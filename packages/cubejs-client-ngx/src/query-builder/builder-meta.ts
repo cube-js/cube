@@ -2,13 +2,13 @@ import {
   Meta,
   TCubeDimension,
   TCubeMeasure,
-  TCubeMember,
+  TCubeSegment,
 } from '@cubejs-client/core';
 
 export class BuilderMeta {
   measures: TCubeMeasure[];
   dimensions: TCubeDimension[];
-  segments: TCubeMember[];
+  segments: TCubeSegment[];
   timeDimensions: TCubeDimension[];
   filters: Array<TCubeMeasure | TCubeDimension>;
 

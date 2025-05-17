@@ -1,7 +1,9 @@
+/* globals describe, expect, test */
+
 import 'jest';
 
-import { defaultOrder } from '../utils';
-import { dayRange, TIME_SERIES } from '../time';
+import { defaultOrder } from '../src/utils';
+import { dayRange, TIME_SERIES } from '../src/time';
 
 describe('utils', () => {
   test('default order', () => {

@@ -198,6 +198,16 @@
           "type": "sum"
         },
         {
+          "name": "totalQuantityPriorMonth",
+          "multiStage": true,
+          "sql": "{totalQuantity}",
+          "type": "number",
+          "timeShift": [{
+            "interval": "1 month",
+            "type": "prior"
+          }]
+        },
+        {
           "name": "avgDiscount",
           "sql": "discount",
           "type": "avg"

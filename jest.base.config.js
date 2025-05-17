@@ -16,6 +16,7 @@ module.exports = {
     '^uuid$': require.resolve('uuid'),
     '^yaml$': require.resolve('yaml'),
   },
+  setupFiles: ['../../jest.setup.js'],
   snapshotFormat: {
     escapeString: true, // To keep existing variant of snapshots
     printBasicPrototype: true

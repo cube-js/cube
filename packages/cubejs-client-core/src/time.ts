@@ -8,7 +8,42 @@ dayjs.extend(quarterOfYear);
 dayjs.extend(duration);
 dayjs.extend(isoWeek);
 
-export const GRANULARITIES = [
+export type SqlInterval = string;
+
+// TODO: Define a better type as unitOfTime.DurationConstructor in moment.js
+export type ParsedInterval = Record<string, number>;
+
+export type Granularity = {
+  interval: SqlInterval;
+  origin?: string;
+  offset?: SqlInterval;
+};
+
+export type DayRange = {
+  by: (value: any) => dayjs.Dayjs[];
+  snapTo: (value: any) => DayRange;
+  start: dayjs.Dayjs;
+  end: dayjs.Dayjs;
+};
+
+export type TimeDimensionPredefinedGranularity =
+  'second'
+  | 'minute'
+  | 'hour'
+  | 'day'
+  | 'week'
+  | 'month'
+  | 'quarter'
+  | 'year';
+
+export type TimeDimensionGranularity = TimeDimensionPredefinedGranularity | string;
+
+export type TGranularityMap = {
+  name: TimeDimensionGranularity | undefined;
+  title: string;
+};
+
+export const GRANULARITIES: TGranularityMap[] = [
   { name: undefined, title: 'w/o grouping' },
   { name: 'second', title: 'Second' },
   { name: 'minute', title: 'Minute' },
@@ -24,9 +59,9 @@ export const DEFAULT_GRANULARITY = 'day';
 
 // When granularity is week, weekStart Value must be 1. However, since the client can change it globally
 // (https://day.js.org/docs/en/i18n/changing-locale) So the function below has been added.
-export const internalDayjs = (...args) => dayjs(...args).locale({ ...en, weekStart: 1 });
+export const internalDayjs = (...args: any[]): dayjs.Dayjs => dayjs(...args).locale({ ...en, weekStart: 1 });
 
-export const TIME_SERIES = {
+export const TIME_SERIES: Record<string, (range: DayRange) => string[]> = {
   day: (range) => range.by('d').map(d => d.format('YYYY-MM-DDT00:00:00.000')),
   month: (range) => range.snapTo('month').by('M').map(d => d.format('YYYY-MM-01T00:00:00.000')),
   year: (range) => range.snapTo('year').by('y').map(d => d.format('YYYY-01-01T00:00:00.000')),
@@ -39,13 +74,13 @@ export const TIME_SERIES = {
   )),
 };
 
-export const isPredefinedGranularity = (granularity) => !!TIME_SERIES[granularity];
+export const isPredefinedGranularity = (granularity: TimeDimensionGranularity): boolean => !!TIME_SERIES[granularity];
 
 export const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 export const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 
-export const dayRange = (from, to) => ({
-  by: (value) => {
+export const dayRange = (from: any, to: any): DayRange => ({
+  by: (value: any) => {
     const results = [];
 
     let start = internalDayjs(from);
@@ -58,7 +93,7 @@ export const dayRange = (from, to) => ({
 
     return results;
   },
-  snapTo: (value) => dayRange(internalDayjs(from).startOf(value), internalDayjs(to).endOf(value)),
+  snapTo: (value: any): DayRange => dayRange(internalDayjs(from).startOf(value), internalDayjs(to).endOf(value)),
   start: internalDayjs(from),
   end: internalDayjs(to),
 });
@@ -73,8 +108,8 @@ export const dayRange = (from, to) => ({
  * It's not referenced to omit imports of moment.js staff.
  * Probably one day we should choose one implementation and reuse it in other places.
  */
-export function parseSqlInterval(intervalStr) {
-  const interval = {};
+export function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
+  const interval: ParsedInterval = {};
   const parts = intervalStr.split(/\s+/);
 
   for (let i = 0; i < parts.length; i += 2) {
@@ -97,7 +132,7 @@ export function parseSqlInterval(intervalStr) {
  * @param interval
  * @returns {dayjs}
  */
-export function addInterval(date, interval) {
+export function addInterval(date: dayjs.Dayjs, interval: ParsedInterval): dayjs.Dayjs {
   let res = date.clone();
 
   Object.entries(interval).forEach(([key, value]) => {
@@ -115,7 +150,7 @@ export function addInterval(date, interval) {
  * @param interval
  * @returns {dayjs}
  */
-export function subtractInterval(date, interval) {
+export function subtractInterval(date: dayjs.Dayjs, interval: ParsedInterval): dayjs.Dayjs {
   let res = date.clone();
 
   Object.entries(interval).forEach(([key, value]) => {
@@ -130,7 +165,7 @@ export function subtractInterval(date, interval) {
  * TODO: It's copy/paste of alignToOrigin from @cubejs-backend/shared [time.ts]
  * but operates with dayjs instead of moment.js
  */
-function alignToOrigin(startDate, interval, origin) {
+function alignToOrigin(startDate: dayjs.Dayjs, interval: ParsedInterval, origin: dayjs.Dayjs): dayjs.Dayjs {
   let alignedDate = startDate.clone();
   let intervalOp;
   let isIntervalNegative = false;
@@ -172,7 +207,7 @@ function alignToOrigin(startDate, interval, origin) {
  * TODO: It's almost a copy/paste of timeSeriesFromCustomInterval from
  * @cubejs-backend/shared [time.ts] but operates with dayjs instead of moment.js
  */
-export const timeSeriesFromCustomInterval = (from, to, granularity) => {
+export const timeSeriesFromCustomInterval = (from: string, to: string, granularity: Granularity): string[] => {
   const intervalParsed = parseSqlInterval(granularity.interval);
   const start = internalDayjs(from);
   const end = internalDayjs(to);
@@ -194,11 +229,8 @@ export const timeSeriesFromCustomInterval = (from, to, granularity) => {
 
 /**
  * Returns the lowest time unit for the interval
- * @protected
- * @param {string} interval
- * @returns {string}
  */
-export const diffTimeUnitForInterval = (interval) => {
+export const diffTimeUnitForInterval = (interval: string): string => {
   if (/second/i.test(interval)) {
     return 'second';
   } else if (/minute/i.test(interval)) {
@@ -220,7 +252,7 @@ export const diffTimeUnitForInterval = (interval) => {
 
 const granularityOrder = ['year', 'quarter', 'month', 'week', 'day', 'hour', 'minute', 'second'];
 
-export const minGranularityForIntervals = (i1, i2) => {
+export const minGranularityForIntervals = (i1: string, i2: string): string => {
   const g1 = diffTimeUnitForInterval(i1);
   const g2 = diffTimeUnitForInterval(i2);
   const g1pos = granularityOrder.indexOf(g1);
@@ -233,7 +265,7 @@ export const minGranularityForIntervals = (i1, i2) => {
   return g2;
 };
 
-export const granularityFor = (dateStr) => {
+export const granularityFor = (dateStr: string): string => {
   const dayjsDate = internalDayjs(dateStr);
   const month = dayjsDate.month();
   const date = dayjsDate.date();

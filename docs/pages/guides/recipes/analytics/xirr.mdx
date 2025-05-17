@@ -1,0 +1,201 @@
+# Calculating the internal rate of return (XIRR)
+
+## Use case
+
+We'd like to calculate the internal rate of return (XIRR) for a schedule of cash
+flows that is not necessarily periodic.
+
+## Data modeling
+
+XIRR calculation is enabled by the `XIRR` function, implemented in [SQL API][ref-sql-api],
+[DAX API][ref-dax-api], and [MDX API][ref-mdx-api]. It means that queries to any of these
+APIs can use the this function.
+
+The `XIRR` function is also implemented in Cube Store, meaning that queries to the SQL API
+or the [REST API][ref-rest-api] that hit pre-aggregations can also use this function.
+That function would need to be used in a measure that makes use of [multi-stage
+calculations][ref-multi-stage-calculations].
+
+<InfoBox>
+
+Consequently, queries that don't hit pre-aggregations would fail with the following error:
+`function xirr(numeric, date) does not exist`.
+
+</InfoBox>
+
+<WarningBox>
+
+Multi-stage calculations are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. Tesseract is currently in preview. Use the
+`CUBEJS_TESSERACT_SQL_PLANNER` environment variable to enable it.
+
+</WarningBox>
+
+Consider the following data model:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: payments
+    sql: >
+      SELECT '2014-01-01'::date AS date, -10000.0 AS payment UNION ALL
+      SELECT '2014-03-01'::date AS date,   2750.0 AS payment UNION ALL
+      SELECT '2014-10-30'::date AS date,   4250.0 AS payment UNION ALL
+      SELECT '2015-02-15'::date AS date,   3250.0 AS payment UNION ALL
+      SELECT '2015-04-01'::date AS date,   2750.0 AS payment
+
+    dimensions:
+      - name: date
+        sql: date
+        type: time
+
+      - name: payment
+        sql: payment
+        type: number
+
+    # Everything below this line is only needed for querying
+    # pre-aggregations in Cube Store
+      - name: date__day
+        sql: "{date.day}"
+        type: time
+
+    measures:
+      - name: total_payments
+        sql: payment
+        type: sum
+
+      - name: xirr
+        multi_stage: true
+        sql: "XIRR({total_payments}, {date__day})"
+        type: number_agg
+        add_group_by:
+          - date__day
+
+    pre_aggregations:
+      - name: main_xirr
+        measures:
+          - total_payments
+        time_dimension: date
+        granularity: day
+```
+
+```javascript
+cube(`payments`, {
+  sql: `
+    SELECT '2014-01-01'::date AS date, -10000.0 AS payment UNION ALL
+    SELECT '2014-03-01'::date AS date,   2750.0 AS payment UNION ALL
+    SELECT '2014-10-30'::date AS date,   4250.0 AS payment UNION ALL
+    SELECT '2015-02-15'::date AS date,   3250.0 AS payment UNION ALL
+    SELECT '2015-04-01'::date AS date,   2750.0 AS payment
+  `,
+
+  dimensions: {
+    date: {
+      sql: `date`,
+      type: `time`
+    },
+
+    payment: {
+      sql: `payment`,
+      type: `number`
+    },
+
+    // Everything below this line is only needed for querying
+    // pre-aggregations in Cube Store
+    date__day: {
+      sql: `${CUBE.date.day}`,
+      type: `time`
+    }
+  },
+
+  measures: {
+    total_payments: {
+      sql: `payment`,
+      type: `sum`
+    },
+
+    xirr: {
+      multi_stage: true,
+      sql: `XIRR(${CUBE.total_payments}, ${CUBE.date__day})`,
+      type: `number_agg`,
+      add_group_by: [
+        date__day
+      ]
+    }
+  },
+
+  pre_aggregations: {
+    main_xirr: {
+      measures: [
+        total_payments
+      ],
+      time_dimension: date,
+      granularity: `day`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+## Query
+
+### DAX API
+
+You can use the `XIRR` function in DAX.
+
+### SQL API
+
+[Query with post-processing][ref-query-wpp] in the SQL API:
+
+```sql
+SELECT                                                                                   
+  XIRR(payment, date) AS xirr
+FROM (
+  SELECT
+    DATE_TRUNC('DAY', date) AS date,
+    SUM(payment) AS payment
+  FROM payments
+  GROUP BY 1
+) AS payments;
+```
+
+[Regular query][ref-query-regular] in the SQL API that hits a pre-aggregation in Cube Store:
+
+```sql
+SELECT MEASURE(xirr) AS xirr
+FROM payments;
+```
+
+### REST API
+
+Regular query in the REST API that hits a pre-aggregation in Cube Store:
+
+```json
+{
+  "measures": [
+    "payments.xirr"
+  ]
+}
+```
+
+## Result
+
+All queries above would yield the same result:
+
+```
+        xirr        
+--------------------
+ 0.3748585976775555
+```
+
+
+[ref-sql-api]: /product/apis-integrations/sql-api/reference#custom-functions
+[ref-dax-api]: /product/apis-integrations/dax-api/reference#financial-functions
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-query-wpp]: /product/apis-integrations/queries#query-with-post-processing
+[ref-query-regular]: /product/apis-integrations/queries#regular-query
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-multi-stage-calculations]: /product/data-modeling/concepts/multi-stage-calculations

@@ -55,8 +55,8 @@ export class CubeClient {
   public load(
     query: Query | Query[],
     options?: LoadMethodOptions
-  ): Observable<ResultSet> {
-    return from(<Promise<ResultSet>>this.apiInstance().load(query, options));
+  ): Observable<ResultSet<any>> {
+    return from(<Promise<ResultSet<any>>>this.apiInstance().load(query, options));
   }
 
   public sql(
@@ -77,7 +77,7 @@ export class CubeClient {
     return from(this.apiInstance().meta(options));
   }
 
-  public watch(query, params = {}): Observable<ResultSet> {
+  public watch(query, params = {}): Observable<ResultSet<any>> {
     return new Observable((observer) =>
       query.subscribe({
         next: async (query) => {

@@ -1,6 +1,7 @@
 **
 !package.json
 !tsconfig.base.json
+!tsconfig.json
 !rollup.config.js
 !yarn.lock
 !lerna.json

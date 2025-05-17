@@ -3,7 +3,7 @@
 import 'jest';
 import dayjs from 'dayjs';
 import ko from 'dayjs/locale/ko';
-import ResultSet from '../ResultSet';
+import ResultSet from '../src/ResultSet';
 
 describe('ResultSet Granularity', () => {
   describe('chartPivot', () => {
@@ -33,7 +33,6 @@ describe('ResultSet Granularity', () => {
               timezone: 'UTC',
               order: [],
               dimensions: [],
-              queryType: 'regularQuery',
             },
             data: [
               {
@@ -98,7 +97,7 @@ describe('ResultSet Granularity', () => {
           queryType: 'regularQuery',
         },
         slowQuery: false,
-      });
+      } as any);
 
       expect(result.chartPivot()).toStrictEqual([
         {
@@ -141,7 +140,6 @@ describe('ResultSet Granularity', () => {
               timezone: 'UTC',
               order: [],
               dimensions: [],
-              queryType: 'regularQuery',
             },
             data: [
               {
@@ -206,7 +204,7 @@ describe('ResultSet Granularity', () => {
           queryType: 'regularQuery',
         },
         slowQuery: false,
-      });
+      } as any);
 
       expect(result.chartPivot()).toStrictEqual([
         {

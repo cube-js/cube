@@ -6,12 +6,21 @@
 
 /* globals describe,test,expect,beforeEach,jest */
 
-import ResultSet from './ResultSet';
-import { CubeApi } from './index';
+import { CubeApi, LoadMethodOptions, LoadResponse } from '../src/index';
+import ResultSet from '../src/ResultSet';
 
-jest.mock('./ResultSet');
+jest.mock('../src/ResultSet');
+
+const MockedResultSet = ResultSet as jest.MockedClass<typeof ResultSet>;
+
+class CubeApiTest extends CubeApi {
+  public loadResponseInternal(response: LoadResponse<any>, options: LoadMethodOptions | null = {}): ResultSet<any> {
+    return super.loadResponseInternal(response, options);
+  }
+}
+
 beforeEach(() => {
-  ResultSet.mockClear();
+  MockedResultSet.mockClear();
 });
 
 const mockData = {
@@ -205,7 +214,7 @@ const mockData = {
 
 describe('CubeApi', () => {
   test('CubeApi#loadResponseInternal should work with the "default" resType for regular query', () => {
-    const api = new CubeApi(undefined, {
+    const api = new CubeApiTest(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -228,7 +237,7 @@ describe('CubeApi', () => {
         )
       }],
     };
-    api.loadResponseInternal(income);
+    api.loadResponseInternal(income as LoadResponse<any>);
     expect(ResultSet).toHaveBeenCalled();
     expect(ResultSet).toHaveBeenCalledTimes(1);
     expect(ResultSet).toHaveBeenCalledWith(outcome, {
@@ -237,7 +246,7 @@ describe('CubeApi', () => {
   });
 
   test('CubeApi#loadResponseInternal should work with the "default" resType for compare date range query', () => {
-    const api = new CubeApi(undefined, {
+    const api = new CubeApiTest(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -274,7 +283,7 @@ describe('CubeApi', () => {
         )
       }],
     };
-    api.loadResponseInternal(income);
+    api.loadResponseInternal(income as LoadResponse<any>);
     expect(ResultSet).toHaveBeenCalled();
     expect(ResultSet).toHaveBeenCalledTimes(1);
     expect(ResultSet).toHaveBeenCalledWith(outcome, {
@@ -283,7 +292,7 @@ describe('CubeApi', () => {
   });
 
   test('CubeApi#loadResponseInternal should work with the "default" resType for blending query', () => {
-    const api = new CubeApi(undefined, {
+    const api = new CubeApiTest(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -320,7 +329,7 @@ describe('CubeApi', () => {
         )
       }],
     };
-    api.loadResponseInternal(income);
+    api.loadResponseInternal(income as LoadResponse<any>);
     expect(ResultSet).toHaveBeenCalled();
     expect(ResultSet).toHaveBeenCalledTimes(1);
     expect(ResultSet).toHaveBeenCalledWith(outcome, {
@@ -329,7 +338,7 @@ describe('CubeApi', () => {
   });
 
   test('CubeApi#loadResponseInternal should work with the "compact" resType for regular query', () => {
-    const api = new CubeApi(undefined, {
+    const api = new CubeApiTest(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -352,7 +361,7 @@ describe('CubeApi', () => {
         )
       }],
     };
-    api.loadResponseInternal(income);
+    api.loadResponseInternal(income as LoadResponse<any>);
     expect(ResultSet).toHaveBeenCalled();
     expect(ResultSet).toHaveBeenCalledTimes(1);
     expect(ResultSet).toHaveBeenCalledWith(outcome, {
@@ -361,7 +370,7 @@ describe('CubeApi', () => {
   });
 
   test('CubeApi#loadResponseInternal should work with the "compact" resType for compare date range query', () => {
-    const api = new CubeApi(undefined, {
+    const api = new CubeApiTest(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -398,7 +407,7 @@ describe('CubeApi', () => {
         )
       }],
     };
-    api.loadResponseInternal(income);
+    api.loadResponseInternal(income as LoadResponse<any>);
     expect(ResultSet).toHaveBeenCalled();
     expect(ResultSet).toHaveBeenCalledTimes(1);
     expect(ResultSet).toHaveBeenCalledWith(outcome, {
@@ -407,7 +416,7 @@ describe('CubeApi', () => {
   });
 
   test('CubeApi#loadResponseInternal should work with the "compact" resType for blending query', () => {
-    const api = new CubeApi(undefined, {
+    const api = new CubeApiTest(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -444,7 +453,7 @@ describe('CubeApi', () => {
         )
       }],
     };
-    api.loadResponseInternal(income);
+    api.loadResponseInternal(income as LoadResponse<any>);
     expect(ResultSet).toHaveBeenCalled();
     expect(ResultSet).toHaveBeenCalledTimes(1);
     expect(ResultSet).toHaveBeenCalledWith(outcome, {
