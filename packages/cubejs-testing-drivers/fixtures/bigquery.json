@@ -18,7 +18,7 @@
 
       "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket",
       "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp",
-      "_CUBEJS_TESSERACT_SQL_PLANNER": "true"
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}"
     },
     "ports" : ["4000", "5656"]
   },

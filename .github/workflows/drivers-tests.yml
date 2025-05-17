@@ -59,7 +59,7 @@ on:
       - 'rust/cubesql/**'
 
 env:
-  CUBEJS_TESSERACT_ORCHESTRATOR: true
+  DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER: false
 
 jobs:
   latest-tag-sha:
