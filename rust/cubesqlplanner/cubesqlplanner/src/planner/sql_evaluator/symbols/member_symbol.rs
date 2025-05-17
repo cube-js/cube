@@ -136,6 +136,22 @@ impl MemberSymbol {
         }
     }
 
+    pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
+        let deps = self.get_dependencies();
+        if deps.is_empty() || !self.is_reference() {
+            return None;
+        }
+        deps.first().cloned()
+    }
+
+    pub fn resolve_reference_chain(self: Rc<Self>) -> Rc<MemberSymbol> {
+        let mut current = self;
+        while let Some(reference) = current.reference_member() {
+            current = reference;
+        }
+        current
+    }
+
     pub fn owned_by_cube(&self) -> bool {
         match self {
             Self::Dimension(d) => d.owned_by_cube(),

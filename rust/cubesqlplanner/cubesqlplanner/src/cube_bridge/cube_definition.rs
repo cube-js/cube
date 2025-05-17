@@ -14,6 +14,8 @@ pub struct CubeDefinitionStatic {
     pub name: String,
     #[serde(rename = "sqlAlias")]
     pub sql_alias: Option<String>,
+    #[serde(rename = "isView")]
+    pub is_view: Option<bool>,
 }
 
 #[nativebridge::native_bridge(CubeDefinitionStatic)]
