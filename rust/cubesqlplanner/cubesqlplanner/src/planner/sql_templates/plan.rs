@@ -359,10 +359,31 @@ impl PlanSqlTemplates {
         start: &str,
         end: &str,
         granularity: &str,
+        granularity_offset: &Option<String>,
+        minimal_time_unit: &str,
     ) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/generated_time_series_select",
-            context! { start => start, end => end, granularity => granularity },
+            context! { start => start, end => end, granularity => granularity, granularity_offset => granularity_offset, minimal_time_unit => minimal_time_unit },
+        )
+    }
+    pub fn generated_time_series_with_cte_range_source(
+        &self,
+        range_source: &str,
+        min_name: &str,
+        max_name: &str,
+        granularity: &str,
+        minimal_time_unit: &str,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "statements/generated_time_series_with_cte_range_source",
+            context! {
+                range_source => range_source,
+                min_name => min_name,
+                max_name => max_name,
+                granularity => granularity,
+                minimal_time_unit => minimal_time_unit,
+            },
         )
     }
 

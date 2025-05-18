@@ -948,13 +948,13 @@ impl PhysicalPlanBuilder {
         select_builder.add_projection_function_expression(
             "MAX",
             args.clone(),
-            "date_to".to_string(),
+            "max_date".to_string(),
         );
 
         select_builder.add_projection_function_expression(
             "MIN",
             args.clone(),
-            "date_from".to_string(),
+            "min_date".to_string(),
         );
         context_factory.set_render_references(render_references);
         let select = Rc::new(select_builder.build(context_factory));

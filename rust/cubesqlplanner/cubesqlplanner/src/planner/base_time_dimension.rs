@@ -176,7 +176,7 @@ impl BaseTimeDimension {
         self.date_range.clone()
     }
 
-    pub fn get_range_for_time_series(&self) -> Result<Option<(String, String)>, CubeError> {
+    pub fn get_range_for_time_series(&self) -> Result<Option<Vec<String>>, CubeError> {
         let res = if let Some(date_range) = &self.date_range {
             if date_range.len() != 2 {
                 return Err(CubeError::user(format!(
@@ -191,12 +191,12 @@ impl BaseTimeDimension {
                         let start = granularity_obj.align_date_to_origin(start)?;
                         let end = QueryDateTime::from_date_str(tz, &date_range[1])?;
 
-                        Some((start.to_string(), end.to_string()))
+                        Some(vec![start.to_string(), end.to_string()])
                     } else {
-                        Some((date_range[0].clone(), date_range[1].clone()))
+                        Some(vec![date_range[0].clone(), date_range[1].clone()])
                     }
                 } else {
-                    Some((date_range[0].clone(), date_range[1].clone()))
+                    Some(vec![date_range[0].clone(), date_range[1].clone()])
                 }
             }
         } else {

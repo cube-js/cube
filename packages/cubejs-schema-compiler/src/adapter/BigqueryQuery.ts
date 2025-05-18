@@ -83,7 +83,7 @@ export class BigqueryQuery extends BaseQuery {
    * @see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#interval_type
    * It returns a tuple of (formatted interval, timeUnit to use in datediff functions)
    */
-  private formatInterval(interval: string): [string, string] {
+  public formatInterval(interval: string): [string, string] {
     const intervalParsed = parseSqlInterval(interval);
     const intKeys = Object.keys(intervalParsed).length;
 
@@ -132,6 +132,10 @@ export class BigqueryQuery extends BaseQuery {
     // No need to support microseconds.
 
     throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
+  }
+
+  public intervalAndMinimalTimeUnit(interval: string): [string, string] {
+    return this.formatInterval(interval);
   }
 
   public newFilter(filter) {
@@ -278,7 +282,25 @@ export class BigqueryQuery extends BaseQuery {
     '{% if not loop.last %} UNION ALL\n{% endif %}' +
     '{% endfor %}' +
     ') AS dates';
-      
+    templates.statements.generated_time_series_select = 'SELECT DATETIME(d) AS date_from,\n' +
+    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    'FROM UNNEST(\n' +
+    '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
+    'GENERATE_DATE_ARRAY(DATE({{ start }}), DATE({{ end }}), INTERVAL {{ granularity }})\n' +
+    '{% else %}' +
+    'GENERATE_TIMESTAMP_ARRAY(TIMESTAMP({{ start }}), TIMESTAMP({{ end }}), INTERVAL {{ granularity }})\n' +
+    '{% endif %}' +
+    ') AS d';
+
+    templates.statements.generated_time_series_with_cte_range_source = 'SELECT DATETIME(d) AS date_from,\n' +
+    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    'FROM {{ range_source }}, UNNEST(\n' +
+    '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
+    'GENERATE_DATE_ARRAY(DATE({{ range_source }}.{{ min_name }}), DATE({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
+    '{% else %}' +
+    'GENERATE_TIMESTAMP_ARRAY(TIMESTAMP({{ range_source }}.{{ min_name }}), TIMESTAMP({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
+    '{% endif %}' +
+    ') AS d';
     return templates;
   }
 }

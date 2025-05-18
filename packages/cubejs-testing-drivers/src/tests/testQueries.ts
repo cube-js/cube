@@ -1525,6 +1525,19 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying BigECommerce: rolling window by 2 day without date range', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountBy2Day',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('querying BigECommerce: rolling window by 2 week', async () => {
       const response = await client.load({
         measures: [
@@ -1548,6 +1561,19 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           dimension: 'BigECommerce.orderDate',
           granularity: 'month',
           dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window by 2 month without date range', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountBy2Month',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
         }],
       });
       expect(response.rawData()).toMatchSnapshot();

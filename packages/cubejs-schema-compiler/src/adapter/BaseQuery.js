@@ -36,6 +36,7 @@ import { BaseTimeDimension } from './BaseTimeDimension';
 import { Granularity } from './Granularity';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
+import { parseSqlInterval } from '@cubejs-backend/shared';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
@@ -760,7 +761,7 @@ export class BaseQuery {
       }
     }
 
-    return this.compilers.compiler.withQuery(
+    const res = this.compilers.compiler.withQuery(
       this,
       () => this.cacheValue(
         ['buildSqlAndParams', exportAnnotatedSql],
@@ -772,6 +773,8 @@ export class BaseQuery {
         { cache: this.queryCache }
       )
     );
+    console.log("!!!! old res ", res[0]);
+    return res;
   }
 
   buildSqlAndParamsRust(exportAnnotatedSql) {
@@ -816,6 +819,7 @@ export class BaseQuery {
     if (preAggregation) {
       this.preAggregations.preAggregationForQuery = preAggregation;
     }
+    console.log("!!!! new res ", query);
     return [query, paramsArray];
   }
 
@@ -1888,6 +1892,64 @@ export class BaseQuery {
 
   dateTimeCast(value) {
     return `${value}::timestamp`;
+  }
+
+  /**
+   * Converts the input interval (e.g. "2 years", "3 months", "5 days")
+   * into a format compatible with the target SQL dialect.
+   * Also returns the minimal time unit required (e.g. for use in DATEDIFF).
+   *
+   * Returns a tuple: (formatted interval, minimal time unit)
+   */
+  intervalAndMinimalTimeUnit(interval) {
+    const intervalParsed = parseSqlInterval(interval);
+    const intKeys = Object.keys(intervalParsed).length;
+
+    if (intervalParsed.year && intKeys === 1) {
+      return [interval, 'year'];
+    } else if (intervalParsed.year && intervalParsed.month && intKeys === 2) {
+      return [interval, 'month'];
+    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intKeys === 3) {
+      return [interval, 'day'];
+    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intervalParsed.hour && intKeys === 4) {
+      return [interval, 'hour'];
+    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 5) {
+      return [interval, 'minute'];
+    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 6) {
+      return [interval, 'second'];
+    } else if (intervalParsed.quarter && intKeys === 1) {
+      return [interval, 'quarter'];
+    } else if (intervalParsed.month && intKeys === 1) {
+      return [interval, 'month'];
+    } else if (intervalParsed.month && intervalParsed.day && intKeys === 2) {
+      return [interval, 'day'];
+    } else if (intervalParsed.month && intervalParsed.day && intervalParsed.hour && intKeys === 3) {
+      return [interval, 'hour'];
+    } else if (intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 4) {
+      return [interval, 'minute'];
+    } else if (intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 5) {
+      return [interval, 'second'];
+    } else if (intervalParsed.week && intKeys === 1) {
+      return [interval, 'week'];
+    } else if (intervalParsed.day && intKeys === 1) {
+      return [interval, 'day'];
+    } else if (intervalParsed.day && intervalParsed.hour && intKeys === 2) {
+      return [interval, 'hour'];
+    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 3) {
+      return [interval, 'minute'];
+    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 4) {
+      return [interval, 'second'];
+    } else if (intervalParsed.hour && intervalParsed.minute && intKeys === 2) {
+      return [interval, 'minute'];
+    } else if (intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 3) {
+      return [interval, 'second'];
+    } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
+      return [interval, 'second'];
+    }
+
+    // No need to support microseconds.
+
+    throw new Error(`Cannot transform interval expression "${interval}"`);
   }
 
   commonQuery() {
