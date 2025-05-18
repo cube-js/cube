@@ -4,7 +4,7 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::str::FromStr;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Granularity {
     granularity: String,
     granularity_interval: String,

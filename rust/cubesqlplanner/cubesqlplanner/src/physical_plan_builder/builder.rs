@@ -980,7 +980,7 @@ impl PhysicalPlanBuilder {
 
         let templates = self.query_tools.plan_sql_templates();
 
-        let ts_date_range = if templates.supports_generated_time_series() {
+        let ts_date_range = if templates.supports_generated_time_series() && granularity_obj.is_predefined_granularity() {
             if let Some(date_range) = time_dimension_symbol
                 .get_range_for_time_series(date_range, self.query_tools.timezone())?
             {
@@ -998,8 +998,8 @@ impl PhysicalPlanBuilder {
             if let Some(date_range) = &time_series.date_range {
                 TimeSeriesDateRange::Filter(date_range[0].clone(), date_range[1].clone())
             } else {
-                return Err(CubeError::internal(
-                    "Date range is required for time series without date range".to_string(),
+                return Err(CubeError::user(
+                    "Date range is required for time series".to_string(),
                 ));
             }
         };

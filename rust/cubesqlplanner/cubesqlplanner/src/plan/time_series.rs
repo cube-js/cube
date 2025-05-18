@@ -44,7 +44,7 @@ impl TimeSeries {
     }
 
     pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
-        if templates.supports_generated_time_series() {
+        if templates.supports_generated_time_series() && self.granularity.is_predefined_granularity() {
             let interval_description = templates.base_tools().interval_and_minimal_time_unit(self.granularity.granularity_interval().clone())?;
             if interval_description.len() != 2 {
                 return Err(CubeError::internal("Interval description must have 2 elements".to_string()));
@@ -56,7 +56,6 @@ impl TimeSeries {
                     let from_date = format!("'{}'", from_date);
                     let to_date = format!("'{}'", to_date);
 
-                    println!("!!!! offset {:?}", self.granularity.granularity_offset());
                     templates.generated_time_series_select(
                         &from_date,
                         &to_date,
@@ -72,7 +71,7 @@ impl TimeSeries {
                         &cte_name,
                         &min_date_name,
                         &max_date_name,
-                        &self.granularity.granularity_interval(),
+                        &interval,
                         &minimal_time_unit,
                     )
                 }

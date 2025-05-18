@@ -1579,6 +1579,33 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying BigECommerce: rolling window YTD', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountYTD',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window YTD without date range', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountYTD',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     if (includeHLLSuite) {
       execute('querying BigECommerce: rolling count_distinct_approx window by 2 day', async () => {
         const response = await client.load({

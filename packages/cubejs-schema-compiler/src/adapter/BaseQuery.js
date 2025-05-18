@@ -761,7 +761,7 @@ export class BaseQuery {
       }
     }
 
-    const res = this.compilers.compiler.withQuery(
+    return this.compilers.compiler.withQuery(
       this,
       () => this.cacheValue(
         ['buildSqlAndParams', exportAnnotatedSql],
@@ -773,8 +773,6 @@ export class BaseQuery {
         { cache: this.queryCache }
       )
     );
-    console.log("!!!! old res ", res[0]);
-    return res;
   }
 
   buildSqlAndParamsRust(exportAnnotatedSql) {
@@ -819,7 +817,6 @@ export class BaseQuery {
     if (preAggregation) {
       this.preAggregations.preAggregationForQuery = preAggregation;
     }
-    console.log("!!!! new res ", query);
     return [query, paramsArray];
   }
 

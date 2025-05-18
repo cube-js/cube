@@ -422,6 +422,14 @@
           }
         },
         {
+          "name": "rollingCountYTD",
+          "type": "count",
+          "rollingWindow": {
+            "type": "to_date",
+            "granularity": "year"
+          }
+        },
+        {
           "name": "rollingCountApproxBy2Day",
           "type": "count_distinct_approx",
           "sql": "order_id",
