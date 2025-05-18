@@ -316,6 +316,10 @@ describe('SQL Generation', () => {
             }
           }
         },
+        created_month: {
+          type: 'time',
+          sql: \`\${created_at.month}\`
+        },
         updated_at: {
           type: 'time',
           sql: 'updated_at'
@@ -1335,6 +1339,33 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         { visitors__created_at_month: '2016-11-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
         { visitors__created_at_month: '2016-12-01T00:00:00.000Z', visitors__count_rolling_three_month: null },
         { visitors__created_at_month: '2017-01-01T00:00:00.000Z', visitors__count_rolling_three_month: '5' },
+      ]);
+    });
+  } else {
+    it.skip('rolling count without date range', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('rolling count proxy time dimension', async () => {
+      await runQueryTest({
+        measures: [
+          'visitors.countRollingThreeMonth'
+        ],
+        dimensions: [
+          'visitors.created_month'
+        ],
+        order: [{
+          id: 'visitors.created_month'
+        }],
+        timezone: 'America/Los_Angeles'
+      }, [
+        { visitors__created_month: '2016-09-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_month: '2016-10-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_month: '2016-11-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_month: '2016-12-01T00:00:00.000Z', visitors__count_rolling_three_month: null },
+        { visitors__created_month: '2017-01-01T00:00:00.000Z', visitors__count_rolling_three_month: '5' },
       ]);
     });
   } else {

@@ -68,6 +68,10 @@ impl TimeDimensionSymbol {
         self.base_symbol.owned_by_cube()
     }
 
+    pub fn date_range_vec(&self) -> Option<Vec<String>> {
+        self.date_range.clone().map(|(from, to)| vec![from, to])
+    }
+
     pub fn get_dependencies_as_time_dimensions(&self) -> Vec<Rc<MemberSymbol>> {
         self.get_dependencies()
             .into_iter()

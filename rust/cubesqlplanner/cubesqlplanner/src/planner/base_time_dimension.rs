@@ -63,6 +63,36 @@ impl BaseMember for BaseTimeDimension {
 }
 
 impl BaseTimeDimension {
+    pub fn try_new_from_td_symbol(
+        query_tools: Rc<QueryTools>,
+        td_symbol: &TimeDimensionSymbol,
+    ) -> Result<Rc<Self>, CubeError> {
+        let dimension =
+            BaseDimension::try_new_required(td_symbol.base_symbol().clone(), query_tools.clone())?;
+        let granularity = td_symbol.granularity().clone();
+        let granularity_obj = td_symbol.granularity_obj().clone();
+        let date_range = td_symbol.date_range_vec();
+        let alias_suffix = td_symbol.alias_suffix();
+        let default_alias = BaseMemberHelper::default_alias(
+            &dimension.cube_name(),
+            &dimension.name(),
+            &Some(alias_suffix.clone()),
+            query_tools.clone(),
+        )?;
+        let member_evaluator = Rc::new(MemberSymbol::TimeDimension(td_symbol.clone()));
+
+        Ok(Rc::new(Self {
+            dimension,
+            query_tools,
+            granularity,
+            granularity_obj,
+            date_range,
+            alias_suffix,
+            default_alias,
+            member_evaluator,
+        }))
+    }
+
     pub fn try_new_required(
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<MemberSymbol>,
