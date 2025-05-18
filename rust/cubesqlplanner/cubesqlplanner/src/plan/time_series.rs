@@ -44,10 +44,16 @@ impl TimeSeries {
     }
 
     pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
-        if templates.supports_generated_time_series() && self.granularity.is_predefined_granularity() {
-            let interval_description = templates.base_tools().interval_and_minimal_time_unit(self.granularity.granularity_interval().clone())?;
+        if templates.supports_generated_time_series()
+            && self.granularity.is_predefined_granularity()
+        {
+            let interval_description = templates
+                .base_tools()
+                .interval_and_minimal_time_unit(self.granularity.granularity_interval().clone())?;
             if interval_description.len() != 2 {
-                return Err(CubeError::internal("Interval description must have 2 elements".to_string()));
+                return Err(CubeError::internal(
+                    "Interval description must have 2 elements".to_string(),
+                ));
             }
             let interval = interval_description[0].clone();
             let minimal_time_unit = interval_description[1].clone();

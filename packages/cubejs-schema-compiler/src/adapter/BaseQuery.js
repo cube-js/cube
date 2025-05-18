@@ -21,8 +21,8 @@ import {
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
-  timeSeriesFromCustomInterval
-} from '@cubejs-backend/shared';
+  timeSeriesFromCustomInterval,
+  parseSqlInterval } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from '../compiler/CubeSymbols';
 import { UserError } from '../compiler/UserError';
@@ -36,7 +36,6 @@ import { BaseTimeDimension } from './BaseTimeDimension';
 import { Granularity } from './Granularity';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
-import { parseSqlInterval } from '@cubejs-backend/shared';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
