@@ -39,14 +39,15 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
                 if let Some(reference) = self.references.get(&node.full_name()) {
-                    let table_ref = reference.source().as_ref().map_or_else(
-                        || format!(""),
-                        |table_name| format!("{}.", query_tools.escape_column_name(table_name)),
-                    );
+                    let table_ref = if let Some(table_name) = reference.source() {
+                        format!("{}.", templates.quote_identifier(table_name)?)
+                    } else {
+                        format!("")
+                    };
                     let pre_aggregation_measure = format!(
                         "{}{}",
                         table_ref,
-                        query_tools.escape_column_name(&reference.name())
+                        templates.quote_identifier(&reference.name())?
                     );
                     if ev.measure_type() == "count" || ev.measure_type() == "sum" {
                         format!("sum({})", pre_aggregation_measure)

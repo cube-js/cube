@@ -1,4 +1,5 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
 use convert_case::{Boundary, Case, Casing};
@@ -9,6 +10,7 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
+    base_tools: Rc<dyn BaseTools>,
 }
 pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
     name: "LowerUpper",
@@ -24,8 +26,8 @@ pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
 };
 
 impl PlanSqlTemplates {
-    pub fn new(render: Rc<dyn SqlTemplatesRender>) -> Self {
-        Self { render }
+    pub fn new(render: Rc<dyn SqlTemplatesRender>, base_tools: Rc<dyn BaseTools>) -> Self {
+        Self { render, base_tools }
     }
 
     pub fn alias_name(name: &str) -> String {
@@ -41,6 +43,10 @@ impl PlanSqlTemplates {
         res
     }
 
+    pub fn base_tools(&self) -> &Rc<dyn BaseTools> {
+        &self.base_tools
+    }
+
     pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
         let suffix = if let Some(suffix) = suffix {
             format!("_{}", suffix)
@@ -52,27 +58,6 @@ impl PlanSqlTemplates {
             Self::alias_name(cube_name),
             Self::alias_name(name),
             suffix
-        )
-    }
-
-    //FIXME duplicated with filter templates
-    pub fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
-        self.render.render_template(
-            &"expressions/add_interval",
-            context! {
-                date => date,
-                interval => interval
-            },
-        )
-    }
-
-    pub fn sub_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
-        self.render.render_template(
-            &"expressions/sub_interval",
-            context! {
-                date => date,
-                interval => interval
-            },
         )
     }
 

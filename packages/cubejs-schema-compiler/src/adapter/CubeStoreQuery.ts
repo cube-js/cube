@@ -68,6 +68,11 @@ export class CubeStoreQuery extends BaseQuery {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
+  // Temporary workaround to avoid checking for multistage in CubeStoreQuery, since that could lead to errors when HLL functions are present in the query.
+  public neverUseSqlPlannerPreaggregation() {
+    return true;
+  }
+
   /**
    * Returns sql for source expression floored to timestamps aligned with
    * intervals relative to origin timestamp point.

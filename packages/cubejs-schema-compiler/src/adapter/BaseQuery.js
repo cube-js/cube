@@ -330,7 +330,7 @@ export class BaseQuery {
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
     this.canUseNativeSqlPlannerPreAggregation = false;
-    if (this.useNativeSqlPlanner) {
+    if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
       const hasMultiStageMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true }).multiStageMembers.length > 0;
       this.canUseNativeSqlPlannerPreAggregation = hasMultiStageMeasures;
     }
@@ -346,6 +346,11 @@ export class BaseQuery {
     this.order = this.options.order ?? this.defaultOrder();
 
     this.initUngrouped();
+  }
+
+  // Temporary workaround to avoid checking for multistage in CubeStoreQuery, since that could lead to errors when HLL functions are present in the query.
+  neverUseSqlPlannerPreaggregation() {
+    return false;
   }
 
   prebuildJoin() {
@@ -774,7 +779,6 @@ export class BaseQuery {
       R.map((hash) => ((!hash || !hash.id) ? null : hash)),
       R.reject(R.isNil),
     )(this.options.order);
-
     const queryParams = {
       measures: this.options.measures,
       dimensions: this.options.dimensions,
@@ -791,7 +795,8 @@ export class BaseQuery {
       baseTools: this,
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: exportAnnotatedSql === true,
-      preAggregationQuery: this.options.preAggregationQuery
+      preAggregationQuery: this.options.preAggregationQuery,
+      totalQuery: this.options.totalQuery,
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
@@ -870,12 +875,12 @@ export class BaseQuery {
 
   // FIXME helper for native generator, maybe should be moved entirely to rust
   generateTimeSeries(granularity, dateRange) {
-    return timeSeriesBase(granularity, dateRange);
+    return timeSeriesBase(granularity, dateRange, { timestampPrecision: this.timestampPrecision() });
   }
 
   // FIXME helper for native generator, maybe should be moved entirely to rust
   generateCustomTimeSeries(granularityInterval, dateRange, origin) {
-    return timeSeriesFromCustomInterval(granularityInterval, dateRange, moment(origin), { timestampPrecision: 3 });
+    return timeSeriesFromCustomInterval(granularityInterval, dateRange, moment(origin), { timestampPrecision: this.timestampPrecision() });
   }
 
   getPreAggregationByName(cube, preAggregationName) {
@@ -3868,6 +3873,9 @@ export class BaseQuery {
         ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}',
         like_escape: '{{ like_expr }} ESCAPE {{ escape_char }}',
         concat_strings: '{{ strings | join(\' || \' ) }}',
+      },
+      tesseract: {
+        ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}', // May require different overloads in Tesseract than the ilike from expressions used in SQLAPI.
       },
       filters: {
         equals: '{{ column }} = {{ value }}{{ is_null_check }}',
