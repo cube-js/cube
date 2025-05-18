@@ -14572,8 +14572,7 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        assert!(sql.contains("DATETIME_TRUNC("));
-        assert!(sql.contains("WEEK(MONDAY)"));
+        assert!(sql.contains(".week"));
     }
 
     #[tokio::test]

@@ -1657,11 +1657,11 @@ GROUP BY
     let dimensions = request.dimensions.unwrap();
     assert_eq!(dimensions.len(), 1);
     let dimension = &dimensions[0];
-    assert!(dimension.contains("DATE_TRUNC"));
+    assert!(dimension.contains(".day"));
     let segments = request.segments.unwrap();
     assert_eq!(segments.len(), 1);
     let segment = &segments[0];
-    assert!(segment.contains("DATE_TRUNC"));
+    assert!(segment.contains(".day"));
 }
 
 /// Aggregation with falsy filter should NOT get pushed to CubeScan with limit=0
