@@ -11,21 +11,25 @@ pub struct MemberExpressionSymbol {
     expression: Rc<SqlCall>,
     #[allow(dead_code)]
     definition: Option<String>,
+    is_reference: bool,
 }
 
 impl MemberExpressionSymbol {
-    pub fn new(
+    pub fn try_new(
         cube_name: String,
         name: String,
         expression: Rc<SqlCall>,
         definition: Option<String>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, CubeError> {
+
+        let is_reference = expression.is_direct_reference()?;
+        Ok(Self {
             cube_name,
             name,
             expression,
             definition,
-        }
+            is_reference
+        })
     }
 
     pub fn evaluate_sql(
@@ -50,7 +54,18 @@ impl MemberExpressionSymbol {
     }
 
     pub fn is_reference(&self) -> bool {
-        false
+        self.is_reference
+    }
+
+    pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
+        if !self.is_reference() {
+            return None;
+        }
+        let deps = self.get_dependencies();
+        if deps.is_empty() {
+            return None;
+        }
+        deps.first().cloned()
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {

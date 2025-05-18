@@ -1010,9 +1010,9 @@ export class CubeSymbols {
           return true;
         }
         if (cube[propertyName]) {
-          depsResolveFn(propertyName, parentIndex);
+          const index = depsResolveFn(propertyName, parentIndex);
           if (cube[propertyName].type === 'time') {
-            return this.timeDimDependenciesProxy(parentIndex);
+            return this.timeDimDependenciesProxy(index);
           }
 
           return '';

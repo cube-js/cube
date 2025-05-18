@@ -135,12 +135,12 @@ impl BaseMeasure {
         member_expression_definition: Option<String>,
         query_tools: Rc<QueryTools>,
     ) -> Result<Rc<Self>, CubeError> {
-        let member_expression_symbol = MemberExpressionSymbol::new(
+        let member_expression_symbol = MemberExpressionSymbol::try_new(
             cube_name.clone(),
             name.clone(),
             expression,
             member_expression_definition.clone(),
-        );
+        )?;
         let full_name = member_expression_symbol.full_name();
         let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
         let default_alias = PlanSqlTemplates::alias_name(&name);

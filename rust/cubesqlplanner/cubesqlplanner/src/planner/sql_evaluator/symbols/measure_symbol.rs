@@ -235,6 +235,17 @@ impl MeasureSymbol {
         self.is_reference
     }
 
+    pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
+        if !self.is_reference() {
+            return None;
+        }
+        let deps = self.get_dependencies();
+        if deps.is_empty() {
+            return None;
+        }
+        deps.first().cloned()
+    }
+
     pub fn measure_type(&self) -> &String {
         &self.definition.static_data().measure_type
     }

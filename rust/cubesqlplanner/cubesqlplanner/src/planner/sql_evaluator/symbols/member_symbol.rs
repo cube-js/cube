@@ -137,11 +137,14 @@ impl MemberSymbol {
     }
 
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
-        let deps = self.get_dependencies();
-        if deps.is_empty() || !self.is_reference() {
-            return None;
+        match self {
+            Self::Dimension(d) => d.reference_member(),
+            Self::TimeDimension(d) => d.reference_member(),
+            Self::Measure(m) => m.reference_member(),
+            Self::CubeName(_) => None,
+            Self::CubeTable(_) => None,
+            Self::MemberExpression(e) => e.reference_member(),
         }
-        deps.first().cloned()
     }
 
     pub fn resolve_reference_chain(self: Rc<Self>) -> Rc<MemberSymbol> {

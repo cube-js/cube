@@ -110,6 +110,20 @@ impl TimeDimensionSymbol {
         self.base_symbol.is_reference()
     }
 
+    pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
+        if let Some(base_symbol) = self.base_symbol.clone().reference_member() {
+            let new_time_dim = Self::new(
+                base_symbol,
+                self.granularity.clone(),
+                self.granularity_obj.clone(),
+                self.date_range.clone(),
+            );
+            Some(Rc::new(MemberSymbol::TimeDimension(new_time_dim)))
+        } else {
+            None
+        }
+    }
+
     pub fn name(&self) -> String {
         self.base_symbol.name()
     }
