@@ -1,7 +1,7 @@
 use super::{Schema, SchemaColumn};
 use crate::planner::{
     query_tools::QueryTools,
-    sql_templates::{PlanSqlTemplates, TemplateProjectionColumn},
+    sql_templates::PlanSqlTemplates,
     Granularity,
 };
 use cubenativeutils::CubeError;
