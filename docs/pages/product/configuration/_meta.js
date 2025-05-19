@@ -4,6 +4,6 @@ module.exports = {
   "multiple-data-sources": "Multiple data sources",
   "concurrency": "Concurrency",
   "multitenancy": "Multitenancy",
-  "recipes": "Recipes",
-  "reference": "Reference"
+  "reference": "Reference",
+  "recipes": "Recipes"
 }

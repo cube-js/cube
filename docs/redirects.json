@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/data-store-cost-saving-guide",
+    "destination": "/product/configuration/recipes/data-store-cost-saving-guide",
+    "permanent": true
+  },
+  {
     "source": "/guides/style-guide",
     "destination": "/product/data-modeling/recipes/style-guide",
     "permanent": true
