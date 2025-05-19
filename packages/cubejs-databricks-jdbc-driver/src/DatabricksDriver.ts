@@ -721,10 +721,6 @@ export class DatabricksDriver extends JDBCDriver {
     // s3://real-bucket-name
     // wasbs://real-container-name@account.blob.core.windows.net
     // The extractors in BaseDriver expect just clean bucket name
-    const url = new URL(this.config.exportBucket || '');
-    const prefix = url.pathname.slice(1);
-    const delimiter = (prefix && !prefix.endsWith('/')) ? '/' : '';
-    const objectSearchPrefix = `${prefix}${delimiter}${tableName}`;
 
     if (this.config.bucketType === 'azure') {
       const {
@@ -733,14 +729,22 @@ export class DatabricksDriver extends JDBCDriver {
         azureTenantId: tenantId,
         azureClientSecret: clientSecret
       } = this.config;
+
+      const { bucketName, path, username } = this.parseBucketUrl(this.config.exportBucket);
+      const azureBucketPath = `${bucketName}/${username}`;
+      const exportPrefix = path ? `${path}/${tableName}` : tableName;
+
       return this.extractFilesFromAzure(
         { azureKey, clientId, tenantId, clientSecret },
         // Databricks uses different bucket address form, so we need to transform it
         // to the one understandable by extractFilesFromAzure implementation
-        `${url.host}/${url.username}`,
-        objectSearchPrefix,
+        azureBucketPath,
+        exportPrefix,
       );
     } else if (this.config.bucketType === 's3') {
+      const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket);
+      const exportPrefix = path ? `${path}/${tableName}` : tableName;
+
       return this.extractUnloadedFilesFromS3(
         {
           credentials: {
@@ -749,14 +753,17 @@ export class DatabricksDriver extends JDBCDriver {
           },
           region: this.config.awsRegion || '',
         },
-        url.host,
-        objectSearchPrefix,
+        bucketName,
+        exportPrefix,
       );
     } else if (this.config.bucketType === 'gcs') {
+      const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket);
+      const exportPrefix = path ? `${path}/${tableName}` : tableName;
+
       return this.extractFilesFromGCS(
         { credentials: this.config.gcsCredentials },
-        url.host,
-        objectSearchPrefix,
+        bucketName,
+        exportPrefix,
       );
     } else {
       throw new Error(`Unsupported export bucket type: ${
