@@ -1,5 +1,4 @@
 module.exports = {
-  "multitenancy": "Multitenancy",
   "data-sources": "Data sources",
   "queries": "Queries",
   "query-acceleration": "Query acceleration",

@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/multitenancy/custom-data-model-per-tenant",
+    "destination": "/product/configuration/recipes/custom-data-model-per-tenant",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/code-reusability/environment-variables",
     "destination": "/product/data-modeling/recipes/environment-variables",
     "permanent": true
