@@ -203,7 +203,7 @@ export abstract class BaseDriver implements DriverInterface {
   /**
    * Class constructor.
    */
-  protected constructor(_options: {
+  public constructor(_options: {
     /**
      * Time to wait for a response from a connection after validation
      * request before determining it as not valid. Default - 10000 ms.
