@@ -19,6 +19,5 @@ module.exports = {
   "budgets": "Budgets",
   "preferences": "Preferences",
   "cli": "CLI",
-  "ai-assistant": "AI Assistant",
   "semantic-catalog": "Semantic Catalog",
 }
