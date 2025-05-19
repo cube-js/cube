@@ -1,4 +1,5 @@
 module.exports = {
+  "designing-metrics": "Designing metrics",
   "percentiles": "Averages and percentiles",
   "nested-aggregates": "Nested aggregates",
   "filtered-aggregates": "Filtered aggregates",

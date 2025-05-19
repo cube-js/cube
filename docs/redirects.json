@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/designing-metrics",
+    "destination": "/product/data-modeling/recipes/designing-metrics",
+    "permanent": true
+  },
+  {
     "source": "/guides/dbt",
     "destination": "/product/data-modeling/recipes/dbt",
     "permanent": true
