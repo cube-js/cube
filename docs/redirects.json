@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/access-control/column-based-access",
+    "destination": "/product/auth/recipes/column-based-access",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/access-control/enforcing-mandatory-filters",
     "destination": "/product/auth/recipes/enforcing-mandatory-filters",
     "permanent": true
