@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/access-control/using-different-schemas-for-tenants",
+    "destination": "/product/configuration/recipes/using-different-schemas-for-tenants",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/access-control/controlling-access-to-cubes-and-views",
     "destination": "/product/auth/recipes/controlling-access-to-cubes-and-views",
     "permanent": true
@@ -1376,7 +1381,7 @@
   },
   {
     "source": "/recipes/using-different-schemas-for-tenants",
-    "destination": "/guides/recipes/access-control/using-different-schemas-for-tenants",
+    "destination": "/product/configuration/recipes/using-different-schemas-for-tenants",
     "permanent": true
   },
   {

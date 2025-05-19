@@ -1,5 +1,4 @@
 module.exports = {
-  "access-control": "Access control",
   "auth": "Authentication & Authorization",
   "data-modeling": "Data modeling",
   "code-reusability": "Code reusability",
