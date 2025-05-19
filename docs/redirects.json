@@ -1,5 +1,20 @@
 [
   {
+    "source": "/guides/recipes/queries/getting-unique-values-for-a-field",
+    "destination": "/product/apis-integrations/recipes/getting-unique-values-for-a-field",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/queries/sorting",
+    "destination": "/product/apis-integrations/recipes/sorting",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/queries/pagination",
+    "destination": "/product/apis-integrations/recipes/pagination",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/data-sources/multiple-sources-same-schema",
     "destination": "/product/configuration/recipes/multiple-sources-same-schema",
     "permanent": true
