@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/upgrading-cube/migrating-from-express-to-docker",
+    "destination": "https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#how-to-migrate-to-cube-store",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/data-exploration/drilldowns",
     "destination": "/product/apis-integrations/recipes/drilldowns",
     "permanent": true
