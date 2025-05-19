@@ -1,5 +1,35 @@
 [
   {
+    "source": "/guides/recipes/query-acceleration/non-additivity",
+    "destination": "/product/caching/recipes/non-additivity",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/incrementally-building-pre-aggregations-for-a-date-range",
+    "destination": "/product/caching/recipes/incrementally-building-pre-aggregations-for-a-date-range",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/disabling-pre-aggregations",
+    "destination": "/product/caching/recipes/disabling-pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/using-originalsql-and-rollups-effectively",
+    "destination": "/product/caching/recipes/using-originalsql-and-rollups-effectively",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/refreshing-select-partitions",
+    "destination": "/product/caching/recipes/refreshing-select-partitions",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/query-acceleration/joining-multiple-data-sources",
+    "destination": "/product/caching/recipes/joining-multiple-data-sources",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/queries/getting-unique-values-for-a-field",
     "destination": "/product/apis-integrations/recipes/getting-unique-values-for-a-field",
     "permanent": true
