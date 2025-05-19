@@ -16,6 +16,5 @@ module.exports = {
   "event-analytics": "Event analytics",
   "funnels": "Funnel analysis",
   "cohort-retention": "Retention analysis",
-  "xirr": "Rate of return",
-  "environment-variables": "Environment variables"
+  "xirr": "Rate of return"
 }
