@@ -463,14 +463,18 @@ impl PhysicalPlanBuilder {
                 .collect_vec();
             let on = JoinCondition::new_dimension_join(conditions, true);
             let next_alias = format!("q_{}", i);
+
+            join_builder.inner_join_source(join.clone(), next_alias, on);
+
+            /*      TODO: Full join fails even in BigQuery, where it’s theoretically supported. Disabled for now — needs investigation.
             if full_key_aggregate.use_full_join_and_coalesce
-                && self.plan_sql_templates.supports_full_join()
-            {
-                join_builder.full_join_source(join.clone(), next_alias, on);
-            } else {
-                // TODO in case of full join is not supported there should be correct blending query that keeps NULL values
-                join_builder.inner_join_source(join.clone(), next_alias, on);
-            }
+                      && self.plan_sql_templates.supports_full_join()
+                  {
+                      join_builder.full_join_source(join.clone(), next_alias, on);
+                  } else {
+                      // TODO in case of full join is not supported there should be correct blending query that keeps NULL values
+                      join_builder.inner_join_source(join.clone(), next_alias, on);
+                  } */
         }
 
         let result = From::new_from_join(join_builder.build());

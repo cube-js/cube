@@ -51,6 +51,7 @@ pub trait BaseTools {
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
     fn subtract_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
     fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
+    fn add_timestamp_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
     fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError>;
     fn interval_and_minimal_time_unit(&self, interval: String) -> Result<Vec<String>, CubeError>;
     //===== TODO Move to templates
