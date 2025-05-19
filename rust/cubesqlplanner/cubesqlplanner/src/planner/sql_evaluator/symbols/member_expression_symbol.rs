@@ -21,14 +21,13 @@ impl MemberExpressionSymbol {
         expression: Rc<SqlCall>,
         definition: Option<String>,
     ) -> Result<Self, CubeError> {
-
         let is_reference = expression.is_direct_reference()?;
         Ok(Self {
             cube_name,
             name,
             expression,
             definition,
-            is_reference
+            is_reference,
         })
     }
 
