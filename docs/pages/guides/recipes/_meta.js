@@ -1,5 +1,4 @@
 module.exports = {
-  "auth": "Authentication & Authorization",
   "data-modeling": "Data modeling",
   "code-reusability": "Code reusability",
   "multitenancy": "Multitenancy",

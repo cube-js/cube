@@ -1,5 +1,15 @@
 [
   {
+    "source": "/guides/recipes/auth/aws-cognito",
+    "destination": "/product/auth/recipes/aws-cognito",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/auth/auth0-guide",
+    "destination": "/product/auth/recipes/auth0-guide",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/auth/sql-api-ldap",
     "destination": "/product/auth/recipes/sql-api-ldap",
     "permanent": true
@@ -1281,22 +1291,22 @@
   },
   {
     "source": "/recipes/authn-with-auth0",
-    "destination": "/guides/recipes/auth/auth0-guide",
+    "destination": "/product/auth/recipes/auth0-guide",
     "permanent": true
   },
   {
     "source": "/security/jwt/auth0",
-    "destination": "/guides/recipes/auth/auth0-guide",
+    "destination": "/product/auth/recipes/auth0-guide",
     "permanent": true
   },
   {
     "source": "/recipes/authn-with-aws-cognito",
-    "destination": "/guides/recipes/auth/aws-cognito",
+    "destination": "/product/auth/recipes/aws-cognito",
     "permanent": true
   },
   {
     "source": "/security/jwt/aws-cognito",
-    "destination": "/guides/recipes/auth/aws-cognito",
+    "destination": "/product/auth/recipes/aws-cognito",
     "permanent": true
   },
   {
