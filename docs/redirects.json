@@ -201,7 +201,7 @@
   },
   {
     "source": "/guides/recipes/access-control/using-different-schemas-for-tenants",
-    "destination": "/product/configuration/recipes/using-different-schemas-for-tenants",
+    "destination": "/product/configuration/recipes/custom-data-model-per-tenant#loading-from-disk",
     "permanent": true
   },
   {
@@ -1581,7 +1581,7 @@
   },
   {
     "source": "/recipes/using-different-schemas-for-tenants",
-    "destination": "/product/configuration/recipes/using-different-schemas-for-tenants",
+    "destination": "/product/configuration/recipes/custom-data-model-per-tenant#loading-from-disk",
     "permanent": true
   },
   {

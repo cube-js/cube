@@ -1,12 +1,18 @@
-# Using SSL Connections to a data source
+# Using SSL connections to a data source
+
+## Use case
 
 Cube supports SSL-encrypted connections to various data sources. Please check
 the documentation for a particular [data source][ref-config-db] for specific
 instructions.
 
-## Cube Core
+## Configuration
 
-To enable it, set the `CUBEJS_DB_SSL` environment variable to `true`. Cube can
+Generally, you can enable SSL via the `CUBEJS_DB_SSL` environment variable.
+
+### Cube Core
+
+To enable SSL, set the `CUBEJS_DB_SSL` environment variable to `true`. Cube can
 also be configured to use custom connection settings. For example, to use a
 custom certificate authority and certificates, you could do the following:
 
@@ -41,10 +47,7 @@ KmZIuh7+XpXzJ1MN0SBZXgXH
 -----END CERTIFICATE-----"
 ```
 
-For a complete list of SSL-related environment variables, consult the
-[Environment Variables Reference][ref-env-var].
-
-## Cube Cloud
+### Cube Cloud
 
 When setting up a new deployment, select the SSL checkbox when entering database
 credentials:
@@ -56,14 +59,6 @@ credentials:
 
 To use custom SSL certificates between Cube Cloud and your database server, go
 to the <Btn>Configuration</Btn> tab in the <Btn>Settings</Btn> screen:
-
-<WarningBox>
-
-Depending on how SSL is configured on your database server, you may need to
-specify additional environment variables, please check the [Environment
-Variables reference][ref-config-env-vars] for more information.
-
-</WarningBox>
 
 <Screenshot
   alt="Cube Cloud Database Connection Screen"
@@ -82,4 +77,3 @@ Add the following environment variables:
 [nodejs-docs-tls-options]:
   https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
 [ref-config-db]: /product/configuration/data-sources
-[ref-env-var]: /product/configuration/reference/environment-variables
