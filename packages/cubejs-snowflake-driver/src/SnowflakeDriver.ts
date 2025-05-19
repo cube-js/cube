@@ -490,7 +490,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Executes query and rerutns queried rows.
+   * Executes query and returns queried rows.
    */
   public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
     return this.getConnection().then((connection) => this.execute<R>(connection, query, values));
