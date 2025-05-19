@@ -717,7 +717,7 @@ export abstract class BaseDriver implements DriverInterface {
    *   s3://my-bucket-name
    *   my-bucket-name/some-path
    *   my-bucket-name
-   *
+   *   wasbs://real-container-name@account.blob.core.windows.net
    */
   protected parseBucketUrl(input: string | null | undefined): ParsedBucketUrl {
     const original = input?.trim() || '';
