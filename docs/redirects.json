@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/access-control/enforcing-mandatory-filters",
+    "destination": "/product/auth/recipes/enforcing-mandatory-filters",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/analytics/xirr",
     "destination": "/product/data-modeling/recipes/xirr",
     "permanent": true
