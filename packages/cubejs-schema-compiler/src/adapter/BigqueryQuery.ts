@@ -83,7 +83,7 @@ export class BigqueryQuery extends BaseQuery {
    * @see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#interval_type
    * It returns a tuple of (formatted interval, timeUnit to use in datediff functions)
    */
-  public formatInterval(interval: string): [string, string] {
+  private formatInterval(interval: string): [string, string] {
     const intervalParsed = parseSqlInterval(interval);
     const intKeys = Object.keys(intervalParsed).length;
 

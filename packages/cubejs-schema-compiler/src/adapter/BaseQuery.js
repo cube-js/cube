@@ -1899,53 +1899,8 @@ export class BaseQuery {
    */
   intervalAndMinimalTimeUnit(interval) {
     const intervalParsed = parseSqlInterval(interval);
-    const intKeys = Object.keys(intervalParsed).length;
-
-    if (intervalParsed.year && intKeys === 1) {
-      return [interval, 'year'];
-    } else if (intervalParsed.year && intervalParsed.month && intKeys === 2) {
-      return [interval, 'month'];
-    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intKeys === 3) {
-      return [interval, 'day'];
-    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intervalParsed.hour && intKeys === 4) {
-      return [interval, 'hour'];
-    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 5) {
-      return [interval, 'minute'];
-    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 6) {
-      return [interval, 'second'];
-    } else if (intervalParsed.quarter && intKeys === 1) {
-      return [interval, 'quarter'];
-    } else if (intervalParsed.month && intKeys === 1) {
-      return [interval, 'month'];
-    } else if (intervalParsed.month && intervalParsed.day && intKeys === 2) {
-      return [interval, 'day'];
-    } else if (intervalParsed.month && intervalParsed.day && intervalParsed.hour && intKeys === 3) {
-      return [interval, 'hour'];
-    } else if (intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 4) {
-      return [interval, 'minute'];
-    } else if (intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 5) {
-      return [interval, 'second'];
-    } else if (intervalParsed.week && intKeys === 1) {
-      return [interval, 'week'];
-    } else if (intervalParsed.day && intKeys === 1) {
-      return [interval, 'day'];
-    } else if (intervalParsed.day && intervalParsed.hour && intKeys === 2) {
-      return [interval, 'hour'];
-    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 3) {
-      return [interval, 'minute'];
-    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 4) {
-      return [interval, 'second'];
-    } else if (intervalParsed.hour && intervalParsed.minute && intKeys === 2) {
-      return [interval, 'minute'];
-    } else if (intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 3) {
-      return [interval, 'second'];
-    } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
-      return [interval, 'second'];
-    }
-
-    // No need to support microseconds.
-
-    throw new Error(`Cannot transform interval expression "${interval}"`);
+    const minGranularity = this.diffTimeUnitForInterval(interval);
+    return [interval, minGranularity];
   }
 
   commonQuery() {
