@@ -215,6 +215,7 @@ jobs:
         athena-export-bucket-s3
         bigquery-export-bucket-gcs
         clickhouse-export-bucket-s3
+        clickhouse-export-bucket-s3-prefix
         databricks-jdbc
         databricks-jdbc-export-bucket-s3
         databricks-jdbc-export-bucket-s3-prefix
@@ -242,6 +243,7 @@ jobs:
           - bigquery-export-bucket-gcs
           - clickhouse
           - clickhouse-export-bucket-s3
+          - clickhouse-export-bucket-s3-prefix
           - databricks-jdbc
           - databricks-jdbc-export-bucket-s3
           - databricks-jdbc-export-bucket-s3-prefix
