@@ -11,11 +11,32 @@
         }
       }
     },
+    "export-bucket-s3-prefix": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+          "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs/testing_prefix/for_export_buckets",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-west-1"
+        }
+      }
+    },
     "export-bucket-azure": {
       "cube": {
         "environment": {
           "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
           "CUBEJS_DB_EXPORT_BUCKET": "coreteamdevtest.blob.core.windows.net/snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN}"
+        }
+      }
+    },
+    "export-bucket-azure-prefix": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
+          "CUBEJS_DB_EXPORT_BUCKET": "coreteamdevtest.blob.core.windows.net/snowflake-drivers-tests-preaggs/testing_prefix/for_export_buckets/",
           "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}",
           "CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN}"
         }
@@ -36,6 +57,16 @@
         "environment": {
           "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcs",
           "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_INTEGRATION": "drivers_tests_preaggs_gcs",
+          "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
+        }
+      }
+    },
+    "export-bucket-gcs-prefix": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcs",
+          "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs/testing_prefix/for_export_buckets",
           "CUBEJS_DB_EXPORT_INTEGRATION": "drivers_tests_preaggs_gcs",
           "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
         }
