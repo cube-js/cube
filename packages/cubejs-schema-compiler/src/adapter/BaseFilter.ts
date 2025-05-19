@@ -47,11 +47,10 @@ export class BaseFilter extends BaseDimension {
   }
 
   // Evaluates filters on measures to whole where statement in query
-  // It used in drill downs
+  // It used in drill-downs
   public measureFilterToWhere() {
     const measureDefinition = this.measureDefinition();
-    if (measureDefinition.filters && measureDefinition.filters.length ||
-      measureDefinition.drillFilters && measureDefinition.drillFilters.length) {
+    if (measureDefinition.filters?.length || measureDefinition.drillFilters?.length) {
       return this.query.evaluateFiltersArray(
         (measureDefinition.filters || []).concat(measureDefinition.drillFilters || []),
         this.query.cubeEvaluator.cubeNameFromPath(this.measure)
@@ -87,6 +86,17 @@ export class BaseFilter extends BaseDimension {
       return this.query.cubeEvaluator.parsePath('segments', this.dimension);
     } else {
       return this.query.cubeEvaluator.parsePath('dimensions', this.dimension);
+    }
+  }
+
+  /**
+   * BaseFilter inherits from BaseDimension while Filter may be measure-based !!
+   */
+  public override dateFieldType() {
+    if (this.measure) {
+      return this.measureDefinition().type; // There is no fieldType in measure, but it seems that it's enough
+    } else {
+      return this.dimensionDefinition().fieldType;
     }
   }
 

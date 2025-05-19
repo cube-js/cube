@@ -618,6 +618,14 @@ examples.
 
 </ReferenceBox>
 
+<WarningBox>
+
+Custom granularities are supported for the following [data sources][ref-data-sources]:
+Amazon Athena, Amazon Redshift, DuckDB, Databricks, Google BigQuery, ClickHouse, Microsoft SQL Server, MySQL, Postgres, and Snowflake.
+Please [file an issue](https://github.com/cube-js/cube/issues) if you need support for another data source.
+
+</WarningBox>
+
 For each custom granularity, the `interval` parameter is required. It specifies
 the duration of the time interval and has the following format:
 `quantity unit [quantity unit...]`, e.g., `5 days` or `1 year 6 months`.
@@ -714,3 +722,4 @@ cube(`orders`, {
 [link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
 [ref-custom-granularity-recipe]: /guides/recipes/data-modeling/custom-granularity
 [ref-ref-hierarchies]: /reference/data-model/hierarchies
+[ref-data-sources]: /product/configuration/data-sources

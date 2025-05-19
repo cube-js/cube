@@ -1,0 +1,37 @@
+# Authentication methods
+
+Cube supports the following methods to authenticate requests to [APIs & integrations][ref-apis].
+Usually, an API supports authentication via [one of these methods][ref-apis-methods]:
+
+* [User name and password][ref-name-password] (e.g., used by the [SQL API][ref-sql-api]).
+* [Kerberos][ref-kerberos] and [NTLM][ref-ntlm] (e.g., used by the [DAX API][ref-dax-api] and [MDX API][ref-mdx-api]).
+* [Identity provider][ref-identity-provider] (e.g., used by the [Cube Cloud for Sheets][ref-cube-cloud-sheets]).
+* [JSON Web Token][ref-jwt] (e.g., used by the [REST API][ref-rest-api]).
+
+## Authentication flow
+
+Regardless of the method, the authentication flow includes the following steps:
+
+* User identity information (e.g., password or access token) is passed to Cube.
+* Cube validates the identity information.
+* Cube associates the API request with a [security context][ref-sec-ctx].
+* The security context is used to configure [member-level security][ref-mls]
+and [row-level security][ref-rls] as well as set [data access policies][ref-dap].
+
+
+[ref-apis]: /product/apis-integrations
+[ref-apis-methods]: /product/apis-integrations#authentication-methods
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-cube-cloud-sheets]: /product/apis-integrations/google-sheets
+[ref-name-password]: /product/auth/methods/name-password
+[ref-kerberos]: /product/auth/methods/kerberos
+[ref-ntlm]: /product/auth/methods/ntlm
+[ref-identity-provider]: /product/auth/methods/identity-provider
+[ref-jwt]: /product/auth/methods/jwt
+[ref-sec-ctx]: /product/auth/context
+[ref-dap]: /product/auth/data-access-policies
+[ref-mls]: /product/auth/member-level-security
+[ref-rls]: /product/auth/row-level-security

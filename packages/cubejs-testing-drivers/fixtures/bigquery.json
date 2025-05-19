@@ -17,7 +17,8 @@
       "CUBESQL_SQL_PUSH_DOWN": "true",
 
       "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket",
-      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp"
+      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp",
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}"
     },
     "ports" : ["4000", "5656"]
   },
@@ -155,6 +156,14 @@
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
+
+    "---------------------------------------",
+    "Requires Tesseract.                    ",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD without date range",
+    "--------------------",
 
     "SKIPPED SQL API (Need work)",
     "---------------------------------------",

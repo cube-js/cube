@@ -21,7 +21,7 @@ export class Granularity {
 
   public readonly granularityOffset: string | undefined;
 
-  public readonly origin: moment.Moment;
+  public origin: moment.Moment;
 
   private readonly predefinedGranularity: boolean;
 
@@ -31,7 +31,7 @@ export class Granularity {
   ) {
     this.granularity = timeDimension.granularity;
     this.predefinedGranularity = isPredefinedGranularity(this.granularity);
-    this.queryTimezone = query.timezone;
+    this.queryTimezone = query.timezone || 'UTC';
     this.origin = moment.tz(query.timezone).startOf('year'); // Defaults to current year start
 
     if (this.predefinedGranularity) {
@@ -52,9 +52,20 @@ export class Granularity {
       if (customGranularity.origin) {
         this.origin = moment.tz(customGranularity.origin, query.timezone);
       } else if (customGranularity.offset) {
+        // Needed because if interval is week-based, offset is expected to be relative to the start of a week
+        this.fixOriginForWeeksIfNeeded();
         this.granularityOffset = customGranularity.offset;
         this.origin = addInterval(this.origin, parseSqlInterval(customGranularity.offset));
+      } else {
+        this.fixOriginForWeeksIfNeeded();
       }
+    }
+  }
+
+  private fixOriginForWeeksIfNeeded() {
+    const parsedInterval = parseSqlInterval(this.granularityInterval);
+    if (Object.keys(parsedInterval).length === 1 && parsedInterval.week) {
+      this.origin = this.origin.isoWeekday(1);
     }
   }
 

@@ -26,6 +26,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
                 wrapper_pullup_replacer(
@@ -37,6 +38,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
             ),
@@ -53,6 +55,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
                 wrapper_pullup_replacer(
@@ -64,6 +67,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
                 self.pushdown_simple_measure("?name", "?cube_members"),
@@ -80,6 +84,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
                 wrapper_pullup_replacer(
@@ -91,6 +96,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
                 self.pushdown_dimension(

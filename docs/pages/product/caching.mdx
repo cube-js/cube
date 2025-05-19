@@ -221,11 +221,11 @@ client to initiate a new data loading query or know if the current invocation
 wasn't initiated earlier by another client. Only Refresh Key freshness
 guarantees are provided in this case.
 
-For situations like real-time analytics or responding to live user changes to
-underlying data, the `refresh_key` query cache can prevent fresh data from
-showing up immediately. For these situations, the cache can effectively be
-disabled by setting the [`refresh_key.every`][ref-schema-ref-cube-refresh-key]
-parameter to something very low, like `1 second`.
+The `refresh_key` parameter can be used to control cache validity.
+For closer-to-real-time use cases, [`refresh_key.every`][ref-schema-ref-cube-refresh-key]
+can be set to a low value, such as `1 minute`, which is the lowest recommended option.
+
+For truly real-time use cases, consider using [streaming pre-aggregations][ref-streaming-preaggs].
 
 ## Inspecting Queries
 
@@ -297,6 +297,7 @@ cache types.
 [ref-schema-ref-cube-refresh-key]:
   /reference/data-model/cube#refresh_key
 [ref-schema-ref-preaggs]: /reference/data-model/pre-aggregations
+[ref-streaming-preaggs]: /product/caching/lambda-pre-aggregations#batch-and-streaming-data
 [ref-query-history]: /product/workspace/query-history#inspecting-api-queries
 [ref-perf-insights]: /product/workspace/performance#cache-type
 [ref-indexes]: /product/caching/using-pre-aggregations#using-indexes

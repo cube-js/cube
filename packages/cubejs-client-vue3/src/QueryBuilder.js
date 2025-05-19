@@ -648,8 +648,8 @@ export default {
             .dryRun(query, {
               mutexObj: this.mutex,
             })
-            .then(({ pivotQuery }) => {
-              const pivotConfig = ResultSet.getNormalizedPivotConfig(pivotQuery, this.pivotConfig);
+            .then((result) => {
+              const pivotConfig = ResultSet.getNormalizedPivotConfig(result?.pivotQuery, this.pivotConfig);
 
               if (!equals(pivotConfig, this.pivotConfig)) {
                 this.pivotConfig = pivotConfig;

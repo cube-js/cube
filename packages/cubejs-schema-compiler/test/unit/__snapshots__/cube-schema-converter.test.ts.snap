@@ -1,0 +1,1088 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CubeSchemaConverter adds a pre-aggregation to JS model (w/o pre-agg) using CubePreAggregationConverter: orders_and_users.js 1`] = `
+"cube('js_orders', {
+  sql: 'select * from orders',
+  public: true,
+  dimensions: {
+    createdAt: {
+      public: true,
+      sql: 'created_at',
+      type: 'time',
+      granularities: {
+        half_year: {
+          interval: '6 months',
+          title: '6 month intervals'
+        },
+        half_year_by_1st_april: {
+          title: 'Half year from Apr to Oct',
+          interval: '6 months',
+          offset: '3 months'
+        },
+        half_year_by_1st_march: {
+          interval: '6 months',
+          origin: '2020-03-01'
+        },
+        half_year_by_1st_june: {
+          interval: '6 months',
+          origin: '2020-06-01 10:00:00'
+        }
+      }
+    },
+    createdAtPredefinedYear: {
+      public: true,
+      sql: \`\${createdAt.year}\`,
+      type: 'string'
+    },
+    createdAtPredefinedQuarter: {
+      public: true,
+      sql: \`\${createdAt.quarter}\`,
+      type: 'string'
+    },
+    createdAtHalfYear: {
+      public: true,
+      sql: \`\${createdAt.half_year}\`,
+      type: 'string'
+    },
+    createdAtHalfYearBy1stJune: {
+      public: true,
+      sql: \`\${createdAt.half_year_by_1st_june}\`,
+      type: 'string'
+    },
+    createdAtHalfYearBy1stMarch: {
+      public: true,
+      sql: \`\${createdAt.half_year_by_1st_march}\`,
+      type: 'string'
+    },
+    status: {
+      type: 'string',
+      sql: 'status'
+    },
+    id: {
+      type: 'number',
+      sql: 'id',
+      primaryKey: true,
+      public: true
+    }
+  },
+  measures: {
+    count: {
+      type: 'count'
+    },
+    count_shifted_year: {
+      type: 'count',
+      multiStage: true,
+      timeShift: [{
+        timeDimension: \`createdAt\`,
+        interval: '1 year',
+        type: 'prior'
+      }]
+    },
+    rollingCountByTrailing2Day: {
+      type: 'count',
+      rollingWindow: {
+        trailing: '2 day'
+      }
+    },
+    rollingCountByLeading2Day: {
+      type: 'count',
+      rollingWindow: {
+        leading: '3 day'
+      }
+    },
+    rollingCountByUnbounded: {
+      type: 'count',
+      rollingWindow: {
+        trailing: 'unbounded'
+      }
+    }
+  },
+  joins: {
+    js_orders_users: {
+      sql: \`\${js_orders_users}.id = \${js_orders}.user_id\`,
+      relationship: \`one_to_many\`
+    }
+  },
+  preAggregations: {
+    js_orders_main: {
+      measures: [js_orders.count],
+      timeDimension: js_orders.createdAt,
+      granularity: \`day\`
+    }
+  }
+});
+cube(\`js_orders_users\`, {
+  sql: \`SELECT * FROM users\`,
+  dimensions: {
+    id: {
+      type: 'number',
+      sql: 'id',
+      primaryKey: true,
+      public: true
+    },
+    name: {
+      sql: 'name',
+      type: 'string',
+      public: true
+    },
+    proxyCreatedAtPredefinedYear: {
+      sql: \`\${js_orders.createdAt.year}\`,
+      type: \`string\`,
+      public: true
+    },
+    proxyCreatedAtHalfYear: {
+      sql: \`\${js_orders.createdAt.half_year}\`,
+      type: 'string',
+      public: true
+    }
+  },
+  measures: {
+    count: {
+      sql: 'user_id',
+      type: 'count_distinct'
+    }
+  }
+});
+view(\`js_orders_view\`, {
+  cubes: [{
+    join_path: js_orders,
+    includes: '*'
+  }]
+});"
+`;
+
+exports[`CubeSchemaConverter adds a pre-aggregation to JS model (with empty pre-aggs property) using CubePreAggregationConverter: single_cube_no_preaggs.js 1`] = `
+"// Useless comment for compilation, but is checked in
+// CubeSchemaConverter tests
+cube('single_cube', {
+  description: 'test cube from createCubeSchema',
+  sql: \`select * from cards\`,
+  measures: {
+    count: {
+      description: 'count measure from createCubeSchema',
+      type: 'count'
+    },
+    sum: {
+      sql: \`amount\`,
+      type: \`sum\`
+    },
+    max: {
+      sql: \`amount\`,
+      type: \`max\`
+    },
+    min: {
+      sql: \`amount\`,
+      type: \`min\`
+    },
+    diff: {
+      sql: \`\${max} - \${min}\`,
+      type: \`number\`
+    }
+  },
+  dimensions: {
+    id: {
+      type: 'number',
+      description: 'id dimension from createCubeSchema',
+      sql: 'id',
+      primaryKey: true
+    },
+    id_cube: {
+      type: 'number',
+      sql: \`\${CUBE}.id\`
+    },
+    other_id: {
+      type: 'number',
+      sql: 'other_id'
+    },
+    type: {
+      type: 'string',
+      sql: 'type'
+    },
+    type_with_cube: {
+      type: 'string',
+      sql: \`\${CUBE.type}\`
+    },
+    type_complex: {
+      type: 'string',
+      sql: \`CONCAT(\${type}, ' ', \${location})\`
+    },
+    createdAt: {
+      type: 'time',
+      sql: 'created_at'
+    },
+    location: {
+      type: 'string',
+      sql: 'location'
+    }
+  },
+  segments: {
+    sfUsers: {
+      description: 'SF users segment from createCubeSchema',
+      sql: \`\${CUBE}.location = 'San Francisco'\`
+    }
+  },
+  preAggregations: {
+    single_cube_main: {
+      measures: [js_orders.count],
+      timeDimension: js_orders.createdAt,
+      granularity: \`day\`
+    }
+  }
+});"
+`;
+
+exports[`CubeSchemaConverter adds a pre-aggregation to JS model (with existing pre-aggs) using CubePreAggregationConverter: single_cube_with_preaggs.js 1`] = `
+"// Useless comment for compilation, but is checked in
+// CubeSchemaConverter tests
+cube('single_preagg_cube', {
+  description: 'test cube from createCubeSchema',
+  sql: \`select * from cards\`,
+  measures: {
+    count: {
+      description: 'count measure from createCubeSchema',
+      type: 'count'
+    },
+    sum: {
+      sql: \`amount\`,
+      type: \`sum\`
+    },
+    max: {
+      sql: \`amount\`,
+      type: \`max\`
+    },
+    min: {
+      sql: \`amount\`,
+      type: \`min\`
+    },
+    diff: {
+      sql: \`\${max} - \${min}\`,
+      type: \`number\`
+    }
+  },
+  dimensions: {
+    id: {
+      type: 'number',
+      description: 'id dimension from createCubeSchema',
+      sql: 'id',
+      primaryKey: true
+    },
+    id_cube: {
+      type: 'number',
+      sql: \`\${CUBE}.id\`
+    },
+    other_id: {
+      type: 'number',
+      sql: 'other_id'
+    },
+    type: {
+      type: 'string',
+      sql: 'type'
+    },
+    type_with_cube: {
+      type: 'string',
+      sql: \`\${CUBE.type}\`
+    },
+    type_complex: {
+      type: 'string',
+      sql: \`CONCAT(\${type}, ' ', \${location})\`
+    },
+    createdAt: {
+      type: 'time',
+      sql: 'created_at'
+    },
+    location: {
+      type: 'string',
+      sql: 'location'
+    }
+  },
+  segments: {
+    sfUsers: {
+      description: 'SF users segment from createCubeSchema',
+      sql: \`\${CUBE}.location = 'San Francisco'\`
+    }
+  },
+  preAggregations: {
+    existing_pre_agg: {
+      measures: [single_preagg_cube.count],
+      timeDimension: single_preagg_cube.createdAt,
+      granularity: \`month\`
+    },
+    single_preagg_cube_main: {
+      measures: [single_preagg_cube.count],
+      timeDimension: single_preagg_cube.createdAt,
+      granularity: \`day\`
+    }
+  }
+});"
+`;
+
+exports[`CubeSchemaConverter adds a pre-aggregation to YAML model (w/o pre-agg) using CubePreAggregationConverter: single_cube.yaml 1`] = `
+"# Useless comment for compilation, but is checked in
+# CubeSchemaConverter tests
+cubes:
+  - name: yml_orders
+    sql_table: yml_orders
+
+    measures:
+      - name: count
+        type: count
+      - name: sum
+        type: sum
+        sql: amount
+      - name: min
+        sql: amount
+        type: min
+      - name: max
+        sql: amount
+        type: max
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: createdAt
+        sql: created_at
+        type: time
+    pre_aggregations:
+      - name: yml_orders_main
+        measures:
+          - yml_orders.count
+        timeDimension: yml_orders.createdAt
+        granularity: day
+"
+`;
+
+exports[`CubeSchemaConverter adds a pre-aggregation to YAML model (with pre-aggs) using CubePreAggregationConverter: multi_ecom.yaml 1`] = `
+"cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: updated_at
+        sql: '{created_at}'
+        type: time
+      - name: status
+        sql: status
+        type: string
+    preAggregations:
+      - name: orders_by_day_with_day
+        measures:
+          - count
+        timeDimension: created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '1000 day'
+        build_range_end:
+          sql: SELECT NOW()
+      - name: orders_by_day_with_day_by_status
+        measures:
+          - count
+        dimensions:
+          - status
+        timeDimension: created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '1000 day'
+        build_range_end:
+          sql: SELECT NOW()
+      - name: orders_main
+        measures:
+          - orders.count
+        timeDimension: orders.created_at
+        granularity: day
+  - name: orders_indexes
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: status
+        sql: status
+        type: string
+    preAggregations:
+      - name: orders_by_day_with_day_by_status
+        measures:
+          - count
+        dimensions:
+          - status
+        timeDimension: created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '1000 day'
+        build_range_end:
+          sql: SELECT NOW()
+        indexes:
+          - name: regular_index
+            columns:
+              - created_at
+              - status
+          - name: agg_index
+            columns:
+              - status
+            type: aggregate
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - created_at
+          - updated_at
+          - count
+          - status
+"
+`;
+
+exports[`CubeSchemaConverter converts all schema repository models (no changes, without additional converters): multi_ecom.yaml 1`] = `
+"cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: updated_at
+        sql: '{created_at}'
+        type: time
+      - name: status
+        sql: status
+        type: string
+    preAggregations:
+      - name: orders_by_day_with_day
+        measures:
+          - count
+        timeDimension: created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '1000 day'
+        build_range_end:
+          sql: SELECT NOW()
+      - name: orders_by_day_with_day_by_status
+        measures:
+          - count
+        dimensions:
+          - status
+        timeDimension: created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '1000 day'
+        build_range_end:
+          sql: SELECT NOW()
+  - name: orders_indexes
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: status
+        sql: status
+        type: string
+    preAggregations:
+      - name: orders_by_day_with_day_by_status
+        measures:
+          - count
+        dimensions:
+          - status
+        timeDimension: created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '1000 day'
+        build_range_end:
+          sql: SELECT NOW()
+        indexes:
+          - name: regular_index
+            columns:
+              - created_at
+              - status
+          - name: agg_index
+            columns:
+              - status
+            type: aggregate
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - created_at
+          - updated_at
+          - count
+          - status
+"
+`;
+
+exports[`CubeSchemaConverter converts all schema repository models (no changes, without additional converters): multi_ecom.yaml 2`] = `
+"cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: updated_at
+        sql: '{created_at}'
+        type: time
+      - name: status
+        sql: status
+        type: string
+    preAggregations:
+      - name: orders_by_day_with_day
+        measures:
+          - count
+        timeDimension: created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '1000 day'
+        build_range_end:
+          sql: SELECT NOW()
+      - name: orders_by_day_with_day_by_status
+        measures:
+          - count
+        dimensions:
+          - status
+        timeDimension: created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '1000 day'
+        build_range_end:
+          sql: SELECT NOW()
+  - name: orders_indexes
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: status
+        sql: status
+        type: string
+    preAggregations:
+      - name: orders_by_day_with_day_by_status
+        measures:
+          - count
+        dimensions:
+          - status
+        timeDimension: created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT NOW() - INTERVAL '1000 day'
+        build_range_end:
+          sql: SELECT NOW()
+        indexes:
+          - name: regular_index
+            columns:
+              - created_at
+              - status
+          - name: agg_index
+            columns:
+              - status
+            type: aggregate
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - created_at
+          - updated_at
+          - count
+          - status
+"
+`;
+
+exports[`CubeSchemaConverter converts all schema repository models (no changes, without additional converters): orders_and_users.js 1`] = `
+"cube('js_orders', {
+  sql: 'select * from orders',
+  public: true,
+  dimensions: {
+    createdAt: {
+      public: true,
+      sql: 'created_at',
+      type: 'time',
+      granularities: {
+        half_year: {
+          interval: '6 months',
+          title: '6 month intervals'
+        },
+        half_year_by_1st_april: {
+          title: 'Half year from Apr to Oct',
+          interval: '6 months',
+          offset: '3 months'
+        },
+        half_year_by_1st_march: {
+          interval: '6 months',
+          origin: '2020-03-01'
+        },
+        half_year_by_1st_june: {
+          interval: '6 months',
+          origin: '2020-06-01 10:00:00'
+        }
+      }
+    },
+    createdAtPredefinedYear: {
+      public: true,
+      sql: \`\${createdAt.year}\`,
+      type: 'string'
+    },
+    createdAtPredefinedQuarter: {
+      public: true,
+      sql: \`\${createdAt.quarter}\`,
+      type: 'string'
+    },
+    createdAtHalfYear: {
+      public: true,
+      sql: \`\${createdAt.half_year}\`,
+      type: 'string'
+    },
+    createdAtHalfYearBy1stJune: {
+      public: true,
+      sql: \`\${createdAt.half_year_by_1st_june}\`,
+      type: 'string'
+    },
+    createdAtHalfYearBy1stMarch: {
+      public: true,
+      sql: \`\${createdAt.half_year_by_1st_march}\`,
+      type: 'string'
+    },
+    status: {
+      type: 'string',
+      sql: 'status'
+    },
+    id: {
+      type: 'number',
+      sql: 'id',
+      primaryKey: true,
+      public: true
+    }
+  },
+  measures: {
+    count: {
+      type: 'count'
+    },
+    count_shifted_year: {
+      type: 'count',
+      multiStage: true,
+      timeShift: [{
+        timeDimension: \`createdAt\`,
+        interval: '1 year',
+        type: 'prior'
+      }]
+    },
+    rollingCountByTrailing2Day: {
+      type: 'count',
+      rollingWindow: {
+        trailing: '2 day'
+      }
+    },
+    rollingCountByLeading2Day: {
+      type: 'count',
+      rollingWindow: {
+        leading: '3 day'
+      }
+    },
+    rollingCountByUnbounded: {
+      type: 'count',
+      rollingWindow: {
+        trailing: 'unbounded'
+      }
+    }
+  },
+  joins: {
+    js_orders_users: {
+      sql: \`\${js_orders_users}.id = \${js_orders}.user_id\`,
+      relationship: \`one_to_many\`
+    }
+  }
+});
+cube(\`js_orders_users\`, {
+  sql: \`SELECT * FROM users\`,
+  dimensions: {
+    id: {
+      type: 'number',
+      sql: 'id',
+      primaryKey: true,
+      public: true
+    },
+    name: {
+      sql: 'name',
+      type: 'string',
+      public: true
+    },
+    proxyCreatedAtPredefinedYear: {
+      sql: \`\${js_orders.createdAt.year}\`,
+      type: \`string\`,
+      public: true
+    },
+    proxyCreatedAtHalfYear: {
+      sql: \`\${js_orders.createdAt.half_year}\`,
+      type: 'string',
+      public: true
+    }
+  },
+  measures: {
+    count: {
+      sql: 'user_id',
+      type: 'count_distinct'
+    }
+  }
+});
+view(\`js_orders_view\`, {
+  cubes: [{
+    join_path: js_orders,
+    includes: '*'
+  }]
+});"
+`;
+
+exports[`CubeSchemaConverter converts all schema repository models (no changes, without additional converters): orders_and_users.js 2`] = `
+"cube('js_orders', {
+  sql: 'select * from orders',
+  public: true,
+  dimensions: {
+    createdAt: {
+      public: true,
+      sql: 'created_at',
+      type: 'time',
+      granularities: {
+        half_year: {
+          interval: '6 months',
+          title: '6 month intervals'
+        },
+        half_year_by_1st_april: {
+          title: 'Half year from Apr to Oct',
+          interval: '6 months',
+          offset: '3 months'
+        },
+        half_year_by_1st_march: {
+          interval: '6 months',
+          origin: '2020-03-01'
+        },
+        half_year_by_1st_june: {
+          interval: '6 months',
+          origin: '2020-06-01 10:00:00'
+        }
+      }
+    },
+    createdAtPredefinedYear: {
+      public: true,
+      sql: \`\${createdAt.year}\`,
+      type: 'string'
+    },
+    createdAtPredefinedQuarter: {
+      public: true,
+      sql: \`\${createdAt.quarter}\`,
+      type: 'string'
+    },
+    createdAtHalfYear: {
+      public: true,
+      sql: \`\${createdAt.half_year}\`,
+      type: 'string'
+    },
+    createdAtHalfYearBy1stJune: {
+      public: true,
+      sql: \`\${createdAt.half_year_by_1st_june}\`,
+      type: 'string'
+    },
+    createdAtHalfYearBy1stMarch: {
+      public: true,
+      sql: \`\${createdAt.half_year_by_1st_march}\`,
+      type: 'string'
+    },
+    status: {
+      type: 'string',
+      sql: 'status'
+    },
+    id: {
+      type: 'number',
+      sql: 'id',
+      primaryKey: true,
+      public: true
+    }
+  },
+  measures: {
+    count: {
+      type: 'count'
+    },
+    count_shifted_year: {
+      type: 'count',
+      multiStage: true,
+      timeShift: [{
+        timeDimension: \`createdAt\`,
+        interval: '1 year',
+        type: 'prior'
+      }]
+    },
+    rollingCountByTrailing2Day: {
+      type: 'count',
+      rollingWindow: {
+        trailing: '2 day'
+      }
+    },
+    rollingCountByLeading2Day: {
+      type: 'count',
+      rollingWindow: {
+        leading: '3 day'
+      }
+    },
+    rollingCountByUnbounded: {
+      type: 'count',
+      rollingWindow: {
+        trailing: 'unbounded'
+      }
+    }
+  },
+  joins: {
+    js_orders_users: {
+      sql: \`\${js_orders_users}.id = \${js_orders}.user_id\`,
+      relationship: \`one_to_many\`
+    }
+  }
+});
+cube(\`js_orders_users\`, {
+  sql: \`SELECT * FROM users\`,
+  dimensions: {
+    id: {
+      type: 'number',
+      sql: 'id',
+      primaryKey: true,
+      public: true
+    },
+    name: {
+      sql: 'name',
+      type: 'string',
+      public: true
+    },
+    proxyCreatedAtPredefinedYear: {
+      sql: \`\${js_orders.createdAt.year}\`,
+      type: \`string\`,
+      public: true
+    },
+    proxyCreatedAtHalfYear: {
+      sql: \`\${js_orders.createdAt.half_year}\`,
+      type: 'string',
+      public: true
+    }
+  },
+  measures: {
+    count: {
+      sql: 'user_id',
+      type: 'count_distinct'
+    }
+  }
+});
+view(\`js_orders_view\`, {
+  cubes: [{
+    join_path: js_orders,
+    includes: '*'
+  }]
+});"
+`;
+
+exports[`CubeSchemaConverter converts all schema repository models (no changes, without additional converters): single_cube.yaml 1`] = `
+"# Useless comment for compilation, but is checked in
+# CubeSchemaConverter tests
+cubes:
+  - name: yml_orders
+    sql_table: yml_orders
+
+    measures:
+      - name: count
+        type: count
+      - name: sum
+        type: sum
+        sql: amount
+      - name: min
+        sql: amount
+        type: min
+      - name: max
+        sql: amount
+        type: max
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: createdAt
+        sql: created_at
+        type: time
+"
+`;
+
+exports[`CubeSchemaConverter converts all schema repository models (no changes, without additional converters): single_cube_no_preaggs.js 1`] = `
+"// Useless comment for compilation, but is checked in
+// CubeSchemaConverter tests
+cube('single_cube', {
+  description: 'test cube from createCubeSchema',
+  sql: \`select * from cards\`,
+  measures: {
+    count: {
+      description: 'count measure from createCubeSchema',
+      type: 'count'
+    },
+    sum: {
+      sql: \`amount\`,
+      type: \`sum\`
+    },
+    max: {
+      sql: \`amount\`,
+      type: \`max\`
+    },
+    min: {
+      sql: \`amount\`,
+      type: \`min\`
+    },
+    diff: {
+      sql: \`\${max} - \${min}\`,
+      type: \`number\`
+    }
+  },
+  dimensions: {
+    id: {
+      type: 'number',
+      description: 'id dimension from createCubeSchema',
+      sql: 'id',
+      primaryKey: true
+    },
+    id_cube: {
+      type: 'number',
+      sql: \`\${CUBE}.id\`
+    },
+    other_id: {
+      type: 'number',
+      sql: 'other_id'
+    },
+    type: {
+      type: 'string',
+      sql: 'type'
+    },
+    type_with_cube: {
+      type: 'string',
+      sql: \`\${CUBE.type}\`
+    },
+    type_complex: {
+      type: 'string',
+      sql: \`CONCAT(\${type}, ' ', \${location})\`
+    },
+    createdAt: {
+      type: 'time',
+      sql: 'created_at'
+    },
+    location: {
+      type: 'string',
+      sql: 'location'
+    }
+  },
+  segments: {
+    sfUsers: {
+      description: 'SF users segment from createCubeSchema',
+      sql: \`\${CUBE}.location = 'San Francisco'\`
+    }
+  },
+  preAggregations: {}
+});"
+`;
+
+exports[`CubeSchemaConverter converts all schema repository models (no changes, without additional converters): single_cube_with_preaggs.js 1`] = `
+"// Useless comment for compilation, but is checked in
+// CubeSchemaConverter tests
+cube('single_preagg_cube', {
+  description: 'test cube from createCubeSchema',
+  sql: \`select * from cards\`,
+  measures: {
+    count: {
+      description: 'count measure from createCubeSchema',
+      type: 'count'
+    },
+    sum: {
+      sql: \`amount\`,
+      type: \`sum\`
+    },
+    max: {
+      sql: \`amount\`,
+      type: \`max\`
+    },
+    min: {
+      sql: \`amount\`,
+      type: \`min\`
+    },
+    diff: {
+      sql: \`\${max} - \${min}\`,
+      type: \`number\`
+    }
+  },
+  dimensions: {
+    id: {
+      type: 'number',
+      description: 'id dimension from createCubeSchema',
+      sql: 'id',
+      primaryKey: true
+    },
+    id_cube: {
+      type: 'number',
+      sql: \`\${CUBE}.id\`
+    },
+    other_id: {
+      type: 'number',
+      sql: 'other_id'
+    },
+    type: {
+      type: 'string',
+      sql: 'type'
+    },
+    type_with_cube: {
+      type: 'string',
+      sql: \`\${CUBE.type}\`
+    },
+    type_complex: {
+      type: 'string',
+      sql: \`CONCAT(\${type}, ' ', \${location})\`
+    },
+    createdAt: {
+      type: 'time',
+      sql: 'created_at'
+    },
+    location: {
+      type: 'string',
+      sql: 'location'
+    }
+  },
+  segments: {
+    sfUsers: {
+      description: 'SF users segment from createCubeSchema',
+      sql: \`\${CUBE}.location = 'San Francisco'\`
+    }
+  },
+  preAggregations: {
+    existing_pre_agg: {
+      measures: [single_preagg_cube.count],
+      timeDimension: single_preagg_cube.createdAt,
+      granularity: \`month\`
+    }
+  }
+});"
+`;

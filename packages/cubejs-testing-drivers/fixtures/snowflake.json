@@ -40,6 +40,15 @@
           "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
         }
       }
+    },
+    "encrypted-pk": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR": "SNOWFLAKE_JWT",
+          "CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY}",
+          "CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS}"
+        }
+      }
     }
   },
   "cube": {
@@ -61,7 +70,8 @@
       "CUBEJS_PG_SQL_PORT": "5656",
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
-      "CUBESQL_SQL_PUSH_DOWN": "true"
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}"
     },
     "ports" : ["4000", "5656"]
   },
@@ -190,6 +200,13 @@
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
     "querying BigECommerce: null sum",
-    "querying BigECommerce: null boolean"
+    "querying BigECommerce: null boolean",
+    "---------------------------------------",
+    "Requires Tesseract.                    ",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD",
+    "querying BigECommerce: rolling window YTD without date range"
   ]
 }

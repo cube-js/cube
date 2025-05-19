@@ -5,7 +5,6 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, window_fun_expr_var_arg, wrapper_pullup_replacer,
         wrapper_pushdown_replacer, wrapper_replacer_context, WindowFunctionExprFun,
-        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -48,6 +47,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -59,6 +59,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -70,6 +71,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     "?window_frame",
@@ -89,9 +91,10 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
-                self.transform_window_fun_expr("?fun", "?alias_to_cube"),
+                self.transform_window_fun_expr("?fun", "?input_data_source"),
             ),
         ]);
 
@@ -117,42 +120,33 @@ impl WrapperRules {
     fn transform_window_fun_expr(
         &self,
         fun_var: &'static str,
-        alias_to_cube_var: &'static str,
+        input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
-        let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                WrapperReplacerContextAliasToCube
-            )
-            .cloned()
-            {
-                if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube) {
-                    if sql_generator
-                        .get_sql_templates()
-                        .templates
-                        .contains_key("expressions/window_function")
-                    {
-                        for fun in var_iter!(egraph[subst[fun_var]], WindowFunctionExprFun).cloned()
-                        {
-                            let fun = match fun {
-                                WindowFunction::AggregateFunction(agg_fun) => agg_fun.to_string(),
-                                WindowFunction::BuiltInWindowFunction(window_fun) => {
-                                    window_fun.to_string()
-                                }
-                            };
+            let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var)
+            else {
+                return false;
+            };
 
-                            if sql_generator
-                                .get_sql_templates()
-                                .templates
-                                .contains_key(&format!("functions/{}", fun.as_str()))
-                            {
-                                return true;
-                            }
-                        }
-                    }
+            if !Self::can_rewrite_template(&data_source, &meta, "expressions/window_function") {
+                return false;
+            }
+
+            for fun in var_iter!(egraph[subst[fun_var]], WindowFunctionExprFun).cloned() {
+                let fun = match fun {
+                    WindowFunction::AggregateFunction(agg_fun) => agg_fun.to_string(),
+                    WindowFunction::BuiltInWindowFunction(window_fun) => window_fun.to_string(),
+                };
+
+                if Self::can_rewrite_template(
+                    &data_source,
+                    &meta,
+                    &format!("functions/{}", fun.as_str()),
+                ) {
+                    return true;
                 }
             }
             false

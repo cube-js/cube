@@ -2,15 +2,17 @@ use std::sync::Arc;
 
 use neon::prelude::*;
 
-use cubesql::compile::convert_sql_to_cube_query;
 use cubesql::compile::datafusion::logical_plan::LogicalPlan;
+use cubesql::compile::datafusion::scalar::ScalarValue;
+use cubesql::compile::datafusion::variable::VarType;
 use cubesql::compile::engine::df::scan::CubeScanNode;
 use cubesql::compile::engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode};
-use cubesql::sql::Session;
+use cubesql::compile::{convert_sql_to_cube_query, DatabaseVariable};
+use cubesql::sql::{Session, CUBESQL_PENALIZE_POST_PROCESSING_VAR};
 use cubesql::transport::MetaContext;
 use cubesql::CubeError;
 
-use crate::auth::NativeAuthContext;
+use crate::auth::NativeSQLAuthContext;
 use crate::config::NodeCubeServices;
 use crate::cubesql_utils::with_session;
 use crate::tokio_runtime_node;
@@ -155,10 +157,22 @@ async fn get_sql(
 
 async fn handle_sql4sql_query(
     services: Arc<NodeCubeServices>,
-    native_auth_ctx: Arc<NativeAuthContext>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
     sql_query: &str,
+    disable_post_processing: bool,
 ) -> Result<Sql4SqlResponse, CubeError> {
     with_session(&services, native_auth_ctx.clone(), |session| async move {
+        if disable_post_processing {
+            let v = DatabaseVariable {
+                name: CUBESQL_PENALIZE_POST_PROCESSING_VAR.to_string(),
+                value: ScalarValue::Boolean(Some(true)),
+                var_type: VarType::UserDefined,
+                readonly: false,
+                additional_params: None,
+            };
+            session.state.set_variables(vec![v]);
+        }
+
         let transport = session.server.transport.clone();
         // todo: can we use compiler_cache?
         let meta_context = transport
@@ -176,8 +190,9 @@ async fn handle_sql4sql_query(
 pub fn sql4sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let interface = cx.argument::<JsBox<crate::node_export::SQLInterface>>(0)?;
     let sql_query = cx.argument::<JsString>(1)?.value(&mut cx);
+    let disable_post_processing = cx.argument::<JsBoolean>(2)?.value(&mut cx);
 
-    let security_context: Option<serde_json::Value> = match cx.argument::<JsValue>(2) {
+    let security_context: Option<serde_json::Value> = match cx.argument::<JsValue>(3) {
         Ok(string) => match string.downcast::<JsString, _>(&mut cx) {
             Ok(v) => v.value(&mut cx).parse::<serde_json::Value>().ok(),
             Err(_) => None,
@@ -190,7 +205,7 @@ pub fn sql4sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
     let channel = cx.channel();
 
-    let native_auth_ctx = Arc::new(NativeAuthContext {
+    let native_auth_ctx = Arc::new(NativeSQLAuthContext {
         user: Some(String::from("unknown")),
         superuser: false,
         security_context,
@@ -208,7 +223,13 @@ pub fn sql4sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     //  can do it relatively rare, and in a single loop for all JoinHandles
     //  this is just a watchdog for a Very Bad case, so latency requirement can be quite relaxed
     runtime.spawn(async move {
-        let result = handle_sql4sql_query(services, native_auth_ctx, &sql_query).await;
+        let result = handle_sql4sql_query(
+            services,
+            native_auth_ctx,
+            &sql_query,
+            disable_post_processing,
+        )
+        .await;
 
         if let Err(err) = deferred.try_settle_with(&channel, move |mut cx| {
             // `neon::result::ResultExt` is implemented only for Result<Handle, Handle>, even though Ok variant is not touched

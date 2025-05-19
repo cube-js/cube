@@ -38,7 +38,7 @@ the [Environment Variables reference][ref-config-env].
 Next, run Cube and tell it to connect to Cube Store running on `localhost` (on
 the default port `3030`):
 
-```bash{outputLines: 2-4}
+```bash
 docker run -p 4000:4000 \
   -e CUBEJS_CUBESTORE_HOST=localhost \
   -v ${PWD}:/cube/conf \

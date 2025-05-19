@@ -10,6 +10,10 @@ pub trait V1CubeMetaMeasureExt {
 
     fn is_same_agg_type(&self, expect_agg_type: &str, disable_strict_match: bool) -> bool;
 
+    fn allow_replace_agg_type(&self, query_agg_type: &str, disable_strict_match: bool) -> bool;
+
+    fn allow_add_filter(&self, query_agg_type: Option<&str>) -> bool;
+
     fn get_sql_type(&self) -> ColumnType;
 }
 
@@ -24,36 +28,73 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
         if disable_strict_match {
             return true;
         }
-        if self.agg_type.is_some() {
-            if expect_agg_type.eq(&"countDistinct".to_string()) {
-                let agg_type = self.agg_type.as_ref().unwrap();
-
-                agg_type.eq(&"countDistinct".to_string())
-                    || agg_type.eq(&"countDistinctApprox".to_string())
-                    || agg_type.eq(&"number".to_string())
-            } else if expect_agg_type.eq(&"sum".to_string()) {
-                let agg_type = self.agg_type.as_ref().unwrap();
-
-                agg_type.eq(&"sum".to_string())
-                    || agg_type.eq(&"count".to_string())
-                    || agg_type.eq(&"number".to_string())
-            } else if expect_agg_type.eq(&"min".to_string())
-                || expect_agg_type.eq(&"max".to_string())
-            {
-                let agg_type = self.agg_type.as_ref().unwrap();
-
-                agg_type.eq(&"number".to_string())
-                    || agg_type.eq(&"string".to_string())
-                    || agg_type.eq(&"time".to_string())
-                    || agg_type.eq(&"boolean".to_string())
-                    || agg_type.eq(expect_agg_type)
-            } else {
-                let agg_type = self.agg_type.as_ref().unwrap();
-
-                agg_type.eq(&"number".to_string()) || agg_type.eq(expect_agg_type)
+        let Some(agg_type) = &self.agg_type else {
+            return false;
+        };
+        match expect_agg_type {
+            "countDistinct" => {
+                agg_type == "countDistinct"
+                    || agg_type == "countDistinctApprox"
+                    || agg_type == "number"
             }
-        } else {
-            false
+            "sum" => agg_type == "sum" || agg_type == "count" || agg_type == "number",
+            "min" | "max" => {
+                agg_type == "number"
+                    || agg_type == "string"
+                    || agg_type == "time"
+                    || agg_type == "boolean"
+                    || agg_type == expect_agg_type
+            }
+            _ => agg_type == "number" || agg_type == expect_agg_type,
+        }
+    }
+
+    // This should be aligned with BaseMeasure.preparePatchedMeasure
+    // See packages/cubejs-schema-compiler/src/adapter/BaseMeasure.ts:16
+    fn allow_replace_agg_type(&self, query_agg_type: &str, disable_strict_match: bool) -> bool {
+        if disable_strict_match {
+            return true;
+        }
+        let Some(agg_type) = &self.agg_type else {
+            return false;
+        };
+
+        match (agg_type.as_str(), query_agg_type) {
+            (
+                "sum" | "avg" | "min" | "max",
+                "sum" | "avg" | "min" | "max" | "count_distinct" | "count_distinct_approx",
+            ) => true,
+
+            (
+                "count_distinct" | "count_distinct_approx",
+                "count_distinct" | "count_distinct_approx",
+            ) => true,
+
+            _ => false,
+        }
+    }
+
+    // This should be aligned with BaseMeasure.preparePatchedMeasure
+    // See packages/cubejs-schema-compiler/src/adapter/BaseMeasure.ts:16
+    fn allow_add_filter(&self, query_agg_type: Option<&str>) -> bool {
+        let Some(agg_type) = &self.agg_type else {
+            return false;
+        };
+
+        let agg_type = match query_agg_type {
+            Some(query_agg_type) => query_agg_type,
+            None => agg_type,
+        };
+
+        match agg_type {
+            "sum"
+            | "avg"
+            | "min"
+            | "max"
+            | "count"
+            | "count_distinct"
+            | "count_distinct_approx" => true,
+            _ => false,
         }
     }
 

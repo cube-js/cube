@@ -1,27 +1,17 @@
----
-redirect_from:
-  - /config/databases/snowflake
----
-
 # Snowflake
+
+[Snowflake][snowflake] is a popular cloud-based data platform.
 
 ## Prerequisites
 
-- [The account ID][snowflake-docs-account-id] for [Snowflake][snowflake]
-- The warehouse name in the [Snowflake][snowflake] account
-- [The region][snowflake-docs-regions] for the [Snowflake][snowflake] warehouse
-- The username/password for the [Snowflake][snowflake] account
-
-## Snowflake quoted identifiers 
-
-Due to an issue in snowflakes opinion about quoted identifers we set a session value to override 
-snowflake defaults for users that have set an account value for: QUOTED_IDENTIFIERS_IGNORE_CASE
-you can learn more about this here: https://docs.snowflake.com/en/sql-reference/identifiers-syntax#double-quoted-identifiers
+- [Account/Server URL][snowflake-docs-account-id] for Snowflake.
+- User name and password or an RSA private key for the Snowflake account.
+- Optionally, the warehouse name, the user role, and the database name.
 
 ## Setup
 
 <WarningBox>
-If you're having Network error and Snowflake can't be reached please make sure you tried 
+If you're having Network error and Snowflake can't be reached please make sure you tried
 [format 2 for an account id][snowflake-format-2].
 </WarningBox>
 
@@ -53,7 +43,7 @@ The following fields are required when creating a Snowflake connection:
 
 <Screenshot
   alt="Cube Cloud Snowflake Configuration Screen"
-  src="https://ucarecdn.com/304d6222-3b82-4edc-b35d-63f70375642c/"
+  src="https://ucarecdn.com/2a113d20-33ca-4634-b6fa-8886df4d215c/"
 />
 
 Cube Cloud also supports connecting to data sources within private VPCs
@@ -65,21 +55,25 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 
 ## Environment Variables
 
-| Environment Variable                            | Description                                                                                                                                         | Possible Values                                                        | Required |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | :------: |
-| `CUBEJS_DB_SNOWFLAKE_ACCOUNT`                   | The Snowflake account identifier to use when connecting to the database                                                                             | [A valid Snowflake account ID][snowflake-docs-account-id]              |    ✅    |
-| `CUBEJS_DB_SNOWFLAKE_REGION`                    | The Snowflake region to use when connecting to the database                                                                                         | [A valid Snowflake region][snowflake-docs-regions]                     |    ❌    |
-| `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`                 | The Snowflake warehouse to use when connecting to the database                                                                                      | [A valid Snowflake warehouse][snowflake-docs-warehouse] in the account |    ✅    |
-| `CUBEJS_DB_SNOWFLAKE_ROLE`                      | The Snowflake role to use when connecting to the database                                                                                           | [A valid Snowflake role][snowflake-docs-roles] in the account          |    ❌    |
-| `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE` | If `true`, [keep the Snowflake connection alive indefinitely][snowflake-docs-connection-options]                                                    | `true`, `false`                                                        |    ❌    |
-| `CUBEJS_DB_NAME`                                | The name of the database to connect to                                                                                                              | A valid database name                                                  |    ✅    |
-| `CUBEJS_DB_USER`                                | The username used to connect to the database                                                                                                        | A valid database username                                              |    ✅    |
-| `CUBEJS_DB_PASS`                                | The password used to connect to the database                                                                                                        | A valid database password                                              |    ✅    |
-| `CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR`             | The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with username/password, or `SNOWFLAKE_JWT` with key pairs. Defaults to `SNOWFLAKE` | `SNOWFLAKE`, `SNOWFLAKE_JWT`                                           |    ❌    |
-| `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`          | The path to the private RSA key folder                                                                                                              | A valid path to the private RSA key                                    |    ❌    |
-| `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`          | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key                     |    ❌    |
-| `CUBEJS_DB_MAX_POOL`                            | The maximum number of concurrent database connections to pool. Default is `20`                                                                      | A valid number                                                         |    ❌    |
-| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| Environment Variable                                 | Description                                                                                                                                         | Possible Values                                                        | Required |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | :------: |
+| `CUBEJS_DB_SNOWFLAKE_ACCOUNT`                        | The Snowflake account identifier to use when connecting to the database                                                                             | [A valid Snowflake account ID][snowflake-docs-account-id]              |    ✅    |
+| `CUBEJS_DB_SNOWFLAKE_REGION`                         | The Snowflake region to use when connecting to the database                                                                                         | [A valid Snowflake region][snowflake-docs-regions]                     |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`                      | The Snowflake warehouse to use when connecting to the database                                                                                      | [A valid Snowflake warehouse][snowflake-docs-warehouse] in the account |    ✅    |
+| `CUBEJS_DB_SNOWFLAKE_ROLE`                           | The Snowflake role to use when connecting to the database                                                                                           | [A valid Snowflake role][snowflake-docs-roles] in the account          |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`      | If `true`, [keep the Snowflake connection alive indefinitely][snowflake-docs-connection-options]                                                    | `true`, `false`                                                        |    ❌    |
+| `CUBEJS_DB_NAME`                                     | The name of the database to connect to                                                                                                              | A valid database name                                                  |    ✅    |
+| `CUBEJS_DB_USER`                                     | The username used to connect to the database                                                                                                        | A valid database username                                              |    ✅    |
+| `CUBEJS_DB_PASS`                                     | The password used to connect to the database                                                                                                        | A valid database password                                              |    ✅    |
+| `CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR`                  | The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with username/password, or `SNOWFLAKE_JWT` with key pairs. Defaults to `SNOWFLAKE` | `SNOWFLAKE`, `SNOWFLAKE_JWT`, `OAUTH`                                  |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY`                    | The content of the private RSA key                                                                                                                  | Content of the private RSA key (encrypted or not)                      |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`               | The path to the private RSA key                                                                                                                     | A valid path to the private RSA key                                    |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`               | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key                     |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`               | The path to the valid oauth toket file                                                                                                              | A valid path for the oauth token file                                  |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_HOST`                           | Host address to which the driver should connect                                                                                                     | A valid hostname                                                       |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE` | Whether or not [quoted identifiers should be case insensitive][link-snowflake-quoted-identifiers]. Default is `false`                               | `true`, `false`                                                        |    ❌    |
+| `CUBEJS_DB_MAX_POOL`                                 | The maximum number of concurrent database connections to pool. Default is `20`                                                                      | A valid number                                                         |    ❌    |
+| `CUBEJS_CONCURRENCY`                                 | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                                                  | A valid number                                                         |    ❌    |
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
@@ -153,15 +147,15 @@ Once the Snowflake integration is set up, configure Cube using the following:
 
 ```dotenv
 CUBEJS_DB_EXPORT_BUCKET=snowflake-export-bucket
-CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
+CUBEJS_DB_EXPORT_BUCKET_TYPE=gcs
 CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
 CUBEJS_DB_EXPORT_INTEGRATION=gcs_int
 ```
 
 #### Azure
 
-To use Azure Blob Storage as an export bucket, follow [the guide on 
-using a Snowflake storage integration (Option 1)][snowflake-docs-azure]. 
+To use Azure Blob Storage as an export bucket, follow [the guide on
+using a Snowflake storage integration (Option 1)][snowflake-docs-azure].
 Take note of the integration name (`azure_int` from the example link)
 as you'll need it to configure Cube.
 
@@ -206,3 +200,4 @@ connections are made over HTTPS.
 [snowflake-format-2]: https://docs.snowflake.com/en/user-guide/admin-account-identifier#format-2-account-locator-in-a-region
 [snowflake-docs-azure]: https://docs.snowflake.com/en/user-guide/data-load-azure-config#option-1-configuring-a-snowflake-storage-integration
 [azure-bs-docs-get-key]: https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?toc=%2Fazure%2Fstorage%2Fblobs%2Ftoc.json&tabs=azure-portal#view-account-access-keys
+[link-snowflake-quoted-identifiers]: https://docs.snowflake.com/en/sql-reference/identifiers-syntax#double-quoted-identifiers

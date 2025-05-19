@@ -8,9 +8,10 @@ use crate::{
     },
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        compiler_cache::CompilerCacheImpl, dataframe::batches_to_dataframe,
-        pg_auth_service::PostgresAuthServiceDefaultImpl, AuthContextRef, AuthenticateResponse,
-        HttpAuthContext, ServerManager, Session, SessionManager, SqlAuthService,
+        auth_service::SqlAuthServiceAuthenticateRequest, compiler_cache::CompilerCacheImpl,
+        dataframe::batches_to_dataframe, pg_auth_service::PostgresAuthServiceDefaultImpl,
+        AuthContextRef, AuthenticateResponse, HttpAuthContext, ServerManager, Session,
+        SessionManager, SqlAuthService,
     },
     transport::{
         CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment,
@@ -536,25 +537,8 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
 }
 
 pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -> Arc<MetaContext> {
-    Arc::new(MetaContext::new(
-        get_test_meta(),
-        vec![
-            (
-                "KibanaSampleDataEcommerce".to_string(),
-                "default".to_string(),
-            ),
-            ("Logs".to_string(), "default".to_string()),
-            ("NumberCube".to_string(), "default".to_string()),
-            ("WideCube".to_string(), "default".to_string()),
-            ("MultiTypeCube".to_string(), "default".to_string()),
-        ]
-        .into_iter()
-        .collect(),
-        vec![("default".to_string(), sql_generator(custom_templates))]
-            .into_iter()
-            .collect(),
-        Uuid::new_v4(),
-    ))
+    let meta = get_test_meta();
+    get_test_tenant_ctx_with_meta_and_templates(meta, custom_templates)
 }
 
 pub fn sql_generator(
@@ -669,19 +653,33 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
     })
 }
 
-pub fn get_test_tenant_ctx_with_meta(meta: Vec<CubeMeta>) -> Arc<MetaContext> {
-    let cube_to_data_source = meta
+fn get_test_tenant_ctx_with_meta_and_templates(
+    meta: Vec<CubeMeta>,
+    custom_templates: Vec<(String, String)>,
+) -> Arc<MetaContext> {
+    let member_to_data_source = meta
         .iter()
-        .map(|c| (c.name.clone(), "default".to_string()))
+        .flat_map(|cube| {
+            cube.dimensions
+                .iter()
+                .map(|d| &d.name)
+                .chain(cube.measures.iter().map(|m| &m.name))
+                .chain(cube.segments.iter().map(|s| &s.name))
+        })
+        .map(|member| (member.clone(), "default".to_string()))
         .collect();
     Arc::new(MetaContext::new(
         meta,
-        cube_to_data_source,
-        vec![("default".to_string(), sql_generator(vec![]))]
+        member_to_data_source,
+        vec![("default".to_string(), sql_generator(custom_templates))]
             .into_iter()
             .collect(),
         Uuid::new_v4(),
     ))
+}
+
+pub fn get_test_tenant_ctx_with_meta(meta: Vec<CubeMeta>) -> Arc<MetaContext> {
+    get_test_tenant_ctx_with_meta_and_templates(meta, vec![])
 }
 
 pub async fn get_test_session(
@@ -750,6 +748,7 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
     impl SqlAuthService for TestSqlAuth {
         async fn authenticate(
             &self,
+            _request: SqlAuthServiceAuthenticateRequest,
             _user: Option<String>,
             password: Option<String>,
         ) -> Result<AuthenticateResponse, CubeError> {

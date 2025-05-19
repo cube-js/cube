@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /configuration/overview
----
-
 # Overview
 
 Cube is configured via [environment variables][link-env-vars] and
@@ -92,16 +87,35 @@ module.exports = {
         member: 'orders_view.id',
         operator: 'equals',
         values: [securityContext.order_id]
-      });
+      })
     }
-    return query;
-  },
-};
+    return query
+  }
+}
 ```
 
 </CodeTabs>
 
 Both ways are equivalent; when in doubt, use Python.
+
+Here is a minimal correct `cube.py` file. Note that the `config` object must be imported:
+
+```python
+from cube import config
+
+# Configuration goes here...
+```
+
+Here is a minimal correct `cube.js` file. Note that the `module.exports` object must be defined:
+
+```javascript
+module.exports = {
+  // Configuration goes here...
+}
+```
+
+You can read more about [Python][ref-python] and [JavaScript][ref-javascript] support
+in the dynamic data modeling section of the documentation.
 
 ### Cube Core
 
@@ -112,7 +126,8 @@ Docker container.
 ### Cube Cloud
 
 You can edit the configuration file by going into <Btn>Development Mode</Btn>
-and navigating to the <Btn>Data Model</Btn> page.
+and navigating to <Btn>[Data Model][ref-data-model]</Btn> or <Btn>[Visual
+Model][ref-visual-model]</Btn> pages.
 
 ## Runtimes and dependencies
 
@@ -179,3 +194,7 @@ mode does the following:
 [ref-mls]: /product/auth/member-level-security
 [link-current-python-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L13
 [link-current-nodejs-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L1
+[ref-data-model]: /product/workspace/data-model
+[ref-visual-model]: /product/workspace/visual-model
+[ref-python]: /product/data-modeling/dynamic/jinja#python
+[ref-javascript]: /product/data-modeling/dynamic/javascript

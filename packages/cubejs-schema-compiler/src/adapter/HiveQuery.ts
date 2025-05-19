@@ -23,7 +23,7 @@ class HiveFilter extends BaseFilter {
 
 export class HiveQuery extends BaseQuery {
   public newFilter(filter) {
-    return new HiveFilter(this, filter);
+    return new HiveFilter(this as BaseQuery, filter);
   }
 
   public convertTz(field) {
@@ -67,11 +67,11 @@ export class HiveQuery extends BaseQuery {
     const select = this.evaluateSymbolSqlWithContext(
       () => this.dimensionsForSelect().map(
         d => d.aliasName()
-      ).concat(this.measures.map(m => m.selectColumns())).filter(s => !!s), {
+      ).concat(this.measures.flatMap(m => m.selectColumns())).filter(s => !!s), {
         ungroupedAliases: R.fromPairs(this.forSelect().map((m: any) => [m.measure || m.dimension, m.aliasName()]))
       }
     );
-    return `SELECT ${select} FROM (${ungrouped}) AS ${this.escapeColumnName('hive_wrapper')} 
+    return `SELECT ${select} FROM (${ungrouped}) AS ${this.escapeColumnName('hive_wrapper')}
     ${this.groupByClause()}${this.baseHaving(this.measureFilters)}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 

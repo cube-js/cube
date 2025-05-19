@@ -249,17 +249,15 @@ export class BaseTimeDimension extends BaseFilter {
               return this.dateRangeGranularity();
             }
 
-            if (!this.dateRange) {
-              return this.granularityObj.minGranularity();
-            }
-
             // If we have granularity and date range, we need to check
             // that the interval and the granularity offset are stacked/fits with date range
-            if (this.granularityObj.isPredefined() ||
-              !this.granularityObj.isAlignedWithDateRange([this.dateFromFormatted(), this.dateToFormatted()])) {
+            if (this.dateRange && (this.granularityObj.isPredefined() ||
+              !this.granularityObj.isAlignedWithDateRange([this.dateFromFormatted(), this.dateToFormatted()]))) {
               return this.query.minGranularity(this.granularityObj.minGranularity(), this.dateRangeGranularity());
             }
 
+            // We return the granularity as-is, including custom ones,
+            // because baseQuery.granularityHierarchies correctly expands all custom granularities into hierarchies.
             return this.granularityObj.granularity;
           }
         );

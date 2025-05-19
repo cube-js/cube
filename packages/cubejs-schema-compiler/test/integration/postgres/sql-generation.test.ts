@@ -3,18 +3,47 @@ import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { PrestodbQuery } from '../../../src/adapter/PrestodbQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
+import { testWithPreAggregation } from './pre-aggregation-utils';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
     }
+
+    cube(\`visitors_create_dates\`, {
+      sql: \`
+      select id AS create_date_id, created_at from visitors WHERE \${SECURITY_CONTEXT.source.filter('source')} AND
+      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
+      \`,
+
+      rewriteQueries: true,
+
+      dimensions: {
+        create_date_id: {
+          type: 'number',
+          sql: 'id',
+          primaryKey: true
+        },
+        create_date_created_at: {
+          type: 'time',
+          sql: 'created_at',
+          granularities: {
+            three_days: {
+              interval: '3 days',
+              title: '3 days',
+              origin: '2017-01-01'
+            }
+          }
+        }
+      }
+    })
 
     cube(\`visitors\`, {
       sql: \`
@@ -32,6 +61,16 @@ describe('SQL Generation', () => {
         visitor_checkins: {
           relationship: 'hasMany',
           sql: \`\${CUBE}.id = \${visitor_checkins}.visitor_id\`
+        },
+        visitors_create_dates: {
+          relationship: 'one_to_one',
+          sql: \`\${CUBE}.id = \${visitors_create_dates}.create_date_id\`
+        }
+      },
+
+      segments: {
+        some_source: {
+          sql: \`\${CUBE}.source = 'some'\`
         }
       },
 
@@ -84,6 +123,13 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
+        countRollingThreeMonth: {
+          type: 'count',
+          rollingWindow: {
+            trailing: '3 month',
+            offset: 'end'
+          }
+        },
         countRollingUnbounded: {
           type: 'count',
           rollingWindow: {
@@ -111,6 +157,25 @@ describe('SQL Generation', () => {
           sql: \`\${revenue}\`,
           time_shift: [{
             time_dimension: created_at,
+            interval: '1 day',
+            type: 'prior',
+          }]
+        },
+        revenue_day_ago_no_td: {
+          multi_stage: true,
+          type: 'sum',
+          sql: \`\${revenue}\`,
+          time_shift: [{
+            interval: '1 day',
+            type: 'prior',
+          }]
+        },
+        revenue_day_ago_via_join: {
+          multi_stage: true,
+          type: 'sum',
+          sql: \`\${revenue}\`,
+          time_shift: [{
+            time_dimension: visitors_create_dates.create_date_created_at,
             interval: '1 day',
             type: 'prior',
           }]
@@ -217,6 +282,10 @@ describe('SQL Generation', () => {
           sql: \`\${revenue}\`,
           type: 'sum',
           group_by: [id]
+        },
+        min_created_at: {
+          type: 'time',
+          sql: 'MIN(created_at)'
         }
       },
 
@@ -246,6 +315,10 @@ describe('SQL Generation', () => {
               origin: '2017-01-01'
             }
           }
+        },
+        created_month: {
+          type: 'time',
+          sql: \`\${created_at.month}\`
         },
         updated_at: {
           type: 'time',
@@ -311,6 +384,10 @@ describe('SQL Generation', () => {
     view('visitors_multi_stage', {
       cubes: [{
         join_path: 'visitors',
+        includes: '*'
+      },
+      {
+        join_path: 'visitors.visitors_create_dates',
         includes: '*'
       }]
     })
@@ -653,6 +730,92 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         }
       }
     });
+
+    cube('UngroupedMeasureWithFilter1', {
+      sql: \`
+        SELECT
+          1 AS id,
+          1 AS sum
+      \`,
+      sqlAlias: 'umwf1',
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: 'number',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        },
+        sum_filter: {
+          sql: \`sum\`,
+          type: 'sum',
+          filters: [{sql: \`\${UngroupedMeasureWithFilter3.id} = 1\`}]
+        }
+      },
+      joins: {
+        UngroupedMeasureWithFilter2: {
+          sql: \`\${CUBE.id} = \${UngroupedMeasureWithFilter2.id}\`,
+          relationship: \`one_to_many\`
+        },
+        UngroupedMeasureWithFilter3: {
+          sql: \`\${CUBE.id} = \${UngroupedMeasureWithFilter3.id}\`,
+          relationship: \`many_to_one\`
+        }
+      }
+    });
+
+    cube('UngroupedMeasureWithFilter2', {
+      sql: \`
+        SELECT
+          1 AS id
+      \`,
+      sqlAlias: 'umwf2',
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: 'number',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        }
+      }
+    });
+
+    cube('UngroupedMeasureWithFilter3', {
+      sql: \`
+        SELECT
+          1 AS id
+      \`,
+      sqlAlias: 'umwf3',
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: 'number',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        }
+      }
+    });
+
+    view('UngroupedMeasureWithFilter_View', {
+      cubes: [{
+        join_path: 'UngroupedMeasureWithFilter1',
+        includes: ['sum_filter']
+      }, {
+        join_path: 'UngroupedMeasureWithFilter1.UngroupedMeasureWithFilter2',
+        includes: ['count']
+      }]
+    })
     `);
 
   it('simple join', async () => {
@@ -889,6 +1052,80 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     timeDimensions: [
       {
         dimension: 'visitors.created_at',
+        granularity: 'month',
+        dateRange: ['2017-01-01', '2017-01-10']
+      },
+      {
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-10']
+      }
+    ],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    {
+      visitors__count_rolling_week_to_date: null,
+      visitors__created_at_day: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '1',
+      visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '1',
+      visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '2',
+      visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '3',
+      visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: null,
+      visitors__created_at_day: '2017-01-09T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: null,
+      visitors__created_at_day: '2017-01-10T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
+    }
+  ]));
+
+  it('rolling window with two time dimension granularities one custom one regular', async () => runQueryTest({
+
+    measures: [
+      'visitors.countRollingWeekToDate'
+    ],
+    timeDimensions: [
+      {
+        dimension: 'visitors.created_at',
         granularity: 'three_days',
         dateRange: ['2017-01-01', '2017-01-10']
       },
@@ -963,12 +1200,12 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     timeDimensions: [
       {
         dimension: 'visitors.created_at',
-        granularity: 'three_days',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-10']
       },
       {
         dimension: 'visitors.created_at',
-        granularity: 'day',
+        granularity: 'week',
         dateRange: ['2017-01-01', '2017-01-10']
       }
     ],
@@ -981,61 +1218,61 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       visitors__count_rolling_unbounded: '1',
       visitors__count_rolling_week_to_date: null,
       visitors__created_at_day: '2017-01-01T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
-    },
-    {
-      visitors__count_rolling_unbounded: '2',
-      visitors__count_rolling_week_to_date: '1',
-      visitors__created_at_day: '2017-01-03T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_week: '2016-12-26T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '2',
       visitors__count_rolling_week_to_date: '1',
       visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '2',
+      visitors__count_rolling_week_to_date: '1',
+      visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '3',
       visitors__count_rolling_week_to_date: '2',
       visitors__created_at_day: '2017-01-04T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '4',
       visitors__count_rolling_week_to_date: '3',
       visitors__created_at_day: '2017-01-05T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '6',
       visitors__count_rolling_week_to_date: '5',
       visitors__created_at_day: '2017-01-06T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
-    },
-    {
-      visitors__count_rolling_unbounded: '6',
-      visitors__count_rolling_week_to_date: '5',
-      visitors__created_at_day: '2017-01-08T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '6',
       visitors__count_rolling_week_to_date: '5',
       visitors__created_at_day: '2017-01-07T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '6',
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '6',
       visitors__count_rolling_week_to_date: null,
       visitors__created_at_day: '2017-01-09T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-09T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '6',
       visitors__count_rolling_week_to_date: null,
       visitors__created_at_day: '2017-01-10T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-10T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-09T00:00:00.000Z',
     }
   ]));
 
@@ -1082,6 +1319,61 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__count_rolling: null }
   ]));
 
+  if (getEnv('nativeSqlPlanner')) {
+    it('rolling count without date range', async () => {
+      await runQueryTest({
+        measures: [
+          'visitors.countRollingThreeMonth'
+        ],
+        timeDimensions: [{
+          dimension: 'visitors.created_at',
+          granularity: 'month',
+        }],
+        order: [{
+          id: 'visitors.created_at'
+        }],
+        timezone: 'America/Los_Angeles'
+      }, [
+        { visitors__created_at_month: '2016-09-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_at_month: '2016-10-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_at_month: '2016-11-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_at_month: '2016-12-01T00:00:00.000Z', visitors__count_rolling_three_month: null },
+        { visitors__created_at_month: '2017-01-01T00:00:00.000Z', visitors__count_rolling_three_month: '5' },
+      ]);
+    });
+  } else {
+    it.skip('rolling count without date range', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('rolling count proxy time dimension', async () => {
+      await runQueryTest({
+        measures: [
+          'visitors.countRollingThreeMonth'
+        ],
+        dimensions: [
+          'visitors.created_month'
+        ],
+        order: [{
+          id: 'visitors.created_month'
+        }],
+        timezone: 'America/Los_Angeles'
+      }, [
+        { visitors__created_month: '2016-09-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_month: '2016-10-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_month: '2016-11-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_month: '2016-12-01T00:00:00.000Z', visitors__count_rolling_three_month: null },
+        { visitors__created_month: '2017-01-01T00:00:00.000Z', visitors__count_rolling_three_month: '5' },
+      ]);
+    });
+  } else {
+    it.skip('rolling count without date range', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
+
   it('rolling qtd', async () => runQueryTest({
     measures: [
       'visitors.revenue_qtd'
@@ -1122,6 +1414,92 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   }, [
     { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago: '200' },
     { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago: '300' }
+  ]));
+
+  it('CAGR (no td in time_shift)', async () => runQueryTest({
+    measures: [
+      'visitors.revenue',
+      'visitors.revenue_day_ago_no_td',
+      'visitors.cagr_day'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-01-31']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago_no_td: '200' },
+    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago_no_td: '300' }
+  ]));
+
+  it('CAGR via view (td from main cube)', async () => runQueryTest({
+    measures: [
+      'visitors_multi_stage.revenue',
+      'visitors_multi_stage.revenue_day_ago',
+      'visitors_multi_stage.cagr_day'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors_multi_stage.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-01-31']
+    }],
+    order: [{
+      id: 'visitors_multi_stage.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors_multi_stage__created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__cagr_day: '150', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago: '200' },
+    { visitors_multi_stage__created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__cagr_day: '300', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago: '300' }
+  ]));
+
+  it('CAGR via view (td from joined cube)', async () => runQueryTest({
+    measures: [
+      'visitors_multi_stage.revenue',
+      'visitors_multi_stage.revenue_day_ago_via_join',
+    ],
+    timeDimensions: [{
+      dimension: 'visitors_multi_stage.create_date_created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-01-31']
+    }],
+    order: [{
+      id: 'visitors_multi_stage.create_date_created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago_via_join: '200' },
+    { visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago_via_join: '300' }
+  ]));
+
+  it('CAGR (no td in time_shift via view)', async () => runQueryTest({
+    measures: [
+      'visitors_multi_stage.revenue',
+      'visitors_multi_stage.revenue_day_ago_no_td',
+    ],
+    timeDimensions: [{
+      dimension: 'visitors_multi_stage.create_date_created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-01-31']
+    }],
+    order: [{
+      id: 'visitors_multi_stage.create_date_created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    {
+      visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z',
+      visitors_multi_stage__revenue: '300',
+      visitors_multi_stage__revenue_day_ago_no_td: '200',
+    },
+    {
+      visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z',
+      visitors_multi_stage__revenue: '900',
+      visitors_multi_stage__revenue_day_ago_no_td: '300',
+    }
   ]));
 
   it('sql utils', async () => runQueryTest({
@@ -1334,6 +1712,45 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
           visitors__visitor_count: '3'
         }]
       );
+    });
+  });
+
+  it('having filter (time measure)', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.min_created_at'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitors.min_created_at',
+        operator: 'inDateRange',
+        values: ['2017-01-01', '2018-01-01']
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual([
+        {
+          visitors__min_created_at: '2017-01-06T00:00:00.000Z',
+          visitors__source: 'google',
+        },
+        {
+          visitors__min_created_at: '2017-01-03T00:00:00.000Z',
+          visitors__source: 'some',
+        },
+      ]);
     });
   });
 
@@ -1777,6 +2194,40 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     });
   });
 
+  /// Test that query with segment member expression, that references dimension, that is covered by pre-agg
+  /// would _not_ trigger stuff like `path.split is not a function` due to unexpected member expression
+  it('pre-aggregation with segment member expression', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      segments: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'visitor_checkins',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${visitor_checkins.source} IS NOT NULL`'
+          ),
+          expressionName: 'source_is_some',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${visitor_checkins.source} IS NOT NULL',
+          cubeName: 'visitor_checkins',
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+      order: [],
+      preAggregationsSchema: ''
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
+
+    const res = await testWithPreAggregation(preAggregationsDescription, query);
+    expect(res).toEqual(
+      // Empty result set, only segments in query
+      [{}]
+    );
+  });
+
   it('join rollup pre-aggregation', async () => {
     await compiler.compile();
 
@@ -1811,21 +2262,17 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     console.log(preAggregationsDescription);
 
-    return dbRunner.testQueries(preAggregationsDescription.invalidateKeyQueries.concat([
-      [preAggregationsDescription.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), preAggregationsDescription.loadSql[1]],
-      query.buildSqlAndParams()
-    ])).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [
-          {
-            vc__source: 'google',
-            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-            visitors__per_visitor_revenue: '100'
-          }
-        ]
-      );
-    });
+    const res = await testWithPreAggregation(preAggregationsDescription, query);
+    console.log(JSON.stringify(res));
+    expect(res).toEqual(
+      [
+        {
+          vc__source: 'google',
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__per_visitor_revenue: '100'
+        }
+      ]
+    );
   });
 
   it('join rollup total pre-aggregation', async () => {
@@ -1856,22 +2303,15 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     console.log(preAggregationsDescription);
 
-    return dbRunner.testQueries(preAggregationsDescription.invalidateKeyQueries.concat([
-      [
-        preAggregationsDescription.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'),
-        preAggregationsDescription.loadSql[1]
-      ],
-      query.buildSqlAndParams()
-    ])).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [{
-          vc__source: 'google',
-          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-          visitors__visitor_revenue: '100'
-        }]
-      );
-    });
+    const res = await testWithPreAggregation(preAggregationsDescription, query);
+    console.log(JSON.stringify(res));
+    expect(res).toEqual(
+      [{
+        vc__source: 'google',
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__visitor_revenue: '100'
+      }]
+    );
   });
 
   it('security context', async () => {
@@ -3276,6 +3716,43 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     }]
   ));
 
+  it('simple join with segment', async () => runQueryTest(
+    {
+      measures: [
+        'visitors.visitor_revenue',
+        'visitors.visitor_count',
+        'visitor_checkins.visitor_checkins_count',
+        'visitors.per_visitor_revenue'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      segments: ['visitors.some_source'],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors.created_at'
+      }]
+    },
+    [
+      {
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__visitor_revenue: '100',
+        visitors__visitor_count: '1',
+        vc__visitor_checkins_count: '3',
+        visitors__per_visitor_revenue: '100'
+      },
+      {
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__visitor_revenue: '200',
+        visitors__visitor_count: '1',
+        vc__visitor_checkins_count: '2',
+        visitors__per_visitor_revenue: '200'
+      },
+    ]
+  ));
+
   // Subquery aggregation for multiplied measure (and any `keysSelect` for that matter)
   // should pick up all dimensions, even through member expressions
   it('multiplied sum with dimension member expressions', async () => runQueryTest(
@@ -3358,7 +3835,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   // ));
 
   it('columns order for the query with the sub-query', async () => {
-    const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+    const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
     await joinedSchemaCompilers.compiler.compile();
     const query = new PostgresQuery({
       joinGraph: joinedSchemaCompilers.joinGraph,
@@ -3456,6 +3933,62 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         }],
       },
       [{ visitors__id_case: 0 }]
+    );
+  });
+
+  it('ungrouped measure with filter', async () => runQueryTest({
+    measures: [
+      'UngroupedMeasureWithFilter_View.sum_filter',
+      'UngroupedMeasureWithFilter_View.count'
+    ],
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true,
+  }, [{
+    ungrouped_measure_with_filter__view__count: 1,
+    ungrouped_measure_with_filter__view__sum_filter: 1
+  }]));
+
+  it('patched measure expression', async () => {
+    await runQueryTest(
+      {
+        measures: [
+          'visitors.revenue',
+          'visitors.visitor_revenue',
+          {
+            expression: {
+              type: 'PatchMeasure',
+              sourceMeasure: 'visitors.revenue',
+              replaceAggregationType: 'max',
+              addFilters: [],
+            },
+            cubeName: 'visitors',
+            name: 'max_revenue',
+            definition: 'PatchMeasure(visitors.revenue, max, [])',
+          },
+          {
+            expression: {
+              type: 'PatchMeasure',
+              sourceMeasure: 'visitors.revenue',
+              replaceAggregationType: null,
+              addFilters: [
+                {
+                  sql: (visitors) => `${visitors.source} IN ('google', 'some')`,
+                },
+              ],
+            },
+            cubeName: 'visitors',
+            name: 'google_revenue',
+            // eslint-disable-next-line no-template-curly-in-string
+            definition: 'PatchMeasure(visitors.revenue, min, [${visitors.source} IN (\'google\', \'some\')])',
+          },
+        ],
+      },
+      [{
+        visitors__revenue: '2000',
+        visitors__visitor_revenue: '300',
+        visitors__max_revenue: 500,
+        visitors__google_revenue: '600',
+      }]
     );
   });
 });

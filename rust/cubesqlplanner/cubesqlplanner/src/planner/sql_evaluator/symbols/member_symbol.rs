@@ -1,7 +1,11 @@
+use cubenativeutils::CubeError;
+
 use super::{
     CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol,
     TimeDimensionSymbol,
 };
+use crate::planner::query_tools::QueryTools;
+use crate::planner::{BaseMember, MemberSymbolRef};
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -121,7 +125,93 @@ impl MemberSymbol {
         }
     }
 
+    pub fn is_reference(&self) -> bool {
+        match self {
+            Self::Dimension(d) => d.is_reference(),
+            Self::TimeDimension(d) => d.is_reference(),
+            Self::Measure(m) => m.is_reference(),
+            Self::CubeName(_) => false,
+            Self::CubeTable(_) => false,
+            Self::MemberExpression(e) => e.is_reference(),
+        }
+    }
+
+    pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
+        match self {
+            Self::Dimension(d) => d.reference_member(),
+            Self::TimeDimension(d) => d.reference_member(),
+            Self::Measure(m) => m.reference_member(),
+            Self::CubeName(_) => None,
+            Self::CubeTable(_) => None,
+            Self::MemberExpression(e) => e.reference_member(),
+        }
+    }
+
+    pub fn resolve_reference_chain(self: Rc<Self>) -> Rc<MemberSymbol> {
+        let mut current = self;
+        while let Some(reference) = current.reference_member() {
+            current = reference;
+        }
+        current
+    }
+
+    pub fn owned_by_cube(&self) -> bool {
+        match self {
+            Self::Dimension(d) => d.owned_by_cube(),
+            Self::TimeDimension(d) => d.owned_by_cube(),
+            Self::Measure(m) => m.owned_by_cube(),
+            Self::CubeName(_) => false,
+            Self::CubeTable(_) => false,
+            Self::MemberExpression(_) => false,
+        }
+    }
+
+    pub fn as_time_dimension(&self) -> Result<&TimeDimensionSymbol, CubeError> {
+        match self {
+            Self::TimeDimension(d) => Ok(d),
+            _ => Err(CubeError::internal(format!(
+                "{} is not a time dimension",
+                self.full_name()
+            ))),
+        }
+    }
+
+    pub fn as_dimension(&self) -> Result<&DimensionSymbol, CubeError> {
+        match self {
+            Self::Dimension(d) => Ok(d),
+            _ => Err(CubeError::internal(format!(
+                "{} is not a dimension",
+                self.full_name()
+            ))),
+        }
+    }
+
+    pub fn as_measure(&self) -> Result<&MeasureSymbol, CubeError> {
+        match self {
+            Self::Measure(m) => Ok(m),
+            _ => Err(CubeError::internal(format!(
+                "{} is not a measure",
+                self.full_name()
+            ))),
+        }
+    }
+
+    pub fn alias_suffix(&self) -> Option<String> {
+        match self {
+            Self::TimeDimension(d) => Some(d.alias_suffix()),
+            _ => None,
+        }
+    }
+
     pub fn is_leaf(&self) -> bool {
         self.get_dependencies().is_empty()
+    }
+
+    // To back compatibility with code that use BaseMembers
+    pub fn as_base_member(
+        self: Rc<Self>,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<Rc<dyn BaseMember>, CubeError> {
+        MemberSymbolRef::try_new(self, query_tools).map(|r| r.as_base_member())
     }
 }

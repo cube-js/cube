@@ -60,6 +60,9 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?left_grouped_subqueries",
                                 "?left_ungrouped_scan",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -76,6 +79,9 @@ impl WrapperRules {
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -103,6 +109,7 @@ impl WrapperRules {
                                 // Can use it, because we've checked that left input allows push-to-Cube,
                                 // so it must be ungrouped, making this whole plan ungrouped
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -114,6 +121,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -125,6 +133,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -136,6 +145,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -147,6 +157,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -160,6 +171,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         // We don't want to use list rules here, because ?right_input is already done
@@ -174,6 +186,7 @@ impl WrapperRules {
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
+                                        "?input_data_source",
                                     ),
                                 ),
                                 wrapper_pushdown_replacer(
@@ -188,6 +201,7 @@ impl WrapperRules {
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
+                                        "?input_data_source",
                                     ),
                                 ),
                                 "?out_join_type",
@@ -202,6 +216,7 @@ impl WrapperRules {
                                     "?left_cube_members",
                                     "?out_grouped_subqueries",
                                     "WrapperReplacerContextUngroupedScan:true",
+                                    "?input_data_source",
                                 ),
                             ),
                         ),
@@ -214,6 +229,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
@@ -228,6 +244,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         "WrappedSelectAlias:None",
@@ -333,6 +350,9 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?left_grouped_subqueries",
                                 "?left_ungrouped_scan",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -349,6 +369,9 @@ impl WrapperRules {
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -366,6 +389,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -377,6 +401,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -388,6 +413,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -399,6 +425,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -410,6 +437,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -423,6 +451,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         // We don't want to use list rules here, because ?right_input is already done
@@ -437,6 +466,7 @@ impl WrapperRules {
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
+                                        "?input_data_source",
                                     ),
                                 ),
                                 wrapper_pushdown_replacer(
@@ -451,6 +481,7 @@ impl WrapperRules {
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
+                                        "?input_data_source",
                                     ),
                                 ),
                                 "?out_join_type",
@@ -465,6 +496,7 @@ impl WrapperRules {
                                     "?left_cube_members",
                                     "?out_grouped_subqueries",
                                     "WrapperReplacerContextUngroupedScan:true",
+                                    "?input_data_source",
                                 ),
                             ),
                         ),
@@ -477,6 +509,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
@@ -491,6 +524,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         "WrappedSelectAlias:None",
@@ -549,6 +583,9 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?left_grouped_subqueries",
                                 "?left_ungrouped_scan",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -565,6 +602,9 @@ impl WrapperRules {
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -589,6 +629,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?left_grouped_subqueries",
                                 "?left_ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -605,6 +646,7 @@ impl WrapperRules {
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",

@@ -26,10 +26,10 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-      - name: Install Node.js 20.x
+      - name: Install Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -73,7 +73,7 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [20]
+        node-version: [22]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         include:
@@ -152,7 +152,7 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.target }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
         os-version: ["macos-13"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
@@ -240,7 +240,7 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
         python-version: ["fallback"]
         os-version: [windows-2019]
         include:

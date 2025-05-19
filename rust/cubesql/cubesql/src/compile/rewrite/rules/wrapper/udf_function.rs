@@ -5,7 +5,7 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, wrapper_replacer_context,
-        ScalarUDFExprFun, WrapperReplacerContextAliasToCube,
+        ScalarUDFExprFun,
     },
     var, var_iter,
 };
@@ -32,6 +32,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                 ),
@@ -44,9 +45,10 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
-                self.transform_udf_expr("?fun", "?alias_to_cube"),
+                self.transform_udf_expr("?fun", "?input_data_source"),
             ),
             rewrite(
                 "wrapper-push-down-udf-args",
@@ -75,28 +77,24 @@ impl WrapperRules {
     fn transform_udf_expr(
         &self,
         fun_var: &'static str,
-        alias_to_cube_var: &'static str,
+        input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
-        let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                WrapperReplacerContextAliasToCube
-            )
-            .cloned()
-            {
-                if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube) {
-                    for fun in var_iter!(egraph[subst[fun_var]], ScalarUDFExprFun).cloned() {
-                        if sql_generator
-                            .get_sql_templates()
-                            .templates
-                            .contains_key(&format!("functions/{}", fun.to_uppercase()))
-                        {
-                            return true;
-                        }
-                    }
+            let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var)
+            else {
+                return false;
+            };
+
+            for fun in var_iter!(egraph[subst[fun_var]], ScalarUDFExprFun).cloned() {
+                if Self::can_rewrite_template(
+                    &data_source,
+                    &meta,
+                    &format!("functions/{}", fun.to_uppercase()),
+                ) {
+                    return true;
                 }
             }
             false

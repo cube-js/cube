@@ -1,5 +1,5 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 
 const getSql = () => `
   select 3060 as row_id, 'CA-2017-131492' as order_id, to_date('2020-10-19', 'YYYY-MM-DD') as order_date, 'HH-15010' as customer_id, 'San Francisco' as city, 'Furniture' as category, 'Tables' as sub_category, 'Anderson Hickey Conga Table Tops & Accessories' as product_name, 24.36800 as sales, 2 as quantity, 0.20000 as discount, -3.35060 as profit union all
@@ -214,7 +214,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(true, false, false));
+        prepareJsCompiler(getCube(true, false, false));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -284,7 +284,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(false, true, false));
+        prepareJsCompiler(getCube(false, true, false));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -354,7 +354,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(false, false, true));
+        prepareJsCompiler(getCube(false, false, true));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -424,7 +424,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(true, true, false));
+        prepareJsCompiler(getCube(true, true, false));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -485,7 +485,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(true, false, true));
+        prepareJsCompiler(getCube(true, false, true));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -546,7 +546,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(false, true, true));
+        prepareJsCompiler(getCube(false, true, true));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -607,7 +607,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(true, true, true));
+        prepareJsCompiler(getCube(true, true, true));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();

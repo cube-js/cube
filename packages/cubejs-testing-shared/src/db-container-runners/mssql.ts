@@ -6,13 +6,15 @@ export class MssqlDbRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_MSSQL_VERSION || options.version || '2019-latest';
 
+    const logMsg = version === '2019-latest' ? 'Service Broker manager has started' : 'SQL Server is now ready for client connections';
+
     const container = new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
       .withEnvironment({
         ACCEPT_EULA: 'Y',
         MSSQL_SA_PASSWORD: process.env.TEST_DB_PASSWORD || 'Test1test',
       })
       .withExposedPorts(1433)
-      .withWaitStrategy(Wait.forLogMessage('Service Broker manager has started'))
+      .withWaitStrategy(Wait.forLogMessage(logMsg))
       .withStartupTimeout(30 * 1000);
 
     if (options.volumes) {

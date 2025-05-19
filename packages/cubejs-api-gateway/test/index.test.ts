@@ -17,6 +17,7 @@ import {
   DataSourceStorageMock,
   AdapterApiMock
 } from './mocks';
+import { ApiScopesTuple } from '../src/types/auth';
 
 const logger = (type, message) => console.log({ type, ...message });
 
@@ -61,6 +62,7 @@ async function createApiGateway(
 
   process.env.NODE_ENV = 'unknown';
   const app = express();
+  app.use(express.json());
   apiGateway.initApp(app);
 
   return {
@@ -769,6 +771,21 @@ describe('API Gateway', () => {
   });
 
   describe('sql api member expressions evaluations', () => {
+    const query = {
+      measures: [
+        // eslint-disable-next-line no-template-curly-in-string
+        '{"cubeName":"sales","alias":"sum_sales_line_i","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"SUM(${sales.line_items_price})"},"groupingSet":null}'
+      ],
+      dimensions: [
+        // eslint-disable-next-line no-template-curly-in-string
+        '{"cubeName":"sales","alias":"users_age","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${sales.users_age}"},"groupingSet":null}',
+        // eslint-disable-next-line no-template-curly-in-string
+        '{"cubeName":"sales","alias":"cast_sales_users","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"CAST(${sales.users_first_name} AS TEXT)"},"groupingSet":null}'
+      ],
+      segments: [],
+      order: []
+    };
+
     test('throw error if expressions are not allowed', async () => {
       const { apiGateway } = await createApiGateway();
       const request: QueryRequest = {
@@ -777,20 +794,7 @@ describe('API Gateway', () => {
           const errorMessage = message as { error: string };
           expect(errorMessage.error).toEqual('Error: Expressions are not allowed in this context');
         },
-        query: {
-          measures: [
-            // eslint-disable-next-line no-template-curly-in-string
-            '{"cube_name":"sales","alias":"sum_sales_line_i","cube_params":["sales"],"expr":"SUM(${sales.line_items_price})","grouping_set":null}'
-          ],
-          dimensions: [
-            // eslint-disable-next-line no-template-curly-in-string
-            '{"cube_name":"sales","alias":"users_age","cube_params":["sales"],"expr":"${sales.users_age}","grouping_set":null}',
-            // eslint-disable-next-line no-template-curly-in-string
-            '{"cube_name":"sales","alias":"cast_sales_users","cube_params":["sales"],"expr":"CAST(${sales.users_first_name} AS TEXT)","grouping_set":null}'
-          ],
-          segments: [],
-          order: []
-        },
+        query,
         expressionParams: [],
         exportAnnotatedSql: true,
         memberExpressions: false,
@@ -818,20 +822,7 @@ describe('API Gateway', () => {
         res(message) {
           expect(message.hasOwnProperty('sql')).toBe(true);
         },
-        query: {
-          measures: [
-            // eslint-disable-next-line no-template-curly-in-string
-            '{"cube_name":"sales","alias":"sum_sales_line_i","cube_params":["sales"],"expr":"SUM(${sales.line_items_price})","grouping_set":null}'
-          ],
-          dimensions: [
-            // eslint-disable-next-line no-template-curly-in-string
-            '{"cube_name":"sales","alias":"users_age","cube_params":["sales"],"expr":"${sales.users_age}","grouping_set":null}',
-            // eslint-disable-next-line no-template-curly-in-string
-            '{"cube_name":"sales","alias":"cast_sales_users","cube_params":["sales"],"expr":"CAST(${sales.users_first_name} AS TEXT)","grouping_set":null}'
-          ],
-          segments: [],
-          order: []
-        },
+        query,
         expressionParams: [],
         exportAnnotatedSql: true,
         memberExpressions: true,
@@ -979,6 +970,96 @@ describe('API Gateway', () => {
           test('wrong params', wrongPayloadsTestFactory(config));
         } */
       });
+    });
+  });
+
+  describe('/v1/pre-aggregations/jobs', () => {
+    const scheduledRefreshContextsFactory = () => ([
+      { securityContext: { foo: 'bar' } },
+      { securityContext: { bar: 'foo' } }
+    ]);
+
+    const scheduledRefreshTimeZonesFactory = () => (['UTC', 'America/Los_Angeles']);
+
+    const appPrepareFactory = async (scope: string[]) => {
+      const playgroundAuthSecret = 'test12345';
+      const { app } = await createApiGateway(
+        new AdapterApiMock(),
+        new DataSourceStorageMock(),
+        {
+          basePath: '/test',
+          playgroundAuthSecret,
+          refreshScheduler: () => new RefreshSchedulerMock(),
+          scheduledRefreshContexts: () => Promise.resolve(scheduledRefreshContextsFactory()),
+          scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory,
+          contextToApiScopes: () => Promise.resolve(<ApiScopesTuple>scope)
+        }
+      );
+      const token = generateAuthToken({ uid: 5, scope }, {}, playgroundAuthSecret);
+      const tokenUser = generateAuthToken({ uid: 5, scope }, {}, API_SECRET);
+
+      return { app, token, tokenUser };
+    };
+
+    test('no input', async () => {
+      const { app, tokenUser } = await appPrepareFactory(['graphql', 'data', 'meta', 'jobs']);
+
+      const req = request(app).post('/test/v1/pre-aggregations/jobs')
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${tokenUser}`);
+
+      const res = await req;
+      expect(res.status).toEqual(400);
+      expect(res.body.error).toEqual('No job description provided');
+    });
+
+    test('invalid input action', async () => {
+      const { app, tokenUser } = await appPrepareFactory(['graphql', 'data', 'meta', 'jobs']);
+
+      const req = request(app).post('/test/v1/pre-aggregations/jobs')
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${tokenUser}`)
+        .send({ action: 'patch' });
+
+      const res = await req;
+      expect(res.status).toEqual(400);
+      expect(res.body.error.includes('Invalid Job query format')).toBeTruthy();
+    });
+
+    test('invalid input date range', async () => {
+      const { app, tokenUser } = await appPrepareFactory(['graphql', 'data', 'meta', 'jobs']);
+
+      let req = request(app).post('/test/v1/pre-aggregations/jobs')
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${tokenUser}`)
+        .send({
+          action: 'post',
+          selector: {
+            contexts: [{ securityContext: {} }],
+            timezones: ['UTC', 'America/Los_Angeles'],
+            dateRange: ['invalid string', '2020-02-20']
+          }
+        });
+
+      let res = await req;
+      expect(res.status).toEqual(400);
+      expect(res.body.error.includes('Cannot parse selector date range')).toBeTruthy();
+
+      req = request(app).post('/test/v1/pre-aggregations/jobs')
+        .set('Content-type', 'application/json')
+        .set('Authorization', `Bearer ${tokenUser}`)
+        .send({
+          action: 'post',
+          selector: {
+            contexts: [{ securityContext: {} }],
+            timezones: ['UTC', 'America/Los_Angeles'],
+            dateRange: ['2020-02-20', 'invalid string']
+          }
+        });
+
+      res = await req;
+      expect(res.status).toEqual(400);
+      expect(res.body.error.includes('Cannot parse selector date range')).toBeTruthy();
     });
   });
 

@@ -1008,13 +1008,13 @@ from cube import config
 
 @config('context_to_api_scopes')
 def context_to_api_scopes(context: dict, default_scopes: list[str]) -> list[str]:
-  return ['meta', 'data', 'graphql']
+  return ['meta', 'data', 'graphql', 'sql']
 ```
 
 ```javascript
 module.exports = {
   contextToApiScopes: (securityContext, defaultScopes) => {
-    return ['meta', 'data', 'graphql'];
+    return ['meta', 'data', 'graphql', 'sql'];
   },
 };
 ```

@@ -62,11 +62,7 @@ jobs:
     #  We use host instead of cross container, because it's much faster
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    name: Unit (Rewrite Engine) (CUBESQL_TOP_DOWN_EXTRACTOR=${{ matrix.top-down-extractor }})
-    strategy:
-      matrix:
-        top-down-extractor: ['true', 'false']
-      fail-fast: false
+    name: Unit (Rewrite Engine)
 
     steps:
       - name: Checkout
@@ -94,14 +90,13 @@ jobs:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
           CUBESQL_SQL_PUSH_DOWN: true
-          CUBESQL_TOP_DOWN_EXTRACTOR: ${{ matrix.top-down-extractor }}
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
         run: |
           cd rust/cubesql
           cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
       - name: Upload code coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./rust/cubesql/lcov.info
@@ -118,13 +113,15 @@ jobs:
     strategy:
       matrix:
         # Current used version + 1 LTS
-        node-version: [20, 22]
+        # TODO: Add 24 after it's been released (don't forget to uncomment excludes below!)
+        node-version: [22]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         # minimize number of jobs
         exclude:
-          - node-version: 20
-            target: "aarch64-unknown-linux-gnu"
+# TODO: uncomment after adding v24
+#          - node-version: 22
+#            target: "aarch64-unknown-linux-gnu"
           - python-version: 3.10
             target: "aarch64-unknown-linux-gnu"
           - python-version: 3.11
@@ -221,7 +218,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [20.x]
+        node-version: [22.x]
         os-version: ["macos-13"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         include:
@@ -314,7 +311,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [20.x]
+        node-version: [22.x]
         os-version: [windows-2019]
         python-version: ["fallback"]
       fail-fast: false

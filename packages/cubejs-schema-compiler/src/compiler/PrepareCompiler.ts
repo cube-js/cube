@@ -1,6 +1,8 @@
 import { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NativeInstance } from '@cubejs-backend/native';
 import { v4 as uuidv4 } from 'uuid';
+import { LRUCache } from 'lru-cache';
+import vm from 'vm';
 
 import { CubeValidator } from './CubeValidator';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
@@ -32,6 +34,7 @@ export type PrepareCompilerOptions = {
   standalone?: boolean;
   headCommitId?: string;
   adapter?: string;
+  compiledScriptCache?: LRUCache<string, vm.Script>;
 };
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}) => {
@@ -48,6 +51,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
   const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler);
+
+  const compiledScriptCache = options.compiledScriptCache || new LRUCache<string, vm.Script>({ max: 250 });
 
   const transpilers: TranspilerInterface[] = [
     new ValidationTranspiler(),
@@ -66,6 +71,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     preTranspileCubeCompilers: [cubeSymbols, cubeValidator],
     transpilers,
     viewCompilationGate,
+    compiledScriptCache,
     viewCompilers: [viewCompiler],
     cubeCompilers: [cubeEvaluator, joinGraph, metaTransformer],
     contextCompilers: [contextEvaluator],

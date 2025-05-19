@@ -50,3 +50,10 @@ cube(`Products`, {
 
   dataSource: 'products',
 });
+
+view(`ProductsView`, {
+  cubes: [{
+    joinPath: Products,
+    includes: `*`,
+  }]
+});

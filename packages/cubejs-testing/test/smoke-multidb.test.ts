@@ -120,12 +120,40 @@ describe('multidb', () => {
     expect(res.rows).toMatchSnapshot();
   });
 
+  test('SQL pushdown queries to different data sources: ProductsView', async () => {
+    const res = await connection.query(`
+  SELECT
+    name
+  FROM
+    ProductsView
+  WHERE
+    LOWER(name) = 'apples'
+  GROUP BY
+    1
+    `);
+    expect(res.rows).toMatchSnapshot();
+  });
+
   test('SQL pushdown queries to different data sources: Suppliers', async () => {
     const res = await connection.query(`
   SELECT
     company
   FROM
     Suppliers
+  WHERE
+    LOWER(company) = 'fruits inc'
+  GROUP BY
+    1
+    `);
+    expect(res.rows).toMatchSnapshot();
+  });
+
+  test('SQL pushdown queries to different data sources: SuppliersView', async () => {
+    const res = await connection.query(`
+  SELECT
+    company
+  FROM
+    SuppliersView
   WHERE
     LOWER(company) = 'fruits inc'
   GROUP BY

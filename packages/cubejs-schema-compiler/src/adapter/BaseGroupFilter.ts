@@ -3,9 +3,9 @@ export class BaseGroupFilter {
 
   protected readonly operator: any;
 
-  protected readonly measure: any;
+  public readonly measure: any;
 
-  protected readonly dimension: any;
+  public readonly dimension: any;
 
   public constructor(filter: any) {
     this.values = filter.values;

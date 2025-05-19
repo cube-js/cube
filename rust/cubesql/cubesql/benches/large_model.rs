@@ -5,17 +5,16 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaType};
 use cubesql::{
     compile::test::{
+        get_test_tenant_ctx_with_meta,
         rewrite_engine::{
             create_test_postgresql_cube_context, query_to_logical_plan, rewrite_rules,
             rewrite_runner,
         },
-        sql_generator,
     },
     transport::{CubeMetaDimension, MetaContext},
 };
 use egg::StopReason;
 use itertools::Itertools;
-use uuid::Uuid;
 
 macro_rules! bench_large_model {
     ($DIMS:expr, $NAME:expr, $QUERY_FN:expr, $CRITERION:expr) => {{
@@ -50,16 +49,7 @@ macro_rules! bench_large_model {
 }
 
 pub fn get_large_model_test_tenant_ctx(dims: usize) -> Arc<MetaContext> {
-    Arc::new(MetaContext::new(
-        get_large_model_test_meta(dims),
-        vec![(format!("LargeCube_{}", dims), "default".to_string())]
-            .into_iter()
-            .collect(),
-        vec![("default".to_string(), sql_generator(vec![]))]
-            .into_iter()
-            .collect(),
-        Uuid::new_v4(),
-    ))
+    get_test_tenant_ctx_with_meta(get_large_model_test_meta(dims))
 }
 
 pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {

@@ -40,7 +40,7 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
   ],
   [
     {
-      name: '#3 Events.count with Events.type order by Events.count DESC',
+      name: '#3 Events.count with Events.type order by Events.type DESC, Events.count',
       ws: true,
     },
     {
@@ -49,7 +49,8 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
       ],
       timeDimensions: [],
       order: {
-        'Events.count': 'desc'
+        'Events.type': 'desc',
+        'Events.count': 'asc'
       },
       dimensions: [
         'Events.type'
@@ -64,6 +65,32 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
       measures: [
         'OrdersFiltered.ordersCount'
       ]
+    }
+  ],
+  [
+    {
+      name: 'Different column data types'
+    },
+    {
+      dimensions: [
+        'unusualDataTypes.array',
+        'unusualDataTypes.bit_column',
+        'unusualDataTypes.boolean_column',
+        'unusualDataTypes.cidr_column',
+        'unusualDataTypes.id',
+        'unusualDataTypes.inet_column',
+        'unusualDataTypes.json',
+        'unusualDataTypes.jsonb',
+        'unusualDataTypes.mac_address',
+        'unusualDataTypes.point_column',
+        'unusualDataTypes.status',
+        'unusualDataTypes.text_column',
+        'unusualDataTypes.xml_column'
+      ],
+      ungrouped: true,
+      order: {
+        'unusualDataTypes.id': 'asc'
+      }
     }
   ],
 ];
@@ -152,7 +179,7 @@ export function createBirdBoxTestCase(
       let transport: WebSocketTransport;
       let http: CubeApi;
       let ws: CubeApi;
-  
+
       beforeAll(async () => {
         try {
           transport = new WebSocketTransport({
@@ -170,11 +197,11 @@ export function createBirdBoxTestCase(
           process.exit(1);
         }
       });
-  
+
       afterAll(async () => {
         await transport.close();
       });
-  
+
       test('http+responseFormat=default', async () => {
         const response = await http.load({
           dimensions: ['Orders.status'],
@@ -184,7 +211,7 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('http+responseFormat=compact option#1', async () => {
         const response = await http.load({
           dimensions: ['Orders.status'],
@@ -195,7 +222,7 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('http+responseFormat=compact option#2', async () => {
         const response = await http.load(
           {
@@ -210,7 +237,7 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('http+responseFormat=compact option#1+2', async () => {
         const response = await http.load(
           {
@@ -226,7 +253,7 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('ws+responseFormat=default', async () => {
         const response = await ws.load({
           dimensions: ['Orders.status'],
@@ -236,7 +263,7 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('ws+responseFormat=compact option#1', async () => {
         const response = await ws.load({
           dimensions: ['Orders.status'],
@@ -247,7 +274,7 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('ws+responseFormat=compact option#2', async () => {
         const response = await ws.load(
           {
@@ -262,7 +289,7 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('ws+responseFormat=compact option#1+2', async () => {
         const response = await ws.load(
           {
@@ -278,7 +305,7 @@ export function createBirdBoxTestCase(
         responses.push(response);
         expect(response.rawData()).toMatchSnapshot('result-type');
       });
-  
+
       test('responses', () => {
         // @ts-ignore
         expect(responses[0].rawData()).toEqual(responses[1].rawData());

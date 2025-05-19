@@ -62,23 +62,13 @@ pre-aggregations on demand.
 
 You can trigger pre-aggregation builds and check build statuses using the
 [`/v1/pre-aggregations/jobs`][ref-ref-jobs-endpoint] endpoint. It is possible to
-rebuild:
+rebuild all pre-aggregations or specify the ones to be rebuilt:
 
-- All pre-aggregations
-- Specific pre-aggregations (e.g., refresh data from some columns)
-- Pre-aggregations using specific cubes (e.g., refresh data from some tables)
-- Pre-aggregations using cubes from specific data sources (e.g., refresh data
-  from some Snowflake connection)
-
-For [partitioned pre-aggregations][ref-pre-agg-partitions], all partitions will
-be rebuilt.
-
-<ReferenceBox>
-
-Currently, rebuilding only select partitions is not supported.
-Please [track this issue](https://github.com/cube-js/cube/issues/6722).
-
-</ReferenceBox>
+* Particular pre-aggregations.
+* Pre-aggregations that reference particular cubes.
+* Pre-aggregations that reference cubes from particular data sources.
+* For [partitioned pre-aggregations][ref-pre-agg-partitions], only partitions that contain
+data from a particular date range.
 
 
 [ref-scheduled-refresh]: /reference/data-model/pre-aggregations#scheduled_refresh
@@ -88,5 +78,5 @@ Please [track this issue](https://github.com/cube-js/cube/issues/6722).
 [ref-lambda-pre-aggs]: /product/caching/lambda-pre-aggregations
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-api-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
-[ref-ref-jobs-endpoint]: /product/apis-integrations/rest-api/reference#v1pre-aggregationsjobs
+[ref-ref-jobs-endpoint]: /product/apis-integrations/rest-api/reference#base_pathv1pre-aggregationsjobs
 [ref-pre-agg-partitions]: /product/caching/using-pre-aggregations#partitioning

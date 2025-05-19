@@ -3,6 +3,222 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
+
+### Bug Fixes
+
+- **schema-compiler:** Collect join hints from subquery join conditions ([#9554](https://github.com/cube-js/cube/issues/9554)) ([cbf0bfd](https://github.com/cube-js/cube/commit/cbf0bfddafc8629ce7d09d9b73d8b60da6d7bafb))
+
+### Features
+
+- **tesseract:** Initial BigQuery support ([#9577](https://github.com/cube-js/cube/issues/9577)) ([60ad2f0](https://github.com/cube-js/cube/commit/60ad2f034d760220c81f7ff9794a388ba5dfbdc5))
+
+## [1.3.15](https://github.com/cube-js/cube/compare/v1.3.14...v1.3.15) (2025-05-15)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix timeshift measure queries coming from SQL API ([#9570](https://github.com/cube-js/cube/issues/9570)) ([d94afeb](https://github.com/cube-js/cube/commit/d94afebbbca9de2eb17fdcfcdb43fa9e64ad1735))
+
+## [1.3.14](https://github.com/cube-js/cube/compare/v1.3.13...v1.3.14) (2025-05-13)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix view queries for measure with single timeshift reference without time dimension ([#9565](https://github.com/cube-js/cube/issues/9565)) ([d3c28d4](https://github.com/cube-js/cube/commit/d3c28d48b470d7ee052107ed10d4bce6a324eef2))
+
+### Features
+
+- Rewrite joins from SQL as query-level join hints ([#9561](https://github.com/cube-js/cube/issues/9561)) ([2b2ac1c](https://github.com/cube-js/cube/commit/2b2ac1c47898f4f6bf67ebae658f90b768c63a7a))
+
+## [1.3.13](https://github.com/cube-js/cube/compare/v1.3.12...v1.3.13) (2025-05-12)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.12](https://github.com/cube-js/cube/compare/v1.3.11...v1.3.12) (2025-05-08)
+
+### Bug Fixes
+
+- **query-orchestrator:** Correct local date parsing for partition start/end queries ([#9543](https://github.com/cube-js/cube/issues/9543)) ([20dd8ad](https://github.com/cube-js/cube/commit/20dd8ad10f6ad0fc2538aecd0ff82cd43f6ff680))
+- **schema-compiler:** Fix filtering by time measure ([#9544](https://github.com/cube-js/cube/issues/9544)) ([00a589f](https://github.com/cube-js/cube/commit/00a589fa3fb324ee3dde36fead0de7ced3d19e5b))
+- **schema-compiler:** Fix rendered references for preaggregations with join paths ([#9528](https://github.com/cube-js/cube/issues/9528)) ([98ef928](https://github.com/cube-js/cube/commit/98ef928ece7385c2b41a359dfe0ebcc78dfaf8ee))
+- **schema-compiler:** Fix view queries with timeShift members ([#9556](https://github.com/cube-js/cube/issues/9556)) ([ef3a04b](https://github.com/cube-js/cube/commit/ef3a04b28c9e0b804a2a24fb4046e3d4755e8abe))
+- **schema-compiler:** Reject pre-agg if measure is unmultiplied in query but multiplied in pre-agg ([#9541](https://github.com/cube-js/cube/issues/9541)) ([f094d09](https://github.com/cube-js/cube/commit/f094d09e25b606001cbb699b82427dc43f19a6dc))
+
+### Features
+
+- **schema-compiler:** Allow one measure timeShift without time dimension ([#9545](https://github.com/cube-js/cube/issues/9545)) ([320484f](https://github.com/cube-js/cube/commit/320484fc03f0c49efe0ada2ac9d3dce443011ab9))
+- **tesseract:** Basic pre-aggregations support ([#9434](https://github.com/cube-js/cube/issues/9434)) ([1deddcc](https://github.com/cube-js/cube/commit/1deddcc4e37795bf2f775770798acefdbeb24c71))
+
+## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix non-match for exact custom granularity pre-aggregation ([#9517](https://github.com/cube-js/cube/issues/9517)) ([313a606](https://github.com/cube-js/cube/commit/313a606e1aedb7dda31a88ea78e71e106a2fa884))
+
+### Features
+
+- **schema-compiler:** Support adding pre-aggregations in Rollup Designer for YAML-based models ([#9500](https://github.com/cube-js/cube/issues/9500)) ([1cfe4c2](https://github.com/cube-js/cube/commit/1cfe4c2dd1cc0fe738590abb39fe2485899fc51e))
+- **schema-compiler:** Support view extends ([#9507](https://github.com/cube-js/cube/issues/9507)) ([e68530a](https://github.com/cube-js/cube/commit/e68530a51dd9fa58dd85dab0d593a034000a6ed3))
+
+## [1.3.8](https://github.com/cube-js/cube/compare/v1.3.7...v1.3.8) (2025-04-24)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.7](https://github.com/cube-js/cube/compare/v1.3.6...v1.3.7) (2025-04-23)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix not working timeshift in views ([#9504](https://github.com/cube-js/cube/issues/9504)) ([9319b0d](https://github.com/cube-js/cube/commit/9319b0df50a4026ceb91732de123a21e8d788b39))
+
+### Features
+
+- **schema-compiler:** Custom granularities support for Amazon Athena/Presto dialect ([#9472](https://github.com/cube-js/cube/issues/9472)) ([4c1520e](https://github.com/cube-js/cube/commit/4c1520e90207469cb4d6be41b28e1c06bb2d0646))
+- **schema-compiler:** Support custom granularities with Year-Month intervals for AWS Redshift dialect ([#9489](https://github.com/cube-js/cube/issues/9489)) ([2fc53f2](https://github.com/cube-js/cube/commit/2fc53f2d10e94ba6ac1b40bfce956167b89b8caf))
+- **schema-compiler:** Support overriding `title`, `description`, `meta`, and `format` on view members ([#9496](https://github.com/cube-js/cube/issues/9496)) ([e0179c5](https://github.com/cube-js/cube/commit/e0179c5644952c6ebe41ab4f1f12784491036bd0))
+
+## [1.3.6](https://github.com/cube-js/cube/compare/v1.3.5...v1.3.6) (2025-04-22)
+
+### Bug Fixes
+
+- **schema-compiler:** Use join paths from pre-aggregation declaration instead of building join tree from scratch ([#9471](https://github.com/cube-js/cube/issues/9471)) ([cd7e9fd](https://github.com/cube-js/cube/commit/cd7e9fddca8fa1c31335adbba6e79c4032841cbb))
+
+## [1.3.5](https://github.com/cube-js/cube/compare/v1.3.4...v1.3.5) (2025-04-17)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.4](https://github.com/cube-js/cube/compare/v1.3.3...v1.3.4) (2025-04-17)
+
+### Bug Fixes
+
+- **schema-compiler:** Make RefreshKeySql timezone-aware ([#9479](https://github.com/cube-js/cube/issues/9479)) ([fa2adb9](https://github.com/cube-js/cube/commit/fa2adb92e6fd87223f551b61d75f367dc8ea2524))
+
+## [1.3.3](https://github.com/cube-js/cube/compare/v1.3.2...v1.3.3) (2025-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.2](https://github.com/cube-js/cube/compare/v1.3.1...v1.3.2) (2025-04-16)
+
+### Bug Fixes
+
+- **schema-compiler:** Allow calling cube functions in yaml python blocks ([#9473](https://github.com/cube-js/cube/issues/9473)) ([61ef9da](https://github.com/cube-js/cube/commit/61ef9da243e8219b8ba3ab7ccbf9f9e0403cba04))
+- **schema-compiler:** Allow escaping of curly braces in yaml models ([#9469](https://github.com/cube-js/cube/issues/9469)) ([0a8cf07](https://github.com/cube-js/cube/commit/0a8cf07f20351a0e591b658f02f243510bf78eae))
+
+## [1.3.1](https://github.com/cube-js/cube/compare/v1.3.0...v1.3.1) (2025-04-14)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix incorrect transpilation of yaml models ([#9465](https://github.com/cube-js/cube/issues/9465)) ([e732fa2](https://github.com/cube-js/cube/commit/e732fa2b8ead0ca605512611eb371b94e0238dec))
+
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+### Bug Fixes
+
+- **schema-compiler:** Do not drop join hints when view member is not itself owned ([#9444](https://github.com/cube-js/cube/issues/9444)) ([b5ddd11](https://github.com/cube-js/cube/commit/b5ddd115a8ad066bc4399fc2608d1d99d3d863dc))
+- **schema-compiler:** Fix cubes inheritance ([#9386](https://github.com/cube-js/cube/issues/9386)) ([409d74d](https://github.com/cube-js/cube/commit/409d74db8c5ac5a314e1e3e7b872586f538713d1))
+- **schema-compiler:** Fix incorrect native bulk transpilation if there are no JS files ([#9453](https://github.com/cube-js/cube/issues/9453)) ([610820f](https://github.com/cube-js/cube/commit/610820fe15701ad0971b4d317bb112ec7765bb9b))
+
+## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
+
+### Bug Fixes
+
+- **schema-compiler:** ExportNamedDeclaration for variables object ([#9390](https://github.com/cube-js/cube/issues/9390)) ([b16e8dd](https://github.com/cube-js/cube/commit/b16e8dd5d37f96349b78796e525fb432ad2f8dcc))
+
+### Features
+
+- **schema-compiler:** Implement bulk processing for js transpilation in native ([#9427](https://github.com/cube-js/cube/issues/9427)) ([c274b2a](https://github.com/cube-js/cube/commit/c274b2ad7c99f7b794b543d820f4f086cc0e35bf))
+
+## [1.2.32](https://github.com/cube-js/cube/compare/v1.2.31...v1.2.32) (2025-04-08)
+
+### Bug Fixes
+
+- **schema-compiler:** Use join paths from pre-aggregation declaration instead of building join tree from scratch ([#9431](https://github.com/cube-js/cube/issues/9431)) ([aea3a6c](https://github.com/cube-js/cube/commit/aea3a6c02886f495b00751e5e12dcd0ef3099441))
+- **tesseract:** Fix issues with member expressions over multi stage ([#9416](https://github.com/cube-js/cube/issues/9416)) ([14ae6a4](https://github.com/cube-js/cube/commit/14ae6a46ca215da8be8c4f5fb12b8f3c01948639))
+
+## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix BigQuery DATE_ADD push down template for years/quarters/months ([#9432](https://github.com/cube-js/cube/issues/9432)) ([5845c88](https://github.com/cube-js/cube/commit/5845c88dc2d7e482d2a79eb3329ecc302655a493))
+
+### Features
+
+- PatchMeasure member expression ([#9218](https://github.com/cube-js/cube/issues/9218)) ([128280a](https://github.com/cube-js/cube/commit/128280ae02d053b8435388ff2a808a27b773cef1))
+- **schema-compiler:** Use LRUCache for js data models compiled vm.Scripts ([#9424](https://github.com/cube-js/cube/issues/9424)) ([e923a0f](https://github.com/cube-js/cube/commit/e923a0fb38f1cdc5bca1256bf868efca46e13cca))
+
+## [1.2.30](https://github.com/cube-js/cube/compare/v1.2.29...v1.2.30) (2025-04-04)
+
+### Bug Fixes
+
+- **tesseract:** Fix for multi fact queries ([#9421](https://github.com/cube-js/cube/issues/9421)) ([5547f50](https://github.com/cube-js/cube/commit/5547f5046c961966b582f76faf1377393ec8557a))
+
+### Features
+
+- **schema-compiler:** generate join sql using dimension refs when po… ([#9413](https://github.com/cube-js/cube/issues/9413)) ([8fc4f7c](https://github.com/cube-js/cube/commit/8fc4f7c4125889fcc24306256665d61ac30198c3))
+
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+### Bug Fixes
+
+- **schema-compiler:** Respect ungrouped alias in measures ([#9411](https://github.com/cube-js/cube/issues/9411)) ([f0829d7](https://github.com/cube-js/cube/commit/f0829d730c284a1e53c833cd53ccf8d37b08e095))
+- **schema-compiler:** Use segments as-is in rollupPreAggregation ([#9391](https://github.com/cube-js/cube/issues/9391)) ([cb7b643](https://github.com/cube-js/cube/commit/cb7b6438da199daf0b07fb2dd6f5087ed259f71f))
+
+## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix BigQuery DATETIME_TRUNC() week processing ([#9380](https://github.com/cube-js/cube/issues/9380)) ([6c8564f](https://github.com/cube-js/cube/commit/6c8564ffc15e5e930fa2160be642ea3f3cb7b888))
+- **schema-compiler:** Fix date alignment for week-based custom granularities ([#9405](https://github.com/cube-js/cube/issues/9405)) ([8b6c490](https://github.com/cube-js/cube/commit/8b6c4906e2c49fb2c04abc381f6fdb3105309eaf))
+- **schema-compiler:** Fix model validation for aliased included members for views ([#9398](https://github.com/cube-js/cube/issues/9398)) ([f5e69f7](https://github.com/cube-js/cube/commit/f5e69f76e7268812aa776a20588875d85077b3bf))
+- **schema-compiler:** Skip syntax check for transpiled files ([#9395](https://github.com/cube-js/cube/issues/9395)) ([c624e88](https://github.com/cube-js/cube/commit/c624e88d4793c917bb43c3099a7c9d128b517b8a))
+- **tesseract:** Support rolling window with multiple granularities ([#9382](https://github.com/cube-js/cube/issues/9382)) ([6ff9331](https://github.com/cube-js/cube/commit/6ff9331729af59e45385608057fa0e99688cfcbe))
+
+### Features
+
+- **tesseract:** Custom granularities support ([#9400](https://github.com/cube-js/cube/issues/9400)) ([dc93e40](https://github.com/cube-js/cube/commit/dc93e4022d4c2741d0aafcdb1007a69c6181f232))
+- **tesseract:** Support for rolling window without date range ([#9364](https://github.com/cube-js/cube/issues/9364)) ([fd94b02](https://github.com/cube-js/cube/commit/fd94b02b8bba286a67264057f9259769215239a9))
+
+## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.2.26](https://github.com/cube-js/cube/compare/v1.2.25...v1.2.26) (2025-03-21)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix doubled calls to convertTz() for compound time dimensions with custom granularities ([#9369](https://github.com/cube-js/cube/issues/9369)) ([0dc8320](https://github.com/cube-js/cube/commit/0dc83209ee8d4d38ebaa6be6c48a07e146c4a7b7))
+
+## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
+
+### Bug Fixes
+
+- **schema-compiler:** Handle measures with dimension-only member expressions ([#9335](https://github.com/cube-js/cube/issues/9335)) ([2f7a128](https://github.com/cube-js/cube/commit/2f7a1288108ea3a62b295c08dcf756bfec76d784))
+- **schema-compiler:** support unary operators in DAP filters ([#9366](https://github.com/cube-js/cube/issues/9366)) ([fff8af2](https://github.com/cube-js/cube/commit/fff8af2bfa25098e8ed20b4e4848f3926bba70b8))
+
+### Features
+
+- **server-core,api-gateway:** Allow manual rebuilding pre-aggregation partitions within date Range ([#9342](https://github.com/cube-js/cube/issues/9342)) ([b5701e3](https://github.com/cube-js/cube/commit/b5701e35a92769e23acdbb2fe72549731cd21aba))
+
+## [1.2.24](https://github.com/cube-js/cube/compare/v1.2.23...v1.2.24) (2025-03-18)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.2.23](https://github.com/cube-js/cube/compare/v1.2.22...v1.2.23) (2025-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.2.22](https://github.com/cube-js/cube/compare/v1.2.21...v1.2.22) (2025-03-14)
+
+### Features
+
+- **tesseract:** Segments and MemberExpressions segments support ([#9336](https://github.com/cube-js/cube/issues/9336)) ([b2c03e7](https://github.com/cube-js/cube/commit/b2c03e7644f954ba29201b4c98de35ded7eebe79))
+
 ## [1.2.21](https://github.com/cube-js/cube/compare/v1.2.20...v1.2.21) (2025-03-11)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

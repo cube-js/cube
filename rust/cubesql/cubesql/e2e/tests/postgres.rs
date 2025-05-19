@@ -1,9 +1,9 @@
-use std::{env, time::Duration};
+use std::{env, pin::pin, time::Duration};
 
 use async_trait::async_trait;
 use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
-use futures::{pin_mut, TryStreamExt};
+use futures::TryStreamExt;
 use portpicker::{pick_unused_port, Port};
 use rust_decimal::prelude::*;
 use tokio::time::sleep;
@@ -461,7 +461,7 @@ impl PostgresIntegrationTestSuite {
 
         let it = self.client.query_raw(&stmt, &["0"]).await.unwrap();
 
-        pin_mut!(it);
+        let mut it = pin!(it);
 
         let mut total = 1;
 

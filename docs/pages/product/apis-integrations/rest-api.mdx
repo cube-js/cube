@@ -124,13 +124,14 @@ by making them accessible to specific users only or disallowing access for
 everyone. By default, API endpoints in all scopes, except for `jobs`, are
 accessible for everyone.
 
-| API scope | REST API endpoints                                                                        | Accessible by default? |
-| --------- | ----------------------------------------------------------------------------------------- | ---------------------- |
-| `meta`    | [`/v1/meta`][ref-ref-meta]                                                                | ✅ Yes                 |
-| `data`    | [`/v1/load`][ref-ref-load], [`/v1/sql`][ref-ref-sql]                                      | ✅ Yes                 |
-| `graphql` | `/graphql`                                                                                | ✅ Yes                 |
-| `jobs`    | [`/v1/pre-aggregations/jobs`][ref-ref-paj]                                                | ❌ No                  |
-| No scope  | `/livez`, `/readyz`                                                                       | ✅ Yes, always |
+| API scope | REST API endpoints | Accessible by default? |
+| --- | --- | --- |
+| `meta`    | [`/v1/meta`][ref-ref-meta] | ✅ Yes |
+| `data`    | [`/v1/load`][ref-ref-load] | ✅ Yes |
+| `graphql` | `/graphql` | ✅ Yes |
+| `sql`     | [`/v1/sql`][ref-ref-sql] | ✅ Yes |
+| `jobs`    | [`/v1/pre-aggregations/jobs`][ref-ref-paj] | ❌ No |
+| No scope  | `/livez`, `/readyz` | ✅ Yes |
 
 You can set accessible API scopes _for all requests_ using the
 `CUBEJS_DEFAULT_API_SCOPES` environment variable. For example, to disallow

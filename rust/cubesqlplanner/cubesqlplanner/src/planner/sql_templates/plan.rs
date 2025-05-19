@@ -1,4 +1,5 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
 use convert_case::{Boundary, Case, Casing};
@@ -9,9 +10,10 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
+    base_tools: Rc<dyn BaseTools>,
 }
 pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
-    name: "LowerUpper",
+    name: "UnderscoreUpper",
     condition: |s, _| {
         s.get(0) == Some(&"_")
             && s.get(1)
@@ -23,15 +25,31 @@ pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
     len: 0,
 };
 
+fn grapheme_is_uppercase(c: &&str) -> bool {
+    c.to_uppercase() != c.to_lowercase() && *c == c.to_uppercase()
+}
+
+pub const UPPER_UPPER_BOUND: Boundary = Boundary {
+    name: "UpperUpper",
+    condition: |s, _| {
+        s.get(0).map(grapheme_is_uppercase) == Some(true)
+            && s.get(1).map(grapheme_is_uppercase) == Some(true)
+    },
+    arg: None,
+    start: 1,
+    len: 0,
+};
+
 impl PlanSqlTemplates {
-    pub fn new(render: Rc<dyn SqlTemplatesRender>) -> Self {
-        Self { render }
+    pub fn new(render: Rc<dyn SqlTemplatesRender>, base_tools: Rc<dyn BaseTools>) -> Self {
+        Self { render, base_tools }
     }
 
     pub fn alias_name(name: &str) -> String {
         let res = name
             .with_boundaries(&[
                 UNDERSCORE_UPPER_BOUND,
+                UPPER_UPPER_BOUND,
                 Boundary::LOWER_UPPER,
                 Boundary::DIGIT_UPPER,
                 Boundary::ACRONYM,
@@ -39,6 +57,10 @@ impl PlanSqlTemplates {
             .to_case(Case::Snake)
             .replace(".", "__");
         res
+    }
+
+    pub fn base_tools(&self) -> &Rc<dyn BaseTools> {
+        &self.base_tools
     }
 
     pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
@@ -158,6 +180,16 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn max(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template("functions/MAX", context! { args_concat => expr })
+    }
+
+    pub fn min(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template("functions/MIN", context! { args_concat => expr })
+    }
+
     pub fn concat_strings(&self, strings: &Vec<String>) -> Result<String, CubeError> {
         self.render.render_template(
             "expressions/concat_strings",
@@ -188,8 +220,8 @@ impl PlanSqlTemplates {
 
     pub fn time_series_select(
         &self,
-        from_date: Option<String>,
-        to_date: Option<String>,
+        from_date: String,
+        to_date: String,
         seria: Vec<Vec<String>>,
     ) -> Result<String, CubeError> {
         self.render.render_template(
@@ -198,6 +230,28 @@ impl PlanSqlTemplates {
                 from_date => from_date,
                 to_date => to_date,
                 seria => seria
+            },
+        )
+    }
+
+    pub fn time_series_get_range(
+        &self,
+        max_expr: &str,
+        min_expr: &str,
+        max_name: &str,
+        min_name: &str,
+        from: &str,
+    ) -> Result<String, CubeError> {
+        let quoted_min_name = self.quote_identifier(min_name)?;
+        let quoted_max_name = self.quote_identifier(max_name)?;
+        self.render.render_template(
+            "expressions/time_series_get_range",
+            context! {
+                max_expr => max_expr,
+                min_expr => min_expr,
+                from_prepared => from,
+                quoted_min_name => quoted_min_name,
+                quoted_max_name => quoted_max_name
             },
         )
     }
@@ -293,6 +347,44 @@ impl PlanSqlTemplates {
     pub fn supports_is_not_distinct_from(&self) -> bool {
         self.render
             .contains_template("operators/is_not_distinct_from")
+    }
+
+    pub fn supports_generated_time_series(&self) -> bool {
+        self.render
+            .contains_template("statements/generated_time_series_select")
+    }
+
+    pub fn generated_time_series_select(
+        &self,
+        start: &str,
+        end: &str,
+        granularity: &str,
+        granularity_offset: &Option<String>,
+        minimal_time_unit: &str,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "statements/generated_time_series_select",
+            context! { start => start, end => end, granularity => granularity, granularity_offset => granularity_offset, minimal_time_unit => minimal_time_unit },
+        )
+    }
+    pub fn generated_time_series_with_cte_range_source(
+        &self,
+        range_source: &str,
+        min_name: &str,
+        max_name: &str,
+        granularity: &str,
+        minimal_time_unit: &str,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "statements/generated_time_series_with_cte_range_source",
+            context! {
+                range_source => range_source,
+                min_name => min_name,
+                max_name => max_name,
+                granularity => granularity,
+                minimal_time_unit => minimal_time_unit,
+            },
+        )
     }
 
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {

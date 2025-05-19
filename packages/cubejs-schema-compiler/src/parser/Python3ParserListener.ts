@@ -81,6 +81,7 @@ import { ExprlistContext } from "./Python3Parser";
 import { TestlistContext } from "./Python3Parser";
 import { DictorsetmakerContext } from "./Python3Parser";
 import { ClassdefContext } from "./Python3Parser";
+import { CallArgumentsContext } from "./Python3Parser";
 import { ArglistContext } from "./Python3Parser";
 import { ArgumentContext } from "./Python3Parser";
 import { Comp_iterContext } from "./Python3Parser";
@@ -956,6 +957,17 @@ export interface Python3ParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitClassdef?: (ctx: ClassdefContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `Python3Parser.callArguments`.
+	 * @param ctx the parse tree
+	 */
+	enterCallArguments?: (ctx: CallArgumentsContext) => void;
+	/**
+	 * Exit a parse tree produced by `Python3Parser.callArguments`.
+	 * @param ctx the parse tree
+	 */
+	exitCallArguments?: (ctx: CallArgumentsContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `Python3Parser.arglist`.

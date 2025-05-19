@@ -168,4 +168,28 @@ describe('dateParser', () => {
 
     Date.now.mockRestore();
   });
+
+  test('throws error on from invalid date to date', () => {
+    expect(() => dateParser('from invalid to 2020-02-02', 'UTC')).toThrow(
+      'Can\'t parse date: \'invalid\''
+    );
+  });
+
+  test('throws error on from date to invalid date', () => {
+    expect(() => dateParser('from 2020-02-02 to invalid', 'UTC')).toThrow(
+      'Can\'t parse date: \'invalid\''
+    );
+  });
+
+  test('from 12AM till now by hour', () => {
+    Date.now = jest.fn().mockReturnValue(new Date(2021, 2, 5, 13, 0, 0, 0));
+    expect(dateParser('2 weeks ago by hour', 'UTC', new Date(Date.UTC(2021, 2, 5, 13, 0, 0, 0)))).toStrictEqual(
+      [
+        '2021-02-19T13:00:00.000',
+        '2021-02-19T13:59:59.999'
+      ]
+    );
+
+    Date.now.mockRestore();
+  });
 });

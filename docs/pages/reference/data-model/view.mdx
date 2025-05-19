@@ -34,6 +34,74 @@ views:
 
 </CodeTabs>
 
+### `extends`
+
+You can use the `extends` parameter to [extend views][ref-extension] in order to reuse
+all declared members of a view.
+
+In the example below, `extended_orders` will extend `orders` with an additional join path:
+
+<CodeTabs>
+
+```javascript
+view(`orders`, {
+  cubes: [
+    {
+      join_path: `base_orders`,
+      includes: `*`
+    }
+  ]
+})
+
+view(`extended_orders`, {
+  extends: orders,
+  cubes: [
+    {
+      join_path: `base_orders.users`,
+      includes: `*`
+    }
+  ]
+})
+```
+
+```yaml
+views:
+  - name: orders
+    cubes:
+      - join_path: base_orders
+        includes: "*"
+
+  - name: extended_orders
+    extends: orders
+    cubes:
+      - join_path: base_orders.users
+        includes: "*"
+```
+
+</CodeTabs>
+
+### `title`
+
+Use the `title` parameter to change the display name of the view.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+    title: Product Orders
+```
+
+</CodeTabs>
+
 ### `description`
 
 This parameter provides a human-readable description of a view.
@@ -41,7 +109,7 @@ When applicable, it will be displayed in [Playground][ref-playground] and expose
 to data consumers via [APIs and integrations][ref-apis].
 
 A description can give a hint both to your team and end users, making sure they
-interpret the data correctly. 
+interpret the data correctly.
 
 <CodeTabs>
 
@@ -55,205 +123,6 @@ view(`active_users`, {
 views:
   - name: active_users
     description: 14 days rolling count of active users
-```
-
-</CodeTabs>
-
-### `cubes`
-
-Use `cubes` parameter in view to include exposed cubes in bulk. You can build
-your view by combining multiple joined cubes together and specifying the path by
-which they should be joined for that particular view.
-
-<CodeTabs>
-
-```javascript
-view(`orders`, {
-  cubes: [
-    {
-      join_path: base_orders,
-      includes: [
-        `status`,
-        `created_date`,
-        `total_amount`,
-        `total_amount_shipped`,
-        `count`,
-        `average_order_value`
-      ]
-    },
-    {
-      join_path: base_orders.line_items.products,
-      includes: [
-        {
-          name: `name`,
-          alias: `product`
-        }
-      ]
-    },
-    {
-      join_path: base_orders.users,
-      prefix: true
-      includes: `*`,
-      excludes: [
-        `company`
-      ]
-    }
-  ]
-});
-```
-
-```yaml
-views:
-  - name: orders
-
-    cubes:
-      - join_path: base_orders
-        includes:
-          - status
-          - created_date
-          - total_amount
-          - total_amount_shipped
-          - count
-          - average_order_value
-
-      - join_path: base_orders.line_items.products
-        includes:
-          - name: name
-            alias: product
-
-      - join_path: base_orders.users
-        prefix: true
-        includes: "*"
-        excludes:
-          - company
-
-
-
-
-
-
-
-
-
-```
-
-</CodeTabs>
-
-#### `join_path`
-
-When listing cubes to expose, you need to provide a `join_path` parameter.
-It uses the "dot notation" to describe the join path: `cube_1.cube_2.cube_3`.
-
-For the root cube of the view, just use the cube name as in the example
-above for `base_orders`.
-
-#### `includes` and `excludes`
-
-The other required parameter inside the `cubes` block is `includes`. Use it
-to list measures, dimensions, or segments you'd like to include into the view. 
-
-To include all members from a cube, use the _includes all_ shorthand: `includes: "*"`.
-In that case, you can also use the `excludes` parameter to list members that
-you'd like to exclude. 
-
-#### `alias`
-
-Optionally, in case you need to rename some of included members, you can provide
-`name` and `alias` parameters.
-
-#### `prefix`
-
-Optionally, if you'd like to prefix exposed measures, dimensions, or segments
-with the cube name, you can use the `prefix: true` parameter. It will prefix
-them with the cube name, e.g. `users_city`. You can use the `alias` parameter to
-specify a custom prefix.
-
-### `folders`
-
-The `folders` parameter is used to organize members of a view (e.g., dimensions,
-hierarchies, measures, etc.) into logical groups. Folders can contain non-overlapping
-subsets of members from a view.
-
-<InfoBox>
-
-Folders display is subject to support in [visualization tools][ref-viz-tools].
-Check [APIs & Integrations][ref-apis-support] for details.
-You can also preview folders in [Playground][ref-playground].
-
-</InfoBox>
-
-Each folder should specify a human-readable name via the `name` parameter and list
-included members via the `includes` parameter:
-
-<CodeTabs>
-
-```javascript
-view(`customers`, {
-  cubes: [
-    {
-      join_path: `users`,
-      includes: `*`
-    },
-    {
-      join_path: `users.orders`,
-      prefix: true,
-      includes: [
-        `status`,
-        `price`,
-        `count`
-      ]
-    }
-  ],
-
-  folders: [
-    {
-      name: `Basic Details`,
-      includes: [
-        `created_at`,
-        `location`,
-        `orders_status`,
-        `orders_count`
-      ]
-    },
-
-    {
-      name: `Sensitive Details`,
-      includes: [
-        `name`,
-        `gender`
-      ]
-    }
-  ]
-})
-```
-
-```yaml
-views:
-  - name: customers
-
-    cubes:
-      - join_path: users
-        includes: "*"
-
-      - join_path: users.orders
-        prefix: true
-        includes:
-          - status
-          - price
-          - count
-
-    folders:
-      - name: Basic Details
-        includes:
-          - created_at
-          - location
-          - orders_status
-          - orders_count
-
-      - name: Sensitive Details
-        includes:
-          - name
-          - gender
 ```
 
 </CodeTabs>
@@ -355,6 +224,228 @@ views:
 
 </CodeTabs>
 
+### `cubes`
+
+Use `cubes` parameter in view to include exposed cubes in bulk. You can build
+your view by combining multiple joined cubes together and specifying the path by
+which they should be joined for that particular view.
+
+<CodeTabs>
+
+```javascript
+view(`orders`, {
+  cubes: [
+    {
+      join_path: base_orders,
+      includes: [
+        `status`,
+        `created_date`,
+        `total_amount`,
+        `total_amount_shipped`,
+        `count`,
+        `average_order_value`
+      ]
+    },
+    {
+      join_path: base_orders.line_items.products,
+      includes: [
+        {
+          name: `name`,
+          alias: `product`,
+          title: `My custom product`,
+          description: `My custom product description`,
+          format: `number`,
+          meta: {
+            some: `custom`,
+            meta: `data`
+          }
+        }
+      ]
+    },
+    {
+      join_path: base_orders.users,
+      prefix: true
+      includes: `*`,
+      excludes: [
+        `company`
+      ]
+    }
+  ]
+});
+```
+
+```yaml
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_date
+          - total_amount
+          - total_amount_shipped
+          - count
+          - average_order_value
+
+      - join_path: base_orders.line_items.products
+        includes:
+          - name: name
+            alias: product
+            title: My custom product
+            description: My custom product description
+            format: number
+            meta:
+              some: custom
+              meta: data
+
+      - join_path: base_orders.users
+        prefix: true
+        includes: "*"
+        excludes:
+          - company
+```
+
+</CodeTabs>
+
+#### `join_path`
+
+When listing cubes to expose, you need to provide a `join_path` parameter.
+It uses the "dot notation" to describe the join path: `cube_1.cube_2.cube_3`.
+
+For the root cube of the view, just use the cube name as in the example
+above for `base_orders`.
+
+#### `includes` and `excludes`
+
+The other required parameter inside the `cubes` block is `includes`. Use it
+to list measures, dimensions, or segments you'd like to include into the view.
+
+To include all members from a cube, use the _includes all_ shorthand: `includes: "*"`.
+In that case, you can also use the `excludes` parameter to list members that
+you'd like to exclude.
+
+#### `prefix`
+
+If you'd like to prefix exposed members with the cube name, you can do so by setting the
+`prefix` parameter to `true`. It will prefix members with the cube name, e.g. `users_city`.
+You can use the [`alias` parameter](#alias) to specify a custom prefix.
+
+#### `alias`
+
+If you'd like to [rename][ref-dim-name] an included member, you can use the `alias`
+parameter.
+
+#### `title`
+
+If you'd like to override the [title][ref-dim-title] of a member, you can use the
+`title` parameter.
+
+#### `description`
+
+If you'd like to override the [description][ref-dim-description] of a member, you
+can use the `description` parameter.
+
+#### `format`
+
+If you'd like to override the [format][ref-dim-format] of a member, you can use the
+`format` parameter.
+
+#### `meta`
+
+If you'd like to override the [metadata][ref-dim-meta] of a member, you can use the
+`meta` parameter. Note that the `meta` is overridded as a whole.
+
+### `folders`
+
+The `folders` parameter is used to organize members of a view (e.g., dimensions,
+hierarchies, measures, etc.) into logical groups. Folders can contain non-overlapping
+subsets of members from a view.
+
+<InfoBox>
+
+Folders display is subject to support in [visualization tools][ref-viz-tools].
+Check [APIs & Integrations][ref-apis-support] for details.
+You can also preview folders in [Playground][ref-playground].
+
+</InfoBox>
+
+Each folder should specify a human-readable name via the `name` parameter and list
+included members via the `includes` parameter:
+
+<CodeTabs>
+
+```javascript
+view(`customers`, {
+  cubes: [
+    {
+      join_path: `users`,
+      includes: `*`
+    },
+    {
+      join_path: `users.orders`,
+      prefix: true,
+      includes: [
+        `status`,
+        `price`,
+        `count`
+      ]
+    }
+  ],
+
+  folders: [
+    {
+      name: `Basic Details`,
+      includes: [
+        `created_at`,
+        `location`,
+        `orders_status`,
+        `orders_count`
+      ]
+    },
+
+    {
+      name: `Sensitive Details`,
+      includes: [
+        `name`,
+        `gender`
+      ]
+    }
+  ]
+})
+```
+
+```yaml
+views:
+  - name: customers
+
+    cubes:
+      - join_path: users
+        includes: "*"
+
+      - join_path: users.orders
+        prefix: true
+        includes:
+          - status
+          - price
+          - count
+
+    folders:
+      - name: Basic Details
+        includes:
+          - created_at
+          - location
+          - orders_status
+          - orders_count
+
+      - name: Sensitive Details
+        includes:
+          - name
+          - gender
+```
+
+</CodeTabs>
+
 ### `access_policy`
 
 The `access_policy` parameter is used to configure [data access policies][ref-ref-dap].
@@ -370,3 +461,9 @@ The `access_policy` parameter is used to configure [data access policies][ref-re
 [ref-apis-support]: /product/apis-integrations#data-modeling
 [ref-playground]: /product/workspace/playground#viewing-the-data-model
 [ref-viz-tools]: /product/configuration/visualization-tools
+[ref-extension]: /product/data-modeling/concepts/code-reusability-extending-cubes
+[ref-dim-name]: /reference/data-model/dimensions#name
+[ref-dim-title]: /reference/data-model/dimensions#title
+[ref-dim-description]: /reference/data-model/dimensions#description
+[ref-dim-format]: /reference/data-model/dimensions#format
+[ref-dim-meta]: /reference/data-model/dimensions#meta

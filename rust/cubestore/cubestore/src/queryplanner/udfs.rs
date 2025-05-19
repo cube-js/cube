@@ -641,7 +641,6 @@ impl AggregateUDFImpl for HllMergeUDF {
         Ok(Box::new(HllMergeAccumulator { acc: None }))
     }
 }
-
 #[derive(Debug)]
 struct HllMergeAccumulator {
     // TODO: store sketch for empty set from the start.

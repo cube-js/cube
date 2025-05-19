@@ -77,30 +77,33 @@ describe('Yaml Schema Testing', () => {
     await compiler.compile();
   });
 
-  it('escapes backticks', async () => {
+  it('empty file', async () => {
     const { compiler } = prepareYamlCompiler(
-      `cubes:
-  - name: Users
-    sql: SELECT * FROM e2e.users
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primaryKey: true
-      - name: c2
-        sql: "{CUBE}.\`C2\`"
-        type: string
-      `
+      '   '
     );
 
     await compiler.compile();
   });
 
-  it('empty string - issue#7126', async () => {
+  it('empty cubes in file', async () => {
     const { compiler } = prepareYamlCompiler(
-      `cubes:
-  - name: Users
-    title: ''`
+      'cubes:   '
+    );
+
+    await compiler.compile();
+  });
+
+  it('empty views in file', async () => {
+    const { compiler } = prepareYamlCompiler(
+      'views:   '
+    );
+
+    await compiler.compile();
+  });
+
+  it('Unexpected keys', async () => {
+    const { compiler } = prepareYamlCompiler(
+      'circles:   '
     );
 
     try {
@@ -108,15 +111,17 @@ describe('Yaml Schema Testing', () => {
 
       throw new Error('compile must return an error');
     } catch (e: any) {
-      expect(e.message).toContain('Users cube: (title = null) must be a string');
+      expect(e.message).toContain('Unexpected YAML key');
     }
   });
 
-  it('null for string field', async () => {
+  it('can\'t parse error', async () => {
     const { compiler } = prepareYamlCompiler(
       `cubes:
-  - name: Users
-    title: null`
+      - name: Products
+        sql: select { "string"+123 } from tbl
+        dimensions:
+    `
     );
 
     try {
@@ -124,7 +129,7 @@ describe('Yaml Schema Testing', () => {
 
       throw new Error('compile must return an error');
     } catch (e: any) {
-      expect(e.message).toContain('Unexpected input during yaml transpiling: null');
+      expect(e.message).toContain('Can\'t parse python expression');
     }
   });
 
@@ -147,6 +152,173 @@ describe('Yaml Schema Testing', () => {
     } catch (e: any) {
       expect(e.message).toContain('name isn\'t defined for dimension: ');
     }
+  });
+
+  describe('Escaping and quoting', () => {
+    it('escapes backticks', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primaryKey: true
+      - name: c2
+        sql: "{CUBE}.\`C2\`"
+        type: string
+      `
+      );
+
+      await compiler.compile();
+    });
+
+    it('escape double quotes', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primaryKey: true
+      - name: id_str
+        sql: "ID"
+        type: string
+      `
+      );
+
+      await compiler.compile();
+    });
+
+    it('escape curly braces', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+  - name: Users
+    sql: SELECT 1 AS id, CAST('\\{"key":"value"\\}'::JSON AS TEXT) AS json_col
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primaryKey: true
+      `
+      );
+
+      await compiler.compile();
+    });
+  });
+
+  describe('Parsing edge cases: ', () => {
+    it('empty string - issue#7126', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+    - name: Users
+      title: ''`
+      );
+
+      try {
+        await compiler.compile();
+
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('Users cube: "title" must be a string');
+      }
+    });
+
+    it('null for string field', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+    - name: Users
+      title: null`
+      );
+
+      try {
+        await compiler.compile();
+
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('Unexpected input during yaml transpiling: null');
+      }
+    });
+
+    it('empty (null) dimensions', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+    - name: Users
+      sql: SELECT * FROM e2e.users
+      dimensions:
+      `
+      );
+
+      await compiler.compile();
+    });
+
+    it('empty (null) measures', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+    - name: Users
+      sql: SELECT * FROM e2e.users
+      measures:
+      `
+      );
+
+      await compiler.compile();
+    });
+
+    it('empty (null) segments', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+    - name: Users
+      sql: SELECT * FROM e2e.users
+      segments:
+      `
+      );
+
+      await compiler.compile();
+    });
+
+    it('empty (null) preAggregations', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+    - name: Users
+      sql: SELECT * FROM e2e.users
+      dimensions: []
+      measures: []
+      segments: []
+      preAggregations:
+      joins: []
+      hierarchies: []
+      `
+      );
+
+      await compiler.compile();
+    });
+
+    it('empty (null) joins', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+    - name: Users
+      sql: SELECT * FROM e2e.users
+      joins:
+      `
+      );
+
+      await compiler.compile();
+    });
+
+    it('empty (null) hierarchies', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `cubes:
+    - name: Users
+      sql: SELECT * FROM e2e.users
+      hierarchies:
+      `
+      );
+
+      await compiler.compile();
+    });
   });
 
   it('accepts cube meta', async () => {
@@ -348,6 +520,7 @@ describe('Yaml Schema Testing', () => {
       await compiler.compile();
     });
   });
+
   describe('Access policy: ', () => {
     it('defines a correct accessPolicy', async () => {
       const { compiler } = prepareYamlCompiler(
@@ -362,6 +535,9 @@ describe('Yaml Schema Testing', () => {
             - name: status
               sql: status
               type: string
+            - name: is_true
+              sql: is_true
+              type: boolean
           measures:
             - name: count
               type: count
@@ -384,6 +560,14 @@ describe('Yaml Schema Testing', () => {
                       operator: equals
                       values:
                         - "{ securityContext.currentDate }"
+                    - member: "count"
+                      operator: equals
+                      values:
+                        - 123
+                    - member: "is_true"
+                      operator: equals
+                      values:
+                        - true
               memberLevel:
                 includes:
                   - status
@@ -396,5 +580,53 @@ describe('Yaml Schema Testing', () => {
 
       await compiler.compile();
     });
+  });
+
+  it('calling cube\'s sql()', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: simple_orders
+    sql: >
+      SELECT 1 AS id, 100 AS amount, 'new' status, now() AS created_at
+
+    measures:
+      - name: count
+        type: count
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+  - name: simple_orders_sql_ext
+
+    sql: >
+      SELECT * FROM {simple_orders.sql()} as q
+      WHERE status = 'processed'
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+    `
+    );
+
+    await compiler.compile();
   });
 });

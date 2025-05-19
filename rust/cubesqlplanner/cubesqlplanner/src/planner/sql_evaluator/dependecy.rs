@@ -2,6 +2,9 @@ use super::symbols::MemberSymbol;
 use super::Compiler;
 use crate::cube_bridge::evaluator::{CallDep, CubeEvaluator};
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::planner::sql_evaluator::TimeDimensionSymbol;
+use crate::planner::GranularityHelper;
+use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -10,6 +13,13 @@ use std::rc::Rc;
 pub enum CubeDepProperty {
     CubeDependency(CubeDependency),
     SymbolDependency(Rc<MemberSymbol>),
+    TimeDimensionDependency(TimeDimensionDependency),
+}
+
+#[derive(Clone, Debug)]
+pub struct TimeDimensionDependency {
+    pub base_symbol: Rc<MemberSymbol>,
+    pub granularities: HashMap<String, Rc<MemberSymbol>>,
 }
 
 #[derive(Clone, Debug)]
@@ -48,19 +58,26 @@ pub enum ContextSymbolDep {
 pub enum Dependency {
     SymbolDependency(Rc<MemberSymbol>),
     CubeDependency(CubeDependency),
+    TimeDimensionDependency(TimeDimensionDependency),
     ContextDependency(ContextSymbolDep),
 }
 
 pub struct DependenciesBuilder<'a> {
     compiler: &'a mut Compiler,
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    timezone: Tz,
 }
 
 impl<'a> DependenciesBuilder<'a> {
-    pub fn new(compiler: &'a mut Compiler, cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
+    pub fn new(
+        compiler: &'a mut Compiler,
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        timezone: Tz,
+    ) -> Self {
         DependenciesBuilder {
             compiler,
             cube_evaluator,
+            timezone,
         }
     }
 
@@ -91,9 +108,14 @@ impl<'a> DependenciesBuilder<'a> {
                 result.push(Dependency::SymbolDependency(
                     self.build_evaluator(&cube_name, &dep.name)?,
                 ));
-            } else {
+            } else if self.check_cube_exists(&dep.name)? {
                 let dep = self.build_cube_dependency(&cube_name, i, &call_deps, &childs)?;
                 result.push(Dependency::CubeDependency(dep));
+            } else {
+                //Assuming this is a time dimension with an explicit granularity
+                let dep =
+                    self.build_time_dimension_dependency(&cube_name, i, &call_deps, &childs)?;
+                result.push(Dependency::TimeDimensionDependency(dep));
             }
         }
 
@@ -126,6 +148,55 @@ impl<'a> DependenciesBuilder<'a> {
         }
 
         Ok(childs_tree)
+    }
+
+    fn check_cube_exists(&self, cube_name: &String) -> Result<bool, CubeError> {
+        if self.is_current_cube(cube_name) {
+            Ok(true)
+        } else {
+            self.cube_evaluator.cube_exists(cube_name.clone())
+        }
+    }
+
+    fn build_time_dimension_dependency(
+        &mut self,
+        cube_name: &String,
+        dep_index: usize,
+        call_deps: &Vec<CallDep>,
+        call_childs: &Vec<Vec<usize>>,
+    ) -> Result<TimeDimensionDependency, CubeError> {
+        let dep = &call_deps[dep_index];
+        let base_evaluator = self.build_evaluator(cube_name, &dep.name)?;
+        let mut granularities = HashMap::new();
+        for child_ind in call_childs[dep_index].iter() {
+            let granularity = &call_deps[*child_ind].name;
+            if let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
+                self.cube_evaluator.clone(),
+                self.timezone.clone(),
+                cube_name,
+                &dep.name,
+                Some(granularity.clone()),
+            )? {
+                let member_evaluator =
+                    Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
+                        base_evaluator.clone(),
+                        Some(granularity.clone()),
+                        Some(granularity_obj),
+                        None,
+                    )));
+                granularities.insert(granularity.clone(), member_evaluator);
+            } else {
+                return Err(CubeError::user(format!(
+                    "Undefined granularity {} for time dimension {}",
+                    granularity, dep.name
+                )));
+            }
+        }
+        let result = TimeDimensionDependency {
+            base_symbol: base_evaluator,
+            granularities,
+        };
+        Ok(result)
     }
 
     fn build_cube_dependency(
@@ -162,13 +233,21 @@ impl<'a> DependenciesBuilder<'a> {
             } else {
                 let child_dep = if call_childs[*child_ind].is_empty() {
                     CubeDepProperty::SymbolDependency(self.build_evaluator(&new_cube_name, &name)?)
-                } else {
+                } else if self.check_cube_exists(name)? {
                     CubeDepProperty::CubeDependency(self.build_cube_dependency(
                         &new_cube_name,
                         *child_ind,
                         call_deps,
                         call_childs,
                     )?)
+                } else {
+                    let dep = self.build_time_dimension_dependency(
+                        &new_cube_name,
+                        *child_ind,
+                        call_deps,
+                        call_childs,
+                    )?;
+                    CubeDepProperty::TimeDimensionDependency(dep)
                 };
                 properties.insert(name.clone(), child_dep);
             }
@@ -209,17 +288,7 @@ impl<'a> DependenciesBuilder<'a> {
         name: &String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let dep_full_name = format!("{}.{}", cube_name, name);
-        //FIXME avoid cloning
-        let dep_path = vec![cube_name.clone(), name.clone()];
-        if self.cube_evaluator.is_measure(dep_path.clone())? {
-            Ok(self.compiler.add_measure_evaluator(dep_full_name)?)
-        } else if self.cube_evaluator.is_dimension(dep_path.clone())? {
-            Ok(self.compiler.add_dimension_evaluator(dep_full_name)?)
-        } else {
-            Err(CubeError::internal(format!(
-                "Cannot resolve dependency {} of member {}.{}",
-                name, cube_name, name
-            )))
-        }
+        self.compiler
+            .add_auto_resolved_member_evaluator(dep_full_name)
     }
 }

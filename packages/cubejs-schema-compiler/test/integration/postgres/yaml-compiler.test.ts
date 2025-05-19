@@ -1,5 +1,5 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
+import { prepareCompiler, prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('YAMLCompiler', () => {
@@ -23,7 +23,7 @@ cubes:
       - name: time
         sql: "{CUBE}.timestamp"
         type: time
-    `, { yamlExtension: true });
+    `);
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -53,6 +53,40 @@ cubes:
       {
         active_users__time_day: '2022-01-03T00:00:00.000Z',
         active_users__weekly_active: '1',
+      }]
+    );
+  });
+
+  it('simple with json/curly in sql', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: ActiveUsers
+    sql: SELECT 1 as user_id, '2022-01-01'::TIMESTAMP as timestamp, CAST('\\{"key":"value"\\}'::JSON AS TEXT) AS json_col
+
+    dimensions:
+      - name: time
+        sql: "{CUBE}.timestamp"
+        type: time
+      - name: json_col
+        sql: json_col
+        type: string
+    `);
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['ActiveUsers.time', 'ActiveUsers.json_col'],
+      timezone: 'UTC'
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+
+    expect(res).toEqual(
+      [{
+        active_users__time: '2022-01-01T00:00:00.000Z',
+        active_users__json_col: '{"key":"value"}',
       }]
     );
   });
@@ -448,7 +482,7 @@ cubes:
         rollingWindow:
           trailing: 7 day
           offset: start
-    `, { yamlExtension: true });
+    `);
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -493,7 +527,6 @@ cubes:
           - name: count
             type: count
     `,
-    {},
     {
       compileContext: {
         authInfo: null,
@@ -640,6 +673,184 @@ views:
         m_view__count: '1',
         m_view__w_z_country: 'US',
       }]
+    );
+  });
+
+  it('calling cube\'s sql() (yaml-yaml)', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(
+      `cubes:
+  - name: simple_orders
+    sql: >
+      SELECT 1 AS id, 100 AS amount, 'new' status, '2025-04-15'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 2 AS id, 200 AS amount, 'new' status, '2025-04-16'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 3 AS id, 300 AS amount, 'processed' status, '2025-04-17'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 4 AS id, 500 AS amount, 'processed' status, '2025-04-18'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 5 AS id, 600 AS amount, 'shipped' status, '2025-04-19'::TIMESTAMP AS created_at
+
+    measures:
+      - name: count
+        type: count
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+  - name: simple_orders_sql_ext
+
+    sql: >
+      SELECT * FROM {simple_orders.sql()} as parent
+      WHERE status = 'new'
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+    `
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['simple_orders_sql_ext.count'],
+      timeDimensions: [{
+        dimension: 'simple_orders_sql_ext.created_at',
+        granularity: 'day',
+        dateRange: ['2025-04-01', '2025-05-01']
+      }],
+      timezone: 'UTC',
+      preAggregationsSchema: ''
+    });
+
+    const res = await dbRunner.evaluateQueryWithPreAggregations(query);
+
+    expect(res).toEqual(
+      [
+        {
+          simple_orders_sql_ext__count: '1',
+          simple_orders_sql_ext__created_at_day: '2025-04-15T00:00:00.000Z',
+        },
+        {
+          simple_orders_sql_ext__count: '1',
+          simple_orders_sql_ext__created_at_day: '2025-04-16T00:00:00.000Z',
+        }
+      ]
+    );
+  });
+
+  it('calling cube\'s sql() (yaml-js)', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler([
+      {
+        content: `
+cube('simple_orders', {
+  sql: \`
+      SELECT 1 AS id, 100 AS amount, 'new' status, '2025-04-15'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 2 AS id, 200 AS amount, 'new' status, '2025-04-16'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 3 AS id, 300 AS amount, 'processed' status, '2025-04-17'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 4 AS id, 500 AS amount, 'processed' status, '2025-04-18'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 5 AS id, 600 AS amount, 'shipped' status, '2025-04-19'::TIMESTAMP AS created_at
+  \`,
+
+  dimensions: {
+    status: {
+      sql: 'status',
+      type: 'string',
+    },
+  },
+
+  measures: {
+    count: {
+      type: 'count',
+    },
+    total_amount: {
+      type: 'sum',
+      sql: 'total_amount',
+    },
+  },
+});
+    `,
+        fileName: 'cube.js',
+      },
+      {
+        content: `cubes:
+  - name: simple_orders_sql_ext
+
+    sql: >
+      SELECT * FROM {simple_orders.sql()} as parent
+      WHERE status = 'new'
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+    `,
+        fileName: 'cube.yml',
+      },
+    ]);
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['simple_orders_sql_ext.count'],
+      timeDimensions: [{
+        dimension: 'simple_orders_sql_ext.created_at',
+        granularity: 'day',
+        dateRange: ['2025-04-01', '2025-05-01']
+      }],
+      timezone: 'UTC',
+      preAggregationsSchema: ''
+    });
+
+    const res = await dbRunner.evaluateQueryWithPreAggregations(query);
+
+    expect(res).toEqual(
+      [
+        {
+          simple_orders_sql_ext__count: '1',
+          simple_orders_sql_ext__created_at_day: '2025-04-15T00:00:00.000Z',
+        },
+        {
+          simple_orders_sql_ext__count: '1',
+          simple_orders_sql_ext__created_at_day: '2025-04-16T00:00:00.000Z',
+        }
+      ]
     );
   });
 });

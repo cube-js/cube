@@ -2,8 +2,8 @@
 source: cubesql/src/compile/test/test_udfs.rs
 expression: "execute_query(\"select pg_backend_pid();\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
-+------------------+
-| pg_backend_pid() |
-+------------------+
-| 1                |
-+------------------+
++----------------+
+| pg_backend_pid |
++----------------+
+| 1              |
++----------------+

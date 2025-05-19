@@ -71,6 +71,7 @@ pub enum FilterOperator {
 pub struct QueryFilter {
     pub member: String,
     pub operator: FilterOperator,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub values: Option<Vec<String>>,
 }
 
@@ -97,6 +98,7 @@ pub type JsFunction = String;
 #[serde(rename_all = "camelCase")]
 pub struct MemberExpression {
     // Made as Option and JsValueDeserializer set's it to None.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expression: Option<JsFunction>,
     pub cube_name: String,
     pub name: String,
@@ -126,8 +128,11 @@ pub struct ParsedMemberExpression {
 #[serde(rename_all = "camelCase")]
 pub struct QueryTimeDimension {
     pub dimension: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub date_range: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compare_date_range: Option<CompareDateRangeType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub granularity: Option<String>,
 }
 

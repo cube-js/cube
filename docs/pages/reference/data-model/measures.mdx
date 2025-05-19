@@ -248,28 +248,45 @@ cubes:
 
 ### `rolling_window`
 
-If you want to calculate some metric within a window, for example a week or a
-month, you should use a `rolling_window` parameter. The `trailing` and `leading`
-parameters define window size.
+The `rolling_window` parameter is used to for [rolling window][ref-rolling-window]
+calculations, e.g., to calculate a metric over a moving window of time, e.g. a
+week or a month.
 
 <WarningBox>
 
-`rolling_window` only works for a query where there's a single `timeDimension`
-with a defined date range.
+Rolling window calculations require the query to contain a single time dimension
+with a provided date range. It is used to calculate the minimum and maximum values
+for the series of time windows.
+
+With Tesseract, the [next-generation data modeling engine][link-tesseract],
+rolling window calculations don't require the date range for the time dimension.
+Tesseract is currently in preview. Use the `CUBEJS_TESSERACT_SQL_PLANNER`
+environment variable to enable it.
 
 </WarningBox>
 
-These parameters have a format defined as
-`(-?\d+) (minute|hour|day|week|month|year)`. The `trailing` and `leading`
-parameters can also be set to an `unbounded` value, which means infinite size
-for the corresponding window part. You can define `trailing` and `leading`
-parameters using negative integers.
+#### `offset`
 
-The `trailing` parameter is a window part size before the `offset` point and the
-`leading` parameter is after it. You can set the window `offset` parameter to
-either `start` or `end`, which will match the start or end of the selected date
-range. By default, the `leading` and `trailing` parameters are set to zero and
-`offset` is set to `end`.
+The `offset` parameter is used to specify the starting point of the time window.
+
+You can set the window `offset` parameter to either `start` or `end`, which will
+match the start or end of the window.
+
+By default, the `offset` parameter is set to `end`.
+
+#### `trailing` and `leading`
+
+The `trailing` and `leading` parameters define the size of the time window.
+The `trailing` parameter defines the size of the window part before the `offset` point,
+and the `leading` parameter defines the size of the window part after the `offset` point.
+
+These parameters have a format defined as `(-?\d+) (minute|hour|day|week|month|year)`.
+It means that you can define these parameters using both positive and negative integers.
+
+The `trailing` and `leading` parameters can also be set to `unbounded`,
+which means _infinite size_ for the corresponding window part.
+
+By default, the `leading` and `trailing` parameters are set to zero.
 
 <CodeTabs>
 
@@ -536,3 +553,5 @@ join will be created automatically.
 [ref-naming]: /product/data-modeling/syntax#naming
 [ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations
+[ref-rolling-window]: /product/data-modeling/concepts/multi-stage-calculations#rolling-window
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine

@@ -57,9 +57,19 @@ on:
       # To test SQL API Push down
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
+  workflow_dispatch:
+    inputs:
+      use_tesseract_sql_planner:
+        description: 'Enable TESSERACT_SQL_PLANNER?'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 env:
-  CUBEJS_TESSERACT_ORCHESTRATOR: true
+  USE_TESSERACT_SQL_PLANNER: false
 
 jobs:
   latest-tag-sha:
@@ -91,7 +101,7 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [ 20 ]
+        node-version: [ 22 ]
         python-version: [ "fallback" ]
         target: [ "x86_64-unknown-linux-gnu" ]
       fail-fast: false
@@ -205,12 +215,18 @@ jobs:
         athena-export-bucket-s3
         bigquery-export-bucket-gcs
         clickhouse-export-bucket-s3
+        clickhouse-export-bucket-s3-prefix
         databricks-jdbc
         databricks-jdbc-export-bucket-s3
+        databricks-jdbc-export-bucket-s3-prefix
         databricks-jdbc-export-bucket-azure
+        databricks-jdbc-export-bucket-azure-prefix
+        databricks-jdbc-export-bucket-gcs
+        databricks-jdbc-export-bucket-gcs-prefix
         redshift
         redshift-export-bucket-s3
         snowflake
+        snowflake-encrypted-pk
         snowflake-export-bucket-s3
         snowflake-export-bucket-azure
         snowflake-export-bucket-azure-via-storage-integration
@@ -222,22 +238,26 @@ jobs:
       DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
     strategy:
       matrix:
-        node:
-          - 20.x
         database:
           - athena-export-bucket-s3
           - bigquery-export-bucket-gcs
           - clickhouse
           - clickhouse-export-bucket-s3
+          - clickhouse-export-bucket-s3-prefix
           - databricks-jdbc
           - databricks-jdbc-export-bucket-s3
+          - databricks-jdbc-export-bucket-s3-prefix
           - databricks-jdbc-export-bucket-azure
+          - databricks-jdbc-export-bucket-azure-prefix
+          - databricks-jdbc-export-bucket-gcs
+          - databricks-jdbc-export-bucket-gcs-prefix
           - mssql
           - mysql
           - postgres
           - redshift
           - redshift-export-bucket-s3
           - snowflake
+          - snowflake-encrypted-pk
           - snowflake-export-bucket-s3
           - snowflake-export-bucket-azure
           - snowflake-export-bucket-azure-via-storage-integration
@@ -248,10 +268,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node.js 20.x
+      - name: Install Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
 
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.22
@@ -308,6 +328,8 @@ jobs:
           (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
           (!contains(env.CLOUD_DATABASES, matrix.database))
         env:
+          DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.use_tesseract_sql_planner || env.USE_TESSERACT_SQL_PLANNER }}
+
           # Athena
           DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
           DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET }}
@@ -336,6 +358,8 @@ jobs:
           # Snowflake
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
+          DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY }}
+          DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS }}
         with:
           max_attempts: 3
           retry_on: error

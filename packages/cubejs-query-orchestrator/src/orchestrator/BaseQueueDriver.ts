@@ -14,7 +14,7 @@ export abstract class BaseQueueDriver implements QueueDriverInterface {
     return getCacheHash(queryKey, this.processUid);
   }
 
-  abstract createConnection(): Promise<QueueDriverConnectionInterface>;
+  public abstract createConnection(): Promise<QueueDriverConnectionInterface>;
 
-  abstract release(connection: QueueDriverConnectionInterface): void;
+  public abstract release(connection: QueueDriverConnectionInterface): void;
 }

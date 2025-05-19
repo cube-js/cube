@@ -1,6 +1,13 @@
 import { camelizeCube } from '../../src/compiler/utils';
+import { toSnakeCase } from '../../src/scaffolding/utils';
 
 describe('Test Utils', () => {
+  it('toSnakeCase', () => {
+    expect(toSnakeCase('customerkey')).toEqual('customerkey');
+    expect(toSnakeCase('customerKey')).toEqual('customer_key');
+    expect(toSnakeCase('customer_key')).toEqual('customer_key');
+  });
+
   it('camelizeObject (js)', () => {
     const res = camelizeCube({
       sql_table: 'tbl',

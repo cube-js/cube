@@ -8,7 +8,7 @@ import CubeCore, {
   SystemOptions
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
-import express from 'express';
+import express, { Express } from 'express';
 import http from 'http';
 import util from 'util';
 import bodyParser from 'body-parser';
@@ -81,7 +81,7 @@ export class CubejsServer {
     return new CubeCore(config, systemOptions);
   }
 
-  public async listen(options: http.ServerOptions = {}) {
+  public async listen(options: http.ServerOptions = {}): Promise<{app: Express, port: number, server: GracefulHttpServer, version: any }> {
     try {
       if (this.server) {
         throw new Error('CubeServer is already listening');

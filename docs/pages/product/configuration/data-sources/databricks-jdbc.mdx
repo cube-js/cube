@@ -122,6 +122,24 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
 CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 ```
 
+#### Google Cloud Storage
+
+<InfoBox>
+
+When using an export bucket, remember to assign the **Storage Object Admin**
+role to your Google Cloud credentials (`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`).
+
+</InfoBox>
+
+To use Google Cloud Storage as an export bucket, first complete [the Databricks guide on
+connecting to cloud object storage using Unity Catalog][databricks-docs-uc-gcs].
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET=gs://databricks-export-bucket
+CUBEJS_DB_EXPORT_BUCKET_TYPE=gcs
+CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
+```
+
 #### Azure Blob Storage
 
 To use Azure Blob Storage as an export bucket, follow [the Databricks guide on
@@ -136,7 +154,7 @@ CUBEJS_DB_EXPORT_BUCKET=wasbs://my-bucket@my-account.blob.core.windows.net
 CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY=<AZURE_STORAGE_ACCOUNT_ACCESS_KEY>
 ```
 
-Access key provides full access to the configuration and data, 
+Access key provides full access to the configuration and data,
 to use a fine-grained control over access to storage resources, follow [the Databricks guide on authorize with Azure Active Directory][authorize-with-azure-active-directory].
 
 [Create the service principal][azure-authentication-with-service-principal] and replace the access key as follows:
@@ -173,6 +191,8 @@ bucket][self-preaggs-export-bucket] **must be** configured.
   https://docs.databricks.com/data/data-sources/azure/azure-storage.html
 [databricks-docs-uc-s3]:
   https://docs.databricks.com/en/connect/unity-catalog/index.html
+[databricks-docs-uc-gcs]:
+  https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage.html
 [databricks-docs-jdbc-url]:
   https://docs.databricks.com/integrations/bi/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url
 [databricks-docs-pat]:

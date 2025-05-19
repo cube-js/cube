@@ -1,5 +1,6 @@
 use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct MemberChildsCollector {
@@ -40,6 +41,8 @@ impl TraversalVisitor for MemberChildsCollector {
             match node.as_ref() {
                 MemberSymbol::Measure(_) => Ok(Some(new_state)),
                 MemberSymbol::Dimension(_) => Ok(Some(new_state)),
+                MemberSymbol::TimeDimension(_) => Ok(Some(new_state)),
+                MemberSymbol::MemberExpression(_) => Ok(Some(new_state)),
                 _ => Ok(None),
             }
         } else {
@@ -54,8 +57,19 @@ impl TraversalVisitor for MemberChildsCollector {
     }
 }
 
-pub fn member_childs(node: &Rc<MemberSymbol>) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+pub fn member_childs(
+    node: &Rc<MemberSymbol>,
+    resolve_references: bool,
+) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
     let mut visitor = MemberChildsCollector::new();
     visitor.apply(node, &MemberChildsCollectorState::new(true))?;
-    Ok(visitor.extract_result())
+    let res = visitor.extract_result();
+    let res = if resolve_references {
+        res.iter()
+            .map(|child| child.clone().resolve_reference_chain())
+            .collect_vec()
+    } else {
+        res
+    };
+    Ok(res)
 }

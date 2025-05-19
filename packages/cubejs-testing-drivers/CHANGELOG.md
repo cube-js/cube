@@ -3,6 +3,138 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
+
+### Features
+
+- **clickhouse-driver:** Add support for S3 Bucket with paths ([#9585](https://github.com/cube-js/cube/issues/9585)) ([2e47147](https://github.com/cube-js/cube/commit/2e4714721ef166b76432bfdd374db57bff886b7b))
+- **tesseract:** Initial BigQuery support ([#9577](https://github.com/cube-js/cube/issues/9577)) ([60ad2f0](https://github.com/cube-js/cube/commit/60ad2f034d760220c81f7ff9794a388ba5dfbdc5))
+
+## [1.3.15](https://github.com/cube-js/cube/compare/v1.3.14...v1.3.15) (2025-05-15)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix timeshift measure queries coming from SQL API ([#9570](https://github.com/cube-js/cube/issues/9570)) ([d94afeb](https://github.com/cube-js/cube/commit/d94afebbbca9de2eb17fdcfcdb43fa9e64ad1735))
+
+## [1.3.14](https://github.com/cube-js/cube/compare/v1.3.13...v1.3.14) (2025-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.13](https://github.com/cube-js/cube/compare/v1.3.12...v1.3.13) (2025-05-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.12](https://github.com/cube-js/cube/compare/v1.3.11...v1.3.12) (2025-05-08)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.8](https://github.com/cube-js/cube/compare/v1.3.7...v1.3.8) (2025-04-24)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.7](https://github.com/cube-js/cube/compare/v1.3.6...v1.3.7) (2025-04-23)
+
+### Features
+
+- **schema-compiler:** Custom granularities support for Amazon Athena/Presto dialect ([#9472](https://github.com/cube-js/cube/issues/9472)) ([4c1520e](https://github.com/cube-js/cube/commit/4c1520e90207469cb4d6be41b28e1c06bb2d0646))
+- **schema-compiler:** Support custom granularities with Year-Month intervals for AWS Redshift dialect ([#9489](https://github.com/cube-js/cube/issues/9489)) ([2fc53f2](https://github.com/cube-js/cube/commit/2fc53f2d10e94ba6ac1b40bfce956167b89b8caf))
+
+## [1.3.6](https://github.com/cube-js/cube/compare/v1.3.5...v1.3.6) (2025-04-22)
+
+### Features
+
+- **mssql-driver:** Return numeric result values as strings ([#9485](https://github.com/cube-js/cube/issues/9485)) ([52da601](https://github.com/cube-js/cube/commit/52da6010792985b610087040733f6da650369c1a))
+
+## [1.3.5](/compare/v1.3.4...v1.3.5) (2025-04-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.4](https://github.com/cube-js/cube/compare/v1.3.3...v1.3.4) (2025-04-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.3](https://github.com/cube-js/cube/compare/v1.3.2...v1.3.3) (2025-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.2](https://github.com/cube-js/cube/compare/v1.3.1...v1.3.2) (2025-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.3.1](https://github.com/cube-js/cube/compare/v1.3.0...v1.3.1) (2025-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+### Features
+
+- **databricks-jdbc-driver:** Add export bucket support for Google Cloud Storage ([#9445](https://github.com/cube-js/cube/issues/9445)) ([a247bf9](https://github.com/cube-js/cube/commit/a247bf9ce073aea69ffb592e933fd365eee70fe1))
+
+## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.32](/compare/v1.2.31...v1.2.32) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.30](/compare/v1.2.29...v1.2.30) (2025-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
+
+### Features
+
+- **snowflake-driver:** Ability to use encrypted private keys for auth ([#9371](https://github.com/cube-js/cube/issues/9371)) ([ab54e28](https://github.com/cube-js/cube/commit/ab54e2817dc4e14f0e1ea3b1257b3a08072c954c))
+
+## [1.2.26](https://github.com/cube-js/cube/compare/v1.2.25...v1.2.26) (2025-03-21)
+
+### Bug Fixes
+
+- **databricks-jdbc-driver:** Allow paths in s3/azure export buckets ([#9365](https://github.com/cube-js/cube/issues/9365)) ([f133737](https://github.com/cube-js/cube/commit/f1337379c977f920bc6c1864138b23e10616007d))
+
+## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.24](/compare/v1.2.23...v1.2.24) (2025-03-18)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.23](https://github.com/cube-js/cube/compare/v1.2.22...v1.2.23) (2025-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.22](https://github.com/cube-js/cube/compare/v1.2.21...v1.2.22) (2025-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
 ## [1.2.21](https://github.com/cube-js/cube/compare/v1.2.20...v1.2.21) (2025-03-11)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

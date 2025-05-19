@@ -11,7 +11,6 @@ use crate::{
     var, var_iter, var_list_iter,
 };
 use egg::{Subst, Var};
-use std::sync::Arc;
 
 impl WrapperRules {
     pub fn subquery_rules(&self, rules: &mut Vec<CubeRewrite>) {
@@ -25,6 +24,7 @@ impl WrapperRules {
                     ),
                     "?context",
                 ),
+                // TODO recheck logic here wrt input data source in ?inner_context vs ?context
                 wrapper_pullup_replacer("?cube_scan_input", "?context"),
                 self.transform_check_subquery_wrapped("?cube_scan_input"),
             ),
@@ -49,6 +49,7 @@ impl WrapperRules {
                             "CubeScanMembers",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "WrapperReplacerContextInputDataSource:None",
                         ),
                     ),
                     "CubeScanWrapperFinalized:false",
@@ -121,26 +122,13 @@ impl WrapperRules {
     pub fn transform_check_subquery_allowed(
         egraph: &mut CubeEGraph,
         subst: &mut Subst,
-        meta: Arc<MetaContext>,
-        alias_to_cube_var: Var,
+        meta: &MetaContext,
+        input_data_source_var: Var,
     ) -> bool {
-        for alias_to_cube in var_iter!(
-            egraph[subst[alias_to_cube_var]],
-            WrapperReplacerContextAliasToCube
-        )
-        .cloned()
-        {
-            if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube) {
-                if sql_generator
-                    .get_sql_templates()
-                    .templates
-                    .contains_key("expressions/subquery")
-                {
-                    return true;
-                }
-            }
-        }
-        false
+        let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var) else {
+            return false;
+        };
+        Self::can_rewrite_template(&data_source, &meta, "expressions/subquery")
     }
 
     fn transform_check_subquery_wrapped(

@@ -251,12 +251,12 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
   return moment.tz(timestamp, 'UTC').tz(timezone).format(timestampFormat);
 };
 
-export const parseLocalDate = (data: any, timezone: string, timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): string | null => {
+export const parseUtcIntoLocalDate = (data: { [key: string]: string }[] | null | undefined, timezone: string, timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): string | null => {
   if (!data) {
     return null;
   }
   data = JSON.parse(JSON.stringify(data));
-  const value = data[0] && data[0][Object.keys(data[0])[0]];
+  const value = data?.[0]?.[Object.keys(data[0])[0]];
   if (!value) {
     return null;
   }
@@ -278,11 +278,12 @@ export const parseLocalDate = (data: any, timezone: string, timestampFormat: str
   let parsedMoment;
 
   if (value.includes('Z') || /([+-]\d{2}:?\d{2})$/.test(value.trim())) {
-    // We have timezone info
+    // We have timezone info encoded in the value string
     parsedMoment = moment(value, formats, true);
   } else {
-    // If no tz info - use provided timezone
-    parsedMoment = moment.tz(value, formats, true, timezone);
+    // If no tz info - use UTC as cube expects data source connection to be in UTC timezone
+    // and so date functions (e.g. `now()`) would return timestamps in UTC.
+    parsedMoment = moment.tz(value, formats, true, 'UTC');
   }
 
   if (!parsedMoment.isValid()) {

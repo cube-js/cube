@@ -94,7 +94,10 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
           const response = await client.load(t.query);
 
           const resultSets = response.decompose();
-          expect(resultSets).toMatchSnapshot('query');
+
+          for (const result of resultSets) {
+            expect(result.rawData()).toMatchSnapshot('query');
+          }
 
           if (t.expectArray) {
             for (const expectFn of t.expectArray) {

@@ -1,7 +1,7 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::MemberSymbol;
 use super::sql_templates::PlanSqlTemplates;
-use super::VisitorContext;
+use super::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -20,6 +20,83 @@ pub trait BaseMember {
     fn name(&self) -> &String;
     fn alias_suffix(&self) -> Option<String> {
         None
+    }
+}
+
+pub struct MemberSymbolRef {
+    member_evaluator: Rc<MemberSymbol>,
+    query_tools: Rc<QueryTools>,
+    default_alias: String,
+    cube_name: String,
+    name: String,
+}
+
+impl MemberSymbolRef {
+    pub fn try_new(
+        member_evaluator: Rc<MemberSymbol>,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let default_alias = match member_evaluator.as_ref() {
+            &MemberSymbol::TimeDimension(_)
+            | &MemberSymbol::Dimension(_)
+            | &MemberSymbol::Measure(_) => BaseMemberHelper::default_alias(
+                &member_evaluator.cube_name(),
+                &member_evaluator.name(),
+                &member_evaluator.alias_suffix(),
+                query_tools.clone(),
+            )?,
+            MemberSymbol::MemberExpression(_)
+            | MemberSymbol::CubeName(_)
+            | MemberSymbol::CubeTable(_) => query_tools.alias_name(&member_evaluator.name()),
+        };
+        let cube_name = member_evaluator.cube_name();
+        let name = member_evaluator.name();
+        Ok(Rc::new(Self {
+            member_evaluator,
+            default_alias,
+            query_tools,
+            cube_name,
+            name,
+        }))
+    }
+}
+
+impl BaseMember for MemberSymbolRef {
+    fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            templates,
+        )
+    }
+
+    fn alias_name(&self) -> String {
+        self.default_alias.clone()
+    }
+
+    fn member_evaluator(&self) -> Rc<MemberSymbol> {
+        self.member_evaluator.clone()
+    }
+
+    fn full_name(&self) -> String {
+        self.member_evaluator.full_name()
+    }
+
+    fn as_base_member(self: Rc<Self>) -> Rc<dyn BaseMember> {
+        self.clone()
+    }
+
+    fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+
+    fn name(&self) -> &String {
+        &self.name
     }
 }
 

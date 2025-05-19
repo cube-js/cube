@@ -5,7 +5,6 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         wrapper_replacer_context, AggregateFunctionExprDistinct, AggregateFunctionExprFun,
-        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -40,6 +39,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     )],
                     "?distinct",
@@ -53,9 +53,10 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
-                self.transform_agg_fun_expr("?fun", "?distinct", "?alias_to_cube"),
+                self.transform_agg_fun_expr("?fun", "?distinct", "?input_data_source"),
             ),
         ]);
     }
@@ -64,42 +65,38 @@ impl WrapperRules {
         &self,
         fun_var: &'static str,
         distinct_var: &'static str,
-        alias_to_cube_var: &'static str,
+        input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
         let distinct_var = var!(distinct_var);
-        let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                WrapperReplacerContextAliasToCube
-            )
-            .cloned()
-            {
-                if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube) {
-                    for fun in var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun).cloned()
-                    {
-                        for distinct in
-                            var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
-                        {
-                            let fun = if *distinct && fun == AggregateFunction::Count {
-                                "COUNT_DISTINCT".to_string()
-                            } else {
-                                fun.to_string()
-                            };
+            let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var)
+            else {
+                return false;
+            };
 
-                            if sql_generator
-                                .get_sql_templates()
-                                .templates
-                                .contains_key(&format!("functions/{}", fun.as_str()))
-                            {
-                                return true;
-                            }
-                        }
+            for fun in var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun).cloned() {
+                for distinct in
+                    var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
+                {
+                    let fun = if *distinct && fun == AggregateFunction::Count {
+                        "COUNT_DISTINCT".to_string()
+                    } else {
+                        fun.to_string()
+                    };
+
+                    if Self::can_rewrite_template(
+                        &data_source,
+                        &meta,
+                        &format!("functions/{}", fun.as_str()),
+                    ) {
+                        return true;
                     }
                 }
             }
+
             false
         }
     }

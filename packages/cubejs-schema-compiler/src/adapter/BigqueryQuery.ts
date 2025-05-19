@@ -42,7 +42,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public convertTz(field) {
-    return `DATETIME(${field}, '${this.timezone}')`;
+    return `DATETIME(${this.timeStampCast(field)}, '${this.timezone}')`;
   }
 
   public timeStampCast(value) {
@@ -134,6 +134,10 @@ export class BigqueryQuery extends BaseQuery {
     throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
   }
 
+  public override intervalAndMinimalTimeUnit(interval: string): [string, string] {
+    return this.formatInterval(interval);
+  }
+
   public newFilter(filter) {
     return new BigqueryFilter(this, filter);
   }
@@ -186,11 +190,21 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public subtractTimestampInterval(date, interval) {
-    return `TIMESTAMP_SUB(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
+    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
+    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit)) {
+      return this.timeStampCast(`DATETIME_SUB(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
+    }
+
+    return `TIMESTAMP_SUB(${date}, INTERVAL ${intervalFormatted})`;
   }
 
   public addTimestampInterval(date, interval) {
-    return `TIMESTAMP_ADD(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
+    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
+    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit)) {
+      return this.timeStampCast(`DATETIME_ADD(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
+    }
+
+    return `TIMESTAMP_ADD(${date}, INTERVAL ${intervalFormatted})`;
   }
 
   public nowTimestampSql() {
@@ -236,28 +250,57 @@ export class BigqueryQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
-    templates.functions.DATETRUNC = 'DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
+    templates.functions.DATETRUNC = 'DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part|upper == \'WEEK\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %})';
     templates.functions.LOG = 'LOG({{ args_concat }}{% if args[1] is undefined %}, 10{% endif %})';
     templates.functions.BTRIM = 'TRIM({{ args_concat }})';
     templates.functions.STRPOS = 'STRPOS({{ args_concat }})';
     templates.functions.DATEDIFF = 'DATETIME_DIFF(CAST({{ args[2] }} AS DATETIME), CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
     // DATEADD is being rewritten to DATE_ADD
-    // templates.functions.DATEADD = 'DATETIME_ADD(CAST({{ args[2] }} AS DATETTIME), INTERVAL {{ interval }} {{ date_part }})';
+    templates.functions.DATE_ADD = 'DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     delete templates.functions.TO_CHAR;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
-    templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
+    templates.expressions.timestamp_literal = 'DATETIME(TIMESTAMP(\'{{ value }}\'))';
     delete templates.expressions.ilike;
     delete templates.expressions.like_escape;
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
     templates.types.boolean = 'BOOL';
     templates.types.float = 'FLOAT64';
     templates.types.double = 'FLOAT64';
     templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
     templates.types.binary = 'BYTES';
+    templates.expressions.cast_to_string = 'CAST({{ expr }} AS STRING)';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.join_types.full = 'FULL';
+    templates.statements.time_series_select = 'SELECT DATETIME(TIMESTAMP(f)) date_from, DATETIME(TIMESTAMP(t)) date_to \n' +
+    'FROM (\n' +
+    '{% for time_item in seria  %}' +
+    '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
+    '{% if not loop.last %} UNION ALL\n{% endif %}' +
+    '{% endfor %}' +
+    ') AS dates';
+    templates.statements.generated_time_series_select = 'SELECT DATETIME(d) AS date_from,\n' +
+    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    'FROM UNNEST(\n' +
+    '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
+    'GENERATE_DATE_ARRAY(DATE({{ start }}), DATE({{ end }}), INTERVAL {{ granularity }})\n' +
+    '{% else %}' +
+    'GENERATE_TIMESTAMP_ARRAY(TIMESTAMP({{ start }}), TIMESTAMP({{ end }}), INTERVAL {{ granularity }})\n' +
+    '{% endif %}' +
+    ') AS d';
+
+    templates.statements.generated_time_series_with_cte_range_source = 'SELECT DATETIME(d) AS date_from,\n' +
+    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    'FROM {{ range_source }}, UNNEST(\n' +
+    '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
+    'GENERATE_DATE_ARRAY(DATE({{ range_source }}.{{ min_name }}), DATE({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
+    '{% else %}' +
+    'GENERATE_TIMESTAMP_ARRAY(TIMESTAMP({{ range_source }}.{{ min_name }}), TIMESTAMP({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
+    '{% endif %}' +
+    ') AS d';
     return templates;
   }
 }

@@ -88,10 +88,11 @@ impl QueryResult {
                         let values = row.values().ok_or(ParseError::NullRow)?;
                         let row_obj: Vec<_> = values
                             .iter()
-                            .map(|val| {
-                                DBResponseValue::Primitive(DBResponsePrimitive::String(
-                                    val.string_value().unwrap_or("").to_owned(),
-                                ))
+                            .map(|val| match val.string_value() {
+                                Some(s) => DBResponseValue::Primitive(DBResponsePrimitive::String(
+                                    s.to_owned(),
+                                )),
+                                None => DBResponseValue::Primitive(DBResponsePrimitive::Null),
                             })
                             .collect();
 

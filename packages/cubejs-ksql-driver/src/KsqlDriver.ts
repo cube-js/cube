@@ -346,9 +346,12 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return `\`${identifier}\``;
   }
 
+  /**
+   * Returns the configurable driver options
+   * Note: It returns the unprefixed option names.
+   * In case of using multisources options need to be prefixed manually.
+   */
   public static driverEnvVariables() {
-    // TODO (buntarb): check how this method can/must be used with split
-    // names by the data source.
     return [
       'CUBEJS_DB_URL',
       'CUBEJS_DB_USER',

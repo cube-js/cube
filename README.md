@@ -3,13 +3,13 @@
 </p>
 <br/>
 
-[Website](https://cube.dev?ref=github-readme) • [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme) • [Docs](https://cube.dev/docs?ref=github-readme) • [Examples](https://cube.dev/docs/examples?ref=github-readme) • [Blog](https://cube.dev/blog?ref=github-readme) • [Slack](https://slack.cube.dev?ref=github-readme) • [Twitter](https://twitter.com/the_cube_dev)
+[Website](https://cube.dev?ref=github-readme) • [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme) • [Docs](https://cube.dev/docs?ref=github-readme) • [Examples](https://cube.dev/docs/examples?ref=github-readme) • [Blog](https://cube.dev/blog?ref=github-readme) • [Slack](https://slack.cube.dev?ref=github-readme) • [X](https://twitter.com/the_cube_dev)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube/workflows/Build/badge.svg)](https://github.com/cube-js/cube/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube is the semantic layer for building data applications.__ It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
+__Cube is the universal semantic layer for modern data applications.__ Born in the cloud era, Cube represents the next evolution of OLAP technology, helping data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
 <img
   src="https://ucarecdn.com/8d945f29-e9eb-4e7f-9e9e-29ae7074e195/"
@@ -27,13 +27,17 @@ For more details, see the [introduction](https://cube.dev/docs/cubejs-introducti
 
 ## Why Cube?
 
-If you are building a data application—such as a business intelligence tool or a customer-facing analytics feature—you’ll probably face the following problems:
+As data infrastructure evolved from traditional relational databases to cloud data platforms, OLAP capabilities that once lived in specialized servers like SQL Server Analysis Services and Oracle Essbase were left behind. Today's organizations face several challenges:
 
-1. __SQL code organization.__ Sooner or later, modeling even a dozen metrics with a dozen dimensions using pure SQL queries becomes a maintenance nightmare, which leads to building a modeling framework.
-2. __Performance.__ Most of the time and effort in modern analytics software development is spent providing adequate time to insight. In a world where every company’s data is big data, writing just SQL queries to get insight isn’t enough anymore.
-3. __Access Control.__ It is important to secure and govern access to data for all downstream data consuming applications.
+1. __Analytics Modeling and Multidimensionality.__ Modern cloud data platforms excel at processing large volumes of data but lack native support for multidimensional analysis and modeling. Cube brings OLAP-style analytics to these platforms, enabling consistent metric definitions and multidimensional analysis.
 
-Cube has the necessary infrastructure and features to implement efficient data modeling, access control, and performance optimizations so that every application—like embedded analytics, dashboarding and reporting tools, data notebooks, and other tools—can access consistent data via REST, SQL, and GraphQL APIs.
+2. __Performance Optimization.__ While cloud data warehouses have improved query performance through column-oriented storage and distributed processing, they still struggle with complex analytical workloads. Cube provides intelligent caching and pre-aggregation strategies that dramatically improve query response times.
+
+3. __Access Control and Governance.__ Securing and governing access to data across all consuming applications remains critical. Cube offers robust access control to ensure consistent security across your entire data ecosystem.
+
+4. __API Flexibility.__ Legacy OLAP tools were limited in how they exposed data. Cube provides modern REST, GraphQL, and SQL APIs along with support for traditional MDX and DAX interfaces, making it a truly universal semantic layer.
+
+Cube is the missing OLAP engine for the cloud data platform era that provides the necessary infrastructure and features to implement efficient data modeling, access control, and performance optimizations without duplicating analytics modeling, data, or security permissions across different tools.
 
 ![](https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/old-was-vs-cubejs-way.png)
 
@@ -76,7 +80,7 @@ For a step-by-step guide on Docker, [see the docs](https://cube.dev/docs/getting
 
 There are many ways you can contribute to Cube! Here are a few possibilities:
 
-* Star this repo and follow us on [Twitter](https://twitter.com/the_cube_dev).
+* Star this repo and follow us on [X](https://twitter.com/the_cube_dev).
 * Add Cube to your stack on [Stackshare](https://stackshare.io/cube-js).
 * Upvote issues with 👍 reaction so we know what's the demand for particular issue to prioritize it within road map.
 * Create issues every time you feel something is missing or goes wrong.

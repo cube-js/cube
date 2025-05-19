@@ -4,21 +4,49 @@ import express, { Application as ExpressApplication, RequestHandler } from 'expr
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { pausePromise } from '@cubejs-backend/shared';
+import { resetLogger } from '@cubejs-backend/native';
 
-import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Request } from '../src';
+import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Request, RequestContext } from '../src';
 import { AdapterApiMock, DataSourceStorageMock } from './mocks';
-import { RequestContext } from '../src/interfaces';
 import { generateAuthToken } from './utils';
+
+class ApiGatewayOpenAPI extends ApiGateway {
+  protected isRunning: Promise<void> | null = null;
+
+  public coerceForSqlQuery(query, context: RequestContext) {
+    return super.coerceForSqlQuery(query, context);
+  }
+
+  public async startSQLServer(): Promise<void> {
+    if (this.isRunning) {
+      return this.isRunning;
+    }
+
+    this.isRunning = this.sqlServer.init({});
+
+    return this.isRunning;
+  }
+
+  public async shutdownSQLServer(): Promise<void> {
+    try {
+      await this.sqlServer.shutdown('fast');
+    } finally {
+      this.isRunning = null;
+    }
+
+    // SQLServer changes logger for rust side with setupLogger in the constructor, but it leads
+    // to a memory leak, that's why jest doesn't allow to shut down tests
+    resetLogger(
+      process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
+    );
+  }
+}
 
 function createApiGateway(handler: RequestHandler, logger: () => any, options: Partial<ApiGatewayOptions>) {
   const adapterApi: any = new AdapterApiMock();
   const dataSourceStorage: any = new DataSourceStorageMock();
 
-  class ApiGatewayFake extends ApiGateway {
-    public coerceForSqlQuery(query, context: RequestContext) {
-      return super.coerceForSqlQuery(query, context);
-    }
-
+  class ApiGatewayFake extends ApiGatewayOpenAPI {
     public initApp(app: ExpressApplication) {
       const userMiddlewares: RequestHandler[] = [
         this.checkAuth,
@@ -26,6 +54,7 @@ function createApiGateway(handler: RequestHandler, logger: () => any, options: P
       ];
 
       app.get('/test-auth-fake', userMiddlewares, handler);
+      this.enableNativeApiGateway(app);
 
       app.use(this.handleErrorMiddleware);
     }
@@ -41,6 +70,7 @@ function createApiGateway(handler: RequestHandler, logger: () => any, options: P
   });
 
   process.env.NODE_ENV = 'unknown';
+
   const app = express();
   apiGateway.initApp(app);
 
@@ -49,6 +79,119 @@ function createApiGateway(handler: RequestHandler, logger: () => any, options: P
     app,
   };
 }
+
+describe('test authorization with native gateway', () => {
+  let app: ExpressApplication;
+  let apiGateway: ApiGatewayOpenAPI;
+
+  const handlerMock = jest.fn(() => {
+    // nothing, we are using it to verify that we don't got to express code
+  });
+  const loggerMock = jest.fn(() => {
+    //
+  });
+  const checkAuthMock = jest.fn((req, token) => {
+    jwt.verify(token, 'secret');
+
+    return {
+      security_context: {}
+    };
+  });
+
+  beforeAll(async () => {
+    const result = createApiGateway(handlerMock, loggerMock, {
+      checkAuth: checkAuthMock,
+      gatewayPort: 8585,
+    });
+
+    app = result.app;
+    apiGateway = result.apiGateway;
+
+    await result.apiGateway.startSQLServer();
+  });
+
+  beforeEach(() => {
+    handlerMock.mockClear();
+    loggerMock.mockClear();
+    checkAuthMock.mockClear();
+  });
+
+  afterAll(async () => {
+    await apiGateway.shutdownSQLServer();
+  });
+
+  it('default authorization - success', async () => {
+    const token = generateAuthToken({ uid: 5, });
+
+    await request(app)
+      .get('/cubejs-api/v2/stream')
+      .set('Authorization', `${token}`)
+      .send()
+      .expect(501);
+
+    // No bad logs
+    expect(loggerMock.mock.calls.length).toEqual(0);
+    // We should not call js handler, request should go into rust code
+    expect(handlerMock.mock.calls.length).toEqual(0);
+
+    // Verify that we passed token to JS side
+    expect(checkAuthMock.mock.calls.length).toEqual(1);
+    expect(checkAuthMock.mock.calls[0][0].protocol).toEqual('http');
+    expect(checkAuthMock.mock.calls[0][1]).toEqual(token);
+  });
+
+  it('default authorization - success (bearer prefix)', async () => {
+    const token = generateAuthToken({ uid: 5, });
+
+    await request(app)
+      .get('/cubejs-api/v2/stream')
+      .set('Authorization', `Bearer ${token}`)
+      .send()
+      .expect(501);
+
+    // No bad logs
+    expect(loggerMock.mock.calls.length).toEqual(0);
+    // We should not call js handler, request should go into rust code
+    expect(handlerMock.mock.calls.length).toEqual(0);
+
+    // Verify that we passed token to JS side
+    expect(checkAuthMock.mock.calls.length).toEqual(1);
+    expect(checkAuthMock.mock.calls[0][0].protocol).toEqual('http');
+    expect(checkAuthMock.mock.calls[0][1]).toEqual(token);
+  });
+
+  it('default authorization - wrong secret', async () => {
+    const badToken = 'SUPER_LARGE_BAD_TOKEN_WHICH_IS_NOT_A_TOKEN';
+
+    await request(app)
+      .get('/cubejs-api/v2/stream')
+      .set('Authorization', `${badToken}`)
+      .send()
+      .expect(401);
+
+    // No bad logs
+    expect(loggerMock.mock.calls.length).toEqual(0);
+    // We should not call js handler, request should go into rust code
+    expect(handlerMock.mock.calls.length).toEqual(0);
+
+    // Verify that we passed token to JS side
+    expect(checkAuthMock.mock.calls.length).toEqual(1);
+    expect(checkAuthMock.mock.calls[0][0].protocol).toEqual('http');
+    expect(checkAuthMock.mock.calls[0][1]).toEqual(badToken);
+  });
+
+  it('default authorization - missing auth header', async () => {
+    await request(app)
+      .get('/cubejs-api/v2/stream')
+      .send()
+      .expect(401);
+
+    // No bad logs
+    expect(loggerMock.mock.calls.length).toEqual(0);
+    // We should not call js handler, request should go into rust code
+    expect(handlerMock.mock.calls.length).toEqual(0);
+  });
+});
 
 describe('test authorization', () => {
   test('default authorization', async () => {

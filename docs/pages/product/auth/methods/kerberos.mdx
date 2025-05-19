@@ -1,0 +1,134 @@
+# Kerberos authentication
+
+[Kerberos][link-kerberos] is the most common authentication method for Windows environments.
+It can be used to authenticate requests to [DAX API][ref-dax-api] and [MDX API][ref-mdx-api].
+
+<SuccessBox>
+
+DAX API and MDX API are available in Cube Cloud on [Enterprise and above](https://cube.dev/pricing) product tiers.
+They also require the M [deployment tier](/product/deployment/cloud/pricing#deployment-tiers).
+
+</SuccessBox>
+
+On the diagram below, Kerberos is used to authenticate requests from Power BI Desktop (step 2):
+
+![](https://ucarecdn.com/a1928cd7-51b5-4d0c-b6b3-7f97eb94b41e/)
+
+## Authentication flow
+
+__Kerberos is the recommended method to authenticate Power BI Desktop requests.__
+
+
+It works as follows:
+
+* Power BI Desktop is launched normally, under the Windows domain account of the user.
+* When connecting the DAX API, Windows verifies whether its [service principal
+name](#registering-the-spn) is registered in the domain.
+* Once verified, the Key Distribution Center issues a Kerberos ticket for the user.
+* This ticket is transmitted to the DAX API in the request authorization header.
+* The DAX API [decrypts and verifies](#configuring-the-deployment) the Kerberos ticket.
+* Finally, the user principal name is passed for [further verification](#verifying-the-credentials).
+
+## Configuration
+
+Configuring Kerberos authentication includes the following steps:
+
+* [Obtain a Windows Server machine](#obtaining-a-windows-machine) to use during the next steps.
+* [Register the service principal name](#registering-the-spn).
+* [Generate a keytab](#generating-the-keytab).
+* [Configure the deployment](#configuring-the-deployment) to verify Kerberos tickets.
+* Optionally, [customize the authentication](#verifying-the-credentials).
+
+### Obtaining a Windows machine
+
+To perform the next steps, you need a Windows Server virtual machine:
+
+* It should be joined to the same domain as the organization’s users.
+* It should have the [RSAT][link-rsat] feature enabled.
+* It should be able to reach the [Key Distribution Center][link-kdc] (KDC). For example,
+on Azure, this virtual machine can be created in the `aadds-vnet` subnet.
+
+You should log in to this Windows Server machine using the account that has
+[AAD DC Administrators][link-aad-dc-admins] group membership.
+
+It is also recommended to create a custom organizational unit (OU) and a new user
+in this OU that will act as the service account.
+
+On the screenshot below, the `mdax-api-svc-account` user is created in the
+`MyCustomOU` OU in the `CUBE` domain:
+
+<Screenshot src="https://ucarecdn.com/4245aea8-3e75-4336-ad63-b8f899d0bbc2/" />
+
+### Registering the SPN
+
+A [service principal name][link-spn] (SPN) is a unique identifier of a service instance.
+Kerberos authentication uses SPNs to associate a service instance with a service sign-in account.
+
+First, obtain your Cube Cloud deployment’s domain by going to <Btn>Settings → General</Btn>
+and copying the value in the <Btn>Custom domain</Btn> section.
+
+Then, use the [`setspn` command][link-setspn] to register the Service Principal Name
+for the DAX API.
+
+In the following example, the web service (`HTTP`) SPN on the
+`redundant-brohman.gcp-us-central1.cubecloudapp.dev` domain is registered for the
+`mdax-api-svc-account` user in the `CUBE` domain:
+
+```
+setspn -S HTTP/redundant-brohman.gcp-us-central1.cubecloudapp.dev CUBE\mdax-api-svc-account
+```
+
+### Generating the keytab
+
+The [keytab][link-keytab-file] file contains information needed to decrypt the Kerberos
+token.
+
+First, use the [`ktpass` command][link-ktpass] to generate the keytab file. You will be
+prompted to enter the password for the specified user:
+
+```
+ktpass /out kerberos.keytab /princ HTTP/redundant-brohman.gcp-us-central1.cubecloudapp.dev@CUBE.DEV /mapuser mdax-api-svc-account /crypto All /ptype KRB5_NT_PRINCIPAL /pass *
+```
+
+Then, convert the keytab to a Base64-encoded string. For example, the following PowerShell
+script will do the conversion and put the result in the clipboard:
+
+```ps
+$Path = "C:\kerberos.keytab"
+[Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path)) | Set-Clipboard
+```
+
+### Configuring the deployment
+
+Go to <Btn>Settings → Environment Variables</Btn> of your Cube Cloud deployment and set
+the following environment variables to facilitate the verification of Kerberos tickets:
+
+| Environment variable | Value |
+| --- | --- |
+| `CUBE_XMLA_KRB5_KEYTAB_B64` | Base64-encoded keytab |
+| `CUBE_XMLA_SPN` | `HTTP` |
+| `KRB5_KTNAME` | `/cube/conf/kerberos.keytab` |
+
+### Verifying the credentials
+
+By default, `CUBEJS_SQL_USER` and `CUBEJS_SQL_PASSWORD` environment variables are used
+to verify the passed credentials. You can also customize the authentication by using the
+[`check_sql_auth` configuration option][ref-config-check-sql-auth].
+
+Once the deployment is ready, you can test the Kerberos authentication by [connecting
+from Power BI][ref-power-bi] to the DAX API.
+
+
+[ref-check-sql-auth]: /reference/configuration/config#check_sql_auth
+[link-rsat]: https://learn.microsoft.com/en-us/troubleshoot/windows-server/system-management-components/remote-server-administration-tools
+[link-kdc]: https://learn.microsoft.com/en-us/windows/win32/secauthn/key-distribution-center
+[link-aad-dc-admins]: https://learn.microsoft.com/en-us/entra/identity/domain-services/tutorial-create-instance-advanced#configure-an-administrative-group
+[link-spn]: https://learn.microsoft.com/en-us/windows/win32/ad/service-principal-names
+[link-setspn]: https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc731241(v=ws.11)
+[link-keytab-file]: https://web.mit.edu/Kerberos/krb5-1.16/doc/basic/keytab_def.html
+[link-ktpass]: https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/ktpass
+[ref-power-bi]: /product/configuration/visualization-tools/powerbi#connecting-from-power-bi
+[link-kerberos]: https://en.wikipedia.org/wiki/Kerberos_(protocol)#Microsoft_Windows
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-config-check-sql-auth]: /reference/configuration/config#check_sql_auth

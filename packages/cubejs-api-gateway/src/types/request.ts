@@ -108,7 +108,7 @@ type ResponseResultFn =
   (
     message: (Record<string, any> | Record<string, any>[]) | DataResult | ErrorResponse,
     extra?: { status: number }
-  ) => void;
+  ) => void | Promise<void>;
 
 /**
  * Base HTTP request parameters map data type.
@@ -148,11 +148,12 @@ type SqlApiRequest = BaseRequest & {
  * Pre-aggregations selector object.
  */
 type PreAggsSelector = {
-  contexts?: {securityContext: any}[],
+  contexts: {securityContext: any}[],
   timezones: string[],
   dataSources?: string[],
   cubes?: string[],
   preAggregations?: string[],
+  dateRange?: [string, string], // We expect only single date Range for rebuilding
 };
 
 /**
@@ -177,7 +178,7 @@ type PreAggJob = {
  * The `/cubejs-system/v1/pre-aggregations/jobs` endpoint object type.
  */
 type PreAggsJobsRequest = {
-  action: 'post' | 'get' | 'delete',
+  action: 'post' | 'get',
   selector?: PreAggsSelector,
   tokens?: string[]
   resType?: 'object' | 'array'

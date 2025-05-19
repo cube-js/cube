@@ -18,14 +18,15 @@ install_root_dependencies() {
 build_packages() {
     echo "Building all packages..."
     cd "$SCRIPT_DIR"
+
+    # Building typescript packages first from root (it's referenced project)
+    yarn tsc
+
     for package in packages/*; do
         if [ -d "$package" ]; then
             echo "Building $package..."
             cd "$package"
-            if ! yarn build 2>/dev/null; then
-                #echo "yarn build failed for $package, trying yarn tsc..."
-                yarn tsc 2>/dev/null || true
-            fi
+            yarn build 2>/dev/null || true
             cd "$SCRIPT_DIR"
         fi
     done

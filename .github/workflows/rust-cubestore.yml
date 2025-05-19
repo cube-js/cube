@@ -27,25 +27,14 @@ jobs:
       fail-fast: false
       matrix:
         rust: [nightly-2024-01-29]
+    container:
+      image: cubejs/rust-builder:bookworm-llvm-18
     env:
       RUST: ${{ matrix.rust }}
     steps:
-      - name: Maximize build space (disk space limitations)
-        run: |
-          echo "Before"
-          df -h
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^mongodb-.*'
-          sudo apt-get remove -y '^mysql-.*'
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          echo "After"
-          df -h
+      - name: Prepare directories
+        # See TMPDIR comment below
+        run: mkdir /__w/tmp
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
@@ -69,10 +58,15 @@ jobs:
           cargo fmt --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
       - name: Run cargo build
         run: |
-          cargo build --manifest-path rust/cubestore/Cargo.toml -j 4
+          cargo build --manifest-path rust/cubestore/Cargo.toml
       - name: Run cargo test
+        env:
+          # LocalDirRemoteFs expect that std::env::temp_dir and its local dir is on same FS, to use `rename`
+          # On Unix it's controlled by TMPDIR
+          # When using `container` in GHA checkout will be located in `/__w`, and that's a separate mount from `/tmp`
+          TMPDIR: /__w/tmp
         run: |
-          cargo test --manifest-path rust/cubestore/Cargo.toml -j 1
+          cargo test --manifest-path rust/cubestore/Cargo.toml
 
   docker-image-latest:
     name: Build only :latest image

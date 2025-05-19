@@ -71,7 +71,7 @@ export class OrchestratorApi {
    * error otherwise.
    */
   public async executeQuery(query: QueryBody) {
-    const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
+    const queryForLog = query.query?.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 
     try {
@@ -174,7 +174,7 @@ export class OrchestratorApi {
   }
 
   /**
-   * Tests worker's connections to the Cubstore and, if not in the rollup only
+   * Tests worker's connections to the Cubestore and, if not in the rollup only
    * mode, to the datasources.
    */
   public async testConnection() {
@@ -297,11 +297,11 @@ export class OrchestratorApi {
     return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
   }
 
-  public async subscribeQueueEvents(id, callback) {
+  public async subscribeQueueEvents(id: string, callback) {
     return this.orchestrator.subscribeQueueEvents(id, callback);
   }
 
-  public async unSubscribeQueueEvents(id) {
+  public async unSubscribeQueueEvents(id: string) {
     return this.orchestrator.unSubscribeQueueEvents(id);
   }
 

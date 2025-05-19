@@ -1,8 +1,0 @@
-FROM --platform=linux/amd64 node:18.9.0-alpine3.15
-
-WORKDIR /usr/src/app
-COPY package.json package-lock.json ./
-RUN npm install --omit=dev
-COPY . ./
-
-CMD [ "node", "src/gateway.js" ]

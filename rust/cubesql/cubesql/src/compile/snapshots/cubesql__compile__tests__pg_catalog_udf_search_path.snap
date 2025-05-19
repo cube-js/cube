@@ -3,7 +3,7 @@ source: cubesql/src/compile/mod.rs
 expression: "execute_query(\"SELECT version() UNION ALL SELECT pg_catalog.version();\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
 +-----------------------------------+
-| version()                         |
+| version                           |
 +-----------------------------------+
 | PostgreSQL 14.2 on x86_64-cubesql |
 | PostgreSQL 14.2 on x86_64-cubesql |

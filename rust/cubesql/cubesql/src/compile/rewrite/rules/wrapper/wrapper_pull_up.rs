@@ -29,6 +29,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -40,6 +41,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -51,6 +53,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -62,6 +65,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -73,6 +77,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -84,6 +89,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -95,6 +101,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -106,6 +113,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
@@ -120,6 +128,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         "?select_alias",
@@ -159,6 +168,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     "CubeScanWrapperFinalized:false",
@@ -184,6 +194,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -195,6 +206,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -206,6 +218,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -217,6 +230,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -228,6 +242,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -257,6 +272,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -269,6 +285,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -280,6 +297,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
@@ -294,6 +312,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         "?select_alias",
@@ -352,6 +371,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     "CubeScanWrapperFinalized:false",

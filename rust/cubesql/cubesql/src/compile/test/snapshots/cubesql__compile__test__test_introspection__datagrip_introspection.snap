@@ -2,8 +2,8 @@
 source: cubesql/src/compile/test/test_introspection.rs
 expression: "execute_query(\"select current_database(), current_schema(), current_user;\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
-+--------------------+------------------+----------------+
-| current_database() | current_schema() | current_user() |
-+--------------------+------------------+----------------+
-| cubedb             | public           | ovr            |
-+--------------------+------------------+----------------+
++------------------+----------------+--------------+
+| current_database | current_schema | current_user |
++------------------+----------------+--------------+
+| cubedb           | public         | ovr          |
++------------------+----------------+--------------+

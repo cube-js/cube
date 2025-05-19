@@ -61,3 +61,33 @@ async fn test_triple_join_with_coercion() {
     .await
     .unwrap());
 }
+
+#[tokio::test]
+async fn union_all_alias_mismatch() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+SELECT
+    foo,
+    bar
+FROM (
+    SELECT
+        'foo' as foo,
+        'bar' as bar
+    UNION ALL
+    SELECT
+        'foo' as foo,
+        'bar' as qux
+) t
+GROUP BY
+    foo, bar
+;
+        "#;
+
+    insta::assert_snapshot!(
+        execute_query(query.to_string(), DatabaseProtocol::PostgreSQL,)
+            .await
+            .unwrap()
+    );
+}

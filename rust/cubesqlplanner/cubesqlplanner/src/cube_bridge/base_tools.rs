@@ -1,7 +1,7 @@
 use super::base_query_options::FilterItem;
 use super::filter_group::{FilterGroup, NativeFilterGroup};
 use super::filter_params::{FilterParams, NativeFilterParams};
-use super::member_sql::{MemberSql, NativeMemberSql};
+use super::pre_aggregation_obj::{NativePreAggregationObj, PreAggregationObj};
 use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
 use super::sql_utils::{NativeSqlUtils, SqlUtils};
@@ -11,15 +11,8 @@ use cubenativeutils::wrappers::serializer::{
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
-use serde::Deserialize;
 use std::any::Any;
 use std::rc::Rc;
-
-#[derive(Deserialize, Debug)]
-pub struct CallDep {
-    pub name: String,
-    pub parent: Option<usize>,
-}
 
 #[nativebridge::native_bridge]
 pub trait BaseTools {
@@ -30,11 +23,6 @@ pub trait BaseTools {
         dimension: String,
     ) -> Result<String, CubeError>;
     fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError>;
-    fn resolve_symbols_call_deps(
-        &self,
-        cube_name: String,
-        sql: Rc<dyn MemberSql>,
-    ) -> Result<Vec<CallDep>, CubeError>;
     fn security_context_for_rust(&self) -> Result<Rc<dyn SecurityContext>, CubeError>;
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError>;
     fn filters_proxy_for_rust(
@@ -46,17 +34,46 @@ pub trait BaseTools {
         used_filters: Option<Vec<FilterItem>>,
     ) -> Result<Rc<dyn FilterGroup>, CubeError>;
     fn timestamp_precision(&self) -> Result<u32, CubeError>;
+    fn time_stamp_cast(&self, field: String) -> Result<String, CubeError>; //TODO move to templates
+    fn date_time_cast(&self, field: String) -> Result<String, CubeError>; //TODO move to templates
     fn in_db_time_zone(&self, date: String) -> Result<String, CubeError>;
     fn generate_time_series(
         &self,
         granularity: String,
         date_range: Vec<String>,
     ) -> Result<Vec<Vec<String>>, CubeError>;
+    fn generate_custom_time_series(
+        &self,
+        granularity: String,
+        date_range: Vec<String>,
+        origin: String,
+    ) -> Result<Vec<Vec<String>>, CubeError>;
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
+    fn subtract_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
+    fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
+    fn add_timestamp_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
     fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError>;
+    fn interval_and_minimal_time_unit(&self, interval: String) -> Result<Vec<String>, CubeError>;
     //===== TODO Move to templates
     fn hll_init(&self, sql: String) -> Result<String, CubeError>;
     fn hll_merge(&self, sql: String) -> Result<String, CubeError>;
     fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError>;
     fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError>;
+    fn date_bin(
+        &self,
+        interval: String,
+        source: String,
+        origin: String,
+    ) -> Result<String, CubeError>;
+
+    fn get_pre_aggregation_by_name(
+        &self,
+        cube_name: String,
+        name: String,
+    ) -> Result<Rc<dyn PreAggregationObj>, CubeError>;
+    fn pre_aggregation_table_name(
+        &self,
+        cube_name: String,
+        name: String,
+    ) -> Result<String, CubeError>; //TODO move to rust
 }

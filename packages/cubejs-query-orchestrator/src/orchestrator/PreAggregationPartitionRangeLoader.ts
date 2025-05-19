@@ -9,11 +9,11 @@ import {
   utcToLocalTimeZone,
   timeSeries,
   localTimestampToUtc,
-  parseLocalDate,
+  parseUtcIntoLocalDate,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
+import { QueryCache, QueryWithParams } from './QueryCache';
 import {
   getLastUpdatedAtTimestamp,
   LAMBDA_TABLE_PREFIX,
@@ -83,8 +83,8 @@ export class PreAggregationPartitionRangeLoader {
     this.compilerCacheFn = options.compilerCacheFn || ((subKey, cacheFn) => cacheFn());
   }
 
-  private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
-    const [query, values, queryOptions]: QueryTuple = rangeQuery;
+  private async loadRangeQuery(rangeQuery: QueryWithParams, partitionRange?: QueryDateRange) {
+    const [query, values, queryOptions]: QueryWithParams = rangeQuery;
     const invalidate =
       this.preAggregation.invalidateKeyQueries?.[0]
         ? this.preAggregation.invalidateKeyQueries[0].slice(0, 2)
@@ -526,7 +526,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   public static extractDate(data: any, timezone: string, timestampFormat: string = DEFAULT_TS_FORMAT): string {
-    return parseLocalDate(data, timezone, timestampFormat);
+    return parseUtcIntoLocalDate(data, timezone, timestampFormat);
   }
 
   public static readonly FROM_PARTITION_RANGE = FROM_PARTITION_RANGE;

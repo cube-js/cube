@@ -108,7 +108,7 @@ export async function runEnvironment(
         default: 'docker',
       }
     })
-    .argv;
+    .parseSync();
   const isLocal = mode === 'local';
   const [composePath, composeFile] = getComposePath(type, fixture, isLocal);
   const compose = new DockerComposeEnvironment(

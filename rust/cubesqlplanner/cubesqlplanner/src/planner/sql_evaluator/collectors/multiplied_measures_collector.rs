@@ -122,6 +122,7 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
                     None
                 }
             }
+            MemberSymbol::MemberExpression(_) => Some(()),
             MemberSymbol::Dimension(_) => None,
             _ => None,
         };

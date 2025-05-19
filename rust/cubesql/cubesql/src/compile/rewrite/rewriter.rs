@@ -15,6 +15,7 @@ use crate::{
         CubeContext,
     },
     config::ConfigObj,
+    sql::database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR,
     sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
     transport::{MetaContext, SpanId},
     CubeError,
@@ -22,7 +23,7 @@ use crate::{
 use datafusion::{
     logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner, scalar::ScalarValue,
 };
-use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner, StopReason};
+use egg::{EGraph, Id, IterationData, Language, Rewrite, Runner, StopReason};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -329,7 +330,6 @@ impl Rewriter {
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
-        top_down_extractor: bool,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
@@ -344,31 +344,32 @@ impl Rewriter {
             .rewrite_rules(cache_entry, true)
             .await?;
 
+        let penalize_post_processing = self
+            .cube_context
+            .session_state
+            .get_variable(CUBESQL_PENALIZE_POST_PROCESSING_VAR)
+            .map(|v| v.value);
+        let penalize_post_processing = match penalize_post_processing {
+            Some(ScalarValue::Boolean(val)) => val.unwrap_or(false),
+            _ => false,
+        };
+
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
             tokio::task::spawn_blocking(move || {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
-                let best = if top_down_extractor {
-                    let mut extractor = TopDownExtractor::new(
-                        &runner.egraph,
-                        BestCubePlan::new(cube_context.meta.clone()),
-                        CubePlanTopDownState::new(),
-                    );
-                    let Some((best_cost, best)) = extractor.find_best(root) else {
-                        return Err(CubeError::internal("Unable to find best plan".to_string()));
-                    };
-                    log::debug!("Best cost: {:#?}", best_cost);
-                    best
-                } else {
-                    let extractor = Extractor::new(
-                        &runner.egraph,
-                        BestCubePlan::new(cube_context.meta.clone()),
-                    );
-                    let (best_cost, best) = extractor.find_best(root);
-                    log::debug!("Best cost: {:#?}", best_cost);
-                    best
+                // TODO maybe check replacers and penalized_ast_size_outside_wrapper right after extraction?
+                let mut extractor = TopDownExtractor::new(
+                    &runner.egraph,
+                    BestCubePlan::new(cube_context.meta.clone(), penalize_post_processing),
+                    CubePlanTopDownState::new(),
+                );
+                let Some((best_cost, best)) = extractor.find_best(root) else {
+                    return Err(CubeError::internal("Unable to find best plan".to_string()));
                 };
+                log::debug!("Best cost: {:#?}", best_cost);
+
                 let qtrace_best_graph = if Qtrace::is_enabled() {
                     best.as_ref().to_vec()
                 } else {
@@ -376,6 +377,7 @@ impl Rewriter {
                 };
                 let new_root = Id::from(best.as_ref().len() - 1);
                 log::debug!("Best: {}", best.pretty(120));
+                // TODO maybe pass penalize_post_processing here as well, to break with sane error
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
@@ -458,12 +460,6 @@ impl Rewriter {
     pub fn sql_push_down_enabled() -> bool {
         env::var("CUBESQL_SQL_PUSH_DOWN")
             .map(|v| v.to_lowercase() == "true")
-            .unwrap_or(true)
-    }
-
-    pub fn top_down_extractor_enabled() -> bool {
-        env::var("CUBESQL_TOP_DOWN_EXTRACTOR")
-            .map(|v| v.to_lowercase() != "false")
             .unwrap_or(true)
     }
 

@@ -81,6 +81,7 @@ import { ExprlistContext } from "./Python3Parser";
 import { TestlistContext } from "./Python3Parser";
 import { DictorsetmakerContext } from "./Python3Parser";
 import { ClassdefContext } from "./Python3Parser";
+import { CallArgumentsContext } from "./Python3Parser";
 import { ArglistContext } from "./Python3Parser";
 import { ArgumentContext } from "./Python3Parser";
 import { Comp_iterContext } from "./Python3Parser";
@@ -647,6 +648,13 @@ export interface Python3ParserVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitClassdef?: (ctx: ClassdefContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `Python3Parser.callArguments`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitCallArguments?: (ctx: CallArgumentsContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `Python3Parser.arglist`.

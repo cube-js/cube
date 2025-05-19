@@ -1,44 +1,20 @@
----
-redirect_from:
-  - /extending-cubes
-  - /recipes/extending-cubes
-  - /schema/advanced/extending-cubes
----
+# Extension
 
-# Extending cubes
+The `extends` parameter, supported for [cubes][ref-cube-extends] and
+[views][ref-view-extends], allows you to create a _child_ cube (or a view) that reuses
+all declared members of a _parent_ cube (or a view). This helps build reusable data models.
 
-Cube supports the [`extends` feature][ref-schema-ref-cube-extends], which allows
-you to create a cube that reuses all declared members of another cube. This is a
-foundation for building reusable data models.
+Cubes declare members such as measures, dimensions, and segments. When a child cube extends
+the parent cube, lists of measures, dimensions, and segments are merged.
+For example, if the parent cube defines the `a` measure and the child cube defines the `b`
+measure, the resulting cube will have both measures `a` and `b`.
 
-[Cubes][ref-schema-concepts-cubes] are represented as [JavaScript
-objects][mdn-js-objects] with such properties as measures, dimensions, and
-segments. Extending in Cube works similarly to JavaScript’s prototype
-inheritance. Measures, dimensions, and segments are merged as separate objects.
-So if the base cube defines measure `a` and the extending cube defines measure
-`b`, the resulting cube will have both measures `a` and `b`.
-
-The usual pattern is to **extract common measures, dimensions, and joins into
-the base cube** and then **extend from the base cube**. This helps to prevent
-code duplication and makes code easier to maintain and refactor.
-
-<ReferenceBox>
-
-Currently, the `extends` parameter does not pass the joins.
-Please [track this issue](https://github.com/cube-js/cube/issues/7137).
-
-</ReferenceBox>
+The usual pattern is to extract common measures, dimensions, and joins into
+the parent cube and then extend from it. This helps prevent code duplication
+and makes code easier to maintain and refactor.
 
 In the example below, the `base_events` cube defines the common events measures,
 dimensions, and a join to the `users` cube:
-
-<InfoBox>
-
-It’s important to use the `CUBE` reference when referencing properties on the
-cube. Not specifying the cube name or using `${base_events}` does not work when
-the cube is extended.
-
-</InfoBox>
 
 <CodeTabs>
 
@@ -89,6 +65,14 @@ cube(`base_events`, {
 ```
 
 </CodeTabs>
+
+<InfoBox>
+
+It’s important to use the [`CUBE` variable][ref-cube-variable] when referencing members
+and columns of the cube. Not specifying the cube name or using `${base_events}` does not
+work when the cube is extended.
+
+</InfoBox>
 
 The `product_purchases` and `page_views` cubes are extended from `base_events`
 and define only the specific dimensions: `product_name` for product purchases
@@ -145,79 +129,80 @@ cube(`page_views`, {
 
 </CodeTabs>
 
-## Usage with FILTER_PARAMS
+## Usage with `FILTER_PARAMS`
 
-If the base cube is using [`FILTER_PARAMS`][ref-schema-ref-cube-filter-params]
-in any `sql` property, then extending cubes can do one of two things:
+If the parent cube is using [`FILTER_PARAMS`][ref-schema-ref-cube-filter-params]
+in any `sql` parameter, then child cubes can accomodate to that in two ways.
 
-- Override the `sql` property in each target cube.
+First, the `sql` parameter can be overridden in each child cube:
 
-  <CodeTabs>
+<CodeTabs>
 
-  ```yaml
-  cubes:
-    - name: product_purchases
-      sql: >
-        SELECT *
-        FROM events
-        WHERE {FILTER_PARAMS.product_purchases.timestamp.filter('time')}
-
-      # ...
-  ```
-
-  ```javascript
-  cube(`product_purchases`, {
-    sql: `
+```yaml
+cubes:
+  - name: product_purchases
+    sql: >
       SELECT *
       FROM events
-      WHERE ${FILTER_PARAMS.product_purchases.timestamp.filter("time")}
-    `,
+      WHERE {FILTER_PARAMS.product_purchases.timestamp.filter('time')}
 
-    // ...
-  });
-  ```
+    # ...
+```
 
-  </CodeTabs>
+```javascript
+cube(`product_purchases`, {
+  sql: `
+    SELECT *
+    FROM events
+    WHERE ${FILTER_PARAMS.product_purchases.timestamp.filter("time")}
+  `,
 
-- Put all filters inside the base cube and reference all specific cubes filters
-  using `AND`. The unused filters will be rendered to `1 = 1` in the SQL query.
+  // ...
+});
+```
 
-  <CodeTabs>
+</CodeTabs>
 
-  ```yaml
-  cubes:
-    - name: base_events
-      sql: >
-        SELECT *
-        FROM events
-        WHERE
-          {FILTER_PARAMS.base_events.timestamp.filter('time')} AND
-          {FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
-          {FILTER_PARAMS.page_views.timestamp.filter('time')}
+Alternatively, all filters can be put inside the parent cube and referenced
+in the child cubes using `AND`. The unused filters will be rendered to `1 = 1`
+in the SQL query:
 
-      # ...
-  ```
+<CodeTabs>
 
-  ```javascript
-  cube(`base_events`, {
-    sql: `
+```yaml
+cubes:
+  - name: base_events
+    sql: >
       SELECT *
       FROM events
       WHERE
-        {$FILTER_PARAMS.base_events.timestamp.filter('time')} AND
-        {$FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
-        {$FILTER_PARAMS.page_views.timestamp.filter('time')}
-    `,
+        {FILTER_PARAMS.base_events.timestamp.filter('time')} AND
+        {FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
+        {FILTER_PARAMS.page_views.timestamp.filter('time')}
 
-    // ...
-  });
-  ```
+    # ...
+```
 
-  </CodeTabs>
+```javascript
+cube(`base_events`, {
+  sql: `
+    SELECT *
+    FROM events
+    WHERE
+      {$FILTER_PARAMS.base_events.timestamp.filter('time')} AND
+      {$FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
+      {$FILTER_PARAMS.page_views.timestamp.filter('time')}
+  `,
 
-[mdn-js-objects]:
-  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
+  // ...
+});
+```
+
+</CodeTabs>
+
+
 [ref-schema-concepts-cubes]: /product/data-modeling/concepts#cubes
-[ref-schema-ref-cube-extends]: /reference/data-model/cube#extends
-[ref-schema-ref-cube-filter-params]:
-  /reference/data-model/cube#filter-params
+[ref-cube-extends]: /reference/data-model/cube#extends
+[ref-view-extends]: /reference/data-model/view#extends
+[ref-schema-ref-cube-filter-params]: /reference/data-model/cube#filter-params
+[ref-cube-variable]: /product/data-modeling/syntax#cube-variable

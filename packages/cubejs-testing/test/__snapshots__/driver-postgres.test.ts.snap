@@ -5844,6 +5844,305 @@ Array [
 ]
 `;
 
+exports[`postgres driver tests querying ECommerce: compare DateRanges by customer over productName by month_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Okidata C610n Printer",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 5",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "time.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "time.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "time.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "time.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "HTC One",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Project Tote Personal File",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 6",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 7",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "time.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+    "time.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "time.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "time.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+    "time.month": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "time.month": "2020-01-01T00:00:00.000",
+  },
+],
+`;
+
 exports[`postgres driver tests querying ECommerce: count by cities + order_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
 Array [
   Object {
@@ -11818,6 +12117,1069 @@ Array [
     "Products.category": "Technology",
     "Products.productName": "HTC One",
     "Products.subCategory": "Phones",
+  },
+]
+`;
+
+exports[`postgres driver tests querying ECommerce: count distinct approx by customer over productName by month_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Okidata C610n Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 5",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "HTC One",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Project Tote Personal File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 6",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 7",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+]
+`;
+
+exports[`postgres driver tests querying ECommerce: count distinct approx by customer over productName_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": 4,
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 3,
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 3,
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 3,
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 3,
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Google Nexus 5",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Google Nexus 6",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Google Nexus 7",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "HTC One",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Okidata C610n Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Project Tote Personal File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+  },
+]
+`;
+
+exports[`postgres driver tests querying ECommerce: count distinct approx by customer_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": 41,
+  },
+]
+`;
+
+exports[`postgres driver tests querying ECommerce: compare DateRanges by customer over productName by month_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Okidata C610n Printer",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "time.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 5",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "time.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "time.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "time.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "time.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "time.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "time.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "HTC One",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Project Tote Personal File",
+    "time.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 6",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 7",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "time.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "time.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+    "time.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "time.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "time.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+    "time.month": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "1",
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "time.month": "2020-01-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`postgres driver tests querying ECommerce: count distinct approx by customer over productName by month_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Okidata C610n Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 5",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "HTC One",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Project Tote Personal File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 6",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 7",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+]
+`;
+
+exports[`postgres driver tests querying ECommerce: count distinct approx by customer over productName_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": 4,
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 3,
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 3,
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 3,
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 3,
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 2,
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Google Nexus 5",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Google Nexus 6",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Google Nexus 7",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "HTC One",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Okidata C610n Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Project Tote Personal File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": 1,
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+  },
+]
+`;
+
+exports[`postgres driver tests querying ECommerce: count distinct approx by customer_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": 41,
   },
 ]
 `;

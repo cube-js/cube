@@ -6,9 +6,10 @@ import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
 import { QueryType } from './types/enums';
+import { PreAggsJobsRequest } from "./types/request";
 
 const getQueryGranularity = (queries) => R.pipe(
-  R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
+  R.map(({ timeDimensions }) => timeDimensions[0]?.granularity),
   R.filter(Boolean),
   R.uniq
 )(queries);
@@ -38,11 +39,31 @@ const getPivotQuery = (queryType, queries) => {
   return pivotQuery;
 };
 
+const parsedPatchMeasureFilterExpression = Joi.array().items(Joi.string());
+
+const evaluatedPatchMeasureFilterExpression = Joi.object().keys({
+  sql: Joi.func().required(),
+});
+
+const parsedPatchMeasureExpression = Joi.object().keys({
+  type: Joi.valid('PatchMeasure').required(),
+  sourceMeasure: Joi.string().required(),
+  replaceAggregationType: Joi.string().allow(null).required(),
+  addFilters: Joi.array().items(parsedPatchMeasureFilterExpression).required(),
+});
+
+const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
+  addFilters: Joi.array().items(evaluatedPatchMeasureFilterExpression).required(),
+});
+
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/);
 const parsedMemberExpression = Joi.object().keys({
-  expression: Joi.array().items(Joi.string()).min(1).required(),
+  expression: Joi.alternatives(
+    Joi.array().items(Joi.string()).min(1),
+    parsedPatchMeasureExpression,
+  ).required(),
   cubeName: Joi.string().required(),
   name: Joi.string().required(),
   expressionName: Joi.string(),
@@ -54,7 +75,43 @@ const parsedMemberExpression = Joi.object().keys({
   })
 });
 const memberExpression = parsedMemberExpression.keys({
-  expression: Joi.func().required(),
+  expression: Joi.alternatives(
+    Joi.func().required(),
+    evaluatedPatchMeasureExpression,
+  ).required(),
+});
+
+const inputSqlFunction = Joi.object().keys({
+  cubeParams: Joi.array().items(Joi.string()).required(),
+  sql: Joi.string().required(),
+});
+
+// This should be aligned with cubesql side
+const inputMemberExpressionSqlFunction = inputSqlFunction.keys({
+  type: Joi.valid('SqlFunction').required(),
+});
+
+// This should be aligned with cubesql side
+const inputMemberExpressionPatchMeasure = Joi.object().keys({
+  type: Joi.valid('PatchMeasure').required(),
+  sourceMeasure: Joi.string().required(),
+  replaceAggregationType: Joi.string().allow(null).required(),
+  addFilters: Joi.array().items(inputSqlFunction).required(),
+});
+
+// This should be aligned with cubesql side
+const inputMemberExpression = Joi.object().keys({
+  cubeName: Joi.string().required(),
+  alias: Joi.string().required(),
+  expr: Joi.alternatives(
+    inputMemberExpressionSqlFunction,
+    inputMemberExpressionPatchMeasure,
+  ),
+  groupingSet: Joi.object().keys({
+    groupType: Joi.valid('Rollup', 'Cube').required(),
+    id: Joi.number().required(),
+    subId: Joi.number().allow(null),
+  }).allow(null)
 });
 
 const operators = [
@@ -105,6 +162,8 @@ const subqueryJoin = Joi.object().keys({
   alias: Joi.string(),
 });
 
+const joinHint = Joi.array().items(Joi.string());
+
 const querySchema = Joi.object().keys({
   // TODO add member expression alternatives only for SQL API queries?
   measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
@@ -132,6 +191,7 @@ const querySchema = Joi.object().keys({
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
   subqueryJoins: Joi.array().items(subqueryJoin),
+  joinHints: Joi.array().items(joinHint),
 });
 
 const normalizeQueryOrder = order => {
@@ -144,6 +204,36 @@ const normalizeQueryOrder = order => {
   }
   return result;
 };
+
+export const preAggsJobsRequestSchema = Joi.object({
+  action: Joi.string().valid('post', 'get').required(),
+  selector: Joi.when('action', {
+    is: 'post',
+    then: Joi.object({
+      contexts: Joi.array().items(
+        Joi.object({
+          securityContext: Joi.required(),
+        })
+      ).min(1).required(),
+      timezones: Joi.array().items(Joi.string()).min(1).required(),
+      dataSources: Joi.array().items(Joi.string()),
+      cubes: Joi.array().items(Joi.string()),
+      preAggregations: Joi.array().items(Joi.string()),
+      dateRange: Joi.array().length(2).items(Joi.string()),
+    }).optional(),
+    otherwise: Joi.forbidden(),
+  }),
+  tokens: Joi.when('action', {
+    is: 'get',
+    then: Joi.array().items(Joi.string()).min(1).required(),
+    otherwise: Joi.forbidden(),
+  }),
+  resType: Joi.when('action', {
+    is: 'get',
+    then: Joi.string().valid('object').optional(),
+    otherwise: Joi.forbidden(),
+  }),
+});
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
@@ -185,6 +275,20 @@ const normalizeQueryFilters = (filter) => (
 );
 
 /**
+ * Parse incoming member expression
+ * @param {unknown} expression
+ * @throws {import('./UserError').UserError}
+ * @returns {import('./types/query').InputMemberExpression}
+ */
+function parseInputMemberExpression(expression) {
+  const { error } = inputMemberExpression.validate(expression);
+  if (error) {
+    throw new UserError(`Invalid member expression format: ${error.message || error.toString()}`);
+  }
+  return expression;
+}
+
+/**
  * Normalize incoming network query.
  * @param {Query} query
  * @param {boolean} persistent
@@ -196,9 +300,9 @@ const normalizeQuery = (query, persistent) => {
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
-  const validQuery = query.measures && query.measures.length ||
-    query.dimensions && query.dimensions.length ||
-    query.timeDimensions && query.timeDimensions.filter(td => !!td.granularity).length;
+  const validQuery = query.measures?.length ||
+    query.dimensions?.length ||
+    query.timeDimensions?.filter(td => !!td.granularity).length;
   if (!validQuery) {
     throw new UserError(
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
@@ -290,6 +394,7 @@ const queryPreAggregationsSchema = Joi.object().keys({
   preAggregations: Joi.array().items(Joi.object().keys({
     id: Joi.string().required(),
     cacheOnly: Joi.boolean(),
+    metaOnly: Joi.boolean(),
     partitions: Joi.array().items(Joi.string()),
     refreshRange: Joi.array().items(Joi.string()).length(2), // TODO: Deprecate after cloud changes
   }))
@@ -352,5 +457,6 @@ export {
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryCancelPreAggregations,
+  parseInputMemberExpression,
   remapToQueryAdapterFormat,
 };

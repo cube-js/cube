@@ -221,10 +221,13 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
   nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool(),
   nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   transpilationWorkerThreads: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS')
     .default('false')
+    .asBoolStrict(),
+  allowNonStrictDateRangeMatching: () => get('CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH')
+    .default('true')
     .asBoolStrict(),
   transpilationWorkerThreadsCount: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT')
     .default('0')
@@ -951,10 +954,17 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Accept Databricks policy flag. This environment variable doesn't
    * need to be split by the data source.
+   * TODO: Tech-debt: Remove totally someday
    */
-  databrickAcceptPolicy: () => (
-    get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict()
-  ),
+  databrickAcceptPolicy: () => {
+    const val = get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict();
+
+    if (val !== undefined) {
+      console.warn(
+        'The CUBEJS_DB_DATABRICKS_ACCEPT_POLICY is not needed anymore. Please, remove it'
+      );
+    }
+  },
 
   /**
    * Databricks jdbc-connection url.
@@ -1164,9 +1174,22 @@ const variables: Record<string, (...args: any) => any> = {
   }: {
     dataSource: string,
   }) => (
-    process.env[
-      keyByDataSource('CUBEJS_DB_CLICKHOUSE_READONLY', dataSource)
-    ]
+    get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_READONLY', dataSource))
+      .default('false')
+      .asBool()
+  ),
+
+  /**
+   * ClickHouse compression flag.
+   */
+  clickhouseCompression: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_COMPRESSION', dataSource))
+      .default('false')
+      .asBool()
   ),
 
   /** ****************************************************************
@@ -1744,6 +1767,19 @@ const variables: Record<string, (...args: any) => any> = {
   }) => {
     const extensions = process.env[
       keyByDataSource('CUBEJS_DB_DUCKDB_EXTENSIONS', dataSource)
+    ];
+    if (extensions) {
+      return extensions.split(',').map(e => e.trim());
+    }
+    return [];
+  },
+  duckdbCommunityExtensions: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const extensions = process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_COMMUNITY_EXTENSIONS', dataSource)
     ];
     if (extensions) {
       return extensions.split(',').map(e => e.trim());

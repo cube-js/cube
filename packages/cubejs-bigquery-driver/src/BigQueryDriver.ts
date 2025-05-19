@@ -146,9 +146,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
+  /**
+   * Returns the configurable driver options
+   * Note: It returns the unprefixed option names.
+   * In case of using multisources options need to be prefixed manually.
+   */
   public static driverEnvVariables() {
-    // TODO (buntarb): check how this method can/must be used with split
-    // names by the data source.
     return [
       'CUBEJS_DB_BQ_PROJECT_ID',
       'CUBEJS_DB_BQ_KEY_FILE',

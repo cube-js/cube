@@ -1,5 +1,5 @@
 use std::{
-    backtrace::Backtrace, collections::HashMap, io::ErrorKind, pin::Pin, sync::Arc,
+    backtrace::Backtrace, collections::HashMap, io::ErrorKind, pin::pin, pin::Pin, sync::Arc,
     time::SystemTime,
 };
 
@@ -22,7 +22,7 @@ use crate::{
     transport::{MetaContext, SpanId},
     CubeError,
 };
-use futures::{pin_mut, FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt};
 use log::{debug, error, trace};
 use pg_srv::{
     buffer,
@@ -972,7 +972,7 @@ impl AsyncPostgresShim {
 
                 let mut portal = Pin::new(portal);
                 let stream = portal.execute(execute.max_rows as usize);
-                pin_mut!(stream);
+                let mut stream = pin!(stream);
 
                 loop {
                     tokio::select! {
@@ -1745,7 +1745,7 @@ impl AsyncPostgresShim {
     ) -> Result<(), ConnectionError> {
         let mut portal = Pin::new(portal);
         let stream = portal.execute(max_rows);
-        pin_mut!(stream);
+        let mut stream = pin!(stream);
 
         loop {
             tokio::select! {

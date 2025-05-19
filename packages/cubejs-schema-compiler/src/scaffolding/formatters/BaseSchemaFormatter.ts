@@ -3,6 +3,7 @@ import { CubeMembers, SchemaContext } from '../ScaffoldingTemplate';
 import {
   CubeDescriptor,
   DatabaseSchema,
+  Dimension,
   MemberType,
   ScaffoldingSchema,
   TableName,
@@ -51,21 +52,39 @@ export abstract class BaseSchemaFormatter {
     tableNames: TableName[],
     schemaContext: SchemaContext = {}
   ): SchemaFile[] {
-    const schemaForTables = this.scaffoldingSchema.generateForTables(
+    const tableSchemas = this.scaffoldingSchema.generateForTables(
       tableNames.map((n) => this.scaffoldingSchema.resolveTableName(n))
     );
 
-    return schemaForTables.map((tableSchema) => ({
-      fileName: `${tableSchema.cube}.${this.fileExtension()}`,
-      content: this.renderFile(this.schemaDescriptorForTable(tableSchema, schemaContext)),
-    }));
+    return this.generateFilesByTableSchemas(tableSchemas, schemaContext);
   }
 
   public generateFilesByCubeDescriptors(
     cubeDescriptors: CubeDescriptor[],
     schemaContext: SchemaContext = {}
   ): SchemaFile[] {
-    return this.schemaForTablesByCubeDescriptors(cubeDescriptors).map((tableSchema) => ({
+    return this.generateFilesByTableSchemas(this.tableSchemasByCubeDescriptors(cubeDescriptors), schemaContext);
+  }
+
+  protected generateFilesByTableSchemas(tableSchemas: TableSchema[], schemaContext: SchemaContext = {}): SchemaFile[] {
+    const cubeToDimensionNamesMap = new Map(
+      tableSchemas.map(tableSchema => [tableSchema.cube, tableSchema.dimensions.map(d => d.name)])
+    );
+
+    tableSchemas = tableSchemas.map((tableSchema) => {
+      const updatedJoins = tableSchema.joins.map((join) => ({
+        ...join,
+        thisTableColumnIncludedAsDimension: !!cubeToDimensionNamesMap.get(tableSchema.cube)?.includes(join.thisTableColumn),
+        columnToJoinIncludedAsDimension: !!cubeToDimensionNamesMap.get(join.cubeToJoin)?.includes(join.columnToJoin)
+      }));
+
+      return {
+        ...tableSchema,
+        joins: updatedJoins
+      };
+    });
+
+    return tableSchemas.map((tableSchema) => ({
       fileName: `${tableSchema.cube}.${this.fileExtension()}`,
       content: this.renderFile(this.schemaDescriptorForTable(tableSchema, schemaContext)),
     }));
@@ -85,7 +104,7 @@ export abstract class BaseSchemaFormatter {
       : undefined;
   }
 
-  protected memberName(member) {
+  protected memberName(member: { title: string }) {
     const title = member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase();
 
     if (this.options.snakeCase) {
@@ -106,7 +125,7 @@ export abstract class BaseSchemaFormatter {
     return !!name.match(/^[a-z0-9_]+$/);
   }
 
-  public schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
+  protected schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
     let table = `${
       tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''
     }${this.escapeName(tableSchema.table)}`;
@@ -130,23 +149,39 @@ export abstract class BaseSchemaFormatter {
         sql: `SELECT * FROM ${table}`,
       };
 
+    // Try to use dimension refs if possible
+    // Source and target columns must be included in the respective cubes as dimensions
+    // {CUBE.dimension_name} = {other_cube.other_dimension_name}
+    // instead of
+    // {CUBE}.dimension_name = {other_cube}.other_dimension_name
+    const joins = tableSchema.joins
+      .map((j) => {
+        const thisTableColumnRef = j.thisTableColumnIncludedAsDimension
+          ? this.cubeReference(`CUBE.${this.memberName({ title: j.thisTableColumn })}`)
+          : `${this.cubeReference('CUBE')}.${this.escapeName(
+            j.thisTableColumn
+          )}`;
+        const columnToJoinRef = j.columnToJoinIncludedAsDimension
+          ? this.cubeReference(`${j.cubeToJoin}.${this.memberName({ title: j.columnToJoin })}`)
+          : `${this.cubeReference(j.cubeToJoin)}.${this.escapeName(j.columnToJoin)}`;
+
+        return ({
+          [j.cubeToJoin]: {
+            sql: `${thisTableColumnRef} = ${columnToJoinRef}`,
+            relationship: this.options.snakeCase
+              ? (JOIN_RELATIONSHIP_MAP[j.relationship] ?? j.relationship)
+              : j.relationship,
+          },
+        });
+      })
+      .reduce((a, b) => ({ ...a, ...b }), {});
+
     return {
       cube: tableSchema.cube,
       ...sqlOption,
       ...dataSourceProp,
 
-      joins: tableSchema.joins
-        .map((j) => ({
-          [j.cubeToJoin]: {
-            sql: `${this.cubeReference('CUBE')}.${this.escapeName(
-              j.thisTableColumn
-            )} = ${this.cubeReference(j.cubeToJoin)}.${this.escapeName(j.columnToJoin)}`,
-            relationship: this.options.snakeCase
-              ? (JOIN_RELATIONSHIP_MAP[j.relationship] ?? j.relationship)
-              : j.relationship,
-          },
-        }))
-        .reduce((a, b) => ({ ...a, ...b }), {}),
+      joins,
       dimensions: tableSchema.dimensions.sort((a) => (a.isPrimaryKey ? -1 : 0))
         .map((m) => ({
           [this.memberName(m)]: {
@@ -189,7 +224,7 @@ export abstract class BaseSchemaFormatter {
     };
   }
 
-  protected schemaForTablesByCubeDescriptors(cubeDescriptors: CubeDescriptor[]) {
+  protected tableSchemasByCubeDescriptors(cubeDescriptors: CubeDescriptor[]) {
     const tableNames = cubeDescriptors.map(({ tableName }) => tableName);
     const generatedSchemaForTables = this.scaffoldingSchema.generateForTables(
       tableNames.map((n) => this.scaffoldingSchema.resolveTableName(n))

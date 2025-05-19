@@ -107,6 +107,7 @@ Cube Cloud deployment should export their logs:
 | `refresh-scheduler` | Logs of the refresh worker |
 | `warmup-job` | Logs of the [pre-aggregation warm-up][ref-preagg-warmup] |
 | `cubestore` | Logs of Cube Store |
+| `query-history` | [Query History export](#query-history-export) |
 
 Example configuration for exporting logs to
 [Datadog][vector-docs-sinks-datadog]:
@@ -274,6 +275,66 @@ You can also customize the user name and password for `prometheus_exporter` by
 setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
 `CUBE_CLOUD_MONITORING_METRICS_PASSWORD` environment variables, respectively.
 
+## Query History export
+
+With Query History export, you can bring [Query History][ref-query-history] data to an
+external monitoring solution for further analysis, for example:
+* Detect queries that do not hit pre-aggregations.
+* Set up alerts for queries that exceed a certain duration.
+* Attribute usage to specific users and implement chargebacks.
+
+<SuccessBox>
+
+Query History export requires the [M tier](/product/deployment/cloud/pricing#monitoring-integrations-tiers)
+of Monitoring Integrations.
+
+</SuccessBox>
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/6Xf2ayeQZC8"
+  aspectRatio={4/3}
+/>
+
+To configure Query History export, add the `query-history` input to the `inputs`
+option of the sink configuration. Example configuration for exporting Query History data
+to the standard output of the Vector agent:
+
+```toml
+[sinks.my_console]
+type = "console"
+inputs = [
+  "query-history"
+]
+target = "stdout"
+encoding = { codec = "json" }
+```
+
+Exported data includes the following fields:
+
+| Field | Description |
+| --- | --- |
+| `trace_id` | Unique identifier of the API request. |
+| `account_name` | Name of the Cube Cloud account. |
+| `deployment_id` | Identifier of the [deployment][ref-deployments]. |
+| `environment_name` | Name of the [environment][ref-environments], `NULL` for production. |
+| `api_type` | Type of [data API][ref-apis] used (`rest`, `sql`, etc.), `NULL` for errors. |
+| `api_query` | Query executed by the API, represented as string. |
+| `security_context` | [Security context][ref-security-context] of the request, represented as a string. |
+| `status` | Status of the request: `success` or `error`. |
+| `error_message` | Error message, if any. |
+| `start_time_unix_ms` | Start time of the execution, Unix timestamp in milliseconds. |
+| `end_time_unix_ms` | End time of the execution, Unix timestamp in milliseconds. |
+| `api_response_duration_ms` | Duration of the execution in milliseconds. |
+| `cache_type` | [Cache type][ref-cache-type]: `no_cache`, `pre_aggregations_in_cube_store`, etc. |
+
+<ReferenceBox>
+
+See [this recipe][ref-query-history-export-recipe] for an example of analyzing data from
+Query History export. 
+
+</ReferenceBox>
+
+
 [ref-autosuspend]: /product/deployment/cloud/auto-suspension#effects-on-experience
 [self-sinks-for-metrics]: #configuration-sinks-for-metrics
 [ref-dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
@@ -303,3 +364,10 @@ setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
 [grafana-cloud]: https://grafana.com/products/cloud/
 [ref-prod-env]: /product/workspace/environments#production-environment
 [ref-preagg-warmup]: /product/deployment/cloud/warm-up#pre-aggregation-warm-up
+[ref-query-history]: /product/workspace/query-history
+[ref-deployments]: /product/deployment/cloud/deployments
+[ref-environments]: /product/workspace/environments
+[ref-apis]: /product/apis-integrations
+[ref-security-context]: /product/auth/context
+[ref-cache-type]: /product/caching#cache-type
+[ref-query-history-export-recipe]: /guides/recipes/data-exploration/query-history-export

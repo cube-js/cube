@@ -1,0 +1,50 @@
+# Connecting to your VPC using AWS PrivateLink
+
+[AWS PrivateLink][aws-docs-private-link] provides private connectivity between virtual private clouds (VPCs), supported services and resources, and your on-premises networks, without exposing your traffic to the public internet.
+To set up a PrivateLink connection between Cube Cloud Dedicated Infrastructure and your own VPC,
+you'll need to prepare an Endpoint Service,
+share service details with the Cube team, and accept the incoming connection request.
+
+## Preparing the Endpoint Service
+
+There are two common scenarios for preparing the Endpoint Service:
+- Connecting to a service in your AWS infrastructure
+- Connecting to a service provided by a third party such as Snowflake, Databricks, Altinity Cloud, etc.
+
+In the case of your own infrastructure, please follow the [official AWS documentation][aws-docs-endpoint-service] to configure the Endpoint Service
+pointing at your data source.
+
+If your data source is hosted in a third-party infrastructure, please follow the vendor's documentation
+for creating and managing an Endpoint Service.
+
+## Allowing Cube Cloud Principal
+
+Cube Cloud needs to be added to the list of principals allowed to discover your Endpoint Service.
+To do so, please go to <Btn>AWS Console</Btn> -> <Btn>VPC</Btn> -> <Btn>Endpoint Services</Btn> -> <Btn>Your service</Btn> -> <Btn>Allow principals</Btn>
+and add `arn:aws:iam::331376342520` to the list.
+
+## Gathering required information
+
+To request establishing a PrivateLink connection, please share the following information with the Cube team:
+
+- **Service Name** (such as `com.amazonaws.vpce.us-west-2.vpce-svc-abcde`)
+- **Reference Name** for the record (such as "Snowflake-prod" or "clickhouse-dev")
+- **Ports**: a list of ports that will be accessed through this connection
+- **DNS Name** (optional): an internal DNS name of the upstream service in case SSL needs to be supported
+
+If a DNS name is provided, an internal DNS record will be created pointing at the established PrivateLink
+connection, and the service will be addressable by that name inside the Cube Cloud infrastructure.
+
+## Accepting the connection
+
+The Cube Cloud team will notify you once the connection request is sent. You can accept it by going to
+<Btn>AWS Console</Btn> -> <Btn>VPC</Btn> -> <Btn>Endpoint Services</Btn> -> <Btn>Your Service</Btn> -> <Btn>Endpoint Connections</Btn> and clicking
+<Btn>Accept Connection Request</Btn>.
+
+## Using the connection
+
+Once the connection is established, you can access your data source by addressing it either via the
+supplied DNS Name or an AWS internal DNS name returned to you by the Cube team.
+
+[aws-docs-private-link]: https://aws.amazon.com/privatelink/
+[aws-docs-endpoint-service]: https://docs.aws.amazon.com/vpc/latest/privatelink/configure-endpoint-service.html
