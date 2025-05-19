@@ -8,7 +8,7 @@ use crate::{
             extract_exprlist_from_groupping_set,
             rules::{
                 filters::Decimal,
-                utils::{DecomposedDayTime, DecomposedMonthDayNano},
+                utils::{granularity_str_to_int_order, DecomposedDayTime, DecomposedMonthDayNano},
             },
             LikeType, WrappedSelectType,
         },
@@ -2520,6 +2520,46 @@ impl WrappedSelectNode {
                 ))
             }
             Expr::ScalarFunction { fun, args } => {
+                if args.len() == 2 {
+                    if let (
+                        BuiltinScalarFunction::DateTrunc,
+                        Expr::Literal(ScalarValue::Utf8(Some(granularity))),
+                        Expr::Column(column),
+                        Some(PushToCubeContext {
+                            ungrouped_scan_node,
+                            known_join_subqueries,
+                        }),
+                    ) = (&fun, &args[0], &args[1], push_to_cube_context)
+                    {
+                        let granularity = granularity.to_ascii_lowercase();
+                        // Security check to prevent SQL injection
+                        if granularity_str_to_int_order(&granularity, Some(false)).is_some()
+                            && subqueries.get(&column.flat_name()).is_none()
+                            && !column
+                                .relation
+                                .as_ref()
+                                .map(|relation| known_join_subqueries.contains(relation))
+                                .unwrap_or(false)
+                        {
+                            if let Ok(MemberField::Member(regular_member)) =
+                                Self::find_member_in_ungrouped_scan(ungrouped_scan_node, column)
+                            {
+                                // TODO: check if member is a time dimension
+                                if let MemberField::Member(time_dimension_member) =
+                                    MemberField::time_dimension(
+                                        regular_member.member.clone(),
+                                        granularity,
+                                    )
+                                {
+                                    return Ok((
+                                        format!("${{{}}}", time_dimension_member.field_name),
+                                        sql_query,
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
                 if let BuiltinScalarFunction::DatePart = &fun {
                     if args.len() >= 2 {
                         match &args[0] {
