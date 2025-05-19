@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/auth/sql-api-ldap",
+    "destination": "/product/auth/recipes/sql-api-ldap",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/access-control/using-different-schemas-for-tenants",
     "destination": "/product/configuration/recipes/using-different-schemas-for-tenants",
     "permanent": true
