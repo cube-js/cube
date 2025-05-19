@@ -117,6 +117,10 @@ impl MultiStageAppliedState {
         self.time_dimensions = time_dimensions;
     }
 
+    pub fn set_dimensions(&mut self, dimensions: Vec<Rc<BaseDimension>>) {
+        self.dimensions = dimensions;
+    }
+
     pub fn remove_filter_for_member(&mut self, member_name: &String) {
         self.time_dimensions_filters =
             self.extract_filters_exclude_member(member_name, &self.time_dimensions_filters);

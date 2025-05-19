@@ -21,7 +21,8 @@ import {
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
-  timeSeriesFromCustomInterval
+  timeSeriesFromCustomInterval,
+  parseSqlInterval
 } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from '../compiler/CubeSymbols';
@@ -1888,6 +1889,19 @@ export class BaseQuery {
 
   dateTimeCast(value) {
     return `${value}::timestamp`;
+  }
+
+  /**
+   * Converts the input interval (e.g. "2 years", "3 months", "5 days")
+   * into a format compatible with the target SQL dialect.
+   * Also returns the minimal time unit required (e.g. for use in DATEDIFF).
+   *
+   * Returns a tuple: (formatted interval, minimal time unit)
+   */
+  intervalAndMinimalTimeUnit(interval) {
+    const intervalParsed = parseSqlInterval(interval);
+    const minGranularity = this.diffTimeUnitForInterval(interval);
+    return [interval, minGranularity];
   }
 
   commonQuery() {

@@ -235,6 +235,17 @@ impl MeasureSymbol {
         self.is_reference
     }
 
+    pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
+        if !self.is_reference() {
+            return None;
+        }
+        let deps = self.get_dependencies();
+        if deps.is_empty() {
+            return None;
+        }
+        deps.first().cloned()
+    }
+
     pub fn measure_type(&self) -> &String {
         &self.definition.static_data().measure_type
     }
@@ -492,18 +503,22 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && !definition.static_data().multi_stage.unwrap_or(false);
         let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+        let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
 
-        let is_reference = !owned_by_cube
-            && is_sql_is_direct_ref
-            && is_calculated
-            && !is_multi_stage
-            && measure_filters.is_empty()
-            && measure_drill_filters.is_empty()
-            && time_shifts.is_empty()
-            && measure_order_by.is_empty()
-            && reduce_by.is_none()
-            && add_group_by.is_none()
-            && group_by.is_none();
+        let is_view = cube.static_data().is_view.unwrap_or(false);
+
+        let is_reference = is_view
+            || (!owned_by_cube
+                && is_sql_is_direct_ref
+                && is_calculated
+                && !is_multi_stage
+                && measure_filters.is_empty()
+                && measure_drill_filters.is_empty()
+                && time_shifts.is_empty()
+                && measure_order_by.is_empty()
+                && reduce_by.is_none()
+                && add_group_by.is_none()
+                && group_by.is_none());
 
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
             cube_name,

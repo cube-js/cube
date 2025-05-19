@@ -63,6 +63,36 @@ impl BaseMember for BaseTimeDimension {
 }
 
 impl BaseTimeDimension {
+    pub fn try_new_from_td_symbol(
+        query_tools: Rc<QueryTools>,
+        td_symbol: &TimeDimensionSymbol,
+    ) -> Result<Rc<Self>, CubeError> {
+        let dimension =
+            BaseDimension::try_new_required(td_symbol.base_symbol().clone(), query_tools.clone())?;
+        let granularity = td_symbol.granularity().clone();
+        let granularity_obj = td_symbol.granularity_obj().clone();
+        let date_range = td_symbol.date_range_vec();
+        let alias_suffix = td_symbol.alias_suffix();
+        let default_alias = BaseMemberHelper::default_alias(
+            &dimension.cube_name(),
+            &dimension.name(),
+            &Some(alias_suffix.clone()),
+            query_tools.clone(),
+        )?;
+        let member_evaluator = Rc::new(MemberSymbol::TimeDimension(td_symbol.clone()));
+
+        Ok(Rc::new(Self {
+            dimension,
+            query_tools,
+            granularity,
+            granularity_obj,
+            date_range,
+            alias_suffix,
+            default_alias,
+            member_evaluator,
+        }))
+    }
+
     pub fn try_new_required(
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<MemberSymbol>,
@@ -176,7 +206,7 @@ impl BaseTimeDimension {
         self.date_range.clone()
     }
 
-    pub fn get_range_for_time_series(&self) -> Result<Option<(String, String)>, CubeError> {
+    pub fn get_range_for_time_series(&self) -> Result<Option<Vec<String>>, CubeError> {
         let res = if let Some(date_range) = &self.date_range {
             if date_range.len() != 2 {
                 return Err(CubeError::user(format!(
@@ -191,12 +221,12 @@ impl BaseTimeDimension {
                         let start = granularity_obj.align_date_to_origin(start)?;
                         let end = QueryDateTime::from_date_str(tz, &date_range[1])?;
 
-                        Some((start.to_string(), end.to_string()))
+                        Some(vec![start.to_string(), end.to_string()])
                     } else {
-                        Some((date_range[0].clone(), date_range[1].clone()))
+                        Some(vec![date_range[0].clone(), date_range[1].clone()])
                     }
                 } else {
-                    Some((date_range[0].clone(), date_range[1].clone()))
+                    Some(vec![date_range[0].clone(), date_range[1].clone()])
                 }
             }
         } else {

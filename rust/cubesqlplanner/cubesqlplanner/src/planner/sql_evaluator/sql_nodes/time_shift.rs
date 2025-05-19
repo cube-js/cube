@@ -47,7 +47,10 @@ impl SqlNode for TimeShiftSqlNode {
             MemberSymbol::Dimension(ev) => {
                 if let Some(shift) = self.shifts.get(&ev.full_name()) {
                     let shift = shift.interval.to_sql();
-                    format!("({input} + interval '{shift}')")
+                    let res = templates
+                        .base_tools()
+                        .add_timestamp_interval(input, shift)?;
+                    format!("({})", res)
                 } else {
                     input
                 }

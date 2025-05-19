@@ -61,25 +61,25 @@ impl SqlInterval {
     pub fn to_sql(&self) -> String {
         let mut res = vec![];
         if self.year != 0 {
-            res.push(format!("{} YEAR", self.year));
+            res.push(format!("{} year", self.year));
         }
         if self.month != 0 {
-            res.push(format!("{} MONTH", self.month));
+            res.push(format!("{} montH", self.month));
         }
         if self.week != 0 {
-            res.push(format!("{} WEEK", self.week));
+            res.push(format!("{} week", self.week));
         }
         if self.day != 0 {
-            res.push(format!("{} DAY", self.day));
+            res.push(format!("{} day", self.day));
         }
         if self.hour != 0 {
-            res.push(format!("{} HOUR", self.hour));
+            res.push(format!("{} hour", self.hour));
         }
         if self.minute != 0 {
-            res.push(format!("{} MINUTE", self.minute));
+            res.push(format!("{} minute", self.minute));
         }
         if self.second != 0 {
-            res.push(format!("{} SECOND", self.second));
+            res.push(format!("{} second", self.second));
         }
         res.join(" ")
     }

@@ -329,6 +329,8 @@ impl SqlCall {
             let arg = MemberSqlArg::String(visitor.apply(&v, node_processor.clone(), templates)?);
             res.properties.insert(k.clone(), arg);
         }
+        let string_fn = visitor.apply(&dep.base_symbol, node_processor.clone(), templates)?;
+        res.to_string_fn = Some(string_fn);
         Ok(MemberSqlArg::Struct(res))
     }
 

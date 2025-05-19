@@ -53,7 +53,7 @@ impl PhysicalPlanBuilderContext {
 
 pub struct PhysicalPlanBuilder {
     query_tools: Rc<QueryTools>,
-    plan_sql_templates: PlanSqlTemplates,
+    _plan_sql_templates: PlanSqlTemplates,
 }
 
 impl PhysicalPlanBuilder {
@@ -61,7 +61,7 @@ impl PhysicalPlanBuilder {
         let plan_sql_templates = query_tools.plan_sql_templates();
         Self {
             query_tools,
-            plan_sql_templates,
+            _plan_sql_templates: plan_sql_templates,
         }
     }
 
@@ -463,14 +463,18 @@ impl PhysicalPlanBuilder {
                 .collect_vec();
             let on = JoinCondition::new_dimension_join(conditions, true);
             let next_alias = format!("q_{}", i);
+
+            join_builder.inner_join_source(join.clone(), next_alias, on);
+
+            /*      TODO: Full join fails even in BigQuery, where it’s theoretically supported. Disabled for now — needs investigation.
             if full_key_aggregate.use_full_join_and_coalesce
-                && self.plan_sql_templates.supports_full_join()
-            {
-                join_builder.full_join_source(join.clone(), next_alias, on);
-            } else {
-                // TODO in case of full join is not supported there should be correct blending query that keeps NULL values
-                join_builder.inner_join_source(join.clone(), next_alias, on);
-            }
+                      && self.plan_sql_templates.supports_full_join()
+                  {
+                      join_builder.full_join_source(join.clone(), next_alias, on);
+                  } else {
+                      // TODO in case of full join is not supported there should be correct blending query that keeps NULL values
+                      join_builder.inner_join_source(join.clone(), next_alias, on);
+                  } */
         }
 
         let result = From::new_from_join(join_builder.build());
@@ -948,13 +952,13 @@ impl PhysicalPlanBuilder {
         select_builder.add_projection_function_expression(
             "MAX",
             args.clone(),
-            "date_to".to_string(),
+            "max_date".to_string(),
         );
 
         select_builder.add_projection_function_expression(
             "MIN",
             args.clone(),
-            "date_from".to_string(),
+            "min_date".to_string(),
         );
         context_factory.set_render_references(render_references);
         let select = Rc::new(select_builder.build(context_factory));
@@ -980,7 +984,9 @@ impl PhysicalPlanBuilder {
 
         let templates = self.query_tools.plan_sql_templates();
 
-        let ts_date_range = if templates.supports_generated_time_series() {
+        let ts_date_range = if templates.supports_generated_time_series()
+            && granularity_obj.is_predefined_granularity()
+        {
             if let Some(date_range) = time_dimension_symbol
                 .get_range_for_time_series(date_range, self.query_tools.timezone())?
             {
@@ -998,8 +1004,8 @@ impl PhysicalPlanBuilder {
             if let Some(date_range) = &time_series.date_range {
                 TimeSeriesDateRange::Filter(date_range[0].clone(), date_range[1].clone())
             } else {
-                return Err(CubeError::internal(
-                    "Date range is required for time series without date range".to_string(),
+                return Err(CubeError::user(
+                    "Date range is required for time series".to_string(),
                 ));
             }
         };

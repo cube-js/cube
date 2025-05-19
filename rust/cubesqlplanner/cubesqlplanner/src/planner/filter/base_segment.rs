@@ -28,7 +28,7 @@ impl BaseSegment {
         query_tools: Rc<QueryTools>,
     ) -> Result<Rc<Self>, CubeError> {
         let member_expression_symbol =
-            MemberExpressionSymbol::new(cube_name.clone(), name.clone(), expression, None);
+            MemberExpressionSymbol::try_new(cube_name.clone(), name.clone(), expression, None)?;
         let full_name = full_name.unwrap_or(member_expression_symbol.full_name());
         let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
 
