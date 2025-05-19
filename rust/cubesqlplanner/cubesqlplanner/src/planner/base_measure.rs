@@ -1,9 +1,7 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::{MeasureTimeShift, MemberExpressionSymbol, MemberSymbol, SqlCall};
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
-use crate::cube_bridge::measure_definition::{
-    MeasureDefinition, RollingWindow, TimeShiftReference,
-};
+use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::fmt::{Debug, Formatter};
@@ -208,12 +206,6 @@ impl BaseMeasure {
             "number" | "string" | "time" | "boolean" => true,
             _ => false,
         }
-    }
-
-    pub fn time_shift_references(&self) -> Option<Vec<TimeShiftReference>> {
-        self.definition
-            .as_ref()
-            .map_or(None, |d| d.static_data().time_shift_references.clone())
     }
 
     pub fn time_shifts(&self) -> Vec<MeasureTimeShift> {

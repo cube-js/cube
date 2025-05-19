@@ -53,7 +53,7 @@ impl PhysicalPlanBuilderContext {
 
 pub struct PhysicalPlanBuilder {
     query_tools: Rc<QueryTools>,
-    plan_sql_templates: PlanSqlTemplates,
+    _plan_sql_templates: PlanSqlTemplates,
 }
 
 impl PhysicalPlanBuilder {
@@ -61,7 +61,7 @@ impl PhysicalPlanBuilder {
         let plan_sql_templates = query_tools.plan_sql_templates();
         Self {
             query_tools,
-            plan_sql_templates,
+            _plan_sql_templates: plan_sql_templates,
         }
     }
 
