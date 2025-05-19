@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/access-control/controlling-access-to-cubes-and-views",
+    "destination": "/product/auth/recipes/controlling-access-to-cubes-and-views",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/access-control/role-based-access",
     "destination": "/product/auth/recipes/role-based-access",
     "permanent": true
@@ -1381,7 +1386,7 @@
   },
   {
     "source": "/recipes/controlling-access-to-cubes-and-views",
-    "destination": "/guides/recipes/access-control/controlling-access-to-cubes-and-views",
+    "destination": "/product/auth/recipes/controlling-access-to-cubes-and-views",
     "permanent": true
   },
   {
