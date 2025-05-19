@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/data-exploration/query-history-export",
+    "destination": "/product/workspace/recipes/query-history-export",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/query-acceleration/non-additivity",
     "destination": "/product/caching/recipes/non-additivity",
     "permanent": true

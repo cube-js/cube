@@ -20,4 +20,5 @@ module.exports = {
   "preferences": "Preferences",
   "cli": "CLI",
   "semantic-catalog": "Semantic Catalog",
+  "recipes": "Recipes",
 }
