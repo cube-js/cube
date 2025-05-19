@@ -134,7 +134,7 @@ export class BigqueryQuery extends BaseQuery {
     throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
   }
 
-  public intervalAndMinimalTimeUnit(interval: string): [string, string] {
+  public override intervalAndMinimalTimeUnit(interval: string): [string, string] {
     return this.formatInterval(interval);
   }
 

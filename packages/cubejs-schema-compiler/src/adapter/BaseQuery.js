@@ -22,7 +22,8 @@ import {
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
   timeSeriesFromCustomInterval,
-  parseSqlInterval } from '@cubejs-backend/shared';
+  parseSqlInterval
+} from '@cubejs-backend/shared';
 
 import { CubeSymbols } from '../compiler/CubeSymbols';
 import { UserError } from '../compiler/UserError';
