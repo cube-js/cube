@@ -1,5 +1,65 @@
 [
   {
+    "source": "/guides/recipes/data-modeling/percentiles",
+    "destination": "/product/data-modeling/recipes/percentiles",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/nested-aggregates",
+    "destination": "/product/data-modeling/recipes/nested-aggregates",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/filtered-aggregates",
+    "destination": "/product/data-modeling/recipes/filtered-aggregates",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/period-over-period",
+    "destination": "/product/data-modeling/recipes/period-over-period",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/custom-granularity",
+    "destination": "/product/data-modeling/recipes/custom-granularity",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/custom-calendar",
+    "destination": "/product/data-modeling/recipes/custom-calendar",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/snapshots",
+    "destination": "/product/data-modeling/recipes/snapshots",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/entity-attribute-value",
+    "destination": "/product/data-modeling/recipes/entity-attribute-value",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+    "destination": "/product/data-modeling/recipes/passing-dynamic-parameters-in-a-query",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/using-dynamic-measures",
+    "destination": "/product/data-modeling/recipes/using-dynamic-measures",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/dynamic-union-tables",
+    "destination": "/product/data-modeling/recipes/dynamic-union-tables",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/string-time-dimensions",
+    "destination": "/product/data-modeling/recipes/string-time-dimensions",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/auth/aws-cognito",
     "destination": "/product/auth/recipes/aws-cognito",
     "permanent": true
