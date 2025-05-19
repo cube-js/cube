@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/style-guide",
+    "destination": "/product/data-modeling/recipes/style-guide",
+    "permanent": true
+  },
+  {
     "source": "/guides/designing-metrics",
     "destination": "/product/data-modeling/recipes/designing-metrics",
     "permanent": true

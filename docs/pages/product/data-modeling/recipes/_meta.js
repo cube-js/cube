@@ -1,4 +1,5 @@
 module.exports = {
+  "style-guide": "Style guide",
   "designing-metrics": "Designing metrics",
   "percentiles": "Averages and percentiles",
   "nested-aggregates": "Nested aggregates",
