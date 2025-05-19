@@ -256,7 +256,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.functions.STRPOS = 'STRPOS({{ args_concat }})';
     templates.functions.DATEDIFF = 'DATETIME_DIFF(CAST({{ args[2] }} AS DATETIME), CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
     // DATEADD is being rewritten to DATE_ADD
-    templates.functions.DATE_ADD = '{% if date_part|upper in [\'YEAR\', \'MONTH\', \'QUARTER\'] %}DATETIME(TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }})), INTERVAL {{ interval }} {{ date_part }})){% else %}DATETIME(TIMESTAMP_ADD(TIMESTAMP({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% endif %}';
+    templates.functions.DATE_ADD = 'DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     delete templates.functions.TO_CHAR;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
