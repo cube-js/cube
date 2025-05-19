@@ -31,9 +31,4 @@ module.exports = {
     type: "page",
     title: "Documentation",
   },
-
-  guides: {
-    type: "page",
-    title: "Guides",
-  },
 };
