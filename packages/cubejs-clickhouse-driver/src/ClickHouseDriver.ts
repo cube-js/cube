@@ -584,33 +584,19 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     );
   }
 
-  /**
-   * Returns clean S3 bucket name and prefix path ending with / (if set)
-   */
-  private parseS3Path(input: string): { bucket: string; prefix: string | null } {
-    let trimmed = input.startsWith('s3://') ? input.slice(5) : input;
-    trimmed = trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
-    const parts = trimmed.split('/');
-    const bucket = parts[0];
-    const prefixParts = parts.slice(1);
-    const prefix = prefixParts.length > 0 ? `${prefixParts.join('/')}/` : null;
-
-    return { bucket, prefix };
-  }
-
   public async unloadFromQuery(sql: string, params: unknown[], _options: UnloadOptions): Promise<DownloadTableCSVData> {
     if (!this.config.exportBucket) {
       throw new Error('Unload is not configured');
     }
 
     const types = await this.queryColumnTypes(`(${sql})`, params);
-    const { bucket, prefix } = this.parseS3Path(this.config.exportBucket.bucketName);
-    const exportPrefix = prefix ? `${prefix}${uuidv4()}` : uuidv4();
+    const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
+    const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
     const formattedQuery = sqlstring.format(`
       INSERT INTO FUNCTION
          s3(
-             'https://${bucket}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
+             'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
              '${this.config.exportBucket.keyId}',
              '${this.config.exportBucket.secretKey}',
              'CSV'
@@ -628,7 +614,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         },
         region: this.config.exportBucket.region,
       },
-      bucket,
+      bucketName,
       exportPrefix,
     );
 
