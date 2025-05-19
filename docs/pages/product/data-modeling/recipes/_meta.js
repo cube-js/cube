@@ -4,6 +4,7 @@ module.exports = {
   "filtered-aggregates": "Filtered aggregates",
   "period-over-period": "Period-over-period changes",
   "passing-dynamic-parameters-in-a-query": "Dynamic parameters",
+  "schema-generation": "Data model generation",
   "using-dynamic-measures": "Dynamic measures",
   "dynamic-union-tables": "Dynamic union tables",
   "string-time-dimensions": "String time dimensions",
@@ -15,5 +16,6 @@ module.exports = {
   "event-analytics": "Event analytics",
   "funnels": "Funnel analysis",
   "cohort-retention": "Retention analysis",
-  "xirr": "Rate of return"
+  "xirr": "Rate of return",
+  "environment-variables": "Environment variables"
 }

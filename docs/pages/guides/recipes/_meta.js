@@ -1,5 +1,4 @@
 module.exports = {
-  "code-reusability": "Code reusability",
   "multitenancy": "Multitenancy",
   "data-sources": "Data sources",
   "queries": "Queries",
