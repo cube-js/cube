@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
+
+### Features
+
+- **clickhouse-driver:** Add support for S3 Bucket with paths ([#9585](https://github.com/cube-js/cube/issues/9585)) ([2e47147](https://github.com/cube-js/cube/commit/2e4714721ef166b76432bfdd374db57bff886b7b))
+
 ## [1.3.15](https://github.com/cube-js/cube/compare/v1.3.14...v1.3.15) (2025-05-15)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver

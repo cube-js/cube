@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
+
+### Features
+
+- **client-core:** Add signal option to support abort fetch ([#9539](https://github.com/cube-js/cube/issues/9539)) ([2536dfc](https://github.com/cube-js/cube/commit/2536dfcd993055ad1cf94ae698265cd58b6be59f))
+
 ## [1.3.15](https://github.com/cube-js/cube/compare/v1.3.14...v1.3.15) (2025-05-15)
 
 **Note:** Version bump only for package @cubejs-client/core

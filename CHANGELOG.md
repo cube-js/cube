@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
+
+### Bug Fixes
+
+- **backend-native:** Fix load response serialization (that breaks cubeApi further processing) ([#9575](https://github.com/cube-js/cube/issues/9575)) ([4b87403](https://github.com/cube-js/cube/commit/4b8740318300584809ff70e280a41dc981be948e))
+- **schema-compiler:** Collect join hints from subquery join conditions ([#9554](https://github.com/cube-js/cube/issues/9554)) ([cbf0bfd](https://github.com/cube-js/cube/commit/cbf0bfddafc8629ce7d09d9b73d8b60da6d7bafb))
+
+### Features
+
+- **clickhouse-driver:** Add support for S3 Bucket with paths ([#9585](https://github.com/cube-js/cube/issues/9585)) ([2e47147](https://github.com/cube-js/cube/commit/2e4714721ef166b76432bfdd374db57bff886b7b))
+- **client-core:** Add signal option to support abort fetch ([#9539](https://github.com/cube-js/cube/issues/9539)) ([2536dfc](https://github.com/cube-js/cube/commit/2536dfcd993055ad1cf94ae698265cd58b6be59f))
+- **cubesql:** Push down `DATE_TRUNC` expressions as member expressions with granularity ([#9583](https://github.com/cube-js/cube/issues/9583)) ([b9c97cd](https://github.com/cube-js/cube/commit/b9c97cd6c169b6d359575649bd845f735ff1a516))
+- **tesseract:** Initial BigQuery support ([#9577](https://github.com/cube-js/cube/issues/9577)) ([60ad2f0](https://github.com/cube-js/cube/commit/60ad2f034d760220c81f7ff9794a388ba5dfbdc5))
+
 ## [1.3.15](https://github.com/cube-js/cube/compare/v1.3.14...v1.3.15) (2025-05-15)
 
 ### Bug Fixes
