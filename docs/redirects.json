@@ -1,5 +1,15 @@
 [
   {
+    "source": "/guides/recipes/data-sources/multiple-sources-same-schema",
+    "destination": "/product/configuration/recipes/multiple-sources-same-schema",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-sources/using-ssl-connections-to-data-source",
+    "destination": "/product/configuration/recipes/using-ssl-connections-to-data-source",
+    "permanent": true
+  },
+  {
     "source": "/product/data-modeling/recipes/environment-variables",
     "destination": "/product/configuration/recipes/environment-variables",
     "permanent": true

@@ -1,5 +1,4 @@
 module.exports = {
-  "data-sources": "Data sources",
   "queries": "Queries",
   "query-acceleration": "Query acceleration",
   "data-exploration": "Data exploration",
