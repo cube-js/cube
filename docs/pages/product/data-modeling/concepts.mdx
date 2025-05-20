@@ -27,6 +27,16 @@ We'll use a sample e-commerce database with two tables, `orders` and
 | 4      | 71             | 4            | 8            | 223       | 2019-12-23 00:00:00.000000 |
 | 5      | 64             | 5            | 5            | 75        | 2019-04-20 00:00:00.000000 |
 
+We'll be following the [entity-first](#entity-first-approach) approach to
+designing the data model.
+
+<ReferenceBox>
+
+See [this recipe][ref-entities-vs-metrics-recipe] to learn about entity-first and
+metrics-first approaches.
+
+</ReferenceBox>
+
 ## Cubes
 
 _Cubes_ represent datasets in Cube and are conceptually similar to [views in
@@ -49,6 +59,13 @@ cubes:
 ```
 
 </CodeTabs>
+
+<ReferenceBox>
+
+If you're using dbt, see [this recipe][ref-cube-with-dbt] to streamline defining cubes
+on top of dbt models.
+
+</ReferenceBox>
 
 You can also use the [`sql` property][ref-schema-ref-sql] to accommodate more
 complex SQL queries:
@@ -338,8 +355,9 @@ you need to use weeks starting on Sunday, fiscal years, etc.
 
 <ReferenceBox>
 
-See [this recipe][ref-custom-granularity-recipe] for more custom granularity
-examples.
+See the following recipes:
+- For a [custom granularity][ref-custom-granularity-recipe] example.
+- For a [custom calendar][ref-custom-calendar-recipe] example.
 
 </ReferenceBox>
 
@@ -499,6 +517,14 @@ aggregate functions in SQL are mapped to measure types in the following way:
 <ReferenceBox>
 
 See the [measure type reference][ref-ref-measure-types] for details.
+
+</ReferenceBox>
+
+<ReferenceBox>
+
+See the following recipes:
+- To learn how to define [average and percentile measures][ref-avg-and-percentile-recipe],
+- To learn how to calculate [period-over-period changes][ref-period-over-period-recipe].
 
 </ReferenceBox>
 
@@ -811,3 +837,8 @@ See the reference documentaton for the full list of pre-aggregation
 [ref-ref-hierarchies]: /product/data-modeling/reference/hierarchies
 [ref-ref-folders]: /product/data-modeling/reference/view#folders
 [ref-multi-stage-calculations]: /product/data-modeling/concepts/multi-stage-calculations
+[ref-entities-vs-metrics-recipe]: /product/data-modeling/recipes/designing-metrics
+[ref-avg-and-percentile-recipe]: /product/data-modeling/recipes/percentiles
+[ref-period-over-period-recipe]: /product/data-modeling/recipes/period-over-period
+[ref-custom-calendar-recipe]: /product/data-modeling/recipes/custom-calendar
+[ref-cube-with-dbt]: /product/data-modeling/recipes/dbt

@@ -182,12 +182,20 @@ new results, then the pre-aggregation will be refreshed.
 
 [Partitioning][wiki-partitioning] is an extremely effective optimization for
 accelerating pre-aggregations build and refresh time. It effectively "shards"
-the data between multiple tables, splitting them by a defined attribute. Cube
-can be configured to incrementally refresh only the last set of partitions
+the data between multiple tables, splitting them by a defined attribute.
+
+Cube can be configured to incrementally refresh only the last set of partitions
 through the `updateWindow` property. This leads to faster refresh times due to
 unnecessary data not being reloaded, and even reduced cost for some databases
 like [BigQuery](/product/configuration/data-sources/google-bigquery) or
 [AWS Athena](/product/configuration/data-sources/aws-athena).
+
+<ReferenceBox>
+
+See [this recipe][ref-incremental-refresh-recipe] for an example of optimized
+incremental refresh.
+
+</ReferenceBox>
 
 Any `rollup` pre-aggregation can be partitioned by time using the
 `partition_granularity` property in [a pre-aggregation
@@ -1065,3 +1073,4 @@ or a decimal type, depending on the nature of your data.
 [ref-cube-store]: /product/caching/running-in-production#architecture
 [ref-cube-store-storage]: /product/caching/running-in-production#storage
 [ref-member-sql]: /product/data-modeling/reference/dimensions#sql
+[ref-incremental-refresh-recipe]: /product/caching/recipes/incrementally-building-pre-aggregations-for-a-date-range

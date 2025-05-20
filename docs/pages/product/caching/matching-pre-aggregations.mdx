@@ -112,8 +112,13 @@ pitfalls](#common-pitfalls) to understand why that part was an issue.
 ### Common pitfalls
 
 - Most commonly, a query would not match a pre-aggregation because they contain
-[non-additive measures][ref-measure-additivity]. See [this
-recipe][ref-non-additive-recipe] for workarounds.
+[non-additive measures][ref-measure-additivity].
+
+  <ReferenceBox>
+  
+  See [this recipe][ref-non-additive-recipe] for workarounds.
+
+  </ReferenceBox>
 
 - If a query uses any time zone other than `UTC`, please check the section on
 [matching time dimensions](#matching-time-dimensions) and the
@@ -130,7 +135,7 @@ configuration option.
 [ref-leaf-measures]: /product/data-modeling/concepts#leaf-measures
 [ref-calculated-measures]: /product/data-modeling/overview#4-using-calculated-measures
 [ref-non-strict-date-range-match]: /product/data-modeling/reference/pre-aggregations#allow_non_strict_date_range_match
-[ref-non-additive-recipe]: /product/data-modeling/recipes/non-additivity
+[ref-non-additive-recipe]: /product/caching/recipes/non-additivity
 [ref-conf-scheduled-refresh-time-zones]: /product/configuration/reference/config#scheduled_refresh_time_zones
 [ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
 [ref-primary-key]: /product/data-modeling/reference/dimensions#primary_key

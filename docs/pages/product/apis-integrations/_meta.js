@@ -1,6 +1,5 @@
 module.exports = {
   "queries": "Queries",
-  "recipes": "Recipes",
   "dax-api": "DAX API",
   "mdx-api": "MDX API",
   "microsoft-excel": "Cube Cloud for Excel",
@@ -11,4 +10,5 @@ module.exports = {
   "graphql-api": "GraphQL API",
   "javascript-sdk": "JavaScript SDK",
   "orchestration-api": "Orchestration API",
+  "recipes": "Recipes"
 };

@@ -1,23 +1,12 @@
-# Using dynamic measures
-
-<InfoBox>
-
-This functionality only works with data models written in JavaScript, not YAML.
-For more information, check out the [Data Modeling Syntax][ref-modeling-syntax]
-page.
-
-</InfoBox>
+# Generating the data model dynamically
 
 ## Use case
 
-We want to understand the distribution of orders by their statuses. Let's
-imagine that new order statuses can be added in the future, or we get a list of
-statuses from an external API. To calculate the orders percentage distribution,
-we need to create several
-[measures](/product/data-modeling/concepts#measures) that refer to
-each other. But we don't want to manually change the data model for each new
-status. To solve this, we will create a [data model
-dynamically](/product/data-modeling/dynamic).
+Let's assume that we want to understand the distribution of orders by their statuses.
+Let's imagine that new order statuses can be added in the future, or we get a list of
+statuses from an external API. To calculate the orders percentage distribution, we need
+to create several [measures][ref-measures] that refer to each other. But we don't want
+to manually change the data model for each new status.
 
 ## Data modeling
 
@@ -97,4 +86,5 @@ Please feel free to check out the
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
 
-[ref-modeling-syntax]: /product/data-modeling/syntax
+
+[ref-measures]: /product/data-modeling/concepts#measures

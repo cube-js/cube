@@ -121,7 +121,7 @@
   },
   {
     "source": "/guides/recipes/code-reusability/schema-generation",
-    "destination": "/product/data-modeling/recipes/schema-generation",
+    "destination": "/product/data-modeling/recipes/using-dynamic-measures",
     "permanent": true
   },
   {
@@ -1531,12 +1531,12 @@
   },
   {
     "source": "/recipes/schema-generation",
-    "destination": "/guides/recipes/code-reusability/schema-generation",
+    "destination": "/guides/recipes/code-reusability/using-dynamic-measures",
     "permanent": true
   },
   {
     "source": "/schema-generation",
-    "destination": "/guides/recipes/code-reusability/schema-generation",
+    "destination": "/guides/recipes/code-reusability/using-dynamic-measures",
     "permanent": true
   },
   {
