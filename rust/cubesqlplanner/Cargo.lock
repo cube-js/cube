@@ -763,7 +763,6 @@ dependencies = [
  "convert_case 0.7.1",
  "cubeclient",
  "cubenativeutils",
- "datafusion",
  "itertools 0.10.5",
  "lazy_static",
  "minijinja",
