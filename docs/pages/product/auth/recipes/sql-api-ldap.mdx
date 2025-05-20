@@ -1,0 +1,191 @@
+# Authenticate requests to the SQL API with LDAP
+
+In this recipe, you'll learn how to authenticate requests to the [SQL
+API](/product/apis-integrations/sql-api) with a LDAP catalog. You can use
+this approach to enable single sign-on (SSO) experience in BI tools
+connecting to Cube for your end users.
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/vGF7n4WWriA"
+  aspectRatio={4/2.25}
+/>
+
+## Use case
+
+We want to allow the end users to enter their Google Workspace credentials to get access to the datasets in Power BI or any other BI tools, powered
+by Cube's SQL API. Google Workspace provides the [Secure
+LDAP](https://support.google.com/a/answer/9048516?hl=en) service that we'll
+use to securely check credentials. However, any LDAP provider would work.
+
+<Diagram src="https://ucarecdn.com/ae60a963-059b-45be-ad68-17ff75de36eb/"/>
+
+Here's a step-by-step breakdown of the authentication flow:
+
+* Users enters their Google Workspace credentials in Power BI.
+* Power BI sends them over a TLS-secured SQL API connection to Cube.
+* Cube verifies the credentials via the Secure LDAP service.
+* If credentials are correct, users get access to the dataset.
+
+<InfoBox>
+
+In this recipe, the SQL API is used to connect to [Power BI][ref-powerbi].
+Currently, it's recommended to use the [DAX API][ref-dax-api].
+
+</InfoBox>
+
+## Configuration
+
+To verify the credentials, use the
+[`check_sql_auth`](/product/configuration/reference/config#check_sql_auth)
+configuration option which accepts user name and password as its 2nd and
+3rd arguments. You can verify the credentials and either authenticate or
+fail the request:
+
+<CodeTabs>
+
+```python filename="cube.py"
+from cube import config
+ 
+@config('check_sql_auth')
+def check_sql_auth(req: dict, user_name: str, password: str) -> dict:
+  # Verify user_name and password
+  authenticated = # ...
+  
+  if authenticated:
+    return {
+      'password': password,
+      'securityContext': {
+        # You can user-related attributes to the security context
+      }
+    }
+ 
+  raise Exception('Incorrect user name or password')
+
+```
+
+```javascript filename="cube.js"
+module.exports = {
+  checkSqlAuth: async (req, user_name, password) => {
+    // Verify user_name and password
+    let authenticated = /* ... */;
+
+    if (authenticated) {
+      return {
+        password,
+        securityContext: {
+          // You can user-related attributes to the security context
+        }
+      }
+    }
+
+    throw new Error('Incorrect user name or password');
+  }
+};
+```
+
+</CodeTabs>
+
+Here's an example code you can use to verify the credentials via the Secure
+LDAP service in Google Workspace:
+
+```javascript filename="cube.js"
+const ldap = require('ldapjs');
+
+const createLdapClient = () => ldap.createClient({
+  url: [ 'ldaps://ldap.google.com:636' ],
+  tlsOptions: {
+    key: process.env.GOOGLE_LDAP_KEY,
+    cert: process.env.GOOGLE_LDAP_CERT,
+    ca: [ process.env.GOOGLE_TRUST_SERVICES_CERT ],
+    requestCert: true,
+    rejectUnauthorized: false
+  }
+});
+
+const client = createLdapClient();
+
+client.on('connectError', (err) => {
+  console.log(`Can't connect to LDAP: ${err.stack || err}`);
+});
+
+module.exports = {
+  checkSqlAuth: async (req, user_name, password) => {
+    const ldapSearchResult = await new Promise((resolve, reject) => {
+      const resultArray = [];
+
+      const userId = `${user_name}@example.com`;
+      console.log(`User id`, userId);
+
+      const opts = {
+        filter: `mail=${userId}`,
+        scope: 'sub',
+        attributes: [ 'dn', 'sn', 'cn', 'memberOf' ]
+      };
+
+      client.search('dc=example, dc=com', opts, (err, res) => {
+        if (err) {
+          console.log(err);
+        }
+
+        res.on('searchRequest', (searchRequest) => {
+          console.log('Search request: ', searchRequest.messageId);
+        });
+
+        res.on('searchEntry', (entry) => {
+          console.log('Search entry: ' + JSON.stringify(entry.object));
+          resultArray.push(entry.object);
+        });
+
+        res.on('searchReference', (referral) => {
+          console.log('Referral: ' + referral.uris.join());
+        });
+
+        res.on('error', (err) => {
+          console.error('Error: ' + err.message);
+          reject(err);
+        });
+
+        res.on('end', (result) => {
+          console.log('Status: ' + result.status);
+          resolve(resultArray);
+        });
+      });
+    });
+
+    if (ldapSearchResult[0]) {
+      console.log(ldapSearchResult[0]);
+
+      const canBind = await new Promise((resolve, reject) => {
+        console.log(`Authenticating ${userId}`);
+
+        createLdapClient().bind(userId, password, (err) => {
+          if (err) {
+            console.log(`Error binding LDAP: ${err}`);
+            resolve(false);
+          }
+          else {
+            console.log(`Authentication for ${userId} has been successful`)
+            resolve(true);
+          }
+        });
+      });
+
+      if (canBind) {
+        return {
+          password,
+          securityContext: {
+            attributes: ldapSearchResult[0]
+          }
+        }
+      }
+    }
+
+    throw new Error('Incorrect user name or password');
+  }
+};
+
+```
+
+
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi

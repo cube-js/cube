@@ -1,0 +1,551 @@
+# Measures
+
+You can use the `measures` parameter within [cubes][ref-ref-cubes] to define measures.
+Each measure is an aggregation over a certain column in your database table.
+
+Any measure should have the following parameters: [`name`](#name), [`sql`](#sql), and [`type`](#type).
+
+## Parameters
+
+### `name`
+
+The `name` parameter serves as the identifier of a measure. It must be unique
+among all measures, dimensions, and segments within a cube and follow the
+[naming conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    count: {
+      sql: `id`,
+      type: `count`,
+    },
+
+    total_amount: {
+      sql: `amount`,
+      type: `sum`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+```
+
+</CodeTabs>
+
+### `description`
+
+This parameter provides a human-readable description of a measure.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    orders_count: {
+      sql: `id`,
+      type: `count`,
+      description: `Count of all orders`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        description: Count of all orders
+        sql: id
+        type: count
+```
+
+</CodeTabs>
+
+### `drill_members`
+
+Using the `drill_members` parameter, you can define a set of [drill
+down][ref-drilldowns] fields for the measure. `drill_members` is defined as an
+array of dimensions. Cube automatically injects dimensions’ names and other
+cubes’ names with dimensions in the context, so you can reference these
+variables in the `drill_members` array. [Learn more about how to define and use
+drill downs][ref-drilldowns].
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    revenue: {
+      type: `sum`,
+      sql: `price`,
+      drill_members: [id, price, status, products.name, products.id],
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue
+        type: sum
+        sql: price
+        drill_members:
+          - id
+          - price
+          - status
+          - products.name
+          - products.id
+```
+
+</CodeTabs>
+
+### `filters`
+
+If you want to add some conditions for a metric's calculation, you should use
+the `filters` parameter. The syntax looks like the following:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    orders_completed_count: {
+      sql: `id`,
+      type: `count`,
+      filters: [{ sql: `${CUBE}.status = 'completed'` }],
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_completed_count
+        sql: id
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+```
+
+</CodeTabs>
+
+### `format`
+
+`format` is an optional parameter. It is used to format the output of measures
+in different ways, for example, as currency for `revenue`. Please refer to the
+[Measure Formats][ref-schema-ref-types-formats-measures-formats] for the full
+list of supported formats.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    total: {
+      sql: `amount`,
+      type: `sum`,
+      format: `currency`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: total
+        sql: amount
+        type: sum
+        format: currency
+```
+
+</CodeTabs>
+
+### `meta`
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    revenue: {
+      type: `sum`,
+      sql: `price`,
+      meta: {
+        any: "value",
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue
+        type: sum
+        sql: price
+        meta:
+          any: value
+```
+
+</CodeTabs>
+
+### `rolling_window`
+
+The `rolling_window` parameter is used to for [rolling window][ref-rolling-window]
+calculations, e.g., to calculate a metric over a moving window of time, e.g. a
+week or a month.
+
+<WarningBox>
+
+Rolling window calculations require the query to contain a single time dimension
+with a provided date range. It is used to calculate the minimum and maximum values
+for the series of time windows.
+
+With Tesseract, the [next-generation data modeling engine][link-tesseract],
+rolling window calculations don't require the date range for the time dimension.
+Tesseract is currently in preview. Use the `CUBEJS_TESSERACT_SQL_PLANNER`
+environment variable to enable it.
+
+</WarningBox>
+
+#### `offset`
+
+The `offset` parameter is used to specify the starting point of the time window.
+
+You can set the window `offset` parameter to either `start` or `end`, which will
+match the start or end of the window.
+
+By default, the `offset` parameter is set to `end`.
+
+#### `trailing` and `leading`
+
+The `trailing` and `leading` parameters define the size of the time window.
+The `trailing` parameter defines the size of the window part before the `offset` point,
+and the `leading` parameter defines the size of the window part after the `offset` point.
+
+These parameters have a format defined as `(-?\d+) (minute|hour|day|week|month|year)`.
+It means that you can define these parameters using both positive and negative integers.
+
+The `trailing` and `leading` parameters can also be set to `unbounded`,
+which means _infinite size_ for the corresponding window part.
+
+By default, the `leading` and `trailing` parameters are set to zero.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    rolling_count_month: {
+      sql: `id`,
+      type: `count`,
+      rolling_window: {
+        trailing: `1 month`,
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: rolling_count_month
+        sql: id
+        type: count
+        rolling_window:
+          trailing: 1 month
+```
+
+</CodeTabs>
+
+Here's an example of an `unbounded` window that's used for cumulative counts:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    cumulative_count: {
+      type: `count`,
+      rolling_window: {
+        trailing: `unbounded`,
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: cumulative_count
+        type: count
+        rolling_window:
+          trailing: unbounded
+```
+
+</CodeTabs>
+
+### `public`
+
+The `public` parameter is used to manage the visibility of a measure. Valid
+values for `public` are `true` and `false`. When set to `false`, this measure
+**cannot** be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    orders_count: {
+      sql: `id`,
+      type: `count`,
+      public: false,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        sql: id
+        type: count
+        public: false
+```
+
+</CodeTabs>
+
+### `sql`
+
+`sql` is a required parameter. It can take any valid SQL expression depending on
+the `type` of the measure. Please refer to the [Measure Types
+Guide][ref-schema-ref-types-formats-measures-types] for detailed information on
+the corresponding `sql` parameter.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    users_count: {
+      sql: `COUNT(*)`,
+      type: `number`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: users_count
+        sql: "COUNT(*)"
+        type: number
+```
+
+</CodeTabs>
+
+Depending on the measure [type](#type), the `sql` parameter would either:
+* Be skipped (in case of the `count` type).
+* Contain an aggregate function, e.g., `STRING_AGG(string_dimension, ',')`
+(in case of `string`, `time`, `boolean`, and `number` types).
+* Contain a non-aggregated expression that Cube would wrap into an aggregate
+function according to the measure type (in case of the `avg`, `count_distinct`,
+`count_distinct_approx`, `min`, `max`, and `sum` types).
+
+### `title`
+
+You can use the `title` parameter to change a measure’s displayed name. By
+default, Cube will humanize your measure key to create a display name. In order
+to override default behavior, please use the `title` parameter.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    orders_count: {
+      title: `Number of Orders Placed`,
+      sql: `id`,
+      type: `count`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        title: Number of Orders Placed
+        sql: id
+        type: count
+```
+
+</CodeTabs>
+
+### `type`
+
+`type` is a required parameter. There are various types that can be assigned to
+a measure. Please refer to the [Measure
+Types][ref-schema-ref-types-formats-measures-types] for the full list of measure
+types.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    orders_count: {
+      sql: `id`,
+      type: `count`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        sql: id
+        type: count
+```
+
+</CodeTabs>
+
+## Calculated measures
+
+In the case where you need to specify a formula for measure calculating with
+other measures, you can compose a formula in `sql`. For example, to calculate
+the conversion of buyers of all users.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    purchases_to_created_account_ratio: {
+      sql: `${purchases} / ${users.count} * 100.0`,
+      type: `number`,
+      format: `percent`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: purchases_to_created_account_ratio
+        sql: "{purchases} / {users.count} * 100.0"
+        type: number
+        format: percent
+```
+
+</CodeTabs>
+
+You can create calculated measures from several joined cubes. In this case, a
+join will be created automatically.
+
+
+[ref-ref-cubes]: /product/data-modeling/reference/cube
+[ref-schema-ref-types-formats-measures-types]:
+  /product/data-modeling/reference/types-and-formats#measure-types
+[ref-schema-ref-types-formats-measures-formats]:
+  /product/data-modeling/reference/types-and-formats#measure-formats
+[ref-drilldowns]: /product/apis-integrations/recipes/drilldowns
+[ref-naming]: /product/data-modeling/syntax#naming
+[ref-playground]: /product/workspace/playground
+[ref-apis]: /product/apis-integrations
+[ref-rolling-window]: /product/data-modeling/concepts/multi-stage-calculations#rolling-window
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine

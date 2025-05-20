@@ -1,0 +1,103 @@
+# Calculating period-over-period changes
+
+## Use case
+
+Often, there's a need to calculate a period-over-period change in a
+metric, e.g., week-over-week or month-over-month growth of clicks, orders,
+revenue, etc.
+
+## Data modeling
+
+In Cube, calculating a period-over-period metric involves the following
+steps:
+- Define a couple of [`rolling_window` measures][ref-rolling-window] with
+different windows, i.e., one for _this period_ and the other for the
+_previous period_.
+- Define a [calculated measure][ref-calculated-measure] that references
+these `rolling_window` measures and uses them in a calculation, e.g.,
+divides or subtracts them.
+
+<WarningBox>
+
+Tesseract, the [next-generation data modeling engine][link-tesseract],
+provides a more efficient way to calculate [period-over-period changes][link-period-over-period].
+Tesseract is currently in preview. Use the `CUBEJS_TESSERACT_SQL_PLANNER`
+environment variable to enable it.
+
+</WarningBox>
+
+The following data model allows to calculate a month-over-month change of
+some value. `current_month_sum` and `previous_month_sum` measures define
+two rolling windows and the `month_over_month_ratio` measure divides
+their values:
+
+```yaml
+cubes:
+  - name: month_over_month
+    sql: >
+      SELECT 1 AS value, '2024-01-01'::TIMESTAMP AS date UNION ALL
+      SELECT 2 AS value, '2024-01-01'::TIMESTAMP AS date UNION ALL
+      SELECT 3 AS value, '2024-02-01'::TIMESTAMP AS date UNION ALL
+      SELECT 4 AS value, '2024-02-01'::TIMESTAMP AS date UNION ALL
+      SELECT 5 AS value, '2024-03-01'::TIMESTAMP AS date UNION ALL
+      SELECT 6 AS value, '2024-03-01'::TIMESTAMP AS date UNION ALL
+      SELECT 7 AS value, '2024-04-01'::TIMESTAMP AS date UNION ALL
+      SELECT 8 AS value, '2024-04-01'::TIMESTAMP AS date
+
+    dimensions:
+      - name: date
+        sql: date
+        type: time
+
+    measures:
+      - name: current_month_sum
+        sql: value
+        type: sum
+        rolling_window:
+          trailing: 1 month
+          offset: end
+
+      - name: previous_month_sum
+        sql: value
+        type: sum
+        rolling_window:
+          trailing: 1 month
+          offset: start
+
+      - name: month_over_month_ratio
+        sql: "{current_month_sum} / {previous_month_sum}"
+        type: number
+```
+
+## Result
+
+Often, when calculating period-over-period changes, you would also use a
+query with a time dimension and [granularity][ref-time-dimension-granularity]
+that matches the period, i.e., `month` for month-over-month calculations:
+
+```json
+{
+  "timeDimensions": [
+    {
+      "dimension": "month_over_month.date",
+      "granularity": "month",
+      "dateRange": "this year"
+    }
+  ],
+  "measures": [
+    "month_over_month.current_month_sum",
+    "month_over_month.previous_month_sum",
+    "month_over_month.change"
+  ]
+}
+```
+
+Here's the result:
+
+<Screenshot src="https://ucarecdn.com/50c9165a-f15d-491f-86b4-d44009b05576/"/>
+
+[ref-rolling-window]: /product/data-modeling/reference/measures#rolling_window
+[ref-calculated-measure]: /product/data-modeling/overview#4-using-calculated-measures
+[ref-time-dimension-granularity]: /product/apis-integrations/rest-api/query-format#time-dimensions-format
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[link-period-over-period]: /product/data-modeling/concepts/multi-stage-calculations#prior-date

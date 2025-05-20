@@ -1,0 +1,161 @@
+# Controlling access to cubes and views
+
+## Use case
+
+We want to manage user access to different cubes and/or views depending on some
+sort of user property. In the recipe below, we will manage access to a view so
+that only users with a `department` claim in their JWT can query it.
+
+## Configuration
+
+```javascript
+module.exports = {
+  contextToAppId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.company}`;
+  },
+  extendContext: ({ securityContext }) => {
+    return {
+      securityContext: {
+        ...securityContext,
+        isFinance: securityContext.department === "finance"
+      }
+    }
+  }
+}
+```
+
+## Data modeling
+
+<CodeTabs>
+
+```yaml
+# orders.yml
+cubes:
+  - name: orders
+    sql_table: orders
+    public: false
+    # ...
+
+# users.yml
+cubes:
+  - name: users
+    sql_table: users
+    public: false
+    # ...
+
+# total_revenue_per_customer.yml
+views:
+  - name: total_revenue_per_customer
+    public: {{ COMPILE_CONTEXT['securityContext']['isFinance'] }}
+
+    cubes:
+      - join_path: orders
+        includes:
+          - total_revenue
+
+      - join_path: orders.users
+        includes:
+          - company
+```
+
+```javascript
+// orders.js
+cube(`orders`, {
+  sql_table: `orders`,
+  public: false,
+
+  // ...
+});
+
+// users.js
+cube(`users`, {
+  sql_table: `users`,
+  public: false,
+
+  // ...
+});
+
+// total_revenue_per_customer.js
+view(`total_revenue_per_customer`, {
+  description: `Total revenue per customer`,
+  public: COMPILE_CONTEXT.securityContext.isFinance,
+
+  cubes: [
+    {
+      join_path: orders,
+      includes: [
+        `total_revenue`
+      ]
+    },
+    {
+      join_path: orders.users,
+      includes: [
+        `company`
+      ]
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+## Query
+
+After generating a JWT with a `department` claim set to `finance`, we can send
+it as part of a cURL command:
+
+```bash
+curl \
+  -H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkZXBhcnRtZW50IjoiZmluYW5jZSIsImV4cCI6MTY2NzMzNzI1MH0.njfL7GMDNlzKaJDZA0OQ_b2u2JhuSm-WjnS0yVfB8NA" \
+  http://localhost:4000/cubejs-api/v1/meta
+```
+
+## Result
+
+The `/meta` endpoint shows the available cubes and views:
+
+```json
+{
+  "cubes": [
+    {
+      "name": "total_revenue_per_customer",
+      "title": "Total Revenue Per Customer",
+      "description": "Total revenue per customer",
+      "measures": [
+        {
+          "name": "total_revenue_per_customer.total_revenue",
+          "title": "Total Revenue Per Customer Total Revenue",
+          "shortTitle": "Total Revenue",
+          "cumulativeTotal": false,
+          "cumulative": false,
+          "type": "number",
+          "aggType": "number",
+          "drillMembers": [],
+          "drillMembersGrouped": {
+            "measures": [],
+            "dimensions": []
+          },
+          "isVisible": true
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "total_revenue_per_customer.company",
+          "title": "Total Revenue Per Customer Company",
+          "type": "string",
+          "shortTitle": "Company",
+          "suggestFilterValues": true,
+          "isVisible": true
+        }
+      ],
+      "segments": []
+    }
+  ]
+}
+```
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/changing-visibility-of-cubes-or-views)
+or run it with the `docker-compose up` command.

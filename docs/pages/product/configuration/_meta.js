@@ -3,5 +3,7 @@ module.exports = {
   "visualization-tools": "Visualization tools",
   "multiple-data-sources": "Multiple data sources",
   "concurrency": "Concurrency",
-  "multitenancy": "Multitenancy"
+  "multitenancy": "Multitenancy",
+  "reference": "Reference",
+  "recipes": "Recipes"
 }

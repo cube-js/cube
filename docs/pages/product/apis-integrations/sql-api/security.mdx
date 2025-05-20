@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /backend/sql/security
----
-
 # Authentication and Authorization
 
 Cube can be configured with dynamic username & password verification system by
@@ -28,7 +23,7 @@ module.exports = {
 };
 ```
 
-Check [this recipe](/guides/recipes/auth/sql-api-ldap) for an example of
+Check [this recipe](/product/auth/recipes/sql-api-ldap) for an example of
 using `check_sql_auth` to authenticate requests to the SQL API with LDAP.
 
 ## Security Context (Row-Level Security)
@@ -58,14 +53,14 @@ configuration file:
 module.exports = {
   // Create a new appId for each team, this prevents teams from seeing each
   // other's data
-  // https://cube.dev/docs/reference/configuration/config#contexttoappid
+  // https://cube.dev/docs/product/configuration/reference/config#contexttoappid
   contextToAppId: ({ securityContext }) => {
     return securityContext.team;
   },
 
   // Enforce a default value for `team` if one is not provided
   // in the security context
-  // https://cube.dev/docs/reference/configuration/config#extendcontext
+  // https://cube.dev/docs/product/configuration/reference/config#extendcontext
   extendContext: ({ securityContext }) => {
     if (!securityContext.team) {
       securityContext.team = "public";
@@ -167,9 +162,9 @@ SELECT * FROM orders WHERE __user = 'anotheruser';
 [preset-docs-rls-inclusive]:
   https://docs.preset.io/docs/row-level-security-rls#define-inclusive-regular-rls-filter
 [ref-config-can-switch-sql-user]:
-  /reference/configuration/config#canswitchsqluser
-[ref-config-check-sql-auth]: /reference/configuration/config#checksqlauth
-[ref-config-ctx-to-app-id]: /reference/configuration/config#contexttoappid
-[ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
+  /product/configuration/reference/config#canswitchsqluser
+[ref-config-check-sql-auth]: /product/configuration/reference/config#checksqlauth
+[ref-config-ctx-to-app-id]: /product/configuration/reference/config#contexttoappid
+[ref-config-queryrewrite]: /product/configuration/reference/config#queryrewrite
 [ref-dynamic-schemas]: /product/data-modeling/dynamic
-[ref-config-js]: /reference/configuration/config
+[ref-config-js]: /product/configuration/reference/config

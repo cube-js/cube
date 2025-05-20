@@ -388,7 +388,16 @@ GROUP BY 1, 2, 3
 
 **Subquery dimensions reference measures from other cubes.** Subquery dimensions
 provide a way to define measures that aggregate values of other measures. They can be
-useful to calculate [nested aggregates][ref-nested-aggregates-recipe].
+useful to calculate nested and filtered aggregates.
+
+<ReferenceBox>
+
+See the following recipes:
+
+- To learn how to calculate [nested aggregates][ref-nested-aggregates-recipe].
+- To learn how to calculate [filtered aggregates][ref-filtered-aggregates-recipe].
+
+</ReferenceBox>
 
 If you have `first_cube` that is [joined][ref-joins] to `second_cube`, you can use a
 subquery dimension to bring `second_cube.measure` to `first_cube` as `dimension` (or
@@ -555,15 +564,16 @@ GROUP BY 1, 2
 [ref-references]: /product/data-modeling/syntax#references
 [ref-sql-expressions]: /product/data-modeling/syntax#sql-expressions
 [ref-joins]: /product/data-modeling/concepts/working-with-joins
-[ref-ref-subquery]: /reference/data-model/dimensions#sub_query
-[ref-schema-ref-measures]: /reference/data-model/measures
-[ref-schema-ref-dimensions]: /reference/data-model/dimensions
-[ref-schema-ref-joins]: /reference/data-model/joins
-[ref-decomposition-recipe]: /guides/recipes/query-acceleration/non-additivity#decomposing-into-a-formula-with-additive-measures
-[ref-nested-aggregates-recipe]: /guides/recipes/data-modeling/nested-aggregates
+[ref-ref-subquery]: /product/data-modeling/reference/dimensions#sub_query
+[ref-schema-ref-measures]: /product/data-modeling/reference/measures
+[ref-schema-ref-dimensions]: /product/data-modeling/reference/dimensions
+[ref-schema-ref-joins]: /product/data-modeling/reference/joins
+[ref-decomposition-recipe]: /product/data-modeling/recipes/non-additivity#decomposing-into-a-formula-with-additive-measures
+[ref-nested-aggregates-recipe]: /product/data-modeling/recipes/nested-aggregates
+[ref-filtered-aggregates-recipe]: /product/data-modeling/recipes/filtered-aggregates
 [ref-non-additive]: /product/data-modeling/concepts#measure-additivity
 [link-postgres-division]: https://www.postgresql.org/docs/current/functions-math.html#FUNCTIONS-MATH
 [wiki-correlated-subquery]: https://en.wikipedia.org/wiki/Correlated_subquery
-[ref-time-dimension]: /reference/data-model/types-and-formats#time-1
+[ref-time-dimension]: /product/data-modeling/reference/types-and-formats#time-1
 [ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
-[ref-custom-granularities]: /reference/data-model/dimensions#granularities
+[ref-custom-granularities]: /product/data-modeling/reference/dimensions#granularities

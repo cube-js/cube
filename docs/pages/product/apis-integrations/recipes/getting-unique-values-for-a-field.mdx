@@ -1,0 +1,131 @@
+# Getting unique values for a field
+
+## Use case
+
+We have a dashboard with information about the users, and we'd like to filter
+them by city. To do so, we need to display all unique values for cities in the
+dropdown. In the recipe below, we'll learn how to get unique values for
+[dimensions](/product/data-modeling/reference/dimensions).
+
+## Data modeling
+
+To filter users by city, we need to define the appropriate dimension:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: city
+        sql: city
+        type: string
+
+      - name: state
+        sql: state
+        type: string
+```
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    city: {
+      sql: `city`,
+      type: `string`,
+    },
+
+    state: {
+      sql: `state`,
+      type: `string`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+## Query
+
+It is enough to include only a dimension in the query to get all unique values
+of that dimension:
+
+```json
+{
+  "dimensions": ["users.city"]
+}
+```
+
+## Result
+
+We got the unique values of the `city` dimension, and now we can use them in the
+dropdown on the dashboard:
+
+```json
+[
+  {
+    "users.city": "Austin"
+  },
+  {
+    "users.city": "Chicago"
+  },
+  {
+    "users.city": "Los Angeles"
+  },
+  {
+    "users.city": "Mountain View"
+  }
+]
+```
+
+## Choosing dimensions
+
+In case we need to choose a dimension or render dropdowns for all dimensions, we
+can fetch the list of dimensions for all cubes from the
+[`/meta` endpoint](/product/apis-integrations/rest-api/reference#v1meta):
+
+```bash
+curl http://localhost:4000/cubejs-api/v1/meta
+```
+
+```json
+{
+  "cubes": [
+    {
+      "name": "users",
+      "title": "Users",
+      "measures": [],
+      "dimensions": [
+        {
+          "name": "users.city",
+          "title": "Users City",
+          "type": "string",
+          "shortTitle": "City",
+          "suggestFilterValues": true
+        },
+        {
+          "name": "users.state",
+          "title": "Users State",
+          "type": "string",
+          "shortTitle": "State",
+          "suggestFilterValues": true
+        }
+      ],
+      "segments": []
+    }
+  ]
+}
+```
+
+Then, we can iterate through dimension names and use any of them in a
+[query](#query).
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/getting-unique-values-for-a-field)
+or run it with the `docker-compose up` command. You'll see the result, including
+queried data, in the console.

@@ -1,10 +1,3 @@
----
-redirect_from:
-  - /schema/fundamentals/working-with-yaml
-  - /schema/getting-started/yaml
-  - /data-modeling/syntax
----
-
 # Syntax
 
 Entities within the data model (e.g., cubes, views, etc.) should be placed under
@@ -69,9 +62,15 @@ models][ref-dynamic-data-models] programmatically. YAML data models use
 [Jinja and Python][ref-dynamic-data-models-jinja] whereas JavaScript data
 models use [JavaScript][ref-dynamic-data-models-js].
 
-It is [recommended][ref-style-guide] to default to YAML syntax because of its
+It is recommended to default to YAML syntax because of its
 simplicity and readability. However, JavaScript might provide more flexibility
 for dynamic data modeling.
+
+<ReferenceBox>
+
+See [Cube style guide][ref-style-guide] for more recommendations on syntax and structure.
+
+</ReferenceBox>
 
 ## Naming
 
@@ -753,6 +752,25 @@ variables][ref-context-variables] within your data model. They are
 generally useful for two purposes: optimizing generated SQL queries and
 defining dynamic data models.
 
+## Troubleshooting
+
+### `Can't parse timestamp`
+
+Sometimes, you might come across the following error message: `Can't parse timestamp:
+2023-11-07T14:33:23.16.000`.
+
+It indicates that the data source was unable to recognize the value of a [time
+dimension][ref-time-dimension] as a timestamp. Please check that the [SQL
+expression](#sql-expressions) of this time dimension evaluates to a `TIMESTAMP` type.
+
+<ReferenceBox>
+
+Check [this recipe][ref-recipe-string-time-dimensions] to see how you can work around
+string values in time dimensions.
+
+</ReferenceBox>
+
+
 [self-folder-structure]: #folder-structure
 [self-naming]: #naming
 [self-syntax]: #code-syntax
@@ -761,22 +779,24 @@ defining dynamic data models.
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-dynamic-data-models-jinja]: /product/data-modeling/dynamic/jinja
 [ref-dynamic-data-models-js]: /product/data-modeling/dynamic/javascript
-[ref-context-variables]: /reference/data-model/context-variables
-[ref-config-model-path]: /reference/configuration/config#schemapath
+[ref-context-variables]: /product/data-modeling/reference/context-variables
+[ref-config-model-path]: /product/configuration/reference/config#schemapath
 [ref-config-repository-factory]:
-  /reference/configuration/config#repositoryfactory
+  /product/configuration/reference/config#repositoryfactory
 [ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [wiki-yaml]: https://en.wikipedia.org/wiki/YAML
 [link-snowflake-listagg]: https://docs.snowflake.com/en/sql-reference/functions/listagg
 [link-bigquery-stringagg]: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#string_agg
 [link-sql-udf]: https://en.wikipedia.org/wiki/User-defined_function#Databases
-[ref-time-dimension]: /reference/data-model/types-and-formats#time-1
+[ref-time-dimension]: /product/data-modeling/reference/types-and-formats#time-1
 [ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
-[ref-custom-granularities]: /reference/data-model/dimensions#granularities
-[ref-style-guide]: /guides/style-guide
+[ref-custom-granularities]: /product/data-modeling/reference/dimensions#granularities
+[ref-style-guide]: /product/data-modeling/recipes/style-guide
 [ref-polymorphism]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
 [link-js-template-literals]: https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Strings#embedding_javascript
 [link-python-reserved-words]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 [ref-dax-api-date-hierarchies]: /product/apis-integrations/dax-api#date-hierarchies
+[ref-time-dimension]: /product/data-modeling/concepts#time-dimensions
+[ref-recipe-string-time-dimensions]: /product/data-modeling/recipes/string-time-dimensions

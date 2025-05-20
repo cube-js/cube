@@ -17,5 +17,31 @@ behavior:
 - `CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`
 - `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`
 
+## Troubleshooting
+
+### `Refresh scheduler interval error`
+
+Sometimes, you might come across the following error:
+
+```json
+{
+  "message": "Refresh Scheduler Interval Error",
+  "error": "Previous interval #2 was not finished with 60000 interval"
+}
+```
+
+It indicates that your refresh worker is overloaded. You probably have a lot of
+[tenants][ref-multitenancy], a lot of [pre-aggregations][ref-preaggs] to refresh,
+or both.
+
+If you're using [multitenancy][ref-multitenancy], you'd need to deploy several Cube
+clusters (each one per a reduced set of tenants) so there will be multiple refresh
+workers which will work only on a subset of your tenants.
+
+If you're using Cube Cloud, you can use a [production multi-cluster][ref-production-multi-cluster]
+that would automatically do this for you.
+
 
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-preaggs]: /product/caching/using-pre-aggregations
+[ref-production-multi-cluster]: /product/deployment/cloud/deployment-types#production-multi-cluster

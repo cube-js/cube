@@ -1,0 +1,54 @@
+# Working around string time dimensions
+
+Cube always expects a timestamp with timezone (or compatible type) as an
+input to the [time dimension][ref-time-dimension].
+
+However, there are a lot of cases when the underlying table's datetime
+information is stored as a string. Most SQL databases support datetime
+parsing which allows converting strings to timestamps. Let's consider an
+example cube for BigQuery:
+
+<CodeTabs>
+
+```javascript
+cube(`events`, {
+  sql_table: `schema.events`,
+
+  dimensions: {
+    date: {
+      sql: `PARSE_TIMESTAMP('%Y-%m-%d', date)`,
+      type: `time`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: events
+    sql_table: schema.events
+
+    dimensions:
+      - name: date
+        sql: PARSE_TIMESTAMP('%Y-%m-%d', date)
+        type: time
+```
+
+</CodeTabs>
+
+In this particular cube, the `date` column will be parsed using the
+`%Y-%m-%d` format.
+
+Please note that as we do not pass timezone parameter to
+[`PARSE_TIMESTAMP`][bq-parse-timestamp], it will set `UTC` as the timezone by
+default. You should always set timezone appropriately for parsed timestamps as
+Cube always does timezone conversions according to user settings.
+
+Although query performance of big data backends like BigQuery or Presto won't
+likely suffer from date parsing, performance of RDBMS backends like Postgres
+most likely will. Adding timestamp columns with indexes or transforming the
+data upstream should strongly be considered in this case.
+
+
+[ref-time-dimension]: /product/data-modeling/reference/types-and-formats#time-1
+[bq-parse-timestamp]: https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp
