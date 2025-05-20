@@ -42,9 +42,9 @@ Object {
     "sql": Object {
       "query_type": "pushdown",
       "sql": Array [
-        "SELECT \\"t\\".\\"avg_t_total_\\" \\"avg_t_total_\\" 
+        "SELECT \\"t\\".\\"avg_t_total_\\" \\"avg_t_total_\\"
 FROM (
-  SELECT AVG(\\"t\\".\\"total\\") \\"avg_t_total_\\" 
+  SELECT AVG(\\"t\\".\\"total\\") \\"avg_t_total_\\"
   FROM (
     SELECT
           \\"orders\\".status \\"status\\", sum(\\"orders\\".amount) \\"total\\"
@@ -344,7 +344,7 @@ Object {
     "sql": Object {
       "query_type": "pushdown",
       "sql": Array [
-        "SELECT \\"Orders\\".\\"sum_orders_total\\" \\"total\\" 
+        "SELECT \\"Orders\\".\\"sum_orders_total\\" \\"total\\"
 FROM (
   SELECT
         sum(\\"orders\\".amount) \\"sum_orders_total\\"
@@ -399,7 +399,7 @@ Object {
     "sql": Object {
       "query_type": "pushdown",
       "sql": Array [
-        "SELECT \\"Orders\\".\\"sum_orders_total\\" \\"total\\" 
+        "SELECT \\"Orders\\".\\"sum_orders_total\\" \\"total\\"
 FROM (
   SELECT
         sum(\\"orders\\".amount) \\"sum_orders_total\\"
@@ -587,6 +587,36 @@ exports[`SQL API Postgres (Data) measure with replaced aggregation: measure-with
 Array [
   Object {
     "min_amount": 100,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) member expression with granularity and raw time dimensions 1`] = `
+Array [
+  Object {
+    "quarter": 2024-01-01T00:00:00.000Z,
+    "total": 100,
+    "updatedAt": 2025-01-01T00:00:00.000Z,
+  },
+  Object {
+    "quarter": 2024-01-01T00:00:00.000Z,
+    "total": 300,
+    "updatedAt": 2025-01-02T00:00:00.000Z,
+  },
+  Object {
+    "quarter": 2024-01-01T00:00:00.000Z,
+    "total": 600,
+    "updatedAt": 2025-01-03T00:00:00.000Z,
+  },
+  Object {
+    "quarter": 2024-01-01T00:00:00.000Z,
+    "total": 1100,
+    "updatedAt": 2025-01-04T00:00:00.000Z,
+  },
+  Object {
+    "quarter": 2024-01-01T00:00:00.000Z,
+    "total": 1700,
+    "updatedAt": 2025-01-05T00:00:00.000Z,
   },
 ]
 `;

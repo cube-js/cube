@@ -2918,8 +2918,10 @@ export class BaseQuery {
           });
           // for time dimension with granularity convertedToTz() is called internally in dimensionSql() flow,
           // so we need to ignore convertTz later even if context convertTzForRawTimeDimension is set to true
-          this.safeEvaluateSymbolContext().ignoreConvertTzForTimeDimension = true;
-          return td.dimensionSql();
+          return this.evaluateSymbolSqlWithContext(
+            () => td.dimensionSql(),
+            { ignoreConvertTzForTimeDimension: true },
+          );
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
           const memPath = this.cubeEvaluator.pathFromArray([cubeName, name]);
