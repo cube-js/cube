@@ -674,21 +674,16 @@ export class PreAggregations {
 
     /**
      * Expand granularity into array of granularity hierarchy.
-     * @param {string} dimension Dimension in the form of `cube.timeDimension`
-     * @param {string} granularity Granularity
-     * @returns {Array<string>}
      */
-    const expandGranularity = (dimension, granularity) => (
+    const expandGranularity = (dimension: string, granularity: string): Array<string> => (
       transformedQuery.granularityHierarchies[`${dimension}.${granularity}`] ||
       [granularity]
     );
 
     /**
      * Determine whether time dimensions match to the window granularity or not.
-     * @param {PreAggregationReferences} references
-     * @returns {boolean}
      */
-    const windowGranularityMatches = (references) => {
+    const windowGranularityMatches = (references: PreAggregationReferences): boolean => {
       if (!transformedQuery.windowGranularity) {
         return true;
       }
@@ -708,10 +703,8 @@ export class PreAggregations {
 
     /**
      * Returns an array of 2-element arrays with dimension and granularity.
-     * @param {*} timeDimension
-     * @returns {Array<Array<string>>}
      */
-    const expandTimeDimension = (timeDimension) => {
+    const expandTimeDimension = (timeDimension: string[]): string[][] => {
       const [dimension, resolvedGranularity] = timeDimension;
       if (!resolvedGranularity) {
         return [[dimension, '*']]; // Any granularity should fit
