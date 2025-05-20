@@ -144,6 +144,12 @@ const variables: Record<string, (...args: any) => any> = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
+  serverHeadersTimeout: () => get('CUBEJS_SERVER_HEADERS_TIMEOUT')
+    .default('60000')
+    .asInt(),
+  serverKeepAliveTimeout: () => get('CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT')
+    .default('5000')
+    .asInt(),
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
