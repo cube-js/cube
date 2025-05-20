@@ -6362,7 +6362,6 @@ mod tests {
             let list = LocalDirRemoteFs::list_recursive(
                 config.remote_dir().clone(),
                 "metastore-".to_string(),
-                config.remote_dir().clone(),
             )
             .await
             .unwrap();
