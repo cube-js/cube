@@ -928,6 +928,80 @@ describe('QueryBuilder.vue', () => {
         expect(wrapper.vm.pivotConfig).toEqual(expectedPivotForLine);
         expect(wrapper.vm.chartType).toBe('line');
       });
+      it('should not reassign validatedQuery if it has not changed', async () => {
+        const cube = createCubeApi();
+        jest
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = shallowMount(QueryBuilder, {
+          propsData: {
+            cubeApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [
+                {
+                  dimension: 'Orders.createdAt',
+                },
+              ],
+            },
+          },
+        });
+
+        const initialValidatedQuery = {
+          measures: ['measure1'],
+          dimensions: ['dimension1'],
+        };
+        wrapper.setData({ prevValidatedQuery: initialValidatedQuery });
+
+        wrapper.setData({
+          measures: [{ name: 'measure1' }],
+          dimensions: [{ name: 'dimension1' }],
+        });
+
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.prevValidatedQuery.measures).toEqual(initialValidatedQuery.measures);
+        expect(wrapper.vm.prevValidatedQuery.dimensions).toEqual(initialValidatedQuery.dimensions);
+      });
+
+      it('should reassign validatedQuery if it has changed', async () => {
+        const cube = createCubeApi();
+        jest
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = shallowMount(QueryBuilder, {
+          propsData: {
+            cubeApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [
+                {
+                  dimension: 'Orders.createdAt',
+                },
+              ],
+            },
+          },
+        });
+        const initialValidatedQuery = {
+          measures: ['measure1'],
+          dimensions: ['dimension1'],
+        };
+        wrapper.setData({ prevValidatedQuery: initialValidatedQuery });
+
+        wrapper.setData({
+          measures: [{ name: 'measure2' }],
+          dimensions: [{ name: 'dimension1' }],
+        });
+
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.prevValidatedQuery.measures).not.toEqual(initialValidatedQuery.measures);
+        expect(wrapper.vm.prevValidatedQuery.dimensions).toEqual(initialValidatedQuery.dimensions);
+      });
     });
     describe('orderMembers', () => {
       it('does not contain time dimension if granularity is set to none', async () => {
@@ -1000,6 +1074,48 @@ describe('QueryBuilder.vue', () => {
               })
             ])
         );
+      });
+      it('calls copyQueryFromProps if query is changed', async () => {
+        const cube = createCubeApi();
+        jest
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
+
+        const copyQueryFromProps = jest.spyOn(QueryBuilder.methods, 'copyQueryFromProps');
+
+        const wrapper = shallowMount(QueryBuilder, {
+          propsData: {
+            cubeApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [
+                {
+                  dimension: 'Orders.createdAt',
+                },
+              ],
+            },
+          },
+        });
+        await flushPromises();
+
+        await wrapper.vm.$nextTick();
+        expect(wrapper.vm.measures.length).toEqual(1);
+        expect(wrapper.vm.measures[0].name).toEqual('Orders.count');
+
+        await wrapper.vm.$nextTick();
+
+        expect(copyQueryFromProps).toHaveBeenCalled();
+        expect(copyQueryFromProps).toHaveBeenCalledTimes(1);
+        const initialValidatedQuery = {
+          measures: ['measure1'],
+          dimensions: ['dimension1'],
+        };
+        wrapper.setData({ prevValidatedQuery: initialValidatedQuery });
+        await wrapper.vm.$nextTick();
+
+        expect(copyQueryFromProps).toHaveBeenCalledTimes(2);
+        copyQueryFromProps.mockRestore();
       });
     });
   });
