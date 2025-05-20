@@ -88,13 +88,13 @@ RUN yarn config set network-timeout 120000 -g
 ######################################################################
 # Databricks driver dependencies                                     #
 ######################################################################
-FROM base as prod_base_dependencies
+FROM base AS prod_base_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 RUN yarn install --prod
 
-FROM prod_base_dependencies as prod_dependencies
+FROM prod_base_dependencies AS prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 
