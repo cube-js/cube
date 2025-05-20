@@ -533,7 +533,7 @@ const CubeRefreshKeySchema = condition(
     (s) => defined(s.sql),
     Joi.object().keys({
       sql: Joi.func().required(),
-      // We dont support timezone for this, because it's useless
+      // We don't support timezone for this, because it's useless
       // We cannot support cron interval
       every: everyInterval,
     }),
@@ -560,9 +560,21 @@ const measureTypeWithCount = Joi.string().valid(
 );
 
 const multiStageMeasureType = Joi.string().valid(
-  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox',
+  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox', 'numberAgg',
   'rank'
 );
+
+const timeShiftItemRequired = Joi.object({
+  timeDimension: Joi.func().required(),
+  interval: regexTimeInterval.required(),
+  type: Joi.string().valid('next', 'prior').required(),
+});
+
+const timeShiftItemOptional = Joi.object({
+  timeDimension: Joi.func(), // не required
+  interval: regexTimeInterval.required(),
+  type: Joi.string().valid('next', 'prior').required(),
+});
 
 const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.multiStage'), [
   {
@@ -574,11 +586,10 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),
-      timeShift: Joi.array().items(Joi.object().keys({
-        timeDimension: Joi.func().required(),
-        interval: regexTimeInterval.required(),
-        type: Joi.string().valid('next', 'prior').required(),
-      })),
+      timeShift: Joi.alternatives().conditional(Joi.array().length(1), {
+        then: Joi.array().items(timeShiftItemOptional),
+        otherwise: Joi.array().items(timeShiftItemRequired)
+      }),
       // TODO validate for order window functions
       orderBy: Joi.array().items(Joi.object().keys({
         sql: Joi.func().required(),

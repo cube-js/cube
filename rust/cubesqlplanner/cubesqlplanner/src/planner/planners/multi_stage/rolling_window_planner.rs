@@ -6,7 +6,7 @@ use super::{
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
+use crate::planner::sql_templates::TemplateProjectionColumn;
 use crate::planner::BaseMeasure;
 use crate::planner::{BaseMember, BaseTimeDimension, GranularityHelper, QueryProperties};
 use cubenativeutils::CubeError;
@@ -51,7 +51,18 @@ impl RollingWindowPlanner {
                     }
                     _ => false,
                 };
-                let time_dimensions = self.query_properties.time_dimensions();
+                let mut time_dimensions = self.query_properties.time_dimensions().clone();
+                for dim in self.query_properties.dimension_symbols() {
+                    let dim = dim.resolve_reference_chain();
+                    if let Ok(time_dimension_symbol) = dim.as_time_dimension() {
+                        let time_dimension = BaseTimeDimension::try_new_from_td_symbol(
+                            self.query_tools.clone(),
+                            time_dimension_symbol,
+                        )?;
+                        time_dimensions.push(time_dimension);
+                    }
+                }
+
                 if time_dimensions.len() == 0 {
                     let rolling_base = self.add_rolling_window_base(
                         member.clone(),
@@ -262,7 +273,7 @@ impl RollingWindowPlanner {
         &self,
         time_series_cte_name: &str,
     ) -> Result<(String, String), CubeError> {
-        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
+        let templates = self.query_tools.plan_sql_templates();
         let from_expr = format!("min(date_from)");
         let to_expr = format!("max(date_to)");
         let alias = format!("value");
@@ -324,7 +335,7 @@ impl RollingWindowPlanner {
             &time_dimension.resolve_granularity()?,
         )?;
 
-        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
+        let templates = self.query_tools.plan_sql_templates();
 
         if templates.supports_generated_time_series() {
             let (from, to) =
@@ -357,6 +368,19 @@ impl RollingWindowPlanner {
         let new_time_dimension = time_dimension.change_granularity(result_granularity.clone())?;
         //We keep only one time_dimension in the leaf query because, even if time_dimension values have different granularity, in the leaf query we need to group by the lowest granularity.
         new_state.set_time_dimensions(vec![new_time_dimension.clone()]);
+
+        let dimensions = new_state
+            .dimensions()
+            .clone()
+            .into_iter()
+            .filter(|d| {
+                d.member_evaluator()
+                    .resolve_reference_chain()
+                    .as_time_dimension()
+                    .is_err()
+            })
+            .collect_vec();
+        new_state.set_dimensions(dimensions);
 
         if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
             new_state.replace_to_date_date_range_filter(&time_dimension_base_name, &granularity);

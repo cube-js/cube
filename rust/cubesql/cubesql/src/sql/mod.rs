@@ -13,7 +13,7 @@ pub(crate) mod types;
 // Public API
 pub use auth_service::{
     AuthContext, AuthContextRef, AuthenticateResponse, HttpAuthContext, SqlAuthDefaultImpl,
-    SqlAuthService,
+    SqlAuthService, SqlAuthServiceAuthenticateRequest,
 };
 pub use database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR;
 pub use postgres::*;

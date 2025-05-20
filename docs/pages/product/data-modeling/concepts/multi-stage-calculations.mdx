@@ -1,0 +1,462 @@
+# Multi-stage calculations
+
+[Measures][ref-measures] are usually calculated as aggregations over [dimensions][ref-dimensions]
+or arbitrary SQL expressions.
+
+_Multi-stage calculations_ enable data modeling of more sophisticated _multi-stage measures_.
+They are calculated in two or more stages and often involve manipulations on already
+aggregated data. Each stage results in one or more [common table expressions][link-cte]
+(CTEs) in the generated SQL query.
+
+<WarningBox>
+
+Multi-stage calculations are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. Tesseract is currently in preview. Use the
+`CUBEJS_TESSERACT_SQL_PLANNER` environment variable to enable it.
+
+</WarningBox>
+
+<WarningBox>
+
+Multi-stage calculations are not currently accelerated by pre-aggregations.
+Please track [this issue](https://github.com/cube-js/cube/issues/8487).
+
+</WarningBox>
+
+Common uses of multi-stage calculations:
+
+- [Rolling window](#rolling-window) calculations.
+- [Period-to-date](#period-to-date) calculations, e.g., year-to-date (YTD) analysis.
+- [Prior date](#prior-date) calculations, e.g., year-over-year sales growth.
+- [Fixed dimension](#fixed-dimension) calculations, e.g., comparing individual items to a broader dataset or calculating percent of total.
+- [Ranking](#ranking) calculations.
+
+## Rolling window
+
+Rolling window calculations are used to calculate metrics over a moving window of time.
+Use the [`rolling_window` parameter][ref-rolling-window] of a measure to define
+a rolling window.
+
+### Stages
+
+Here's how the rolling window calculation is performed:
+
+- **Date range.** First, the date range for the query is determined.
+If there's a time dimension with a date range filter in the query, it's used.
+Otherwise, the date range is determined by selecting the minimum and maximum
+values for the time dimension.
+
+<WarningBox>
+
+Tesseract enables rolling window calculations without the date range for the time dimension.
+If Tesseract is not used, the date range must be provided. Otherwise, the query would
+fail with the following error: `Time series queries without dateRange aren't supported`.
+
+</WarningBox>
+
+- **Time windows.** Then, the series of time windows is calculated. The size of the
+window is defined by the time dimension granularity and the `trailing` and
+`leading` parameters.
+- **Measure.** Finally, the measure is calculated for each window.
+
+### Example
+
+Data model:
+
+```yaml
+
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, '2025-01-01'::TIMESTAMP AS time UNION ALL
+      SELECT 2 AS id, '2025-01-11'::TIMESTAMP AS time UNION ALL
+      SELECT 3 AS id, '2025-01-21'::TIMESTAMP AS time UNION ALL
+      SELECT 4 AS id, '2025-01-31'::TIMESTAMP AS time UNION ALL
+      SELECT 5 AS id, '2025-02-01'::TIMESTAMP AS time UNION ALL
+      SELECT 6 AS id, '2025-02-11'::TIMESTAMP AS time UNION ALL
+      SELECT 7 AS id, '2025-02-21'::TIMESTAMP AS time UNION ALL
+      SELECT 8 AS id, '2025-03-01'::TIMESTAMP AS time UNION ALL
+      SELECT 9 AS id, '2025-03-11'::TIMESTAMP AS time UNION ALL
+      SELECT 10 AS id, '2025-03-21'::TIMESTAMP AS time UNION ALL
+      SELECT 11 AS id, '2025-03-31'::TIMESTAMP AS time UNION ALL
+      SELECT 12 AS id, '2025-04-01'::TIMESTAMP AS time
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+ 
+    measures:
+      - name: rolling_count_month
+        sql: id
+        type: count
+        rolling_window:
+          trailing: unbounded
+```
+
+Query and result:
+
+<Screenshot src="https://ucarecdn.com/40179d09-3e10-4ada-8456-1deca6a5035d/" />
+
+## Period-to-date
+
+Period-to-date calculations can be used to analyze data over different time periods:
+
+- Year-to-date (YTD) analysis.
+- Quarter-to-date (QTD) analysis.
+- Month-to-date (MTD) analysis.
+
+```yaml
+- name: revenue_ytd
+  sql: revenue
+  type: sum
+  rolling_window:
+    type: to_date
+    granularity: year
+  
+- name: revenue_qtd
+  sql: revenue
+  type: sum
+  rolling_window:
+    type: to_date
+    granularity: quarter
+  
+- name: revenue_mtd
+  sql: revenue
+  type: sum
+  rolling_window:
+    type: to_date
+    granularity: month
+```
+
+### Example
+
+Data model:
+
+```yaml
+cubes:
+  - name: period_to_date
+    sql: >
+      SELECT '2024-01-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-02-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-03-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-06-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-07-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-08-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-09-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-10-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-11-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-12-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-01-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-02-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-03-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-06-01'::TIMESTAMP AS time, 1000 AS revenue
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+
+    measures:
+      - name: revenue_ytd
+        sql: revenue
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+        
+      - name: revenue_qtd
+        sql: revenue
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: quarter
+        
+      - name: revenue_mtd
+        sql: revenue
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: month
+```
+
+Query and result:
+
+<Screenshot src="https://ucarecdn.com/3c8bbb38-b582-410d-8a1c-fa7c0dc38d14/" />
+
+## Prior date
+
+Prior date calculations can be used to find the difference between two aggregated
+measures, like year-over-year sales growth.
+
+```yaml
+- name: revenue_prior_year
+  multi_stage: true
+  sql: "{revenue}"
+  type: number
+  time_shift:
+    - time_dimension: calendar.CalendarDate
+      interval: 1 year
+      type: prior
+      
+- name: revenue_prior_year_ytd
+  multi_stage: true
+  sql: "{revenue_ytd}"
+  type: number
+  time_shift:
+    - time_dimension: calendar.CalendarDate
+      interval: 1 year
+      type: prior
+```
+
+### Example
+
+Data model:
+
+```yaml
+cubes:
+  - name: prior_date
+    sql: >
+      SELECT '2023-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-06-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-07-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-08-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-09-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-10-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-11-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-12-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-01-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-02-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-03-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-06-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-07-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-08-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-09-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-10-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-11-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-12-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-01-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-02-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-03-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-06-01'::TIMESTAMP AS time, 1000 AS revenue
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+
+    measures:
+      - name: revenue
+        sql: revenue
+        type: sum
+
+      - name: revenue_ytd
+        sql: revenue
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+
+      - name: revenue_prior_year
+        multi_stage: true
+        sql: "{revenue}"
+        type: number
+        time_shift:
+          - time_dimension: time
+            interval: 1 year
+            type: prior
+            
+      - name: revenue_prior_year_ytd
+        multi_stage: true
+        sql: "{revenue_ytd}"
+        type: number
+        time_shift:
+          - time_dimension: time
+            interval: 1 year
+            type: prior
+```
+
+Queries and results:
+
+<Screenshot src="https://ucarecdn.com/fdc8dba1-6c9e-4682-87b9-1435f8eac0ca/" />
+
+<Screenshot src="https://ucarecdn.com/d60c3ec2-07e0-47c3-adcd-1f7fe2c75bc9/" />
+
+## Fixed dimension
+
+Fixed dimension calculations can be used to perform fixed comparisons, e.g., to compare
+individual items to a broader dataset.
+
+For example, comparing revenue sales to the overall average:
+
+```yaml
+- name: revenue
+  sql: revenue
+  format: currency
+  type: sum
+  
+- name: occupied_sq_feet
+  sql: occupied_sq_feet
+  type: sum
+
+- name: occupied_sq_feet_per_city
+  multi_stage: true
+  sql: "{occupied_sq_feet}"
+  type: sum
+  group_by:
+    - city
+    - state
+
+- name: revenue_per_city_sq_feet
+  multi_stage: true
+  sql: "{revenue} / NULLIF({occupied_sq_feet_per_city}, 0)"
+  type: number
+```
+
+Percent of total calculations:
+
+```yaml
+- name: revenue
+  sql: revenue
+  format: currency
+  type: sum
+
+- name: country_revenue
+  multi_stage: true
+  sql: "{revenue}"
+  type: sum
+  group_by:
+    - country
+
+- name: country_revenue_percentage
+  multi_stage: true
+  sql: "{revenue} / NULLIF({country_revenue}, 0)"
+  type: number
+```
+
+### Example
+
+Data model:
+
+```yaml
+cubes:
+  - name: percent_of_total
+    sql: >
+      SELECT 1 AS id, 1000 AS revenue, 'A' AS product, 'USA' AS country UNION ALL
+      SELECT 2 AS id, 2000 AS revenue, 'B' AS product, 'USA' AS country UNION ALL
+      SELECT 3 AS id, 3000 AS revenue, 'A' AS product, 'Austria' AS country UNION ALL
+      SELECT 4 AS id, 4000 AS revenue, 'B' AS product, 'Austria' AS country UNION ALL
+      SELECT 5 AS id, 5000 AS revenue, 'A' AS product, 'Netherlands' AS country UNION ALL
+      SELECT 6 AS id, 6000 AS revenue, 'B' AS product, 'Netherlands' AS country
+
+    dimensions:
+      - name: product
+        sql: product
+        type: string
+
+      - name: country
+        sql: country
+        type: string
+
+    measures:
+      - name: revenue
+        sql: revenue
+        format: currency
+        type: sum
+      
+      - name: country_revenue
+        multi_stage: true
+        sql: "{revenue}"
+        format: currency
+        type: sum
+        group_by:
+          - country
+      
+      - name: country_revenue_percentage
+        multi_stage: true
+        sql: "{revenue} / NULLIF({country_revenue}, 0)"
+        type: number
+```
+
+Query and result:
+
+<Screenshot src="https://ucarecdn.com/0d0b318c-0743-4698-bb05-b9bf6dfeb292/" />
+
+
+## Ranking
+
+Ranking calculations can be used to get valuable insights, especially when analyzing
+data across various dimensions.
+
+```yaml
+- name: product_rank
+  multi_stage: true
+  order_by:
+    - sql: "{revenue}"
+      dir: asc
+  reduce_by: 
+    - product
+  type: rank
+```
+
+You can reduce by one or more dimensions.
+
+### Example
+
+Data model:
+
+```yaml
+cubes:
+  - name: ranking
+    sql: >
+      SELECT 1 AS id, 1000 AS revenue, 'A' AS product, 'USA' AS country UNION ALL
+      SELECT 2 AS id, 2000 AS revenue, 'B' AS product, 'USA' AS country UNION ALL
+      SELECT 3 AS id, 3000 AS revenue, 'A' AS product, 'Austria' AS country UNION ALL
+      SELECT 4 AS id, 4000 AS revenue, 'B' AS product, 'Austria' AS country UNION ALL
+      SELECT 5 AS id, 5000 AS revenue, 'A' AS product, 'Netherlands' AS country UNION ALL
+      SELECT 6 AS id, 6000 AS revenue, 'B' AS product, 'Netherlands' AS country
+
+    dimensions:
+      - name: product
+        sql: product
+        type: string
+
+      - name: country
+        sql: country
+        type: string
+
+    measures:
+      - name: revenue
+        sql: revenue
+        format: currency
+        type: sum
+
+      - name: product_rank
+        multi_stage: true
+        order_by:
+          - sql: "{revenue}"
+            dir: asc
+        reduce_by: 
+          - product
+        type: rank
+```
+
+Query and result:
+
+<Screenshot src="https://ucarecdn.com/a5e5b94e-d2a6-4c1f-a8fa-58e7dfaf4d31/" />
+
+
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-measures]: /product/data-modeling/concepts#measures
+[ref-dimensions]: /product/data-modeling/concepts#dimensions
+[ref-rolling-window]: /reference/data-model/measures#rolling_window
+[link-cte]: https://en.wikipedia.org/wiki/Hierarchical_and_recursive_queries_in_SQL#Common_table_expression

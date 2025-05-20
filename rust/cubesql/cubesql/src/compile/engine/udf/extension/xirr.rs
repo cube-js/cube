@@ -14,6 +14,9 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
+// Note:  A copy/pasted and minimally(?) modified version of this is in Cubestore in udf_xirr.rs, and you might
+// want to update both.
+
 pub const XIRR_UDAF_NAME: &str = "xirr";
 
 /// Creates a XIRR Aggregate UDF.

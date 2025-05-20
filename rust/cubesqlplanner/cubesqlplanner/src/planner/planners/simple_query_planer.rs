@@ -48,7 +48,7 @@ impl SimpleQueryPlanner {
             ungrouped: self.query_properties.ungrouped(),
             order_by: self.query_properties.order_by().clone(),
             dimension_subqueries: subquery_dimension_queries,
-            source,
+            source: SimpleQuerySource::LogicalJoin(source),
         };
         Ok(Rc::new(Query::SimpleQuery(result)))
     }

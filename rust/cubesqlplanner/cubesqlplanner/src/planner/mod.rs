@@ -27,4 +27,6 @@ pub use base_time_dimension::BaseTimeDimension;
 pub use params_allocator::ParamsAllocator;
 pub use query_properties::{FullKeyAggregateMeasures, OrderByItem, QueryProperties};
 pub use time_dimension::*;
-pub use visitor_context::{evaluate_sql_call_with_context, evaluate_with_context, VisitorContext};
+pub use visitor_context::{
+    evaluate_sql_call_with_context, evaluate_with_context, FiltersContext, VisitorContext,
+};

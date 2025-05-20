@@ -1,9 +1,5 @@
 use super::{Schema, SchemaColumn};
-use crate::planner::{
-    query_tools::QueryTools,
-    sql_templates::{PlanSqlTemplates, TemplateProjectionColumn},
-    Granularity,
-};
+use crate::planner::{query_tools::QueryTools, sql_templates::PlanSqlTemplates, Granularity};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -44,61 +40,52 @@ impl TimeSeries {
     }
 
     pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
-        if templates.supports_generated_time_series() {
-            let (from_date, to_date) = match &self.date_range {
+        if templates.supports_generated_time_series()
+            && self.granularity.is_predefined_granularity()
+        {
+            let interval_description = templates
+                .base_tools()
+                .interval_and_minimal_time_unit(self.granularity.granularity_interval().clone())?;
+            if interval_description.len() != 2 {
+                return Err(CubeError::internal(
+                    "Interval description must have 2 elements".to_string(),
+                ));
+            }
+            let interval = interval_description[0].clone();
+            let minimal_time_unit = interval_description[1].clone();
+            match &self.date_range {
                 TimeSeriesDateRange::Filter(from_date, to_date) => {
-                    (format!("'{}'", from_date), format!("'{}'", to_date))
+                    let from_date = format!("'{}'", from_date);
+                    let to_date = format!("'{}'", to_date);
+
+                    templates.generated_time_series_select(
+                        &from_date,
+                        &to_date,
+                        &interval,
+                        &self.granularity.granularity_offset(),
+                        &minimal_time_unit,
+                    )
                 }
                 TimeSeriesDateRange::Generated(cte_name) => {
-                    let date_from_name = format!("date_from");
-                    let date_to_name = format!("date_to");
-                    let from_column = TemplateProjectionColumn {
-                        expr: date_from_name.clone(),
-                        alias: date_from_name.clone(),
-                        aliased: templates.column_aliased(&date_from_name, &date_from_name)?,
-                    };
-                    let to_column = TemplateProjectionColumn {
-                        expr: date_to_name.clone(),
-                        alias: date_to_name.clone(),
-                        aliased: templates.column_aliased(&date_to_name, &date_to_name)?,
-                    };
-                    let from = templates.select(
-                        vec![],
+                    let min_date_name = format!("min_date");
+                    let max_date_name = format!("max_date");
+                    templates.generated_time_series_with_cte_range_source(
                         &cte_name,
-                        vec![from_column],
-                        None,
-                        vec![],
-                        None,
-                        vec![],
-                        None,
-                        None,
-                        false,
-                    )?;
-                    let to = templates.select(
-                        vec![],
-                        &cte_name,
-                        vec![to_column],
-                        None,
-                        vec![],
-                        None,
-                        vec![],
-                        None,
-                        None,
-                        false,
-                    )?;
-                    (format!("({})", from), format!("({})", to))
+                        &min_date_name,
+                        &max_date_name,
+                        &interval,
+                        &minimal_time_unit,
+                    )
                 }
-            };
-            templates.generated_time_series_select(
-                &from_date,
-                &to_date,
-                &self.granularity.granularity_interval(),
-            )
+            }
         } else {
-            let (from_date, to_date) = match &self.date_range {
-                TimeSeriesDateRange::Filter(from_date, to_date) => {
-                    (format!("'{}'", from_date), format!("'{}'", to_date))
-                }
+            let (from_date, to_date, raw_from_date, raw_to_date) = match &self.date_range {
+                TimeSeriesDateRange::Filter(from_date, to_date) => (
+                    format!("'{}'", from_date),
+                    format!("'{}'", to_date),
+                    from_date.clone(),
+                    to_date.clone(),
+                ),
                 TimeSeriesDateRange::Generated(_) => {
                     return Err(CubeError::user(
                         "Date range is required for time series in drivers where generated time series is not supported".to_string(),
@@ -108,12 +95,12 @@ impl TimeSeries {
             let series = if self.granularity.is_predefined_granularity() {
                 self.query_tools.base_tools().generate_time_series(
                     self.granularity.granularity().clone(),
-                    vec![from_date.clone(), to_date.clone()],
+                    vec![raw_from_date.clone(), raw_to_date.clone()],
                 )?
             } else {
                 self.query_tools.base_tools().generate_custom_time_series(
                     self.granularity.granularity_interval().clone(),
-                    vec![from_date.clone(), to_date.clone()],
+                    vec![raw_from_date.clone(), raw_to_date.clone()],
                     self.granularity.origin_local_formatted(),
                 )?
             };

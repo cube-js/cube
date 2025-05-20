@@ -490,7 +490,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Executes query and rerutns queried rows.
+   * Executes query and returns queried rows.
    */
   public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
     return this.getConnection().then((connection) => this.execute<R>(connection, query, values));
@@ -545,10 +545,25 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     } else {
       const types = await this.queryColumnTypes(options.query.sql, options.query.params);
       const connection = await this.getConnection();
-      const { bucketType, bucketName } =
+      const { bucketType } =
         <SnowflakeDriverExportBucket> this.config.exportBucket;
+
+      let bucketName: string;
+      let exportPrefix: string;
+      let path: string;
+
+      if (bucketType === 'azure') {
+        ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
+        const pathArr = path.split('/');
+        bucketName = `${bucketName}/${pathArr[0]}`;
+        exportPrefix = pathArr.length > 1 ? `${pathArr.slice(1).join('/')}/${tableName}` : tableName;
+      } else {
+        ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
+        exportPrefix = path ? `${path}/${tableName}` : tableName;
+      }
+
       const unloadSql = `
-        COPY INTO '${bucketType}://${bucketName}/${tableName}/'
+        COPY INTO '${bucketType}://${bucketName}/${exportPrefix}/'
         FROM (${options.query.sql})
         ${this.exportOptionsClause(options)}`;
       const result = await this.execute<UnloadResponse[]>(
@@ -594,10 +609,25 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   ): Promise<TableStructure> {
     const types = await this.tableColumnTypes(tableName);
     const connection = await this.getConnection();
-    const { bucketType, bucketName } =
+    const { bucketType } =
       <SnowflakeDriverExportBucket> this.config.exportBucket;
+
+    let bucketName: string;
+    let exportPrefix: string;
+    let path: string;
+
+    if (bucketType === 'azure') {
+      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
+      const pathArr = path.split('/');
+      bucketName = `${bucketName}/${pathArr[0]}`;
+      exportPrefix = pathArr.length > 1 ? `${pathArr.slice(1).join('/')}/${tableName}` : tableName;
+    } else {
+      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
+      exportPrefix = path ? `${path}/${tableName}` : tableName;
+    }
+
     const unloadSql = `
-      COPY INTO '${bucketType}://${bucketName}/${tableName}/'
+      COPY INTO '${bucketType}://${bucketName}/${exportPrefix}/'
       FROM ${tableName}
       ${this.exportOptionsClause(options)}`;
     const result = await this.execute<UnloadResponse[]>(
@@ -695,36 +725,50 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Returns an array of signed URLs of the unloaded csv files.
    */
   private async getCsvFiles(tableName: string): Promise<string[]> {
-    const { bucketType, bucketName } =
+    const { bucketType } =
       <SnowflakeDriverExportBucket> this.config.exportBucket;
 
     if (bucketType === 's3') {
-      const cfg = <SnowflakeDriverExportAWS> this.config.exportBucket;
+      const { keyId, secretKey, region } = <SnowflakeDriverExportAWS> this.config.exportBucket;
+
+      const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName);
+      const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
       return this.extractUnloadedFilesFromS3(
         {
           credentials: {
-            accessKeyId: cfg.keyId,
-            secretAccessKey: cfg.secretKey,
+            accessKeyId: keyId,
+            secretAccessKey: secretKey,
           },
-          region: cfg.region,
+          region,
         },
         bucketName,
-        tableName,
+        exportPrefix,
       );
     } else if (bucketType === 'gcs') {
       const { credentials } = (
         <SnowflakeDriverExportGCS> this.config.exportBucket
       );
-      return this.extractFilesFromGCS({ credentials }, bucketName, tableName);
+
+      const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName);
+      const exportPrefix = path ? `${path}/${tableName}` : tableName;
+
+      return this.extractFilesFromGCS({ credentials }, bucketName, exportPrefix);
     } else if (bucketType === 'azure') {
       const { azureKey, sasToken, clientId, tenantId, tokenFilePath } = (
         <SnowflakeDriverExportAzure> this.config.exportBucket
       );
+
+      const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName);
+      const pathArr = path.split('/');
+      const azureBucketPath = `${bucketName}/${pathArr[0]}`;
+
+      const exportPrefix = pathArr.length > 1 ? `${pathArr.slice(1).join('/')}/${tableName}` : tableName;
+
       return this.extractFilesFromAzure(
         { azureKey, sasToken, clientId, tenantId, tokenFilePath },
-        bucketName,
-        tableName,
+        azureBucketPath,
+        exportPrefix,
       );
     } else {
       throw new Error(`Unsupported export bucket type: ${bucketType}`);

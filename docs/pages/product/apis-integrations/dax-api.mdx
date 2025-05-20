@@ -43,38 +43,32 @@ To enable or disable the DAX API on a specific deployment, go to <Btn>Settings</
 in the Cube Cloud sidebar, then <Btn>Configuration</Btn>, and then toggle the
 <Btn>Enable DAX API</Btn> option.
 
-By default, the DAX API exposes all [time dimensions][ref-time-dimensions] as calendar
-hierarchies. You can set the `CUBEJS_DAX_CREATE_DATE_HIERARCHIES` environment
-variable to `false` to disable this behavior.
+### Date hierarchies
+
+By default, the DAX API exposes all [time dimensions][ref-time-dimensions] as _date
+hierarchies_ in [Power BI][ref-power-bi]. You can set the `CUBEJS_DAX_CREATE_DATE_HIERARCHIES`
+environment variable to `false` to disable this behavior.
+
+Note that each date hierarchy will include additional columns, suffixed by `_year`,
+`_quarter`, `_month`, `_day`. If the data model has other members with names that follow
+this pattern (e.g., a time dimension named `date` and another dimension named `date_year`
+in the same cube or view), that would cause a conflict.
 
 ## Authentication
 
-The DAX API supports the user name and password authentication method.
+The DAX API supports [Kerberos][ref-kerberos] and [NTLM][ref-ntlm] authentication
+methods.
 
-## Using DAX API with Power BI
+While NTLM can be used for testing purposes, we strongly recommend configuring
+Kerberos for production environments.
+
+## Data modeling
 
 <InfoBox>
 
-The DAX API works only with [views][ref-views], not cubes.
+The DAX API only exposes [views][ref-views], not cubes.
 
 </InfoBox>
-
-### Connection methods
-
-Power BI provides [three methods][link-powerbi-connection] to connect to data
-sources: _live connection_, _DirectQuery_, and _import mode_.
-
-| | Live connection | DirectQuery | <nobr>Import mode</nobr> |
-| --- | --- | --- | --- |
-| Data location | 🟢 Data source | 🟢 Data source | 🟡 Power BI |
-| Data freshness | 🟢 Real-time data | 🟢 Real-time data | 🟡 Stale copy |
-| Semantic model | <nobr>🟢 Up-to-date model</nobr> | 🟡 Stale copy | 🟡 Stale copy |
-| Queries | <nobr>🟢 Composed in UI</nobr><br/><nobr>🔴 No custom queries</nobr> | <nobr>🟢 Composed in UI</nobr><br/><nobr>🟢 Custom queries</nobr> | <nobr>🟢 Composed in UI</nobr><br/><nobr>🟢 Custom queries</nobr> |
-
-__It's recommended to use a _live connection_ whenever possible.__ Use _DirectQuery_
-if you need to write your own DAX queries, but be aware that you must manually
-synchronize semantic models as they evolve. _Import mode_ is not recommended, as
-it removes the benefits of using a semantic layer.
 
 
 [ref-powerbi]: /product/configuration/visualization-tools/powerbi
@@ -82,5 +76,7 @@ it removes the benefits of using a semantic layer.
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-ref-dax-api]: /product/apis-integrations/dax-api/reference
 [ref-views]: /product/data-modeling/concepts#views
-[link-powerbi-connection]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-live-connect-dq-datasets
 [ref-time-dimensions]: /product/data-modeling/concepts#time-dimensions
+[ref-kerberos]: /product/auth/methods/kerberos
+[ref-ntlm]: /product/auth/methods/ntlm
+[ref-power-bi]: /product/configuration/visualization-tools/powerbi

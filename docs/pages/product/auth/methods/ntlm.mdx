@@ -1,0 +1,98 @@
+# NTLM authentication
+
+[NTLM][link-ntlm] is an authentication method developed by Microsoft that can be used to
+authenticate requests to [DAX API][ref-dax-api] and [MDX API][ref-mdx-api].
+
+<SuccessBox>
+
+DAX API and MDX API are available in Cube Cloud on [Enterprise and above](https://cube.dev/pricing) product tiers.
+They also require the M [deployment tier](/product/deployment/cloud/pricing#deployment-tiers).
+
+</SuccessBox>
+
+On the diagram below, NTLM is used to authenticate requests from Power BI Service that
+come through the [on-premises data gateway][link-power-bi-opdg] (step 6):
+
+![](https://ucarecdn.com/a1928cd7-51b5-4d0c-b6b3-7f97eb94b41e/)
+
+## Authentication flow
+
+The NTLM authentication can be used with Power BI Desktop or with Power BI Service and
+the [on-premises data gateway][link-power-bi-opdg].
+
+### Power BI Desktop
+
+Initiated by Power BI Desktop, NTLM authentication works as follows:
+
+* Power BI Desktop is launched under a specific user account via the `runas` command.
+* Power BI Desktop performs an NTLM challenge-response authentication and passes the
+credentials of that account to the Cube Cloud deployment.
+* The Cube Cloud deployment [verifies the credentials](#verifying-the-credentials).
+
+In the following example, Power BI Desktop is launched under the `cube` user:
+
+```bash
+# Run Power BI Desktop as the `cube` user
+runas /user:cube "C:\Program Files\Microsoft Power BI Desktop\bin\PBIDesktop.exe"
+
+# Run a specific report in Power BI Desktop as the `cube` user 
+runas /user:cube "C:\Program Files\Microsoft Power BI Desktop\bin\PBIDesktop.exe \"C:\Users\Administrator\Desktop\Dashboard.pbix\""
+```
+
+__This flow should only be used for testing purposes.__ Note that, when Power BI Desktop
+is started as a user different from the currently logged-in Windows account, it may
+encounter permission issues, e.g., when saving files on network drives.
+
+In a production environment, Power BI Desktop should be used with [Kerberos
+authentication][ref-kerberos].
+
+### Power BI Service
+
+Initiated by Power BI Service, NTLM authentication works as follows:
+
+* [The gateway is configured](#installing-the-gateway) with a master user account.
+* When users interact with a Power BI report in Power BI Service, their _user principal
+name_ (UPN) is passed to the gateway.
+* The gateway performs an NTLM challenge-response authentication and passes the the
+credentials of the master user account to the Cube Cloud deployment. It also passes the
+UPN of the interacting user.
+* The Cube Cloud deployment [verifies the credentials](#verifying-the-credentials) and
+changes the user name to the UPN of the interacting user.
+
+__This is the recommended way to authenticate Power BI Service requests.__
+
+## Configuration
+
+Using NTLM authentication requires configuring the deployment to [verify the
+credentials](#verifying-the-credentials).
+
+To use NTLM authentication with Power BI Service, you also need to [install the on-premises
+data gateway](#installing-the-gateway) first.
+
+### Installing the gateway
+
+You need to have the [on-premises data gateway][link-power-bi-opdg] installed
+on a Windows Server machine.
+
+It should be configured to authenticate with a _master user_ account. It can be a
+local user on the machine or a domain user.
+
+### Verifying the credentials
+
+By default, `CUBEJS_SQL_USER` and `CUBEJS_SQL_PASSWORD` environment variables are used
+to verify the passed credentials. You can also customize the authentication by using the
+[`check_sql_auth` configuration option][ref-config-check-sql-auth].
+
+Also, the `CUBEJS_SQL_SUPER_USER` environment variable or the [`can_switch_sql_user`
+configuration option][ref-config-can-switch-sql-user] can be used to ensure that the
+user name can be changed to the UPN of the interacting user only if proper credentials
+of the master user account were passed.
+
+
+[link-ntlm]: https://en.wikipedia.org/wiki/NTLM
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[link-power-bi-opdg]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
+[ref-kerberos]: /product/auth/methods/kerberos
+[ref-config-check-sql-auth]: /reference/configuration/config#check_sql_auth
+[ref-config-can-switch-sql-user]: /reference/configuration/config#can_switch_sql_user

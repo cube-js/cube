@@ -6,7 +6,6 @@
 
 /* globals describe,test,expect */
 /* eslint-disable import/no-duplicates */
-/* eslint-disable @typescript-eslint/no-duplicate-imports */
 
 import { MemberType } from '../../src/types/enums';
 import prepareAnnotationDef

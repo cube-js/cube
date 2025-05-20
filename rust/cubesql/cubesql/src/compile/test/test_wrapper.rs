@@ -1147,6 +1147,10 @@ WHERE
             ]),
             segments: Some(vec![]),
             order: Some(vec![]),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     );
@@ -1154,14 +1158,20 @@ WHERE
     assert_eq!(
         logical_plan.find_cube_scan().member_fields,
         vec![
-            MemberField::Member("Logs.content".to_string()),
-            MemberField::Member("KibanaSampleDataEcommerce.last_mod.month".to_string()),
+            MemberField::regular("Logs.content".to_string()),
+            MemberField::time_dimension(
+                "KibanaSampleDataEcommerce.last_mod".to_string(),
+                "month".to_string()
+            ),
             MemberField::Literal(ScalarValue::Utf8(None)),
             MemberField::Literal(ScalarValue::Int64(Some(1))),
-            MemberField::Member("KibanaSampleDataEcommerce.order_date.month".to_string()),
+            MemberField::time_dimension(
+                "KibanaSampleDataEcommerce.order_date".to_string(),
+                "month".to_string()
+            ),
             MemberField::Literal(ScalarValue::Utf8(None)),
             MemberField::Literal(ScalarValue::Int64(Some(2))),
-            MemberField::Member("KibanaSampleDataEcommerce.sumPrice".to_string()),
+            MemberField::regular("KibanaSampleDataEcommerce.sumPrice".to_string()),
         ],
     );
 
@@ -1647,11 +1657,11 @@ GROUP BY
     let dimensions = request.dimensions.unwrap();
     assert_eq!(dimensions.len(), 1);
     let dimension = &dimensions[0];
-    assert!(dimension.contains("DATE_TRUNC"));
+    assert!(dimension.contains(".day"));
     let segments = request.segments.unwrap();
     assert_eq!(segments.len(), 1);
     let segment = &segments[0];
-    assert!(segment.contains("DATE_TRUNC"));
+    assert!(segment.contains(".day"));
 }
 
 /// Aggregation with falsy filter should NOT get pushed to CubeScan with limit=0

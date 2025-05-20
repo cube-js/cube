@@ -70,14 +70,16 @@ impl MultiStageQueryPlanner {
         let top_level_ctes = multi_stage_members
             .into_iter()
             .map(|memb| -> Result<_, CubeError> {
-                Ok(self
-                    .make_queries_descriptions(
-                        memb.member_evaluator().clone(),
-                        state.clone(),
-                        &mut descriptions,
-                    )?
-                    .alias()
-                    .clone())
+                let description = self.make_queries_descriptions(
+                    memb.member_evaluator().clone(),
+                    state.clone(),
+                    &mut descriptions,
+                )?;
+                let result = (
+                    description.alias().clone(),
+                    vec![description.member_node().clone()],
+                );
+                Ok(result)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -96,9 +98,10 @@ impl MultiStageQueryPlanner {
 
         let top_level_ctes = top_level_ctes
             .iter()
-            .map(|alias| {
+            .map(|(alias, symbols)| {
                 Rc::new(MultiStageSubqueryRef {
                     name: alias.clone(),
+                    symbols: symbols.clone(),
                 })
             })
             .collect_vec();
@@ -168,6 +171,7 @@ impl MultiStageQueryPlanner {
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
+        let member = member.resolve_reference_chain();
         let member_name = member.full_name();
         if let Some(exists) = descriptions
             .iter()
@@ -184,7 +188,7 @@ impl MultiStageQueryPlanner {
             return Ok(rolling_window_query);
         }
 
-        let childs = member_childs(&member)?;
+        let childs = member_childs(&member, true)?;
         let has_multi_stage_members = has_multi_stage_members(&member, false)?;
         let description = if childs.is_empty() || !has_multi_stage_members {
             if has_multi_stage_members {

@@ -1507,7 +1507,7 @@ ORDER BY \"COUNT(count)\" DESC"
         );
         assert_eq!(
             &cube_scan.member_fields,
-            &vec![MemberField::Member(
+            &vec![MemberField::regular(
                 "KibanaSampleDataEcommerce.count".to_string()
             )]
         );
@@ -4665,6 +4665,13 @@ ORDER BY "ca_4" ASC
                 segments: Some(vec![]),
                 dimensions: Some(vec!["Logs.read".to_string()]),
                 order: Some(vec![]),
+                join_hints: Some(vec![
+                    vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                    vec![
+                        "KibanaSampleDataEcommerce".to_string(),
+                        "NumberCube".to_string(),
+                    ],
+                ]),
                 ..Default::default()
             }
         );
@@ -4726,6 +4733,10 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
+                join_hints: Some(vec![vec![
+                    "KibanaSampleDataEcommerce".to_string(),
+                    "Logs".to_string(),
+                ],]),
                 ..Default::default()
             }
         );
@@ -8218,6 +8229,10 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 ungrouped: Some(true),
+                join_hints: Some(vec![vec![
+                    "KibanaSampleDataEcommerce".to_string(),
+                    "Logs".to_string(),
+                ],]),
                 ..Default::default()
             }
         )
@@ -9794,6 +9809,10 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 ungrouped: Some(true),
+                join_hints: Some(vec![vec![
+                    "Logs".to_string(),
+                    "KibanaSampleDataEcommerce".to_string(),
+                ],]),
                 ..Default::default()
             },
         );
@@ -11845,6 +11864,12 @@ ORDER BY "source"."str0" ASC
                     }).to_string(),
                 ]),
                 order: Some(vec![]),
+                join_hints: Some(vec![
+                    vec![
+                        "KibanaSampleDataEcommerce".to_string(),
+                        "Logs".to_string(),
+                    ],
+                ]),
                 ..Default::default()
             }
         );
@@ -12271,6 +12296,10 @@ ORDER BY "source"."str0" ASC
                 ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
+                join_hints: Some(vec![vec![
+                    "KibanaSampleDataEcommerce".to_string(),
+                    "Logs".to_string(),
+                ],]),
                 ..Default::default()
             }
         )
@@ -14543,8 +14572,7 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        assert!(sql.contains("DATETIME_TRUNC("));
-        assert!(sql.contains("WEEK(MONDAY)"));
+        assert!(sql.contains(".week"));
     }
 
     #[tokio::test]
@@ -16677,5 +16705,38 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         insta::assert_snapshot!("quoted_keyword", result);
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_double_window_aggr_sql_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                customer_gender AS customer_gender,
+                notes AS notes,
+                SUM(SUM(taxful_total_price)) OVER (PARTITION BY customer_gender ORDER BY customer_gender) AS sum,
+                AVG(SUM(taxful_total_price)) OVER (PARTITION BY notes ORDER BY notes) AS avg
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1, 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("OVER (PARTITION BY"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
     }
 }

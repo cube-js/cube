@@ -17,6 +17,15 @@ _previous period_.
 these `rolling_window` measures and uses them in a calculation, e.g.,
 divides or subtracts them.
 
+<WarningBox>
+
+Tesseract, the [next-generation data modeling engine][link-tesseract],
+provides a more efficient way to calculate [period-over-period changes][link-period-over-period].
+Tesseract is currently in preview. Use the `CUBEJS_TESSERACT_SQL_PLANNER`
+environment variable to enable it.
+
+</WarningBox>
+
 The following data model allows to calculate a month-over-month change of
 some value. `current_month_sum` and `previous_month_sum` measures define
 two rolling windows and the `month_over_month_ratio` measure divides
@@ -90,3 +99,5 @@ Here's the result:
 [ref-rolling-window]: /reference/data-model/measures#rolling_window
 [ref-calculated-measure]: /product/data-modeling/overview#4-using-calculated-measures
 [ref-time-dimension-granularity]: /product/apis-integrations/rest-api/query-format#time-dimensions-format
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[link-period-over-period]: /product/data-modeling/concepts/multi-stage-calculations#prior-date

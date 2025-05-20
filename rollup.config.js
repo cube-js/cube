@@ -2,9 +2,17 @@ import babel from '@rollup/plugin-babel';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import alias from '@rollup/plugin-alias';
+import tsconfigPaths from 'rollup-plugin-tsconfig-paths';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
+import json from '@rollup/plugin-json';
+import { builtinModules } from 'module';
 
-const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) => {
+const bundle = (
+  name,
+  globalName,
+  { globals = {}, ...baseConfig },
+  umdConfig
+) => {
   const baseUmdConfig = {
     ...(umdConfig || baseConfig),
     plugins: [
@@ -14,6 +22,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       resolve({
         extensions: ['.ts', '.js', '.json'],
         mainFields: ['browser', 'module', 'main'],
+        resolveOnly: [/^\.\.?/],
       }),
       babel({
         extensions: ['.js', '.jsx', '.ts', '.tsx'],
@@ -45,13 +54,16 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       }),
       alias({
         entries: {
-          '@cubejs-client/core': '../cubejs-client-core/src/index.js',
+          '@cubejs-client/core': '../cubejs-client-core/src/index.ts',
         },
       }),
     ],
   };
 
-  return [
+  // Will be built with typescript
+  const skipEsModule = name === 'cubejs-client-core';
+
+  const config = [
     // browser-friendly UMD build
     {
       ...baseUmdConfig,
@@ -69,6 +81,13 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
     {
       ...baseConfig,
       plugins: [
+        json(),
+        tsconfigPaths(),
+        resolve({
+          extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json'],
+          resolveOnly: [/^\.\.?/],
+        }),
+        commonjs(),
         peerDepsExternal(),
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
@@ -101,24 +120,30 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       ],
       output: [
         {
-          file: `packages/${name}/dist/${name}.js`,
+          file: `packages/${name}/dist/${name}.cjs.js`,
           format: 'cjs',
           sourcemap: true,
-        }
+        },
       ],
     },
+  ];
+
+  if (!skipEsModule) {
     // ES module (for bundlers) build.
-    {
+    config.push({
       ...baseConfig,
       plugins: [
+        tsconfigPaths(),
+        resolve({
+          extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json'],
+          resolveOnly: [/^\.\.?/],
+        }),
+        commonjs(),
         peerDepsExternal(),
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
-          presets: [
-            '@babel/preset-react',
-            '@babel/preset-typescript',
-          ],
+          presets: ['@babel/preset-react', '@babel/preset-typescript'],
         }),
       ],
       output: [
@@ -129,18 +154,20 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
           globals,
         },
       ],
-    },
-  ];
+    });
+  }
+
+  return config;
 };
 
 export default bundle(
   'cubejs-client-core',
   'cubejs',
   {
-    input: 'packages/cubejs-client-core/src/index.js',
+    input: 'packages/cubejs-client-core/src/index.ts',
   },
   {
-    input: 'packages/cubejs-client-core/src/index.umd.js',
+    input: 'packages/cubejs-client-core/src/index.umd.ts',
   }
 )
   .concat(

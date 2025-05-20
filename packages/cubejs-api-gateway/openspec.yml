@@ -369,6 +369,10 @@ components:
         - "on"
         - joinType
         - alias
+    V1LoadRequestJoinHint:
+      type: "array"
+      items:
+        type: "string"
     V1LoadRequestQuery:
       type: "object"
       properties:
@@ -412,6 +416,10 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1LoadRequestQueryJoinSubquery"
+        joinHints:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1LoadRequestJoinHint"
     V1LoadRequest:
       type: "object"
       properties:

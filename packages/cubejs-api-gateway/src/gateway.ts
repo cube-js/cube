@@ -9,7 +9,7 @@ import structuredClone from '@ungap/structured-clone';
 import {
   getEnv,
   getRealType,
-  parseLocalDate,
+  parseUtcIntoLocalDate,
   QueryAlias,
 } from '@cubejs-backend/shared';
 import {
@@ -921,8 +921,8 @@ class ApiGateway {
     // It's expected that selector.dateRange is provided in local time (without timezone)
     // At the same time it is ok to get timestamps with `Z` (in UTC).
     if (selector.dateRange) {
-      const start = parseLocalDate([{ val: selector.dateRange[0] }], 'UTC');
-      const end = parseLocalDate([{ val: selector.dateRange[1] }], 'UTC');
+      const start = parseUtcIntoLocalDate([{ val: selector.dateRange[0] }], 'UTC');
+      const end = parseUtcIntoLocalDate([{ val: selector.dateRange[1] }], 'UTC');
       if (!start || !end) {
         throw new UserError(`Cannot parse selector date range ${selector.dateRange}`);
       }
@@ -1486,15 +1486,14 @@ class ApiGateway {
       const query = {
         requestId: context.requestId,
       };
-      const cubeNameToDataSource = await compilerApi.cubeNameToDataSource(query);
+      const memberToDataSource: Record<string, string> = await compilerApi.memberToDataSource(query);
 
-      let dataSources = Object.keys(cubeNameToDataSource).map(c => cubeNameToDataSource[c]);
-      dataSources = [...new Set(dataSources)];
+      const dataSources = new Set(Object.values(memberToDataSource));
       const dataSourceToSqlGenerator = (await Promise.all(
-        dataSources.map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
+        [...dataSources].map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
-      res({ cubeNameToDataSource, dataSourceToSqlGenerator });
+      res({ memberToDataSource, dataSourceToSqlGenerator });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted

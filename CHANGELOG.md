@@ -3,6 +3,79 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
+
+### Bug Fixes
+
+- **backend-native:** Fix load response serialization (that breaks cubeApi further processing) ([#9575](https://github.com/cube-js/cube/issues/9575)) ([4b87403](https://github.com/cube-js/cube/commit/4b8740318300584809ff70e280a41dc981be948e))
+- **schema-compiler:** Collect join hints from subquery join conditions ([#9554](https://github.com/cube-js/cube/issues/9554)) ([cbf0bfd](https://github.com/cube-js/cube/commit/cbf0bfddafc8629ce7d09d9b73d8b60da6d7bafb))
+
+### Features
+
+- **clickhouse-driver:** Add support for S3 Bucket with paths ([#9585](https://github.com/cube-js/cube/issues/9585)) ([2e47147](https://github.com/cube-js/cube/commit/2e4714721ef166b76432bfdd374db57bff886b7b))
+- **client-core:** Add signal option to support abort fetch ([#9539](https://github.com/cube-js/cube/issues/9539)) ([2536dfc](https://github.com/cube-js/cube/commit/2536dfcd993055ad1cf94ae698265cd58b6be59f))
+- **cubesql:** Push down `DATE_TRUNC` expressions as member expressions with granularity ([#9583](https://github.com/cube-js/cube/issues/9583)) ([b9c97cd](https://github.com/cube-js/cube/commit/b9c97cd6c169b6d359575649bd845f735ff1a516))
+- **tesseract:** Initial BigQuery support ([#9577](https://github.com/cube-js/cube/issues/9577)) ([60ad2f0](https://github.com/cube-js/cube/commit/60ad2f034d760220c81f7ff9794a388ba5dfbdc5))
+
+## [1.3.15](https://github.com/cube-js/cube/compare/v1.3.14...v1.3.15) (2025-05-15)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix timeshift measure queries coming from SQL API ([#9570](https://github.com/cube-js/cube/issues/9570)) ([d94afeb](https://github.com/cube-js/cube/commit/d94afebbbca9de2eb17fdcfcdb43fa9e64ad1735))
+
+## [1.3.14](https://github.com/cube-js/cube/compare/v1.3.13...v1.3.14) (2025-05-13)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix view queries for measure with single timeshift reference without time dimension ([#9565](https://github.com/cube-js/cube/issues/9565)) ([d3c28d4](https://github.com/cube-js/cube/commit/d3c28d48b470d7ee052107ed10d4bce6a324eef2))
+
+### Features
+
+- Rewrite joins from SQL as query-level join hints ([#9561](https://github.com/cube-js/cube/issues/9561)) ([2b2ac1c](https://github.com/cube-js/cube/commit/2b2ac1c47898f4f6bf67ebae658f90b768c63a7a))
+
+## [1.3.13](https://github.com/cube-js/cube/compare/v1.3.12...v1.3.13) (2025-05-12)
+
+### Features
+
+- introduce "protocol" and "method" props for request param in checkSqlAuth ([#9525](https://github.com/cube-js/cube/issues/9525)) ([401a845](https://github.com/cube-js/cube/commit/401a84584f418e2b4bdabe13766ac213646e0924))
+
+## [1.3.12](https://github.com/cube-js/cube/compare/v1.3.11...v1.3.12) (2025-05-08)
+
+### Bug Fixes
+
+- **query-orchestrator:** Correct local date parsing for partition start/end queries ([#9543](https://github.com/cube-js/cube/issues/9543)) ([20dd8ad](https://github.com/cube-js/cube/commit/20dd8ad10f6ad0fc2538aecd0ff82cd43f6ff680))
+- **schema-compiler:** Fix filtering by time measure ([#9544](https://github.com/cube-js/cube/issues/9544)) ([00a589f](https://github.com/cube-js/cube/commit/00a589fa3fb324ee3dde36fead0de7ced3d19e5b))
+- **schema-compiler:** Fix rendered references for preaggregations with join paths ([#9528](https://github.com/cube-js/cube/issues/9528)) ([98ef928](https://github.com/cube-js/cube/commit/98ef928ece7385c2b41a359dfe0ebcc78dfaf8ee))
+- **schema-compiler:** Fix view queries with timeShift members ([#9556](https://github.com/cube-js/cube/issues/9556)) ([ef3a04b](https://github.com/cube-js/cube/commit/ef3a04b28c9e0b804a2a24fb4046e3d4755e8abe))
+- **schema-compiler:** Reject pre-agg if measure is unmultiplied in query but multiplied in pre-agg ([#9541](https://github.com/cube-js/cube/issues/9541)) ([f094d09](https://github.com/cube-js/cube/commit/f094d09e25b606001cbb699b82427dc43f19a6dc))
+- Throw a user-friendly error on an empty cube.py file ([#9550](https://github.com/cube-js/cube/issues/9550)) ([d69222c](https://github.com/cube-js/cube/commit/d69222cecdf4b3bdfebfaaadc18bbd665d005757))
+
+### Features
+
+- **cubestore:** Add `XIRR` aggregate function to Cube Store ([#9520](https://github.com/cube-js/cube/issues/9520)) ([785142d](https://github.com/cube-js/cube/commit/785142d1c8ecc89cadaa7696c9f58b34115d929b))
+- **schema-compiler:** Allow one measure timeShift without time dimension ([#9545](https://github.com/cube-js/cube/issues/9545)) ([320484f](https://github.com/cube-js/cube/commit/320484fc03f0c49efe0ada2ac9d3dce443011ab9))
+- **tesseract:** Basic pre-aggregations support ([#9434](https://github.com/cube-js/cube/issues/9434)) ([1deddcc](https://github.com/cube-js/cube/commit/1deddcc4e37795bf2f775770798acefdbeb24c71))
+
+## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
+
+### Features
+
+- **cubesql:** Data source per member ([#9537](https://github.com/cube-js/cube/issues/9537)) ([c0be00c](https://github.com/cube-js/cube/commit/c0be00cd4e5239b52116e38e0f5bf8d846e57090))
+- **snowflake-driver:** Upgrade snowflake-sdk from 2.0.3 to 2.0.4 ([#9527](https://github.com/cube-js/cube/issues/9527)) ([8cc6346](https://github.com/cube-js/cube/commit/8cc6346a0daaf35706155671f34bf2cb387b6ad7))
+
+## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
+
+### Bug Fixes
+
+- **cubesql:** Disable filter pushdown over Filter(CrossJoin) ([#9474](https://github.com/cube-js/cube/issues/9474)) ([940c30f](https://github.com/cube-js/cube/commit/940c30f81c0d0f73bcc58bc80d3b673d484cc067))
+
+### Features
+
+- **backend-native:** Allow importing modules from python files within `cube.py` and `globals.py` ([#9490](https://github.com/cube-js/cube/issues/9490)) ([b8ebf15](https://github.com/cube-js/cube/commit/b8ebf15294faa118303112a2d94990dac884e9dd))
+- **cubesql:** SQL push down complex window expressions ([#8788](https://github.com/cube-js/cube/issues/8788)) ([2b1bb28](https://github.com/cube-js/cube/commit/2b1bb284e1413a13f96df62fe712c61aee32fd68))
+- **cubesql:** Support trivial casts in member pushdown ([#9480](https://github.com/cube-js/cube/issues/9480)) ([85c27a9](https://github.com/cube-js/cube/commit/85c27a928a773245163406d0262c7a5bc69c69bb))
+- **databricks-jdbc-driver:** Implement connection checking without waking up SQL warehouse ([#9529](https://github.com/cube-js/cube/issues/9529)) ([044341e](https://github.com/cube-js/cube/commit/044341ee1812c3a2c95c57fb20a2efeaa4e8d803))
+
 ## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
 
 ### Bug Fixes

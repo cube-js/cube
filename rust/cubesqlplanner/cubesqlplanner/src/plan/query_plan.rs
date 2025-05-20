@@ -3,6 +3,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub enum QueryPlan {
     Select(Rc<Select>),
     Union(Rc<Union>),

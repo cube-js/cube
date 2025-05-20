@@ -8,7 +8,23 @@ Array [
 ]
 `;
 
+exports[`multidb SQL pushdown queries to different data sources: ProductsView 1`] = `
+Array [
+  Object {
+    "name": "apples",
+  },
+]
+`;
+
 exports[`multidb SQL pushdown queries to different data sources: Suppliers 1`] = `
+Array [
+  Object {
+    "company": "Fruits Inc",
+  },
+]
+`;
+
+exports[`multidb SQL pushdown queries to different data sources: SuppliersView 1`] = `
 Array [
   Object {
     "company": "Fruits Inc",

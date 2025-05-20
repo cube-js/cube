@@ -120,15 +120,21 @@ jobs:
         run: yarn build
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        if: (matrix.node-version == '22.x')
+      - name: Fix lcov paths
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
+        run: |
+          ./.github/actions/codecov-fix.sh
+      - name: Combine all fixed LCOV files
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
+        run: |
+          echo "" > ./combined-unit.lcov
+          find ./packages -type f -name lcov.fixed.info -exec cat {} + >> ./combined-unit.lcov || true
+      - name: Upload coverage artifact
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
+        uses: actions/upload-artifact@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./packages/*/coverage/*
-          verbose: true
-          flags: cube-backend
-          fail_ci_if_error: false
+          name: coverage-unit
+          path: ./combined-unit.lcov
 
   lint:
     runs-on: ubuntu-24.04
@@ -496,6 +502,18 @@ jobs:
           # Snowflake
           DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
           DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
+      - name: Fix lcov paths
+        run: |
+          ./.github/actions/codecov-fix.sh
+      - name: Combine all fixed LCOV files
+        run: |
+          echo "" > ./combined-integration-${{ matrix.db }}.lcov
+          find ./packages -type f -name lcov.fixed.info -exec cat {} + >> ./combined-integration-${{ matrix.db }}.lcov || true
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration-${{ matrix.db }}
+          path: ./combined-integration-${{ matrix.db }}.lcov
 
   integration-smoke:
     needs: [latest-tag-sha, build-cubestore, build-native-linux]
@@ -778,3 +796,29 @@ jobs:
         with:
           name: cypress-screenshots-docker-dev-${{ matrix.name }}
           path: packages/cubejs-testing/cypress/screenshots
+
+  upload-coverage:
+    name: Upload merged coverage to Codecov
+    needs: [unit, integration]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Install Codecov CLI
+        run: |
+          curl -Os https://uploader.codecov.io/latest/linux/codecov
+          chmod +x codecov
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-coverage
+      - name: Merge all coverage files
+        run: |
+          find all-coverage -name '*.lcov' -exec cat {} + > merged-coverage.info
+      - name: Upload merged coverage to Codecov
+        run: |
+          ./codecov --token "${{ secrets.CODECOV_TOKEN }}" \
+              --file ./merged-coverage.info \
+              --flags cube-backend \
+              --name "cube backend coverage"

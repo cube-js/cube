@@ -702,7 +702,7 @@ export class CubeSymbols {
     return options.originalSorting ? references : R.sortBy(R.identity, references) as any;
   }
 
-  public pathFromArray(array) {
+  public pathFromArray(array: string[]): string {
     return array.join('.');
   }
 
@@ -1010,9 +1010,9 @@ export class CubeSymbols {
           return true;
         }
         if (cube[propertyName]) {
-          depsResolveFn(propertyName, parentIndex);
+          const index = depsResolveFn(propertyName, parentIndex);
           if (cube[propertyName].type === 'time') {
-            return this.timeDimDependenciesProxy(parentIndex);
+            return this.timeDimDependenciesProxy(index);
           }
 
           return '';

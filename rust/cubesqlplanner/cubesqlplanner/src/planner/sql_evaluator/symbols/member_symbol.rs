@@ -125,6 +125,47 @@ impl MemberSymbol {
         }
     }
 
+    pub fn is_reference(&self) -> bool {
+        match self {
+            Self::Dimension(d) => d.is_reference(),
+            Self::TimeDimension(d) => d.is_reference(),
+            Self::Measure(m) => m.is_reference(),
+            Self::CubeName(_) => false,
+            Self::CubeTable(_) => false,
+            Self::MemberExpression(e) => e.is_reference(),
+        }
+    }
+
+    pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
+        match self {
+            Self::Dimension(d) => d.reference_member(),
+            Self::TimeDimension(d) => d.reference_member(),
+            Self::Measure(m) => m.reference_member(),
+            Self::CubeName(_) => None,
+            Self::CubeTable(_) => None,
+            Self::MemberExpression(e) => e.reference_member(),
+        }
+    }
+
+    pub fn resolve_reference_chain(self: Rc<Self>) -> Rc<MemberSymbol> {
+        let mut current = self;
+        while let Some(reference) = current.reference_member() {
+            current = reference;
+        }
+        current
+    }
+
+    pub fn owned_by_cube(&self) -> bool {
+        match self {
+            Self::Dimension(d) => d.owned_by_cube(),
+            Self::TimeDimension(d) => d.owned_by_cube(),
+            Self::Measure(m) => m.owned_by_cube(),
+            Self::CubeName(_) => false,
+            Self::CubeTable(_) => false,
+            Self::MemberExpression(_) => false,
+        }
+    }
+
     pub fn as_time_dimension(&self) -> Result<&TimeDimensionSymbol, CubeError> {
         match self {
             Self::TimeDimension(d) => Ok(d),

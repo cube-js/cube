@@ -77,6 +77,8 @@ pub struct QueryProperties {
     ignore_cumulative: bool,
     ungrouped: bool,
     multi_fact_join_groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>,
+    pre_aggregation_query: bool,
+    total_query: bool,
 }
 
 impl QueryProperties {
@@ -268,9 +270,18 @@ impl QueryProperties {
             order
                 .iter()
                 .map(|o| -> Result<_, CubeError> {
-                    let member_evaluator =
-                        evaluator_compiler.add_auto_resolved_member_evaluator(o.id.clone())?;
-                    Ok(OrderByItem::new(member_evaluator, o.is_desc()))
+                    let evaluator = if let Some(found) =
+                        dimensions.iter().find(|d| d.name() == &o.id)
+                    {
+                        found.member_evaluator().clone()
+                    } else if let Some(found) = time_dimensions.iter().find(|d| d.name() == &o.id) {
+                        found.member_evaluator().clone()
+                    } else if let Some(found) = measures.iter().find(|d| d.name() == &o.id) {
+                        found.member_evaluator().clone()
+                    } else {
+                        evaluator_compiler.add_auto_resolved_member_evaluator(o.id.clone())?
+                    };
+                    Ok(OrderByItem::new(evaluator, o.is_desc()))
                 })
                 .collect::<Result<Vec<_>, _>>()?
         } else {
@@ -300,6 +311,9 @@ impl QueryProperties {
             &segments,
         )?;
 
+        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        let total_query = options.static_data().total_query.unwrap_or(false);
+
         Ok(Rc::new(Self {
             measures,
             dimensions,
@@ -315,6 +329,8 @@ impl QueryProperties {
             ignore_cumulative: false,
             ungrouped,
             multi_fact_join_groups,
+            pre_aggregation_query,
+            total_query,
         }))
     }
 
@@ -332,6 +348,8 @@ impl QueryProperties {
         offset: Option<usize>,
         ignore_cumulative: bool,
         ungrouped: bool,
+        pre_aggregation_query: bool,
+        total_query: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -365,6 +383,8 @@ impl QueryProperties {
             ignore_cumulative,
             ungrouped,
             multi_fact_join_groups,
+            pre_aggregation_query,
+            total_query,
         }))
     }
 
@@ -382,6 +402,10 @@ impl QueryProperties {
             &self.measures_filters,
             &self.segments,
         )
+    }
+
+    pub fn is_total_query(&self) -> bool {
+        self.total_query
     }
 
     pub fn compute_join_multi_fact_groups(
@@ -549,6 +573,10 @@ impl QueryProperties {
 
     pub fn ungrouped(&self) -> bool {
         self.ungrouped
+    }
+
+    pub fn is_pre_aggregation_query(&self) -> bool {
+        self.pre_aggregation_query
     }
 
     pub fn all_filters(&self) -> Option<Filter> {
@@ -761,7 +789,10 @@ impl QueryProperties {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.all_used_measures()?;
         for m in measures.iter() {
-            if has_multi_stage_members(m.member_evaluator(), self.ignore_cumulative)? {
+            if has_multi_stage_members(
+                m.member_evaluator(),
+                self.ignore_cumulative || self.pre_aggregation_query,
+            )? {
                 result.multi_stage_measures.push(m.clone())
             } else {
                 let join = self

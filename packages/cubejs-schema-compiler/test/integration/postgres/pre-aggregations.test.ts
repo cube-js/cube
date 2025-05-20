@@ -1,4 +1,7 @@
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
+import {
+  getEnv,
+} from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
@@ -93,6 +96,10 @@ describe('PreAggregations', () => {
           type: 'string',
           sql: 'source'
         },
+        shortSource: {
+          type: 'string',
+          sql: \`SUBSTRING(\${source}, 0, 2)\`
+        },
         sourceAndId: {
           type: 'string',
           sql: \`\${source} || '_' || \${id}\`,
@@ -114,6 +121,10 @@ describe('PreAggregations', () => {
         signedUpAt: {
           type: 'time',
           sql: \`\${createdAt}\`
+        },
+        createdAtDay: {
+          type: 'time',
+          sql: \`\${createdAt.day}\`
         },
         checkinsCount: {
           type: 'number',
@@ -529,6 +540,11 @@ describe('PreAggregations', () => {
       preAggregationsSchema: ''
     });
 
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    console.log(query.preAggregations?.preAggregationsDescription());
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [
@@ -553,9 +569,58 @@ describe('PreAggregations', () => {
     });
   });
 
+  if (getEnv('nativeSqlPlanner')) {
+    it('simple pre-aggregation proxy time dimension', () => compiler.compile().then(() => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitors.count'
+        ],
+        dimensions: [
+          'visitors.createdAtDay',
+        ],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'visitors.createdAtDay'
+        }],
+        preAggregationsSchema: ''
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      console.log(query.preAggregations?.preAggregationsDescription());
+      expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [
+            {
+              visitors__created_at_day: '2016-09-06T00:00:00.000Z',
+              visitors__count: '1'
+            },
+            {
+              visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+              visitors__count: '1'
+            },
+            {
+              visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+              visitors__count: '1'
+            },
+            {
+              visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+              visitors__count: '1'
+            },
+            {
+              visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+              visitors__count: '2'
+            }
+          ]
+        );
+      });
+    }));
+  }
+
   it('simple pre-aggregation (allowNonStrictDateRangeMatch: true)', async () => {
     await compiler.compile();
-
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.count'
@@ -889,9 +954,91 @@ describe('PreAggregations', () => {
     });
   });
 
+  it('non-additive view dimension', async () => {
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors_view.uniqueSourceCount'
+      ],
+      dimensions: [
+        'visitors_view.source'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors_view.signedUpAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors_view.createdAt'
+      }],
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/visitors_unique_source_count/);
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [
+          {
+            visitors_view__source: 'google',
+            visitors_view__signed_up_at_day: '2017-01-05T00:00:00.000Z',
+            visitors_view__unique_source_count: '1'
+          },
+          {
+            visitors_view__source: 'some',
+            visitors_view__signed_up_at_day: '2017-01-02T00:00:00.000Z',
+            visitors_view__unique_source_count: '1'
+          },
+          {
+            visitors_view__source: 'some',
+            visitors_view__signed_up_at_day: '2017-01-04T00:00:00.000Z',
+            visitors_view__unique_source_count: '1'
+          },
+          {
+            visitors_view__source: null,
+            visitors_view__signed_up_at_day: '2017-01-06T00:00:00.000Z',
+            visitors_view__unique_source_count: '0'
+          }
+        ]
+
+      );
+    });
+  });
+  it('non-additive proxy but not direct alias dimension', async () => {
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors_view.uniqueSourceCount'
+      ],
+      dimensions: [
+        'visitors.shortSource'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors_view.signedUpAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors_view.createdAt'
+      }],
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect((<any>preAggregationsDescription)[0].type).toEqual('originalSql');
+  });
+
   it('non-additive single value view filtered measure', async () => {
     await compiler.compile();
-
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors_view.googleUniqueSourceCount'
@@ -949,6 +1096,7 @@ describe('PreAggregations', () => {
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
     expect(queryAndParams[0]).toMatch(/count\(distinct/ig);
+    expect(queryAndParams[0]).toMatch(/visitors_default/ig);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect((<any>preAggregationsDescription).filter(p => p.type === 'rollup').length).toBe(0);
@@ -971,7 +1119,6 @@ describe('PreAggregations', () => {
 
   it('multiplied measure match', async () => {
     await compiler.compile();
-
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.count'
@@ -1588,7 +1735,6 @@ describe('PreAggregations', () => {
 
   it('partitioned', async () => {
     await compiler.compile();
-
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.checkinsTotal'
@@ -1612,6 +1758,7 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
@@ -1668,6 +1815,7 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
@@ -1716,6 +1864,7 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     expect(queries.filter(([q]) => !!q.match(/3600/)).length).toBeGreaterThanOrEqual(1);
@@ -1766,9 +1915,9 @@ describe('PreAggregations', () => {
     });
 
     const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
@@ -1846,6 +1995,7 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
@@ -2346,9 +2496,8 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
-    const { partitionInvalidateKeyQueries, loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'RealTimeLambdaVisitors.partitioned');
+    const { loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'RealTimeLambdaVisitors.partitioned');
 
-    expect(partitionInvalidateKeyQueries).toStrictEqual([]);
     expect(loadSql[0]).not.toMatch(/GROUP BY/);
     expect(loadSql[0]).toMatch(/THEN 1 END `real_time_lambda_visitors__count`/);
   });

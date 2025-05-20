@@ -1,6 +1,23 @@
 use super::*;
 use crate::planner::query_properties::OrderByItem;
 use std::rc::Rc;
+
+#[derive(Clone)]
+pub enum SimpleQuerySource {
+    LogicalJoin(Rc<LogicalJoin>),
+    PreAggregation(Rc<PreAggregation>),
+}
+impl PrettyPrint for SimpleQuerySource {
+    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
+        match self {
+            SimpleQuerySource::LogicalJoin(join) => join.pretty_print(result, state),
+            SimpleQuerySource::PreAggregation(pre_aggregation) => {
+                pre_aggregation.pretty_print(result, state)
+            }
+        }
+    }
+}
+#[derive(Clone)]
 pub struct SimpleQuery {
     pub schema: Rc<LogicalSchema>,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
@@ -9,7 +26,7 @@ pub struct SimpleQuery {
     pub limit: Option<usize>,
     pub ungrouped: bool,
     pub order_by: Vec<OrderByItem>,
-    pub source: Rc<LogicalJoin>,
+    pub source: SimpleQuerySource,
 }
 
 impl PrettyPrint for SimpleQuery {
