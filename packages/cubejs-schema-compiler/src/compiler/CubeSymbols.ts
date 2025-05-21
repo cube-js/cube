@@ -1173,7 +1173,7 @@ export class CubeSymbols {
           };
         }
         if (cube[propertyName as string]) {
-          return this.cubeReferenceProxy(cubeName, joinHints, propertyName);
+          return this.cubeReferenceProxy(cubeName, joinHints?.slice(0, -1), propertyName);
         }
         if (self.symbols[propertyName]) {
           return this.cubeReferenceProxy(propertyName, joinHints);
