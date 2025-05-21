@@ -91,3 +91,24 @@ GROUP BY
             .unwrap()
     );
 }
+
+/// See https://www.postgresql.org/docs/current/functions-math.html
+#[tokio::test]
+async fn test_round() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+SELECT
+    round(42.4), -- 42
+    round(42.4382, 2), -- 42.44
+    round(1234.56, -1) -- 1230
+;
+        "#;
+
+    insta::assert_snapshot!(
+        execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .unwrap()
+    );
+}
