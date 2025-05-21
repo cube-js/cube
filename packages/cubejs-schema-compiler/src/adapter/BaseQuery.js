@@ -632,7 +632,9 @@ export class BaseQuery {
     if (this.from) {
       return this.simpleQuery();
     }
-    if (!this.options.preAggregationQuery && !this.customSubQueryJoins.length) {
+    const hasMemberExpressions = this.allMembersConcat(false).some(m => m.isMemberExpression);
+
+    if (!this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
