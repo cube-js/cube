@@ -28,6 +28,11 @@ name = "cluster"
 path = "tests/cluster.rs"
 harness = false
 
+[[test]]
+name = "migration"
+path = "tests/migration.rs"
+harness = false
+
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 ipc-channel = { version = "0.18.0" }
 
