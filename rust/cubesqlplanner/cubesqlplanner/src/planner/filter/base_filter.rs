@@ -53,7 +53,7 @@ impl BaseFilter {
             vec![]
         };
 
-        //Check if we have proxy time dimension as input 
+        //Check if we have proxy time dimension as input
         let symbol_to_check = if let Ok(time_dimension) = member_evaluator.as_time_dimension() {
             time_dimension.base_symbol().clone()
         } else {
@@ -66,10 +66,6 @@ impl BaseFilter {
         } else {
             false
         };
-        
-
-            
-        
 
         Ok(Rc::new(Self {
             query_tools,
@@ -154,7 +150,9 @@ impl BaseFilter {
                 plan_templates,
             )?;
             let member_sql = if self.is_over_date_range {
-                plan_templates.base_tools().time_stamp_cast(member_sql.clone())?
+                plan_templates
+                    .base_tools()
+                    .time_stamp_cast(member_sql.clone())?
             } else {
                 member_sql
             };
