@@ -273,7 +273,7 @@ impl RollingWindowPlanner {
         &self,
         time_series_cte_name: &str,
     ) -> Result<(String, String), CubeError> {
-        let templates = self.query_tools.plan_sql_templates();
+        let templates = self.query_tools.plan_sql_templates(false)?;
         let from_expr = format!("min(date_from)");
         let to_expr = format!("max(date_to)");
         let alias = format!("value");
@@ -335,7 +335,7 @@ impl RollingWindowPlanner {
             &time_dimension.resolve_granularity()?,
         )?;
 
-        let templates = self.query_tools.plan_sql_templates();
+        let templates = self.query_tools.plan_sql_templates(false)?;
 
         if templates.supports_generated_time_series() {
             let (from, to) =

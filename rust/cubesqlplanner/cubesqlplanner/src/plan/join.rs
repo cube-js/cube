@@ -52,9 +52,7 @@ impl RegularRollingWindowJoinCondition {
             };
 
             let trailing_start = if let Some(trailing_interval) = &self.trailing_interval {
-                templates
-                    .base_tools()
-                    .subtract_interval(start_date, trailing_interval.clone())?
+                templates.subtract_interval(start_date, trailing_interval.clone())?
             } else {
                 start_date
             };
@@ -72,9 +70,7 @@ impl RegularRollingWindowJoinCondition {
             };
 
             let leading_end = if let Some(leading_interval) = &self.leading_interval {
-                templates
-                    .base_tools()
-                    .add_interval(end_date, leading_interval.clone())?
+                templates.add_interval(end_date, leading_interval.clone())?
             } else {
                 end_date
             };

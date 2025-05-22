@@ -1,5 +1,5 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
-use crate::cube_bridge::base_tools::BaseTools;
+use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
 use convert_case::{Boundary, Case, Casing};
@@ -10,7 +10,7 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
-    base_tools: Rc<dyn BaseTools>,
+    driver_tools: Rc<dyn DriverTools>,
 }
 pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
     name: "UnderscoreUpper",
@@ -41,10 +41,79 @@ pub const UPPER_UPPER_BOUND: Boundary = Boundary {
 };
 
 impl PlanSqlTemplates {
-    pub fn new(render: Rc<dyn SqlTemplatesRender>, base_tools: Rc<dyn BaseTools>) -> Self {
-        Self { render, base_tools }
+    pub fn try_new(driver_tools: Rc<dyn DriverTools>) -> Result<Self, CubeError> {
+        let render = driver_tools.sql_templates()?;
+        Ok(Self { render, driver_tools })
     }
 
+    pub fn convert_tz(&self, field: String) -> Result<String, CubeError> {
+        self.driver_tools.convert_tz(field)
+    }
+
+    pub fn time_grouped_column(
+        &self,
+        granularity: String,
+        dimension: String,
+    ) -> Result<String, CubeError> {
+        self.driver_tools.time_grouped_column(granularity, dimension)
+    }
+
+    pub fn timestamp_precision(&self) -> Result<u32, CubeError> {
+        self.driver_tools.timestamp_precision()
+    }
+
+    pub fn time_stamp_cast(&self, field: String) -> Result<String, CubeError> {
+        self.driver_tools.time_stamp_cast(field)
+    }
+
+    pub fn date_time_cast(&self, field: String) -> Result<String, CubeError> {
+        self.driver_tools.date_time_cast(field)
+    }
+
+    pub fn in_db_time_zone(&self, date: String) -> Result<String, CubeError> {
+        self.driver_tools.in_db_time_zone(date)
+    }
+
+    pub fn subtract_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.driver_tools.subtract_interval(date, interval)
+    }
+
+    pub fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.driver_tools.add_interval(date, interval)
+    }
+
+    pub fn add_timestamp_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.driver_tools.add_timestamp_interval(date, interval)
+    }
+
+    pub fn interval_and_minimal_time_unit(&self, interval: String) -> Result<Vec<String>, CubeError> {
+        self.driver_tools.interval_and_minimal_time_unit(interval)
+    }
+
+    pub fn hll_init(&self, sql: String) -> Result<String, CubeError> {  
+        self.driver_tools.hll_init(sql)
+    }
+
+    pub fn hll_merge(&self, sql: String) -> Result<String, CubeError> {
+        self.driver_tools.hll_merge(sql)
+    }
+
+    pub fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError> {
+        self.driver_tools.hll_cardinality_merge(sql)
+    }
+
+    pub fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError> {
+        self.driver_tools.count_distinct_approx(sql)
+    }
+
+    pub fn date_bin(
+        &self,
+        interval: String,
+        source: String,
+        origin: String,
+    ) -> Result<String, CubeError> {
+        self.driver_tools.date_bin(interval, source, origin)
+    }
     pub fn alias_name(name: &str) -> String {
         let res = name
             .with_boundaries(&[
@@ -59,8 +128,8 @@ impl PlanSqlTemplates {
         res
     }
 
-    pub fn base_tools(&self) -> &Rc<dyn BaseTools> {
-        &self.base_tools
+    pub fn driver_tools(&self) -> &Rc<dyn DriverTools> {
+        &self.driver_tools
     }
 
     pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
@@ -122,10 +191,6 @@ impl PlanSqlTemplates {
             "expressions/is_null",
             context! { expr => expr, negate => negate },
         )
-    }
-
-    pub fn always_true(&self) -> Result<String, CubeError> {
-        Ok(self.render.get_template("filters/always_true")?.clone())
     }
 
     pub fn query_aliased(&self, query: &str, alias: &str) -> Result<String, CubeError> {
@@ -420,6 +485,209 @@ impl PlanSqlTemplates {
                 args => args,
                 date_part => date_part,
                 interval => interval,
+            },
+        )
+    }
+
+    pub fn equals(
+        &self,
+        column: String,
+        value: String,
+        is_null_check: bool,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/equals",
+            context! {
+                value => value,
+                is_null_check => self.additional_null_check(is_null_check, &column)?,
+                column => column,
+            },
+        )
+    }
+
+    pub fn not_equals(
+        &self,
+        column: String,
+        value: String,
+        is_null_check: bool,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/not_equals",
+            context! {
+                value => value,
+                is_null_check => self.additional_null_check(is_null_check, &column)?,
+                column => column,
+            },
+        )
+    }
+
+    pub fn time_range_filter(
+        &self,
+        column: String,
+        from_timestamp: String,
+        to_timestamp: String,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/time_range_filter",
+            context! {
+                column => column,
+                from_timestamp => from_timestamp,
+                to_timestamp => to_timestamp,
+            },
+        )
+    }
+
+    pub fn time_not_in_range_filter(
+        &self,
+        column: String,
+        from_timestamp: String,
+        to_timestamp: String,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/time_not_in_range_filter",
+            context! {
+                column => column,
+                from_timestamp => from_timestamp,
+                to_timestamp => to_timestamp,
+            },
+        )
+    }
+
+    pub fn in_where(
+        &self,
+        column: String,
+        values: Vec<String>,
+        is_null_check: bool,
+    ) -> Result<String, CubeError> {
+        let values_concat = values.join(", ");
+        self.render.render_template(
+            &"filters/in",
+            context! {
+                is_null_check => self.additional_null_check(is_null_check, &column)?,
+                values_concat => values_concat,
+                column => column,
+            },
+        )
+    }
+
+    pub fn not_in_where(
+        &self,
+        column: String,
+        values: Vec<String>,
+        is_null_check: bool,
+    ) -> Result<String, CubeError> {
+        let values_concat = values.join(", ");
+        self.render.render_template(
+            &"filters/not_in",
+            context! {
+                is_null_check => self.additional_null_check(is_null_check, &column)?,
+                values_concat => values_concat,
+                column => column,
+            },
+        )
+    }
+
+    pub fn or_is_null_check(&self, column: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/or_is_null_check",
+            context! {
+                column => column,
+            },
+        )
+    }
+
+    pub fn set_where(&self, column: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/set_where",
+            context! {
+                column => column,
+            },
+        )
+    }
+
+    pub fn not_set_where(&self, column: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/not_set_where",
+            context! {
+                column => column,
+            },
+        )
+    }
+
+    pub fn gt(&self, column: String, param: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/gt",
+            context! {
+                column => column,
+                param => param
+            },
+        )
+    }
+
+    pub fn always_true(&self) -> Result<String, CubeError> {
+        Ok(self.render.get_template("filters/always_true")?.clone())
+    }
+
+    pub fn gte(&self, column: String, param: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/gte",
+            context! {
+                column => column,
+                param => param
+            },
+        )
+    }
+
+    pub fn lt(&self, column: String, param: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/lt",
+            context! {
+                column => column,
+                param => param
+            },
+        )
+    }
+
+    pub fn lte(&self, column: String, param: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/lte",
+            context! {
+                column => column,
+                param => param
+            },
+        )
+    }
+
+    pub fn additional_null_check(&self, need: bool, column: &String) -> Result<String, CubeError> {
+        if need {
+            self.or_is_null_check(column.clone())
+        } else {
+            Ok(String::default())
+        }
+    }
+
+    pub fn ilike(
+        &self,
+        column: &str,
+        value: &str,
+        start_wild: bool,
+        end_wild: bool,
+        not: bool,
+    ) -> Result<String, CubeError> {
+        let pattern = self.render.render_template(
+            &"filters/like_pattern",
+            context! {
+                start_wild => start_wild,
+                value => value,
+                end_wild => end_wild
+            },
+        )?;
+        self.render.render_template(
+            &"tesseract/ilike",
+            context! {
+                expr => column,
+                negated => not,
+                pattern => pattern
             },
         )
     }

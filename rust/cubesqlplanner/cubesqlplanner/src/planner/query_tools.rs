@@ -144,7 +144,7 @@ impl QueryTools {
             cube_evaluator.clone(),
             timezone.clone(),
         )));
-        let sql_templates = PlanSqlTemplates::new(templates_render.clone(), base_tools.clone());
+        let sql_templates = PlanSqlTemplates::try_new(base_tools.driver_tools(false)?)?;
         Ok(Rc::new(Self {
             cube_evaluator,
             base_tools,
@@ -164,8 +164,9 @@ impl QueryTools {
         &self.cube_evaluator
     }
 
-    pub fn plan_sql_templates(&self) -> PlanSqlTemplates {
-        PlanSqlTemplates::new(self.templates_render.clone(), self.base_tools.clone())
+    pub fn plan_sql_templates(&self, external: bool) -> Result<PlanSqlTemplates, CubeError> {
+        let driver_tools = self.base_tools.driver_tools(external)?;
+        PlanSqlTemplates::try_new(driver_tools)
     }
 
     pub fn base_tools(&self) -> &Rc<dyn BaseTools> {

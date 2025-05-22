@@ -330,11 +330,11 @@ export class BaseQuery {
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
-    this.canUseNativeSqlPlannerPreAggregation = false;
-    if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
+    this.canUseNativeSqlPlannerPreAggregation = true;
+/*     if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
       const hasMultiStageMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true }).multiStageMembers.length > 0;
       this.canUseNativeSqlPlannerPreAggregation = hasMultiStageMeasures;
-    }
+    } */
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -773,6 +773,13 @@ export class BaseQuery {
         { cache: this.queryCache }
       )
     );
+  }
+
+  driverTools(external) {
+    if (external && this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      return this.externalQuery();
+    }
+    return this;
   }
 
   buildSqlAndParamsRust(exportAnnotatedSql) {

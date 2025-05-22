@@ -78,14 +78,14 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
-        let templates = self.query_tools.plan_sql_templates();
+        let templates = self.query_tools.plan_sql_templates(false)?;
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let logical_plan = query_planner.plan()?;
 
         let (optimized_plan, used_pre_aggregations) =
             self.try_pre_aggregations(logical_plan.clone())?;
 
-        let physical_plan_builder = PhysicalPlanBuilder::new(self.query_tools.clone());
+        let physical_plan_builder = PhysicalPlanBuilder::new(self.query_tools.clone(), templates.clone());
         let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query() {
             OriginalSqlCollector::new(self.query_tools.clone()).collect(&optimized_plan)?
         } else {

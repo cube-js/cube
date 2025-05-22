@@ -41,15 +41,14 @@ impl PhysicalPlanBuilderContext {
 
 pub struct PhysicalPlanBuilder {
     query_tools: Rc<QueryTools>,
-    _plan_sql_templates: PlanSqlTemplates,
+    plan_sql_templates: PlanSqlTemplates,
 }
 
 impl PhysicalPlanBuilder {
-    pub fn new(query_tools: Rc<QueryTools>) -> Self {
-        let plan_sql_templates = query_tools.plan_sql_templates();
+    pub fn new(query_tools: Rc<QueryTools>, plan_sql_templates: PlanSqlTemplates) -> Self {
         Self {
             query_tools,
-            _plan_sql_templates: plan_sql_templates,
+            plan_sql_templates,
         }
     }
 
@@ -970,7 +969,7 @@ impl PhysicalPlanBuilder {
             ));
         };
 
-        let templates = self.query_tools.plan_sql_templates();
+        let templates = self.query_tools.plan_sql_templates(false)?;
 
         let ts_date_range = if templates.supports_generated_time_series()
             && granularity_obj.is_predefined_granularity()
