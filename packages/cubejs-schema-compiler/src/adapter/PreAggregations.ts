@@ -4,6 +4,7 @@ import { CubeSymbols, PreAggregationDefinition } from '../compiler/CubeSymbols';
 import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
 import {
+
   PreAggregationDefinitions,
   PreAggregationReferences,
   PreAggregationTimeDimensionReference
@@ -1306,6 +1307,7 @@ export class PreAggregations {
         const preAggQuery = this.query.preAggregationQueryForSqlEvaluation(cube, aggregation, { inPreAggEvaluation: true });
         const aggregateMeasures = preAggQuery?.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
         references.multipliedMeasures = aggregateMeasures?.multipliedMeasures?.map(m => m.measure);
+        references.joinTree = preAggQuery?.join;
       }
       if (aggregation.type === 'rollupLambda') {
         if (references.rollups.length > 0) {
