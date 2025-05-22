@@ -16739,4 +16739,95 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             displayable(physical_plan.as_ref()).indent()
         );
     }
+
+    #[tokio::test]
+    async fn test_date_filter_with_or_and() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                DATE_TRUNC('year', "order_date") AS "y",
+                SUM("KibanaSampleDataEcommerce"."sumPrice") AS "m1"
+            FROM "KibanaSampleDataEcommerce" AS "KibanaSampleDataEcommerce"
+            WHERE
+                DATE_TRUNC('year', "order_date") = '2024-01-01T00:00:00Z'::timestamptz
+                OR (
+                    DATE_TRUNC('year', "order_date") = '2025-01-01T00:00:00Z'::timestamptz
+                    AND DATE_TRUNC('month', "order_date") = '2025-01-01T00:00:00Z'::timestamptz
+                )
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: None
+                }]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("inDateRange".to_string()),
+                            values: Some(vec![
+                                "2024-01-01T00:00:00.000Z".to_string(),
+                                "2024-12-31T23:59:59.999Z".to_string(),
+                            ]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: None,
+                            operator: None,
+                            values: None,
+                            or: None,
+                            and: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.order_date".to_string()
+                                    ),
+                                    operator: Some("inDateRange".to_string()),
+                                    values: Some(vec![
+                                        "2025-01-01T00:00:00.000Z".to_string(),
+                                        "2025-12-31T23:59:59.999Z".to_string(),
+                                    ]),
+                                    or: None,
+                                    and: None,
+                                }),
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.order_date".to_string()
+                                    ),
+                                    operator: Some("inDateRange".to_string()),
+                                    values: Some(vec![
+                                        "2025-01-01T00:00:00.000Z".to_string(),
+                                        "2025-01-31T23:59:59.999Z".to_string(),
+                                    ]),
+                                    or: None,
+                                    and: None,
+                                })
+                            ]),
+                        }),
+                    ]),
+                    and: None
+                }]),
+                ..Default::default()
+            }
+        )
+    }
 }

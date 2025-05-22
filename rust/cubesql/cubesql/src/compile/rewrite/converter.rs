@@ -1783,7 +1783,7 @@ impl LanguageToLogicalPlanConverter {
                                     query_time_dimensions,
                                     filters,
                                     node_by_id,
-                                    !is_in_or || !is_and_op,
+                                    is_in_or || !is_and_op,
                                 )?;
                                 match op.as_str() {
                                     "and" => {
