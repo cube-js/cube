@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.17](https://github.com/cube-js/cube/compare/v1.3.16...v1.3.17) (2025-05-22)
+
+### Features
+
+- **snowflake-driver:** Add support for export Buckets with paths ([#9587](https://github.com/cube-js/cube/issues/9587)) ([e1f22da](https://github.com/cube-js/cube/commit/e1f22daac005170f354a4f69ecdfa27273350d87))
+
 ## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

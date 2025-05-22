@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.17](https://github.com/cube-js/cube/compare/v1.3.16...v1.3.17) (2025-05-22)
+
+### Bug Fixes
+
+- **cubesql:** Do not merge time dimension ranges in "or" filter into date range ([#9609](https://github.com/cube-js/cube/issues/9609)) ([803998f](https://github.com/cube-js/cube/commit/803998fc8e1799719542d0611c82032473409e01))
+- **cubestore:** Avoid empty result set with LocalDirRemoteFs:list_with_metadata on Windows ([#9598](https://github.com/cube-js/cube/issues/9598)) ([7b4e4ad](https://github.com/cube-js/cube/commit/7b4e4ad151274a16cd34154f1cad5bd048884bde))
+- **schema-compiler:** Avoid mutating context on first occasion of TD with granularity ([#9592](https://github.com/cube-js/cube/issues/9592)) ([93027d8](https://github.com/cube-js/cube/commit/93027d8bcb7f0e76d25679aeccad446ee9d265ad))
+- **schema-compiler:** Fix rolling window queries with expressions from SQL API ([#9603](https://github.com/cube-js/cube/issues/9603)) ([43f47d8](https://github.com/cube-js/cube/commit/43f47d890a5c17416dd818b1712d54cb958ee95c))
+
+### Features
+
+- **snowflake-driver:** Add support for export Buckets with paths ([#9587](https://github.com/cube-js/cube/issues/9587)) ([e1f22da](https://github.com/cube-js/cube/commit/e1f22daac005170f354a4f69ecdfa27273350d87))
+
 ## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
 
 ### Bug Fixes

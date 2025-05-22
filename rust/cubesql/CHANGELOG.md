@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.17](https://github.com/cube-js/cube/compare/v1.3.16...v1.3.17) (2025-05-22)
+
+### Bug Fixes
+
+- **cubesql:** Do not merge time dimension ranges in "or" filter into date range ([#9609](https://github.com/cube-js/cube/issues/9609)) ([803998f](https://github.com/cube-js/cube/commit/803998fc8e1799719542d0611c82032473409e01))
+
 ## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
 
 ### Features
