@@ -945,45 +945,50 @@ export class BaseQuery {
   }
 
   runningTotalDateJoinCondition() {
-    return this.timeDimensions.map(
-      d => [
-        d,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
-      ]
-    );
+    return this.timeDimensions
+      .map(
+        d => [
+          d,
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
+        ]
+      );
   }
 
   rollingWindowToDateJoinCondition(granularity) {
-    return this.timeDimensions.map(
-      d => [
-        d,
-        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
-      ]
-    );
+    return this.timeDimensions
+      .filter(td => td.granularity)
+      .map(
+        d => [
+          d,
+          (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
+        ]
+      );
   }
 
   rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
     offset = offset || 'end';
-    return this.timeDimensions.map(
-      d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+    return this.timeDimensions
+      .filter(td => td.granularity)
+      .map(
+        d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
         // dateFrom based window
-        const conditions = [];
-        if (trailingInterval !== 'unbounded') {
-          const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
-          const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
-          const sign = offset === 'start' ? '>=' : '>';
-          conditions.push(`${dateField} ${sign} ${trailingStart}`);
-        }
-        if (leadingInterval !== 'unbounded') {
-          const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
-          const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
-          const sign = offset === 'end' ? '<=' : '<';
-          conditions.push(`${dateField} ${sign} ${leadingEnd}`);
-        }
-        return conditions.length ? conditions.join(' AND ') : '1 = 1';
-      }]
-    );
+          const conditions = [];
+          if (trailingInterval !== 'unbounded') {
+            const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
+            const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
+            const sign = offset === 'start' ? '>=' : '>';
+            conditions.push(`${dateField} ${sign} ${trailingStart}`);
+          }
+          if (leadingInterval !== 'unbounded') {
+            const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
+            const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
+            const sign = offset === 'end' ? '<=' : '<';
+            conditions.push(`${dateField} ${sign} ${leadingEnd}`);
+          }
+          return conditions.length ? conditions.join(' AND ') : '1 = 1';
+        }]
+      );
   }
 
   /**
