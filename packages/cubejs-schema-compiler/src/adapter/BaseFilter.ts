@@ -389,7 +389,7 @@ export class BaseFilter extends BaseDimension {
     return this.query.afterOrOnDateFilter(column, after);
   }
 
-  public formatFromDate(date: string) {
+  public formatFromDate(date: string): string {
     if (date) {
       if (this.query.timestampPrecision() === 3) {
         if (date.match(dateTimeLocalMsRegex)) {
@@ -425,7 +425,7 @@ export class BaseFilter extends BaseDimension {
     return this.query.inDbTimeZone(this.formatFromDate(date));
   }
 
-  public formatToDate(date: string) {
+  public formatToDate(date: string): string {
     if (date) {
       if (this.query.timestampPrecision() === 3) {
         if (date.match(dateTimeLocalMsRegex)) {
