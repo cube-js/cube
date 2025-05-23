@@ -3,5 +3,6 @@ module.exports = {
   "cast-numerics": "Numeric values",
   "sorting": "Custom sorting",
   "pagination": "Pagination",
-  "drilldowns": "Drilldowns"
+  "drilldowns": "Drilldowns",
+  "real-time-data-fetch": "Real-time data fetch"
 }
