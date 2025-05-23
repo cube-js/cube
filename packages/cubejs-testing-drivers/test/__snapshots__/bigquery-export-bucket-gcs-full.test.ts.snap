@@ -6327,47 +6327,47 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
@@ -6377,12 +6377,12 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": null,
+    "BigECommerce.rollingCountApproxBy2Day": 0,
   },
 ]
 `;
@@ -6427,7 +6427,7 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": null,
+    "BigECommerce.rollingCountApproxBy2Month": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
@@ -6472,7 +6472,7 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": null,
+    "BigECommerce.rollingCountApproxBy2Week": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
@@ -6487,12 +6487,12 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": null,
+    "BigECommerce.rollingCountApproxBy2Week": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": null,
+    "BigECommerce.rollingCountApproxBy2Week": 0,
   },
   Object {
     "BigECommerce.orderDate": "2020-09-01T00:00:00.000",

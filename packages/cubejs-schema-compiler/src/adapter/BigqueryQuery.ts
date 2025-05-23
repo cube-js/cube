@@ -142,10 +142,6 @@ export class BigqueryQuery extends BaseQuery {
     return new BigqueryFilter(this, filter);
   }
 
-  public dateSeriesSql(timeDimension: BaseTimeDimension) {
-    return `${timeDimension.dateSeriesAliasName()} AS (${this.seriesSql(timeDimension)})`;
-  }
-
   public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
@@ -159,26 +155,6 @@ export class BigqueryQuery extends BaseQuery {
 
   public timestampPrecision(): number {
     return 6;
-  }
-
-  public overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
-    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
-    const outerSeriesAlias = this.cubeAlias('outer_series');
-    const outerBase = this.cubeAlias('outer_base');
-    const timeDimensionAlias = this.timeDimensions.map(d => d.aliasName()).filter(d => !!d)[0];
-    const aliasesForSelect = this.timeDimensions.map(d => d.dateSeriesSelectColumn(outerSeriesAlias)).concat(
-      this.dimensions.concat(cumulativeMeasures).map(s => s.aliasName())
-    ).filter(c => !!c).join(', ');
-    const dateSeriesAlias = this.timeDimensions.map(d => `${d.dateSeriesAliasName()}`).filter(c => !!c)[0];
-    return `
-    WITH ${dateSeriesSql} SELECT ${aliasesForSelect} FROM
-    ${dateSeriesAlias} ${outerSeriesAlias}
-    LEFT JOIN (
-      SELECT ${forSelect} FROM ${dateSeriesAlias}
-      INNER JOIN (${baseQuery}) AS ${baseQueryAlias} ON ${dateJoinConditionSql}
-      ${this.groupByClause()}
-    ) AS ${outerBase} ON ${outerSeriesAlias}.${this.escapeColumnName('date_from')} = ${outerBase}.${timeDimensionAlias}
-    `;
   }
 
   public subtractInterval(date, interval) {
