@@ -44,8 +44,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public selectColumns() {
-    const context = this.query.safeEvaluateSymbolContext();
-    if (!context.granularityOverride && !this.granularityObj) {
+    if (!this.granularityObj) {
       return null;
     }
 
@@ -53,8 +52,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public hasNoRemapping() {
-    const context = this.query.safeEvaluateSymbolContext();
-    if (!context.granularityOverride && !this.granularityObj) {
+    if (!this.granularityObj) {
       return false;
     }
 
@@ -62,8 +60,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public aliasName() {
-    const context = this.query.safeEvaluateSymbolContext();
-    if (!context.granularityOverride && !this.granularityObj) {
+    if (!this.granularityObj) {
       return null;
     }
 
