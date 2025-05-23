@@ -1192,6 +1192,66 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     }
   ]));
 
+  it('rolling window with same td with and without granularity', async () => runQueryTest({
+    measures: [
+      'visitors.countRollingWeekToDate'
+    ],
+    timeDimensions: [
+      {
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-10']
+      },
+      {
+        dimension: 'visitors.created_at',
+        dateRange: ['2017-01-01', '2017-01-10']
+      }
+    ],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [{
+    visitors__count_rolling_week_to_date: null,
+    visitors__created_at_day: '2017-01-01T00:00:00.000Z',
+  },
+  {
+    visitors__count_rolling_week_to_date: '1',
+    visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+  },
+  {
+    visitors__count_rolling_week_to_date: '1',
+    visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+  },
+  {
+    visitors__count_rolling_week_to_date: '2',
+    visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+  },
+  {
+    visitors__count_rolling_week_to_date: '3',
+    visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+  },
+  {
+    visitors__count_rolling_week_to_date: '5',
+    visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+  },
+  {
+    visitors__count_rolling_week_to_date: '5',
+    visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+  },
+  {
+    visitors__count_rolling_week_to_date: '5',
+    visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+  },
+  {
+    visitors__count_rolling_week_to_date: null,
+    visitors__created_at_day: '2017-01-09T00:00:00.000Z',
+  },
+  {
+    visitors__count_rolling_week_to_date: null,
+    visitors__created_at_day: '2017-01-10T00:00:00.000Z',
+  }]));
+
   it('two rolling windows with two time dimension granularities', async () => runQueryTest({
     measures: [
       'visitors.countRollingUnbounded',
