@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/apis-integrations/rest-api/real-time-data-fetch",
+    "destination": "/product/apis-integrations/recipes/real-time-data-fetch",
+    "permanent": true
+  },
+  {
     "source": "/guides",
     "destination": "/product/introduction",
     "permanent": true

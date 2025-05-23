@@ -1,0 +1,93 @@
+# Real-Time data fetch in the REST API
+
+## Use case
+
+When building an embedded analytics application, you'd like to provide a real-time
+experience to the users. On some page, you'd like to display a chart that updates
+as soon as the data changes in the database.
+
+## Configuration
+
+When using the [REST API][ref-rest-api], you can use the [WebSocket
+transport][ref-websocket-transport] to receive real-time updates. Using this
+transport enables subscriptions to real-time updates.
+
+### Client code
+
+JavaScript example:
+
+```javascript
+import cube from "@cubejs-client/core";
+import WebSocketTransport from "@cubejs-client/ws-transport";
+
+const cubeApi = cube({
+  transport: new WebSocketTransport({
+    authorization: CUBE_TOKEN,
+    apiUrl: "ws://localhost:4000/",
+  }),
+});
+
+// Create a subscription
+const subscription = cubeApi.subscribe(
+  {
+    measures: ["logs.count"],
+    timeDimensions: [
+      {
+        dimension: "logs.time",
+        granularity: "hour",
+        dateRange: "last 1440 minutes",
+      },
+    ],
+  },
+  options,
+  (error, resultSet) => {
+    if (!error) {
+      // handle the update
+    }
+  }
+);
+
+// Later on, unsubscribe from subscription
+subscription.unsubscribe();
+```
+
+React example:
+
+```javascript
+import { useCubeQuery } from "@cubejs-client/react";
+
+const Chart = ({ query }) => {
+  const { resultSet, error, isLoading } = useCubeQuery(query, {
+    // The component will automatically unsubscribe when unmounted
+    subscribe: true,
+  });
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <pre>{error.toString()}</pre>;
+  }
+
+  if (!resultSet) {
+    return null;
+  }
+
+  return <LineChart resultSet={resultSet} />;
+};
+```
+
+### Refresh rate
+
+Real-time data fetch obeys the [`refresh_key`][ref-refresh-key].
+In order to provide a desired refresh rate, `refresh_key` should reflect the rate of
+change of the underlying data set; the querying time should also be much less than the
+desired refresh rate. Please use the [`every`][ref-every] parameter to adjust the
+refresh interval.
+
+
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-websocket-transport]: /product/apis-integrations/rest-api#websocket-transport
+[ref-refresh-key]: /product/caching#refresh-keys
+[ref-every]: /product/data-modeling/reference/cube#refresh_key
