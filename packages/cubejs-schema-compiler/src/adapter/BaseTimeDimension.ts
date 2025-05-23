@@ -13,7 +13,7 @@ import { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluato
 import { Granularity } from './Granularity';
 
 export class BaseTimeDimension extends BaseFilter {
-  public readonly dateRange: any;
+  public readonly dateRange: [string, string];
 
   public readonly granularityObj: Granularity | undefined;
 
@@ -74,7 +74,7 @@ export class BaseTimeDimension extends BaseFilter {
     const actualGranularity = granularity || this.granularityObj?.granularity || 'day';
 
     const fullName = `${this.dimension}.${actualGranularity}`;
-    if (this.query.options.memberToAlias && this.query.options.memberToAlias[fullName]) {
+    if (this.query.options.memberToAlias?.[fullName]) {
       return this.query.options.memberToAlias[fullName];
     }
 
@@ -110,7 +110,7 @@ export class BaseTimeDimension extends BaseFilter {
         granularity: granularityName
       }) : this.granularityObj;
 
-    if ((context.renderedReference || {})[path]) {
+    if (context.renderedReference?.[path]) {
       return context.renderedReference[path];
     }
 
@@ -158,7 +158,7 @@ export class BaseTimeDimension extends BaseFilter {
     return super.filterParams();
   }
 
-  protected dateFromFormattedValue: any | null = null;
+  protected dateFromFormattedValue: string | null = null;
 
   public dateFromFormatted() {
     if (!this.dateFromFormattedValue) {
@@ -192,7 +192,7 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateRange ? this.dateFromFormatted() : BUILD_RANGE_START_LOCAL));
   }
 
-  protected dateToFormattedValue: any | null = null;
+  protected dateToFormattedValue: string | null = null;
 
   public dateToFormatted() {
     if (!this.dateToFormattedValue) {
