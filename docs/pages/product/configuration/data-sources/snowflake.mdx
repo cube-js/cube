@@ -6,8 +6,9 @@
 
 <InfoBox>
 
-In order to connect Cube to Snowflake, you need to grant certain permissions to the Snowflake role used by Cube. Cube requires the role to have **USAGE** on the Databases and Schemas
-and **SELECT** on the Tables. An example configuration:
+In order to connect Cube to Snowflake, you need to grant certain permissions to the Snowflake role
+used by Cube. Cube requires the role to have `USAGE` on databases and schemas
+and `SELECT` on tables. An example configuration:
 ```
 GRANT USAGE ON DATABASE ABC TO ROLE XYZ;
 GRANT USAGE ON ALL SCHEMAS IN DATABASE ABC TO ROLE XYZ;
