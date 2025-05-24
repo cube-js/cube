@@ -326,6 +326,9 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
     /**
+     * For now this might come only from SQL API, it might be some queries that uses measures and filters to
+     * get the dimensions that are then used as join conditions to get the final results.
+     * As consequence - if there are such sub query joins - pre-aggregations can't be used.
      * @type {Array<{sql: string, on: {expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}>}
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
@@ -629,7 +632,9 @@ export class BaseQuery {
     if (this.from) {
       return this.simpleQuery();
     }
-    if (!this.options.preAggregationQuery) {
+    const hasMemberExpressions = this.allMembersConcat(false).some(m => m.isMemberExpression);
+
+    if (!this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
@@ -641,8 +646,6 @@ export class BaseQuery {
         multipliedMeasures,
         regularMeasures,
         cumulativeMeasures,
-        withQueries,
-        multiStageMembers,
       } = this.fullKeyQueryAggregateMeasures();
 
       if (cumulativeMeasures.length === 0) {
