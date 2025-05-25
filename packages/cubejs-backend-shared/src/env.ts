@@ -1831,6 +1831,62 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /** ****************************************************************
+   * Semantic Proxy Configuration                                    *
+   ***************************************************************** */
+
+  /**
+     * Semantic Proxy URL for query transformation.
+     */
+  semanticProxyUrl: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SEMANTIC_PROXY_URL', dataSource)
+    ]
+  ),
+
+  /**
+   * Semantic Proxy authorization token.
+   */
+  semanticProxyToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SEMANTIC_PROXY_TOKEN', dataSource)
+    ]
+  ),
+
+  /**
+   * Semantic Proxy timeout in milliseconds.
+   */
+  semanticProxyTimeout: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const key = keyByDataSource('CUBEJS_DB_SEMANTIC_PROXY_TIMEOUT', dataSource);
+    const value = process.env[key] || '5000';
+    return convertTimeStrToSeconds(value, key) * 1000;
+  },
+
+  /** 
+   * Semantic Proxy Remark
+  */
+  semanticProxyRemark: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const key = keyByDataSource('CUBEJS_DB_SEMANTIC_PROXY_REMARK', dataSource);
+    const value = process.env[key] || '';
+    return value;
+  },
+
+  /** ****************************************************************
    * Cube Store Driver                                               *
    ***************************************************************** */
 

@@ -30,6 +30,7 @@
     "@clickhouse/client": "^1.7.0",
     "@cubejs-backend/base-driver": "1.2.24",
     "@cubejs-backend/shared": "1.2.24",
+    "cross-fetch": "^3.0.2",
     "moment": "^2.24.0",
     "sqlstring": "^2.3.1",
     "uuid": "^8.3.2"
