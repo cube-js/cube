@@ -221,11 +221,16 @@ export class ClickHouseQuery extends BaseQuery {
 
    ClickHouse uses :
 
-     select
-      parseDateTimeBestEffort(arrayJoin(['2017-01-01T00:00:00.000','2017-01-02T00:00:00.000'])) as date_from,
-      parseDateTimeBestEffort(arrayJoin(['2017-01-01T23:59:59.999','2017-01-02T23:59:59.999'])) as date_to
-      ...
-   )
+     SELECT
+      parseDateTimeBestEffort(date_from) as date_from,
+      parseDateTimeBestEffort(date_to) as date_to
+     FROM (
+       SELECT
+         arrayJoin(['2017-01-01T00:00:00.000','2017-01-02T00:00:00.000']) as date_from,
+         arrayJoin(['2017-01-01T23:59:59.999','2017-01-02T23:59:59.999']) as date_to
+       WHERE arrayIndex(['2017-01-01T00:00:00.000','2017-01-02T00:00:00.000'], date_from) = 
+             arrayIndex(['2017-01-01T23:59:59.999','2017-01-02T23:59:59.999'], date_to)
+     )
    */
 
     const datesFrom: string[] = [];
@@ -236,7 +241,8 @@ export class ClickHouseQuery extends BaseQuery {
       datesTo.push(to);
     });
 
-    return `SELECT parseDateTimeBestEffort(arrayJoin(['${datesFrom.join('\',\'')}'])) as date_from, parseDateTimeBestEffort(arrayJoin(['${datesTo.join('\',\'')}'])) as date_to`;
+    // Use arrayJoin with range to properly pair the dates
+    return `SELECT parseDateTimeBestEffort(arrayElement(['${datesFrom.join('\',\'')}'], number + 1)) as date_from, parseDateTimeBestEffort(arrayElement(['${datesTo.join('\',\'')}'], number + 1)) as date_to FROM numbers(${datesFrom.length})`;
   }
 
   public concatStringsSql(strings) {

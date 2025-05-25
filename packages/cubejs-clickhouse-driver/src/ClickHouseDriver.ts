@@ -30,6 +30,7 @@ import { ClickHouseClient, createClient } from '@clickhouse/client';
 import type { ClickHouseSettings, ResponseJSON } from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
 import sqlstring from 'sqlstring';
+import fetch from 'cross-fetch';
 
 import { transformRow, transformStreamRow } from './HydrationStream';
 
@@ -87,6 +88,28 @@ export interface ClickHouseDriverOptions {
    * request before determining it as not valid. Default - 10000 ms.
    */
   testConnectionTimeout?: number,
+
+  /**
+   * REST API endpoint URL for query transformation.
+   * If specified, queries will be sent here first for modification.
+   */
+  queryTransformApiUrl?: string,
+
+  /**
+   * Authorization token for the query transform API.
+   */
+  queryTransformApiToken?: string,
+
+  /**
+   * Timeout in milliseconds for query transform API requests.
+   * Default is 5000ms (5 seconds).
+   */
+  queryTransformApiTimeout?: number,
+
+  /**
+   * Remark/comment to include with query transform API requests.
+   */
+  queryTransformApiRemark?: string,
 }
 
 interface ClickhouseDriverExportRequiredAWS {
@@ -112,6 +135,10 @@ type ClickHouseDriverConfig = {
   requestTimeout: number,
   exportBucket: ClickhouseDriverExportAWS | null,
   clickhouseSettings: ClickHouseSettings,
+  queryTransformApiUrl?: string,
+  queryTransformApiToken?: string,
+  queryTransformApiTimeout: number,
+  queryTransformApiRemark?: string,
 };
 
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
@@ -171,6 +198,10 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         // can not be changed
         ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
       },
+      queryTransformApiUrl: config.queryTransformApiUrl ?? getEnv('semanticProxyUrl', { dataSource }),
+      queryTransformApiToken: config.queryTransformApiToken ?? getEnv('semanticProxyToken', { dataSource }),
+      queryTransformApiTimeout: config.queryTransformApiTimeout ?? getEnv('semanticProxyTimeout', { dataSource }),
+      queryTransformApiRemark: config.queryTransformApiRemark ?? getEnv('semanticProxyRemark', { dataSource }),
     };
 
     const maxPoolSize = config.maxPoolSize ?? getEnv('dbMaxPoolSize', { dataSource }) ?? 8;
@@ -240,9 +271,81 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       true;
   }
 
+  private async callQueryTransformApi(query: string, values: unknown[]): Promise<string | null> {
+    if (!this.config.queryTransformApiUrl) {
+      return null;
+    }
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (this.config.queryTransformApiToken) {
+        headers.Authorization = this.config.queryTransformApiToken;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.config.queryTransformApiTimeout);
+
+      const formattedQuery = sqlstring.format(query, values);
+
+      const response = await fetch(this.config.queryTransformApiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sql: formattedQuery,
+          dialect: 'clickhouse',
+          remark: this.config.queryTransformApiRemark,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result && typeof result.query === 'string') {
+        return result.query;
+      }
+
+      throw new Error('Invalid response format: expected object with query property');
+    } catch (error) {
+      // Log the error but don't throw - we'll fall back to the original query
+      console.warn(`Query transform API call failed: ${error instanceof Error ? error.message : error}`);
+      return null;
+    }
+  }
+
   public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
-    const response = await this.queryResponse(query, values);
-    return this.normaliseResponse(response);
+    const transformedQuery = await this.callQueryTransformApi(query, values);
+    const queryToUse = transformedQuery ?? query;
+
+    // Check if the query contains allow_experimental_join_condition = 1
+    const hasExperimentalJoinCondition = queryToUse.includes('allow_experimental_join_condition = 1');
+    
+    // Temporarily override join_use_nulls setting if experimental join condition is used
+    const originalSettings = this.config.clickhouseSettings;
+    if (hasExperimentalJoinCondition) {
+      this.config.clickhouseSettings = {
+        ...originalSettings,
+        join_use_nulls: 0,
+      };
+    }
+
+    try {
+      const response = await this.queryResponse(queryToUse, values);
+      return this.normaliseResponse(response);
+    } finally {
+      // Restore original settings if they were modified
+      if (hasExperimentalJoinCondition) {
+        this.config.clickhouseSettings = originalSettings;
+      }
+    }
   }
 
   protected queryResponse(query: string, values: unknown[]): Promise<ResponseJSON<Record<string, unknown>>> {
