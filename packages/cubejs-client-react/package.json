@@ -10,7 +10,7 @@
     "directory": "packages/cubejs-client-react"
   },
   "description": "React components for cube.js",
-  "main": "dist/cubejs-client-react.js",
+  "main": "dist/cubejs-client-react.cjs.js",
   "module": "dist/cubejs-client-react.esm.js",
   "types": "index.d.ts",
   "scripts": {

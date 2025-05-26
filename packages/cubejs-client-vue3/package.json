@@ -21,7 +21,7 @@
     "test:unit": "vue-cli-service test:unit",
     "test:unit:watch": "vue-cli-service test:unit --watch --require tests/setup.js"
   },
-  "main": "dist/cubejs-client-vue3.js",
+  "main": "dist/cubejs-client-vue3.cjs.js",
   "module": "dist/cubejs-client-vue3.esm.js",
   "files": [
     "dist",
