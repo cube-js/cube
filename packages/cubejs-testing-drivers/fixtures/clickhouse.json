@@ -179,20 +179,25 @@
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
+
+    "---------------------------------------",
     "Unsupported JOIN ON conditions. Unexpected 'big_e_commerce__order_date_month > subtractWeeks(date_to, 2)'",
-    "--------------------",
+    "---------------------------------------",
     "querying BigECommerce: rolling window by 2 day",
     "querying BigECommerce: rolling window by 2 week",
     "querying BigECommerce: rolling window by 2 month",
+    "querying BigECommerce: rolling window YTD (month)",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce: rolling window YTD (month + week + day)",
+    "querying BigECommerce: rolling window YTD (month + week + day + no gran)",
 
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
-    "querying BigECommerce: rolling window YTD",
     "querying BigECommerce: rolling window YTD without date range",
-    "--------------------",
 
     "---------------------------------------",
     "Custom Granularities                   ",
@@ -210,6 +215,11 @@
     "SQL API: Rollup over exprs",
     "SQL API: Rollup with aliases",
     "SQL API: Simple Rollup",
-    "SQL API: SQL push down push to cube quoted alias"
+    "SQL API: SQL push down push to cube quoted alias",
+
+    "SKIPPED SQL API (due to inconsistency)",
+    "---------------------------------------",
+    "Below doesn't work probably due to strict type comparison in ClickHouse, but tests run across all DBs",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
   ]
 }
