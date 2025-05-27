@@ -2220,6 +2220,7 @@ describe('PreAggregations', () => {
       order: [{
         id: 'visitors.source',
       }],
+      timezone: 'UTC',
     });
 
     const queryAndParams = query.buildSqlAndParams();
@@ -2259,6 +2260,7 @@ describe('PreAggregations', () => {
       }, {
         id: 'cards.visitorId',
       }],
+      timezone: 'UTC',
     });
 
     const queryAndParams = query.buildSqlAndParams();
