@@ -130,9 +130,7 @@ export class BaseQuery {
   /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
   timeDimensions;
 
-  /**
-   * @type {import('../compiler/JoinGraph').FinishedJoinTree}
-   */
+  /** @type {import('../compiler/JoinGraph').FinishedJoinTree} */
   join;
 
   /**
@@ -423,7 +421,7 @@ export class BaseQuery {
 
   /**
    *
-   * @returns {Array<Array<string>>}
+   * @returns {Array<string | Array<string>>}
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
@@ -3813,7 +3811,7 @@ export class BaseQuery {
 
   /**
    *
-   * @param options
+   * @param {unknown} options
    * @returns {this}
    */
   newSubQuery(options) {

@@ -16,6 +16,8 @@ import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
 
+// TODO replace Function with proper types
+
 export type SegmentDefinition = {
   type: string;
   sql(): string;
