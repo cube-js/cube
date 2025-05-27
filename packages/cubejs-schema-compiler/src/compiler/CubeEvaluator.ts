@@ -3,13 +3,15 @@ import R from 'ramda';
 
 import { CubeSymbols, type ToString } from './CubeSymbols';
 import { UserError } from './UserError';
-import { BaseQuery } from '../adapter';
+import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
 
+// TODO replace Function with proper types
+
 export type SegmentDefinition = {
   type: string,
-  sql: Function,
+  sql(): string,
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
@@ -19,7 +21,7 @@ export type SegmentDefinition = {
 
 export type DimensionDefinition = {
   type: string,
-  sql: Function,
+  sql(): string,
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
@@ -41,7 +43,7 @@ export type TimeShiftDefinitionReference = {
 
 export type MeasureDefinition = {
   type: string,
-  sql: Function,
+  sql(): string,
   ownedByCube: boolean,
   rollingWindow?: any
   filters?: any
@@ -679,7 +681,7 @@ export class CubeEvaluator extends CubeSymbols {
     return this.byPath('segments', segmentPath);
   }
 
-  public cubeExists(cube) {
+  public cubeExists(cube: string): boolean {
     return !!this.evaluatedCubes[cube];
   }
 

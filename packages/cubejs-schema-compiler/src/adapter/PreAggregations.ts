@@ -758,7 +758,7 @@ export class PreAggregations {
             if (td[1] === '*') {
               return R.any((tdtc: [string, string]) => tdtc[0] === td[0]); // need to match the dimension at least
             } else {
-              return R.contains(td);
+              return R.includes(td);
             }
           }))
         )
