@@ -364,6 +364,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::Log => "Log",
                 BuiltinScalarFunction::Log10 => "Log10",
                 BuiltinScalarFunction::Log2 => "Log2",
+                BuiltinScalarFunction::Power => "Power",
                 BuiltinScalarFunction::Round => "Round",
                 BuiltinScalarFunction::Signum => "Signum",
                 BuiltinScalarFunction::Sin => "Sin",
