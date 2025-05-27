@@ -2,8 +2,9 @@ use super::planners::QueryPlanner;
 use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
-use crate::cube_bridge::pre_aggregation_obj::{NativePreAggregationObj, PreAggregationObj};
+use crate::cube_bridge::pre_aggregation_obj::NativePreAggregationObj;
 use crate::logical_plan::optimizers::*;
+use crate::logical_plan::PreAggregation;
 use crate::logical_plan::Query;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
@@ -78,19 +79,30 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
-        let templates = self.query_tools.plan_sql_templates(false)?;
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let logical_plan = query_planner.plan()?;
 
         let (optimized_plan, used_pre_aggregations) =
             self.try_pre_aggregations(logical_plan.clone())?;
 
-        let physical_plan_builder = PhysicalPlanBuilder::new(self.query_tools.clone(), templates.clone());
+        let is_external = if !used_pre_aggregations.is_empty() {
+            used_pre_aggregations
+                .iter()
+                .all(|pre_aggregation| pre_aggregation.external)
+        } else {
+            false
+        };
+
+        let templates = self.query_tools.plan_sql_templates(is_external)?;
+
+        let physical_plan_builder =
+            PhysicalPlanBuilder::new(self.query_tools.clone(), templates.clone());
         let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query() {
             OriginalSqlCollector::new(self.query_tools.clone()).collect(&optimized_plan)?
         } else {
             HashMap::new()
         };
+
         let physical_plan = physical_plan_builder.build(
             optimized_plan,
             original_sql_pre_aggregations,
@@ -98,7 +110,9 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         )?;
 
         let sql = physical_plan.to_sql(&templates)?;
-        let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;
+        let (result_sql, params) = self
+            .query_tools
+            .build_sql_and_params(&sql, true, &templates)?;
 
         let res = self.context.empty_array()?;
         res.set(0, result_sql.to_native(self.context.clone())?)?;
@@ -107,6 +121,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             res.set(
                 2,
                 used_pre_aggregations
+                    .pre_aggregation_obj
                     .clone()
                     .as_any()
                     .downcast::<NativePreAggregationObj<IT>>()
@@ -122,7 +137,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     fn try_pre_aggregations(
         &self,
         plan: Rc<Query>,
-    ) -> Result<(Rc<Query>, Vec<Rc<dyn PreAggregationObj>>), CubeError> {
+    ) -> Result<(Rc<Query>, Vec<Rc<PreAggregation>>), CubeError> {
         let result = if !self.request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer =
                 PreAggregationOptimizer::new(self.query_tools.clone());

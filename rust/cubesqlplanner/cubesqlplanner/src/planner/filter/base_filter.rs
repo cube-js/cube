@@ -1,8 +1,8 @@
 use super::filter_operator::FilterOperator;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_templates::filter::FilterTemplates;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::sql_templates::TemplateProjectionColumn;
 use crate::planner::QueryDateTimeHelper;
 use crate::planner::{evaluate_with_context, FiltersContext, VisitorContext};
 use cubenativeutils::CubeError;
@@ -44,7 +44,6 @@ impl BaseFilter {
         filter_operator: FilterOperator,
         values: Option<Vec<Option<String>>>,
     ) -> Result<Rc<Self>, CubeError> {
-        let templates = FilterTemplates::new(query_tools.templates_render());
         let values = if let Some(values) = values {
             values
         } else {
@@ -131,35 +130,69 @@ impl BaseFilter {
             let filters_context = context.filters_context();
 
             let res = match self.filter_operator {
-                FilterOperator::Equal => self.equals_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::NotEqual => self.not_equals_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::InDateRange => self.in_date_range(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::BeforeDate => self.before_date(&member_sql, plan_templates, filters_context)?,
+                FilterOperator::Equal => {
+                    self.equals_where(&member_sql, plan_templates, filters_context)?
+                }
+                FilterOperator::NotEqual => {
+                    self.not_equals_where(&member_sql, plan_templates, filters_context)?
+                }
+                FilterOperator::InDateRange => {
+                    self.in_date_range(&member_sql, plan_templates, filters_context)?
+                }
+                FilterOperator::BeforeDate => {
+                    self.before_date(&member_sql, plan_templates, filters_context)?
+                }
                 FilterOperator::BeforeOrOnDate => {
                     self.before_or_on_date(&member_sql, plan_templates, filters_context)?
                 }
-                FilterOperator::AfterDate => self.after_date(&member_sql, plan_templates, filters_context)?,
+                FilterOperator::AfterDate => {
+                    self.after_date(&member_sql, plan_templates, filters_context)?
+                }
                 FilterOperator::AfterOrOnDate => {
                     self.after_or_on_date(&member_sql, plan_templates, filters_context)?
                 }
                 FilterOperator::NotInDateRange => {
                     self.not_in_date_range(&member_sql, plan_templates, filters_context)?
                 }
-                FilterOperator::RegularRollingWindowDateRange => {
-                    self.regular_rolling_window_date_range(&member_sql, plan_templates, filters_context)?
+                FilterOperator::RegularRollingWindowDateRange => self
+                    .regular_rolling_window_date_range(
+                        &member_sql,
+                        plan_templates,
+                        filters_context,
+                    )?,
+                FilterOperator::ToDateRollingWindowDateRange => self
+                    .to_date_rolling_window_date_range(
+                        &member_sql,
+                        plan_templates,
+                        filters_context,
+                    )?,
+                FilterOperator::In => {
+                    self.in_where(&member_sql, plan_templates, filters_context)?
                 }
-                FilterOperator::ToDateRollingWindowDateRange => {
-                    self.to_date_rolling_window_date_range(&member_sql, plan_templates, filters_context)?
+                FilterOperator::NotIn => {
+                    self.not_in_where(&member_sql, plan_templates, filters_context)?
                 }
-                FilterOperator::In => self.in_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::NotIn => self.not_in_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::Set => self.set_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::NotSet => self.not_set_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::Gt => self.gt_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::Gte => self.gte_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::Lt => self.lt_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::Lte => self.lte_where(&member_sql, plan_templates, filters_context)?,
-                FilterOperator::Contains => self.contains_where(&member_sql, plan_templates, filters_context)?,
+                FilterOperator::Set => {
+                    self.set_where(&member_sql, plan_templates, filters_context)?
+                }
+                FilterOperator::NotSet => {
+                    self.not_set_where(&member_sql, plan_templates, filters_context)?
+                }
+                FilterOperator::Gt => {
+                    self.gt_where(&member_sql, plan_templates, filters_context)?
+                }
+                FilterOperator::Gte => {
+                    self.gte_where(&member_sql, plan_templates, filters_context)?
+                }
+                FilterOperator::Lt => {
+                    self.lt_where(&member_sql, plan_templates, filters_context)?
+                }
+                FilterOperator::Lte => {
+                    self.lte_where(&member_sql, plan_templates, filters_context)?
+                }
+                FilterOperator::Contains => {
+                    self.contains_where(&member_sql, plan_templates, filters_context)?
+                }
                 FilterOperator::NotContains => {
                     self.not_contains_where(&member_sql, plan_templates, filters_context)?
                 }
@@ -169,7 +202,9 @@ impl BaseFilter {
                 FilterOperator::NotStartsWith => {
                     self.not_starts_with_where(&member_sql, plan_templates, filters_context)?
                 }
-                FilterOperator::EndsWith => self.ends_with_where(&member_sql, plan_templates, filters_context)?,
+                FilterOperator::EndsWith => {
+                    self.ends_with_where(&member_sql, plan_templates, filters_context)?
+                }
                 FilterOperator::NotEndsWith => {
                     self.not_ends_with_where(&member_sql, plan_templates, filters_context)?
                 }
@@ -232,13 +267,13 @@ impl BaseFilter {
         if self.is_array_value() {
             plan_templates.in_where(
                 member_sql.to_string(),
-                self.filter_and_allocate_values(plan_templates),
+                self.filter_and_allocate_values(),
                 need_null_check,
             )
         } else if self.is_values_contains_null() {
             plan_templates.not_set_where(member_sql.to_string())
         } else {
-            plan_templates.equals(member_sql.to_string(), self.first_param(plan_templates)?, need_null_check)
+            plan_templates.equals(member_sql.to_string(), self.first_param()?, need_null_check)
         }
     }
 
@@ -252,14 +287,13 @@ impl BaseFilter {
         if self.is_array_value() {
             plan_templates.not_in_where(
                 member_sql.to_string(),
-                self.filter_and_allocate_values(plan_templates),
+                self.filter_and_allocate_values(),
                 need_null_check,
             )
         } else if self.is_values_contains_null() {
             plan_templates.set_where(member_sql.to_string())
         } else {
-            plan_templates
-                .not_equals(member_sql.to_string(), self.first_param(plan_templates)?, need_null_check)
+            plan_templates.not_equals(member_sql.to_string(), self.first_param()?, need_null_check)
         }
     }
 
@@ -271,8 +305,7 @@ impl BaseFilter {
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
         let (from, to) = self.allocate_date_params(use_db_time_zone, false, plan_templates)?;
-        plan_templates
-            .time_range_filter(member_sql.to_string(), from, to)
+        plan_templates.time_range_filter(member_sql.to_string(), from, to)
     }
 
     fn not_in_date_range(
@@ -283,8 +316,7 @@ impl BaseFilter {
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
         let (from, to) = self.allocate_date_params(use_db_time_zone, false, plan_templates)?;
-        plan_templates
-            .time_not_in_range_filter(member_sql.to_string(), from, to)
+        plan_templates.time_not_in_range_filter(member_sql.to_string(), from, to)
     }
 
     fn before_date(
@@ -340,21 +372,16 @@ impl BaseFilter {
         date: String,
         interval: &Option<String>,
         is_sub: bool,
+        plan_templates: &PlanSqlTemplates,
     ) -> Result<Option<String>, CubeError> {
         if let Some(interval) = interval {
             if interval != "unbounded" {
                 if is_sub {
                     Ok(Some(
-                        self.query_tools
-                            .base_tools()
-                            .subtract_interval(date, interval.clone())?,
+                        plan_templates.subtract_interval(date, interval.clone())?,
                     ))
                 } else {
-                    Ok(Some(
-                        self.query_tools
-                            .base_tools()
-                            .add_interval(date, interval.clone())?,
-                    ))
+                    Ok(Some(plan_templates.add_interval(date, interval.clone())?))
                 }
             } else {
                 Ok(None)
@@ -364,33 +391,76 @@ impl BaseFilter {
         }
     }
 
+    fn date_range_from_time_series(
+        &self,
+        plan_templates: &PlanSqlTemplates,
+    ) -> Result<(String, String), CubeError> {
+        let from_expr = format!("min(date_from)");
+        let to_expr = format!("max(date_to)");
+        let alias = format!("value");
+        let time_series_cte_name = format!("time_series"); // FIXME May be should be passed as parameter
+
+        let from_column = TemplateProjectionColumn {
+            expr: from_expr.clone(),
+            alias: alias.clone(),
+            aliased: plan_templates.column_aliased(&from_expr, &alias)?,
+        };
+
+        let to_column = TemplateProjectionColumn {
+            expr: to_expr.clone(),
+            alias: alias.clone(),
+            aliased: plan_templates.column_aliased(&to_expr, &alias)?,
+        };
+        let from = plan_templates.select(
+            vec![],
+            &time_series_cte_name,
+            vec![from_column],
+            None,
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            false,
+        )?;
+        let to = plan_templates.select(
+            vec![],
+            &time_series_cte_name,
+            vec![to_column],
+            None,
+            vec![],
+            None,
+            vec![],
+            None,
+            None,
+            false,
+        )?;
+        Ok((format!("({})", from), format!("({})", to)))
+    }
+
     fn regular_rolling_window_date_range(
         &self,
         member_sql: &str,
         plan_templates: &PlanSqlTemplates,
         _filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
-        let (from, to) = self.allocate_date_params(false, true, plan_templates)?;
+        let (from, to) = self.date_range_from_time_series(plan_templates)?;
 
         let from = if self.values.len() >= 3 {
-            self.extend_date_range_bound(from, &self.values[2], true)?
+            self.extend_date_range_bound(from, &self.values[2], true, plan_templates)?
         } else {
             Some(from)
         };
 
         let to = if self.values.len() >= 4 {
-            self.extend_date_range_bound(to, &self.values[3], false)?
+            self.extend_date_range_bound(to, &self.values[3], false, plan_templates)?
         } else {
             Some(to)
         };
 
-        let date_field = self
-            .query_tools
-            .base_tools()
-            .convert_tz(member_sql.to_string())?;
+        let date_field = plan_templates.convert_tz(member_sql.to_string())?;
         if let (Some(from), Some(to)) = (&from, &to) {
-            plan_templates
-                .time_range_filter(date_field, from.clone(), to.clone())
+            plan_templates.time_range_filter(date_field, from.clone(), to.clone())
         } else if let Some(from) = &from {
             plan_templates.gte(date_field, from.clone())
         } else if let Some(to) = &to {
@@ -406,13 +476,11 @@ impl BaseFilter {
         plan_templates: &PlanSqlTemplates,
         _filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
-        let (from, to) = self.allocate_date_params(false, true, plan_templates)?;
+        let (from, to) = self.date_range_from_time_series(plan_templates)?;
 
         let from = if self.values.len() >= 3 {
             if let Some(granularity) = &self.values[2] {
-                self.query_tools
-                    .base_tools()
-                    .time_grouped_column(granularity.clone(), from)?
+                plan_templates.time_grouped_column(granularity.clone(), from)?
             } else {
                 return Err(CubeError::user(format!(
                     "Granularity required for to_date rolling window"
@@ -424,10 +492,7 @@ impl BaseFilter {
             )));
         };
 
-        let date_field = self
-            .query_tools
-            .base_tools()
-            .convert_tz(member_sql.to_string())?;
+        let date_field = plan_templates.convert_tz(member_sql.to_string())?;
         plan_templates.time_range_filter(date_field, from, to)
     }
 
@@ -440,7 +505,7 @@ impl BaseFilter {
         let need_null_check = self.is_need_null_chek(false);
         plan_templates.in_where(
             member_sql.to_string(),
-            self.filter_and_allocate_values(plan_templates),
+            self.filter_and_allocate_values(),
             need_null_check,
         )
     }
@@ -454,7 +519,7 @@ impl BaseFilter {
         let need_null_check = self.is_need_null_chek(true);
         plan_templates.not_in_where(
             member_sql.to_string(),
-            self.filter_and_allocate_values(plan_templates),
+            self.filter_and_allocate_values(),
             need_null_check,
         )
     }
@@ -483,8 +548,7 @@ impl BaseFilter {
         plan_templates: &PlanSqlTemplates,
         _filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
-        plan_templates
-            .gt(member_sql.to_string(), self.first_param(plan_templates)?)
+        plan_templates.gt(member_sql.to_string(), self.first_param()?)
     }
 
     fn gte_where(
@@ -493,8 +557,7 @@ impl BaseFilter {
         plan_templates: &PlanSqlTemplates,
         _filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
-        plan_templates
-            .gte(member_sql.to_string(), self.first_param(plan_templates)?)
+        plan_templates.gte(member_sql.to_string(), self.first_param()?)
     }
 
     fn lt_where(
@@ -503,8 +566,7 @@ impl BaseFilter {
         plan_templates: &PlanSqlTemplates,
         _filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
-        plan_templates
-            .lt(member_sql.to_string(), self.first_param(plan_templates)?)
+        plan_templates.lt(member_sql.to_string(), self.first_param()?)
     }
 
     fn lte_where(
@@ -513,8 +575,7 @@ impl BaseFilter {
         plan_templates: &PlanSqlTemplates,
         _filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
-        plan_templates
-            .lte(member_sql.to_string(), self.first_param(plan_templates)?)
+        plan_templates.lte(member_sql.to_string(), self.first_param()?)
     }
 
     fn contains_where(
@@ -579,12 +640,10 @@ impl BaseFilter {
         end_wild: bool,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let values = self.filter_and_allocate_values(plan_templates);
+        let values = self.filter_and_allocate_values();
         let like_parts = values
             .into_iter()
-            .map(|v| {
-                plan_templates.ilike(member_sql, &v, start_wild, end_wild, not)
-            })
+            .map(|v| plan_templates.ilike(member_sql, &v, start_wild, end_wild, not))
             .collect::<Result<Vec<_>, _>>()?;
         let logical_symbol = if not { " AND " } else { " OR " };
         let null_check = if self.is_need_null_chek(not) {
@@ -603,15 +662,15 @@ impl BaseFilter {
         &self,
         value: &String,
         use_db_time_zone: bool,
-        plan_templates: &PlanSqlTemplates
+        plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         if self.use_raw_values {
             return Ok(value.clone());
         }
         let from = self.format_from_date(value, plan_templates)?;
 
-        let res = if use_db_time_zone && from != FROM_PARTITION_RANGE {
-            self.query_tools.base_tools().in_db_time_zone(from)?
+        let res = if use_db_time_zone && &from != FROM_PARTITION_RANGE {
+            plan_templates.in_db_time_zone(from)?
         } else {
             from
         };
@@ -622,15 +681,15 @@ impl BaseFilter {
         &self,
         value: &String,
         use_db_time_zone: bool,
-        plan_templates: &PlanSqlTemplates
+        plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         if self.use_raw_values {
             return Ok(value.clone());
         }
         let from = self.format_to_date(value, plan_templates)?;
 
-        let res = if use_db_time_zone && from != TO_PARTITION_RANGE {
-            self.query_tools.base_tools().in_db_time_zone(from)?
+        let res = if use_db_time_zone && &from != TO_PARTITION_RANGE {
+            plan_templates.in_db_time_zone(from)?
         } else {
             from
         };
@@ -641,7 +700,7 @@ impl BaseFilter {
         &self,
         use_db_time_zone: bool,
         as_date_time: bool,
-        plan_templates: &PlanSqlTemplates
+        plan_templates: &PlanSqlTemplates,
     ) -> Result<(String, String), CubeError> {
         if self.values.len() >= 2 {
             let from = if let Some(from_str) = &self.values[0] {
@@ -670,15 +729,23 @@ impl BaseFilter {
         }
     }
 
-    fn format_from_date(&self, date: &str, plan_templates: &PlanSqlTemplates) -> Result<String, CubeError> {
-        QueryDateTimeHelper::format_from_date(date, self.query_tools.clone())
+    fn format_from_date(
+        &self,
+        date: &str,
+        plan_templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        QueryDateTimeHelper::format_from_date(date, plan_templates.timestamp_precision()?)
     }
 
-    fn format_to_date(&self, date: &str, plan_templates: &PlanSqlTemplates) -> Result<String, CubeError> {
-        QueryDateTimeHelper::format_to_date(date, self.query_tools.clone())
+    fn format_to_date(
+        &self,
+        date: &str,
+        plan_templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        QueryDateTimeHelper::format_to_date(date, plan_templates.timestamp_precision()?)
     }
 
-    fn allocate_param(&self, param: &str, plan_templates: &PlanSqlTemplates) -> String {
+    fn allocate_param(&self, param: &str) -> String {
         self.query_tools.allocate_param(param)
     }
 
@@ -686,27 +753,27 @@ impl BaseFilter {
         &self,
         param: &str,
         as_date_time: bool,
-        plan_templates: &PlanSqlTemplates
+        plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         if self.use_raw_values {
             return Ok(param.to_string());
         }
         let placeholder = self.query_tools.allocate_param(param);
         if as_date_time {
-            self.query_tools.base_tools().date_time_cast(placeholder)
+            plan_templates.date_time_cast(placeholder)
         } else {
-            self.query_tools.base_tools().time_stamp_cast(placeholder)
+            plan_templates.time_stamp_cast(placeholder)
         }
     }
 
-    fn first_param(&self, plan_templates: &PlanSqlTemplates) -> Result<String, CubeError> {
+    fn first_param(&self) -> Result<String, CubeError> {
         if self.values.is_empty() {
             Err(CubeError::user(format!(
                 "Expected one parameter but nothing found"
             )))
         } else {
             if let Some(value) = &self.values[0] {
-                Ok(self.allocate_param(value, plan_templates))
+                Ok(self.allocate_param(value))
             } else {
                 Ok("NULL".to_string())
             }
@@ -717,7 +784,7 @@ impl BaseFilter {
         &self,
         use_db_time_zone: bool,
         as_date_time: bool,
-        plan_templates: &PlanSqlTemplates
+        plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         if self.values.is_empty() {
             Err(CubeError::user(format!(
@@ -756,10 +823,10 @@ impl BaseFilter {
         self.values.len() > 1
     }
 
-    fn filter_and_allocate_values(&self, plan_templates: &PlanSqlTemplates) -> Vec<String> {
+    fn filter_and_allocate_values(&self) -> Vec<String> {
         self.values
             .iter()
-            .filter_map(|v| v.as_ref().map(|v| self.allocate_param(&v, plan_templates)))
+            .filter_map(|v| v.as_ref().map(|v| self.allocate_param(&v)))
             .collect::<Vec<_>>()
     }
 }

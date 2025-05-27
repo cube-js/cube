@@ -43,7 +43,10 @@ pub const UPPER_UPPER_BOUND: Boundary = Boundary {
 impl PlanSqlTemplates {
     pub fn try_new(driver_tools: Rc<dyn DriverTools>) -> Result<Self, CubeError> {
         let render = driver_tools.sql_templates()?;
-        Ok(Self { render, driver_tools })
+        Ok(Self {
+            render,
+            driver_tools,
+        })
     }
 
     pub fn convert_tz(&self, field: String) -> Result<String, CubeError> {
@@ -55,7 +58,8 @@ impl PlanSqlTemplates {
         granularity: String,
         dimension: String,
     ) -> Result<String, CubeError> {
-        self.driver_tools.time_grouped_column(granularity, dimension)
+        self.driver_tools
+            .time_grouped_column(granularity, dimension)
     }
 
     pub fn timestamp_precision(&self) -> Result<u32, CubeError> {
@@ -82,15 +86,22 @@ impl PlanSqlTemplates {
         self.driver_tools.add_interval(date, interval)
     }
 
-    pub fn add_timestamp_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+    pub fn add_timestamp_interval(
+        &self,
+        date: String,
+        interval: String,
+    ) -> Result<String, CubeError> {
         self.driver_tools.add_timestamp_interval(date, interval)
     }
 
-    pub fn interval_and_minimal_time_unit(&self, interval: String) -> Result<Vec<String>, CubeError> {
+    pub fn interval_and_minimal_time_unit(
+        &self,
+        interval: String,
+    ) -> Result<Vec<String>, CubeError> {
         self.driver_tools.interval_and_minimal_time_unit(interval)
     }
 
-    pub fn hll_init(&self, sql: String) -> Result<String, CubeError> {  
+    pub fn hll_init(&self, sql: String) -> Result<String, CubeError> {
         self.driver_tools.hll_init(sql)
     }
 

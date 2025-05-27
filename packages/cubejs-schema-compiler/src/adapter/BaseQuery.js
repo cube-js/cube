@@ -331,10 +331,11 @@ export class BaseQuery {
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
     this.canUseNativeSqlPlannerPreAggregation = true;
-/*     if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
-      const hasMultiStageMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true }).multiStageMembers.length > 0;
-      this.canUseNativeSqlPlannerPreAggregation = hasMultiStageMeasures;
-    } */
+    if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
+      const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
+
+      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0 || fullAggregateMeasures.cumulativeMeasures.length > 0;
+    }
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -776,7 +777,7 @@ export class BaseQuery {
   }
 
   driverTools(external) {
-    if (external && this.options.disableExternalPreAggregations && this.externalQueryClass) {
+    if (external && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       return this.externalQuery();
     }
     return this;

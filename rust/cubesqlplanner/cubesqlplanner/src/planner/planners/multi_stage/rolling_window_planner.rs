@@ -6,7 +6,6 @@ use super::{
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_templates::TemplateProjectionColumn;
 use crate::planner::BaseMeasure;
 use crate::planner::{BaseMember, BaseTimeDimension, GranularityHelper, QueryProperties};
 use cubenativeutils::CubeError;
@@ -269,53 +268,6 @@ impl RollingWindowPlanner {
         }
     }
 
-    fn make_time_seires_from_to_dates_suqueries_conditions(
-        &self,
-        time_series_cte_name: &str,
-    ) -> Result<(String, String), CubeError> {
-        let templates = self.query_tools.plan_sql_templates(false)?;
-        let from_expr = format!("min(date_from)");
-        let to_expr = format!("max(date_to)");
-        let alias = format!("value");
-
-        let from_column = TemplateProjectionColumn {
-            expr: from_expr.clone(),
-            alias: alias.clone(),
-            aliased: templates.column_aliased(&from_expr, &alias)?,
-        };
-
-        let to_column = TemplateProjectionColumn {
-            expr: to_expr.clone(),
-            alias: alias.clone(),
-            aliased: templates.column_aliased(&to_expr, &alias)?,
-        };
-        let from = templates.select(
-            vec![],
-            &time_series_cte_name,
-            vec![from_column],
-            None,
-            vec![],
-            None,
-            vec![],
-            None,
-            None,
-            false,
-        )?;
-        let to = templates.select(
-            vec![],
-            &time_series_cte_name,
-            vec![to_column],
-            None,
-            vec![],
-            None,
-            vec![],
-            None,
-            None,
-            false,
-        )?;
-        Ok((format!("({})", from), format!("({})", to)))
-    }
-
     fn make_rolling_base_state(
         &self,
         time_dimension: Rc<BaseTimeDimension>,
@@ -335,36 +287,6 @@ impl RollingWindowPlanner {
             &time_dimension.resolve_granularity()?,
         )?;
 
-        let templates = self.query_tools.plan_sql_templates(false)?;
-
-        if templates.supports_generated_time_series() {
-            let (from, to) =
-                self.make_time_seires_from_to_dates_suqueries_conditions("time_series")?;
-            new_state.replace_range_to_subquery_in_date_filter(&time_dimension_base_name, from, to);
-        } else if time_dimension.get_date_range().is_some() && result_granularity.is_some() {
-            let granularity = time_dimension.get_granularity_obj().clone().unwrap();
-            let date_range = time_dimension.get_date_range().unwrap();
-            let series = if granularity.is_predefined_granularity() {
-                self.query_tools
-                    .base_tools()
-                    .generate_time_series(granularity.granularity().clone(), date_range.clone())?
-            } else {
-                self.query_tools.base_tools().generate_custom_time_series(
-                    granularity.granularity_interval().clone(),
-                    date_range.clone(),
-                    granularity.origin_local_formatted(),
-                )?
-            };
-            if !series.is_empty() {
-                let new_from_date = series.first().unwrap()[0].clone();
-                let new_to_date = series.last().unwrap()[1].clone();
-                new_state.replace_range_in_date_filter(
-                    &time_dimension_base_name,
-                    new_from_date,
-                    new_to_date,
-                );
-            }
-        }
         let new_time_dimension = time_dimension.change_granularity(result_granularity.clone())?;
         //We keep only one time_dimension in the leaf query because, even if time_dimension values have different granularity, in the leaf query we need to group by the lowest granularity.
         new_state.set_time_dimensions(vec![new_time_dimension.clone()]);

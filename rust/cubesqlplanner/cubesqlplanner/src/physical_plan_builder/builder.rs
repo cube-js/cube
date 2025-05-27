@@ -101,6 +101,7 @@ impl PhysicalPlanBuilder {
     ) -> Result<Rc<Select>, CubeError> {
         let mut render_references = HashMap::new();
         let mut measure_references = HashMap::new();
+        let mut dimensions_references = HashMap::new();
         let mut context_factory = context.make_sql_nodes_factory();
         let from = match &logical_plan.source {
             SimpleQuerySource::LogicalJoin(join) => self.process_logical_join(
@@ -113,8 +114,8 @@ impl PhysicalPlanBuilder {
                 let res = self.process_pre_aggregation(
                     pre_aggregation,
                     context,
-                    &mut render_references,
                     &mut measure_references,
+                    &mut dimensions_references,
                 )?;
                 for member in logical_plan.schema.time_dimensions.iter() {
                     context_factory.add_dimensions_with_ignored_timezone(member.full_name());
@@ -127,6 +128,7 @@ impl PhysicalPlanBuilder {
         let mut select_builder = SelectBuilder::new(from);
         context_factory.set_ungrouped(logical_plan.ungrouped);
         context_factory.set_pre_aggregation_measures_references(measure_references);
+        context_factory.set_pre_aggregation_dimensions_references(dimensions_references);
 
         let mut group_by = Vec::new();
         for member in logical_plan.schema.dimensions.iter() {
@@ -184,8 +186,8 @@ impl PhysicalPlanBuilder {
         &self,
         pre_aggregation: &Rc<PreAggregation>,
         _context: &PhysicalPlanBuilderContext,
-        render_references: &mut HashMap<String, QualifiedColumnName>,
         measure_references: &mut HashMap<String, QualifiedColumnName>,
+        dimensions_references: &mut HashMap<String, QualifiedColumnName>,
     ) -> Result<Rc<From>, CubeError> {
         let mut pre_aggregation_schema = Schema::empty();
         let pre_aggregation_alias = PlanSqlTemplates::memeber_alias_name(
@@ -200,7 +202,7 @@ impl PhysicalPlanBuilder {
                 &dim.alias_suffix(),
                 self.query_tools.clone(),
             )?;
-            render_references.insert(
+            dimensions_references.insert(
                 dim.full_name(),
                 QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
             );
@@ -213,16 +215,10 @@ impl PhysicalPlanBuilder {
                 granularity,
                 self.query_tools.clone(),
             )?;
-            render_references.insert(
+            dimensions_references.insert(
                 dim.full_name(),
                 QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
             );
-            if let Some(granularity) = &granularity {
-                render_references.insert(
-                    format!("{}_{}", dim.full_name(), granularity),
-                    QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
-                );
-            }
             pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(dim.full_name())));
         }
         for meas in pre_aggregation.measures.iter() {
@@ -969,9 +965,7 @@ impl PhysicalPlanBuilder {
             ));
         };
 
-        let templates = self.query_tools.plan_sql_templates(false)?;
-
-        let ts_date_range = if templates.supports_generated_time_series()
+        let ts_date_range = if self.plan_sql_templates.supports_generated_time_series()
             && granularity_obj.is_predefined_granularity()
         {
             if let Some(date_range) = time_dimension_symbol

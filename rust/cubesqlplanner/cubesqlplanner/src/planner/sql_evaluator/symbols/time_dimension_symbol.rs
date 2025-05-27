@@ -134,10 +134,8 @@ impl TimeDimensionSymbol {
     ) -> Result<Option<String>, CubeError> {
         if let Some(date_range) = &self.date_range {
             let tz = query_tools.timezone();
-            let from_date_str =
-                QueryDateTimeHelper::format_from_date(&date_range.0, query_tools.clone())?;
-            let to_date_str =
-                QueryDateTimeHelper::format_to_date(&date_range.1, query_tools.clone())?;
+            let from_date_str = QueryDateTimeHelper::format_from_date(&date_range.0, 3)?;
+            let to_date_str = QueryDateTimeHelper::format_to_date(&date_range.1, 3)?;
             let start = QueryDateTime::from_date_str(tz, &from_date_str)?;
             let end = QueryDateTime::from_date_str(tz, &to_date_str)?;
             let end = end.add_duration(Duration::milliseconds(1))?;
