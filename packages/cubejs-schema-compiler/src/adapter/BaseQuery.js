@@ -709,7 +709,7 @@ export class BaseQuery {
   externalPreAggregationQuery() {
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
-      if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
+      if (preAggregationForQuery?.preAggregation.external) {
         return true;
       }
       const preAggregationsDescription = this.preAggregations.preAggregationsDescription();

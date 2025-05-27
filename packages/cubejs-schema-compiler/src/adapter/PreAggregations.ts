@@ -1070,7 +1070,8 @@ export class PreAggregations {
       preAggregationName,
       preAggregation,
       cube,
-      canUsePreAggregation: canUsePreAggregation(references) && this.doesQueryAndPreAggJoinTreeMatch(references),
+      // There are no connections in the joinTree between cubes from different datasources for 'rollupJoin' pre-aggs
+      canUsePreAggregation: canUsePreAggregation(references) && (preAggregation.type === 'rollupJoin' || this.doesQueryAndPreAggJoinTreeMatch(references)),
       references,
       preAggregationId: `${cube}.${preAggregationName}`
     };
