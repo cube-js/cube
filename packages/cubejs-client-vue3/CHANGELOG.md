@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.18](https://github.com/cube-js/cube.js/compare/v1.3.17...v1.3.18) (2025-05-27)
+
+### Bug Fixes
+
+- **client:** Update main fields in package.json to cjs files, thanks @Graphmaxer ([#9620](https://github.com/cube-js/cube.js/issues/9620)) ([06f82e5](https://github.com/cube-js/cube.js/commit/06f82e5a68beb5471d676734cabefa23aeb8a701))
+
 ## [1.3.17](https://github.com/cube-js/cube.js/compare/v1.3.16...v1.3.17) (2025-05-22)
 
 **Note:** Version bump only for package @cubejs-client/vue3
