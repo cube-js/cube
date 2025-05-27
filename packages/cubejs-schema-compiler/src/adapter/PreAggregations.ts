@@ -4,6 +4,7 @@ import { CubeSymbols } from '../compiler/CubeSymbols';
 import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
 import {
+  JoinEdge,
   PreAggregationDefinition,
   PreAggregationDefinitions,
   PreAggregationReferences,
@@ -1042,6 +1043,22 @@ export class PreAggregations {
     );
   }
 
+  private doesQueryAndPreAggJoinTreeMatch(references: PreAggregationReferences): boolean {
+    const { query } = this;
+    const preAggTree = references.joinTree || { joins: [] };
+    const preAggEdges = new Set(preAggTree.joins.map((e: JoinEdge) => `${e.from}->${e.to}`));
+    const queryTree = query.join;
+
+    for (const edge of queryTree.joins) {
+      const key = `${edge.from}->${edge.to}`;
+      if (!preAggEdges.has(key)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   private evaluatedPreAggregationObj(
     cube: string,
     preAggregationName: string,
@@ -1053,7 +1070,7 @@ export class PreAggregations {
       preAggregationName,
       preAggregation,
       cube,
-      canUsePreAggregation: canUsePreAggregation(references),
+      canUsePreAggregation: canUsePreAggregation(references) && this.doesQueryAndPreAggJoinTreeMatch(references),
       references,
       preAggregationId: `${cube}.${preAggregationName}`
     };
