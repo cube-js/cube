@@ -13055,6 +13055,51 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_date_trunc_column_not_equals_literal() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                avg("avgPrice") AS "avgPrice"
+            FROM public."KibanaSampleDataEcommerce"
+            WHERE
+                DATE_TRUNC('week', "order_date") != str_to_date('2022-11-14 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.avgPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    or: Some(vec![
+                        json!({
+                            "member": "KibanaSampleDataEcommerce.order_date",
+                            "operator": "beforeDate",
+                            "values": ["2022-11-14T00:00:00.000Z"],
+                        }),
+                        json!({
+                            "member": "KibanaSampleDataEcommerce.order_date",
+                            "operator": "afterOrOnDate",
+                            "values": ["2022-11-21T00:00:00.000Z"],
+                        }),
+                    ]),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_psqlodbc_null() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "psqlodbc_null",
