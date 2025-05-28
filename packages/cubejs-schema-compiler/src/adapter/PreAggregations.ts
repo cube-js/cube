@@ -577,11 +577,6 @@ export class PreAggregations {
    * for specified query, or its value for `refs` if specified.
    */
   public static canUsePreAggregationForTransformedQueryFn(transformedQuery: TransformedQuery, refs: PreAggregationReferences | null = null): CanUsePreAggregationFn {
-    // TODO this needs to check not only members list, but their join paths as well:
-    //  query can have same members as pre-agg, but different calculated join path
-    //  `refs` will come from pre-agg references, and would contain full join paths
-
-    // TODO remove this in favor of matching with join path
     function trimmedReferences(references: PreAggregationReferences): PreAggregationReferences {
       const timeDimensionsTrimmed = references
         .timeDimensions
@@ -643,7 +638,6 @@ export class PreAggregations {
      * Determine whether pre-aggregation can be used or not.
      */
     const canUsePreAggregationNotAdditive: CanUsePreAggregationFn = (references: PreAggregationReferences): boolean => {
-      // TODO remove this in favor of matching with join path
       const referencesTrimmed = trimmedReferences(references);
 
       const refTimeDimensions = backAlias(sortTimeDimensions(referencesTrimmed.timeDimensions));
@@ -728,7 +722,6 @@ export class PreAggregations {
         ? transformedQuery.ownedTimeDimensionsAsIs.map(expandTimeDimension)
         : transformedQuery.ownedTimeDimensionsWithRollupGranularity.map(expandTimeDimension);
 
-      // TODO remove this in favor of matching with join path
       const referencesTrimmed = trimmedReferences(references);
 
       // Even if there are no multiplied measures in the query (because no multiplier dimensions are requested)
@@ -1257,7 +1250,6 @@ export class PreAggregations {
         ) &&
         !!references.dimensions.find((d) => {
           // `d` can contain full join path, so we should trim it
-          // TODO check full join path match here
           const trimmedDimension = CubeSymbols.joinHintFromPath(d).path;
           return this.query.cubeEvaluator.dimensionByPath(trimmedDimension).primaryKey;
         }),
@@ -1306,10 +1298,6 @@ export class PreAggregations {
   }
 
   private evaluateAllReferences(cube: string, aggregation: PreAggregationDefinition, preAggregationName: string | null = null, context: EvaluateReferencesContext = {}): PreAggregationReferences {
-    // TODO build a join tree for all references, so they would always include full join path
-    //  Even for preaggregation references without join path
-    //  It is necessary to be able to match query and preaggregation based on full join tree
-
     const evaluateReferences = () => {
       const references = this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
       if (!context.inPreAggEvaluation) {
