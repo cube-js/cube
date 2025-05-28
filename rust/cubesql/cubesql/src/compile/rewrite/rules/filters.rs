@@ -1831,6 +1831,38 @@ impl RewriteRules for FilterRules {
                     "?end_date",
                 ),
             ),
+            transforming_rewrite(
+                "filter-date-trunc-neq-literal",
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec!["?granularity".to_string(), column_expr("?column")],
+                        ),
+                        "!=",
+                        "?date".to_string(),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(column_expr("?column"), "<", literal_expr("?start_date")),
+                        "OR",
+                        binary_expr(column_expr("?column"), ">=", literal_expr("?end_date")),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_date_trunc_eq_literal(
+                    "?granularity",
+                    "?date",
+                    "?start_date",
+                    "?end_date",
+                ),
+            ),
             rewrite(
                 "between-move-interval-beyond-equal-sign",
                 between_expr(
