@@ -5214,6 +5214,14 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-s3 SQL API: SQL push down push to cube quoted alias 1`] = `
+Array [
+  Object {
+    "result": true,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-s3 SQL API: Simple Rollup: simple_rollup 1`] = `
 Array [
   Object {

@@ -7270,6 +7270,14 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs-prefix SQL API: SQL push down push to cube quoted alias 1`] = `
+Array [
+  Object {
+    "result": true,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs-prefix SQL API: Simple Rollup: simple_rollup 1`] = `
 Array [
   Object {
