@@ -6,6 +6,7 @@ pub mod case_item;
 pub mod case_label;
 pub mod cube_definition;
 pub mod dimension_definition;
+pub mod driver_tools;
 pub mod evaluator;
 pub mod filter_group;
 pub mod filter_params;
