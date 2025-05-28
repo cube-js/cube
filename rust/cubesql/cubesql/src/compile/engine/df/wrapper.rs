@@ -3177,9 +3177,13 @@ impl WrappedSelectNode {
                     }
                 };
 
+                let mut alias = subq_alias.unwrap_or_else(|| alias.clone());
+                if let Some(generator) = meta.data_source_to_sql_generator.get(data_source) {
+                    alias = generator.get_sql_templates().quote_identifier(&alias)?;
+                };
                 join_subqueries.push(JoinSubquery {
                     // TODO what alias to actually use here? two more-or-less valid options: returned from generate_sql_for_node ot realiased from `alias`. Plain `alias` is incorrect here
-                    alias: subq_alias.unwrap_or_else(|| alias.clone()),
+                    alias,
                     sql: subq_sql_string,
                     condition: cond.clone(),
                     join_type: *join_type,
