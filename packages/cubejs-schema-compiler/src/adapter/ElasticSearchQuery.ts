@@ -1,9 +1,9 @@
 /* eslint-disable max-classes-per-file */
 import R from 'ramda';
 
+import { GRANULARITY_LEVELS } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
-import { GRANULARITY_LEVELS } from '@cubejs-backend/shared';
 import { BaseMeasure } from './BaseMeasure';
 import { BaseDimension } from './BaseDimension';
 import { BaseTimeDimension } from './BaseTimeDimension';
