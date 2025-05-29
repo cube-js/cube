@@ -22,7 +22,7 @@ import {
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
   timeSeriesFromCustomInterval,
-  parseSqlInterval
+  parseSqlInterval, GRANULARITY_LEVELS
 } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from '../compiler/CubeSymbols';
@@ -2569,7 +2569,7 @@ export class BaseQuery {
 
   /**
    * XXX: String as return value is added because of HiveQuery.getFieldIndex()
-   * @param id
+   * @param {string} id member name in form of "cube.member[.granularity]"
    * @returns {number|string|null}
    */
   getFieldIndex(id) {
@@ -2577,15 +2577,55 @@ export class BaseQuery {
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
 
-    let index;
+    let index = -1;
+    const path = id.split('.');
 
-    index = this.dimensionsForSelect()
+    // Granularity is specified
+    if (path.length === 3) {
+      const memberName = path.slice(0, 2).join('.');
+      const granularity = path[2];
+
+      index = this.timeDimensions
+        // Not all time dimensions are used in select list, some are just filters,
+        // but they exist in this.timeDimensions, so need to filter them out
+        .filter(d => d.selectColumns())
+        .findIndex(
+          d => (
+            (equalIgnoreCase(d.dimension, memberName) && (d.granularityObj?.granularity === granularity)) ||
+            equalIgnoreCase(d.expressionName, memberName)
+          )
+        );
+
+      if (index > -1) {
+        return index + 1;
+      }
+
+      // TODO IT would be nice to log a warning that requested member wasn't found, but we don't have a logger here
+      return null;
+    }
+
+    let minGranularity = GRANULARITY_LEVELS.MAX;
+    let minGranularityIndex = -1;
+
+    this.dimensionsForSelect()
       // Not all time dimensions are used in select list, some are just filters,
       // but they exist in this.timeDimensions, so need to filter them out
       .filter(d => d.selectColumns())
-      .findIndex(
-        d => equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)
-      );
+      .forEach((d, i) => {
+        if (equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)) {
+          index = i;
+
+          const gr = GRANULARITY_LEVELS[d.granularityObj?.minGranularity()];
+          if (gr < minGranularity) {
+            minGranularityIndex = i;
+            minGranularity = gr;
+          }
+        }
+      });
+
+    if (minGranularityIndex > -1) {
+      return minGranularityIndex + 1;
+    }
 
     if (index > -1) {
       return index + 1;

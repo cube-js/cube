@@ -12,6 +12,18 @@ export type TimeSeriesOptions = {
 };
 type ParsedInterval = Partial<Record<unitOfTime.DurationConstructor, number>>;
 
+export const GRANULARITY_LEVELS: Record<string, number> = {
+  second: 1,
+  minute: 2,
+  hour: 3,
+  day: 4,
+  week: 5,
+  month: 6,
+  quarter: 7,
+  year: 8,
+  MAX: 1000,
+};
+
 export const TIME_SERIES: Record<string, (range: DateRange, timestampPrecision: number) => QueryDateRange[]> = {
   day: (range: DateRange, digits) => Array.from(range.snapTo('day').by('day'))
     .map(d => [d.format(`YYYY-MM-DDT00:00:00.${'0'.repeat(digits)}`), d.format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),

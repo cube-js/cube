@@ -57,7 +57,8 @@ const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
 });
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
+// It might be member name, td+granularity or member expression
+const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/);
 const parsedMemberExpression = Joi.object().keys({
   expression: Joi.alternatives(
