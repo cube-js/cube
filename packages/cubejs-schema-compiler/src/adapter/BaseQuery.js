@@ -2569,6 +2569,7 @@ export class BaseQuery {
 
   /**
    * XXX: String as return value is added because of HiveQuery.getFieldIndex()
+   * @protected
    * @param {string} id member name in form of "cube.member[.granularity]"
    * @returns {number|string|null}
    */
@@ -2643,6 +2644,85 @@ export class BaseQuery {
     return null;
   }
 
+  /**
+   * @protected
+   * @param {string} id member name in form of "cube.member[.granularity]"
+   * @returns {null|string}
+   */
+  getFieldAlias(id) {
+    const equalIgnoreCase = (a, b) => (
+      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
+    );
+
+    let field;
+
+    const path = id.split('.');
+
+    // Granularity is specified
+    if (path.length === 3) {
+      const memberName = path.slice(0, 2).join('.');
+      const granularity = path[2];
+
+      field = this.timeDimensions
+        // Not all time dimensions are used in select list, some are just filters,
+        // but they exist in this.timeDimensions, so need to filter them out
+        .filter(d => d.selectColumns())
+        .find(
+          d => (
+            (equalIgnoreCase(d.dimension, memberName) && (d.granularityObj?.granularity === granularity)) ||
+            equalIgnoreCase(d.expressionName, memberName)
+          )
+        );
+
+      if (field) {
+        return field.aliasName();
+      }
+
+      return null;
+    }
+
+    let minGranularity = GRANULARITY_LEVELS.MAX;
+    let minGranularityField;
+
+    this.dimensionsForSelect()
+      // Not all time dimensions are used in select list, some are just filters,
+      // but they exist in this.timeDimensions, so need to filter them out
+      .filter(d => d.selectColumns())
+      .forEach((d) => {
+        if (equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)) {
+          field = d;
+
+          const gr = GRANULARITY_LEVELS[d.granularityObj?.minGranularity()];
+          if (gr < minGranularity) {
+            minGranularityField = d;
+            minGranularity = gr;
+          }
+        }
+      });
+
+    if (minGranularityField) {
+      return minGranularityField.aliasName();
+    }
+
+    if (field) {
+      return field.aliasName();
+    }
+
+    field = this.measures.find(
+      (d) => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
+    );
+
+    if (field) {
+      return field.aliasName();
+    }
+
+    return null;
+  }
+
+  /**
+   * @param {{ id: string, desc: boolean }} hash
+   * @returns {string|null}
+   */
   orderHashToString(hash) {
     if (!hash || !hash.id) {
       return null;
