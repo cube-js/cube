@@ -2568,7 +2568,7 @@ export class BaseQuery {
   }
 
   /**
-   * XXX: String as return value is added because of HiveQuery.getFieldIndex()
+   * XXX: String as return value is added because of HiveQuery.getFieldIndex() and DatabricksQuery.getFieldIndex()
    * @protected
    * @param {string} id member name in form of "cube.member[.granularity]"
    * @returns {number|string|null}
