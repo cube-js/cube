@@ -28,41 +28,41 @@ class ElasticSearchQueryFilter extends BaseFilter {
 }
 
 export class ElasticSearchQuery extends BaseQuery {
-  public newFilter(filter) {
+  public override newFilter(filter) {
     return new ElasticSearchQueryFilter(this, filter);
   }
 
-  public convertTz(field) {
+  public override convertTz(field) {
     return `${field}`; // TODO
   }
 
-  public timeStampCast(value) {
+  public override timeStampCast(value) {
     return `${value}`;
   }
 
-  public dateTimeCast(value) {
+  public override dateTimeCast(value) {
     return `${value}`; // TODO
   }
 
-  public subtractInterval(date, interval) {
+  public override subtractInterval(date, interval) {
     // TODO: Test this, note sure how value gets populated here
     return `${date} - INTERVAL ${interval}`;
   }
 
-  public addInterval(date, interval) {
+  public override addInterval(date, interval) {
     // TODO: Test this, note sure how value gets populated here
     return `${date} + INTERVAL ${interval}`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public override timeGroupedColumn(granularity, dimension) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  public unixTimestampSql() {
+  public override unixTimestampSql() {
     return 'TIMESTAMP_DIFF(\'seconds\', \'1970-01-01T00:00:00.000Z\'::datetime, CURRENT_TIMESTAMP())';
   }
 
-  public groupByClause() {
+  public override groupByClause() {
     if (this.ungrouped) {
       return '';
     }
@@ -74,7 +74,7 @@ export class ElasticSearchQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  public orderHashToString(hash) {
+  public override orderHashToString(hash: { id: string, desc: boolean }) {
     if (!hash || !hash.id) {
       return null;
     }
@@ -89,10 +89,10 @@ export class ElasticSearchQuery extends BaseQuery {
     return `${fieldAlias} ${direction}`;
   }
 
-  public getFieldAlias(id) {
-    const equalIgnoreCase = (a, b) => typeof a === 'string' &&
-      typeof b === 'string' &&
-      a.toUpperCase() === b.toUpperCase();
+  public getFieldAlias(id: string): string | null {
+    const equalIgnoreCase = (a: any, b: any) => (
+      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
+    );
 
     let field;
 
@@ -113,7 +113,7 @@ export class ElasticSearchQuery extends BaseQuery {
     return null;
   }
 
-  public escapeColumnName(name) {
-    return `${name}`; // TODO
+  public override escapeColumnName(name) {
+    return `${name}`;
   }
 }
