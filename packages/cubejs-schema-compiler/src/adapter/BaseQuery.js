@@ -508,8 +508,9 @@ export class BaseQuery {
 
       res.push({ id, desc: true });
     } else if (this.dimensions.length > 0) {
+      const dim = this.dimensions[0];
       res.push({
-        id: this.dimensions[0].dimension,
+        id: dim.expressionName ?? dim.dimension,
         desc: false,
       });
     }
