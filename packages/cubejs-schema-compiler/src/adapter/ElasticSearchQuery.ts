@@ -3,6 +3,10 @@ import R from 'ramda';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import { GRANULARITY_LEVELS } from '@cubejs-backend/shared';
+import { BaseMeasure } from './BaseMeasure';
+import { BaseDimension } from './BaseDimension';
+import { BaseTimeDimension } from './BaseTimeDimension';
 
 const GRANULARITY_TO_INTERVAL = {
   day: date => `DATE_TRUNC('day', ${date}::datetime)`,
@@ -89,17 +93,69 @@ export class ElasticSearchQuery extends BaseQuery {
     return `${fieldAlias} ${direction}`;
   }
 
+  /**
+   * This implementation is a bit different from the one in BaseQuery
+   * as it uses dimensionSql() as ordering expression
+   */
   public getFieldAlias(id: string): string | null {
     const equalIgnoreCase = (a: any, b: any) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
 
-    let field;
+    let field: BaseMeasure | BaseDimension | undefined;
 
-    field = this.dimensionsForSelect().find(d => equalIgnoreCase(d.dimension, id));
+    const path = id.split('.');
+
+    // Granularity is specified
+    if (path.length === 3) {
+      const memberName = path.slice(0, 2).join('.');
+      const granularity = path[2];
+
+      field = this.timeDimensions
+        // Not all time dimensions are used in select list, some are just filters,
+        // but they exist in this.timeDimensions, so need to filter them out
+        .filter(d => d.selectColumns())
+        .find(
+          d => (
+            (equalIgnoreCase(d.dimension, memberName) && (d.granularityObj?.granularity === granularity)) ||
+            equalIgnoreCase(d.expressionName, memberName)
+          )
+        );
+
+      if (field) {
+        return field.dimensionSql();
+      }
+
+      return null;
+    }
+
+    let minGranularity = GRANULARITY_LEVELS.MAX;
+    let minGranularityField: BaseTimeDimension | BaseDimension | undefined;
+
+    this.dimensionsForSelect()
+      // Not all time dimensions are used in select list, some are just filters,
+      // but they exist in this.timeDimensions, so need to filter them out
+      .filter(d => d.selectColumns())
+      .forEach((d) => {
+        if (equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)) {
+          field = d;
+
+          if ('granularityObj' in d && d.granularityObj) {
+            const gr = GRANULARITY_LEVELS[d.granularityObj.minGranularity()];
+            if (gr < minGranularity) {
+              minGranularityField = d;
+              minGranularity = gr;
+            }
+          }
+        }
+      });
+
+    if (minGranularityField) {
+      return minGranularityField.dimensionSql();
+    }
 
     if (field) {
-      return field.dimensionSql();
+      return (field as BaseDimension).dimensionSql();
     }
 
     field = this.measures.find(
