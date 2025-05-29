@@ -1837,6 +1837,7 @@ class ApiGateway {
 
       this.log({
         type: 'Load Request',
+        apiType,
         query
       }, context);
 
