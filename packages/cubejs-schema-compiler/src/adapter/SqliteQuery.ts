@@ -16,7 +16,7 @@ const GRANULARITY_TO_INTERVAL = {
       WHEN cast(strftime('%m', ${date}) as integer) BETWEEN 4 AND 6 THEN strftime('%Y-04-01T00:00:00.000', ${date})
       WHEN cast(strftime('%m', ${date}) as integer) BETWEEN 7 AND 9 THEN strftime('%Y-07-01T00:00:00.000', ${date})
       ELSE strftime('%Y-10-01T00:00:00.000', ${date})
-    END`.trim()
+    END`
 };
 
 class SqliteFilter extends BaseFilter {
