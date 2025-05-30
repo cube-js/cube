@@ -1,7 +1,7 @@
 /* eslint-disable max-classes-per-file */
 import R from 'ramda';
 
-import { GRANULARITY_LEVELS } from '@cubejs-backend/shared';
+import { findMinGranularityDimension } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseMeasure } from './BaseMeasure';
@@ -129,33 +129,15 @@ export class ElasticSearchQuery extends BaseQuery {
       return null;
     }
 
-    let minGranularity = GRANULARITY_LEVELS.MAX;
-    let minGranularityField: BaseTimeDimension | BaseDimension | undefined;
-
-    this.dimensionsForSelect()
+    const dimensionsForSelect = this.dimensionsForSelect()
       // Not all time dimensions are used in select list, some are just filters,
       // but they exist in this.timeDimensions, so need to filter them out
-      .filter(d => d.selectColumns())
-      .forEach((d) => {
-        if (equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)) {
-          field = d;
+      .filter(d => d.selectColumns());
 
-          if ('granularityObj' in d && d.granularityObj) {
-            const gr = GRANULARITY_LEVELS[d.granularityObj.minGranularity()];
-            if (gr < minGranularity) {
-              minGranularityField = d;
-              minGranularity = gr;
-            }
-          }
-        }
-      });
+    const found = findMinGranularityDimension(id, dimensionsForSelect);
 
-    if (minGranularityField) {
-      return minGranularityField.dimensionSql();
-    }
-
-    if (field) {
-      return (field as BaseDimension).dimensionSql();
+    if (found?.dimension) {
+      return (found.dimension as BaseDimension).dimensionSql();
     }
 
     field = this.measures.find(

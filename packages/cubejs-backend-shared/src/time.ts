@@ -12,7 +12,7 @@ export type TimeSeriesOptions = {
 };
 type ParsedInterval = Partial<Record<unitOfTime.DurationConstructor, number>>;
 
-export const GRANULARITY_LEVELS: Record<string, number> = {
+const GRANULARITY_LEVELS: Record<string, number> = {
   second: 1,
   minute: 2,
   hour: 3,
@@ -23,6 +23,55 @@ export const GRANULARITY_LEVELS: Record<string, number> = {
   year: 8,
   MAX: 1000,
 };
+
+export type DimensionToCompareGranularity = {
+  dimension: string;
+  expressionName?: string;
+  granularityObj?: {
+    minGranularity(): string;
+  }
+};
+
+/**
+ * Actually dimensions type is (BaseDimension|BaseTimeDimension)[], but can not ref due to cyclic dependencies refs.
+ */
+export function findMinGranularityDimension(id: string, dimensions: DimensionToCompareGranularity[]): { index: number, dimension: DimensionToCompareGranularity | undefined } | null {
+  const equalIgnoreCase = (a: any, b: any): boolean => (
+    typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
+  );
+
+  let minGranularity = GRANULARITY_LEVELS.MAX;
+  let index = -1;
+  let minGranularityIndex = -1;
+  let field;
+  let minGranularityField;
+
+  dimensions.forEach((d, i) => {
+    if (equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)) {
+      field = d;
+      index = i;
+
+      if ('granularityObj' in d && d.granularityObj) {
+        const gr = GRANULARITY_LEVELS[d.granularityObj?.minGranularity()];
+        if (gr < minGranularity) {
+          minGranularityIndex = i;
+          minGranularityField = d;
+          minGranularity = gr;
+        }
+      }
+    }
+  });
+
+  if (minGranularityIndex > -1) {
+    return { index: minGranularityIndex, dimension: minGranularityField };
+  }
+
+  if (index > -1) {
+    return { index, dimension: field };
+  }
+
+  return null;
+}
 
 export const TIME_SERIES: Record<string, (range: DateRange, timestampPrecision: number) => QueryDateRange[]> = {
   day: (range: DateRange, digits) => Array.from(range.snapTo('day').by('day'))

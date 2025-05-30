@@ -22,7 +22,8 @@ import {
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
   timeSeriesFromCustomInterval,
-  parseSqlInterval, GRANULARITY_LEVELS
+  parseSqlInterval,
+  findMinGranularityDimension
 } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from '../compiler/CubeSymbols';
@@ -2606,31 +2607,14 @@ export class BaseQuery {
       return null;
     }
 
-    let minGranularity = GRANULARITY_LEVELS.MAX;
-    let minGranularityIndex = -1;
-
-    this.dimensionsForSelect()
+    const dimensionsForSelect = this.dimensionsForSelect()
       // Not all time dimensions are used in select list, some are just filters,
       // but they exist in this.timeDimensions, so need to filter them out
-      .filter(d => d.selectColumns())
-      .forEach((d, i) => {
-        if (equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)) {
-          index = i;
+      .filter(d => d.selectColumns());
 
-          const gr = GRANULARITY_LEVELS[d.granularityObj?.minGranularity()];
-          if (gr < minGranularity) {
-            minGranularityIndex = i;
-            minGranularity = gr;
-          }
-        }
-      });
-
-    if (minGranularityIndex > -1) {
-      return minGranularityIndex + 1;
-    }
-
-    if (index > -1) {
-      return index + 1;
+    const found = findMinGranularityDimension(id, dimensionsForSelect);
+    if (found?.index > -1) {
+      return found.index + 1;
     }
 
     index = this.measures.findIndex(
@@ -2682,31 +2666,15 @@ export class BaseQuery {
       return null;
     }
 
-    let minGranularity = GRANULARITY_LEVELS.MAX;
-    let minGranularityField;
-
-    this.dimensionsForSelect()
+    const dimensionsForSelect = this.dimensionsForSelect()
       // Not all time dimensions are used in select list, some are just filters,
       // but they exist in this.timeDimensions, so need to filter them out
-      .filter(d => d.selectColumns())
-      .forEach((d) => {
-        if (equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)) {
-          field = d;
+      .filter(d => d.selectColumns());
 
-          const gr = GRANULARITY_LEVELS[d.granularityObj?.minGranularity()];
-          if (gr < minGranularity) {
-            minGranularityField = d;
-            minGranularity = gr;
-          }
-        }
-      });
+    const found = findMinGranularityDimension(id, dimensionsForSelect);
 
-    if (minGranularityField) {
-      return minGranularityField.aliasName();
-    }
-
-    if (field) {
-      return field.aliasName();
+    if (found?.dimension) {
+      return found.dimension.aliasName();
     }
 
     field = this.measures.find(
