@@ -12,7 +12,7 @@ export class TrinoDriver extends PrestoDriver {
   }
 
   public override async testConnection(): Promise<void> {
-    const { host, port, ssl,basic_auth: basicAuth } = this.config;
+    const { host, port, ssl, basic_auth: basicAuth } = this.config;
     const protocol = ssl ? 'https' : 'http';
     const url = `${protocol}://${host}:${port}/v1/info`;
     const headers: Record<string, string> = {};
