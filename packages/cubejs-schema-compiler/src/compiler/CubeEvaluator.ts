@@ -308,6 +308,7 @@ export class CubeEvaluator extends CubeSymbols {
     if (cube.isView && (cube.includedMembers || []).length) {
       const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
       const includedCubeNames: string[] = R.uniq(includedMemberPaths.map(it => it.split('.')[0]));
+
       // Path to name (which can be prefixed or aliased) map for hierarchy
       const hierarchyPathToName = cube.includedMembers.filter(it => it.type === 'hierarchies').reduce((acc, it) => ({
         ...acc,
@@ -336,14 +337,18 @@ export class CubeEvaluator extends CubeSymbols {
               })
                 .filter(Boolean);
 
-              const name = hierarchyPathToName[[cubeName, it.name].join('.')];
+              const aliasMember = [cubeName, it.name].join('.');
+
+              const name = hierarchyPathToName[aliasMember];
               if (!name) {
                 throw new UserError(`Hierarchy '${it.name}' not found in cube '${cubeName}'`);
               }
+
               return {
                 // Title might be overridden in the view
                 title: cube.hierarchies?.[it.name]?.override?.title || it.title,
                 ...it,
+                aliasMember,
                 name,
                 levels
               };

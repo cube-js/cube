@@ -109,6 +109,7 @@ export class CubeToMetaTransformer {
         )(cube.segments || {}),
         hierarchies: (cube.evaluatedHierarchies || []).map((it) => ({
           ...it,
+          aliasMember: it.aliasMember,
           public: it.public ?? true,
           name: `${cube.name}.${it.name}`,
         })),

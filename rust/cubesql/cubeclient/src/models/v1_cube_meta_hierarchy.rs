@@ -12,6 +12,9 @@
 pub struct V1CubeMetaHierarchy {
     #[serde(rename = "name")]
     pub name: String,
+    /// When hierarchy is defined in Cube, it keeps the original path: Cube.hierarchy
+    #[serde(rename = "aliasMember", skip_serializing_if = "Option::is_none")]
+    pub alias_member: Option<String>,
     #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(rename = "levels")]
@@ -22,6 +25,7 @@ impl V1CubeMetaHierarchy {
     pub fn new(name: String, levels: Vec<String>) -> V1CubeMetaHierarchy {
         V1CubeMetaHierarchy {
             name,
+            alias_member: None,
             title: None,
             levels,
         }

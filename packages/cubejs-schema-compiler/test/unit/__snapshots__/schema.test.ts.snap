@@ -1446,6 +1446,7 @@ Object {
   },
   "evaluatedHierarchies": Array [
     Object {
+      "aliasMember": "orders.hello",
       "levels": Array [
         "orders_view.my_beloved_status",
       ],
