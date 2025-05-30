@@ -182,6 +182,9 @@ components:
       properties:
         name:
           type: "string"
+        aliasMember:
+          description: "When hierarchy is defined in Cube, it keeps the original path: Cube.hierarchy"
+          type: "string"
         title:
           type: "string"
         levels:
