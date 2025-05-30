@@ -144,40 +144,17 @@ export class DatabricksQuery extends BaseQuery {
     return `\`${name}\``;
   }
 
-  public getFieldIndex(id: string) {
-    const dimension = this.dimensionsForSelect().find((d: any) => d.dimension === id);
-    if (dimension) {
-      return super.getFieldIndex(id);
+  public override getFieldIndex(id: string): string | number | null {
+    const idx = super.getFieldIndex(id);
+    if (idx !== null) {
+      return idx;
     }
+
     return this.escapeColumnName(this.aliasName(id, false));
   }
 
   public unixTimestampSql() {
     return 'unix_timestamp()';
-  }
-
-  public orderHashToString(hash: any) {
-    if (!hash || !hash.id) {
-      return null;
-    }
-
-    const fieldIndex = this.getFieldIndex(hash.id);
-    if (fieldIndex === null) {
-      return null;
-    }
-
-    const dimensionsForSelect = this.dimensionsForSelect();
-    const dimensionColumns = R.flatten(
-      dimensionsForSelect.map((s: any) => s.selectColumns() && s.aliasName())
-    )
-      .filter(s => !!s);
-
-    if (dimensionColumns.length) {
-      const direction = hash.desc ? 'DESC' : 'ASC';
-      return `${fieldIndex} ${direction}`;
-    }
-
-    return null;
   }
 
   public defaultRefreshKeyRenewalThreshold() {
