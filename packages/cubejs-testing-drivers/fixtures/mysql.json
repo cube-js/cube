@@ -131,12 +131,12 @@
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
+
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
-    "querying BigECommerce: rolling window YTD",
     "querying BigECommerce: rolling window YTD without date range",
 
     "---------------------------------------",
@@ -157,6 +157,12 @@
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
     "SQL API: Extended nested Rollup over asterisk",
-    "SQL API: SQL push down push to cube quoted alias"
+    "SQL API: SQL push down push to cube quoted alias",
+
+    "---------------------------------------",
+    "Error during rewrite: Can't detect Cube query and it may be not supported yet.",
+    "---------------------------------------",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
   ]
 }
