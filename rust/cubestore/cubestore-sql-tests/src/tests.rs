@@ -1351,9 +1351,9 @@ async fn column_escaping(service: Box<dyn SqlClient>) {
 
     let result = service
         .exec_query(
-            "SELECT date_trunc('day', `timestamp`.t) `day`, sum(`timestamp`.amount) \
-            FROM foo.timestamps `timestamp` \
-            WHERE `timestamp`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
+            "SELECT date_trunc('day', `timestamp_``_quote`.t) `day_``_quote`, sum(`timestamp_``_quote`.amount) \
+            FROM foo.timestamps `timestamp_``_quote` \
+            WHERE `timestamp_``_quote`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
         )
         .await
         .unwrap();
@@ -1448,9 +1448,9 @@ async fn case_column_escaping(service: Box<dyn SqlClient>) {
         .unwrap();
 
     let result = service.exec_query(
-            "SELECT date_trunc('day', `timestamp`.t) `day`, sum(CASE WHEN `timestamp`.t > to_timestamp('2020-01-02T00:01:00.000Z') THEN `timestamp`.amount END) \
-            FROM foo.timestamps `timestamp` \
-            WHERE `timestamp`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1"
+            "SELECT date_trunc('day', `timestamp_``_quote`.t) `day_``_quote`, sum(CASE WHEN `timestamp_``_quote`.t > to_timestamp('2020-01-02T00:01:00.000Z') THEN `timestamp_``_quote`.amount END) \
+            FROM foo.timestamps `timestamp_``_quote` \
+            WHERE `timestamp_``_quote`.t >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1"
         ).await.unwrap();
 
     assert_eq!(
@@ -1482,9 +1482,9 @@ async fn inner_column_escaping(service: Box<dyn SqlClient>) {
 
     let result = service
         .exec_query(
-            "SELECT date_trunc('day', `t`) `day`, sum(`amount`) \
-            FROM foo.timestamps `timestamp` \
-            WHERE `t` >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
+            "SELECT date_trunc('day', `t_``_quote`) `day_``_quote`, sum(`amount_``_quote`) \
+            FROM foo.timestamps `timestamp_``_quote` \
+            WHERE `t_``_quote` >= to_timestamp('2020-01-02T00:00:00.000Z') GROUP BY 1",
         )
         .await
         .unwrap();
