@@ -3,13 +3,15 @@ import R from 'ramda';
 
 import { CubeSymbols, type ToString } from './CubeSymbols';
 import { UserError } from './UserError';
-import { BaseQuery } from '../adapter';
+import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
 
+// TODO replace Function with proper types
+
 export type SegmentDefinition = {
   type: string,
-  sql: Function,
+  sql(): string,
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
@@ -19,7 +21,7 @@ export type SegmentDefinition = {
 
 export type DimensionDefinition = {
   type: string,
-  sql: Function,
+  sql(): string,
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
@@ -41,7 +43,7 @@ export type TimeShiftDefinitionReference = {
 
 export type MeasureDefinition = {
   type: string,
-  sql: Function,
+  sql(): string,
   ownedByCube: boolean,
   rollingWindow?: any
   filters?: any
@@ -115,6 +117,25 @@ export type PreAggregationTimeDimensionReference = {
   granularity: string,
 };
 
+// TODO: Move to JonGraph when it will be ts
+export type JoinEdge = {
+  from: string;
+  to: string;
+  originalFrom: string;
+  originalTo: string;
+  join: {
+    relationship: string; // TODO Use an enum from validator
+    sql: Function,
+  }
+};
+
+// TODO: Move to JonGraph when it will be ts
+export type JoinTree = {
+  root: string;
+  joins: JoinEdge[];
+  multiplicationFactor: Record<string, boolean>;
+};
+
 /// Strings in `dimensions`, `measures` and `timeDimensions[*].dimension` can contain full join path, not just `cube.member`
 export type PreAggregationReferences = {
   allowNonStrictDateRangeMatch?: boolean,
@@ -123,6 +144,7 @@ export type PreAggregationReferences = {
   timeDimensions: Array<PreAggregationTimeDimensionReference>,
   rollups: Array<string>,
   multipliedMeasures?: Array<string>,
+  joinTree?: JoinTree;
 };
 
 export type PreAggregationInfo = {
@@ -664,7 +686,7 @@ export class CubeEvaluator extends CubeSymbols {
     return this.byPath('segments', segmentPath);
   }
 
-  public cubeExists(cube) {
+  public cubeExists(cube: string): boolean {
     return !!this.evaluatedCubes[cube];
   }
 
