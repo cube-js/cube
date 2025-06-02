@@ -116,10 +116,9 @@ export class DataSchemaCompiler {
     const { compilerId } = this;
 
     if (!transpilationNative) {
-      const wc = getEnv('transpilationWorkerThreadsCount');
       this.workerPool = workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
-        wc > 0 ? { maxWorkers: wc } : undefined,
+        { maxWorkers: transpilationNativeThreadsCount },
       );
     }
 
@@ -128,8 +127,6 @@ export class DataSchemaCompiler {
      * @returns {Promise<*>}
      */
     const transpile = async (stage) => {
-      let results;
-
       const cubeNames = Object.keys(this.cubeDictionary.byId);
       // We need only cubes and all its member names for transpiling.
       // Cubes doesn't change during transpiling, but are changed during compilation phase,
@@ -150,6 +147,27 @@ export class DataSchemaCompiler {
       // Transpilers are the same for all files within phase.
       const transpilerNames = this.transpilers.map(t => t.constructor.name);
 
+      const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js'))
+        .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
+
+      const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js'));
+      let JsFilesTasks = [];
+      let jsChunks = [];
+
+      if (jsFiles.length > 0) {
+        if (jsFiles.length < transpilationNativeThreadsCount * transpilationNativeThreadsCount) {
+          jsChunks = [jsFiles];
+        } else {
+          const baseSize = Math.floor(jsFiles.length / transpilationNativeThreadsCount);
+          for (let i = 0; i < transpilationNativeThreadsCount; i++) {
+            // For the last part, we take the remaining files so we don't lose the extra ones.
+            const start = i * baseSize;
+            const end = (i === transpilationNativeThreadsCount - 1) ? jsFiles.length : start + baseSize;
+            jsChunks.push(jsFiles.slice(start, end));
+          }
+        }
+      }
+
       if (transpilationNative) {
         // Warming up swc compiler cache
         const dummyFile = {
@@ -159,33 +177,12 @@ export class DataSchemaCompiler {
 
         await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
 
-        const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js'))
-          .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
-
-        const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js'));
-        let JsFilesTasks = [];
-
-        if (jsFiles.length > 0) {
-          let jsChunks;
-          if (jsFiles.length < transpilationNativeThreadsCount * transpilationNativeThreadsCount) {
-            jsChunks = [jsFiles];
-          } else {
-            const baseSize = Math.floor(jsFiles.length / transpilationNativeThreadsCount);
-            jsChunks = [];
-            for (let i = 0; i < transpilationNativeThreadsCount; i++) {
-              // For the last part, we take the remaining files so we don't lose the extra ones.
-              const start = i * baseSize;
-              const end = (i === transpilationNativeThreadsCount - 1) ? jsFiles.length : start + baseSize;
-              jsChunks.push(jsFiles.slice(start, end));
-            }
-          }
-          JsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesBulk(chunk, errorsReport, { transpilerNames, compilerId }));
-        }
-
-        results = (await Promise.all([...nonJsFilesTasks, ...JsFilesTasks])).flat();
+        JsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesBulk(chunk, errorsReport, { transpilerNames, compilerId }));
       } else {
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
+        JsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesBulk(chunk, errorsReport, { cubeNames, cubeSymbols, transpilerNames, compilerId, stage }));
       }
+
+      const results = (await Promise.all([...nonJsFilesTasks, ...JsFilesTasks])).flat();
 
       return results.filter(f => !!f);
     };
@@ -260,42 +257,62 @@ export class DataSchemaCompiler {
     }
   }
 
-  /**
-   * Right now it is used only for transpilation in native,
-   * so no checks for transpilation type inside this method
-   */
   async transpileJsFilesBulk(files, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }) {
-    // for bulk processing this data may be optimized even more by passing transpilerNames, compilerId only once for a bulk
-    // but this requires more complex logic to be implemented in the native side.
-    // And comparing to the file content sizes, a few bytes of JSON data is not a big deal here
-    const reqDataArr = files.map(file => ({
-      fileName: file.fileName,
-      fileContent: file.content,
-      transpilers: transpilerNames,
-      compilerId,
-      ...(cubeNames && {
-        metaData: {
-          cubeNames,
-          cubeSymbols,
-          contextSymbols,
-          stage
-        },
-      }),
-    }));
-    const res = await transpileJs(reqDataArr);
+    const transpilationNative = getEnv('transpilationNative');
 
-    return files.map((file, index) => {
-      errorsReport.inFile(file);
-      if (!res[index]) { // This should not happen in theory but just to be safe
-        errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
-        return undefined;
-      }
-      errorsReport.addErrors(res[index].errors);
-      errorsReport.addWarnings(res[index].warnings);
-      errorsReport.exitFile();
+    if (transpilationNative) {
+      // for bulk processing this data may be optimized even more by passing transpilerNames, compilerId only once for a bulk
+      // but this requires more complex logic to be implemented in the native side.
+      // And comparing to the file content sizes, a few bytes of JSON data is not a big deal here
+      const reqDataArr = files.map(file => ({
+        fileName: file.fileName,
+        fileContent: file.content,
+        transpilers: transpilerNames,
+        compilerId,
+        ...(cubeNames && {
+          metaData: {
+            cubeNames,
+            cubeSymbols,
+            contextSymbols,
+            stage
+          },
+        }),
+      }));
+      const res = await transpileJs(reqDataArr);
 
-      return { ...file, content: res[index].code };
-    });
+      return files.map((file, index) => {
+        errorsReport.inFile(file);
+        if (!res[index]) { // This should not happen in theory but just to be safe
+          errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
+          return undefined;
+        }
+        errorsReport.addErrors(res[index].errors);
+        errorsReport.addWarnings(res[index].warnings);
+        errorsReport.exitFile();
+
+        return { ...file, content: res[index].code };
+      });
+    } else {
+      const request = {
+        files,
+        transpilers: transpilerNames,
+        cubeNames,
+        cubeSymbols,
+      };
+
+      const res = await this.workerPool.exec('transpile', [request]);
+      errorsReport.addErrors(res.errors);
+      errorsReport.addWarnings(res.warnings);
+
+      return files.map((file, index) => {
+        if (!res.content[index]) { // This should not happen in theory but just to be safe
+          errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
+          return undefined;
+        }
+
+        return { ...file, content: res.content[index] };
+      });
+    }
   }
 
   async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }) {
@@ -325,8 +342,7 @@ export class DataSchemaCompiler {
         return { ...file, content: res[0].code };
       } else {
         const data = {
-          fileName: file.fileName,
-          content: file.content,
+          files: [file],
           transpilers: transpilerNames,
           cubeNames,
           cubeSymbols,
@@ -336,7 +352,7 @@ export class DataSchemaCompiler {
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
 
-        return { ...file, content: res.content };
+        return { ...file, content: res.content[0] };
       }
     } catch (e) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
