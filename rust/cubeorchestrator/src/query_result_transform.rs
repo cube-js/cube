@@ -13,7 +13,7 @@ use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 pub const COMPARE_DATE_RANGE_FIELD: &str = "compareDateRange";
@@ -21,6 +21,20 @@ pub const COMPARE_DATE_RANGE_SEPARATOR: &str = " - ";
 pub const BLENDING_QUERY_KEY_PREFIX: &str = "time.";
 pub const BLENDING_QUERY_RES_SEPARATOR: &str = ".";
 pub const MEMBER_SEPARATOR: &str = ".";
+
+pub static GRANULARITY_LEVELS: LazyLock<HashMap<&'static str, u8>> = LazyLock::new(|| {
+    HashMap::from([
+        ("second", 1),
+        ("minute", 2),
+        ("hour", 3),
+        ("day", 4),
+        ("week", 5),
+        ("month", 6),
+        ("quarter", 7),
+        ("year", 8),
+    ])
+});
+const DEFAULT_LEVEL_FOR_UNKNOWN: u8 = 10;
 
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimitive {
@@ -168,6 +182,10 @@ pub fn get_members(
         return Ok((members_map, members_arr));
     }
 
+    // FIXME: For now custom granularities are not supported, only common ones.
+    // There is no granularity type/class implementation in rust yet.
+    let mut minimal_granularities: HashMap<String, (u8, String)> = HashMap::new();
+
     for column in db_data.columns.iter() {
         let member_name = alias_to_member_name_map
             .get(column)
@@ -197,9 +215,27 @@ pub fn get_members(
                     .any(|dim| *dim == MemberOrMemberExpression::Member(calc_member.clone()))
             })
         {
-            members_map.insert(calc_member.clone(), column.clone());
-            members_arr.push(calc_member);
+            let granularity = path[2];
+            // For cases when the same dimension with few different granularities is present
+            //We should not duplicate the dimension without granularity
+            let level = GRANULARITY_LEVELS
+                .get(granularity)
+                .cloned()
+                .unwrap_or(DEFAULT_LEVEL_FOR_UNKNOWN);
+
+            match minimal_granularities.get(&calc_member) {
+                Some((existing_level, _)) if *existing_level < level => {}
+                _ => {
+                    minimal_granularities.insert(calc_member, (level, column.clone()));
+                }
+            }
         }
+    }
+
+    // Handle deprecated time dimensions without granularity
+    for (member_name, (_, column)) in minimal_granularities {
+        members_map.insert(member_name.clone(), column.clone());
+        members_arr.push(member_name.clone());
     }
 
     match query_type {
@@ -290,6 +326,10 @@ pub fn get_vanilla_row(
 ) -> Result<HashMap<String, DBResponsePrimitive>> {
     let mut row = HashMap::new();
 
+    // FIXME: For now custom granularities are not supported, only common ones.
+    // There is no granularity type/class implementation in rust yet.
+    let mut minimal_granularities: HashMap<String, (u8, DBResponsePrimitive)> = HashMap::new();
+
     for (alias, &index) in columns_pos {
         if let Some(value) = db_row.get(index) {
             let member_name = match alias_to_member_name_map.get(alias) {
@@ -324,21 +364,44 @@ pub fn get_vanilla_row(
             row.insert(member_name.clone(), transformed_value.clone());
 
             // Handle deprecated time dimensions without granularity
+            // Try to collect minimal granularity value for time dimensions without granularity
+            // as there might be more than one granularity column for the same dimension
             let path: Vec<&str> = member_name.split(MEMBER_SEPARATOR).collect();
-            let member_name_without_granularity =
-                format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
-            if path.len() == 3
-                && query.dimensions.as_ref().map_or(true, |dims| {
+            if path.len() == 3 {
+                let granularity = path[2];
+                let member_name_without_granularity =
+                    format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
+
+                // Check that a member without granularity is absent in the query
+                if query.dimensions.as_ref().map_or(true, |dims| {
                     !dims.iter().any(|dim| {
                         *dim == MemberOrMemberExpression::Member(
                             member_name_without_granularity.clone(),
                         )
                     })
-                })
-            {
-                row.insert(member_name_without_granularity, transformed_value);
+                }) {
+                    let level = GRANULARITY_LEVELS
+                        .get(granularity)
+                        .cloned()
+                        .unwrap_or(DEFAULT_LEVEL_FOR_UNKNOWN);
+
+                    match minimal_granularities.get(&member_name_without_granularity) {
+                        Some((existing_level, _)) if *existing_level < level => {}
+                        _ => {
+                            minimal_granularities.insert(
+                                member_name_without_granularity,
+                                (level, transformed_value),
+                            );
+                        }
+                    }
+                }
             }
         }
+    }
+
+    // Handle deprecated time dimensions without granularity
+    for (member, (_, value)) in minimal_granularities {
+        row.insert(member, value);
     }
 
     match query_type {
@@ -1271,6 +1334,133 @@ mod tests {
         ]
       ]
     }
+  },
+  "blending_query_multiple_granularities": {
+    "request": {
+      "aliasToMemberNameMap": {
+        "e_commerce_records_us2021__avg_discount": "ECommerceRecordsUs2021.avg_discount",
+        "e_commerce_records_us2021__order_date_month": "ECommerceRecordsUs2021.orderDate.month",
+        "e_commerce_records_us2021__order_date_week": "ECommerceRecordsUs2021.orderDate.week"
+      },
+      "annotation": {
+        "ECommerceRecordsUs2021.avg_discount": {
+          "title": "E Commerce Records Us2021 Avg Discount",
+          "shortTitle": "Avg Discount",
+          "type": "number",
+          "drillMembers": [],
+          "drillMembersGrouped": {
+            "measures": [],
+            "dimensions": []
+          }
+        },
+        "ECommerceRecordsUs2021.orderDate.month": {
+          "title": "E Commerce Records Us2021 Order Date",
+          "shortTitle": "Order Date",
+          "type": "time"
+        },
+        "ECommerceRecordsUs2021.orderDate.week": {
+          "title": "E Commerce Records Us2021 Order Date",
+          "shortTitle": "Order Date",
+          "type": "time"
+        },
+        "ECommerceRecordsUs2021.orderDate": {
+          "title": "E Commerce Records Us2021 Order Date",
+          "shortTitle": "Order Date",
+          "type": "time"
+        }
+      },
+      "query": {
+        "measures": [
+          "ECommerceRecordsUs2021.avg_discount"
+        ],
+        "timeDimensions": [
+          {
+            "dimension": "ECommerceRecordsUs2021.orderDate",
+            "granularity": "month",
+            "dateRange": [
+              "2020-01-01T00:00:00.000",
+              "2020-12-30T23:59:59.999"
+            ]
+          },
+          {
+            "dimension": "ECommerceRecordsUs2021.orderDate",
+            "granularity": "week",
+            "dateRange": [
+              "2020-01-01T00:00:00.000",
+              "2020-12-30T23:59:59.999"
+            ]
+          }
+        ],
+        "filters": [
+          {
+            "operator": "equals",
+            "values": [
+              "First Class"
+            ],
+            "member": "ECommerceRecordsUs2021.shipMode"
+          }
+        ],
+        "limit": 2,
+        "rowLimit": 2,
+        "timezone": "UTC",
+        "order": [],
+        "dimensions": []
+      },
+      "queryType": "blendingQuery"
+    },
+    "queryResult": [
+      {
+        "e_commerce_records_us2021__order_date_month": "2020-01-01T00:00:00.000",
+        "e_commerce_records_us2021__order_date_week": "2019-12-30T00:00:00.000",
+        "e_commerce_records_us2021__avg_discount": "0.28571428571428571429"
+      },
+      {
+        "e_commerce_records_us2021__order_date_month": "2020-02-01T00:00:00.000",
+        "e_commerce_records_us2021__order_date_week": "2020-01-27T00:00:00.000",
+        "e_commerce_records_us2021__avg_discount": "0.21777777777777777778"
+      }
+    ],
+    "finalResultDefault": [
+      {
+        "ECommerceRecordsUs2021.orderDate.month": "2020-01-01T00:00:00.000",
+        "ECommerceRecordsUs2021.orderDate.week": "2019-12-30T00:00:00.000",
+        "ECommerceRecordsUs2021.orderDate": "2019-12-30T00:00:00.000",
+        "ECommerceRecordsUs2021.avg_discount": "0.28571428571428571429",
+        "time.month": "2020-01-01T00:00:00.000"
+      },
+      {
+        "ECommerceRecordsUs2021.orderDate.month": "2020-02-01T00:00:00.000",
+        "ECommerceRecordsUs2021.orderDate.week": "2020-01-27T00:00:00.000",
+        "ECommerceRecordsUs2021.orderDate": "2020-01-27T00:00:00.000",
+        "ECommerceRecordsUs2021.avg_discount": "0.21777777777777777778",
+        "time.month": "2020-02-01T00:00:00.000"
+      }
+    ],
+    "finalResultCompact": {
+      "members": [
+        "ECommerceRecordsUs2021.orderDate.month",
+        "ECommerceRecordsUs2021.orderDate.week",
+        "ECommerceRecordsUs2021.orderDate",
+        "ECommerceRecordsUs2021.avg_discount",
+        "time.month"
+      ],
+      "dataset": [
+        [
+          "2020-01-01T00:00:00.000",
+          "2019-12-30T00:00:00.000",
+          "2019-12-30T00:00:00.000",
+          "0.28571428571428571429",
+          "2020-01-01T00:00:00.000"
+        ],
+        [
+          "2020-02-01T00:00:00.000",
+          "2020-01-27T00:00:00.000",
+          "2020-01-27T00:00:00.000",
+          "0.21777777777777777778",
+          "2020-02-01T00:00:00.000"
+        ]
+      ]
+    }
   }
 }
     "#;
@@ -1916,6 +2106,32 @@ mod tests {
         let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
         let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
         compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_blending_query_multiple_granularities_default() -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA
+            .get(&"blending_query_multiple_granularities".to_string())
+            .unwrap()
+            .clone();
+        test_data.request.res_type = Some(ResultType::Default);
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
+        compare_transformed_data(&transformed, &test_data.final_result_default.unwrap())?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_blending_query_multiple_granularities_compact() -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA
+            .get(&"blending_query_multiple_granularities".to_string())
+            .unwrap()
+            .clone();
+        test_data.request.res_type = Some(ResultType::Compact);
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+        let transformed = TransformedData::transform(&test_data.request, &raw_data)?;
+        compare_transformed_data(&transformed, &test_data.final_result_compact.unwrap())?;
         Ok(())
     }
 
