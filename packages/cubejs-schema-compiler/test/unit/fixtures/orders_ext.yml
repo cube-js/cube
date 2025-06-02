@@ -12,6 +12,11 @@ cubes:
         sql: status
         type: count_distinct
 
+    joins:
+      - name: line_items
+        sql: '{CUBE.id} = {line_items.order_id}'
+        relationship: one_to_many
+
     segments:
       - name: anotherStatus
         description: Just another one
