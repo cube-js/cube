@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
+
+### Bug Fixes
+
+- **cubesql:** Quote subquery joins alias in SQL push down to cube ([#9629](https://github.com/cube-js/cube/issues/9629)) ([89b00cf](https://github.com/cube-js/cube/commit/89b00cf76dfbbfd06f0412d6e80178f0fdb9f46c))
+
 ## [1.3.18](https://github.com/cube-js/cube/compare/v1.3.17...v1.3.18) (2025-05-27)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

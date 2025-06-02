@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
+
+### Features
+
+- Expose aliasMember for hierarchy in View ([#9636](https://github.com/cube-js/cube/issues/9636)) ([737caab](https://github.com/cube-js/cube/commit/737caabf2a43bc28ea0ad90085f44ffbaa1b292b))
+- **schema-compiler:** add quarter granularity support in SqliteQuery using CASE expression ([#9633](https://github.com/cube-js/cube/issues/9633)) ([c7ae936](https://github.com/cube-js/cube/commit/c7ae9365eaf333e995d2536101ebe7dec1daf16a))
+
 ## [1.3.18](https://github.com/cube-js/cube/compare/v1.3.17...v1.3.18) (2025-05-27)
 
 ### Bug Fixes

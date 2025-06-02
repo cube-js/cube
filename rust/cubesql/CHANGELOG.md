@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
+
+### Bug Fixes
+
+- **cubesql:** Fix "Tracker memory shrink underflow" error ([#9624](https://github.com/cube-js/cube/issues/9624)) ([d3af150](https://github.com/cube-js/cube/commit/d3af1506d845276a5b7fd97c5d8543d2cf03a1e0))
+- **cubesql:** Quote subquery joins alias in SQL push down to cube ([#9629](https://github.com/cube-js/cube/issues/9629)) ([89b00cf](https://github.com/cube-js/cube/commit/89b00cf76dfbbfd06f0412d6e80178f0fdb9f46c))
+
+### Features
+
+- **cubesql:** Support `date_trunc != literal date` filter ([#9627](https://github.com/cube-js/cube/issues/9627)) ([2b36aae](https://github.com/cube-js/cube/commit/2b36aae5e93f88f4cca6059067bee047c32f4d24))
+- **cubesql:** Support round() function with two parameters ([#9594](https://github.com/cube-js/cube/issues/9594)) ([8cd1dfe](https://github.com/cube-js/cube/commit/8cd1dfec1b18b246ed8f24f4d7c33a91556a4afa))
+- Expose aliasMember for hierarchy in View ([#9636](https://github.com/cube-js/cube/issues/9636)) ([737caab](https://github.com/cube-js/cube/commit/737caabf2a43bc28ea0ad90085f44ffbaa1b292b))
+
 ## [1.3.18](https://github.com/cube-js/cube/compare/v1.3.17...v1.3.18) (2025-05-27)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
