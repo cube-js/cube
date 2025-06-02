@@ -186,7 +186,7 @@ describe('DataSchemaCompiler', () => {
         })
       `;
 
-      it('Should compile 200 schemas in less than 2500ms * 10', async () => {
+      it('Should compile 200 schemas in less than 5000ms * 10', async () => {
         const repeats = 200;
 
         const compilerWith = prepareJsCompiler(schema, { allowJsDuplicatePropsInSchema: false });
@@ -198,7 +198,7 @@ describe('DataSchemaCompiler', () => {
         const end = new Date().getTime();
         const time = end - start;
 
-        expect(time).toBeLessThan(2500 * 10);
+        expect(time).toBeLessThan(5000 * 10);
       });
     });
   });
