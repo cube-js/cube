@@ -1353,7 +1353,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling_three_day: '900' }
   ]));
 
-  it('rolling count 11', async () => runQueryTest({
+  it('rolling count', async () => runQueryTest({
     measures: [
       'visitors.countRolling'
     ],
