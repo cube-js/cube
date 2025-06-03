@@ -91,6 +91,16 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     token?: string,
 
     /**
+     * Databricks OAuth Client ID.
+     */
+    oauthClientId?: string,
+
+    /**
+     * Databricks OAuth Client Secret.
+     */
+    oauthClientSecret?: string,
+
+    /**
      * Azure tenant Id
      */
     azureTenantId?: string,
@@ -200,6 +210,41 @@ export class DatabricksDriver extends JDBCDriver {
     }
 
     const [uid, pwd, cleanedUrl] = extractAndRemoveUidPwdFromJdbcUrl(url);
+    const passwd = conf?.token ||
+          getEnv('databricksToken', { dataSource }) ||
+          pwd;
+    const oauthClientId = conf?.oauthClientId || getEnv('databricksOAuthClientId', { dataSource });
+    const oauthClientSecret = conf?.oauthClientSecret || getEnv('databricksOAuthClientSecret', { dataSource });
+
+    if (oauthClientId && !oauthClientSecret) {
+      throw new Error('Invalid credentials: No OAuth Client Secret provided');
+    } else if (!oauthClientId && oauthClientSecret) {
+      throw new Error('Invalid credentials: No OAuth Client ID provided');
+    } else if (!oauthClientId && !oauthClientSecret && !passwd) {
+      throw new Error('No credentials provided');
+    }
+
+    const user = uid || 'token';
+
+    let authProps = {};
+
+    // OAuth has an advantage over UID+PWD
+    // For magic numbers below - see Databricks docs:
+    // https://docs.databricks.com/aws/en/integrations/jdbc-oss/configure#authenticate-the-driver
+    if (oauthClientId) {
+      authProps = {
+        OAuth2ClientID: oauthClientId,
+        OAuth2Secret: oauthClientSecret,
+        AuthMech: 11,
+        Auth_Flow: 1,
+      };
+    } else {
+      authProps = {
+        UID: user,
+        PWD: passwd,
+        AuthMech: 3,
+      };
+    }
 
     const config: DatabricksDriverConfiguration = {
       ...conf,
@@ -208,11 +253,7 @@ export class DatabricksDriver extends JDBCDriver {
       drivername: 'com.databricks.client.jdbc.Driver',
       customClassPath: undefined,
       properties: {
-        UID: uid,
-        PWD:
-          conf?.token ||
-          getEnv('databricksToken', { dataSource }) ||
-          pwd,
+        ...authProps,
         UserAgentEntry: 'CubeDev_Cube',
       },
       catalog:
@@ -292,7 +333,31 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public override async testConnection() {
-    const token = `Bearer ${this.config.properties.PWD}`;
+    let token: string;
+
+    // Databricks docs on accessing REST API
+    // https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m
+    if (this.config.properties.OAuth2Secret) {
+      // Need to exchange client ID + Secret => Access token
+
+      const basicAuth = Buffer.from(`${this.config.properties.OAuth2ClientID}:${this.config.properties.OAuth2Secret}`).toString('base64');
+
+      const res = await fetch(`https://${this.parsedConnectionProperties.host}/oidc/v1/token`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          scope: 'all-apis',
+        }),
+      });
+      const resp = await res.json();
+      token = resp.access_token;
+    } else {
+      token = `Bearer ${this.config.properties.PWD}`;
+    }
 
     const res = await fetch(`https://${this.parsedConnectionProperties.host}/api/2.0/sql/warehouses/${this.parsedConnectionProperties.warehouseId}`, {
       headers: { Authorization: token },

@@ -997,6 +997,32 @@ const variables: Record<string, (...args: any) => any> = {
     keyByDataSource('CUBEJS_DB_DATABRICKS_CATALOG', dataSource)
   ],
 
+  /**
+   * Databricks OAuth Client ID (Same as the service principal UUID)
+   */
+  databricksOAuthClientId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID', dataSource)
+    ]
+  ),
+
+  /**
+   * Databricks OAuth Client Secret.
+   */
+  databricksOAuthClientSecret: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_SECRET', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * Athena Driver                                                   *
    ***************************************************************** */
