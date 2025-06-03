@@ -6,11 +6,9 @@ use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::cube_ext;
 use futures::future::join_all;
-use itertools::Itertools;
 use log::{error, info};
 use regex::Regex;
-use std::collections::BTreeSet;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -57,6 +55,7 @@ pub struct BaseRocksStoreFs {
     name: &'static str,
     minimum_snapshots_count: u64,
     snapshots_lifetime: u64,
+    remote_files_cleanup_batch_size: u64,
 }
 
 impl BaseRocksStoreFs {
@@ -66,11 +65,13 @@ impl BaseRocksStoreFs {
     ) -> Arc<Self> {
         let minimum_snapshots_count = config.minimum_metastore_snapshots_count();
         let snapshots_lifetime = config.metastore_snapshots_lifetime();
+        let remote_files_cleanup_batch_size = config.remote_files_cleanup_batch_size();
         Arc::new(Self {
             remote_fs,
             name: "metastore",
             minimum_snapshots_count,
             snapshots_lifetime,
+            remote_files_cleanup_batch_size,
         })
     }
     pub fn new_for_cachestore(
@@ -79,11 +80,13 @@ impl BaseRocksStoreFs {
     ) -> Arc<Self> {
         let minimum_snapshots_count = config.minimum_cachestore_snapshots_count();
         let snapshots_lifetime = config.cachestore_snapshots_lifetime();
+        let remote_files_cleanup_batch_size = config.remote_files_cleanup_batch_size();
         Arc::new(Self {
             remote_fs,
             name: "cachestore",
             minimum_snapshots_count,
             snapshots_lifetime,
+            remote_files_cleanup_batch_size,
         })
     }
 
@@ -135,63 +138,78 @@ impl BaseRocksStoreFs {
 
         Ok(upload_results)
     }
+
+    // Exposed for tests
+    pub async fn list_files_by_snapshot(
+        remote_fs: &dyn RemoteFs,
+        name: &str,
+    ) -> Result<HashMap<u128, Vec<String>>, CubeError> {
+        let existing_metastore_files = remote_fs.list(format!("{}-", name)).await?;
+        let mut snapshot_map = HashMap::<u128, Vec<String>>::new();
+        for existing in existing_metastore_files.into_iter() {
+            let path = existing.split("/").nth(0).map(|p| {
+                u128::from_str(
+                    &p.replace(&format!("{}-", name), "")
+                        .replace("-index-logs", "")
+                        .replace("-logs", ""),
+                )
+            });
+            if let Some(Ok(millis)) = path {
+                snapshot_map
+                    .entry(millis)
+                    .or_insert(Vec::new())
+                    .push(existing);
+            }
+        }
+        Ok(snapshot_map)
+    }
+
     pub async fn delete_old_snapshots(&self) -> Result<Vec<String>, CubeError> {
-        let existing_metastore_files = self.remote_fs.list(format!("{}-", self.name)).await?;
-        let candidates = existing_metastore_files
-            .iter()
-            .filter_map(|existing| {
-                let path = existing.split("/").nth(0).map(|p| {
-                    u128::from_str(
-                        &p.replace(&format!("{}-", self.name), "")
-                            .replace("-index-logs", "")
-                            .replace("-logs", ""),
-                    )
-                });
-                if let Some(Ok(millis)) = path {
-                    Some((existing, millis))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        let candidates_map =
+            Self::list_files_by_snapshot(self.remote_fs.as_ref(), &self.name).await?;
 
         let lifetime_ms = (self.snapshots_lifetime as u128) * 1000;
         let min_snapshots_count = self.minimum_snapshots_count as usize;
 
-        let mut snapshots_list = candidates
-            .iter()
-            .map(|(_, ms)| ms.to_owned())
-            .unique()
-            .collect::<Vec<_>>();
-        snapshots_list.sort_unstable_by(|a, b| b.cmp(a));
+        // snapshots_list sorted by oldest first.
+        let mut snapshots_list: Vec<u128> = candidates_map.keys().cloned().collect::<Vec<_>>();
+        snapshots_list.sort_unstable();
 
-        let snapshots_to_delete = snapshots_list
-            .into_iter()
-            .skip(min_snapshots_count)
-            .filter(|ms| {
-                SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis()
-                    - ms
-                    > lifetime_ms
-            })
-            .collect::<HashSet<_>>();
+        if snapshots_list.len() <= min_snapshots_count {
+            return Ok(vec![]);
+        }
+        snapshots_list.truncate(snapshots_list.len() - min_snapshots_count);
 
-        if !snapshots_to_delete.is_empty() {
-            let to_delete = candidates
-                .into_iter()
-                .filter_map(|(path, ms)| {
-                    if snapshots_to_delete.contains(&ms) {
-                        Some(path.to_owned())
-                    } else {
-                        None
-                    }
-                })
-                .unique()
-                .collect::<Vec<_>>();
+        let cutoff_time_ms: u128 = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+            - lifetime_ms;
+
+        while !snapshots_list.is_empty() && *snapshots_list.last().unwrap() >= cutoff_time_ms {
+            snapshots_list.pop();
+        }
+
+        let snapshots_list = snapshots_list;
+
+        if snapshots_list.is_empty() {
+            // Avoid empty join_all, iteration, etc.
+            return Ok(vec![]);
+        }
+
+        let mut to_delete = Vec::new();
+
+        for ms in snapshots_list {
+            to_delete.extend_from_slice(&candidates_map[&ms]);
+        }
+
+        for batch in to_delete.chunks(
+            self.remote_files_cleanup_batch_size
+                .try_into()
+                .unwrap_or(usize::MAX),
+        ) {
             for v in join_all(
-                to_delete
+                batch
                     .iter()
                     .map(|f| self.remote_fs.delete_file(f.to_string()))
                     .collect::<Vec<_>>(),
@@ -201,11 +219,9 @@ impl BaseRocksStoreFs {
             {
                 v?;
             }
-
-            Ok(to_delete)
-        } else {
-            Ok(vec![])
         }
+
+        Ok(to_delete)
     }
 
     pub async fn is_remote_metadata_exists(&self) -> Result<bool, CubeError> {
@@ -367,9 +383,9 @@ impl MetaStoreFs for BaseRocksStoreFs {
         self.upload_snapsots_files(&remote_path, &checkpoint_path)
             .await?;
 
-        self.delete_old_snapshots().await?;
-
         self.write_metastore_current(&remote_path).await?;
+
+        self.delete_old_snapshots().await?;
 
         Ok(())
     }
