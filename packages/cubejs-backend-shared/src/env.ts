@@ -954,7 +954,7 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Databricks jdbc-connection url.
    */
-  databrickUrl: ({
+  databricksUrl: ({
     dataSource,
   }: {
     dataSource: string,
@@ -975,7 +975,7 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Databricks jdbc-connection token.
    */
-  databrickToken: ({
+  databricksToken: ({
     dataSource,
   }: {
     dataSource: string,

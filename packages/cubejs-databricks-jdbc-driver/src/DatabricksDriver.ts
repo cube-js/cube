@@ -192,7 +192,7 @@ export class DatabricksDriver extends JDBCDriver {
     let showSparkProtocolWarn = false;
     let url: string =
       conf?.url ||
-      getEnv('databrickUrl', { dataSource }) ||
+      getEnv('databricksUrl', { dataSource }) ||
       getEnv('jdbcUrl', { dataSource });
     if (url.indexOf('jdbc:spark://') !== -1) {
       showSparkProtocolWarn = true;
@@ -211,7 +211,7 @@ export class DatabricksDriver extends JDBCDriver {
         UID: uid,
         PWD:
           conf?.token ||
-          getEnv('databrickToken', { dataSource }) ||
+          getEnv('databricksToken', { dataSource }) ||
           pwd,
         UserAgentEntry: 'CubeDev_Cube',
       },
