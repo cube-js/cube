@@ -244,7 +244,7 @@ export class CubeSymbols {
 
       get accessPolicy() {
         if (!accessPolicy) {
-          const parentAcls = cubeDefinition.extends ? super.accessPolicy : [];
+          const parentAcls = cubeDefinition.extends ? R.clone(super.accessPolicy) : [];
           accessPolicy = [...(parentAcls || []), ...(cubeDefinition.accessPolicy || [])];
         }
         // Schema validator expects accessPolicy to be not empty if defined
