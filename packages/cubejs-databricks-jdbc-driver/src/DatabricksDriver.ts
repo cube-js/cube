@@ -230,7 +230,7 @@ export class DatabricksDriver extends JDBCDriver {
 
     const user = uid || 'token';
 
-    let authProps = {};
+    let authProps: Record<string, any> = {};
 
     // OAuth has an advantage over UID+PWD
     // For magic numbers below - see Databricks docs:
@@ -244,7 +244,7 @@ export class DatabricksDriver extends JDBCDriver {
       };
     } else {
       authProps = {
-        UID: user,
+        user,
         PWD: passwd,
         AuthMech: 3,
       };
