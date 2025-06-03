@@ -162,6 +162,10 @@ export class DatabricksDriver extends JDBCDriver {
 
   private readonly parsedConnectionProperties: ParsedConnectionProperties;
 
+  private accessToken: string | undefined;
+
+  private accessTokenExpires: number = 0;
+
   public static dialectClass() {
     return DatabricksQuery;
   }
@@ -332,29 +336,52 @@ export class DatabricksDriver extends JDBCDriver {
     this.showDeprecations();
   }
 
+  private async fetchAccessToken(): Promise<void> {
+    // Need to exchange client ID + Secret => Access token
+
+    const basicAuth = Buffer.from(`${this.config.properties.OAuth2ClientID}:${this.config.properties.OAuth2Secret}`).toString('base64');
+
+    const res = await fetch(`https://${this.parsedConnectionProperties.host}/oidc/v1/token`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        scope: 'all-apis',
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to get access token: ${res.statusText}`);
+    }
+
+    const resp = await res.json();
+
+    this.accessToken = resp.access_token;
+    this.accessTokenExpires = Date.now() + resp.expires_in * 1000 - 60_000;
+  }
+
+  private async getValidAccessToken(): Promise<string> {
+    if (
+      !this.accessToken ||
+      !this.accessTokenExpires ||
+      Date.now() >= this.accessTokenExpires
+    ) {
+      await this.fetchAccessToken();
+    }
+    return this.accessToken!;
+  }
+
   public override async testConnection() {
     let token: string;
 
     // Databricks docs on accessing REST API
     // https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m
     if (this.config.properties.OAuth2Secret) {
-      // Need to exchange client ID + Secret => Access token
-
-      const basicAuth = Buffer.from(`${this.config.properties.OAuth2ClientID}:${this.config.properties.OAuth2Secret}`).toString('base64');
-
-      const res = await fetch(`https://${this.parsedConnectionProperties.host}/oidc/v1/token`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${basicAuth}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          grant_type: 'client_credentials',
-          scope: 'all-apis',
-        }),
-      });
-      const resp = await res.json();
-      token = resp.access_token;
+      const at = await this.getValidAccessToken();
+      token = `Bearer ${at}`;
     } else {
       token = `Bearer ${this.config.properties.PWD}`;
     }
