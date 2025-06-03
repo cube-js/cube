@@ -43,7 +43,7 @@ export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [uid: string
   const uidMatch = jdbcUrl.match(/UID=([^;]*)/i);
   const pwdMatch = jdbcUrl.match(/PWD=([^;]*)/i);
 
-  const uid = uidMatch?.[1] || '';
+  const uid = uidMatch?.[1] || 'token';
   const pwd = pwdMatch?.[1] || '';
 
   const cleanedUrl = jdbcUrl

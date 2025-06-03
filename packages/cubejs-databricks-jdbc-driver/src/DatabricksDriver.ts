@@ -228,8 +228,6 @@ export class DatabricksDriver extends JDBCDriver {
       throw new Error('No credentials provided');
     }
 
-    const user = uid || 'token';
-
     let authProps: Record<string, any> = {};
 
     // OAuth has an advantage over UID+PWD
@@ -244,7 +242,7 @@ export class DatabricksDriver extends JDBCDriver {
       };
     } else {
       authProps = {
-        user,
+        UID: uid,
         PWD: passwd,
         AuthMech: 3,
       };
