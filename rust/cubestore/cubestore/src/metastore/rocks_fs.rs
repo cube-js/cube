@@ -145,6 +145,12 @@ impl BaseRocksStoreFs {
         name: &str,
     ) -> Result<HashMap<u128, Vec<String>>, CubeError> {
         let existing_metastore_files = remote_fs.list(format!("{}-", name)).await?;
+        // Log a debug statement so that we can rule out the filename list itself being too large for memory.
+        log::debug!(
+            "Listed existing {} files, count = {}",
+            name,
+            existing_metastore_files.len()
+        );
         let mut snapshot_map = HashMap::<u128, Vec<String>>::new();
         for existing in existing_metastore_files.into_iter() {
             let path = existing.split("/").nth(0).map(|p| {
@@ -197,10 +203,15 @@ impl BaseRocksStoreFs {
             return Ok(vec![]);
         }
 
-        let mut to_delete = Vec::new();
+        let mut to_delete: Vec<String> = Vec::new();
 
+        let mut candidates_map = candidates_map;
         for ms in snapshots_list {
-            to_delete.extend_from_slice(&candidates_map[&ms]);
+            to_delete.append(
+                candidates_map
+                    .get_mut(&ms)
+                    .expect("delete_old_snapshots candidates_map lookup should succeed"),
+            );
         }
 
         for batch in to_delete.chunks(
