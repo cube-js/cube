@@ -344,6 +344,7 @@ macro_rules! variant_field_struct {
                 AggregateFunction::ApproxMedian => "ApproxMedian",
                 AggregateFunction::BoolAnd => "BoolAnd",
                 AggregateFunction::BoolOr => "BoolOr",
+                AggregateFunction::PercentileCont => "PercentileCont",
             }
         );
     };

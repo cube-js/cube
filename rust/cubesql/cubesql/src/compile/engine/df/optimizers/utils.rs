@@ -242,15 +242,31 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             fun,
             args,
             distinct,
-        } => args
-            .iter()
-            .map(|arg| rewrite(arg, map))
-            .collect::<Result<Option<Vec<_>>>>()?
-            .map(|args| Expr::AggregateFunction {
-                fun: fun.clone(),
-                args,
-                distinct: *distinct,
-            }),
+            within_group,
+        } => {
+            let args = args
+                .iter()
+                .map(|arg| rewrite(arg, map))
+                .collect::<Result<Option<Vec<_>>>>()?;
+            let within_group = match within_group.as_ref() {
+                Some(within_group) => within_group
+                    .iter()
+                    .map(|expr| rewrite(expr, map))
+                    .collect::<Result<Option<Vec<_>>>>()?
+                    .map(|within_group| Some(within_group)),
+                None => Some(None),
+            };
+            if let (Some(args), Some(within_group)) = (args, within_group) {
+                Some(Expr::AggregateFunction {
+                    fun: fun.clone(),
+                    args,
+                    distinct: *distinct,
+                    within_group,
+                })
+            } else {
+                None
+            }
+        }
         Expr::WindowFunction {
             fun,
             args,

@@ -2,7 +2,7 @@ use crate::{
     compile::{
         engine::udf::{MEASURE_UDAF_NAME, PATCH_MEASURE_UDAF_NAME},
         rewrite::{
-            agg_fun_expr, aggregate, alias_expr,
+            agg_fun_expr, agg_fun_expr_within_group_empty_tail, aggregate, alias_expr,
             analysis::ConstantFolding,
             binary_expr, case_expr, column_expr, cube_scan_wrapper, grouping_set_expr,
             literal_null, original_expr_name, rewrite,
@@ -356,6 +356,7 @@ impl WrapperRules {
                                 Some(literal_null()),
                             )],
                             "?distinct",
+                            agg_fun_expr_within_group_empty_tail(),
                         ),
                     ),
                     (
