@@ -60,11 +60,11 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return 2;
   }
 
-  private config: PrestoDriverConfiguration;
+  protected readonly config: PrestoDriverConfiguration;
 
-  private catalog: string | undefined;
+  protected readonly catalog: string | undefined;
 
-  private client: any;
+  protected client: any;
 
   /**
    * Class constructor.
