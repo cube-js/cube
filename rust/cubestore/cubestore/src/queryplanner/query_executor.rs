@@ -2073,24 +2073,33 @@ fn combine_filters(filters: &[Expr]) -> Option<Expr> {
     Some(combined_filter)
 }
 
+pub fn regroup_batch_onto(
+    b: RecordBatch,
+    max_rows: usize,
+    onto: &mut Vec<RecordBatch>,
+) -> Result<(), CubeError> {
+    let mut row = 0;
+    while row != b.num_rows() {
+        let slice_len = min(b.num_rows() - row, max_rows);
+        onto.push(RecordBatch::try_new(
+            b.schema(),
+            b.columns()
+                .iter()
+                .map(|c| slice_copy(c.as_ref(), row, slice_len))
+                .collect(),
+        )?);
+        row += slice_len;
+    }
+    Ok(())
+}
+
 fn regroup_batches(
     batches: Vec<RecordBatch>,
     max_rows: usize,
 ) -> Result<Vec<RecordBatch>, CubeError> {
     let mut r = Vec::with_capacity(batches.len());
     for b in batches {
-        let mut row = 0;
-        while row != b.num_rows() {
-            let slice_len = min(b.num_rows() - row, max_rows);
-            r.push(RecordBatch::try_new(
-                b.schema(),
-                b.columns()
-                    .iter()
-                    .map(|c| slice_copy(c.as_ref(), row, slice_len))
-                    .collect(),
-            )?);
-            row += slice_len
-        }
+        regroup_batch_onto(b, max_rows, &mut r)?;
     }
     Ok(r)
 }
