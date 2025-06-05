@@ -136,7 +136,7 @@ export class CubeToMetaTransformer {
 
     // As for now context works on the cubes level
     return R.filter(
-      (query) => R.contains(query.config.name, context.contextMembers)
+      (query) => R.includes(query.config.name, context.contextMembers)
     )(this.queries);
   }
 

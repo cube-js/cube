@@ -81,17 +81,22 @@ export class BaseSegment {
     return this.segmentDefinition().sql;
   }
 
-  public path() {
+  public path(): Array<string> | null {
     if (this.expression) {
       return null;
     }
     return this.query.cubeEvaluator.parsePath('segments', this.segment);
   }
 
-  public expressionPath() {
+  public expressionPath(): string {
     if (this.expression) {
       return `expr:${this.expression.expressionName}`;
     }
-    return this.query.cubeEvaluator.pathFromArray(this.path() as string[]);
+    const path = this.path();
+    if (path === null) {
+      // Sanity check, this should not actually happen because we checked this.expression earlier
+      throw new Error('Unexpected null path');
+    }
+    return this.query.cubeEvaluator.pathFromArray(path);
   }
 }

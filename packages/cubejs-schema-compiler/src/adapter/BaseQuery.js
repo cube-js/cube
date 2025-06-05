@@ -326,6 +326,9 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
     /**
+     * For now this might come only from SQL API, it might be some queries that uses measures and filters to
+     * get the dimensions that are then used as join conditions to get the final results.
+     * As consequence - if there are such sub query joins - pre-aggregations can't be used.
      * @type {Array<{sql: string, on: {expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}>}
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
@@ -413,7 +416,7 @@ export class BaseQuery {
 
   /**
    *
-   * @returns {Array<Array<string>>}
+   * @returns {Array<string | Array<string>>}
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
@@ -629,7 +632,9 @@ export class BaseQuery {
     if (this.from) {
       return this.simpleQuery();
     }
-    if (!this.options.preAggregationQuery) {
+    const hasMemberExpressions = this.allMembersConcat(false).some(m => m.isMemberExpression);
+
+    if (!this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
@@ -641,8 +646,6 @@ export class BaseQuery {
         multipliedMeasures,
         regularMeasures,
         cumulativeMeasures,
-        withQueries,
-        multiStageMembers,
       } = this.fullKeyQueryAggregateMeasures();
 
       if (cumulativeMeasures.length === 0) {
@@ -706,7 +709,7 @@ export class BaseQuery {
   externalPreAggregationQuery() {
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
-      if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
+      if (preAggregationForQuery?.preAggregation.external) {
         return true;
       }
       const preAggregationsDescription = this.preAggregations.preAggregationsDescription();
@@ -2006,6 +2009,12 @@ export class BaseQuery {
     ));
   }
 
+  /**
+   *
+   * @param {string} cube
+   * @param {boolean} [isLeftJoinCondition]
+   * @returns {[string, string, string?]}
+   */
   rewriteInlineCubeSql(cube, isLeftJoinCondition) {
     const sql = this.cubeSql(cube);
     const cubeAlias = this.cubeAlias(cube);
@@ -2113,6 +2122,11 @@ export class BaseQuery {
     return this.filtersWithoutSubQueriesValue;
   }
 
+  /**
+   *
+   * @param {string} dimension
+   * @returns {{ prefix: string, subQuery: this, cubeName: string }}
+   */
   subQueryDescription(dimension) {
     const symbol = this.cubeEvaluator.dimensionByPath(dimension);
     const [cubeName, name] = this.cubeEvaluator.parsePath('dimensions', dimension);
@@ -2157,6 +2171,12 @@ export class BaseQuery {
     return { prefix, subQuery, cubeName };
   }
 
+  /**
+   *
+   * @param {string} cubeName
+   * @param {string} name
+   * @returns {string}
+   */
   subQueryName(cubeName, name) {
     return `${cubeName}_${name}_subquery`;
   }
@@ -2501,6 +2521,11 @@ export class BaseQuery {
     );
   }
 
+  /**
+   *
+   * @param {() => void} fn
+   * @returns {Array<string>}
+   */
   collectSubQueryDimensionsFor(fn) {
     const context = { subQueryDimensions: [] };
     this.evaluateSymbolSqlWithContext(
@@ -2976,6 +3001,11 @@ export class BaseQuery {
     return strings.join(' || ');
   }
 
+  /**
+   *
+   * @param {string} cubeName
+   * @returns {Array<string>}
+   */
   primaryKeyNames(cubeName) {
     const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
     if (!primaryKeys || !primaryKeys.length) {
@@ -3478,8 +3508,8 @@ export class BaseQuery {
 
   /**
    *
-   * @param options
-   * @returns {BaseQuery}
+   * @param {unknown} options
+   * @returns {this}
    */
   newSubQuery(options) {
     const QueryClass = this.constructor;
