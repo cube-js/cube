@@ -3,7 +3,7 @@ use crate::queryplanner::topk::execute::{AggregateTopKExec, TopKAggregateFunctio
 use crate::queryplanner::topk::{
     ClusterAggregateTopKLower, ClusterAggregateTopKUpper, SortColumn, MIN_TOPK_STREAM_ROWS,
 };
-use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeScalarUDFKind};
+use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeScalarUDFKind, HllCardinality};
 use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::common::tree_node::{Transformed, TreeNode};
@@ -11,11 +11,12 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::SessionState;
 use datafusion::logical_expr::expr::{physical_name, AggregateFunctionParams};
 use datafusion::logical_expr::expr::{AggregateFunction, Alias, ScalarFunction};
-use datafusion::physical_expr::{LexOrdering, LexRequirement, PhysicalSortRequirement};
+use datafusion::physical_expr::{
+    LexOrdering, LexRequirement, PhysicalSortRequirement, ScalarFunctionExpr,
+};
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::sorts::sort::SortExec;
-use datafusion::physical_plan::udf::create_physical_expr;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
 use datafusion::common::{DFSchema, DFSchemaRef, Spans};
@@ -599,10 +600,6 @@ pub fn plan_topk(
     )?);
 
     let aggregate_schema = aggregate.schema();
-    // This is only used in make_sort_expr with HllCardinality, which doesn't use the schema in
-    // create_physical_expr.  So this value is unused.  Which means that creating a DFSchema that is
-    // missing qualifiers and other info is okay.
-    let aggregate_dfschema = Arc::new(DFSchema::try_from(aggregate_schema.clone())?);
 
     let agg_fun = lower_node
         .aggregate_expr
@@ -618,11 +615,8 @@ pub fn plan_topk(
             let i = group_expr_len + c.agg_index;
             PhysicalSortExpr {
                 expr: make_sort_expr(
-                    &aggregate_schema,
                     &agg_fun[c.agg_index].0,
                     Arc::new(Column::new(aggregate_schema.field(i).name(), i)),
-                    agg_fun[c.agg_index].1,
-                    &aggregate_dfschema,
                 ),
                 options: SortOptions {
                     descending: !c.asc,
@@ -676,24 +670,22 @@ pub fn plan_topk(
 }
 
 pub fn make_sort_expr(
-    schema: &Arc<Schema>,
     fun: &TopKAggregateFunction,
     col: Arc<dyn PhysicalExpr>,
-    args: &[Expr],
-    logical_schema: &DFSchema,
 ) -> Arc<dyn PhysicalExpr> {
     // Note that logical_schema is computed by our caller from schema, may lack qualifiers or other
     // info, and this works OK because HllCardinality's trait implementation functions don't use the
     // schema in create_physical_expr.
     match fun {
-        TopKAggregateFunction::Merge => create_physical_expr(
-            &scalar_udf_by_kind(CubeScalarUDFKind::HllCardinality),
-            &[col],
-            schema,
-            args,
-            logical_schema,
-        )
-        .unwrap(),
+        TopKAggregateFunction::Merge => {
+            let udf = scalar_udf_by_kind(CubeScalarUDFKind::HllCardinality);
+            Arc::new(ScalarFunctionExpr::new(
+                HllCardinality::static_name(),
+                udf,
+                vec![col],
+                HllCardinality::static_return_type(),
+            ))
+        }
         _ => col,
     }
 }

@@ -16,7 +16,7 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::SessionStateDefaults;
 use datafusion::logical_expr::{
     AggregateUDF, Expr, ScalarUDF, ScalarUDFImpl, Signature, TableSource, TypeSignature,
-    Volatility, Window, WindowUDF,
+    Volatility, WindowUDF,
 };
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ColumnarValue;
@@ -150,10 +150,10 @@ impl TableProvider for TopicTableProvider {
 
     async fn scan(
         &self,
-        state: &dyn Session,
-        projection: Option<&Vec<usize>>,
-        filters: &[Expr],
-        limit: Option<usize>,
+        _state: &dyn Session,
+        _projection: Option<&Vec<usize>>,
+        _filters: &[Expr],
+        _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         Ok(Arc::new(EmptyExec::new(self.schema())))
     }
@@ -183,7 +183,10 @@ fn parse_timestamp_array(
         if input.is_null(i) {
             result.append_null();
         } else {
-            let ts = match tz.datetime_from_str(input.value(i), &format) {
+            #[allow(deprecated)]
+            let parse_result = tz.datetime_from_str(input.value(i), &format);
+
+            let ts = match parse_result {
                 Ok(ts) => ts,
                 Err(e) => {
                     return Err(DataFusionError::Execution(format!(
@@ -231,7 +234,7 @@ fn convert_tz_array(
                     }
                 };
                 let res = from.with_timezone(to_tz);
-                result.append_value(res.naive_local().timestamp_micros());
+                result.append_value(res.naive_local().and_utc().timestamp_micros());
             }
         }
     }
@@ -329,7 +332,10 @@ impl ScalarUDFImpl for ParseTimestampFunc {
 
         match &inputs[0] {
             ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
-                let ts = match tz.datetime_from_str(s, &format) {
+                #[allow(deprecated)]
+                let parse_result = tz.datetime_from_str(s, &format);
+
+                let ts = match parse_result {
                     Ok(ts) => ts,
                     Err(e) => {
                         return Err(DataFusionError::Execution(format!(
@@ -451,7 +457,7 @@ impl ScalarUDFImpl for ConvertTzFunc {
                     };
                     let result = from.with_timezone(&to_tz);
                     Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
-                        Some(result.naive_local().timestamp_micros()),
+                        Some(result.naive_local().and_utc().timestamp_micros()),
                         None,
                     )))
                 }

@@ -1,17 +1,14 @@
 mod check_memory;
 mod distributed_partial_aggregate;
-mod prefer_inplace_aggregates;
 pub mod rewrite_plan;
 pub mod rolling_optimizer;
 mod trace_data_loaded;
 
+use super::serialized_plan::PreSerializedPlan;
 use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::queryplanner::optimizations::distributed_partial_aggregate::{
     add_limit_to_workers, ensure_partition_merge, push_aggregate_to_workers,
 };
-use std::fmt::{Debug, Formatter};
-// use crate::queryplanner::optimizations::prefer_inplace_aggregates::try_switch_to_inplace_aggregates;
-use super::serialized_plan::PreSerializedPlan;
 use crate::queryplanner::planning::CubeExtensionPlanner;
 use crate::queryplanner::rolling::RollingWindowPlanner;
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
@@ -28,6 +25,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_planner::{DefaultPhysicalPlanner, PhysicalPlanner};
 use distributed_partial_aggregate::ensure_partition_merge_with_acceptable_parent;
 use rewrite_plan::rewrite_physical_plan;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use trace_data_loaded::add_trace_data_loaded_exec;
 
@@ -105,20 +103,11 @@ impl QueryPlanner for CubeQueryPlanner {
 }
 
 #[derive(Debug)]
-pub struct PreOptimizeRule {
-    memory_handler: Arc<dyn MemoryHandler>,
-    data_loaded_size: Option<Arc<DataLoadedSize>>,
-}
+pub struct PreOptimizeRule {}
 
 impl PreOptimizeRule {
-    pub fn new(
-        memory_handler: Arc<dyn MemoryHandler>,
-        data_loaded_size: Option<Arc<DataLoadedSize>>,
-    ) -> Self {
-        Self {
-            memory_handler,
-            data_loaded_size,
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -128,11 +117,7 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
-        pre_optimize_physical_plan(
-            plan,
-            self.memory_handler.clone(),
-            self.data_loaded_size.clone(),
-        )
+        pre_optimize_physical_plan(plan)
     }
 
     fn name(&self) -> &str {
@@ -146,10 +131,7 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
 
 fn pre_optimize_physical_plan(
     p: Arc<dyn ExecutionPlan>,
-    memory_handler: Arc<dyn MemoryHandler>,
-    data_loaded_size: Option<Arc<DataLoadedSize>>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    // TODO upgrade DF
     let p = rewrite_physical_plan(p, &mut |p| push_aggregate_to_workers(p))?;
 
     // Handles non-root-node cases

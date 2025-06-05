@@ -1,4 +1,5 @@
 use crate::metastore::table::TablePath;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -164,7 +165,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                             .get_row()
                             .created_at()
                             .as_ref()
-                            .map(|t| t.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),
@@ -175,28 +176,31 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                             .get_row()
                             .build_range_end()
                             .as_ref()
-                            .map(|t| t.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),
             Box::new(|tables| {
-                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
-                    |row| {
-                        row.table
-                            .get_row()
-                            .seal_at()
-                            .as_ref()
-                            .map(|t| t.timestamp_nanos())
-                    },
-                )))
-            }),
-            Box::new(|tables| {
-                Arc::new(BooleanArray::from_iter(
-                    tables.iter().map(|row| Some(row.table.get_row().sealed())),
+                Arc::new(StringArray::from_iter_values(
+                    tables
+                        .iter()
+                        .map(|row| {
+                            row.table
+                                .get_row()
+                                .seal_at()
+                                .as_ref()
+                                .map(timestamp_nanos_or_panic)
+                        })
+                        .collect::<Vec<_>>(),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from_iter(tables.iter().map(|row| {
+                Arc::new(BooleanArray::from_iter_values(
+                    tables.iter().map(|row| row.table.get_row().sealed()),
+                ))
+            }),
+            Box::new(|tables| {
+                Arc::new(StringArray::from_iter_values(tables.iter().map(|row| {
                     row.table
                         .get_row()
                         .select_statement()
@@ -205,11 +209,9 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 })))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from_iter(
-                    tables
-                        .iter()
-                        .map(|row| row.table.get_row().extension().as_deref()),
-                ))
+                Arc::new(StringArray::from_iter(tables.iter().map(|row| {
+                    row.table.get_row().extension().as_ref().map(|t| t.as_str())
+                })))
             }),
         ]
     }

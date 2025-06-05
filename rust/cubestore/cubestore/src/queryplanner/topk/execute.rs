@@ -1510,14 +1510,11 @@ mod tests {
                 let i = key_len + c.agg_index;
                 PhysicalSortRequirement {
                     expr: make_sort_expr(
-                        &input_schema.inner(),
                         &aggs[c.agg_index],
                         Arc::new(datafusion::physical_expr::expressions::Column::new(
                             input_schema.field(i).name(),
                             i,
                         )),
-                        &agg_functions[c.agg_index].params.args,
-                        &input_schema,
                     ),
                     options: Some(SortOptions {
                         descending: !c.asc,
