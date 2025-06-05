@@ -137,6 +137,7 @@ export class PrestodbQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    delete templates.functions.PERCENTILECONT;
     templates.statements.select = 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
       'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
       '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +

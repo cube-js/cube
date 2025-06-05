@@ -235,6 +235,7 @@ crate::plan_to_language! {
             fun: AggregateFunction,
             args: Vec<Expr>,
             distinct: bool,
+            within_group: Vec<Expr>,
         },
         WindowFunctionExpr {
             fun: WindowFunction,
@@ -1416,19 +1417,37 @@ fn scalar_fun_expr_args_empty_tail() -> String {
     fun_expr_args_empty_tail()
 }
 
-fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
+fn agg_fun_expr(
+    fun_name: impl Display,
+    args: Vec<impl Display>,
+    distinct: impl Display,
+    within_group: impl Display,
+) -> String {
     let prefix = if fun_name.to_string().starts_with("?") {
         ""
     } else {
         "AggregateFunctionExprFun:"
     };
     format!(
-        "(AggregateFunctionExpr {}{} {} {})",
+        "(AggregateFunctionExpr {}{} {} {} {})",
         prefix,
         fun_name,
         list_expr("AggregateFunctionExprArgs", args),
-        distinct
+        distinct,
+        within_group,
     )
+}
+
+fn agg_fun_expr_within_group(left: impl Display, right: impl Display) -> String {
+    format!("(AggregateFunctionExprWithinGroup {} {})", left, right)
+}
+
+fn agg_fun_expr_within_group_list(order_by: Vec<impl Display>) -> String {
+    list_expr("AggregateFunctionExprWithinGroup", order_by)
+}
+
+fn agg_fun_expr_within_group_empty_tail() -> String {
+    agg_fun_expr_within_group_list(Vec::<String>::new())
 }
 
 fn window_fun_expr_var_arg(
