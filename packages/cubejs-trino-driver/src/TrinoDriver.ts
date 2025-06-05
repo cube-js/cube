@@ -12,12 +12,14 @@ export class TrinoDriver extends PrestoDriver {
   }
 
   public override async testConnection(): Promise<void> {
-    const { host, port, ssl, basic_auth: basicAuth } = this.config;
+    const { host, port, ssl, basic_auth: basicAuth, custom_auth: customAuth } = this.config;
     const protocol = ssl ? 'https' : 'http';
     const url = `${protocol}://${host}:${port}/v1/info`;
     const headers: Record<string, string> = {};
 
-    if (basicAuth) {
+    if (customAuth) {
+      headers.Authorization = customAuth;
+    } else if (basicAuth) {
       const { user, password } = basicAuth;
       const encoded = Buffer.from(`${user}:${password}`).toString('base64');
       headers.Authorization = `Basic ${encoded}`;
