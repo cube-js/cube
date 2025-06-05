@@ -63,9 +63,9 @@ use datafusion::execution::{SessionState, TaskContext};
 use datafusion::logical_expr::expr::Alias;
 use datafusion::logical_expr::utils::expr_to_columns;
 use datafusion::logical_expr::{
-    expr, logical_plan, Aggregate, BinaryExpr, Expr, Extension, FetchType, Filter, InvariantLevel,
-    Join, Limit, LogicalPlan, Operator, Projection, SkipType, Sort, SortExpr, SubqueryAlias,
-    TableScan, Union, Unnest, UserDefinedLogicalNode,
+    expr, Aggregate, BinaryExpr, Expr, Extension, FetchType, Filter, InvariantLevel, Join, Limit,
+    LogicalPlan, Operator, Projection, SkipType, Sort, SortExpr, SubqueryAlias, TableScan, Union,
+    Unnest, UserDefinedLogicalNode,
 };
 use datafusion::physical_expr::{Distribution, LexRequirement};
 use datafusion::physical_planner::{ExtensionPlanner, PhysicalPlanner};

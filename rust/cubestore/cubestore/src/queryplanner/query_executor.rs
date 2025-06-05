@@ -75,11 +75,10 @@ use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
-    PhysicalExpr, PlanProperties, SendableRecordBatchStream,
+    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalExpr,
+    PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
-use datafusion_datasource::memory::MemoryExec;
 use datafusion_datasource::memory::MemorySourceConfig;
 use datafusion_datasource::source::DataSourceExec;
 use futures_util::{stream, StreamExt, TryStreamExt};
@@ -411,10 +410,11 @@ impl QueryExecutorImpl {
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<PreSerializedPlan>,
     ) -> Result<Arc<SessionContext>, CubeError> {
-        self.make_context(
-            CubeQueryPlanner::new_on_router(cluster, serialized_plan, self.memory_handler.clone()),
-            None,
-        )
+        self.make_context(CubeQueryPlanner::new_on_router(
+            cluster,
+            serialized_plan,
+            self.memory_handler.clone(),
+        ))
     }
 
     fn worker_context(
@@ -423,21 +423,17 @@ impl QueryExecutorImpl {
         worker_planning_params: WorkerPlanningParams,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<SessionContext>, CubeError> {
-        self.make_context(
-            CubeQueryPlanner::new_on_worker(
-                serialized_plan,
-                worker_planning_params,
-                self.memory_handler.clone(),
-                data_loaded_size.clone(),
-            ),
-            data_loaded_size,
-        )
+        self.make_context(CubeQueryPlanner::new_on_worker(
+            serialized_plan,
+            worker_planning_params,
+            self.memory_handler.clone(),
+            data_loaded_size.clone(),
+        ))
     }
 
     fn make_context(
         &self,
         query_planner: CubeQueryPlanner,
-        data_loaded_size: Option<Arc<DataLoadedSize>>, // None on router
     ) -> Result<Arc<SessionContext>, CubeError> {
         let runtime = Arc::new(RuntimeEnv::default());
         let config = self.session_config();
@@ -448,22 +444,16 @@ impl QueryExecutorImpl {
             .with_query_planner(Arc::new(query_planner))
             .with_aggregate_functions(registerable_arc_aggregate_udfs())
             .with_scalar_functions(registerable_arc_scalar_udfs())
-            .with_physical_optimizer_rules(self.optimizer_rules(data_loaded_size))
+            .with_physical_optimizer_rules(self.optimizer_rules())
             .build();
         let ctx = SessionContext::new_with_state(session_state);
         Ok(Arc::new(ctx))
     }
 
-    fn optimizer_rules(
-        &self,
-        data_loaded_size: Option<Arc<DataLoadedSize>>,
-    ) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
+    fn optimizer_rules(&self) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
         vec![
             // Cube rules
-            Arc::new(PreOptimizeRule::new(
-                self.memory_handler.clone(),
-                data_loaded_size,
-            )),
+            Arc::new(PreOptimizeRule::new()),
             // DF rules without EnforceDistribution.  We do need to keep EnforceSorting.
             Arc::new(OutputRequirements::new_add_mode()),
             Arc::new(AggregateStatistics::new()),
@@ -1783,7 +1773,7 @@ impl TableProvider for InlineTableProvider {
         &self,
         state: &dyn Session,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
+        _filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         let schema = self.schema();
@@ -1801,8 +1791,10 @@ impl TableProvider for InlineTableProvider {
             return Ok(Arc::new(EmptyExec::new(projected_schema)));
         }
 
-        // TODO batch_size
-        let batches = dataframe_to_batches(self.data.as_ref(), 16384)?;
+        let batches = dataframe_to_batches(
+            self.data.as_ref(),
+            state.config_options().execution.batch_size,
+        )?;
         let projection = projection.cloned();
         Ok(try_make_memory_data_source(
             &vec![batches],

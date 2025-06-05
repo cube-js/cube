@@ -7,7 +7,6 @@ use datafusion::logical_expr::planner::ExprPlanner;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion_datasource::memory::MemorySourceConfig;
 use datafusion_datasource::source::DataSourceExec;
-// use datafusion::physical_plan::parquet::MetadataCacheFactory;
 pub use planning::PlanningMeta;
 mod check_memory;
 pub mod physical_plan_flags;
@@ -21,7 +20,6 @@ pub mod trace_data_loaded;
 use rewrite_inlist_literals::RewriteInListLiterals;
 use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
-use udf_xirr::XIRR_UDAF_NAME;
 use udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
 mod filter_by_key_range;
 pub mod info_schema;
@@ -742,9 +740,9 @@ impl TableProvider for InfoSchemaTableProvider {
 
     async fn scan(
         &self,
-        state: &dyn Session,
+        _state: &dyn Session,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
+        _filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let schema = project_schema(&self.schema(), projection.cloned().as_deref());
@@ -825,8 +823,14 @@ impl ExecutionPlan for InfoSchemaTableExec {
     fn execute(
         &self,
         partition: usize,
-        context: Arc<TaskContext>,
+        _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
+        if partition != 0 {
+            return datafusion::common::internal_err!(
+                "invalid partition {} for InfoSchemaTableExec",
+                partition
+            );
+        }
         let table_def = InfoSchemaTableDefContext {
             meta_store: self.meta_store.clone(),
             cache_store: self.cache_store.clone(),
@@ -883,10 +887,10 @@ impl TableProvider for CubeTableLogical {
 
     async fn scan(
         &self,
-        state: &dyn Session,
-        projection: Option<&Vec<usize>>,
-        filters: &[Expr],
-        limit: Option<usize>,
+        _state: &dyn Session,
+        _projection: Option<&Vec<usize>>,
+        _filters: &[Expr],
+        _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         panic!("scan has been called on CubeTableLogical: serialized plan wasn't preprocessed for select");
     }

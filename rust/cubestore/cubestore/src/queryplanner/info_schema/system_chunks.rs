@@ -1,5 +1,6 @@
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::{Chunk, IdRow, MetaStoreTable};
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -125,7 +126,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                             row.get_row()
                                 .created_at()
                                 .as_ref()
-                                .map(|t| t.timestamp_nanos())
+                                .map(timestamp_nanos_or_panic)
                         })
                         .collect::<Vec<_>>(),
                 ))
@@ -138,7 +139,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                             row.get_row()
                                 .oldest_insert_at()
                                 .as_ref()
-                                .map(|t| t.timestamp_nanos())
+                                .map(timestamp_nanos_or_panic)
                         })
                         .collect::<Vec<_>>(),
                 ))
@@ -151,7 +152,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                             row.get_row()
                                 .deactivated_at()
                                 .as_ref()
-                                .map(|t| t.timestamp_nanos())
+                                .map(timestamp_nanos_or_panic)
                         })
                         .collect::<Vec<_>>(),
                 ))

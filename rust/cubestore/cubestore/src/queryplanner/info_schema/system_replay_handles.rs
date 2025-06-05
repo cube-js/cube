@@ -1,5 +1,6 @@
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointerForLocation};
 use crate::metastore::IdRow;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -71,7 +72,7 @@ impl InfoSchemaTableDef for SystemReplayHandlesTableDef {
                 Arc::new(TimestampNanosecondArray::from(
                     handles
                         .iter()
-                        .map(|row| row.get_row().created_at().timestamp_nanos())
+                        .map(|row| timestamp_nanos_or_panic(row.get_row().created_at()))
                         .collect::<Vec<_>>(),
                 ))
             }),
