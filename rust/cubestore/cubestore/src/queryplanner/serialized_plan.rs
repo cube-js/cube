@@ -23,9 +23,9 @@ use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{
-    wrap_projection_for_join_if_necessary, Aggregate, Distinct, DistinctOn, EmptyRelation, Expr,
-    Extension, Filter, Join, Limit, LogicalPlan, Projection, RecursiveQuery, Repartition, Sort,
-    Subquery, SubqueryAlias, TableScan, Union, Unnest, Values, Window,
+    Aggregate, Distinct, DistinctOn, EmptyRelation, Extension, Filter, Join, Limit, LogicalPlan,
+    Projection, RecursiveQuery, Repartition, Sort, Subquery, SubqueryAlias, TableScan, Union,
+    Unnest, Values, Window,
 };
 use datafusion::prelude::SessionContext;
 use datafusion_proto::bytes::logical_plan_from_bytes_with_extension_codec;
@@ -1262,9 +1262,9 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
     fn try_decode_table_provider(
         &self,
         buf: &[u8],
-        table_ref: &TableReference,
-        schema: SchemaRef,
-        ctx: &SessionContext,
+        _table_ref: &TableReference,
+        _schema: SchemaRef,
+        _ctx: &SessionContext,
     ) -> datafusion::common::Result<Arc<dyn TableProvider>> {
         use serde::Deserialize;
         let r = flexbuffers::Reader::get_root(buf)

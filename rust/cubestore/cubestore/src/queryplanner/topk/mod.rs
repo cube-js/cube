@@ -322,8 +322,8 @@ impl UserDefinedLogicalNode for ClusterAggregateTopKLower {
 
     fn check_invariants(
         &self,
-        check: datafusion::logical_expr::InvariantLevel,
-        plan: &LogicalPlan,
+        _check: datafusion::logical_expr::InvariantLevel,
+        _plan: &LogicalPlan,
     ) -> datafusion::error::Result<()> {
         // TODO upgrade DF: Check anything?
         Ok(())

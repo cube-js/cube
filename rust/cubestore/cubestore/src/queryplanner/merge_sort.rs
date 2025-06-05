@@ -7,7 +7,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::error::DataFusionError;
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext};
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::{LexRequirement, PhysicalSortRequirement};
+use datafusion::physical_expr::LexRequirement;
 use datafusion::physical_plan::{
     DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
 };
@@ -97,7 +97,7 @@ impl ExecutionPlan for LastRowByUniqueKeyExec {
             .equivalence_properties()
             .oeq_class()
             .output_ordering();
-        vec![ordering.map(|exprs| PhysicalSortRequirement::from_sort_exprs(&exprs))]
+        vec![ordering.map(LexRequirement::from_lex_ordering)]
     }
 
     fn with_new_children(

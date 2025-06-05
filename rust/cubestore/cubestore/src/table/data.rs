@@ -11,7 +11,7 @@ use datafusion::arrow::array::{Array, ArrayBuilder, ArrayRef, StringArray};
 use datafusion::arrow::compute::concat_batches;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::execution::TaskContext;
-use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use datafusion::physical_plan::SendableRecordBatchStream;
 use std::fmt;
 use std::sync::Arc;
 
@@ -149,12 +149,12 @@ macro_rules! match_column_type {
             ColumnType::HyperLogLog(_) => $matcher!(HyperLogLog, BinaryBuilder, Bytes),
             ColumnType::Timestamp => $matcher!(Timestamp, TimestampMicrosecondBuilder, Timestamp),
             ColumnType::Boolean => $matcher!(Boolean, BooleanBuilder, Boolean),
-            // TODO upgrade DF
-            ColumnType::Decimal { scale, precision } => {
-                $matcher!(Decimal, Decimal128Builder, Decimal, scale, precision)
+            // scale and precision are used when creating but not when appending, hence underscore here.
+            ColumnType::Decimal { scale: _scale, precision: _precision } => {
+                $matcher!(Decimal, Decimal128Builder, Decimal, _scale, _precision)
             }
-            ColumnType::Decimal96 { scale, precision } => {
-                $matcher!(Decimal96, Decimal128Builder, Decimal96, scale, precision)
+            ColumnType::Decimal96 { scale: _scale, precision: _precision } => {
+                $matcher!(Decimal96, Decimal128Builder, Decimal96, _scale, _precision)
             }
             ColumnType::Float => $matcher!(Float, Float64Builder, Float),
         }

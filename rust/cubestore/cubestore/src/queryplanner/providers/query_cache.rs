@@ -57,10 +57,10 @@ impl TableProvider for InfoSchemaQueryCacheTableProvider {
 
     async fn scan(
         &self,
-        state: &dyn Session,
+        _state: &dyn Session,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
-        limit: Option<usize>,
+        _filters: &[Expr],
+        _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let schema = project_schema(&self.schema(), projection.cloned().as_deref());
         let exec = InfoSchemaQueryCacheTableExec {
@@ -87,8 +87,8 @@ struct InfoSchemaQueryCacheBuilder {
 impl InfoSchemaQueryCacheBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            sql: StringBuilder::new(),
-            size: Int64Builder::new(),
+            sql: StringBuilder::with_capacity(capacity, 0),
+            size: Int64Builder::with_capacity(capacity),
         }
     }
 
