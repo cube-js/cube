@@ -259,34 +259,51 @@ export class CubeEvaluator extends CubeSymbols {
 
   private prepareFolders(cube: any, errorReporter: ErrorReporter) {
     const folders = cube.rawFolders();
-    if (folders.length) {
-      cube.folders = folders.map(it => {
-        const includedMembers = this.allMembersOrList(cube, it.includes);
-        const includes = includedMembers.map(memberName => {
-          if (memberName.includes('.')) {
-            errorReporter.error(
-              `Paths aren't allowed in the 'folders' but '${memberName}' has been provided for ${cube.name}`
-            );
+    if (!folders.length) return;
+
+    const checkMember = (memberName: string, folderName: string) => {
+      if (memberName.includes('.')) {
+        errorReporter.error(
+          `Paths aren't allowed in the 'folders' but '${memberName}' has been provided for ${cube.name}`
+        );
+      }
+
+      const member = cube.includedMembers.find(m => m.name === memberName);
+      if (!member) {
+        errorReporter.error(
+          `Member '${memberName}' included in folder '${folderName}' not found`
+        );
+        return null;
+      }
+
+      return member;
+    };
+
+    const processFolder = (folder: any): any => {
+      let includedMembers: string[];
+      let includes: any[] = [];
+
+      if (folder.includes === '*') {
+        includedMembers = this.allMembersOrList(cube, folder.includes);
+        includes = includedMembers.map(m => checkMember(m, folder.name)).filter(Boolean);
+      } else if (Array.isArray(folder.includes)) {
+        includes = folder.includes.map(item => {
+          if (typeof item === 'object' && item !== null) {
+            return processFolder(item);
           }
 
-          const member = cube.includedMembers.find(m => m.name === memberName);
-          if (!member) {
-            errorReporter.error(
-              `Member '${memberName}' included in folder '${it.name}' not found`
-            );
-            return null;
-          }
-
-          return member;
-        })
-          .filter(Boolean);
-
-        return ({
-          ...it,
-          includes
+          return checkMember(item, folder.name);
         });
-      });
-    }
+      }
+
+      return {
+        ...folder,
+        type: 'folder',
+        includes: includes.filter(Boolean)
+      };
+    };
+
+    cube.folders = folders.map(processFolder);
   }
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
