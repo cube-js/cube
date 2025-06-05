@@ -43,6 +43,17 @@ export class CubeToMetaTransformer {
 
     const isCubeVisible = this.isVisible(cube, true);
 
+    const processFolderMember = (member) => {
+      if (member.type === 'folder') {
+        return {
+          name: member.name,
+          members: member.includes.map(processFolderMember),
+        };
+      }
+
+      return `${cube.name}.${member.name}`;
+    };
+
     return {
       config: {
         name: cube.name,
@@ -115,7 +126,7 @@ export class CubeToMetaTransformer {
         })),
         folders: (cube.folders || []).map((it) => ({
           name: it.name,
-          members: it.includes.map(member => `${cube.name}.${member.name}`),
+          members: it.includes.map(processFolderMember),
         })),
       },
     };
