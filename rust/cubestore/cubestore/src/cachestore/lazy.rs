@@ -24,6 +24,7 @@ pub enum LazyRocksCacheStoreState {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         listeners: Vec<tokio::sync::broadcast::Sender<MetaStoreEvent>>,
+        #[allow(dead_code)] // Receiver closed on drop
         init_flag: Sender<bool>,
     },
     Closed {},

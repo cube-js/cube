@@ -1,5 +1,6 @@
 use crate::cachestore::QueueResult;
 use crate::metastore::IdRow;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -55,7 +56,7 @@ impl InfoSchemaTableDef for SystemQueueResultsTableDef {
                 Arc::new(TimestampNanosecondArray::from(
                     items
                         .iter()
-                        .map(|row| row.get_row().get_expire().timestamp_nanos())
+                        .map(|row| timestamp_nanos_or_panic(row.get_row().get_expire()))
                         .collect::<Vec<_>>(),
                 ))
             }),

@@ -271,10 +271,11 @@ impl<'a> RocksSecondaryIndexValue<'a> {
                     let expire = if expire_timestamp == 0 {
                         None
                     } else {
-                        Some(DateTime::<Utc>::from_naive_utc_and_offset(
-                            NaiveDateTime::from_timestamp(expire_timestamp, 0),
-                            Utc,
-                        ))
+                        Some(
+                            DateTime::<Utc>::from_timestamp(expire_timestamp, 0).ok_or_else(
+                                || CubeError::internal("timestamp out of range".to_owned()),
+                            )?,
+                        )
                     };
 
                     Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))

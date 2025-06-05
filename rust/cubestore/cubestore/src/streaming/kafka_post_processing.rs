@@ -13,9 +13,7 @@ use datafusion::common;
 use datafusion::common::{DFSchema, DFSchemaRef};
 use datafusion::config::ConfigOptions;
 use datafusion::logical_expr::expr::{Alias, ScalarFunction};
-use datafusion::logical_expr::{
-    projection_schema, Expr, Filter, LogicalPlan, Projection, SubqueryAlias,
-};
+use datafusion::logical_expr::{Expr, Filter, LogicalPlan, Projection, SubqueryAlias};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::{collect, ExecutionPlan};
 use datafusion::sql::parser::Statement as DFStatement;
@@ -494,6 +492,7 @@ impl KafkaPostProcessPlanner {
                             let plan_ctx = QueryPlannerImpl::make_execution_context(
                                 self.metadata_cache_factory.make_session_config(),
                             );
+                            #[allow(deprecated)] // TODO upgrade DF: Avoid deprecated
                             let state = plan_ctx.state().with_physical_optimizer_rules(vec![]);
 
                             let projection_phys_plan_without_new_children = state
@@ -521,6 +520,7 @@ impl KafkaPostProcessPlanner {
                     let plan_ctx = QueryPlannerImpl::make_execution_context(
                         self.metadata_cache_factory.make_session_config(),
                     );
+                    #[allow(deprecated)] // TODO upgrade DF: Avoid deprecated function
                     let state = plan_ctx.state().with_physical_optimizer_rules(vec![]);
 
                     let projection_phys_plan = state

@@ -47,6 +47,7 @@ use crate::metastore::{
     is_valid_plain_binary_hll, HllFlavour, IdRow, ImportFormat, Index, IndexDef, IndexType,
     MetaStoreTable, Schema,
 };
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::query_executor::{
@@ -1628,7 +1629,7 @@ pub fn timestamp_from_string(v: &str) -> Result<TimestampValue, CubeError> {
         #[rustfmt::skip] // built from "%Y-%m-%d %H:%M:%S%.3f UTC".
         const FORMAT: [chrono::format::Item; 14] = [Numeric(Year, Zero), Literal("-"), Numeric(Month, Zero), Literal("-"), Numeric(Day, Zero), Space(" "), Numeric(Hour, Zero), Literal(":"), Numeric(Minute, Zero), Literal(":"), Numeric(Second, Zero), Fixed(Nanosecond3), Space(" "), Literal("UTC")];
         match parse_time(v, &FORMAT).and_then(|p| p.to_datetime_with_timezone(&Utc)) {
-            Ok(ts) => nanos = ts.timestamp_nanos(),
+            Ok(ts) => nanos = timestamp_nanos_or_panic(&ts),
             Err(_) => return Err(CubeError::user(format!("Can't parse timestamp: {}", v))),
         }
     } else {

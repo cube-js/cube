@@ -1,4 +1,5 @@
 use crate::metastore::table::TablePath;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -193,7 +194,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                                 .get_row()
                                 .created_at()
                                 .as_ref()
-                                .map(|t| t.timestamp_nanos())
+                                .map(timestamp_nanos_or_panic)
                         })
                         .collect::<Vec<_>>(),
                 ))
@@ -207,7 +208,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                                 .get_row()
                                 .build_range_end()
                                 .as_ref()
-                                .map(|t| t.timestamp_nanos())
+                                .map(timestamp_nanos_or_panic)
                         })
                         .collect::<Vec<_>>(),
                 ))
@@ -221,7 +222,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                                 .get_row()
                                 .seal_at()
                                 .as_ref()
-                                .map(|t| t.timestamp_nanos())
+                                .map(timestamp_nanos_or_panic)
                         })
                         .collect::<Vec<_>>(),
                 ))

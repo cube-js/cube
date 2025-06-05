@@ -1,5 +1,6 @@
 use crate::metastore::job::Job;
 use crate::metastore::IdRow;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -66,7 +67,7 @@ impl InfoSchemaTableDef for SystemJobsTableDef {
             Box::new(|jobs| {
                 Arc::new(TimestampNanosecondArray::from(
                     jobs.iter()
-                        .map(|row| row.get_row().last_heart_beat().timestamp_nanos())
+                        .map(|row| timestamp_nanos_or_panic(row.get_row().last_heart_beat()))
                         .collect::<Vec<_>>(),
                 ))
             }),

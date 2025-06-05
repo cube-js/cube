@@ -1,5 +1,6 @@
 use crate::cachestore::CacheItem;
 use crate::metastore::IdRow;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -54,7 +55,7 @@ impl InfoSchemaTableDef for SystemCacheTableDef {
                             row.get_row()
                                 .get_expire()
                                 .as_ref()
-                                .map(|t| t.timestamp_nanos())
+                                .map(timestamp_nanos_or_panic)
                         })
                         .collect::<Vec<_>>(),
                 ))

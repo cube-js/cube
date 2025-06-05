@@ -77,7 +77,7 @@ impl PPOptions {
             show_output_hints: true,
             show_check_memory_nodes: true,
             show_partitions: true,
-            show_metrics: false, // yeah
+            show_metrics: false, // yeah.  Is useful only after plan is evaluated, so defaults to false.
             traverse_past_clustersend: false,
         }
     }
@@ -262,7 +262,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                         Ok(SkipType::Literal(0)) => {
                             sep = "";
                         }
-                        Ok(SkipType::Literal(n)) => {
+                        Ok(SkipType::Literal(_n)) => {
                             silent_infinite_fetch = true;
                             self.output += "Skip";
                         }

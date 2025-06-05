@@ -728,7 +728,7 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
 }
 fn proper_decimal_args(precision: &Option<u64>, scale: &Option<u64>) -> (i32, i32) {
     let mut precision = precision.unwrap_or(18);
-    let mut scale = scale.unwrap_or(5);
+    let scale = scale.unwrap_or(5);
     // TODO upgrade DF
     // if precision > 27 {
     //     precision = 27;

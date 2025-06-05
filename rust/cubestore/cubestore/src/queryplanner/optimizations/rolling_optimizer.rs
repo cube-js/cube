@@ -50,6 +50,7 @@ impl RollingOptimizerRule {
     pub fn extract_rolling_window_projection(
         node: &LogicalPlan,
     ) -> Option<RollingWindowProjectionExtractorResult> {
+        // TODO upgrade DF: Use alias relation?
         match node {
             LogicalPlan::Projection(Projection { expr, input, .. }) => {
                 let RollingWindowAggregateExtractorResult {
@@ -74,7 +75,7 @@ impl RollingOptimizerRule {
                     dimension_alias: expr.iter().find_map(|e| match e {
                         Expr::Alias(Alias {
                             expr,
-                            relation,
+                            relation: _,
                             name,
                         }) => match expr.as_ref() {
                             Expr::Column(col)
@@ -94,7 +95,7 @@ impl RollingOptimizerRule {
                         .flat_map(|e| match e {
                             Expr::Alias(Alias {
                                 expr,
-                                relation,
+                                relation: _,
                                 name,
                             }) => match expr.as_ref() {
                                 Expr::Column(col)
@@ -254,7 +255,7 @@ impl RollingOptimizerRule {
                 left,
                 right,
                 // TODO
-                on,
+                on: _,
                 join_type: JoinType::Left,
                 filter,
                 ..
@@ -288,7 +289,7 @@ impl RollingOptimizerRule {
                     offset_to_end,
                 })
             }
-            LogicalPlan::Projection(Projection { expr, input, .. }) => {
+            LogicalPlan::Projection(Projection { expr: _, input, .. }) => {
                 Self::extract_rolling_window_join(input)
             }
             _ => None,
@@ -470,7 +471,7 @@ impl RollingOptimizerRule {
         node: &LogicalPlan,
     ) -> Option<RollingWindowSeriesProjectionResult> {
         match node {
-            LogicalPlan::Projection(Projection { expr, input, .. }) => {
+            LogicalPlan::Projection(Projection { expr, input: _, .. }) => {
                 if expr.len() != 2 && expr.len() != 1 {
                     return None;
                 }
@@ -523,7 +524,7 @@ impl RollingOptimizerRule {
                             relation,
                             name,
                         }) => match expr.as_ref() {
-                            Expr::BinaryExpr(BinaryExpr { left, op, right }) => {
+                            Expr::BinaryExpr(BinaryExpr { left, op, right: _ }) => {
                                 if op == &Operator::Plus {
                                     match left.as_ref() {
                                         Expr::Column(col) if &col.name == &series.from_col.name => {
@@ -618,12 +619,13 @@ impl RollingOptimizerRule {
         series_column: Column,
     ) -> Option<RollingWindowSeriesExtractorResult> {
         match node {
-            LogicalPlan::Projection(Projection { expr, input, .. }) => {
+            LogicalPlan::Projection(Projection { expr, input: _, .. }) => {
                 for e in expr.iter() {
+                    // TODO upgrade DF: Presumably, use `relation`.
                     match e {
                         Expr::Alias(Alias {
                             expr,
-                            relation,
+                            relation: _,
                             name,
                         }) if name == &series_column.name => match expr.as_ref() {
                             Expr::ScalarFunction(ScalarFunction { func, args })

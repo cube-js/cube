@@ -41,6 +41,7 @@ impl QueueItemPayload {
     }
 }
 
+#[allow(unused)] // TODO upgrade DF: This is unused in pre-DF-upgrade too.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum QueueItemPayloadRocksIndex {}
 
