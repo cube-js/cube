@@ -156,6 +156,7 @@
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
