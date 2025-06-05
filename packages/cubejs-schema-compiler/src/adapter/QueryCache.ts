@@ -1,14 +1,14 @@
 export class QueryCache {
-  constructor() {
+  private readonly storage: {};
+
+  public constructor() {
     this.storage = {};
   }
 
   /**
-   * @param {Array} key
-   * @param {Function} fn
    * @returns Returns the result of executing a function (Either call a function or take a value from the cache)
    */
-  cache(key, fn) {
+  public cache(key: any[], fn: Function): any {
     let keyHolder = this.storage;
     const { length } = key;
     for (let i = 0; i < length - 1; i++) {
