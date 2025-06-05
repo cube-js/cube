@@ -11,6 +11,7 @@ use crate::metastore::{
 };
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
+use crate::queryplanner::query_executor::regroup_batch_onto;
 use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
 use crate::queryplanner::{try_make_memory_data_source, QueryPlannerImpl};
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
@@ -668,6 +669,7 @@ impl CompactionService for CompactionServiceImpl {
                     None,
                 )?)
             }
+
             Ok((store, new))
         })
         .await??;
@@ -1425,7 +1427,11 @@ pub async fn merge_chunks(
     task_context: Arc<TaskContext>,
 ) -> Result<SendableRecordBatchStream, CubeError> {
     let schema = l.schema();
-    let r = RecordBatch::try_new(schema.clone(), r)?;
+    let r_batch = RecordBatch::try_new(schema.clone(), r)?;
+    let mut r = Vec::<RecordBatch>::new();
+    // Regroup batches -- which had been concatenated and sorted -- so that SortPreservingMergeExec
+    // doesn't overflow i32 in interleaving or building a Utf8Array.
+    regroup_batch_onto(r_batch, 8192, &mut r)?;
 
     let mut key = Vec::with_capacity(key_size);
     for i in 0..key_size {
@@ -1436,10 +1442,7 @@ pub async fn merge_chunks(
         ));
     }
 
-    let inputs = UnionExec::new(vec![
-        l,
-        try_make_memory_data_source(&[vec![r]], schema, None)?,
-    ]);
+    let inputs = UnionExec::new(vec![l, try_make_memory_data_source(&[r], schema, None)?]);
     let mut res: Arc<dyn ExecutionPlan> = Arc::new(SortPreservingMergeExec::new(
         LexOrdering::new(key),
         Arc::new(inputs),
