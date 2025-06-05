@@ -7,7 +7,11 @@
           "CUBEJS_DB_EXPORT_BUCKET": "s3://databricks-drivers-tests-preaggs",
           "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
           "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
-          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1",
+          "Cannot_left_comments_in_json": "Use OAuth machine-to-machine (M2M) authentication here for testing it too",
+          "CUBEJS_DB_DATABRICKS_TOKEN": "",
+          "CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID": "${DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID}",
+          "CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_SECRET}"
         }
       }
     },
