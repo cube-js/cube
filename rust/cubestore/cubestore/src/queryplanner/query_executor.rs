@@ -45,7 +45,7 @@ use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::{SessionStateBuilder, TaskContext};
-use datafusion::logical_expr::{Expr, LogicalPlan};
+use datafusion::logical_expr::{Expr, LogicalPlan, TableSource};
 use datafusion::physical_expr;
 use datafusion::physical_expr::{
     expressions, Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr,
