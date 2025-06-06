@@ -6125,6 +6125,7 @@ async fn unsorted_data_timestamps(service: Box<dyn SqlClient>) {
 }
 
 async fn now(service: Box<dyn SqlClient>) {
+    // This is no longer a UDF, so we're just testing DataFusion.
     let r = service.exec_query("SELECT now()").await.unwrap();
     assert_eq!(r.get_rows().len(), 1);
     assert_eq!(r.get_rows()[0].values().len(), 1);
