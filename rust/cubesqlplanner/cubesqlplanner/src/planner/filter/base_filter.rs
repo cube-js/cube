@@ -8,9 +8,9 @@ use crate::planner::{evaluate_with_context, FiltersContext, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-const FROM_PARTITION_RANGE: &'static str = "__FROM_PARTITION_RANGE";
+const FROM_PARTITION_RANGE: &str = "__FROM_PARTITION_RANGE";
 
-const TO_PARTITION_RANGE: &'static str = "__TO_PARTITION_RANGE";
+const TO_PARTITION_RANGE: &str = "__TO_PARTITION_RANGE";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FilterType {
@@ -589,7 +589,7 @@ impl BaseFilter {
         }
         let from = self.format_from_date(value)?;
 
-        let res = if use_db_time_zone && &from != FROM_PARTITION_RANGE {
+        let res = if use_db_time_zone && from != FROM_PARTITION_RANGE {
             self.query_tools.base_tools().in_db_time_zone(from)?
         } else {
             from
@@ -607,7 +607,7 @@ impl BaseFilter {
         }
         let from = self.format_to_date(value)?;
 
-        let res = if use_db_time_zone && &from != TO_PARTITION_RANGE {
+        let res = if use_db_time_zone && from != TO_PARTITION_RANGE {
             self.query_tools.base_tools().in_db_time_zone(from)?
         } else {
             from
@@ -705,10 +705,10 @@ impl BaseFilter {
                     as_date_time,
                 )
             } else {
-                return Err(CubeError::user(format!(
+                Err(CubeError::user(format!(
                     "Arguments for timestamp parameter for operator {} is not valid",
                     self.filter_operator().to_string()
-                )));
+                )))
             }
         }
     }

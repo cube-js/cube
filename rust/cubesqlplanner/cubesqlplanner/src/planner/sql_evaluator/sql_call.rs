@@ -60,7 +60,7 @@ impl SqlCall {
             .collect::<Result<Vec<_>, _>>()?;
         let eval_result = self.member_sql.call(args)?;
 
-        Ok(eval_result.trim() == &reference_candidate.full_name())
+        Ok(eval_result.trim() == reference_candidate.full_name())
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
@@ -180,11 +180,8 @@ impl SqlCall {
         result.push(cube_dep.cube_symbol.name());
 
         for (_, v) in cube_dep.properties.iter() {
-            match v {
-                CubeDepProperty::CubeDependency(cube_dep) => {
-                    self.extract_cube_deps_from_cube_dep(cube_dep, result)
-                }
-                _ => {}
+            if let CubeDepProperty::CubeDependency(cube_dep) = v {
+                self.extract_cube_deps_from_cube_dep(cube_dep, result)
             };
         }
     }

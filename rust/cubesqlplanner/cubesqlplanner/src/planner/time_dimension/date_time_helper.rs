@@ -63,7 +63,7 @@ impl QueryDateTimeHelper {
 
         // Ensure `high` is a valid local time (expand if needed)
         while let LocalResult::None = tz.from_local_datetime(&high) {
-            high = high + max_offset;
+            high += max_offset;
         }
 
         // Binary search for the first valid local time >= `naive`

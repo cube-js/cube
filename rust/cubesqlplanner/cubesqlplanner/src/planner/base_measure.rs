@@ -185,19 +185,19 @@ impl BaseMeasure {
     pub fn reduce_by(&self) -> Option<Vec<String>> {
         self.definition
             .as_ref()
-            .map_or(None, |d| d.static_data().reduce_by_references.clone())
+            .and_then(|d| d.static_data().reduce_by_references.clone())
     }
 
     pub fn add_group_by(&self) -> Option<Vec<String>> {
         self.definition
             .as_ref()
-            .map_or(None, |d| d.static_data().add_group_by_references.clone())
+            .and_then(|d| d.static_data().add_group_by_references.clone())
     }
 
     pub fn group_by(&self) -> Option<Vec<String>> {
         self.definition
             .as_ref()
-            .map_or(None, |d| d.static_data().group_by_references.clone())
+            .and_then(|d| d.static_data().group_by_references.clone())
     }
 
     //FIXME dublicate with symbol
@@ -218,13 +218,13 @@ impl BaseMeasure {
     pub fn is_multi_stage(&self) -> bool {
         self.definition
             .as_ref()
-            .map_or(false, |d| d.static_data().multi_stage.unwrap_or(false))
+            .is_some_and(|d| d.static_data().multi_stage.unwrap_or(false))
     }
 
     pub fn rolling_window(&self) -> Option<RollingWindow> {
         self.definition
             .as_ref()
-            .map_or(None, |d| d.static_data().rolling_window.clone())
+            .and_then(|d| d.static_data().rolling_window.clone())
     }
 
     pub fn is_rolling_window(&self) -> bool {

@@ -16,28 +16,16 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
-const TOTAL_COUNT: &'static str = "total_count";
-const ORIGINAL_QUERY: &'static str = "original_query";
+const TOTAL_COUNT: &str = "total_count";
+const ORIGINAL_QUERY: &str = "original_query";
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct PhysicalPlanBuilderContext {
     pub alias_prefix: Option<String>,
     pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
     pub render_measure_for_ungrouped: bool,
     pub time_shifts: HashMap<String, MeasureTimeShift>,
     pub original_sql_pre_aggregations: HashMap<String, String>,
-}
-
-impl Default for PhysicalPlanBuilderContext {
-    fn default() -> Self {
-        Self {
-            alias_prefix: None,
-            render_measure_as_state: false,
-            render_measure_for_ungrouped: false,
-            time_shifts: HashMap::new(),
-            original_sql_pre_aggregations: HashMap::new(),
-        }
-    }
 }
 
 impl PhysicalPlanBuilderContext {

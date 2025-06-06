@@ -72,15 +72,15 @@ impl GranularityHelper {
 
     pub fn granularity_from_interval(interval: &Option<String>) -> Option<String> {
         if let Some(interval) = interval {
-            if interval.find("day").is_some() {
+            if interval.contains("day") {
                 Some("day".to_string())
-            } else if interval.find("month").is_some() {
+            } else if interval.contains("month") {
                 Some("month".to_string())
-            } else if interval.find("year").is_some() {
+            } else if interval.contains("year") {
                 Some("year".to_string())
-            } else if interval.find("week").is_some() {
+            } else if interval.contains("week") {
                 Some("week".to_string())
-            } else if interval.find("hour").is_some() {
+            } else if interval.contains("hour") {
                 Some("hour".to_string())
             } else {
                 None

@@ -63,7 +63,7 @@ impl RollingWindowPlanner {
                     }
                 }
 
-                if time_dimensions.len() == 0 {
+                if time_dimensions.is_empty() {
                     let rolling_base = self.add_rolling_window_base(
                         member.clone(),
                         state.clone(),
@@ -254,7 +254,7 @@ impl RollingWindowPlanner {
         let is_to_date = rolling_window
             .rolling_type
             .as_ref()
-            .map_or(false, |tp| tp == "to_date");
+            .is_some_and(|tp| tp == "to_date");
 
         if is_to_date {
             if let Some(granularity) = &rolling_window.granularity {
