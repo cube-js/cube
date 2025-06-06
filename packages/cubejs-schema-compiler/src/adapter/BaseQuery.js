@@ -3831,6 +3831,8 @@ export class BaseQuery {
         // DATEADD is being rewritten to DATE_ADD
         // DATEADD: 'DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})',
         DATE: 'DATE({{ args_concat }})',
+
+        PERCENTILECONT: 'PERCENTILE_CONT({{ args_concat }})',
       },
       statements: {
         select: '{% if ctes %} WITH \n' +
@@ -3893,6 +3895,7 @@ export class BaseQuery {
         like: '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}',
         ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}',
         like_escape: '{{ like_expr }} ESCAPE {{ escape_char }}',
+        within_group: '{{ fun_sql }} WITHIN GROUP (ORDER BY {{ within_group_concat }})',
         concat_strings: '{{ strings | join(\' || \' ) }}',
       },
       tesseract: {

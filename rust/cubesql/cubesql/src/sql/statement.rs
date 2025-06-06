@@ -7,6 +7,7 @@ use pg_srv::{
 };
 use sqlparser::ast::{
     self, ArrayAgg, Expr, Function, FunctionArg, FunctionArgExpr, Ident, ObjectName, Value,
+    WithinGroup,
 };
 use std::{collections::HashMap, error::Error};
 
@@ -177,9 +178,6 @@ trait Visitor<'ast, E: Error> {
                         }
                     }
                 }
-                for order_expr in list_agg.within_group.iter_mut() {
-                    self.visit_expr(&mut order_expr.expr)?;
-                }
             }
             Expr::GroupingSets(vec) | Expr::Cube(vec) | Expr::Rollup(vec) => {
                 for v in vec.iter_mut() {
@@ -227,6 +225,12 @@ trait Visitor<'ast, E: Error> {
                 }
                 if let Some(limit) = limit {
                     self.visit_expr(limit)?;
+                }
+            }
+            Expr::WithinGroup(WithinGroup { expr, order_by }) => {
+                self.visit_expr(expr)?;
+                for order_by_expr in order_by {
+                    self.visit_expr(&mut order_by_expr.expr)?;
                 }
             }
         };

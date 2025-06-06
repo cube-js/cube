@@ -1,7 +1,7 @@
 use crate::compile::rewrite::{
-    agg_fun_expr, alias_expr, binary_expr, cast_expr, flatten_pushdown_replacer, fun_expr_var_arg,
-    is_not_null_expr, is_null_expr, rewrite, rewriter::CubeRewrite, rules::flatten::FlattenRules,
-    udf_expr_var_arg,
+    agg_fun_expr, agg_fun_expr_within_group_empty_tail, alias_expr, binary_expr, cast_expr,
+    flatten_pushdown_replacer, fun_expr_var_arg, is_not_null_expr, is_null_expr, rewrite,
+    rewriter::CubeRewrite, rules::flatten::FlattenRules, udf_expr_var_arg,
 };
 
 impl FlattenRules {
@@ -15,7 +15,14 @@ impl FlattenRules {
         );
         self.single_arg_pass_through_rules(
             "agg-function",
-            |expr| agg_fun_expr("?fun", vec![expr], "?distinct"),
+            |expr| {
+                agg_fun_expr(
+                    "?fun",
+                    vec![expr],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             rules,
         );
         self.single_arg_pass_through_rules(

@@ -16875,4 +16875,99 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_tableau_relative_dates() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT) AS "customer_gendder",
+                SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:sumPrice:ok"
+            FROM
+                "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE
+                (
+                    CASE
+                        WHEN (
+                            NOT (
+                                CAST(
+                                    CAST(
+                                        TO_TIMESTAMP(
+                                            CAST(
+                                                CAST("KibanaSampleDataEcommerce"."order_date" AS TEXT) AS TEXT
+                                            ),
+                                            'YYYY-MM-DD"T"HH24:MI:SS.MS'
+                                        ) AS TIMESTAMP
+                                    ) AS DATE
+                                ) IS NULL
+                            )
+                        ) THEN CAST(
+                            CAST(
+                                TO_TIMESTAMP(
+                                    CAST(
+                                        CAST("KibanaSampleDataEcommerce"."order_date" AS TEXT) AS TEXT
+                                    ),
+                                    'YYYY-MM-DD"T"HH24:MI:SS.MS'
+                                ) AS TIMESTAMP
+                            ) AS DATE
+                        )
+                        ELSE NULL
+                    END
+                ) < (TIMESTAMP '2025-01-01 00:00:00.000')
+            GROUP BY
+                1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("beforeDate".to_string()),
+                    values: Some(vec!["2025-01-01T00:00:00.000Z".to_string()]),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_within_group_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY taxful_total_price) AS pc
+            FROM KibanaSampleDataEcommerce
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("WITHIN GROUP (ORDER BY"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
 }

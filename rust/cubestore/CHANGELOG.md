@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.20](https://github.com/cube-js/cube/compare/v1.3.19...v1.3.20) (2025-06-06)
+
+### Bug Fixes
+
+- **cubestore:** Delete old metastore snapshots in batches, after updating metastore-current ([#9647](https://github.com/cube-js/cube/issues/9647)) ([1104bde](https://github.com/cube-js/cube/commit/1104bde3307b4e5fd941c731305d8faa67ac803f))
+
+## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
 ## [1.3.18](https://github.com/cube-js/cube/compare/v1.3.17...v1.3.18) (2025-05-27)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

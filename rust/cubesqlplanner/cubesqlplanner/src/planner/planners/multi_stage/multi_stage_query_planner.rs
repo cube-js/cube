@@ -63,7 +63,7 @@ impl MultiStageQueryPlanner {
             self.query_properties.dimensions().clone(),
             self.query_properties.time_dimensions_filters().clone(),
             self.query_properties.dimensions_filters().clone(),
-            self.query_properties.measures_filters().clone(),
+            vec![], //TODO: We do not pass measures filters to CTE queries. This seems correct, but we need to check
             self.query_properties.segments().clone(),
         );
 
