@@ -1502,6 +1502,70 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn streaming_filter_kafka_concat() {
+        Config::test("streaming_filter_kafka").update_config(|mut c| {
+            c.stream_replay_check_interval_secs = 1;
+            c.compaction_in_memory_chunks_max_lifetime_threshold = 8;
+            c.partition_split_threshold = 1000000;
+            c.max_partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 100;
+            c.compaction_chunks_total_size_threshold = 100000;
+            c.stale_stream_timeout = 1;
+            c.wal_split_threshold = 1638;
+            c
+        }).start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
+                Arc::new(MockKafkaClient)
+            })
+                .await
+        }, async move |services| {
+            //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            let listener = services.cluster.job_result_listener();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `CONCATID` text) \
+                            WITH (stream_offset = 'earliest', select_statement = 'SELECT `ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, concat(`ANONYMOUSID`, `MESSAGEID`) AS `CONCATID` FROM `EVENTS_BY_TYPE` WHERE `FILTER_ID` >= 1000 and `FILTER_ID` < 1400') \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`) INDEX by_anonymous(`ANONYMOUSID`, `FILTER_ID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            let wait = listener.wait_for_job_results(vec![
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
+            ]);
+            let _ = timeout(Duration::from_secs(15), wait).await;
+
+            let result = service
+                .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(800)])]);
+
+            let result = service
+            .exec_query("SELECT concat(`ANONYMOUSID`, `MESSAGEID`), `CONCATID` FROM test.events_by_type_1 ")
+            .await
+            .unwrap();
+            let rows = result.get_rows();
+            assert_eq!(rows.len(), 800);
+            for (i, row) in rows.iter().enumerate() {
+                let values = row.values();
+                assert_eq!(values[0], values[1], "i = {}", i);
+            }
+
+        })
+            .await;
+    }
+
+    #[tokio::test]
     async fn streaming_filter_kafka_parse_timestamp() {
         Config::test("streaming_filter_kafka_parse_timestamp").update_config(|mut c| {
             c.stream_replay_check_interval_secs = 1;
