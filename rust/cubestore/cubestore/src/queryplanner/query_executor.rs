@@ -1503,21 +1503,21 @@ impl ClusterSendExec {
         }
     }
 
-    pub fn worker_plans(&self) -> Vec<(String, PreSerializedPlan)> {
+    pub fn worker_plans(&self) -> Result<Vec<(String, PreSerializedPlan)>, CubeError> {
         let mut res = Vec::new();
         for (node_name, partitions) in self.partitions.iter() {
             res.push((
                 node_name.clone(),
-                self.serialized_plan_for_partitions(partitions),
+                self.serialized_plan_for_partitions(partitions)?,
             ));
         }
-        res
+        Ok(res)
     }
 
     fn serialized_plan_for_partitions(
         &self,
         partitions: &(Vec<(u64, RowRange)>, Vec<InlineTableId>),
-    ) -> PreSerializedPlan {
+    ) -> Result<PreSerializedPlan, CubeError> {
         let (partitions, inline_table_ids) = partitions;
         let mut ps = HashMap::<_, RowFilter>::new();
         for (id, range) in partitions {
@@ -1576,7 +1576,7 @@ impl ExecutionPlan for ClusterSendExec {
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         let (node_name, partitions) = &self.partitions[partition];
 
-        let plan = self.serialized_plan_for_partitions(partitions);
+        let plan = self.serialized_plan_for_partitions(partitions)?;
 
         let cluster = self.cluster.clone();
         let schema = self.properties.eq_properties.schema().clone();
