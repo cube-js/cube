@@ -1,13 +1,10 @@
-use crate::cube_ext::stream::StreamWithSchema;
-use crate::queryplanner::planning::Snapshots;
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::array::{
-    make_array, make_builder, Array, ArrayRef, BooleanBuilder, MutableArrayData, UInt64Array,
+    make_array, Array, ArrayRef, BooleanBuilder, MutableArrayData, UInt64Array,
 };
-use datafusion::arrow::compute::kernels::numeric::add;
-use datafusion::arrow::compute::{concat, concat_batches, filter, SortOptions};
-use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use datafusion::arrow::compute::{concat_batches, filter, SortOptions};
+use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::row::{RowConverter, SortField};
 use datafusion::common::{Column, DFSchema, DFSchemaRef, DataFusionError, ScalarValue};
@@ -19,7 +16,7 @@ use datafusion::logical_expr::utils::exprlist_to_fields;
 use datafusion::logical_expr::{
     EmitTo, Expr, GroupsAccumulator, LogicalPlan, UserDefinedLogicalNode,
 };
-use datafusion::physical_expr::aggregate::{AggregateExprBuilder, AggregateFunctionExpr};
+use datafusion::physical_expr::aggregate::AggregateFunctionExpr;
 use datafusion::physical_expr::{
     EquivalenceProperties, GroupsAccumulatorAdapter, LexOrdering, LexRequirement, Partitioning,
     PhysicalExpr, PhysicalSortExpr, PhysicalSortRequirement,
@@ -37,10 +34,7 @@ use datafusion::physical_planner::{
 };
 use datafusion::{arrow, physical_expr, physical_plan};
 use datafusion_proto::bytes::Serializeable;
-use datafusion_proto::protobuf;
-use datafusion_proto::protobuf::LogicalExprNode;
 use itertools::Itertools;
-use log::debug;
 use prost::Message;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;

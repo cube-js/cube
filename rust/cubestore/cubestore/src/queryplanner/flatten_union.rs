@@ -1,11 +1,10 @@
 use datafusion::common::tree_node::Transformed;
 use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
-use datafusion::execution::context::ExecutionProps;
 use datafusion::logical_expr::{LogicalPlan, Union};
 use datafusion::optimizer::optimizer::OptimizerRule;
-use datafusion::optimizer::{utils, OptimizerConfig};
-use std::fmt::{Debug, Formatter};
+use datafusion::optimizer::OptimizerConfig;
+use std::fmt::Debug;
 use std::sync::Arc;
 
 #[derive(Debug)]

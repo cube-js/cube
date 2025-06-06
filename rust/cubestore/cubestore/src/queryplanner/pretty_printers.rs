@@ -338,7 +338,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                             self.output += ", (ERROR: no matching lower node)";
                         }
                         self.expecting_topk_lower = true;
-                    } else if let Some(topk) =
+                    } else if let Some(_) =
                         node.as_any().downcast_ref::<ClusterAggregateTopKLower>()
                     {
                         if !was_expecting_topk_lower {

@@ -19,7 +19,7 @@ pub mod trace_data_loaded;
 use rewrite_inlist_literals::RewriteInListLiterals;
 use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
-use udfs::{aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_scalar_udfs};
+use udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
 mod filter_by_key_range;
 mod flatten_union;
 pub mod info_schema;
@@ -39,7 +39,6 @@ use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{IdRow, MetaStore};
-use crate::queryplanner::flatten_union::FlattenUnion;
 use crate::queryplanner::info_schema::{
     ColumnsInfoSchemaTableDef, RocksDBPropertiesTableDef, SchemataInfoSchemaTableDef,
     SystemCacheTableDef, SystemChunksTableDef, SystemIndexesTableDef, SystemJobsTableDef,
@@ -54,13 +53,11 @@ use crate::queryplanner::query_executor::{
     batches_to_dataframe, ClusterSendExec, InlineTableProvider,
 };
 use crate::queryplanner::serialized_plan::SerializedPlan;
-use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper};
-// use crate::queryplanner::udfs::aggregate_udf_by_kind;
-use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
+use crate::queryplanner::topk::ClusterAggregateTopKLower;
 
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
-use crate::queryplanner::pretty_printers::{pp_plan, pp_plan_ext, PPOptions};
+use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::sql::cache::SqlResultCache;
 use crate::sql::InlineTables;
 use crate::store::DataFrame;
@@ -75,8 +72,7 @@ use datafusion::catalog::Session;
 use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
 use datafusion::common::{plan_datafusion_err, TableReference};
 use datafusion::config::ConfigOptions;
-use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
-use datafusion::datasource::{provider_as_source, DefaultTableSource, TableType};
+use datafusion::datasource::{provider_as_source, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::execution::{SessionState, TaskContext};
 use datafusion::logical_expr::{
@@ -84,8 +80,6 @@ use datafusion::logical_expr::{
     TableSource, WindowUDF,
 };
 use datafusion::physical_expr::EquivalenceProperties;
-// TODO upgrade DF
-// use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
     collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PlanProperties,
@@ -95,8 +89,6 @@ use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use datafusion::{cube_ext, datasource::TableProvider};
-use futures::TryStreamExt;
-use futures_util::TryFutureExt;
 use log::{debug, trace};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
@@ -811,7 +803,7 @@ impl fmt::Debug for InfoSchemaTableExec {
 }
 
 impl DisplayAs for InfoSchemaTableExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "InfoSchemaTableExec")
     }
 }

@@ -15,7 +15,6 @@ use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
-use crate::sql::SqlServiceImpl;
 use crate::store::DataFrame;
 use crate::table::data::rows_to_columns;
 use crate::table::parquet::{parquet_source, CubestoreParquetMetadataCache};
@@ -48,12 +47,11 @@ use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::{SessionStateBuilder, TaskContext};
-use datafusion::logical_expr::{Expr, LogicalPlan, TableSource};
+use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
 use datafusion::physical_expr::LexOrdering;
 use datafusion::physical_expr::{
-    expressions, Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr,
-    PhysicalSortRequirement,
+    Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
 };
 use datafusion::physical_optimizer::aggregate_statistics::AggregateStatistics;
 use datafusion::physical_optimizer::coalesce_batches::CoalesceBatches;
@@ -62,7 +60,6 @@ use datafusion::physical_optimizer::enforce_sorting::EnforceSorting;
 use datafusion::physical_optimizer::join_selection::JoinSelection;
 use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
 use datafusion::physical_optimizer::limited_distinct_aggregation::LimitedDistinctAggregation;
-use datafusion::physical_optimizer::optimizer::PhysicalOptimizer;
 use datafusion::physical_optimizer::output_requirements::OutputRequirements;
 use datafusion::physical_optimizer::projection_pushdown::ProjectionPushdown;
 use datafusion::physical_optimizer::sanity_checker::SanityCheckPlan;
@@ -73,7 +70,6 @@ use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion::physical_plan::projection::ProjectionExec;
-use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
@@ -83,7 +79,7 @@ use datafusion::physical_plan::{
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemoryExec;
-use futures_util::{stream, FutureExt, StreamExt, TryStreamExt};
+use futures_util::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
 use mockall::automock;
@@ -99,10 +95,7 @@ use std::time::SystemTime;
 use tracing::{instrument, Instrument};
 
 use super::serialized_plan::PreSerializedPlan;
-use super::udfs::{
-    aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_arc_aggregate_udfs,
-    registerable_arc_scalar_udfs, CubeAggregateUDFKind,
-};
+use super::udfs::{registerable_arc_aggregate_udfs, registerable_arc_scalar_udfs};
 use super::QueryPlannerImpl;
 
 #[automock]
@@ -1020,7 +1013,7 @@ impl Debug for CubeTableExec {
 }
 
 impl DisplayAs for CubeTableExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "CubeTableExec")
     }
 }
@@ -1597,7 +1590,7 @@ impl ClusterSendExec {
 }
 
 impl DisplayAs for ClusterSendExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "ClusterSendExec")
     }
 }
