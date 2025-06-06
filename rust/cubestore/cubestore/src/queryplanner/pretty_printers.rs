@@ -12,13 +12,13 @@ use datafusion::logical_expr::{
     Projection, Repartition, SkipType, Sort, TableScan, Union, Window,
 };
 use datafusion::physical_expr::{AcrossPartitions, ConstExpr};
+use datafusion::physical_optimizer::pruning;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
+use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
-use datafusion::physical_plan::{
-    DefaultDisplay, DisplayAs, DisplayFormatType, ExecutionPlan, InputOrderMode, PlanProperties,
-};
+use datafusion::physical_plan::{DefaultDisplay, ExecutionPlan, InputOrderMode, PlanProperties};
 use datafusion::prelude::Expr;
 use datafusion_datasource::file_scan_config::FileScanConfig;
 use datafusion_datasource::memory::MemoryExec;
@@ -42,7 +42,6 @@ use crate::queryplanner::topk::SortColumn;
 use crate::queryplanner::topk::{
     AggregateTopKExec, ClusterAggregateTopKLower, ClusterAggregateTopKUpper,
 };
-use crate::queryplanner::trace_data_loaded::TraceDataLoadedExec;
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider, QueryPlan};
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -64,10 +63,12 @@ pub struct PPOptions {
     pub show_output_hints: bool,
     pub show_check_memory_nodes: bool,
     pub show_partitions: bool,
+    pub show_metrics: bool,
     pub traverse_past_clustersend: bool,
 }
 
 impl PPOptions {
+    // TODO upgrade DF: Rename
     #[allow(unused)]
     pub fn show_all() -> PPOptions {
         PPOptions {
@@ -78,6 +79,7 @@ impl PPOptions {
             show_output_hints: true,
             show_check_memory_nodes: true,
             show_partitions: true,
+            show_metrics: false, // yeah
             traverse_past_clustersend: false,
         }
     }
@@ -491,9 +493,7 @@ pub fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
 }
 
 fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, out: &mut String) {
-    if (p.as_any().is::<CheckMemoryExec>() || p.as_any().is::<TraceDataLoadedExec>())
-        && !o.show_check_memory_nodes
-    {
+    if p.as_any().is::<CheckMemoryExec>() && !o.show_check_memory_nodes {
         //We don't show CheckMemoryExec in plan by default
         if let Some(child) = p.children().first() {
             pp_phys_plan_indented(child.as_ref(), indent, o, out)
@@ -651,6 +651,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "PanicWorker";
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
             *out += &format!("Worker");
+        } else if let Some(_) = a.downcast_ref::<CoalesceBatchesExec>() {
+            *out += "CoalesceBatches";
         } else if let Some(_) = a.downcast_ref::<CoalescePartitionsExec>() {
             *out += "CoalescePartitions";
         } else if let Some(s) = a.downcast_ref::<SortPreservingMergeExec>() {
@@ -701,6 +703,23 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                             .map(|p| p.object_meta.location.to_string())
                             .join(","),
                     );
+                    if o.show_filters {
+                        if let Some(predicate) = p.predicate() {
+                            *out += &format!(", predicate: {}", predicate);
+                        }
+                        // pruning_predicate and page_pruning_predicate are derived from
+                        // p.predicate(), and they tend to be more verbose.  Note: because we have
+                        // configured the default pushdown_filters = false (default false as of DF
+                        // <= 46.0.1), p.predicate() is not directly used.
+
+                        // if let Some(pruning_predicate) = p.pruning_predicate() {
+                        //     *out += &format!(", pruning_predicate: {}", pruning_predicate.predicate_expr());
+                        // }
+                        // if let Some(page_pruning_predicate) = p.page_pruning_predicate() {
+                        //     // If this is uncommented, page_pruning_predicate.predicates() would need to be added to DF.
+                        //     *out += &format!(", page_pruning_predicates: [{}]", page_pruning_predicate.predicates().iter().map(|pred| pred.predicate_expr()).join(", "));
+                        // }
+                    }
                 } else {
                     *out += &format!("{}", DefaultDisplay(dse));
                 }
@@ -791,6 +810,12 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 ", partitions: {}",
                 p.properties().output_partitioning().partition_count()
             );
+        }
+
+        if o.show_metrics {
+            if let Some(m) = p.metrics() {
+                *out += &format!(", metrics: {}", m);
+            }
         }
     }
 }
