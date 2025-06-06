@@ -204,11 +204,12 @@ impl RecordBatchStream for TailLimitStream {
 
 #[cfg(test)]
 mod tests {
+    use crate::queryplanner::try_make_memory_data_source;
+
     use super::*;
     use datafusion::arrow::array::Int64Array;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::physical_plan::collect as result_collect;
-    use datafusion_datasource::memory::MemoryExec;
     use itertools::Itertools;
 
     fn ints_schema() -> SchemaRef {
@@ -237,8 +238,7 @@ mod tests {
         let input = vec![ints(vec![1, 2, 3, 4])];
 
         let schema = ints_schema();
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 3)),
             Arc::new(TaskContext::default()),
@@ -250,8 +250,7 @@ mod tests {
             vec![2, 3, 4],
         );
 
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 4)),
             Arc::new(TaskContext::default()),
@@ -263,8 +262,7 @@ mod tests {
             vec![1, 2, 3, 4],
         );
 
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 8)),
             Arc::new(TaskContext::default()),
@@ -276,8 +274,7 @@ mod tests {
             vec![1, 2, 3, 4],
         );
 
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 1)),
             Arc::new(TaskContext::default()),
@@ -286,8 +283,7 @@ mod tests {
         .unwrap();
         assert_eq!(to_ints(r).into_iter().flatten().collect_vec(), vec![4],);
 
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 0)),
             Arc::new(TaskContext::default()),
@@ -308,8 +304,7 @@ mod tests {
         ];
 
         let schema = ints_schema();
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 2)),
             Arc::new(TaskContext::default()),
@@ -318,8 +313,7 @@ mod tests {
         .unwrap();
         assert_eq!(to_ints(r).into_iter().flatten().collect_vec(), vec![9, 10],);
 
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 3)),
             Arc::new(TaskContext::default()),
@@ -331,8 +325,7 @@ mod tests {
             vec![8, 9, 10],
         );
 
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 4)),
             Arc::new(TaskContext::default()),
@@ -344,8 +337,7 @@ mod tests {
             vec![7, 8, 9, 10],
         );
 
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 5)),
             Arc::new(TaskContext::default()),
@@ -357,8 +349,7 @@ mod tests {
             vec![6, 7, 8, 9, 10],
         );
 
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 10)),
             Arc::new(TaskContext::default()),
@@ -370,8 +361,7 @@ mod tests {
             vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         );
 
-        let inp =
-            Arc::new(MemoryExec::try_new(&vec![input.clone()], schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&vec![input.clone()], schema.clone(), None).unwrap();
         let r = result_collect(
             Arc::new(TailLimitExec::new(inp, 100)),
             Arc::new(TaskContext::default()),

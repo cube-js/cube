@@ -8,7 +8,8 @@ use datafusion::physical_plan::common::collect as common_collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column as FusionColumn;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
-use datafusion_datasource::memory::MemoryExec;
+use datafusion_datasource::memory::MemorySourceConfig;
+use datafusion_datasource::source::DataSourceExec;
 use serde::{de, Deserialize, Serialize};
 extern crate bincode;
 
@@ -18,7 +19,7 @@ use crate::metastore::{
     deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, table::Table, Chunk,
     Column, ColumnType, IdRow, Index, IndexType, MetaStore, Partition, WAL,
 };
-use crate::queryplanner::QueryPlannerImpl;
+use crate::queryplanner::{try_make_memory_data_source, QueryPlannerImpl};
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::columns_vec_buffer_size;
@@ -134,11 +135,11 @@ impl DataFrame {
 
         let batch = RecordBatch::try_new(schema.clone(), column_values)?;
 
-        Ok(Arc::new(MemoryExec::try_new(
+        Ok(try_make_memory_data_source(
             &vec![vec![batch]],
             schema,
             None,
-        )?))
+        )?)
     }
 }
 
@@ -1308,7 +1309,8 @@ impl ChunkStore {
 
                 let batch = RecordBatch::try_new(schema.clone(), data)?;
 
-                let memory_exec = MemoryExec::try_new(&[vec![batch]], schema.clone(), None)?;
+                let memory_source_config =
+                    MemorySourceConfig::try_new(&[vec![batch]], schema.clone(), None)?;
 
                 let key_size = index.get_row().sort_key_size() as usize;
                 let mut groups = Vec::with_capacity(key_size);
@@ -1321,9 +1323,10 @@ impl ChunkStore {
                     lex_ordering.push(PhysicalSortExpr::new(col, SortOptions::default()));
                 }
 
-                let input = Arc::new(
-                    memory_exec.try_with_sort_information(vec![LexOrdering::new(lex_ordering)])?,
-                );
+                let input = Arc::new(DataSourceExec::new(Arc::new(
+                    memory_source_config
+                        .try_with_sort_information(vec![LexOrdering::new(lex_ordering)])?,
+                )));
 
                 let aggregates = table
                     .get_row()

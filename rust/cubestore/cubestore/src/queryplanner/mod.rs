@@ -5,6 +5,8 @@ mod partition_filter;
 mod planning;
 use datafusion::logical_expr::planner::ExprPlanner;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
+use datafusion_datasource::memory::MemorySourceConfig;
+use datafusion_datasource::source::DataSourceExec;
 // use datafusion::physical_plan::parquet::MetadataCacheFactory;
 pub use planning::PlanningMeta;
 mod check_memory;
@@ -949,6 +951,19 @@ fn compute_workers(
         )),
         Err(e) => Err(CubeError::internal(e.to_string())),
     }
+}
+
+/// Creates a [`DataSourceExec`] with a [`MemorySourceConfig`], i.e. the alternative to the
+/// deprecated `MemoryExec`.  Useful when the [`MemorySourceConfig`] doesn't need sorting
+/// information.
+pub fn try_make_memory_data_source(
+    partitions: &[Vec<RecordBatch>],
+    schema: SchemaRef,
+    projection: Option<Vec<usize>>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    Ok(Arc::new(DataSourceExec::new(Arc::new(
+        MemorySourceConfig::try_new(partitions, schema, projection)?,
+    ))))
 }
 
 #[cfg(test)]
