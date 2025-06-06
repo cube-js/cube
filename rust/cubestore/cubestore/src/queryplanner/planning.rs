@@ -2238,7 +2238,7 @@ pub mod tests {
             "customer_registered_date",
         ]);
         let customers = i.add_table(Table::new(
-            "Customers".to_string(),
+            "customers".to_string(),
             SCHEMA,
             customers_cols.clone(),
             None,
@@ -2290,7 +2290,7 @@ pub mod tests {
             "order_city",
         ]);
         let orders = i.add_table(Table::new(
-            "Orders".to_string(),
+            "orders".to_string(),
             SCHEMA,
             orders_cols.clone(),
             None,
@@ -2348,7 +2348,7 @@ pub mod tests {
         }
 
         i.add_table(Table::new(
-            "Products".to_string(),
+            "products".to_string(),
             SCHEMA,
             int_columns(&["product_id", "product_name"]),
             None,
@@ -2467,7 +2467,7 @@ pub mod tests {
             };
             self.tables
                 .iter()
-                .find_position(|t| t.get_table_name().to_lowercase() == name.to_lowercase())
+                .find_position(|t| t.get_table_name() == name.as_ref())
                 .map(|(id, t)| -> Arc<dyn TableSource> {
                     let schema = Arc::new(ArrowSchema::new(
                         t.get_columns()
