@@ -756,7 +756,7 @@ impl TableProvider for InfoSchemaTableProvider {
             properties: PlanProperties::new(
                 EquivalenceProperties::new(schema),
                 Partitioning::UnknownPartitioning(1),
-                EmissionType::Both, // TODO upgrade DF:  Both is safe choice
+                EmissionType::Final,
                 Boundedness::Bounded,
             ),
         };
