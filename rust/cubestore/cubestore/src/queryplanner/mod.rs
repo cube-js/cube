@@ -154,7 +154,7 @@ impl QueryPlanner for QueryPlannerImpl {
             state.clone(),
         );
 
-        let query_planner = SqlToRel::new(&schema_provider);
+        let query_planner = SqlToRel::new_with_options(&schema_provider, sql_to_rel_options());
         let mut logical_plan = query_planner.statement_to_plan(statement)?;
 
         // TODO upgrade DF remove
@@ -350,7 +350,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 let table = self
                     .inline_tables
                     .iter()
-                    .find(|inline_table| inline_table.name.to_lowercase() == table.as_ref())
+                    .find(|inline_table| inline_table.name == table.as_ref())
                     .ok_or_else(|| {
                         DataFusionError::Plan(format!("Inline table {} was not found", name))
                     })?;
@@ -572,6 +572,17 @@ impl ContextProvider for MetaStoreSchemaProvider {
             .keys()
             .cloned()
             .collect()
+    }
+}
+
+/// Enables our options used with `SqlToRel`.  Sets `enable_ident_normalization` to false.  See also
+/// `normalize_for_column_name` and its doc-comment, and similar functions, which must be kept in
+/// sync with changes to the `enable_ident_normalization` option set here.
+pub fn sql_to_rel_options() -> datafusion::sql::planner::ParserOptions {
+    // not to be confused with sql_parser's ParserOptions
+    datafusion::sql::planner::ParserOptions {
+        enable_ident_normalization: false,
+        ..Default::default()
     }
 }
 
@@ -960,7 +971,7 @@ pub mod tests {
             other => panic!("not a statement, actual {:?}", other),
         };
 
-        let plan = SqlToRel::new(&ctx)
+        let plan = SqlToRel::new_with_options(&ctx, sql_to_rel_options())
             .statement_to_plan(DFStatement::Statement(Box::new(statement)))
             .unwrap();
         SessionContext::new().state().optimize(&plan).unwrap()

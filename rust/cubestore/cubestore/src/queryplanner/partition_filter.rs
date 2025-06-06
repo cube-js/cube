@@ -575,6 +575,7 @@ impl Builder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::queryplanner::sql_to_rel_options;
     use crate::sql::parser::{CubeStoreParser, Statement as CubeStatement};
     use datafusion::arrow::datatypes::Field;
     use datafusion::common::{TableReference, ToDFSchema};
@@ -1472,9 +1473,12 @@ mod tests {
             _ => panic!("unexpected parse result"),
         }
 
-        SqlToRel::new(&NoContextProvider {
-            config_options: ConfigOptions::new(),
-        })
+        SqlToRel::new_with_options(
+            &NoContextProvider {
+                config_options: ConfigOptions::new(),
+            },
+            sql_to_rel_options(),
+        )
         .sql_to_expr(
             sql_expr,
             &schema.clone().to_dfschema().unwrap(),
