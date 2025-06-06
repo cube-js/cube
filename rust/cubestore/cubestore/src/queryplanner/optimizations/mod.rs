@@ -5,7 +5,7 @@ pub mod rewrite_plan;
 pub mod rolling_optimizer;
 mod trace_data_loaded;
 
-use crate::cluster::Cluster;
+use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::queryplanner::optimizations::distributed_partial_aggregate::{
     add_limit_to_workers, ensure_partition_merge, push_aggregate_to_workers,
 };
@@ -29,12 +29,16 @@ use datafusion::logical_expr::LogicalPlan;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_planner::{DefaultPhysicalPlanner, PhysicalPlanner};
+use distributed_partial_aggregate::ensure_partition_merge_with_acceptable_parent;
 use rewrite_plan::rewrite_physical_plan;
 use std::sync::Arc;
 use trace_data_loaded::add_trace_data_loaded_exec;
 
 pub struct CubeQueryPlanner {
+    /// Set on the router
     cluster: Option<Arc<dyn Cluster>>,
+    /// Set on the worker
+    worker_partition_count: Option<WorkerPlanningParams>,
     serialized_plan: Arc<PreSerializedPlan>,
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,
@@ -48,6 +52,7 @@ impl CubeQueryPlanner {
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             cluster: Some(cluster),
+            worker_partition_count: None,
             serialized_plan,
             memory_handler,
             data_loaded_size: None,
@@ -56,12 +61,14 @@ impl CubeQueryPlanner {
 
     pub fn new_on_worker(
         serialized_plan: Arc<PreSerializedPlan>,
+        worker_planning_params: WorkerPlanningParams,
         memory_handler: Arc<dyn MemoryHandler>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
             serialized_plan,
             cluster: None,
+            worker_partition_count: Some(worker_planning_params),
             memory_handler,
             data_loaded_size,
         }
@@ -84,13 +91,14 @@ impl QueryPlanner for CubeQueryPlanner {
         let p = DefaultPhysicalPlanner::with_extension_planners(vec![
             Arc::new(CubeExtensionPlanner {
                 cluster: self.cluster.clone(),
+                worker_planning_params: self.worker_partition_count,
                 serialized_plan: self.serialized_plan.clone(),
             }),
             Arc::new(RollingWindowPlanner {}),
         ])
         .create_physical_plan(logical_plan, ctx_state)
         .await?;
-        // TODO: assert there is only a single ClusterSendExec in the plan.
+        // TODO: assert there is only a single ClusterSendExec in the plan.  Update: This is no longer true.
         finalize_physical_plan(
             p,
             self.memory_handler.clone(),
@@ -145,7 +153,11 @@ fn pre_optimize_physical_plan(
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     // TODO upgrade DF
     let p = rewrite_physical_plan(p, &mut |p| push_aggregate_to_workers(p))?;
-    let p = rewrite_physical_plan(p, &mut |p| ensure_partition_merge(p))?;
+
+    // Handles non-root-node cases
+    let p = rewrite_physical_plan(p, &mut |p| ensure_partition_merge_with_acceptable_parent(p))?;
+    // Handles the root node case
+    let p = ensure_partition_merge(p)?;
     Ok(p)
 }
 

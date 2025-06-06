@@ -3240,7 +3240,7 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
                                AND (`day` >= to_timestamp('2021-01-01T00:00:00.000') \
                                 AND `day` <= to_timestamp('2021-01-02T23:59:59.999')) \
                          GROUP BY 1 \
-                         ORDER BY 2 DESC \
+                         ORDER BY 2 DESC NULLS LAST \
                          LIMIT 10",
         )
         .await
@@ -3251,27 +3251,31 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
     verbose.show_sort_by = true;
     assert_eq!(
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
-        "Projection, [url, SUM(Data.hits)@1:hits]\
+        "Projection, [url, sum(Data.hits)@1:hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc null last]\
            \n    ClusterSend, partitions: [[1, 2]], sort_order: [1]"
     );
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &verbose),
-        "Projection, [url, SUM(Data.hits)@1:hits]\
+        "Projection, [url, sum(Data.hits)@1:hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc null last]\
            \n    Worker, sort_order: [1]\
-           \n      Sort, by: [SUM(hits)@1 desc nulls last], sort_order: [1]\
-           \n        FullInplaceAggregate, sort_order: [0]\
-           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2]\
-           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2]\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
-           \n                MergeSort, sort_order: [0, 1, 2]\
-           \n                  Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
-           \n                    Empty\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
-           \n                MergeSort, sort_order: [0, 1, 2]\
-           \n                  Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
-           \n                    Empty"
+           \n      Sort, by: [sum(Data.hits)@1 desc nulls last], sort_order: [1]\
+           \n        LinearSingleAggregate\
+           \n          CoalescePartitions\
+           \n            Union\
+           \n              CoalescePartitions\
+           \n                CoalesceBatchesExec\
+           \n                  Filter\
+           \n                    Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                      Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
+           \n                        Empty\
+           \n              CoalescePartitions\
+           \n                CoalesceBatchesExec\
+           \n                  Filter\
+           \n                    Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                      Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
+           \n                        Empty"
     );
 }
 
@@ -4211,18 +4215,18 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
     show_hints.show_filters = true;
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Projection, [url, SUM(Data.hits)@1:hits]\
-        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10\
+        "Projection, [url, sum(Data.hits)@1:hits]\
+        \n  AggregateTopK, limit: 3, having: sum(Data.hits)@1 > 10\
         \n    Worker\
         \n      Sort\
-        \n        FullInplaceAggregate\
+        \n        SortedSingleAggregate\
         \n          MergeSort\
         \n            Union\
-        \n              MergeSort\
-        \n                Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n              Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                Sort\
         \n                  Empty\
-        \n              MergeSort\
-        \n                Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n              Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                Sort\
         \n                  Empty"
     );
 
@@ -4239,26 +4243,26 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
     show_hints.show_filters = true;
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Projection, [url, hits, CARDINALITY(MERGE(Data.uhits)@2):uhits]\
-        \n  Projection, [url, SUM(Data.hits)@1:hits, MERGE(Data.uhits)@2:MERGE(uhits)]\
-        \n    AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10 AND CAST(CARDINALITY(MERGE(Data.uhits)@2) AS Int64) > 5\
-        \n      Worker\
-        \n        Sort\
-        \n          FullInplaceAggregate\
-        \n            MergeSort\
-        \n              Union\
-        \n                MergeSort\
-        \n                  Scan, index: default:1:[1]:sort_on[url], fields: *\
-        \n                    Empty\
-        \n                MergeSort\
-        \n                  Scan, index: default:2:[2]:sort_on[url], fields: *\
-        \n                    Empty"
+        "Projection, [url, sum(Data.hits)@1:hits, cardinality(merge(Data.uhits)@2):uhits]\
+        \n  AggregateTopK, limit: 3, having: sum(Data.hits)@1 > 10 AND cardinality(merge(Data.uhits)@2) > 5\
+        \n    Worker\
+        \n      Sort\
+        \n        SortedSingleAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              Scan, index: default:1:[1]:sort_on[url], fields: *\
+        \n                Sort\
+        \n                  Empty\
+        \n              Scan, index: default:2:[2]:sort_on[url], fields: *\
+        \n                Sort\
+        \n                  Empty"
         );
     // Checking execution because the column name MERGE(Data.uhits) in the top projection in the
     // above assertion seems incorrect, but the column number is correct.
     let result = service.exec_query(query).await.unwrap();
     assert_eq!(result.len(), 0);
 }
+
 async fn planning_topk_hll(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -4286,19 +4290,19 @@ async fn planning_topk_hll(service: Box<dyn SqlClient>) {
     show_hints.show_filters = true;
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
-         \n  AggregateTopK, limit: 3\
-         \n    Worker\
-         \n      Sort\
-         \n        FullInplaceAggregate\
-         \n          MergeSort\
-         \n            Union\
-         \n              MergeSort\
-         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
-         \n                  Empty\
-         \n              MergeSort\
-         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
-         \n                  Empty"
+        "Projection, [url, cardinality(merge(Data.hits)@1):hits]\
+        \n  AggregateTopK, limit: 3\
+        \n    Worker\
+        \n      Sort\
+        \n        SortedSingleAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              Scan, index: default:1:[1]:sort_on[url], fields: *\
+        \n                Sort\
+        \n                  Empty\
+        \n              Scan, index: default:2:[2]:sort_on[url], fields: *\
+        \n                Sort\
+        \n                  Empty"
     );
 
     let p = service
@@ -4318,18 +4322,18 @@ async fn planning_topk_hll(service: Box<dyn SqlClient>) {
     show_hints.show_filters = true;
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
-         \n  AggregateTopK, limit: 3, having: CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) > 20 AND CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) < 40\
+        "Projection, [url, cardinality(merge(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3, having: cardinality(merge(Data.hits)@1) > 20 AND cardinality(merge(Data.hits)@1) < 40\
          \n    Worker\
          \n      Sort\
-         \n        FullInplaceAggregate\
+         \n        SortedSingleAggregate\
          \n          MergeSort\
          \n            Union\
-         \n              MergeSort\
-         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n              Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                Sort\
          \n                  Empty\
-         \n              MergeSort\
-         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n              Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                Sort\
          \n                  Empty"
         );
 }

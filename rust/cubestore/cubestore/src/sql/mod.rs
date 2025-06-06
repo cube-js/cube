@@ -36,7 +36,7 @@ use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
 use crate::cachestore::CacheStore;
-use crate::cluster::Cluster;
+use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
@@ -49,7 +49,9 @@ use crate::metastore::{
 };
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
-use crate::queryplanner::query_executor::{batches_to_dataframe, ClusterSendExec, QueryExecutor};
+use crate::queryplanner::query_executor::{
+    batches_to_dataframe, find_topmost_cluster_send_exec, ClusterSendExec, QueryExecutor,
+};
 use crate::queryplanner::serialized_plan::{PreSerializedPlan, RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
@@ -382,16 +384,11 @@ impl SqlServiceImpl {
     ) -> Result<Arc<DataFrame>, CubeError> {
         fn extract_worker_plans(
             p: &Arc<dyn ExecutionPlan>,
-        ) -> Result<Option<Vec<(String, PreSerializedPlan)>>, CubeError> {
-            if let Some(p) = p.as_any().downcast_ref::<ClusterSendExec>() {
-                Ok(Some(p.worker_plans()?))
+        ) -> Result<Option<(Vec<(String, PreSerializedPlan)>, WorkerPlanningParams)>, CubeError>
+        {
+            if let Some(p) = find_topmost_cluster_send_exec(p) {
+                Ok(Some((p.worker_plans()?, p.worker_planning_params())))
             } else {
-                for c in p.children() {
-                    let res = extract_worker_plans(&c)?;
-                    if res.is_some() {
-                        return Ok(res);
-                    }
-                }
                 Ok(None)
             }
         }
@@ -437,12 +434,18 @@ impl SqlServiceImpl {
                         TableValue::String(pp_phys_plan(router_plan.as_ref())),
                     ]));
 
-                    if let Some(worker_plans) = extract_worker_plans(&router_plan)? {
+                    if let Some((worker_plans, worker_planning_params)) =
+                        extract_worker_plans(&router_plan)?
+                    {
                         let worker_futures = worker_plans
                             .into_iter()
                             .map(|(name, plan)| async move {
                                 self.cluster
-                                    .run_explain_analyze(&name, plan.to_serialized_plan()?)
+                                    .run_explain_analyze(
+                                        &name,
+                                        plan.to_serialized_plan()?,
+                                        worker_planning_params,
+                                    )
                                     .await
                                     .map(|p| (name, p))
                             })
@@ -624,7 +627,15 @@ impl SqlService for SqlServiceImpl {
                         }?;
                     } else {
                         let worker = &workers[0];
-                        cluster.run_select(worker, plan).await?;
+                        cluster
+                            .run_select(
+                                worker,
+                                plan,
+                                WorkerPlanningParams {
+                                    worker_partition_count: 1,
+                                },
+                            )
+                            .await?;
                     }
                     panic!("worker did not panic")
                 }
@@ -1199,18 +1210,27 @@ impl SqlService for SqlServiceImpl {
                             .into_iter()
                             .map(|(c, _, _)| (c.get_id(), Vec::new()))
                             .collect();
+                        let (router_plan, _) = self
+                            .query_executor
+                            .router_plan(router_plan.to_serialized_plan()?, self.cluster.clone())
+                            .await?;
+                        let worker_planning_params =
+                            if let Some(p) = find_topmost_cluster_send_exec(&router_plan) {
+                                p.worker_planning_params()
+                            } else {
+                                WorkerPlanningParams::no_worker()
+                            };
                         return Ok(QueryPlans {
-                            router: self
-                                .query_executor
-                                .router_plan(
-                                    router_plan.to_serialized_plan()?,
-                                    self.cluster.clone(),
-                                )
-                                .await?
-                                .0,
+                            router: router_plan,
                             worker: self
                                 .query_executor
-                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches, None)
+                                .worker_plan(
+                                    worker_plan,
+                                    worker_planning_params,
+                                    mocked_names,
+                                    chunk_ids_to_batches,
+                                    None,
+                                )
                                 .await?
                                 .0,
                         });
