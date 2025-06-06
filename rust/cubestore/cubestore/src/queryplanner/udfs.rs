@@ -28,7 +28,6 @@ use std::time::SystemTime;
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeScalarUDFKind {
     HllCardinality, // cardinality(), accepting the HyperLogLog sketches.
-    // Coalesce,
     UnixTimestamp,
     DateAdd,
     DateSub,
@@ -38,7 +37,6 @@ pub enum CubeScalarUDFKind {
 pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Arc<ScalarUDF> {
     match k {
         CubeScalarUDFKind::HllCardinality => Arc::new(HllCardinality::descriptor()),
-        // CubeScalarUDFKind::Coalesce => Box::new(Coalesce {}),
         CubeScalarUDFKind::UnixTimestamp => {
             Arc::new(ScalarUDF::new_from_impl(UnixTimestamp::new()))
         }
@@ -69,9 +67,6 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     if n == "CARDINALITY" {
         return Some(CubeScalarUDFKind::HllCardinality);
     }
-    // if n == "COALESCE" {
-    //     return Some(CubeScalarUDFKind::Coalesce);
-    // }
     if n == "UNIX_TIMESTAMP" {
         return Some(CubeScalarUDFKind::UnixTimestamp);
     }
@@ -87,7 +82,7 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     // TODO upgrade DF: Remove this (once we are no longer in flux about naming casing of UDFs and UDAFs).
     if [
         "CARDINALITY",
-        /* "COALESCE", */ "UNIX_TIMESTAMP",
+        "UNIX_TIMESTAMP",
         "DATE_ADD",
         "DATE_SUB",
         "DATE_BIN",
@@ -145,40 +140,6 @@ pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
 
 // The rest of the file are implementations of the various functions that we have.
 // TODO: add custom type and use it instead of `Binary` for HLL columns.
-
-// TODO upgrade DF - remove?
-// struct Coalesce {}
-// impl Coalesce {
-//     fn signature() -> Signature {
-//         Signature::Variadic(SUPPORTED_COALESCE_TYPES.to_vec())
-//     }
-// }
-// impl CubeScalarUDF for Coalesce {
-//     fn kind(&self) -> CubeScalarUDFKind {
-//         CubeScalarUDFKind::Coalesce
-//     }
-//
-//     fn name(&self) -> &str {
-//         "COALESCE"
-//     }
-//
-//     fn descriptor(&self) -> ScalarUDF {
-//         return ScalarUDF {
-//             name: self.name().to_string(),
-//             signature: Self::signature(),
-//             return_type: Arc::new(|inputs| {
-//                 if inputs.is_empty() {
-//                     return Err(DataFusionError::Plan(
-//                         "COALESCE requires at least 1 argument".to_string(),
-//                     ));
-//                 }
-//                 let ts = type_coercion::data_types(inputs, &Self::signature())?;
-//                 Ok(Arc::new(ts[0].clone()))
-//             }),
-//             fun: Arc::new(coalesce),
-//         };
-//     }
-// }
 
 #[derive(Debug)]
 struct UnixTimestamp {
