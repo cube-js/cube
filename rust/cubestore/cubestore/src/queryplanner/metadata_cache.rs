@@ -2,8 +2,10 @@ use bytes::Bytes;
 use datafusion::datasource::physical_plan::parquet::DefaultParquetFileReaderFactory;
 use datafusion::datasource::physical_plan::{FileMeta, ParquetFileReaderFactory};
 use datafusion::parquet::arrow::async_reader::AsyncFileReader;
+use datafusion::parquet::file::encryption::ParquetEncryptionConfig;
 use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
+use datafusion::prelude::SessionConfig;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use std::fmt;
@@ -22,6 +24,9 @@ pub trait MetadataCacheFactory: Sync + Send {
         max_capacity: u64,
         time_to_idle: Duration,
     ) -> Arc<dyn ParquetFileReaderFactory>;
+    fn make_session_config(&self) -> SessionConfig {
+        SessionConfig::new()
+    }
 }
 /// Default MetadataCache, does not cache anything
 #[derive(Debug)]
@@ -131,6 +136,20 @@ pub struct LruCachingFileReader {
     cache: Arc<moka::sync::Cache<object_store::path::Path, Arc<ParquetMetaData>>>,
 }
 
+impl LruCachingFileReader {
+    pub fn new(
+        path: object_store::path::Path,
+        reader: Box<dyn AsyncFileReader>,
+        cache: Arc<moka::sync::Cache<object_store::path::Path, Arc<ParquetMetaData>>>,
+    ) -> LruCachingFileReader {
+        LruCachingFileReader {
+            path,
+            reader,
+            cache,
+        }
+    }
+}
+
 impl AsyncFileReader for LruCachingFileReader {
     fn get_bytes(
         &mut self,
@@ -148,14 +167,16 @@ impl AsyncFileReader for LruCachingFileReader {
 
     fn get_metadata(
         &mut self,
+        encryption_config: &Option<ParquetEncryptionConfig>,
     ) -> BoxFuture<'_, datafusion::parquet::errors::Result<Arc<ParquetMetaData>>> {
         let cache = self.cache.clone();
         let path = self.path.clone();
+        let encryption_config = encryption_config.clone();
         async move {
             match cache.get(&path) {
                 Some(metadata) => Ok(metadata),
                 None => {
-                    let metadata = self.reader.get_metadata().await?;
+                    let metadata = self.reader.get_metadata(&encryption_config).await?;
                     cache.insert(path, metadata.clone());
                     Ok(metadata)
                 }
