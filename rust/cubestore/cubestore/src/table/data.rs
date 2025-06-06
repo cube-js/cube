@@ -253,6 +253,7 @@ pub fn rows_to_columns(cols: &[Column], rows: &[Row]) -> Vec<ArrayRef> {
 
 pub fn to_stream(r: RecordBatch) -> SendableRecordBatchStream {
     let schema = r.schema();
+    // TaskContext::default is OK here because it's a plain memory exec.
     MemoryExec::try_new(&[vec![r]], schema, None)
         .unwrap()
         .execute(0, Arc::new(TaskContext::default()))
