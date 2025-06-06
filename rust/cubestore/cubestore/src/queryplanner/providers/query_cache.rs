@@ -1,4 +1,4 @@
-use crate::queryplanner::project_schema;
+use crate::queryplanner::{project_schema, try_make_memory_data_source};
 use crate::sql::cache::{sql_result_cache_sizeof, SqlResultCache};
 use async_trait::async_trait;
 use datafusion::arrow::array::{Array, Int64Builder, StringBuilder};
@@ -13,7 +13,6 @@ use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion::physical_plan::{DisplayAs, DisplayFormatType, Partitioning, PlanProperties};
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
-use datafusion_datasource::memory::MemoryExec;
 use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -179,8 +178,11 @@ impl ExecutionPlan for InfoSchemaQueryCacheTableExec {
         let batch = RecordBatch::try_new(get_schema(), data.to_vec())?;
 
         // TODO: Please migrate to real streaming, if we are going to expose query results
-        let mem_exec =
-            MemoryExec::try_new(&vec![vec![batch]], self.schema(), self.projection.clone())?;
+        let mem_exec = try_make_memory_data_source(
+            &vec![vec![batch]],
+            self.schema(),
+            self.projection.clone(),
+        )?;
         mem_exec.execute(partition, context)
     }
 }

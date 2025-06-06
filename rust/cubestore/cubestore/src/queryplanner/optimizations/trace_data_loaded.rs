@@ -1,5 +1,5 @@
 use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
-use datafusion::datasource::physical_plan::{ParquetExec, ParquetSource};
+use datafusion::datasource::physical_plan::ParquetSource;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion_datasource::file_scan_config::FileScanConfig;
@@ -7,10 +7,13 @@ use datafusion_datasource::source::DataSourceExec;
 use std::sync::Arc;
 
 /// Add `TraceDataLoadedExec` behind ParquetExec or DataSourceExec (with File hence Parquet source) nodes.
+#[allow(deprecated)]
 pub fn add_trace_data_loaded_exec(
     p: Arc<dyn ExecutionPlan>,
     data_loaded_size: &Arc<DataLoadedSize>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    use datafusion::datasource::physical_plan::ParquetExec;
+
     fn do_wrap(
         p: Arc<dyn ExecutionPlan>,
         data_loaded_size: &Arc<DataLoadedSize>,

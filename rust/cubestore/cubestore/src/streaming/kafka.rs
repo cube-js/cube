@@ -415,7 +415,7 @@ mod tests {
     use super::*;
     use crate::metastore::{Column, ColumnType};
     use crate::queryplanner::query_executor::batches_to_dataframe;
-    use crate::queryplanner::sql_to_rel_options;
+    use crate::queryplanner::{sql_to_rel_options, try_make_memory_data_source};
     use crate::sql::MySqlDialectWithBackTicks;
     use crate::streaming::topic_table_provider::TopicTableProvider;
     use datafusion::arrow::array::StringArray;
@@ -425,7 +425,6 @@ mod tests {
     use datafusion::prelude::SessionContext;
     use datafusion::sql::parser::Statement as DFStatement;
     use datafusion::sql::planner::SqlToRel;
-    use datafusion_datasource::memory::MemoryExec;
     use sqlparser::parser::Parser;
     use sqlparser::tokenizer::Tokenizer;
 
@@ -465,7 +464,7 @@ mod tests {
         let batch =
             RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(input))]).unwrap();
         let memery_input = vec![vec![batch]];
-        let inp = Arc::new(MemoryExec::try_new(&memery_input, schema.clone(), None).unwrap());
+        let inp = try_make_memory_data_source(&memery_input, schema.clone(), None).unwrap();
 
         let dialect = &MySqlDialectWithBackTicks {};
         let mut tokenizer = Tokenizer::new(dialect, &select_statement);
