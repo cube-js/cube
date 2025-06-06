@@ -425,7 +425,7 @@ impl ChunkDataStore for ChunkStore {
         if old_chunk_ids.is_empty() {
             return Ok(());
         }
-        let task_context = QueryPlannerImpl::execution_context_helper(
+        let task_context = QueryPlannerImpl::make_execution_context(
             self.metadata_cache_factory
                 .cache_factory()
                 .make_session_config(),
@@ -1348,7 +1348,7 @@ impl ChunkStore {
                     .output_ordering()
                     .is_some_and(|ordering| ordering.len() == key_size));
 
-                let task_context = QueryPlannerImpl::execution_context_helper(
+                let task_context = QueryPlannerImpl::make_execution_context(
                     self.metadata_cache_factory
                         .cache_factory()
                         .make_session_config(),

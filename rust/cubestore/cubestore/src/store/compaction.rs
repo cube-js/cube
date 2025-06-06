@@ -190,7 +190,7 @@ impl CompactionServiceImpl {
             .deactivate_and_mark_failed_chunks_for_replay(failed)
             .await;
 
-        let task_context = QueryPlannerImpl::execution_context_helper(
+        let task_context = QueryPlannerImpl::make_execution_context(
             self.metadata_cache_factory
                 .cache_factory()
                 .make_session_config(),
@@ -718,7 +718,7 @@ impl CompactionService for CompactionServiceImpl {
             IndexType::Regular => None,
             IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
         };
-        let task_context = QueryPlannerImpl::execution_context_helper(session_config).task_ctx();
+        let task_context = QueryPlannerImpl::make_execution_context(session_config).task_ctx();
         let records = merge_chunks(
             key_size,
             main_table,
@@ -929,7 +929,7 @@ impl CompactionService for CompactionServiceImpl {
             key_len,
             // TODO should it respect table partition_split_threshold?
             self.config.partition_split_threshold() as usize,
-            QueryPlannerImpl::execution_context_helper(
+            QueryPlannerImpl::make_execution_context(
                 self.metadata_cache_factory
                     .cache_factory()
                     .make_session_config(),
@@ -2399,7 +2399,7 @@ impl MultiSplit {
             ROW_GROUP_SIZE,
             self.metadata_cache_factory.clone(),
         );
-        let task_context = QueryPlannerImpl::execution_context_helper(
+        let task_context = QueryPlannerImpl::make_execution_context(
             self.metadata_cache_factory
                 .cache_factory()
                 .make_session_config(),
