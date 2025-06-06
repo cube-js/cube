@@ -2521,21 +2521,14 @@ mod tests {
             .join("testing-fixtures")
             .join("int96_read");
         crate::util::copy_dir_all(&fixtures_path, ".").unwrap();
-        let remote_dir = "./int96_read-upstream";
 
         Config::test("int96_read")
             .update_config(|mut c| {
                 c.partition_split_threshold = 2;
                 c
             })
-            .start_test_worker(async move |services| {
-                // ^^ start_test_worker for clean_remote set to false
-
-                int96_helper(services, false).await
-            })
+            .start_migration_test(async move |services| int96_helper(services, false).await)
             .await;
-
-        std::fs::remove_dir_all(remote_dir).unwrap();
     }
 
     async fn decimal96_helper(services: CubeServices, perform_writes: bool) {
@@ -2826,21 +2819,14 @@ mod tests {
             .join("testing-fixtures")
             .join("decimal96_read");
         crate::util::copy_dir_all(&fixtures_path, ".").unwrap();
-        let remote_dir = "./decimal96_read-upstream";
 
         Config::test("decimal96_read")
             .update_config(|mut c| {
                 c.partition_split_threshold = 2;
                 c
             })
-            .start_test_worker(async move |services| {
-                // ^^ start_test_worker for clean_remote set to false
-
-                decimal96_helper(services, false).await
-            })
+            .start_migration_test(async move |services| decimal96_helper(services, false).await)
             .await;
-
-        std::fs::remove_dir_all(remote_dir).unwrap();
     }
 
     #[tokio::test]

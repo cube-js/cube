@@ -10,7 +10,7 @@ use cubestore::util::respawn::register_pushdownable_envs;
 use cubestore_sql_tests::multiproc::{
     multiproc_child_main, run_multiproc_test, MultiProcTest, SignalInit, WaitCompletion, WorkerProc,
 };
-use cubestore_sql_tests::{run_sql_tests, TestFn};
+use cubestore_sql_tests::{run_sql_tests, BasicSqlClient, TestFn};
 
 const METASTORE_PORT: u16 = 51336;
 const WORKER_PORTS: [u16; 2] = [51337, 51338];
@@ -78,7 +78,11 @@ impl MultiProcTest for ClusterSqlTest {
                 c
             })
             .start_test(|services| async move {
-                (self.test_fn)(Box::new(services.sql_service)).await;
+                (self.test_fn)(Box::new(BasicSqlClient {
+                    prefix: "cluster",
+                    service: services.sql_service,
+                }))
+                .await;
             })
             .await;
     }

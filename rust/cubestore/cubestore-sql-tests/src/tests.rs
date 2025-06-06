@@ -14,6 +14,7 @@ use cubestore::CubeError;
 use indoc::indoc;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
+use std::collections::HashSet;
 use std::env;
 use std::fs::File;
 use std::future::Future;
@@ -33,7 +34,7 @@ pub type TestFn = Box<
         + RefUnwindSafe,
 >;
 pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
-    return vec![
+    let test_list = vec![
         t("insert", insert),
         t("select_test", select_test),
         t("refresh_selects", refresh_selects),
@@ -219,12 +220,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "unique_key_and_multi_measures_for_stream_table",
             unique_key_and_multi_measures_for_stream_table,
         ),
-        ("unique_key_and_multi_partitions", {
-            let prefix = prefix.to_owned();
-            Box::new(move |service| {
-                Box::pin(unique_key_and_multi_partitions(prefix.clone(), service))
-            })
-        }),
+        t(
+            "unique_key_and_multi_partitions",
+            unique_key_and_multi_partitions,
+        ),
         t(
             "unique_key_and_multi_partitions_hash_aggregate",
             unique_key_and_multi_partitions_hash_aggregate,
@@ -291,12 +290,67 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
     ];
 
+    let test_list = if prefix == "migration" {
+        test_list
+            .into_iter()
+            .filter(|(name, _)| !excluded_from_migration_test(name))
+            .collect()
+    } else {
+        test_list
+    };
+
+    return test_list;
+
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
     where
         F: Future<Output = ()> + Send + 'static,
     {
         (name, Box::new(move |c| Box::pin(f(c))))
     }
+}
+
+lazy_static::lazy_static! {
+    // Generally, these are tests that would fail and which are useless as a migration test.  Some
+    // other migration tests are useless, but they pass.
+    //
+    // Also, some tests are new.  This should probably be a whitelist.
+    static ref MIGRATION_TEST_EXCLUSION_SET: HashSet<String> = [
+        // Tests that would fail and are useless as a migration test.
+        "aggregate_index_errors",
+        "create_table_with_location_invalid_digit",
+        "create_table_with_url",
+        "hyperloglog_inserts",
+        "partitioned_index_if_not_exists",
+        "drop_partitioned_index",
+        "dump",
+        "panic_worker",
+
+        // These are confirmed to fail if you backport migration tests to old cube (thus making
+        // it a non-migration test)
+        "dimension_only_queries_for_stream_table",
+        "limit_pushdown_unique_key",
+        "queue_ack_then_result_v2",
+        "queue_custom_orphaned",
+        "queue_full_workflow_v1",
+        "queue_full_workflow_v2",
+        "queue_heartbeat_by_id",
+        "queue_heartbeat_by_path",
+        "queue_latest_result_v1",
+        "queue_list_v1",
+        "queue_merge_extra_by_id",
+        "queue_orphaned_timeout",
+        "queue_retrieve_extended",
+        "unique_key_and_multi_measures_for_stream_table",
+        "unique_key_and_multi_partitions",
+        "unique_key_and_multi_partitions_hash_aggregate",
+
+        // New tests
+        "decimal_math",
+    ].into_iter().map(ToOwned::to_owned).collect();
+}
+
+fn excluded_from_migration_test(name: &str) -> bool {
+    MIGRATION_TEST_EXCLUSION_SET.contains(name)
 }
 
 async fn insert(service: Box<dyn SqlClient>) {
@@ -1825,22 +1879,24 @@ async fn coalesce(service: Box<dyn SqlClient>) {
 }
 
 async fn count_distinct_crash(service: Box<dyn SqlClient>) {
-    service.exec_query("CREATE SCHEMA s").await.unwrap();
-    service
-        .exec_query("CREATE TABLE s.Data (n int)")
-        .await
-        .unwrap();
+    if !service.is_migration() {
+        service.exec_query("CREATE SCHEMA s").await.unwrap();
+        service
+            .exec_query("CREATE TABLE s.Data (n int)")
+            .await
+            .unwrap();
 
-    let r = service
-        .exec_query("SELECT COUNT(DISTINCT n) FROM s.Data")
-        .await
-        .unwrap();
-    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
+        let r = service
+            .exec_query("SELECT COUNT(DISTINCT n) FROM s.Data")
+            .await
+            .unwrap();
+        assert_eq!(to_rows(&r), vec![vec![TableValue::Int(0)]]);
 
-    service
-        .exec_query("INSERT INTO s.Data(n) VALUES (1), (2), (3), (3), (4), (4), (4)")
-        .await
-        .unwrap();
+        service
+            .exec_query("INSERT INTO s.Data(n) VALUES (1), (2), (3), (3), (4), (4), (4)")
+            .await
+            .unwrap();
+    }
 
     let r = service
         .exec_query("SELECT COUNT(DISTINCT n) FROM s.Data WHERE n > 4")
@@ -2092,6 +2148,7 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
                 paths.into_iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
             )
         ).await.unwrap();
+    service.migration_hardcode_next_query(Err(CubeError::user("... has data ...".to_owned())));
     let res = service
         .exec_query("CREATE INDEX by_city ON Foo.Persons (city)")
         .await;
@@ -2324,6 +2381,7 @@ async fn create_table_with_url(service: Box<dyn SqlClient>) {
 
 async fn create_table_fail_and_retry(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service.migration_hardcode_generic_err();
     service
         .exec_query(
             "CREATE TABLE s.Data(n int, v int) INDEX reverse (v,n) LOCATION 'non-existing-file'",
@@ -2814,6 +2872,7 @@ async fn hyperloglog_snowflake(service: Box<dyn SqlClient>) {
     );
 
     // Does not allow to import HLL in AirLift format.
+    service.migration_hardcode_generic_err();
     service
         .exec_query("INSERT INTO s.Data(id, hll) VALUES(2, X'020C0200C02FF58941D5F0C6')")
         .await
@@ -7319,7 +7378,7 @@ async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClie
     );
 }
 
-async fn unique_key_and_multi_partitions(prefix: String, service: Box<dyn SqlClient>) {
+async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA test").await.unwrap();
     service.exec_query("CREATE TABLE test.unique_parts1 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
     service.exec_query("CREATE TABLE test.unique_parts2 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
@@ -7375,10 +7434,11 @@ async fn unique_key_and_multi_partitions(prefix: String, service: Box<dyn SqlCli
         rows(&[(1, 1), (2, 2), (3, 3), (4, 4), (11, 11), (22, 22)])
     );
 
-    let test_multiple_partitions = match prefix.as_str() {
+    let test_multiple_partitions = match service.prefix() {
         "cluster" => true,
         "in_process" => false,
         "multi_process" => false,
+        "migration" => true,
         _ => false,
     };
 
@@ -8253,24 +8313,32 @@ async fn assert_limit_pushdown(
 }
 
 async fn cache_incr(service: Box<dyn SqlClient>) {
+    service.note_non_idempotent_migration_test();
     let query = r#"CACHE INCR "prefix:key""#;
 
+    service.migration_run_next_query();
     let r = service.exec_query(query).await.unwrap();
 
     assert_eq!(
         r.get_rows(),
-        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+        &vec![Row::new(vec![TableValue::String(
+            (if !service.is_migration() { "1" } else { "3" }).to_string()
+        ),]),]
     );
 
+    service.migration_run_next_query();
     let r = service.exec_query(query).await.unwrap();
 
     assert_eq!(
         r.get_rows(),
-        &vec![Row::new(vec![TableValue::String("2".to_string()),]),]
+        &vec![Row::new(vec![TableValue::String(
+            (if !service.is_migration() { "2" } else { "4" }).to_string()
+        ),]),]
     );
 }
 
 async fn cache_set_get_rm(service: Box<dyn SqlClient>) {
+    service.migration_run_next_query();
     service
         .exec_query("CACHE SET 'key_to_rm' 'myvalue';")
         .await
@@ -8288,15 +8356,13 @@ async fn cache_set_get_rm(service: Box<dyn SqlClient>) {
         &vec![Row::new(vec![TableValue::String("myvalue".to_string()),]),]
     );
 
+    service.migration_run_next_query();
     service
         .exec_query("CACHE REMOVE 'key_to_rm' 'myvalue';")
         .await
         .unwrap();
 
-    let get_response = service
-        .exec_query("CACHE GET 'key_compaction'")
-        .await
-        .unwrap();
+    let get_response = service.exec_query("CACHE GET 'key_to_rm'").await.unwrap();
 
     assert_eq!(
         get_response.get_rows(),
@@ -8305,8 +8371,21 @@ async fn cache_set_get_rm(service: Box<dyn SqlClient>) {
 }
 
 async fn cache_set_get_set_get(service: Box<dyn SqlClient>) {
+    if service.is_migration() {
+        let get_response = service
+            .exec_query("CACHE GET 'key_for_update'")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![TableValue::String("2".to_string()),]),]
+        );
+    }
+
     // Initial set
     {
+        service.migration_run_next_query();
         service
             .exec_query("CACHE SET 'key_for_update' '1';")
             .await
@@ -8325,6 +8404,7 @@ async fn cache_set_get_set_get(service: Box<dyn SqlClient>) {
 
     // update
     {
+        service.migration_run_next_query();
         service
             .exec_query("CACHE SET 'key_for_update' '2';")
             .await
@@ -8343,22 +8423,25 @@ async fn cache_set_get_set_get(service: Box<dyn SqlClient>) {
 }
 
 async fn cache_compaction(service: Box<dyn SqlClient>) {
-    service
-        .exec_query("CACHE SET NX TTL 4 'my_prefix:my_key' 'myvalue';")
-        .await
-        .unwrap();
+    if !service.is_migration() {
+        service
+            .exec_query("CACHE SET NX TTL 4 'my_prefix:my_key' 'myvalue';")
+            .await
+            .unwrap();
 
-    let get_response = service
-        .exec_query("CACHE GET 'my_prefix:my_key'")
-        .await
-        .unwrap();
+        let get_response = service
+            .exec_query("CACHE GET 'my_prefix:my_key'")
+            .await
+            .unwrap();
 
-    assert_eq!(
-        get_response.get_rows(),
-        &vec![Row::new(vec![TableValue::String("myvalue".to_string()),]),]
-    );
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![TableValue::String("myvalue".to_string()),]),]
+        );
 
-    tokio::time::sleep(Duration::new(5, 0)).await;
+        tokio::time::sleep(Duration::new(5, 0)).await;
+    }
+    service.tolerate_next_query_revisit();
     service
         .exec_query("SYS CACHESTORE COMPACTION;")
         .await
@@ -8391,6 +8474,7 @@ async fn cache_compaction(service: Box<dyn SqlClient>) {
 async fn cache_set_nx(service: Box<dyn SqlClient>) {
     let set_nx_key_sql = "CACHE SET NX TTL 4 'mykey' 'myvalue';";
 
+    service.migration_run_next_query();
     let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
 
     assert_eq!(
@@ -8404,6 +8488,7 @@ async fn cache_set_nx(service: Box<dyn SqlClient>) {
     );
 
     // key was already defined
+    service.migration_run_next_query();
     let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
 
     assert_eq!(
@@ -8414,6 +8499,7 @@ async fn cache_set_nx(service: Box<dyn SqlClient>) {
     tokio::time::sleep(Duration::new(5, 0)).await;
 
     // key was expired
+    service.migration_run_next_query();
     let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
 
     assert_eq!(
@@ -11192,19 +11278,23 @@ async fn queue_custom_orphaned(service: Box<dyn SqlClient>) {
 }
 
 async fn sys_cachestore_info(service: Box<dyn SqlClient>) {
+    service.migration_run_next_query();
     service.exec_query("SYS CACHESTORE INFO").await.unwrap();
 }
 
 async fn sys_drop_cache(service: Box<dyn SqlClient>) {
+    service.migration_run_next_query();
     service
         .exec_query(r#"SYS DROP QUERY CACHE;"#)
         .await
         .unwrap();
 
+    service.migration_run_next_query();
     service.exec_query(r#"SYS DROP CACHE;"#).await.unwrap();
 }
 
 async fn sys_metastore_healthcheck(service: Box<dyn SqlClient>) {
+    service.migration_run_next_query();
     service
         .exec_query(r#"SYS METASTORE HEALTHCHECK;"#)
         .await
@@ -11212,6 +11302,7 @@ async fn sys_metastore_healthcheck(service: Box<dyn SqlClient>) {
 }
 
 async fn sys_cachestore_healthcheck(service: Box<dyn SqlClient>) {
+    service.migration_run_next_query();
     service
         .exec_query(r#"SYS CACHESTORE HEALTHCHECK;"#)
         .await
