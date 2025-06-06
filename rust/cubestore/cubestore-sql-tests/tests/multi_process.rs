@@ -6,9 +6,13 @@ use tokio::runtime::Builder;
 
 #[cfg(not(target_os = "windows"))]
 fn main() {
+    use cubestore_sql_tests::BasicSqlClient;
+
     respawn::init(); // TODO: logs on workers.
 
-    run_sql_tests("multi_process", vec![], |test_name, test_fn| {
+    let prefix: &'static str = "multi_process";
+
+    run_sql_tests(prefix, vec![], move |test_name, test_fn| {
         let r = Builder::new_current_thread().enable_all().build().unwrap();
         // Add a suffix to avoid clashes with other configurations run concurrently.
         // TODO: run each test in unique temp folder.
@@ -20,7 +24,11 @@ fn main() {
                     c
                 })
                 .start_test(|services| async move {
-                    test_fn(Box::new(services.sql_service)).await;
+                    test_fn(Box::new(BasicSqlClient {
+                        prefix,
+                        service: services.sql_service,
+                    }))
+                    .await;
                 }),
         );
     });

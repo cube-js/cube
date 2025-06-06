@@ -1,4 +1,5 @@
-use crate::{to_rows, SqlClient};
+use crate::files::download_and_unzip;
+use crate::to_rows;
 use async_trait::async_trait;
 use cubestore::cluster::Cluster;
 use cubestore::config::{env_parse, Config, CubeServices};
@@ -6,13 +7,9 @@ use cubestore::metastore::{Column, ColumnType};
 use cubestore::table::TableValue;
 use cubestore::util::strings::path_to_string;
 use cubestore::CubeError;
-use flate2::read::GzDecoder;
 use std::any::Any;
-use std::io::Cursor;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use tar::Archive;
 use tokio::time::timeout;
 
 pub type BenchState = dyn Any + Send + Sync;
@@ -241,21 +238,6 @@ impl Bench for crate::benches::QueueListBench {
 
         Ok(())
     }
-}
-
-async fn download_and_unzip(url: &str, dataset: &str) -> Result<Box<Path>, CubeError> {
-    let root = std::env::current_dir()?.join("data");
-    let dataset_path = root.join(dataset);
-    if !dataset_path.exists() {
-        println!("Downloading {}", dataset);
-        let response = reqwest::get(url).await?;
-        let content = Cursor::new(response.bytes().await?);
-        let tarfile = GzDecoder::new(content);
-        let mut archive = Archive::new(tarfile);
-        archive.unpack(root)?;
-    }
-    assert!(dataset_path.exists());
-    Ok(dataset_path.into_boxed_path())
 }
 
 async fn wait_for_all_jobs(services: &CubeServices) -> Result<(), CubeError> {
