@@ -14,7 +14,7 @@ pub fn add_check_memory_exec(
     mem_handler: Arc<dyn MemoryHandler>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p_any = p.as_any();
-    // TODO upgrade DF: Do we use ParquetExec?  Or just DataSourceExec?  It's fine to have both here.
+    // We supposedly don't use ParquetExec, which is deprecated in DF 46, anymore but we keep the check here in case we do.
     if p_any.is::<DataSourceExec>()
         || p_any.is::<ParquetExec>()
         || p_any.is::<MemoryExec>()

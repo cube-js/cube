@@ -4,7 +4,7 @@ use bigdecimal::ToPrimitive;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
 use datafusion::common::DFSchema;
-use datafusion::datasource::physical_plan::ParquetExec;
+use datafusion::datasource::physical_plan::{ParquetExec, ParquetSource};
 use datafusion::datasource::{DefaultTableSource, TableProvider};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{
@@ -16,9 +16,13 @@ use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
-use datafusion::physical_plan::{ExecutionPlan, InputOrderMode, PlanProperties};
+use datafusion::physical_plan::{
+    DefaultDisplay, DisplayAs, DisplayFormatType, ExecutionPlan, InputOrderMode, PlanProperties,
+};
 use datafusion::prelude::Expr;
+use datafusion_datasource::file_scan_config::FileScanConfig;
 use datafusion_datasource::memory::MemoryExec;
+use datafusion_datasource::source::DataSourceExec;
 use itertools::{repeat_n, Itertools};
 use std::sync::Arc;
 
@@ -675,8 +679,9 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
         } else if let Some(_) = a.downcast_ref::<FilterByKeyRangeExec>() {
             *out += "FilterByKeyRange";
         } else if let Some(p) = a.downcast_ref::<ParquetExec>() {
+            // We don't use ParquetExec any more.
             *out += &format!(
-                "ParquetScan, files: {}",
+                "ParquetExec (ERROR: deprecated), files: {}",
                 p.base_config()
                     .file_groups
                     .iter()
@@ -684,6 +689,25 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     .map(|p| p.object_meta.location.to_string())
                     .join(",")
             );
+        } else if let Some(dse) = a.downcast_ref::<DataSourceExec>() {
+            let data_source = dse.data_source();
+            if let Some(fse) = data_source.as_any().downcast_ref::<FileScanConfig>() {
+                if let Some(p) = fse.file_source().as_any().downcast_ref::<ParquetSource>() {
+                    *out += &format!(
+                        "ParquetScan, files: {}",
+                        fse.file_groups
+                            .iter()
+                            .flatten()
+                            .map(|p| p.object_meta.location.to_string())
+                            .join(","),
+                    );
+                } else {
+                    *out += &format!("{}", DefaultDisplay(dse));
+                }
+            } else {
+                *out += &format!("{}", DefaultDisplay(dse));
+            }
+
             // TODO upgrade DF
             // } else if let Some(_) = a.downcast_ref::<SkipExec>() {
             //     *out += "SkipRows";
