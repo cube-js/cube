@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.20](https://github.com/cube-js/cube/compare/v1.3.19...v1.3.20) (2025-06-06)
+
+### Bug Fixes
+
+- **cubesql:** Fix Tableau relative dates ([#9641](https://github.com/cube-js/cube/issues/9641)) ([18ec4fc](https://github.com/cube-js/cube/commit/18ec4fc4fcd9ea94799241dc3f8ce9c7ac531b4a))
+- **cubestore:** Delete old metastore snapshots in batches, after updating metastore-current ([#9647](https://github.com/cube-js/cube/issues/9647)) ([1104bde](https://github.com/cube-js/cube/commit/1104bde3307b4e5fd941c731305d8faa67ac803f))
+- **schema-compiler:** Support for `export function xxx()` during transpilation ([#9645](https://github.com/cube-js/cube/issues/9645)) ([9bcb5a1](https://github.com/cube-js/cube/commit/9bcb5a16ae0c3f1b36d80ce4fcdfab20586b0b8a))
+- **tesseract:** Removed unnecessary pushdown of measure filters in multistage queries ([#9650](https://github.com/cube-js/cube/issues/9650)) ([265580f](https://github.com/cube-js/cube/commit/265580f59437ff762118e79e469e157da548d4aa))
+
+### Features
+
+- **cubesql:** Support `PERCENTILE_CONT` SQL push down ([#8697](https://github.com/cube-js/cube/issues/8697)) ([577a09f](https://github.com/cube-js/cube/commit/577a09f498085ca5a7950467e602dee54691e88e))
+- **databricks-jdbc-driver:** Support M2M OAuth Authentication ([#9651](https://github.com/cube-js/cube/issues/9651)) ([71c1022](https://github.com/cube-js/cube/commit/71c10226f7c797e8b63df248fc704f2a2f1b7452))
+- **prestodb-driver, trino-driver:** Support custom auth headers (JWT) ([#9660](https://github.com/cube-js/cube/issues/9660)) ([3219695](https://github.com/cube-js/cube/commit/32196950d2c54ce482f686ae61c978a0c375e2f8))
+- **trino-driver:** Add special testConnection for Trino ([#9634](https://github.com/cube-js/cube/issues/9634)) ([ae10a76](https://github.com/cube-js/cube/commit/ae10a767636322a7fcff21ca6b648b4a0374aad2))
+
 ## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
 
 ### Bug Fixes

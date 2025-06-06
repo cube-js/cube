@@ -2641,8 +2641,10 @@ impl WrappedSelectNode {
                 fun,
                 args,
                 distinct,
+                within_group,
             } => {
                 let mut sql_args = Vec::new();
+                let mut sql_within_group = Vec::new();
                 for arg in args {
                     if let AggregateFunction::Count = fun {
                         if !distinct {
@@ -2663,10 +2665,24 @@ impl WrappedSelectNode {
                     sql_query = query;
                     sql_args.push(sql);
                 }
+                if let Some(within_group) = within_group {
+                    for expr in within_group {
+                        let (sql, query) = Self::generate_sql_for_expr_rec(
+                            sql_query,
+                            sql_generator.clone(),
+                            expr,
+                            push_to_cube_context,
+                            subqueries,
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_within_group.push(sql);
+                    }
+                }
                 Ok((
                     sql_generator
                         .get_sql_templates()
-                        .aggregate_function(fun, sql_args, distinct)
+                        .aggregate_function(fun, sql_args, distinct, sql_within_group)
                         .map_err(|e| {
                             DataFusionError::Internal(format!(
                                 "Can't generate SQL for aggregate function: {}",

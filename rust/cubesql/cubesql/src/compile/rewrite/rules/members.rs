@@ -2,7 +2,7 @@ use crate::{
     compile::{
         engine::udf::MEASURE_UDAF_NAME,
         rewrite::{
-            agg_fun_expr, aggregate, alias_expr, all_members,
+            agg_fun_expr, agg_fun_expr_within_group_empty_tail, aggregate, alias_expr, all_members,
             analysis::{ConstantFolding, LogicalPlanData, Member, MemberNamesToExpr, OriginalExpr},
             binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
             cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
@@ -99,7 +99,12 @@ impl RewriteRules for MemberRules {
             ),
             self.measure_rewrite(
                 "simple-count",
-                agg_fun_expr("?aggr_fun", vec![literal_expr("?literal")], "?distinct"),
+                agg_fun_expr(
+                    "?aggr_fun",
+                    vec![literal_expr("?literal")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                ),
                 None,
                 Some("?distinct"),
                 Some("?aggr_fun"),
@@ -107,7 +112,12 @@ impl RewriteRules for MemberRules {
             ),
             self.measure_rewrite(
                 "named",
-                agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
+                agg_fun_expr(
+                    "?aggr_fun",
+                    vec![column_expr("?column")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                ),
                 Some("?column"),
                 Some("?distinct"),
                 Some("?aggr_fun"),
@@ -124,6 +134,7 @@ impl RewriteRules for MemberRules {
                     "?aggr_fun",
                     vec![cast_expr(column_expr("?column"), "?data_type")],
                     "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
                 ),
                 Some("?column"),
                 Some("?distinct"),
@@ -611,14 +622,24 @@ impl MemberRules {
         ));
         rules.push(find_matching_old_member(
             "agg-fun",
-            agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            agg_fun_expr(
+                "?fun_name",
+                vec![column_expr("?column")],
+                "?distinct",
+                agg_fun_expr_within_group_empty_tail(),
+            ),
             ColumnToSearch::Var("?column"),
             None,
         ));
         rules.push(find_matching_old_member(
             "agg-fun-alias",
             alias_expr(
-                agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![column_expr("?column")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                ),
                 "?alias",
             ),
             ColumnToSearch::Var("?column"),
@@ -636,6 +657,7 @@ impl MemberRules {
                 "Count",
                 vec![literal_expr("?any")],
                 "AggregateFunctionExprDistinct:false",
+                agg_fun_expr_within_group_empty_tail(),
             ),
             ColumnToSearch::DefaultCount,
             None,
@@ -647,6 +669,7 @@ impl MemberRules {
                     "Count",
                     vec![literal_expr("?any")],
                     "AggregateFunctionExprDistinct:false",
+                    agg_fun_expr_within_group_empty_tail(),
                 ),
                 "?alias",
             ),
@@ -660,6 +683,7 @@ impl MemberRules {
                 "?fun_name",
                 vec![cast_expr(column_expr("?column"), "?data_type")],
                 "?distinct",
+                agg_fun_expr_within_group_empty_tail(),
             ),
             ColumnToSearch::Var("?column"),
             None,
@@ -1046,7 +1070,12 @@ impl MemberRules {
     ) {
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun",
-            agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            agg_fun_expr(
+                "?fun_name",
+                vec![column_expr("?column")],
+                "?distinct",
+                agg_fun_expr_within_group_empty_tail(),
+            ),
             measure_expr("?name", "?old_alias"),
             Some("?fun_name"),
             Some("?distinct"),
@@ -1056,7 +1085,12 @@ impl MemberRules {
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-alias",
             alias_expr(
-                agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![column_expr("?column")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                ),
                 "?alias",
             ),
             measure_expr("?name", "?old_alias"),
@@ -1071,6 +1105,7 @@ impl MemberRules {
                 "?fun_name",
                 vec![cast_expr(column_expr("?column"), "?data_type")],
                 "?distinct",
+                agg_fun_expr_within_group_empty_tail(),
             ),
             measure_expr("?name", "?old_alias"),
             Some("?fun_name"),
@@ -1080,7 +1115,12 @@ impl MemberRules {
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-on-dimension",
-            agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            agg_fun_expr(
+                "?fun_name",
+                vec![column_expr("?column")],
+                "?distinct",
+                agg_fun_expr_within_group_empty_tail(),
+            ),
             dimension_expr("?name", "?old_alias"),
             Some("?fun_name"),
             Some("?distinct"),
@@ -1107,7 +1147,12 @@ impl MemberRules {
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-default-count",
-            agg_fun_expr("?fun_name", vec![literal_expr("?any")], "?distinct"),
+            agg_fun_expr(
+                "?fun_name",
+                vec![literal_expr("?any")],
+                "?distinct",
+                agg_fun_expr_within_group_empty_tail(),
+            ),
             measure_expr("?name", "?old_alias"),
             Some("?fun_name"),
             Some("?distinct"),
@@ -1117,7 +1162,12 @@ impl MemberRules {
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-default-count-alias",
             alias_expr(
-                agg_fun_expr("?fun_name", vec![literal_expr("?any")], "?distinct"),
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![literal_expr("?any")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                ),
                 "?alias",
             ),
             measure_expr("?name", "?old_alias"),

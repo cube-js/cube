@@ -416,6 +416,7 @@ impl LogicalPlanToLanguageConverter {
                 fun,
                 args,
                 distinct,
+                within_group,
             } => {
                 let fun = add_expr_data_node!(graph, fun, AggregateFunctionExprFun);
                 let args = add_expr_list_node!(
@@ -426,8 +427,18 @@ impl LogicalPlanToLanguageConverter {
                     flat_list
                 );
                 let distinct = add_expr_data_node!(graph, distinct, AggregateFunctionExprDistinct);
+                let within_group = add_expr_list_node!(
+                    graph,
+                    within_group.as_ref().unwrap_or(&vec![]),
+                    query_params,
+                    AggregateFunctionExprWithinGroup,
+                    flat_list
+                );
                 graph.add(LogicalPlanLanguage::AggregateFunctionExpr([
-                    fun, args, distinct,
+                    fun,
+                    args,
+                    distinct,
+                    within_group,
                 ]))
             }
             Expr::WindowFunction {
@@ -1136,10 +1147,20 @@ pub fn node_to_expr(
             let args =
                 match_expr_list_node!(node_by_id, to_expr, params[1], AggregateFunctionExprArgs);
             let distinct = match_data_node!(node_by_id, params[2], AggregateFunctionExprDistinct);
+            let within_group = match_expr_list_node!(
+                node_by_id,
+                to_expr,
+                params[3],
+                AggregateFunctionExprWithinGroup
+            );
             Expr::AggregateFunction {
                 fun,
                 args,
                 distinct,
+                within_group: match within_group.len() {
+                    0 => None,
+                    _ => Some(within_group),
+                },
             }
         }
         LogicalPlanLanguage::WindowFunctionExpr(params) => {
