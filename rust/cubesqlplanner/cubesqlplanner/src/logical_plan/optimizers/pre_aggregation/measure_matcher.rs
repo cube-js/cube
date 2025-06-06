@@ -24,7 +24,9 @@ impl MeasureMatcher {
     pub fn try_match(&self, symbol: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
         match symbol.as_ref() {
             MemberSymbol::Measure(measure) => {
-                if self.pre_aggregation_measures.contains(&measure.full_name()) && (!self.only_addictive || measure.is_addictive()) {
+                if self.pre_aggregation_measures.contains(&measure.full_name())
+                    && (!self.only_addictive || measure.is_addictive())
+                {
                     return Ok(true);
                 }
             }

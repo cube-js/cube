@@ -27,7 +27,9 @@ impl SubQueryDimensionsCollector {
 
     fn check_dim_has_measures(&self, dim: &DimensionSymbol) -> bool {
         for dep in dim.get_dependencies().iter() {
-            if let MemberSymbol::Measure(_) = dep.as_ref() { return true }
+            if let MemberSymbol::Measure(_) = dep.as_ref() {
+                return true;
+            }
         }
         false
     }

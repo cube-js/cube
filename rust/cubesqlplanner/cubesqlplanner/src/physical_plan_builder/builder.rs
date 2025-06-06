@@ -19,8 +19,7 @@ use std::rc::Rc;
 const TOTAL_COUNT: &str = "total_count";
 const ORIGINAL_QUERY: &str = "original_query";
 
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 struct PhysicalPlanBuilderContext {
     pub alias_prefix: Option<String>,
     pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
@@ -28,7 +27,6 @@ struct PhysicalPlanBuilderContext {
     pub time_shifts: HashMap<String, MeasureTimeShift>,
     pub original_sql_pre_aggregations: HashMap<String, String>,
 }
-
 
 impl PhysicalPlanBuilderContext {
     pub fn make_sql_nodes_factory(&self) -> SqlNodesFactory {

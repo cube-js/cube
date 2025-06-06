@@ -12,7 +12,6 @@ pub struct FiltersContext {
     pub use_local_tz: bool,
 }
 
-
 pub struct VisitorContext {
     node_processor: Rc<dyn SqlNode>,
     all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP

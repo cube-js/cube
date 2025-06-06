@@ -796,7 +796,8 @@ impl QueryProperties {
                 result.multi_stage_measures.push(m.clone())
             } else {
                 let join = self
-                    .compute_join_multi_fact_groups_with_measures(&vec![m.clone()])?.first()
+                    .compute_join_multi_fact_groups_with_measures(&vec![m.clone()])?
+                    .first()
                     .expect("No join groups returned for single measure multi-fact join group")
                     .0
                     .clone();
@@ -843,9 +844,7 @@ impl QueryProperties {
             }
             FilterItem::Item(item) => {
                 let item_member_name = item.member_name();
-                if !measures
-                    .iter().any(|m| m.full_name() == item_member_name)
-                {
+                if !measures.iter().any(|m| m.full_name() == item_member_name) {
                     measures.push(BaseMeasure::try_new_required(
                         item.member_evaluator().clone(),
                         self.query_tools.clone(),

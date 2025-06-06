@@ -3,8 +3,7 @@ use itertools::Itertools;
 use std::ops::{Add, AddAssign, Neg, Sub};
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq)]
-#[derive(Default)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq, Default)]
 pub struct SqlInterval {
     pub year: i32,
     pub month: i32,

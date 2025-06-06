@@ -233,7 +233,9 @@ impl PreAggregationOptimizer {
         }
 
         if let Some(multi_stage_item) = multi_stage_queries
-            .iter().find(|&query| &query.name == multi_stage_name).cloned()
+            .iter()
+            .find(|&query| &query.name == multi_stage_name)
+            .cloned()
         {
             match &multi_stage_item.member_type {
                 MultiStageMemberLogicalType::LeafMeasure(multi_stage_leaf_measure) => self
