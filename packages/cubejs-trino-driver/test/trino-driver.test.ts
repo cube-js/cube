@@ -1,16 +1,16 @@
-import { PrestoDriver } from '../src/PrestoDriver';
+import { TrinoDriver } from '../src/TrinoDriver';
 
 const path = require('path');
 const { DockerComposeEnvironment, Wait } = require('testcontainers');
 
-describe('PrestoHouseDriver', () => {
+describe('TrinoDriver', () => {
   jest.setTimeout(6 * 60 * 1000);
 
   let env: any;
   let config: any;
 
   const doWithDriver = async (callback: any) => {
-    const driver = new PrestoDriver(config);
+    const driver = new TrinoDriver(config);
 
     await callback(driver);
   };
