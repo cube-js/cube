@@ -1,3 +1,4 @@
+use crate::cluster::WorkerPlanningParams;
 use crate::queryplanner::planning::WorkerExec;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
@@ -155,9 +156,19 @@ impl ExecutionPlan for PanicWorkerExec {
 }
 
 pub fn plan_panic_worker() -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    Ok(Arc::new(WorkerExec {
-        input: Arc::new(PanicWorkerExec::new()),
-        max_batch_rows: 1,
-        limit_and_reverse: None,
-    }))
+    Ok(Arc::new(WorkerExec::new(
+        Arc::new(PanicWorkerExec::new()),
+        /* max_batch_rows */ 1,
+        /* limit_and_reverse */ None,
+        /* required_input_ordering */ None,
+        // worker_partition_count is generally set to 1 for panic worker messages
+        // (SystemCommand::PanicWorker).  What is important is that router and worker nodes have the
+        // same plan properties so that DF optimizations run identically -- router node is creating
+        // a WorkerExec for some reason. (Also, it's important that DF optimizations run identically
+        // when it comes to aggregates pushed down through ClusterSend and the like -- it's actually
+        // NOT important for panic worker planning.)
+        WorkerPlanningParams {
+            worker_partition_count: 1,
+        },
+    )))
 }
