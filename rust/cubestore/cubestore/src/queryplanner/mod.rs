@@ -520,7 +520,8 @@ impl ContextProvider for MetaStoreSchemaProvider {
         */
         let name = name_param.to_ascii_lowercase();
 
-        let aggregate_udf_by_registry: Option<&Arc<AggregateUDF>> = self.session_state.aggregate_functions().get(&name);
+        let aggregate_udf_by_registry: Option<&Arc<AggregateUDF>> =
+            self.session_state.aggregate_functions().get(&name);
 
         aggregate_udf_by_registry.map(|arc| arc.clone())
     }
