@@ -420,7 +420,6 @@ mod tests {
     use datafusion::arrow::array::StringArray;
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::datasource::TableProvider;
-    use datafusion::execution::TaskContext;
     use datafusion::physical_plan::collect;
     use datafusion::prelude::SessionContext;
     use datafusion::sql::parser::Statement as DFStatement;

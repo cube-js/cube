@@ -125,7 +125,7 @@ impl std::fmt::Debug for InfoSchemaQueryCacheTableExec {
 }
 
 impl DisplayAs for InfoSchemaQueryCacheTableExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> fmt::Result {
         write!(f, "InfoSchemaQueryCacheTableExec")
     }
 }

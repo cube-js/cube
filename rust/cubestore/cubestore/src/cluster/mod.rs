@@ -45,7 +45,6 @@ use crate::telemetry::tracing::{TraceIdAndSpanId, TracingHelper};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
