@@ -1,4 +1,5 @@
 use crate::metastore::Column;
+use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::{QueryPlan, QueryPlannerImpl};
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
@@ -29,6 +30,7 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct KafkaPostProcessPlan {
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     projection_plan: Arc<dyn ExecutionPlan>,
     filter_plan: Option<Arc<dyn ExecutionPlan>>,
     source_columns: Vec<Column>,
@@ -44,6 +46,7 @@ impl KafkaPostProcessPlan {
         source_columns: Vec<Column>,
         source_unique_columns: Vec<Column>,
         source_seq_column_index: usize,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Self {
         let source_schema = Arc::new(Schema::new(
             source_columns
@@ -58,6 +61,7 @@ impl KafkaPostProcessPlan {
             source_unique_columns,
             source_seq_column_index,
             source_schema,
+            metadata_cache_factory,
         }
     }
 
@@ -91,7 +95,12 @@ impl KafkaPostProcessPlan {
             .clone()
             .with_new_children(vec![filter_input])?;
 
-        let mut out_batches = collect(projection, Arc::new(TaskContext::default())).await?;
+        let task_context = QueryPlannerImpl::execution_context_helper(
+            self.metadata_cache_factory.make_session_config(),
+        )
+        .task_ctx();
+
+        let mut out_batches = collect(projection, task_context).await?;
         let res = if out_batches.len() == 1 {
             out_batches.pop().unwrap()
         } else {
@@ -136,7 +145,11 @@ impl KafkaPostProcessPlanner {
         }
     }
 
-    pub async fn build(&self, select_statement: String) -> Result<KafkaPostProcessPlan, CubeError> {
+    pub async fn build(
+        &self,
+        select_statement: String,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+    ) -> Result<KafkaPostProcessPlan, CubeError> {
         let target_schema = Arc::new(Schema::new(
             self.columns
                 .iter()
@@ -177,6 +190,7 @@ impl KafkaPostProcessPlanner {
             self.source_columns.clone(),
             source_unique_columns,
             source_seq_column_index,
+            metadata_cache_factory,
         ))
     }
 

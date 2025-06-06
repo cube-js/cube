@@ -88,7 +88,7 @@ use datafusion::physical_plan::{
     collect, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, Partitioning,
     PlanProperties, SendableRecordBatchStream,
 };
-use datafusion::prelude::SessionContext;
+use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use datafusion::{cube_ext, datasource::TableProvider};
@@ -218,7 +218,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let physical_plan = plan_ctx.state().create_physical_plan(&plan_to_move).await?;
 
         let execution_time = SystemTime::now();
-        let results = collect(physical_plan, Arc::new(TaskContext::default())).await?;
+        let results = collect(physical_plan, ctx.task_ctx()).await?;
         let execution_time = execution_time.elapsed()?;
         app_metrics::META_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         debug!("Meta query data processing time: {:?}", execution_time,);
@@ -246,8 +246,8 @@ impl QueryPlannerImpl {
 }
 
 impl QueryPlannerImpl {
-    pub fn make_execution_context() -> SessionContext {
-        let context = SessionContext::new();
+    pub fn execution_context_helper(config: SessionConfig) -> SessionContext {
+        let context = SessionContext::new_with_config(config);
         // TODO upgrade DF: build SessionContexts consistently -- that now means check all appropriate SessionContext constructors use this make_execution_context or execution_context function.
         for udaf in registerable_aggregate_udfs() {
             context.register_udaf(udaf);
@@ -267,8 +267,15 @@ impl QueryPlannerImpl {
         context
     }
 
+    pub fn make_execution_context() -> SessionContext {
+        Self::execution_context_helper(SessionConfig::new())
+    }
+
+    // TODO upgrade DF: Don't be async
     async fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
-        Ok(Arc::new(Self::make_execution_context()))
+        Ok(Arc::new(Self::execution_context_helper(
+            self.metadata_cache_factory.make_session_config(),
+        )))
     }
 }
 
