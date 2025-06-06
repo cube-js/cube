@@ -82,6 +82,10 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     if n == "DATE_BIN" {
         return Some(CubeScalarUDFKind::DateBin);
     }
+    // TODO upgrade DF: Remove this (once we are no longer in flux about naming casing of UDFs and UDAFs).
+    if ["CARDINALITY", /* "COALESCE", "NOW", */ "UNIX_TIMESTAMP", "DATE_ADD", "DATE_SUB", "DATE_BIN"].contains(&(&n.to_ascii_uppercase() as &str)) {
+        panic!("scalar_kind_by_name failing on '{}' due to uppercase/lowercase mixup", n);
+    }
     return None;
 }
 
@@ -117,7 +121,7 @@ pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> AggregateUDF {
 
 /// Note that only full match counts. Pass capitalized names.
 pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
-    if n == "MERGE" {
+    if n == "merge" {
         return Some(CubeAggregateUDFKind::MergeHll);
     }
     // if n == "XIRR" {
@@ -652,7 +656,7 @@ impl HllMergeUDF {
 
 impl AggregateUDFImpl for HllMergeUDF {
     fn name(&self) -> &str {
-        return "MERGE";
+        return "merge";
     }
 
     fn as_any(&self) -> &dyn Any {
