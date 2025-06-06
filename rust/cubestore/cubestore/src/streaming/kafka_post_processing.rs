@@ -1,7 +1,7 @@
 use crate::metastore::Column;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
-use crate::queryplanner::{sql_to_rel_options, QueryPlannerImpl};
+use crate::queryplanner::{sql_to_rel_options, try_make_memory_data_source, QueryPlannerImpl};
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use crate::CubeError;
@@ -20,7 +20,6 @@ use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::{collect, ExecutionPlan};
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
-use datafusion_datasource::memory::MemoryExec;
 use sqlparser::ast::{Expr as SQExpr, FunctionArgExpr, FunctionArgumentList, FunctionArguments};
 use sqlparser::ast::{FunctionArg, Ident, ObjectName, Query, SelectItem, SetExpr, Statement};
 use sqlparser::parser::Parser;
@@ -79,11 +78,7 @@ impl KafkaPostProcessPlan {
 
     pub async fn apply(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
         let batch = RecordBatch::try_new(self.source_schema.clone(), data)?;
-        let input = Arc::new(MemoryExec::try_new(
-            &[vec![batch]],
-            self.source_schema.clone(),
-            None,
-        )?);
+        let input = try_make_memory_data_source(&[vec![batch]], self.source_schema.clone(), None)?;
         let filter_input = if let Some(filter_plan) = &self.filter_plan {
             filter_plan.clone().with_new_children(vec![input])?
         } else {

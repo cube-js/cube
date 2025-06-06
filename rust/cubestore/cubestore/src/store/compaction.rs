@@ -12,7 +12,7 @@ use crate::metastore::{
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
-use crate::queryplanner::QueryPlannerImpl;
+use crate::queryplanner::{try_make_memory_data_source, QueryPlannerImpl};
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{min_max_values_from_data, ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
@@ -46,7 +46,6 @@ use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMerge
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, SendableRecordBatchStream};
 use datafusion::scalar::ScalarValue;
-use datafusion_datasource::memory::MemoryExec;
 use datafusion_datasource::source::DataSourceExec;
 use futures::StreamExt;
 use futures_util::future::join_all;
@@ -1439,7 +1438,7 @@ pub async fn merge_chunks(
 
     let inputs = UnionExec::new(vec![
         l,
-        Arc::new(MemoryExec::try_new(&[vec![r]], schema, None)?),
+        try_make_memory_data_source(&[vec![r]], schema, None)?,
     ]);
     let mut res: Arc<dyn ExecutionPlan> = Arc::new(SortPreservingMergeExec::new(
         LexOrdering::new(key),

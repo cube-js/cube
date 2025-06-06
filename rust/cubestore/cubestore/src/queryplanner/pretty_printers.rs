@@ -4,7 +4,7 @@ use bigdecimal::ToPrimitive;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
 use datafusion::common::DFSchema;
-use datafusion::datasource::physical_plan::{ParquetExec, ParquetSource};
+use datafusion::datasource::physical_plan::ParquetSource;
 use datafusion::datasource::{DefaultTableSource, TableProvider};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{
@@ -12,7 +12,6 @@ use datafusion::logical_expr::{
     Projection, Repartition, SkipType, Sort, TableScan, Union, Window,
 };
 use datafusion::physical_expr::{AcrossPartitions, ConstExpr};
-use datafusion::physical_optimizer::pruning;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
@@ -21,7 +20,7 @@ use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::{DefaultDisplay, ExecutionPlan, InputOrderMode, PlanProperties};
 use datafusion::prelude::Expr;
 use datafusion_datasource::file_scan_config::FileScanConfig;
-use datafusion_datasource::memory::MemoryExec;
+use datafusion_datasource::memory::MemorySourceConfig;
 use datafusion_datasource::source::DataSourceExec;
 use itertools::{repeat_n, Itertools};
 use std::sync::Arc;
@@ -509,7 +508,11 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
         pp_phys_plan_indented(c.as_ref(), indent + 2, o, out);
     }
 
+    #[allow(deprecated)]
     fn pp_instance(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, out: &mut String) {
+        use datafusion::datasource::physical_plan::ParquetExec;
+        use datafusion_datasource::memory::MemoryExec;
+
         if indent != 0 {
             *out += "\n";
         }
@@ -693,7 +696,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             );
         } else if let Some(dse) = a.downcast_ref::<DataSourceExec>() {
             let data_source = dse.data_source();
-            if let Some(fse) = data_source.as_any().downcast_ref::<FileScanConfig>() {
+            let data_source_any = data_source.as_any();
+            if let Some(fse) = data_source_any.downcast_ref::<FileScanConfig>() {
                 if let Some(p) = fse.file_source().as_any().downcast_ref::<ParquetSource>() {
                     *out += &format!(
                         "ParquetScan, files: {}",
@@ -723,6 +727,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 } else {
                     *out += &format!("{}", DefaultDisplay(dse));
                 }
+            } else if data_source_any.is::<MemorySourceConfig>() {
+                *out += "MemoryScan";
             } else {
                 *out += &format!("{}", DefaultDisplay(dse));
             }
@@ -734,8 +740,9 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             //     *out += "RollingWindowAgg";
         } else if let Some(_) = a.downcast_ref::<LastRowByUniqueKeyExec>() {
             *out += "LastRowByUniqueKey";
-        } else if let Some(_) = a.downcast_ref::<MemoryExec>() {
-            *out += "MemoryScan";
+        } else if a.is::<MemoryExec>() {
+            // We don't use MemoryExec any more.
+            *out += "MemoryExec (ERROR: deprecated)";
         } else if let Some(r) = a.downcast_ref::<RepartitionExec>() {
             *out += &format!("Repartition, partitioning: {}", r.partitioning());
         } else {

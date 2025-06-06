@@ -1,5 +1,6 @@
 use crate::queryplanner::topk::util::{append_value, create_builder};
 use crate::queryplanner::topk::SortColumn;
+use crate::queryplanner::try_make_memory_data_source;
 use crate::queryplanner::udfs::read_sketch;
 use datafusion::arrow::array::{ArrayBuilder, ArrayRef, StringBuilder};
 use datafusion::arrow::compute::{concat_batches, SortOptions};
@@ -23,7 +24,6 @@ use datafusion::physical_plan::{
     PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::scalar::ScalarValue;
-use datafusion_datasource::memory::MemoryExec;
 use flatbuffers::bitflags::_core::cmp::Ordering;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
@@ -640,11 +640,7 @@ impl TopKState<'_> {
                 let schema = new_batch.schema();
                 let filter_exec = Arc::new(FilterExec::try_new(
                     having.clone(),
-                    Arc::new(MemoryExec::try_new(
-                        &vec![vec![new_batch]],
-                        schema.clone(),
-                        None,
-                    )?),
+                    try_make_memory_data_source(&vec![vec![new_batch]], schema.clone(), None)?,
                 )?);
                 let batches_stream =
                     GlobalLimitExec::new(filter_exec, 0, Some(self.limit - self.result.num_rows()))
@@ -1051,7 +1047,6 @@ mod tests {
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::physical_planner::create_aggregate_expr_and_maybe_filter;
     use datafusion::prelude::Expr;
-    use datafusion_datasource::memory::MemoryExec;
     use futures::StreamExt;
     use itertools::Itertools;
 
@@ -1550,7 +1545,7 @@ mod tests {
         inputs: Vec<Vec<RecordBatch>>,
         context: Arc<TaskContext>,
     ) -> Result<RecordBatch, DataFusionError> {
-        let input = Arc::new(MemoryExec::try_new(&inputs, proto.cluster.schema(), None)?);
+        let input = try_make_memory_data_source(&inputs, proto.cluster.schema(), None)?;
         let results = proto
             .with_new_children(vec![input])?
             .execute(0, context)?
