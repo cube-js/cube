@@ -57,6 +57,10 @@ describe('Transpilers', () => {
       export const helperFunction = () => 'hello'
       export { helperFunction as alias }
       export default helperFunction
+      export function requireFilterParam() {
+        return 'required';
+      }
+      export const someVar = 42
     `;
     const ast = parse(
       code,
@@ -77,7 +81,17 @@ addExport({
 addExport({
   alias: helperFunction
 });
-setExport(helperFunction);`);
+setExport(helperFunction);
+function requireFilterParam() {
+  return 'required';
+}
+addExport({
+  requireFilterParam: requireFilterParam
+})
+const someVar = 42;
+addExport({
+  someVar: someVar
+})`);
 
     errorsReport.throwIfAny(); // should not throw
   });

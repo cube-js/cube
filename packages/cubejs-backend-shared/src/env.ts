@@ -952,24 +952,9 @@ const variables: Record<string, (...args: any) => any> = {
    ***************************************************************** */
 
   /**
-   * Accept Databricks policy flag. This environment variable doesn't
-   * need to be split by the data source.
-   * TODO: Tech-debt: Remove totally someday
-   */
-  databrickAcceptPolicy: () => {
-    const val = get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict();
-
-    if (val !== undefined) {
-      console.warn(
-        'The CUBEJS_DB_DATABRICKS_ACCEPT_POLICY is not needed anymore. Please, remove it'
-      );
-    }
-  },
-
-  /**
    * Databricks jdbc-connection url.
    */
-  databrickUrl: ({
+  databricksUrl: ({
     dataSource,
   }: {
     dataSource: string,
@@ -990,7 +975,7 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Databricks jdbc-connection token.
    */
-  databrickToken: ({
+  databricksToken: ({
     dataSource,
   }: {
     dataSource: string,
@@ -1011,6 +996,32 @@ const variables: Record<string, (...args: any) => any> = {
   }) => process.env[
     keyByDataSource('CUBEJS_DB_DATABRICKS_CATALOG', dataSource)
   ],
+
+  /**
+   * Databricks OAuth Client ID (Same as the service principal UUID)
+   */
+  databricksOAuthClientId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID', dataSource)
+    ]
+  ),
+
+  /**
+   * Databricks OAuth Client Secret.
+   */
+  databricksOAuthClientSecret: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_SECRET', dataSource)
+    ]
+  ),
 
   /** ****************************************************************
    * Athena Driver                                                   *

@@ -29,7 +29,16 @@ See [SQL API reference][ref-ref-sql-api] for the list of supported SQL commands,
 functions, and operators. Also, check [query format][ref-sql-query-format] for
 details about supported queries.
 
-## Example request
+## Transport
+
+The SQL API supports the following transports:
+
+| Transport | Description | When to use |
+| --- | --- | --- |
+| Postgres | Same protocol that is used by the `psql` utility and other Postgres clients | Use by default |
+| HTTP | JSON-based protocol that is also used by the [REST API][ref-rest-api] | Use when you need to run a SQL API query from an embedded analytics application and REST API is not an option |
+
+### Postgres protocol
 
 You can use the [`psql` utility][link-psql] to connect to the SQL API:
 
@@ -79,6 +88,21 @@ WHERE table_schema = 'public';
 ```sql
 \d
 ```
+
+### HTTP protocol
+
+You can use the `curl` utility to run a SQL API query over the HTTP protocol:
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT 123 AS value UNION ALL SELECT 456 AS value UNION ALL SELECT 789 AS value"}' \
+  http://localhost:4000/cubejs-api/v1/cubesql
+```
+
+See the [`/v1/cubesql` endpoint][ref-rest-api-cubesql] reference for more details.
 
 ## Fundamentals
 
@@ -175,7 +199,7 @@ services:
 ```
 
 After running it with `docker compose up`, you can finally connect and execute
-an [example request](#example-request).
+an [example request](#transport).
 
 ### Cube Cloud
 
@@ -236,8 +260,8 @@ limit.
 [ref-mdx-api]: /product/apis-integrations/mdx-api
 [ref-sls]: /product/apis-integrations/semantic-layer-sync
 [ref-sql-api-auth]: /product/apis-integrations/sql-api/security
-[ref-config-checksqlauth]: /reference/configuration/config#checksqlauth
-[ref-config-canswitchsqluser]: /reference/configuration/config#canswitchsqluser
+[ref-config-checksqlauth]: /product/configuration/reference/config#checksqlauth
+[ref-config-canswitchsqluser]: /product/configuration/reference/config#canswitchsqluser
 [ref-dataviz-tools]: /product/configuration/visualization-tools
 [ref-bi]: /product/configuration/visualization-tools#bi-data-exploration-tools
 [ref-thoughtspot]: /product/configuration/visualization-tools/thoughtspot
@@ -263,3 +287,5 @@ limit.
 [postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
 [cube-bi-use-case]: https://cube.dev/use-cases/connected-bi
 [ref-queries-row-limit]: /product/apis-integrations/queries#row-limit
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-rest-api-cubesql]: /product/apis-integrations/rest-api/reference#base_pathv1cubesql

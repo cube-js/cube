@@ -1,0 +1,104 @@
+# Drilldowns
+
+Drilldowns are a powerful feature to facilitate data exploration. It allows
+building an interface to let users dive deeper into visualizations and data
+tables. See [`ResultSet.drillDown()`][ref-cube-client-ref-resultset-drilldown]
+on how to use this feature on the client side.
+
+A drilldown is defined on the [measure][ref-schema-ref-measures] level in your
+data model. It’s defined as a list of dimensions called **drill members**. Once
+defined, these drill members will always be used to show underlying data when
+drilling into that measure.
+
+Let’s consider the following example of our imaginary e-commerce store. We have
+the `orders` cube, which describes orders in our store. It’s connected to
+`users` and `products`.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  joins: {
+    users: {
+      relationship: `many_to_one`,
+      sql: `${CUBE}.user_id = ${users.id}`,
+    },
+
+    products: {
+      relationship: `many_to_one`,
+      sql: `${CUBE}.product_id = ${products.id}`,
+    },
+  },
+
+  measures: {
+    count: {
+      type: `count`,
+      // Here we define all possible properties we might want
+      // to "drill down" on from our front-end
+      drill_members: [id, status, products.name, users.city],
+    },
+  },
+
+  dimensions: {
+    id: {
+      type: `number`,
+      sql: `id`,
+      primary_key: true,
+      public: true,
+    },
+
+    status: {
+      type: `string`,
+      sql: `status`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    joins:
+      - name: users
+        relationship: many_to_one
+        sql: "{CUBE}.user_id = {users.id}"
+
+      - name: products
+        relationship: many_to_one
+        sql: "{CUBE}.product_id = {products.id}"
+
+    measures:
+      - name: count
+        type: count
+        # Here we define all possible properties we might want
+        # to "drill down" on from our front-end
+        drill_members:
+          - id
+          - status
+          - products.name
+          - users.city
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        public: true
+
+      - name: status
+        sql: status
+        type: string
+```
+
+</CodeTabs>
+
+You can follow [this tutorial][blog-drilldown-api] to learn more about building
+a UI for drilldowns.
+
+[ref-cube-client-ref-resultset-drilldown]: /product/apis-integrations/javascript-sdk/reference/cubejs-client-core#drilldown
+[blog-drilldown-api]: https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/
+[ref-schema-ref-measures]: /product/data-modeling/reference/measures

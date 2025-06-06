@@ -15,6 +15,13 @@ cube('ordersExt', {
     },
   },
 
+  joins: {
+    line_items: {
+      relationship: 'one_to_many',
+      sql: `${CUBE}.id = ${line_items}.order_id`,
+    }
+  },
+
   segments: {
     anotherStatus: {
       description: 'Just another one',

@@ -10,7 +10,13 @@ const GRANULARITY_TO_INTERVAL = {
   minute: (date) => `strftime('%Y-%m-%dT%H:%M:00.000', ${date})`,
   second: (date) => `strftime('%Y-%m-%dT%H:%M:%S.000', ${date})`,
   month: (date) => `strftime('%Y-%m-01T00:00:00.000', ${date})`,
-  year: (date) => `strftime('%Y-01-01T00:00:00.000', ${date})`
+  year: (date) => `strftime('%Y-01-01T00:00:00.000', ${date})`,
+  quarter: (date) => `CASE
+      WHEN cast(strftime('%m', ${date}) as integer) BETWEEN 1 AND 3 THEN strftime('%Y-01-01T00:00:00.000', ${date})
+      WHEN cast(strftime('%m', ${date}) as integer) BETWEEN 4 AND 6 THEN strftime('%Y-04-01T00:00:00.000', ${date})
+      WHEN cast(strftime('%m', ${date}) as integer) BETWEEN 7 AND 9 THEN strftime('%Y-07-01T00:00:00.000', ${date})
+      ELSE strftime('%Y-10-01T00:00:00.000', ${date})
+    END`
 };
 
 class SqliteFilter extends BaseFilter {

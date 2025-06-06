@@ -3,6 +3,45 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
+
+### Bug Fixes
+
+- **client-vue3:** Avoid Maximum recursive updates exceeded ([5d5f7da](https://github.com/cube-js/cube/commit/5d5f7da1dd7ad69b0db6ce9f33973efcc08879c5))
+- **cubesql:** Fix "Tracker memory shrink underflow" error ([#9624](https://github.com/cube-js/cube/issues/9624)) ([d3af150](https://github.com/cube-js/cube/commit/d3af1506d845276a5b7fd97c5d8543d2cf03a1e0))
+- **cubesql:** Quote subquery joins alias in SQL push down to cube ([#9629](https://github.com/cube-js/cube/issues/9629)) ([89b00cf](https://github.com/cube-js/cube/commit/89b00cf76dfbbfd06f0412d6e80178f0fdb9f46c))
+
+### Features
+
+- **cubesql:** Support `date_trunc != literal date` filter ([#9627](https://github.com/cube-js/cube/issues/9627)) ([2b36aae](https://github.com/cube-js/cube/commit/2b36aae5e93f88f4cca6059067bee047c32f4d24))
+- **cubesql:** Support round() function with two parameters ([#9594](https://github.com/cube-js/cube/issues/9594)) ([8cd1dfe](https://github.com/cube-js/cube/commit/8cd1dfec1b18b246ed8f24f4d7c33a91556a4afa))
+- Expose aliasMember for hierarchy in View ([#9636](https://github.com/cube-js/cube/issues/9636)) ([737caab](https://github.com/cube-js/cube/commit/737caabf2a43bc28ea0ad90085f44ffbaa1b292b))
+- **schema-compiler:** add quarter granularity support in SqliteQuery using CASE expression ([#9633](https://github.com/cube-js/cube/issues/9633)) ([c7ae936](https://github.com/cube-js/cube/commit/c7ae9365eaf333e995d2536101ebe7dec1daf16a))
+
+## [1.3.18](https://github.com/cube-js/cube/compare/v1.3.17...v1.3.18) (2025-05-27)
+
+### Bug Fixes
+
+- **client:** Update main fields in package.json to cjs files, thanks @Graphmaxer ([#9620](https://github.com/cube-js/cube/issues/9620)) ([06f82e5](https://github.com/cube-js/cube/commit/06f82e5a68beb5471d676734cabefa23aeb8a701))
+- **schema-compiler:** exclude time dimensions w/o granularities from select list in base queries ([#9614](https://github.com/cube-js/cube/issues/9614)) ([c9ebfbc](https://github.com/cube-js/cube/commit/c9ebfbca8a791ba917b20c691476a336f92374c7))
+
+### Features
+
+- **docker:** Security upgrade node from 22.14.0 to 22.16.0 ([#9602](https://github.com/cube-js/cube/issues/9602)) ([efbb709](https://github.com/cube-js/cube/commit/efbb709b6ac7d9cbb7a0403d9036ed1fc3d80b49))
+
+## [1.3.17](https://github.com/cube-js/cube/compare/v1.3.16...v1.3.17) (2025-05-22)
+
+### Bug Fixes
+
+- **cubesql:** Do not merge time dimension ranges in "or" filter into date range ([#9609](https://github.com/cube-js/cube/issues/9609)) ([803998f](https://github.com/cube-js/cube/commit/803998fc8e1799719542d0611c82032473409e01))
+- **cubestore:** Avoid empty result set with LocalDirRemoteFs:list_with_metadata on Windows ([#9598](https://github.com/cube-js/cube/issues/9598)) ([7b4e4ad](https://github.com/cube-js/cube/commit/7b4e4ad151274a16cd34154f1cad5bd048884bde))
+- **schema-compiler:** Avoid mutating context on first occasion of TD with granularity ([#9592](https://github.com/cube-js/cube/issues/9592)) ([93027d8](https://github.com/cube-js/cube/commit/93027d8bcb7f0e76d25679aeccad446ee9d265ad))
+- **schema-compiler:** Fix rolling window queries with expressions from SQL API ([#9603](https://github.com/cube-js/cube/issues/9603)) ([43f47d8](https://github.com/cube-js/cube/commit/43f47d890a5c17416dd818b1712d54cb958ee95c))
+
+### Features
+
+- **snowflake-driver:** Add support for export Buckets with paths ([#9587](https://github.com/cube-js/cube/issues/9587)) ([e1f22da](https://github.com/cube-js/cube/commit/e1f22daac005170f354a4f69ecdfa27273350d87))
+
 ## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
 
 ### Bug Fixes

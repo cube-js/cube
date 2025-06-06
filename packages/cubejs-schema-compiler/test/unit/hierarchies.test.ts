@@ -23,6 +23,7 @@ describe('Cube hierarchies', () => {
         name: 'orders_users_view.orders_hierarchy',
         title: 'Hello Hierarchy',
         public: true,
+        aliasMember: 'orders.orders_hierarchy',
         levels: [
           'orders_users_view.status',
           'orders_users_view.number',
@@ -32,6 +33,7 @@ describe('Cube hierarchies', () => {
       {
         name: 'orders_users_view.some_other_hierarchy',
         public: true,
+        aliasMember: 'orders.some_other_hierarchy',
         title: 'Some other hierarchy',
         levels: ['orders_users_view.state', 'orders_users_view.user_city']
       }
@@ -54,6 +56,7 @@ describe('Cube hierarchies', () => {
 
     const prefixedHierarchy = allHierarchyView.config.hierarchies.find((it) => it.name === 'all_hierarchy_view.users_users_hierarchy');
     expect(prefixedHierarchy).toBeTruthy();
+    expect(prefixedHierarchy?.aliasMember).toEqual('users.users_hierarchy');
     expect(prefixedHierarchy?.levels).toEqual(['all_hierarchy_view.users_age', 'all_hierarchy_view.users_city']);
   });
 
@@ -146,12 +149,14 @@ describe('Cube hierarchies', () => {
 
     expect(testView?.config.hierarchies).toEqual([
       {
+        aliasMember: 'orders.base_orders_hierarchy',
         name: 'test_view.base_orders_hierarchy',
         title: 'Hello Hierarchy',
         levels: ['test_view.status', 'test_view.number'],
         public: true
       },
       {
+        aliasMember: 'orders.orders_hierarchy',
         name: 'test_view.orders_hierarchy',
         levels: ['test_view.state', 'test_view.city'],
         public: true
@@ -174,6 +179,7 @@ describe('Cube hierarchies', () => {
 
     expect(ordersCube.config.hierarchies).toEqual([
       {
+        aliasMember: undefined,
         name: 'orders.hello',
         title: 'World',
         levels: ['orders.status'],

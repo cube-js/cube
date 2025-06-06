@@ -14,6 +14,14 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/athena-driver SQL API: SQL push down push to cube quoted alias 1`] = `
+Array [
+  Object {
+    "result": true,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/athena-driver SQL API: Timeshift measure from cube 1`] = `
 Array [
   Object {

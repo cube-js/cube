@@ -1,0 +1,673 @@
+# Joins
+
+You can use the `joins` parameter within [cubes][ref-ref-cubes] to define joins to other cubes.
+Joins allow to access and compare members from two or more cubes at the same time.
+
+<CodeTabs>
+
+```javascript
+cube(`my_cube`, {
+  // ...
+
+  joins: {
+    target_cube: {
+      relationship: `one_to_one` || `one_to_many` || `many_to_one`,
+      sql: `SQL ON clause`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: my_cube
+    # ...
+
+    joins:
+      - name: target_cube
+        relationship: one_to_one || one_to_many || many_to_one
+        sql: SQL ON clause
+```
+
+</CodeTabs>
+
+All joins are generated as `LEFT JOIN`. The cube which defines the join serves
+as a main table, and any cubes referenced inside the `joins` property are used
+in the `LEFT JOIN` clause. Learn more about direction of joins
+[here][ref-schema-fundamentals-join-dir].
+
+The semantics of `INNER JOIN` can be achieved with additional filtering. For
+example, a simple check of whether the column value `IS NOT NULL` by using [set
+filter][ref-restapi-query-filter-op-set] satisfies this requirement.
+
+There's also no way to define `FULL OUTER JOIN` and `RIGHT OUTER JOIN` for the
+sake of join modeling simplicity. To get `RIGHT OUTER JOIN` semantics just
+define join [from other side of relationship][ref-schema-fundamentals-join-dir].
+The `FULL OUTER JOIN` can be built inside cube [sql][ref-schema-cube-sql]
+parameter. Quite frequently, `FULL OUTER JOIN` is used to solve [Data
+Blending][ref-schema-data-blenging] or similar problems. In that case, it's best
+practice to have a separate cube for such an operation.
+
+## Parameters
+
+### name
+
+The name must match the name of the joined cube and, thus, follow the [naming
+conventions][ref-naming].
+
+For example, when the `products` cube is joined on to the `orders` cube, we
+would define the join as follows:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  joins: {
+    products: {
+      relationship: `many_to_one`,
+      sql: `${CUBE.id} = ${products.order_id}`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    joins:
+      - name: products
+        relationship: many_to_one
+        sql: "{CUBE.id} = {products.order_id}"
+```
+
+</CodeTabs>
+
+### relationship
+
+The `relationship` property is used to describe the type of the relationship
+between joined cubes. It’s important to properly define the type of relationship
+so Cube can accurately calculate measures.
+
+The cube that declares the join is considered _left_ in terms of the [left
+join][wiki-left-join] semantics, and the joined cube is considered _right_. It
+means that all rows of the _left_ cube are selected, while only those rows of
+the _right_ cube that match the condition are selected as well. For more
+information and specific examples, please see [join
+directions][ref-schema-fundamentals-join-dir].
+
+<InfoBox>
+
+The join does not need to be defined on both cubes, but the definition can
+affect the [join direction][ref-schema-fundamentals-join-dir].
+
+</InfoBox>
+
+You can use the following types of relationships:
+
+- `one_to_one` for [one-to-one][wiki-1-1] relationships
+- `one_to_many` for [one-to-many][wiki-1-m] relationships
+- `many_to_one` for the opposite of [one-to-many][wiki-1-m] relationships
+
+<WarningBox>
+
+The types of relationships listed above were introduced in v0.32.19 for clarity
+as they are commonly used in the data space. The following aliases were used
+before and are still valid, so there's no need to update existing data models:
+
+- `one_to_one` was known as `has_one` or `hasOne`
+- `one_to_many` was known as `has_many` or `hasMany`
+- `many_to_one` was known as `belongs_to` or `belongsTo`
+
+</WarningBox>
+
+#### One-to-one
+
+The `one_to_one` type indicates a [one-to-one][wiki-1-1] relationship between
+the declaring cube and the joined cube. It means that one row in the declaring
+cube can match only one row in the joined cube.
+
+For example, in a data model containing `users` and their `profiles`, the
+`users` cube would declare the following join:
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  joins: {
+    profiles: {
+      relationship: `one_to_one`,
+      sql: `${CUBE}.id = ${profiles.user_id}`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    joins:
+      - name: profiles
+        relationship: one_to_one
+        sql: "{users}.id = {profiles.user_id}"
+```
+
+</CodeTabs>
+
+#### One-to-many
+
+The `one_to_many` type indicates a [one-to-many][wiki-1-m] relationship between
+the declaring cube and the joined cube. It means that one row in the declaring
+cube can match many rows in the joined cube.
+
+For example, in a data model containing `authors` and the `books` they have
+written, the `authors` cube would declare the following join:
+
+<CodeTabs>
+
+```javascript
+cube(`authors`, {
+  // ...
+
+  joins: {
+    books: {
+      relationship: `one_to_many`,
+      sql: `${CUBE}.id = ${books.author_id}`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: authors
+    # ...
+
+    joins:
+      - name: books
+        relationship: one_to_many
+        sql: "{authors}.id = {books.author_id}"
+```
+
+</CodeTabs>
+
+#### Many-to-one
+
+The `many_to_one` type indicates the many-to-one relationship between the
+declaring cube and the joined cube. You’ll often find this type of relationship
+on the opposite side of the [one-to-many][wiki-1-m] relationship. It means that
+one row in the declaring cube matches a single row in the joined cube, while a
+row in the joined cube can match many rows in the declaring cube.
+
+For example, in a data model containing `orders` and `customers` who made them,
+the `orders` cube would have the following join:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  joins: {
+    customers: {
+      relationship: `many_to_one`,
+      sql: `${CUBE}.customer_id = ${customers.id}`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{orders}.customer_id = {customers.id}"
+```
+
+</CodeTabs>
+
+### sql
+
+`sql` is necessary to indicate a related column between cubes. It is important
+to properly specify a matching column when creating joins. Take a look at the
+example below:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  joins: {
+    customers: {
+      relationship: `many_to_one`,
+      // The `customer_id` column of the `orders` cube corresponds to the
+      // `id` dimension of the `customers` cube
+      sql: `${CUBE}.customer_id = ${customers.id}`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{orders}.customer_id = {customers.id}"
+```
+
+</CodeTabs>
+
+## Setting a primary key
+
+In order for a join to work, it is necessary to define a `primary_key` as
+specified below. It is a requirement when a join is defined so that Cube can
+handle row multiplication issues such as chasm and fan traps.
+
+Let's imagine you want to calculate `Order Amount` by `Order Item Product Name`.
+In this case, `Order` rows will be multiplied by the `Order Item` join due to
+the `one_to_many` relationship. In order to produce correct results, Cube will
+select distinct primary keys from `Order` first and then will join these primary
+keys with `Order` to get the correct `Order Amount` sum result. Please note that
+`primary_key` should be defined in the `dimensions` section.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    customer_id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: customer_id
+        sql: id
+        type: number
+        primary_key: true
+```
+
+</CodeTabs>
+
+<InfoBox>
+
+Setting `primary_key` to `true` will change the default value of the `public`
+parameter to `false`. If you still want `public` to be `true` — set it manually.
+
+</InfoBox>
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    customer_id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true,
+      public: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: customer_id
+        sql: id
+        type: number
+        primary_key: true
+        public: true
+```
+
+</CodeTabs>
+
+If you don't have a single column in a cube's table that can act as a primary
+key, you can create a composite primary key as shown below.
+
+<InfoBox>
+
+The example uses Postgres string concatenation; note that SQL may be different
+depending on your database.
+
+</InfoBox>
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  dimensions: {
+    id: {
+      sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
+      type: `string`,
+      primary_key: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    dimensions:
+      - name: id
+        sql:
+          "{CUBE}.user_id || '-' || {CUBE}.signup_week || '-' ||
+          {CUBE}.activity_week"
+        type: string
+        primary_key: true
+```
+
+</CodeTabs>
+
+## Chasm and fan traps
+
+Cube automatically detects chasm and fan traps based on the `many_to_one` and `one_to_many` relationships defined in join.
+When detected, Cube generates a deduplication query that evaluates all distinct primary keys within the multiplied measure's cube and then joins distinct primary keys to this cube on itself to calculate the aggregation result.
+If there's more than one multiplied measure in a query, then such query is generated for every such multiplied measure, and results are joined.
+Cube solves for chasm and fan traps during query time.
+If there's pre-aggregregation that fits measure multiplication requirements it'd be leveraged to serve such a query.
+Such pre-aggregations and queries are always considered non-additive for the purpose of pre-aggregation matching.
+
+Let's consider an example data model:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+    city: {
+      sql: `city`,
+      type: `string`
+    }
+  },
+
+  joins: {
+    customers: {
+      relationship: `many_to_one`,
+      sql: `${CUBE}.customer_id = ${customers.id}`,
+    },
+  },
+});
+
+cube(`customers`, {
+  sql_table: `customers`
+
+  measures: {
+    count: {
+      type: `count`,
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  }
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{orders}.customer_id = {customers.id}"
+
+- name: customers
+    sql_table: customers
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: average_age
+        sql: age
+        type: avg
+
+```
+
+</CodeTabs>
+
+If we try to query `customers.average_age` by `orders.city`, the Cube detects that the `average_age` measure in the `customers` cube would be multiplied by `orders` to `customers` and would generate SQL similar to:
+
+```sql
+SELECT
+  "keys"."orders__city",
+  avg("customers_key__customers".age) "customers__average_age"
+FROM
+  (
+    SELECT
+      DISTINCT "customers_key__orders".city "orders__city",
+      "customers_key__customers".id "customers__id"
+    FROM
+      orders AS "customers_key__orders"
+      LEFT JOIN customers AS "customers_key__customers" ON "customers_key__orders".customer_id = "customers_key__customers".id
+  ) AS "keys"
+  LEFT JOIN customers AS "customers_key__customers" ON "keys"."customers__id" = "customers_key__customers".id
+GROUP BY
+  1
+```
+
+## CUBE reference
+
+When you have several joined cubes, you should accurately use columns’ names to
+avoid any mistakes. One way to make no mistakes is to use the `CUBE` reference.
+It allows you to specify columns’ names in cubes without any ambiguity. During
+the implementation of the query, this reference will be used as an alias for a
+basic cube. Take a look at the following example:
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  dimensions: {
+    name: {
+      sql: `${CUBE}.name`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    dimensions:
+      - name: name
+        sql: "{CUBE}.name"
+        type: string
+```
+
+</CodeTabs>
+
+## Transitive joins
+
+<WarningBox>
+
+Join graph is directed and `a → b` join is different from `b → a`. [Learn more
+about it here][ref-schema-fundamentals-join-dir].
+
+</WarningBox>
+
+Cube automatically takes care of transitive joins. For example, consider the
+following data model:
+
+<CodeTabs>
+
+```javascript
+cube(`a`, {
+  // ...
+
+  joins: {
+    b: {
+      sql: `${a}.b_id = ${b.id}`,
+      relationship: `many_to_one`,
+    },
+  },
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+});
+
+cube(`b`, {
+  // ...
+
+  joins: {
+    c: {
+      sql: `${b}.c_id = ${c.id}`,
+      relationship: `many_to_one`,
+    },
+  },
+});
+
+cube(`c`, {
+  // ...
+
+  dimensions: {
+    category: {
+      sql: `category`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: a
+    # ...
+
+    joins:
+      - name: b
+        sql: "{a}.b_id = {b.id}"
+        relationship: many_to_one
+
+    measures:
+      - name: count
+        type: count
+
+  - name: b
+    # ...
+
+    joins:
+      - name: c
+        sql: "{b}.c_id = {c.id}"
+        relationship: many_to_one
+
+  - name: c
+    # ...
+
+    dimensions:
+      - name: category
+        sql: category
+        type: string
+```
+
+</CodeTabs>
+
+Assume that the following query is run:
+
+```json
+{
+  "measures": ["a.count"],
+  "dimensions": ["c.category"]
+}
+```
+
+Joins `a → b` and `b → c` will be resolved automatically. Cube uses the
+[Dijkstra algorithm][wiki-djikstra-alg] to find a join path between cubes given
+requested members.
+
+In case there are multiple join paths that can be used to join the same set of cubes, Cube will collect cube names from members in the following order:
+
+1. Measures
+2. Dimensions
+3. Segments
+4. Time dimensions
+
+Cube makes join trees as predictable and stable as possible, but this isn't guaranteed in case multiple join paths exist.
+Please use views to address join predictability and stability.
+
+
+[ref-ref-cubes]: /product/data-modeling/reference/cube
+[ref-restapi-query-filter-op-set]:
+  /product/apis-integrations/rest-api/query-format#set
+[ref-schema-fundamentals-join-dir]:
+  /product/data-modeling/concepts/working-with-joins#directions-of-joins
+[ref-schema-cube-sql]: /product/data-modeling/reference/cube#sql
+[ref-schema-data-blenging]:
+  /product/data-modeling/concepts/data-blending#data-blending
+[ref-naming]: /product/data-modeling/syntax#naming
+[wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+[wiki-left-join]: https://en.wikipedia.org/wiki/Join_(SQL)#Left_outer_join
+[wiki-1-1]: https://en.wikipedia.org/wiki/One-to-one_(data_model)
+[wiki-1-m]: https://en.wikipedia.org/wiki/One-to-many_(data_model)

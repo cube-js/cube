@@ -2092,5 +2092,31 @@ from
       `);
       expect(res.rows).toMatchSnapshot();
     });
+
+    executePg('SQL API: SQL push down push to cube quoted alias', async (connection) => {
+      const res = await connection.query(`
+        SELECT
+          (NOT ("t0"."$temp1_output" IS NULL)) AS "result"
+        FROM
+          "public"."ECommerce" "ECommerce"
+          LEFT JOIN (
+            SELECT
+              CAST("ECommerce"."customerName" AS TEXT) AS "customerName",
+              1 AS "$temp1_output",
+              MEASURE("ECommerce"."totalQuantity") AS "$__alias__0"
+            FROM "public"."ECommerce" "ECommerce"
+            GROUP BY 1
+            ORDER BY
+              3 DESC NULLS LAST,
+              1 ASC NULLS FIRST
+            LIMIT 3
+          ) "t0" ON (
+            CAST("ECommerce"."customerName" AS TEXT) IS NOT DISTINCT
+            FROM "t0"."customerName"
+          )
+        GROUP BY 1
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
   });
 }

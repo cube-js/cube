@@ -945,45 +945,50 @@ export class BaseQuery {
   }
 
   runningTotalDateJoinCondition() {
-    return this.timeDimensions.map(
-      d => [
-        d,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
-      ]
-    );
+    return this.timeDimensions
+      .map(
+        d => [
+          d,
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
+        ]
+      );
   }
 
   rollingWindowToDateJoinCondition(granularity) {
-    return this.timeDimensions.map(
-      d => [
-        d,
-        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
-      ]
-    );
+    return this.timeDimensions
+      .filter(td => td.granularity)
+      .map(
+        d => [
+          d,
+          (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
+        ]
+      );
   }
 
   rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
     offset = offset || 'end';
-    return this.timeDimensions.map(
-      d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+    return this.timeDimensions
+      .filter(td => td.granularity)
+      .map(
+        d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
         // dateFrom based window
-        const conditions = [];
-        if (trailingInterval !== 'unbounded') {
-          const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
-          const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
-          const sign = offset === 'start' ? '>=' : '>';
-          conditions.push(`${dateField} ${sign} ${trailingStart}`);
-        }
-        if (leadingInterval !== 'unbounded') {
-          const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
-          const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
-          const sign = offset === 'end' ? '<=' : '<';
-          conditions.push(`${dateField} ${sign} ${leadingEnd}`);
-        }
-        return conditions.length ? conditions.join(' AND ') : '1 = 1';
-      }]
-    );
+          const conditions = [];
+          if (trailingInterval !== 'unbounded') {
+            const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
+            const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
+            const sign = offset === 'start' ? '>=' : '>';
+            conditions.push(`${dateField} ${sign} ${trailingStart}`);
+          }
+          if (leadingInterval !== 'unbounded') {
+            const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
+            const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
+            const sign = offset === 'end' ? '<=' : '<';
+            conditions.push(`${dateField} ${sign} ${leadingEnd}`);
+          }
+          return conditions.length ? conditions.join(' AND ') : '1 = 1';
+        }]
+      );
   }
 
   /**
@@ -2918,8 +2923,10 @@ export class BaseQuery {
           });
           // for time dimension with granularity convertedToTz() is called internally in dimensionSql() flow,
           // so we need to ignore convertTz later even if context convertTzForRawTimeDimension is set to true
-          this.safeEvaluateSymbolContext().ignoreConvertTzForTimeDimension = true;
-          return td.dimensionSql();
+          return this.evaluateSymbolSqlWithContext(
+            () => td.dimensionSql(),
+            { ignoreConvertTzForTimeDimension: true },
+          );
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
           const memPath = this.cubeEvaluator.pathFromArray([cubeName, name]);
@@ -3824,6 +3831,8 @@ export class BaseQuery {
         // DATEADD is being rewritten to DATE_ADD
         // DATEADD: 'DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})',
         DATE: 'DATE({{ args_concat }})',
+
+        PERCENTILECONT: 'PERCENTILE_CONT({{ args_concat }})',
       },
       statements: {
         select: '{% if ctes %} WITH \n' +
@@ -3886,6 +3895,7 @@ export class BaseQuery {
         like: '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}',
         ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}',
         like_escape: '{{ like_expr }} ESCAPE {{ escape_char }}',
+        within_group: '{{ fun_sql }} WITHIN GROUP (ORDER BY {{ within_group_concat }})',
         concat_strings: '{{ strings | join(\' || \' ) }}',
       },
       tesseract: {

@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /http-api/rest
----
-
 # REST API
 
 REST API enables Cube to deliver data over the HTTP protocol to certain kinds of
@@ -38,7 +33,16 @@ REST API also provides endpoints for [GraphQL API][ref-graphql-api] and
 [Orchestration API][ref-orchestration-api]. However, they target specific use
 cases and are not considered part of the REST API.
 
-## Example request
+## Transport
+
+The REST API supports the following transports:
+
+| Transport | Description | When to use |
+| --- | --- | --- |
+| HTTP | HTTP-based protocol with long polling | Use by default |
+| WebSocket | [WebSocket][link-websocket]-based protocol with support for real-time updates | Use for applications that require subscriptions to real-time updates |
+
+### HTTP transport
 
 You can use the `curl` utility to execute requests to the REST API:
 
@@ -92,6 +96,36 @@ curl \
   -H "Authorization: JSON.WEB.TOKEN" \
   http://localhost:4000/cubejs-api/v1/meta | jq
 ```
+
+You can also use the [JavaScript SDK][ref-javascript-sdk] to call the REST API
+from your JavaScript applications.
+
+### WebSocket transport
+
+WebSocket can be used to provide real-time experience. You can configire it via the
+`CUBEJS_WEB_SOCKETS` environment variable.
+
+Clients using the [JavaScript SDK][ref-javascript-sdk] can be switched to WebSocket
+by passing `WebSocketTransport` to the `CubeApi` constructor:
+
+```javascript
+import cube from "@cubejs-client/core"
+import WebSocketTransport from "@cubejs-client/ws-transport"
+
+const cubeApi = cube({
+  transport: new WebSocketTransport({
+    authorization: CUBE_TOKEN,
+    apiUrl: "ws://localhost:4000/"
+  })
+})
+```
+
+<ReferenceBox>
+
+See [this recipe][ref-recipe-real-time-data-fetch] for an example of real-time
+data fetch using the WebSocket transport.
+
+</ReferenceBox>
 
 ## Configuration
 
@@ -193,30 +227,7 @@ how to generate it.
 In the development environment the token is not required for authorization, but
 you can still use it to pass a security context.
 
-### Continue wait
-
-If the request takes too long to be processed, Cube Backend responds with
-`{ "error": "Continue wait" }` and 200 status code. This is how the long polling
-mechanism in Cube is implemented. Clients should continuously retry the same
-query in a loop until they get a successful result. Subsequent calls to the Cube
-endpoints are idempotent and don't lead to scheduling new database queries if
-not required by the [`refresh_key`][ref-schema-ref-cube-refresh-key]. Also,
-receiving `Continue wait` doesn't mean the database query has been canceled, and
-it's actually still being processed by the Cube. Database queries that weren't
-started and are no longer waited by the client's long polling loop will be
-marked as orphaned and removed from the querying queue.
-
-Possible reasons of **Continue wait**:
-
-- The query requested is heavy, and it takes some time for the database to
-  process it. Clients should wait for its completion, continuously sending the
-  same REST API request. [`continueWaitTimeout`][ref-conf-queue-opts] can be
-  adjusted in order to change the time Cube waits before returning
-  `Continue wait` message.
-- There are many queries requested and Cube backend queues them to save database
-  from overloading.
-
-### Error Handling
+### Error handling
 
 Cube REST API has basic errors and HTTP Error codes for all requests.
 
@@ -227,7 +238,7 @@ Cube REST API has basic errors and HTTP Error codes for all requests.
 | 403    | Invalid token                  | The auth token provided is not valid. It may be expired or have invalid signature.                   |
 | 500    | Error message                  | Cube internal server error. Check error message for details.                                         |
 
-### Request Span Annotation
+### Request span annotation
 
 For monitoring tools such as Cube Cloud proper request span annotation should be
 provided in `x-request-id` header of a request. Each request id should consist
@@ -237,46 +248,50 @@ should be unique for each separate request. `spanId` should define user
 interaction span such us `Continue wait` retry cycle and it's value shouldn't
 change during one single interaction.
 
-### Pagination
+## Troubleshooting
 
-Cube supports paginated requests for the `/v1/load` endpoint by including
-[`limit` and `offset` parameters][ref-rest-query-format] in the query. For
-example, the following query will retrieve rows 101-200 from the `Orders` cube:
+### `Continue wait`
 
-```json
-{
-  "dimensions": ["Orders.status"],
-  "measures": ["Orders.count"],
-  "timeDimensions": [
-    {
-      "dimension": "Orders.createdAt",
-      "dateRange": "last year",
-      "granularity": "day"
-    }
-  ],
-  "limit": 100,
-  "offset": 100
-}
-```
+If the request takes too long to be processed, the REST API responds with
+`{ "error": "Continue wait" }` and the status code 200.
+
+This is part of the long polling mechanism:
+- After an API instance receives a request, it adds the query to the query queue.
+- If the query takes too long to be processed, the API instance will respond with `Continue wait`. Receiving `Continue wait` doesn't mean the database query has been canceled, and it's actually still being processed by Cube.
+- Clients who received `Continue wait` should continuously retry the same query in a loop until they get a successful result. Database queries that are no longer retried by clients will be marked as orphaned and removed from the query queue. Subsequent calls to the REST API are idempotent and don't lead to scheduling new database queries if not required by the [`refresh_key`][ref-schema-ref-cube-refresh-key].
+
+Possible reasons of `Continue wait`:
+- The query is too heavy for the upstream database, i.e., it takes too long to be processed.
+- The maximum [concurrency][ref-concurrency] is reached, i.e., there are many queries
+waiting in the query queue until the previous ones are completed.
+
+[`continueWaitTimeout`][ref-conf-queue-opts] configuration option can be adjusted
+in order to change the time Cube waits before returning `Continue wait` message.
+However, it's recommended to address the root cause of the issue instead of
+increasing the timeout:
+- Switch from a [traditional database][ref-traditional-databases] to a [data
+warehouse][ref-data-warehouses].
+- Increase the [concurrency][ref-concurrency] if your database can handle it.
+- Implement [pre-aggregations][ref-pre-aggregations] to reduce the query time by using Cube Store.
 
 [mdn-cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
-[ref-config-js]: /reference/configuration/config
-[ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
-[ref-conf-queue-opts]: /reference/configuration/config#queueoptions
+[ref-config-js]: /product/configuration/reference/config
+[ref-config-queryrewrite]: /product/configuration/reference/config#queryrewrite
+[ref-conf-queue-opts]: /product/configuration/reference/config#queueoptions
 [ref-rest-query-format]: /product/apis-integrations/rest-api/query-format#query-properties
 [ref-ref-meta-endpoint]: /product/apis-integrations/rest-api/reference#v1meta
-[ref-config-cors]: /reference/configuration/config#http
+[ref-config-cors]: /product/configuration/reference/config#http
 [ref-schema-ref-cube-refresh-key]:
-  /reference/data-model/cube#refresh_key
+  /product/data-modeling/reference/cube#refresh_key
 [ref-security]: /product/auth
 [ref-notebooks]: /product/configuration/visualization-tools#notebooks
 [ref-observable]: /product/configuration/visualization-tools/observable
 [ref-low-code]:
   /product/configuration/visualization-tools#low-code-tools-internal-tool-builders
 [ref-retool]: /product/configuration/visualization-tools/retool
-[ref-conf-basepath]: /reference/configuration/config#basepath
+[ref-conf-basepath]: /product/configuration/reference/config#basepath
 [ref-conf-contexttoapiscopes]:
-  /reference/configuration/config#contexttoapiscopes
+  /product/configuration/reference/config#contexttoapiscopes
 [ref-ref-load]: /product/apis-integrations/rest-api/reference#base_pathv1load
 [ref-ref-meta]: /product/apis-integrations/rest-api/reference#base_pathv1meta
 [ref-ref-sql]: /product/apis-integrations/rest-api/reference#base_pathv1sql
@@ -292,3 +307,10 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-ref-rest-api]: /product/apis-integrations/rest-api/reference
 [link-jq-utility]: https://jqlang.github.io/jq/
 [gh-cube-openspec]: https://github.com/cube-js/cube/blob/master/packages/cubejs-api-gateway/openspec.yml
+[link-websocket]: https://en.wikipedia.org/wiki/WebSocket
+[ref-concurrency]: /product/configuration/concurrency
+[ref-data-warehouses]: /product/configuration/data-sources#data-warehouses
+[ref-traditional-databases]: /product/configuration/data-sources#transactional-databases
+[ref-pre-aggregations]: /product/caching/using-pre-aggregations
+[ref-javascript-sdk]: /product/apis-integrations/javascript-sdk
+[ref-recipe-real-time-data-fetch]: /product/apis-integrations/recipes/real-time-data-fetch

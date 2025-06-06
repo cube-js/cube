@@ -1,0 +1,339 @@
+# Segments
+
+You can use the `segments` parameter within [cubes][ref-ref-cubes] to define segments.
+Segments are predefined filters. You can use segments to define complex filtering logic in SQL.
+
+For example, users for one particular city can be treated as a segment:
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
+
+</CodeTabs>
+
+Or use segments to implement cross-column `OR` logic:
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  segments: {
+    sf_users: {
+      sql: `
+        ${CUBE}.location = 'San Francisco' OR
+        ${CUBE}.state = 'CA'
+      `,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: >
+          {CUBE}.location = 'San Francisco' OR {CUBE}.state = 'CA'
+```
+
+</CodeTabs>
+
+As with other cube member definitions, segments can be
+[generated][ref-schema-gen]:
+
+```javascript
+const userSegments = {
+  sf_users: ["San Francisco", "CA"],
+  ny_users: ["New York City", "NY"],
+};
+
+cube(`users`, {
+  // ...
+
+  segments: {
+    ...Object.keys(userSegments)
+      .map((segment) => ({
+        [segment]: {
+          sql: `${CUBE}.location = '${userSegments[segment][0]}' or ${CUBE}.state = '${userSegments[segment][1]}'`,
+        },
+      }))
+      .reduce((a, b) => ({ ...a, ...b })),
+  },
+});
+```
+
+After defining a segment, you can pass it in [query object][ref-backend-query]:
+
+```json
+{
+  "measures": ["users.count"],
+  "segments": ["users.sf_users"]
+}
+```
+
+## Parameters
+
+### `name`
+
+The `name` parameter serves as the identifier of a segment. It must be unique
+among all segments, dimensions, and measures within a cube and follow the
+[naming conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
+
+</CodeTabs>
+
+### `description`
+
+This parameter provides a human-readable description of a segment.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+      description: `Users from San Francisco`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+        description: Users from San Francisco
+```
+
+</CodeTabs>
+
+### `public`
+
+The `public` parameter is used to manage the visibility of a segment. Valid
+values for `public` are `true` and `false`. When set to `false`, this segment
+**cannot** be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+      public: false,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+        public: false
+```
+
+</CodeTabs>
+
+### `sql`
+
+The `sql` parameter defines how a segment would filter out a subset of data. It
+takes any SQL expression that would be valid within a `WHERE` statement.
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
+
+</CodeTabs>
+
+## Segments vs Dimension Filters
+
+As segments are simply predefined filters, it can be difficult to determine when
+to use segments instead of filters on dimensions.
+
+Let's consider an example:
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  dimensions: {
+    location: {
+      sql: `location`,
+      type: `string`,
+    },
+  },
+
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    dimensions:
+      - name: location
+        sql: location
+        type: string
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
+
+</CodeTabs>
+
+In this case following queries are equivalent:
+
+```json
+{
+  "measures": ["users.count"],
+  "filters": [
+    {
+      "member": "users.location",
+      "operator": "equals",
+      "values": ["San Francisco"]
+    }
+  ]
+}
+```
+
+and
+
+```json
+{
+  "measures": ["users.count"],
+  "segments": ["users.sf_users"]
+}
+```
+
+This case is a bad candidate for segment usage and a filter on a dimension works
+better here. `users.location` filter value can change a lot for user queries and
+`users.sf_users` segment won't be used much in this case.
+
+A good candidate case for a segment is when you have a complex filtering
+expression which can be reused for a lot of user queries. For example:
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  segments: {
+    sf_ny_users: {
+      sql: `
+        ${CUBE}.location = 'San Francisco' OR
+        ${CUBE}.location like '%New York%'
+      `,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_ny_users
+        sql: >
+          {CUBE}.location = 'San Francisco' OR {CUBE}.location like '%New York%'
+```
+
+</CodeTabs>
+
+
+[ref-ref-cubes]: /product/data-modeling/reference/cube
+[ref-backend-query]: /product/apis-integrations/rest-api/query-format
+[ref-schema-gen]: /product/data-modeling/recipes/schema-generation
+[ref-naming]: /product/data-modeling/syntax#naming
+[ref-playground]: /product/workspace/playground
+[ref-apis]: /product/apis-integrations

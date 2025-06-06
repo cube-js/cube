@@ -346,7 +346,6 @@ impl RemoteFs for LocalDirRemoteFs {
         let result = Self::list_recursive(
             remote_dir.clone().unwrap_or(self.dir.clone()),
             remote_prefix.to_string(),
-            remote_dir.unwrap_or(self.dir.clone()),
         )
         .await?;
         Ok(result)
@@ -395,45 +394,59 @@ impl LocalDirRemoteFs {
         Ok(())
     }
 
-    fn list_recursive_boxed(
-        remote_dir: PathBuf,
-        remote_prefix: String,
-        dir: PathBuf,
-    ) -> BoxFuture<'static, Result<Vec<RemoteFile>, CubeError>> {
-        async move { Self::list_recursive(remote_dir, remote_prefix, dir).await }.boxed()
-    }
-
     pub async fn list_recursive(
         remote_dir: PathBuf,
         remote_prefix: String,
-        dir: PathBuf,
     ) -> Result<Vec<RemoteFile>, CubeError> {
-        let mut result = Vec::new();
+        let mut result_builder = Vec::new();
+        Self::list_recursive_helper(
+            remote_dir,
+            remote_prefix,
+            &mut result_builder,
+            &mut PathBuf::new(),
+        )
+        .await?;
+        Ok(result_builder)
+    }
+
+    fn list_recursive_boxed_helper<'a>(
+        dir: PathBuf,
+        remote_prefix: String,
+        result_builder: &'a mut Vec<RemoteFile>,
+        relative_prefix: &'a mut PathBuf,
+    ) -> BoxFuture<'a, Result<(), CubeError>> {
+        async move {
+            Self::list_recursive_helper(dir, remote_prefix, result_builder, relative_prefix).await
+        }
+        .boxed()
+    }
+
+    async fn list_recursive_helper(
+        dir: PathBuf,
+        remote_prefix: String,
+        result_builder: &mut Vec<RemoteFile>,
+        relative_prefix: &mut PathBuf,
+    ) -> Result<(), CubeError> {
         if fs::metadata(dir.clone()).await.is_err() {
-            return Ok(vec![]);
+            return Ok(());
         }
         if let Ok(mut dir) = fs::read_dir(dir).await {
             while let Ok(Some(file)) = dir.next_entry().await {
                 if let Ok(true) = file.file_type().await.map(|r| r.is_dir()) {
-                    result.append(
-                        &mut Self::list_recursive_boxed(
-                            remote_dir.clone(),
-                            remote_prefix.to_string(),
-                            file.path(),
-                        )
-                        .await?,
-                    );
+                    relative_prefix.push(file.file_name());
+                    Self::list_recursive_boxed_helper(
+                        file.path(),
+                        remote_prefix.to_string(),
+                        result_builder,
+                        relative_prefix,
+                    )
+                    .await?;
+                    relative_prefix.pop();
                 } else if let Ok(metadata) = file.metadata().await {
-                    let relative_name = file
-                        .path()
-                        .to_str()
-                        .unwrap()
-                        .to_string()
-                        .replace(&remote_dir.to_str().unwrap().to_string(), "")
-                        .trim_start_matches("/")
-                        .to_string();
+                    let relative_path = relative_prefix.join(file.file_name());
+                    let relative_name = relative_path.to_str().unwrap();
                     if relative_name.starts_with(&remote_prefix) {
-                        result.push(RemoteFile {
+                        result_builder.push(RemoteFile {
                             remote_path: relative_name.to_string(),
                             updated: DateTime::from(metadata.modified()?),
                             file_size: metadata.len(),
@@ -442,7 +455,7 @@ impl LocalDirRemoteFs {
                 }
             }
         }
-        Ok(result)
+        Ok(())
     }
 }
 

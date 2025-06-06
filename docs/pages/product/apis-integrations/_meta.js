@@ -10,4 +10,5 @@ module.exports = {
   "graphql-api": "GraphQL API",
   "javascript-sdk": "JavaScript SDK",
   "orchestration-api": "Orchestration API",
+  "recipes": "Recipes"
 };

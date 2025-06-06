@@ -165,6 +165,8 @@ export class MysqlQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // PERCENTILE_CONT works but requires PARTITION BY
+    delete templates.functions.PERCENTILECONT;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
     // NOTE: this template contains a comma; two order expressions are being generated

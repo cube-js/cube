@@ -1,7 +1,7 @@
 import path from 'path';
 import { downloadAndExtractFile, getEnv } from '@cubejs-backend/shared';
 
-export const OSS_DRIVER_VERSION = '1.0.2';
+export const OSS_DRIVER_VERSION = '1.0.6';
 
 /**
  * In the beginning of 2025 Databricks released their open-source version of JDBC driver and encourage
@@ -11,9 +11,6 @@ export const OSS_DRIVER_VERSION = '1.0.2';
  * Java Runtime Environment (JRE) 11.0 or above. CI testing is supported on JRE 11, 17, and 21.
  */
 export async function downloadJDBCDriver(): Promise<string | null> {
-  // TODO: Just to throw a console warning that this ENV is obsolete and could be safely removed
-  getEnv('databrickAcceptPolicy');
-
   console.log(`Downloading databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`);
 
   await downloadAndExtractFile(

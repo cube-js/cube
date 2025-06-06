@@ -1,0 +1,254 @@
+# Refreshing select partitions
+
+## Use case
+
+We have a dataset with orders and we want to aggregate data while having decent
+performance. Orders have a creation time, so we can use
+[partitioning](/product/caching/using-pre-aggregations#partitioning) by time to
+optimize pre-aggregations build and refresh time. The problem is that the
+order's status can change after a long period. In this case, we want to rebuild
+only partitions associated with this order.
+
+In the recipe below, we'll learn how to use the
+[`refresh_key`](/product/data-modeling/reference/pre-aggregations#sql) together
+with the [`FITER_PARAMS`](/product/data-modeling/reference/cube#filter-params)
+for partition separately.
+
+## Data modeling
+
+Let's explore the `orders` cube data that contains various information about
+orders, including number and status:
+
+| id  | number | status     | created_at          | updated_at          |
+| --- | ------ | ---------- | ------------------- | ------------------- |
+| 1   | 1      | processing | 2021-08-10 14:26:40 | 2021-08-10 14:26:40 |
+| 2   | 2      | completed  | 2021-08-20 13:21:38 | 2021-08-22 13:10:38 |
+| 3   | 3      | shipped    | 2021-09-01 10:27:38 | 2021-09-02 01:12:38 |
+| 4   | 4      | completed  | 2021-09-20 10:27:38 | 2021-09-20 10:27:38 |
+
+In our case, each order has `created_at` and `updated_at` properties. The
+`updated_at` property is the last order update timestamp. To create a
+pre-aggregation with partitions, we need to specify the
+[`partition_granularity` property](/product/data-modeling/reference/pre-aggregations#partition_granularity).
+Partitions will be split monthly by the `created_at` dimension.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders
+        type: rollup
+        dimensions:
+          - number
+          - status
+          - created_at
+          - updated_at
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: month # this is where we specify the partition
+        refreshKey:
+          sql: SELECT max(updated_at) FROM public.orders # check for updates of the updated_at property
+```
+
+```javascript
+cube(`orders`, {
+  pre_aggregations: {
+    orders: {
+      type: `rollup`,
+      dimensions: [number, status, created_at, updated_at],
+      time_dimension: created_at,
+      granularity: `day`,
+      partition_granularity: `month`, // this is where we specify the partition
+      refresh_key: {
+        sql: `SELECT max(updated_at) FROM public.orders`, // check for updates of the updated_at property
+      },
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+As you can see, we defined custom a
+[`refresh_key`](/product/data-modeling/reference/pre-aggregations#sql) that will
+check for new values of the `updated_at` property. The refresh key is evaluated
+for each partition separately. For example, if we update orders from August and
+update their `updated_at` property, the current refresh key will update for
+**all** partitions. There is how it looks in the Cube logs:
+
+```bash
+Executing SQL: 5b4c517f-b496-4c69-9503-f8cd2b4c73b6
+--
+  SELECT max(updated_at) FROM public.orders
+--
+Performing query completed: 5b4c517f-b496-4c69-9503-f8cd2b4c73b6 (15ms)
+Performing query: 5b4c517f-b496-4c69-9503-f8cd2b4c73b6
+Performing query: 5b4c517f-b496-4c69-9503-f8cd2b4c73b6
+Executing SQL: 5b4c517f-b496-4c69-9503-f8cd2b4c73b6
+--
+  select min(("orders".created_at::timestamptz AT TIME ZONE 'UTC')) from public.orders AS "orders"
+--
+Executing SQL: 5b4c517f-b496-4c69-9503-f8cd2b4c73b6
+--
+  select max(("orders".created_at::timestamptz AT TIME ZONE 'UTC')) from public.orders AS "orders"
+--
+```
+
+Note that the query for two partitions is the same. It's the reason why **all
+partitions** will be updated.
+
+How do we fix this and update only the partition for August? We can use the
+[`FILTER_PARAMS`](/product/data-modeling/reference/cube#filter-params) for that!
+
+Let's update our pre-aggregation definition:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders
+        type: rollup
+        dimensions:
+          - number
+          - status
+          - created_at
+          - updated_at
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: month # this is where we specify the partition
+        refreshKey:
+          sql: >
+            SELECT max(updated_at) FROM public.orders WHERE
+            {FILTER_PARAMS.orders.created_at.filter('created_at')}
+```
+
+```javascript
+cube(`orders`, {
+  pre_aggregations: {
+    orders: {
+      type: `rollup`,
+      dimensions: [number, status, created_at, updated_at],
+      time_dimension: created_at,
+      granularity: `day`,
+      partition_granularity: `month`,
+      refresh_key: {
+        sql: `
+          SELECT max(updated_at)
+          FROM public.orders
+          WHERE ${FILTER_PARAMS.orders.created_at.filter("created_at")}`,
+      },
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+Cube will filter data by the `created_at` property and then apply the refresh
+key for the `updated_at` property. Here's how it looks in the Cube logs:
+
+```bash
+Executing SQL: e1155b2f-859b-4e61-a760-17af891f5f0b
+--
+  select min(("updated_orders".created_at::timestamptz AT TIME ZONE 'UTC')) from public.orders AS "updated_orders"
+--
+Executing SQL: e1155b2f-859b-4e61-a760-17af891f5f0b
+--
+  select max(("updated_orders".created_at::timestamptz AT TIME ZONE 'UTC')) from public.orders AS "updated_orders"
+--
+Performing query completed: e1155b2f-859b-4e61-a760-17af891f5f0b (10ms)
+Performing query completed: e1155b2f-859b-4e61-a760-17af891f5f0b (13ms)
+Performing query: e1155b2f-859b-4e61-a760-17af891f5f0b
+Performing query: e1155b2f-859b-4e61-a760-17af891f5f0b
+Executing SQL: e1155b2f-859b-4e61-a760-17af891f5f0b
+--
+  SELECT max(updated_at) FROM public.orders WHERE created_at >= '2021-08-01T00:00:00.000Z'::timestamptz AND created_at <= '2021-08-31T23:59:59.999Z'::timestamptz
+--
+Executing SQL: e1155b2f-859b-4e61-a760-17af891f5f0b
+--
+  SELECT max(updated_at) FROM public.orders WHERE created_at >= '2021-09-01T00:00:00.000Z'::timestamptz AND created_at <= '2021-09-30T23:59:59.999Z'::timestamptz
+```
+
+Note that Cube checks the refresh key value using a date range over the
+`created_at` property. With this refresh key, only one partition will be
+updated.
+
+## Result
+
+We have received orders from two partitions of a pre-aggregation and only one of
+them has been updated when an order changed its status:
+
+```json5
+// orders before update:
+[
+  {
+    "orders.number": "1",
+    "orders.status": "processing",
+    "orders.created_at": "2021-08-10T14:26:40.000",
+    "orders.updated_at": "2021-08-10T14:26:40.000",
+  },
+  {
+    "orders.number": "2",
+    "orders.status": "completed",
+    "orders.created_at": "2021-08-20T13:21:38.000",
+    "orders.updated_at": "2021-08-20T13:21:38.000",
+  },
+  {
+    "orders.number": "3",
+    "orders.status": "shipped",
+    "orders.created_at": "2021-09-01T10:27:38.000",
+    "orders.updated_at": "2021-09-01T10:27:38.000",
+  },
+  {
+    "orders.number": "4",
+    "orders.status": "completed",
+    "orders.created_at": "2021-09-20T10:27:38.000",
+    "orders.updated_at": "2021-09-20T10:27:38.000",
+  },
+]
+```
+
+```json5
+// orders after update:
+[
+  {
+    "orders.number": "1",
+    "orders.status": "shipped",
+    "orders.created_at": "2021-08-10T14:26:40.000",
+    "orders.updated_at": "2021-09-30T06:45:28.000",
+  },
+  {
+    "orders.number": "2",
+    "orders.status": "completed",
+    "orders.created_at": "2021-08-20T13:21:38.000",
+    "orders.updated_at": "2021-08-20T13:21:38.000",
+  },
+  {
+    "orders.number": "3",
+    "orders.status": "shipped",
+    "orders.created_at": "2021-09-01T10:27:38.000",
+    "orders.updated_at": "2021-09-01T10:27:38.000",
+  },
+  {
+    "orders.number": "4",
+    "orders.status": "completed",
+    "orders.created_at": "2021-09-20T10:27:38.000",
+    "orders.updated_at": "2021-09-20T10:27:38.000",
+  },
+]
+```
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/refreshing-select-partitions)
+or run it with the `docker-compose up` command. You'll see the result, including
+queried data, in the console.

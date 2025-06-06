@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.18](https://github.com/cube-js/cube/compare/v1.3.17...v1.3.18) (2025-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.17](https://github.com/cube-js/cube/compare/v1.3.16...v1.3.17) (2025-05-22)
+
+### Bug Fixes
+
+- **cubestore:** Avoid empty result set with LocalDirRemoteFs:list_with_metadata on Windows ([#9598](https://github.com/cube-js/cube/issues/9598)) ([7b4e4ad](https://github.com/cube-js/cube/commit/7b4e4ad151274a16cd34154f1cad5bd048884bde))
+
 ## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

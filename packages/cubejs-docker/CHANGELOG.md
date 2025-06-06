@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.3.18](https://github.com/cube-js/cube/compare/v1.3.17...v1.3.18) (2025-05-27)
+
+### Features
+
+- **docker:** Security upgrade node from 22.14.0 to 22.16.0 ([#9602](https://github.com/cube-js/cube/issues/9602)) ([efbb709](https://github.com/cube-js/cube/commit/efbb709b6ac7d9cbb7a0403d9036ed1fc3d80b49))
+
+## [1.3.17](https://github.com/cube-js/cube/compare/v1.3.16...v1.3.17) (2025-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
 ## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
 
 **Note:** Version bump only for package @cubejs-backend/docker

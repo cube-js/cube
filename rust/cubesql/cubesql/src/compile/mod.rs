@@ -13055,6 +13055,51 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_date_trunc_column_not_equals_literal() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                avg("avgPrice") AS "avgPrice"
+            FROM public."KibanaSampleDataEcommerce"
+            WHERE
+                DATE_TRUNC('week', "order_date") != str_to_date('2022-11-14 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.avgPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    or: Some(vec![
+                        json!({
+                            "member": "KibanaSampleDataEcommerce.order_date",
+                            "operator": "beforeDate",
+                            "values": ["2022-11-14T00:00:00.000Z"],
+                        }),
+                        json!({
+                            "member": "KibanaSampleDataEcommerce.order_date",
+                            "operator": "afterOrOnDate",
+                            "values": ["2022-11-21T00:00:00.000Z"],
+                        }),
+                    ]),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_psqlodbc_null() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "psqlodbc_null",
@@ -16732,6 +16777,192 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("OVER (PARTITION BY"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_date_filter_with_or_and() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                DATE_TRUNC('year', "order_date") AS "y",
+                SUM("KibanaSampleDataEcommerce"."sumPrice") AS "m1"
+            FROM "KibanaSampleDataEcommerce" AS "KibanaSampleDataEcommerce"
+            WHERE
+                DATE_TRUNC('year', "order_date") = '2024-01-01T00:00:00Z'::timestamptz
+                OR (
+                    DATE_TRUNC('year', "order_date") = '2025-01-01T00:00:00Z'::timestamptz
+                    AND DATE_TRUNC('month', "order_date") = '2025-01-01T00:00:00Z'::timestamptz
+                )
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: None
+                }]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("inDateRange".to_string()),
+                            values: Some(vec![
+                                "2024-01-01T00:00:00.000Z".to_string(),
+                                "2024-12-31T23:59:59.999Z".to_string(),
+                            ]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: None,
+                            operator: None,
+                            values: None,
+                            or: None,
+                            and: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.order_date".to_string()
+                                    ),
+                                    operator: Some("inDateRange".to_string()),
+                                    values: Some(vec![
+                                        "2025-01-01T00:00:00.000Z".to_string(),
+                                        "2025-12-31T23:59:59.999Z".to_string(),
+                                    ]),
+                                    or: None,
+                                    and: None,
+                                }),
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.order_date".to_string()
+                                    ),
+                                    operator: Some("inDateRange".to_string()),
+                                    values: Some(vec![
+                                        "2025-01-01T00:00:00.000Z".to_string(),
+                                        "2025-01-31T23:59:59.999Z".to_string(),
+                                    ]),
+                                    or: None,
+                                    and: None,
+                                })
+                            ]),
+                        }),
+                    ]),
+                    and: None
+                }]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_tableau_relative_dates() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT) AS "customer_gendder",
+                SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:sumPrice:ok"
+            FROM
+                "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE
+                (
+                    CASE
+                        WHEN (
+                            NOT (
+                                CAST(
+                                    CAST(
+                                        TO_TIMESTAMP(
+                                            CAST(
+                                                CAST("KibanaSampleDataEcommerce"."order_date" AS TEXT) AS TEXT
+                                            ),
+                                            'YYYY-MM-DD"T"HH24:MI:SS.MS'
+                                        ) AS TIMESTAMP
+                                    ) AS DATE
+                                ) IS NULL
+                            )
+                        ) THEN CAST(
+                            CAST(
+                                TO_TIMESTAMP(
+                                    CAST(
+                                        CAST("KibanaSampleDataEcommerce"."order_date" AS TEXT) AS TEXT
+                                    ),
+                                    'YYYY-MM-DD"T"HH24:MI:SS.MS'
+                                ) AS TIMESTAMP
+                            ) AS DATE
+                        )
+                        ELSE NULL
+                    END
+                ) < (TIMESTAMP '2025-01-01 00:00:00.000')
+            GROUP BY
+                1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("beforeDate".to_string()),
+                    values: Some(vec!["2025-01-01T00:00:00.000Z".to_string()]),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_within_group_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY taxful_total_price) AS pc
+            FROM KibanaSampleDataEcommerce
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("WITHIN GROUP (ORDER BY"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
