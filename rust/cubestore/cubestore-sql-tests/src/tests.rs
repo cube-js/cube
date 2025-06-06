@@ -6827,10 +6827,10 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
     );
 
     let columns = vec![
-        Column::new("ID".to_string(), ColumnType::Int, 0),
-        Column::new("LastName".to_string(), ColumnType::String, 1),
-        Column::new("FirstName".to_string(), ColumnType::String, 2),
-        Column::new("Timestamp".to_string(), ColumnType::Timestamp, 3),
+        Column::new("id".to_string(), ColumnType::Int, 0),
+        Column::new("lastname".to_string(), ColumnType::String, 1),
+        Column::new("firstname".to_string(), ColumnType::String, 2),
+        Column::new("timestamp".to_string(), ColumnType::Timestamp, 3),
     ];
     let rows = vec![
         Row::new(vec![
@@ -6859,7 +6859,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]),
     ];
     let data = Arc::new(DataFrame::new(columns, rows.clone()));
-    let inline_tables = vec![InlineTable::new(1000, "Persons".to_string(), data)];
+    let inline_tables = vec![InlineTable::new(1000, "persons".to_string(), data)];
 
     let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
@@ -6968,9 +6968,9 @@ async fn inline_tables_2x(service: Box<dyn SqlClient>) {
         .unwrap();
 
     let columns = vec![
-        Column::new("ID".to_string(), ColumnType::Int, 0),
-        Column::new("Last".to_string(), ColumnType::String, 1),
-        Column::new("First".to_string(), ColumnType::String, 2),
+        Column::new("id".to_string(), ColumnType::Int, 0),
+        Column::new("last".to_string(), ColumnType::String, 1),
+        Column::new("first".to_string(), ColumnType::String, 2),
     ];
     let rows = vec![
         Row::new(vec![
@@ -7009,8 +7009,8 @@ async fn inline_tables_2x(service: Box<dyn SqlClient>) {
     let data = Arc::new(DataFrame::new(columns.clone(), rows.clone()));
     let data2 = Arc::new(DataFrame::new(columns.clone(), rows2.clone()));
     let inline_tables = vec![
-        InlineTable::new(1000, "Persons".to_string(), data),
-        InlineTable::new(1001, "Persons2".to_string(), data2),
+        InlineTable::new(1000, "persons".to_string(), data),
+        InlineTable::new(1001, "persons2".to_string(), data2),
     ];
 
     let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
