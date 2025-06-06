@@ -21,7 +21,7 @@ async function validate(options) {
     });
   } catch (error: any) {
     console.log('❌ Cube Schema validation failed');
-    displayError(error.messages);
+    displayError(error.messages || error.message);
     return;
   }
 
