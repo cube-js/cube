@@ -12,6 +12,7 @@ use crate::table::Row;
 use crate::CubeError;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::optimizer::propagate_empty_relation::apply_aliasing_projection_if_necessary;
 use serde_derive::{Deserialize, Serialize};
 
 use datafusion::catalog::TableProvider;
@@ -174,51 +175,6 @@ fn is_empty_relation(plan: &LogicalPlan) -> Option<DFSchemaRef> {
     }
 }
 
-/// Takes an inner LogicalPlan, whose schema has the same length and names as
-/// `union_schema`, but (perhaps) different table qualifiers.  Assumes the
-/// DataTypes are the same.  Wraps the inner LogicalPlan with a Projection
-/// having the correct alias expressions for the output schema.
-fn wrap_pruned_union_if_necessary(
-    inner: LogicalPlan,
-    union_schema: &DFSchemaRef,
-) -> Result<LogicalPlan, CubeError> {
-    let inner_schema = inner.schema();
-    if inner_schema.fields().len() != union_schema.fields().len() {
-        return Err(CubeError::internal(format!("inner schema incompatible with union_schema (len): inner_schema = {:?}; union_schema = {:?}", inner_schema, union_schema)));
-    }
-
-    let mut expr_list = Vec::<Expr>::with_capacity(inner_schema.fields().len());
-    let mut projection_needed = false;
-    for (i, ((union_table_reference, union_field), ip @ (inner_table_reference, inner_field))) in
-        union_schema.iter().zip(inner_schema.iter()).enumerate()
-    {
-        if union_field.name() != inner_field.name() {
-            return Err(CubeError::internal(format!("inner schema incompatible with union schema (name mismatch at index {}): inner_schema = {:?}; union_schema = {:?}", i, inner_schema, union_schema)));
-        }
-
-        let expr = Expr::from(ip);
-
-        if union_table_reference != inner_table_reference {
-            projection_needed = true;
-            expr_list.push(expr.alias_qualified(
-                union_table_reference.map(|tr| tr.clone()),
-                union_field.name(),
-            ));
-        } else {
-            expr_list.push(expr);
-        }
-    }
-
-    if projection_needed {
-        Ok(LogicalPlan::Projection(Projection::try_new(
-            expr_list,
-            Arc::new(inner),
-        )?))
-    } else {
-        Ok(inner)
-    }
-}
-
 impl PreSerializedPlan {
     fn remove_unused_tables(
         plan: &LogicalPlan,
@@ -338,14 +294,13 @@ impl PreSerializedPlan {
                     1 => {
                         // Union _requires_ 2 or more inputs.
                         let plan = new_inputs.pop().unwrap();
-                        wrap_pruned_union_if_necessary(plan, schema)?
+                        apply_aliasing_projection_if_necessary(plan, schema)?
                     }
                     _ => {
-                        let plan = LogicalPlan::Union(Union {
-                            inputs: new_inputs.into_iter().map(Arc::new).collect(),
-                            schema: schema.clone(),
-                        });
-                        wrap_pruned_union_if_necessary(plan, schema)?
+                        let plan = LogicalPlan::Union(Union::try_new_with_loose_types(
+                            new_inputs.into_iter().map(Arc::new).collect(),
+                        )?);
+                        apply_aliasing_projection_if_necessary(plan, schema)?
                     }
                 };
                 res
