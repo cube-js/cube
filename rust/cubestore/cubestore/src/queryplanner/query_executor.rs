@@ -98,6 +98,7 @@ use super::udfs::{
     aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_arc_aggregate_udfs,
     registerable_arc_scalar_udfs, CubeAggregateUDFKind,
 };
+use super::QueryPlannerImpl;
 
 #[automock]
 #[async_trait]
@@ -140,13 +141,22 @@ pub trait QueryExecutor: DIService + Send + Sync {
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
 
 pub struct QueryExecutorImpl {
-    // TODO: Why do we need a MetadataCacheFactory when we have a ParquetMetadataCache?
+    // TODO: Why do we need a MetadataCacheFactory when we have a ParquetMetadataCache?  (We use its make_session_config() now, TODO rename stuff)
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
     memory_handler: Arc<dyn MemoryHandler>,
 }
 
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
+
+impl QueryExecutorImpl {
+    fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
+        // This is supposed to be identical to QueryImplImpl::execution_context.
+        Ok(Arc::new(QueryPlannerImpl::execution_context_helper(
+            self.metadata_cache_factory.make_session_config(),
+        )))
+    }
+}
 
 #[async_trait]
 impl QueryExecutor for QueryExecutorImpl {
@@ -175,7 +185,8 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let execution_time = SystemTime::now();
 
-        let results = collect(split_plan.clone(), Arc::new(TaskContext::default()))
+        let session_context = self.execution_context()?;
+        let results = collect(split_plan.clone(), session_context.task_ctx())
             .instrument(collect_span)
             .await;
         let execution_time = execution_time.elapsed()?;
@@ -242,8 +253,9 @@ impl QueryExecutor for QueryExecutorImpl {
         );
 
         let execution_time = SystemTime::now();
+        let session_context = self.execution_context()?;
         // TODO context
-        let results = collect(worker_plan.clone(), Arc::new(TaskContext::default()))
+        let results = collect(worker_plan.clone(), session_context.task_ctx())
             .instrument(tracing::span!(
                 tracing::Level::TRACE,
                 "collect_physical_plan"

@@ -18,6 +18,7 @@ use crate::metastore::{
     deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, table::Table, Chunk,
     Column, ColumnType, IdRow, Index, IndexType, MetaStore, Partition, WAL,
 };
+use crate::queryplanner::QueryPlannerImpl;
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::columns_vec_buffer_size;
@@ -445,12 +446,20 @@ impl ChunkDataStore for ChunkStore {
         if old_chunk_ids.is_empty() {
             return Ok(());
         }
+        let task_context = QueryPlannerImpl::execution_context_helper(
+            self.metadata_cache_factory
+                .cache_factory()
+                .make_session_config(),
+        )
+        .task_ctx();
+
         let batches_stream = merge_chunks(
             key_size,
             main_table.clone(),
             in_memory_columns,
             unique_key.clone(),
             aggregate_columns.clone(),
+            task_context,
         )
         .await?;
         let batches = common_collect(batches_stream).await?;
@@ -1358,7 +1367,14 @@ impl ChunkStore {
                     .output_ordering()
                     .is_some_and(|ordering| ordering.len() == key_size));
 
-                let batches = collect(aggregate, Arc::new(TaskContext::default())).await?;
+                let task_context = QueryPlannerImpl::execution_context_helper(
+                    self.metadata_cache_factory
+                        .cache_factory()
+                        .make_session_config(),
+                )
+                .task_ctx();
+
+                let batches = collect(aggregate, task_context).await?;
                 if batches.is_empty() {
                     Ok(vec![])
                 } else if batches.len() == 1 {
