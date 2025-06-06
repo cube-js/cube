@@ -590,7 +590,7 @@ impl ExtensionPlanner for RollingWindowPlanner {
                 // EquivalenceProperties::new_with_orderings(schema.clone().into(), &[sort_key]),
                 EquivalenceProperties::new(schema.clone().into()),
                 Partitioning::UnknownPartitioning(1),
-                EmissionType::Both, // TODO upgrade DF
+                EmissionType::Final,
                 Boundedness::Bounded,
             ),
             sorted_input: sort,
