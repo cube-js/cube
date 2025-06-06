@@ -329,6 +329,28 @@ Array [
 ]
 `;
 
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 13`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 14`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 1`] = `
 Object {
   "completed_at": Object {
@@ -702,6 +724,28 @@ Array [
 ]
 `;
 
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 13`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 14`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 1`] = `
 Object {
   "completed_at": Object {
@@ -1001,6 +1045,28 @@ Array [
     "role": "manager",
   },
 ]
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 13`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 14`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 1`] = `
@@ -1348,6 +1414,28 @@ Array [
 ]
 `;
 
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 13`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 14`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
 exports[`Schema Testing Views allows to override \`title\`, \`description\`, \`meta\`, and \`format\` on includes members 1`] = `
 Object {
   "accessPolicy": undefined,
@@ -1446,6 +1534,7 @@ Object {
   },
   "evaluatedHierarchies": Array [
     Object {
+      "aliasMember": "orders.hello",
       "levels": Array [
         "orders_view.my_beloved_status",
       ],

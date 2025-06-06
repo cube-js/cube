@@ -35,7 +35,7 @@ export async function resolveJDBCDriver(): Promise<string> {
 
 /**
  * Extract if exist UID and PWD from URL and return UID, PWD and URL without these params.
- * New Databricks OSS driver throws an error if UID and PWD are provided in the URL and as a separate params
+ * New Databricks OSS driver throws an error if any parameter is provided in the URL and as a separate param
  * passed to the driver instance. That's why we strip them out from the URL if they exist there.
  * @param jdbcUrl
  */
@@ -48,7 +48,8 @@ export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [uid: string
 
   const cleanedUrl = jdbcUrl
     .replace(/;?UID=[^;]*/i, '')
-    .replace(/;?PWD=[^;]*/i, '');
+    .replace(/;?PWD=[^;]*/i, '')
+    .replace(/;?AuthMech=[^;]*/i, '');
 
   return [uid, pwd, cleanedUrl];
 }

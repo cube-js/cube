@@ -3,14 +3,14 @@ use crate::{
     compile::rewrite::{
         alias_expr,
         analysis::{ConstantFolding, Member, OriginalExpr},
-        between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
-        column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
-        dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
-        filter_op_filters_empty_tail, filter_replacer, filter_simplify_pull_up_replacer,
-        filter_simplify_push_down_replacer, fun_expr, fun_expr_args_legacy, fun_expr_var_arg,
-        inlist_expr, inlist_expr_list, is_not_null_expr, is_null_expr, like_expr, limit,
-        list_rewrite, literal_bool, literal_expr, literal_int, literal_string, measure_expr,
-        negative_expr, not_expr, projection, rewrite,
+        between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, cast_expr_explicit,
+        change_user_member, column_expr, cube_scan, cube_scan_filters,
+        cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, expr_column_name, filter,
+        filter_member, filter_op, filter_op_filters, filter_op_filters_empty_tail, filter_replacer,
+        filter_simplify_pull_up_replacer, filter_simplify_push_down_replacer, fun_expr,
+        fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, inlist_expr_list, is_not_null_expr,
+        is_null_expr, like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int,
+        literal_null, literal_string, measure_expr, negative_expr, not_expr, projection, rewrite,
         rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
         time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
@@ -2460,6 +2460,67 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 self.transform_not_column_equals_date("?literal", "?one_day"),
+            ),
+            rewrite(
+                "filter-tableau-case-when-not-null",
+                filter_replacer(
+                    binary_expr(
+                        case_expr(
+                            None,
+                            vec![(
+                                not_expr(is_null_expr("?left_expr")),
+                                "?left_expr".to_string(),
+                            )],
+                            Some(literal_null()),
+                        ),
+                        "?op",
+                        "?right_expr",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr("?left_expr", "?op", "?right_expr"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            rewrite(
+                "filter-tableau-cast-text-to-timestamp-to-date",
+                filter_replacer(
+                    binary_expr(
+                        cast_expr_explicit(
+                            udf_expr(
+                                "str_to_date",
+                                vec![
+                                    column_expr("?column"),
+                                    literal_string("YYYY-MM-DD\"T\"HH24:MI:SS.MS"),
+                                ],
+                            ),
+                            DataType::Date32,
+                        ),
+                        "?op",
+                        "?right_expr",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec![literal_string("day"), column_expr("?column")],
+                        ),
+                        "?op",
+                        "?right_expr",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
             ),
             rewrite(
                 "in-date-range-to-time-dimension-pull-up-left",

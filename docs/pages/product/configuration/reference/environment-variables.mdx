@@ -1303,6 +1303,12 @@ Required port to send where collector server accept UDP connections.
 
 ## `CUBEJS_TOUCH_PRE_AGG_TIMEOUT`
 
+<WarningBox>
+
+If the refresh worker’s throughput isn’t sufficient and the Cube Refresh Worker can’t refresh every partition, Cube will start dropping partitions once the timeout is reached.
+
+</WarningBox>
+
 The number of seconds without a touch before pre-aggregation is considered
 orphaned and marked for removal. Please see
 [`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`](#cubejs-drop-pre-agg-without-touch) to

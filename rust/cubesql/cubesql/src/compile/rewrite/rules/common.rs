@@ -1,6 +1,6 @@
 use crate::{
     compile::rewrite::{
-        agg_fun_expr, alias_expr,
+        agg_fun_expr, agg_fun_expr_within_group_empty_tail, alias_expr,
         analysis::{ConstantFolding, OriginalExpr},
         binary_expr, column_expr, fun_expr,
         rewriter::{CubeEGraph, CubeRewrite, RewriteRules, Rewriter},
@@ -29,10 +29,16 @@ impl RewriteRules for CommonRules {
                     "Sum",
                     vec![binary_expr(column_expr("?column"), "/", "?literal")],
                     "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
                 ),
                 alias_expr(
                     binary_expr(
-                        agg_fun_expr("Sum", vec![column_expr("?column")], "?distinct"),
+                        agg_fun_expr(
+                            "Sum",
+                            vec![column_expr("?column")],
+                            "?distinct",
+                            agg_fun_expr_within_group_empty_tail(),
+                        ),
                         "/",
                         "?literal",
                     ),
@@ -46,10 +52,16 @@ impl RewriteRules for CommonRules {
                     "Sum",
                     vec![binary_expr(column_expr("?column"), "*", "?literal")],
                     "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
                 ),
                 alias_expr(
                     binary_expr(
-                        agg_fun_expr("Sum", vec![column_expr("?column")], "?distinct"),
+                        agg_fun_expr(
+                            "Sum",
+                            vec![column_expr("?column")],
+                            "?distinct",
+                            agg_fun_expr_within_group_empty_tail(),
+                        ),
                         "*",
                         "?literal",
                     ),

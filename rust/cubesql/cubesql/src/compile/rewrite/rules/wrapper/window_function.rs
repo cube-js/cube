@@ -12,7 +12,7 @@ use datafusion::physical_plan::windows::WindowFunction;
 use egg::Subst;
 
 impl WrapperRules {
-    pub fn aggregate_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
+    pub fn window_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-window-function",
