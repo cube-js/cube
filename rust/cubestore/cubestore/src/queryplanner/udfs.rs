@@ -5,7 +5,7 @@ use chrono::{Datelike, Duration, Months, NaiveDateTime, TimeZone, Utc};
 use datafusion::arrow::array::{
     Array, ArrayRef, BinaryArray, TimestampNanosecondArray, UInt64Builder,
 };
-use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
+use datafusion::arrow::datatypes::{DataType, IntervalDayTime, IntervalUnit, TimeUnit};
 use std::any::Any;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::Data;
 // use datafusion::cube_ext::datetime::{date_addsub_array, date_addsub_scalar};
@@ -44,12 +44,15 @@ pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Arc<ScalarUDF> {
         }
         CubeScalarUDFKind::DateAdd => todo!(), // Box::new(DateAddSub { is_add: true }),
         CubeScalarUDFKind::DateSub => todo!(), // Box::new(DateAddSub { is_add: false }),
-        CubeScalarUDFKind::DateBin => todo!(), // Box::new(DateBin {}),
+        CubeScalarUDFKind::DateBin => Arc::new(ScalarUDF::new_from_impl(DateBin::new())),
     }
 }
 
 pub fn registerable_scalar_udfs() -> Vec<ScalarUDF> {
-    vec![HllCardinality::descriptor()]
+    vec![
+        HllCardinality::descriptor(),
+        ScalarUDF::new_from_impl(DateBin::new()),
+    ]
 }
 
 pub fn registerable_arc_scalar_udfs() -> Vec<Arc<ScalarUDF>> {
@@ -83,8 +86,19 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
         return Some(CubeScalarUDFKind::DateBin);
     }
     // TODO upgrade DF: Remove this (once we are no longer in flux about naming casing of UDFs and UDAFs).
-    if ["CARDINALITY", /* "COALESCE", "NOW", */ "UNIX_TIMESTAMP", "DATE_ADD", "DATE_SUB", "DATE_BIN"].contains(&(&n.to_ascii_uppercase() as &str)) {
-        panic!("scalar_kind_by_name failing on '{}' due to uppercase/lowercase mixup", n);
+    if [
+        "CARDINALITY",
+        /* "COALESCE", "NOW", */ "UNIX_TIMESTAMP",
+        "DATE_ADD",
+        "DATE_SUB",
+        "DATE_BIN",
+    ]
+    .contains(&(&n.to_ascii_uppercase() as &str))
+    {
+        panic!(
+            "scalar_kind_by_name failing on '{}' due to uppercase/lowercase mixup",
+            n
+        );
     }
     return None;
 }
@@ -260,234 +274,300 @@ impl ScalarUDFImpl for UnixTimestamp {
     }
 }
 
-//
-// fn interval_dt_duration(i: &i64) -> Duration {
-//     let days: i64 = i.signum() * (i.abs() >> 32);
-//     let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
-//     let duration = Duration::days(days) + Duration::milliseconds(millis);
-//
-//     duration
-// }
-//
-// fn calc_intervals(start: NaiveDateTime, end: NaiveDateTime, interval: i32) -> i32 {
-//     let years_diff = end.year() - start.year();
-//     let months_diff = end.month() as i32 - start.month() as i32;
-//     let mut total_months = years_diff * 12 + months_diff;
-//
-//     if total_months > 0 && end.day() < start.day() {
-//         total_months -= 1; // If the day in the final date is less, reduce by 1 month
-//     }
-//
-//     let rem = months_diff % interval;
-//     let mut num_intervals = total_months / interval;
-//
-//     if num_intervals < 0 && rem == 0 && end.day() < start.day() {
-//         num_intervals -= 1;
-//     }
-//
-//     num_intervals
-// }
-//
-// /// Calculate date_bin timestamp for source date for year-month interval
-// fn calc_bin_timestamp_ym(origin: NaiveDateTime, source: &i64, interval: i32) -> NaiveDateTime {
-//     let timestamp =
-//         NaiveDateTime::from_timestamp(*source / 1_000_000_000, (*source % 1_000_000_000) as u32);
-//     let num_intervals = calc_intervals(origin, timestamp, interval);
-//     let nearest_date = if num_intervals >= 0 {
-//         origin
-//             .date()
-//             .checked_add_months(Months::new((num_intervals * interval) as u32))
-//             .unwrap_or(origin.date())
-//     } else {
-//         origin
-//             .date()
-//             .checked_sub_months(Months::new((-num_intervals * interval) as u32))
-//             .unwrap_or(origin.date())
-//     };
-//
-//     NaiveDateTime::new(nearest_date, origin.time())
-// }
-//
-// /// Calculate date_bin timestamp for source date for date-time interval
-// fn calc_bin_timestamp_dt(origin: NaiveDateTime, source: &i64, interval: &i64) -> NaiveDateTime {
-//     let timestamp =
-//         NaiveDateTime::from_timestamp(*source / 1_000_000_000, (*source % 1_000_000_000) as u32);
-//     let diff = timestamp - origin;
-//     let interval_duration = interval_dt_duration(&interval);
-//     let num_intervals =
-//         diff.num_nanoseconds().unwrap_or(0) / interval_duration.num_nanoseconds().unwrap_or(1);
-//     let mut nearest_timestamp = origin
-//         .checked_add_signed(interval_duration * num_intervals as i32)
-//         .unwrap_or(origin);
-//
-//     if diff.num_nanoseconds().unwrap_or(0) < 0 {
-//         nearest_timestamp = nearest_timestamp
-//             .checked_sub_signed(interval_duration)
-//             .unwrap_or(origin);
-//     }
-//
-//     nearest_timestamp
-// }
-//
-// struct DateBin {}
-// impl DateBin {
-//     fn signature() -> Signature {
-//         Signature::OneOf(vec![
-//             Signature::Exact(vec![
-//                 DataType::Interval(IntervalUnit::YearMonth),
-//                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-//                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-//             ]),
-//             Signature::Exact(vec![
-//                 DataType::Interval(IntervalUnit::DayTime),
-//                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-//                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-//             ]),
-//         ])
-//     }
-// }
-// impl CubeScalarUDF for DateBin {
-//     fn kind(&self) -> CubeScalarUDFKind {
-//         CubeScalarUDFKind::DateBin
-//     }
-//
-//     fn name(&self) -> &str {
-//         "DATE_BIN"
-//     }
-//
-//     fn descriptor(&self) -> ScalarUDF {
-//         return ScalarUDF {
-//             name: self.name().to_string(),
-//             signature: Self::signature(),
-//             return_type: Arc::new(|_| {
-//                 Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
-//             }),
-//             fun: Arc::new(move |inputs| {
-//                 assert_eq!(inputs.len(), 3);
-//                 let interval = match &inputs[0] {
-//                     ColumnarValue::Scalar(i) => i.clone(),
-//                     _ => {
-//                         // We leave this case out for simplicity.
-//                         // CubeStore does not allow intervals inside tables, so this is super rare.
-//                         return Err(DataFusionError::Execution(format!(
-//                             "Only scalar intervals are supported in DATE_BIN"
-//                         )));
-//                     }
-//                 };
-//
-//                 let origin = match &inputs[2] {
-//                     ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(o))) => {
-//                         NaiveDateTime::from_timestamp(
-//                             *o / 1_000_000_000,
-//                             (*o % 1_000_000_000) as u32,
-//                         )
-//                     }
-//                     ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => {
-//                         return Err(DataFusionError::Execution(format!(
-//                             "Third argument (origin) of DATE_BIN must be a non-null timestamp"
-//                         )));
-//                     }
-//                     _ => {
-//                         // Leaving out other rare cases.
-//                         // The initial need for the date_bin comes from custom granularities support
-//                         // and there will always be a scalar origin point
-//                         return Err(DataFusionError::Execution(format!(
-//                             "Only scalar origins are supported in DATE_BIN"
-//                         )));
-//                     }
-//                 };
-//
-//                 match interval {
-//                     ScalarValue::IntervalYearMonth(Some(interval)) => match &inputs[1] {
-//                         ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => Ok(
-//                             ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)),
-//                         ),
-//                         ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t))) => {
-//                             let nearest_timestamp = calc_bin_timestamp_ym(origin, t, interval);
-//
-//                             Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-//                                 Some(nearest_timestamp.timestamp_nanos()),
-//                             )))
-//                         }
-//                         ColumnarValue::Array(arr)
-//                             if arr.as_any().is::<TimestampNanosecondArray>() =>
-//                         {
-//                             let ts_array = arr
-//                                 .as_any()
-//                                 .downcast_ref::<TimestampNanosecondArray>()
-//                                 .unwrap();
-//
-//                             let mut builder = TimestampNanosecondArray::builder(ts_array.len());
-//
-//                             for i in 0..ts_array.len() {
-//                                 if ts_array.is_null(i) {
-//                                     builder.append_null()?;
-//                                 } else {
-//                                     let ts = ts_array.value(i);
-//                                     let nearest_timestamp =
-//                                         calc_bin_timestamp_ym(origin, &ts, interval);
-//                                     builder.append_value(nearest_timestamp.timestamp_nanos())?;
-//                                 }
-//                             }
-//
-//                             Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
-//                         }
-//                         _ => {
-//                             return Err(DataFusionError::Execution(format!(
-//                                 "Second argument of DATE_BIN must be a non-null timestamp"
-//                             )));
-//                         }
-//                     },
-//                     ScalarValue::IntervalDayTime(Some(interval)) => match &inputs[1] {
-//                         ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => Ok(
-//                             ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)),
-//                         ),
-//                         ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t))) => {
-//                             let nearest_timestamp = calc_bin_timestamp_dt(origin, t, &interval);
-//
-//                             Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-//                                 Some(nearest_timestamp.timestamp_nanos()),
-//                             )))
-//                         }
-//                         ColumnarValue::Array(arr)
-//                             if arr.as_any().is::<TimestampNanosecondArray>() =>
-//                         {
-//                             let ts_array = arr
-//                                 .as_any()
-//                                 .downcast_ref::<TimestampNanosecondArray>()
-//                                 .unwrap();
-//
-//                             let mut builder = TimestampNanosecondArray::builder(ts_array.len());
-//
-//                             for i in 0..ts_array.len() {
-//                                 if ts_array.is_null(i) {
-//                                     builder.append_null()?;
-//                                 } else {
-//                                     let ts = ts_array.value(i);
-//                                     let nearest_timestamp =
-//                                         calc_bin_timestamp_dt(origin, &ts, &interval);
-//                                     builder.append_value(nearest_timestamp.timestamp_nanos())?;
-//                                 }
-//                             }
-//
-//                             Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
-//                         }
-//                         _ => {
-//                             return Err(DataFusionError::Execution(format!(
-//                                 "Second argument of DATE_BIN must be a non-null timestamp"
-//                             )));
-//                         }
-//                     },
-//                     _ => Err(DataFusionError::Execution(format!(
-//                         "Unsupported interval type: {:?}",
-//                         interval
-//                     ))),
-//                 }
-//             }),
-//         };
-//     }
-// }
-//
+fn interval_dt_duration(i: &IntervalDayTime) -> Duration {
+    // TODO upgrade DF: Check we're handling, or check that we _were_ handling, interval values
+    // correctly. It seems plausible there was a bug here with millis: if the representation hasn't
+    // changed, then it should have been doing `(i & ((1 << 32) - 1))`.
+
+    // let days: i64 = i.signum() * (i.abs() >> 32);
+    // let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
+
+    let duration = Duration::days(i.days as i64) + Duration::milliseconds(i.milliseconds as i64);
+
+    duration
+}
+
+fn calc_intervals(start: NaiveDateTime, end: NaiveDateTime, interval: i32) -> i32 {
+    let years_diff = end.year() - start.year();
+    let months_diff = end.month() as i32 - start.month() as i32;
+    let mut total_months = years_diff * 12 + months_diff;
+
+    if total_months > 0 && end.day() < start.day() {
+        total_months -= 1; // If the day in the final date is less, reduce by 1 month
+    }
+
+    let rem = months_diff % interval;
+    let mut num_intervals = total_months / interval;
+
+    if num_intervals < 0 && rem == 0 && end.day() < start.day() {
+        num_intervals -= 1;
+    }
+
+    num_intervals
+}
+
+// TODO upgrade DF: Use DateTime::from_timestamp because NaiveDateTime::from_timestamp is
+// deprecated?  Or does that break behavior?
+
+/// Calculate date_bin timestamp for source date for year-month interval
+fn calc_bin_timestamp_ym(origin: NaiveDateTime, source: &i64, interval: i32) -> NaiveDateTime {
+    let timestamp =
+        NaiveDateTime::from_timestamp(*source / 1_000_000_000, (*source % 1_000_000_000) as u32);
+    let num_intervals = calc_intervals(origin, timestamp, interval);
+    let nearest_date = if num_intervals >= 0 {
+        origin
+            .date()
+            .checked_add_months(Months::new((num_intervals * interval) as u32))
+            .unwrap_or(origin.date())
+    } else {
+        origin
+            .date()
+            .checked_sub_months(Months::new((-num_intervals * interval) as u32))
+            .unwrap_or(origin.date())
+    };
+
+    NaiveDateTime::new(nearest_date, origin.time())
+}
+
+/// Calculate date_bin timestamp for source date for date-time interval
+fn calc_bin_timestamp_dt(
+    origin: NaiveDateTime,
+    source: &i64,
+    interval: &IntervalDayTime,
+) -> NaiveDateTime {
+    let timestamp =
+        NaiveDateTime::from_timestamp(*source / 1_000_000_000, (*source % 1_000_000_000) as u32);
+    let diff = timestamp - origin;
+    let interval_duration = interval_dt_duration(&interval);
+    let num_intervals =
+        diff.num_nanoseconds().unwrap_or(0) / interval_duration.num_nanoseconds().unwrap_or(1);
+    let mut nearest_timestamp = origin
+        .checked_add_signed(interval_duration * num_intervals as i32)
+        .unwrap_or(origin);
+
+    if diff.num_nanoseconds().unwrap_or(0) < 0 {
+        nearest_timestamp = nearest_timestamp
+            .checked_sub_signed(interval_duration)
+            .unwrap_or(origin);
+    }
+
+    nearest_timestamp
+}
+
+#[derive(Debug)]
+struct DateBin {
+    signature: Signature,
+}
+impl DateBin {
+    fn new() -> DateBin {
+        DateBin {
+            signature: Signature {
+                type_signature: TypeSignature::OneOf(vec![
+                    TypeSignature::Exact(vec![
+                        DataType::Interval(IntervalUnit::YearMonth),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Interval(IntervalUnit::DayTime),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Interval(IntervalUnit::MonthDayNano),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    ]),
+                ]),
+                volatility: Volatility::Immutable,
+            },
+        }
+    }
+}
+
+impl ScalarUDFImpl for DateBin {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn name(&self) -> &str {
+        "DATE_BIN"
+    }
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+        Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
+    }
+    fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+        assert_eq!(inputs.len(), 3);
+        let interval = match &inputs[0] {
+            ColumnarValue::Scalar(i) => i.clone(),
+            _ => {
+                // We leave this case out for simplicity.
+                // CubeStore does not allow intervals inside tables, so this is super rare.
+                return Err(DataFusionError::Execution(format!(
+                    "Only scalar intervals are supported in DATE_BIN"
+                )));
+            }
+        };
+
+        let origin = match &inputs[2] {
+            // TODO upgrade DF: We ignore timezone field
+            ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(o), _tz)) => {
+                NaiveDateTime::from_timestamp(*o / 1_000_000_000, (*o % 1_000_000_000) as u32)
+            }
+            ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, _)) => {
+                return Err(DataFusionError::Execution(format!(
+                    "Third argument (origin) of DATE_BIN must be a non-null timestamp"
+                )));
+            }
+            _ => {
+                // Leaving out other rare cases.
+                // The initial need for the date_bin comes from custom granularities support
+                // and there will always be a scalar origin point
+                return Err(DataFusionError::Execution(format!(
+                    "Only scalar origins are supported in DATE_BIN"
+                )));
+            }
+        };
+
+        fn handle_year_month(
+            inputs: &[ColumnarValue],
+            origin: NaiveDateTime,
+            interval: i32,
+        ) -> Result<ColumnarValue, DataFusionError> {
+            match &inputs[1] {
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, _)) => Ok(
+                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, None)),
+                ),
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t), _tz)) => {
+                    // TODO upgrade DF: Handle _tz?
+                    let nearest_timestamp = calc_bin_timestamp_ym(origin, t, interval);
+
+                    Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                        Some(nearest_timestamp.timestamp_nanos()),
+                        None, // TODO upgrade DF: handle _tz?
+                    )))
+                }
+                ColumnarValue::Array(arr) if arr.as_any().is::<TimestampNanosecondArray>() => {
+                    let ts_array = arr
+                        .as_any()
+                        .downcast_ref::<TimestampNanosecondArray>()
+                        .unwrap();
+
+                    let mut builder = TimestampNanosecondArray::builder(ts_array.len());
+
+                    for i in 0..ts_array.len() {
+                        if ts_array.is_null(i) {
+                            builder.append_null();
+                        } else {
+                            let ts = ts_array.value(i);
+                            let nearest_timestamp = calc_bin_timestamp_ym(origin, &ts, interval);
+                            builder.append_value(nearest_timestamp.timestamp_nanos());
+                        }
+                    }
+
+                    Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
+                }
+                _ => {
+                    return Err(DataFusionError::Execution(format!(
+                        "Second argument of DATE_BIN must be a non-null timestamp"
+                    )));
+                }
+            }
+        }
+
+        fn handle_day_time(
+            inputs: &[ColumnarValue],
+            origin: NaiveDateTime,
+            interval: IntervalDayTime,
+        ) -> Result<ColumnarValue, DataFusionError> {
+            match &inputs[1] {
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, _)) => Ok(
+                    ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, None)),
+                ),
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t), _tz)) => {
+                    let nearest_timestamp = calc_bin_timestamp_dt(origin, t, &interval);
+
+                    Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                        Some(nearest_timestamp.timestamp_nanos()),
+                        None, // TODO upgrade DF: Handle _tz?
+                    )))
+                }
+                ColumnarValue::Array(arr) if arr.as_any().is::<TimestampNanosecondArray>() => {
+                    let ts_array = arr
+                        .as_any()
+                        .downcast_ref::<TimestampNanosecondArray>()
+                        .unwrap();
+
+                    let mut builder = TimestampNanosecondArray::builder(ts_array.len());
+
+                    for i in 0..ts_array.len() {
+                        if ts_array.is_null(i) {
+                            builder.append_null();
+                        } else {
+                            let ts = ts_array.value(i);
+                            let nearest_timestamp = calc_bin_timestamp_dt(origin, &ts, &interval);
+                            builder.append_value(nearest_timestamp.timestamp_nanos());
+                        }
+                    }
+
+                    Ok(ColumnarValue::Array(Arc::new(builder.finish()) as ArrayRef))
+                }
+                _ => {
+                    return Err(DataFusionError::Execution(format!(
+                        "Second argument of DATE_BIN must be a non-null timestamp"
+                    )));
+                }
+            }
+        }
+
+        match interval {
+            ScalarValue::IntervalYearMonth(Some(interval)) => {
+                handle_year_month(inputs, origin, interval)
+            }
+            ScalarValue::IntervalDayTime(Some(interval)) => {
+                handle_day_time(inputs, origin, interval)
+            }
+            ScalarValue::IntervalMonthDayNano(Some(month_day_nano)) => {
+                // We handle months or day/time but not combinations of month with day/time.
+                // Potential reasons:  Before the upgrade to DF 42.2.0, there was no
+                // IntervalMonthDayNano.  Also, custom granularities support doesn't need it.
+                // (Also, how would it behave?)
+                if month_day_nano.months != 0 {
+                    if month_day_nano.days == 0 && month_day_nano.nanoseconds == 0 {
+                        handle_year_month(inputs, origin, month_day_nano.months)
+                    } else {
+                        Err(DataFusionError::Execution(format!(
+                            "Unsupported interval type (mixed month with day/time interval): {:?}",
+                            interval
+                        )))
+                    }
+                } else {
+                    let milliseconds64 = month_day_nano.nanoseconds / 1_000_000;
+                    let milliseconds32 = i32::try_from(milliseconds64).map_err(|_| {
+                        DataFusionError::Execution(format!(
+                        "Unsupported interval time value ({} nanoseconds is out of range): {:?}",
+                        month_day_nano.nanoseconds,
+                        interval
+                    ))
+                    })?;
+                    // TODO upgrade DF: Pass nanoseconds to handle_day_time?
+                    handle_day_time(
+                        inputs,
+                        origin,
+                        IntervalDayTime::new(month_day_nano.days, milliseconds32),
+                    )
+                }
+            }
+            _ => Err(DataFusionError::Execution(format!(
+                "Unsupported interval type: {:?}",
+                interval
+            ))),
+        }
+    }
+}
+
 // struct DateAddSub {
 //     is_add: bool,
 // }
