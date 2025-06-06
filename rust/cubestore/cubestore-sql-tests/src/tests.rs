@@ -8485,7 +8485,7 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
 
-    let mut res = assert_limit_pushdown(
+    let res = assert_limit_pushdown(
         &service,
         "SELECT id, SUM(n) FROM (
                 SELECT * FROM foo.pushdown1

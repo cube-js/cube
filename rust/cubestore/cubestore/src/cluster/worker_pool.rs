@@ -460,15 +460,12 @@ mod tests {
     use std::time::Duration;
 
     use async_trait::async_trait;
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
-    use datafusion::dfschema::ToDFSchema;
     use futures_timer::Delay;
     use serde::{Deserialize, Serialize};
     use tokio::runtime::{Builder, Runtime};
 
     use crate::cluster::worker_pool::{worker_main, WorkerPool};
     use crate::config::Config;
-    use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
     use crate::CubeError;
     use datafusion::cube_ext;
@@ -653,22 +650,6 @@ mod tests {
             pool.stop_workers().await.unwrap();
         });
     }
-
-    // TODO upgrade DF
-    // #[tokio::test]
-    // async fn serialize_plan() -> Result<(), CubeError> {
-    //     let schema = Schema::new(vec![
-    //         Field::new("c1", DataType::Int64, false),
-    //         Field::new("c2", DataType::Utf8, false),
-    //     ]);
-    //     let plan = SerializedLogicalPlan::EmptyRelation {
-    //         produce_one_row: false,
-    //         schema: schema.to_dfschema_ref()?,
-    //     };
-    //     let bytes = bincode::serialize(&plan)?;
-    //     bincode::deserialize::<SerializedLogicalPlan>(bytes.as_slice())?;
-    //     Ok(())
-    // }
 
     type TestServicePool = WorkerPool<ServConfigurator, ServProcessor, ServTransport>;
 

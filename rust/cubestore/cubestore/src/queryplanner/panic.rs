@@ -1,7 +1,7 @@
 use crate::cluster::WorkerPlanningParams;
 use crate::queryplanner::planning::WorkerExec;
 use async_trait::async_trait;
-use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::datatypes::Schema;
 use datafusion::common::{DFSchema, DFSchemaRef};
 use datafusion::error::DataFusionError;
 use datafusion::execution::TaskContext;
@@ -17,7 +17,7 @@ use datafusion::physical_plan::{
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::cmp::Ordering;
-use std::fmt::{Formatter, Pointer};
+use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 

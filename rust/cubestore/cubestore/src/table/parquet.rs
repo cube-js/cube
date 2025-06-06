@@ -97,7 +97,7 @@ pub struct ParquetTableStore {
 impl ParquetTableStore {
     pub fn read_columns(&self, path: &str) -> Result<Vec<RecordBatch>, CubeError> {
         let builder = ParquetRecordBatchReaderBuilder::try_new(File::open(path)?)?;
-        let mut r = builder.with_batch_size(self.row_group_size).build()?;
+        let r = builder.with_batch_size(self.row_group_size).build()?;
         let mut batches = Vec::new();
         for b in r {
             batches.push(b?)
@@ -192,10 +192,9 @@ mod tests {
         ArrayRef, BooleanArray, Decimal128Array, Float64Array, Int64Array, StringArray,
         TimestampMicrosecondArray,
     };
-    use datafusion::arrow::datatypes::{Int32Type, Int64Type};
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::parquet;
-    use datafusion::parquet::data_type::{BoolType, DataType};
+    use datafusion::parquet::data_type::DataType;
     use datafusion::parquet::file::reader::FileReader;
     use datafusion::parquet::file::reader::SerializedFileReader;
     use datafusion::parquet::file::statistics::{Statistics, TypedStatistics};

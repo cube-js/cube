@@ -12,11 +12,8 @@ use crate::queryplanner::optimizations::distributed_partial_aggregate::{
 use std::fmt::{Debug, Formatter};
 // use crate::queryplanner::optimizations::prefer_inplace_aggregates::try_switch_to_inplace_aggregates;
 use super::serialized_plan::PreSerializedPlan;
-use crate::queryplanner::optimizations::prefer_inplace_aggregates::try_regroup_columns;
 use crate::queryplanner::planning::CubeExtensionPlanner;
-use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::rolling::RollingWindowPlanner;
-use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::util::memory::MemoryHandler;
 use async_trait::async_trait;
@@ -129,7 +126,7 @@ impl PhysicalOptimizerRule for PreOptimizeRule {
     fn optimize(
         &self,
         plan: Arc<dyn ExecutionPlan>,
-        config: &ConfigOptions,
+        _config: &ConfigOptions,
     ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
         pre_optimize_physical_plan(
             plan,

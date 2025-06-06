@@ -1,10 +1,8 @@
 use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
-use datafusion::arrow::compute::SortOptions;
 use datafusion::error::DataFusionError;
-use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
+use datafusion::physical_expr::LexOrdering;
 use datafusion::physical_plan::aggregates::AggregateExec;
-use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;

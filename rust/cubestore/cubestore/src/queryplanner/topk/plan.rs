@@ -5,7 +5,7 @@ use crate::queryplanner::topk::{
 };
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeScalarUDFKind};
 use datafusion::arrow::compute::SortOptions;
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::error::DataFusionError;
 use datafusion::execution::SessionState;
@@ -741,15 +741,15 @@ impl ExecutionPlan for DummyTopKLowerExec {
 
     fn with_new_children(
         self: Arc<Self>,
-        children: Vec<Arc<dyn ExecutionPlan>>,
+        _children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
         panic!("DataFusion invoked DummyTopKLowerExec::with_new_children");
     }
 
     fn execute(
         &self,
-        partition: usize,
-        context: Arc<datafusion::execution::TaskContext>,
+        _partition: usize,
+        _context: Arc<datafusion::execution::TaskContext>,
     ) -> datafusion::error::Result<datafusion::execution::SendableRecordBatchStream> {
         panic!("DataFusion invoked DummyTopKLowerExec::execute");
     }
