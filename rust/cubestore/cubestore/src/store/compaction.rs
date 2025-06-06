@@ -27,19 +27,15 @@ use async_trait::async_trait;
 use chrono::Utc;
 use datafusion::arrow::array::{ArrayRef, UInt64Array};
 use datafusion::arrow::compute::{concat_batches, lexsort_to_indices, SortColumn, SortOptions};
-use datafusion::arrow::datatypes::{DataType, Schema};
+use datafusion::arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::datasource::listing::PartitionedFile;
 use datafusion::datasource::physical_plan::parquet::ParquetExecBuilder;
-use datafusion::datasource::physical_plan::{
-    FileScanConfig, ParquetExec, ParquetFileReaderFactory,
-};
+use datafusion::datasource::physical_plan::FileScanConfig;
 use datafusion::execution::object_store::ObjectStoreUrl;
 use datafusion::execution::TaskContext;
-use datafusion::functions_aggregate::count::{count_udaf, Count};
-use datafusion::functions_aggregate::expr_fn::count;
-use datafusion::logical_expr::lit;
+use datafusion::functions_aggregate::count::count_udaf;
 use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::physical_expr::aggregate::{AggregateExprBuilder, AggregateFunctionExpr};
 use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};

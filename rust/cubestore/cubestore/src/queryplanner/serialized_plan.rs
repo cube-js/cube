@@ -1,37 +1,23 @@
-use crate::cluster::Cluster;
+use super::udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
-use crate::queryplanner::planning::{
-    ClusterSendNode, ExtensionNodeSerialized, PlanningMeta, Snapshots,
-};
+use crate::queryplanner::planning::{ClusterSendNode, ExtensionNodeSerialized, PlanningMeta};
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
-use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper, SortColumn};
-use crate::queryplanner::udfs::aggregate_udf_by_kind;
-use crate::queryplanner::udfs::{
-    aggregate_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind,
-};
+use crate::queryplanner::rolling::RollingWindowAggregate;
+use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper};
 use crate::queryplanner::{pretty_printers, CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::Row;
 use crate::CubeError;
-use datafusion::arrow::datatypes::{DataType, SchemaRef};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::logical_expr::expr::{Alias, InSubquery};
-use datafusion::logical_expr::expr_rewriter::coerce_plan_expr_for_schema;
-use datafusion::physical_optimizer::topk_aggregation::TopKAggregation;
-use datafusion::physical_plan::aggregates;
-use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
-//TODO
-// use sqlparser::ast::RollingOffset;
-use super::udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
-use crate::queryplanner::rolling::RollingWindowAggregate;
-use bytes::Bytes;
+
 use datafusion::catalog::TableProvider;
 use datafusion::common::tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeVisitor};
+use datafusion::common::DFSchemaRef;
 use datafusion::common::TableReference;
-use datafusion::common::{Column, DFSchemaRef, JoinConstraint, JoinType};
 use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::error::DataFusionError;
@@ -41,11 +27,8 @@ use datafusion::logical_expr::{
     Subquery, SubqueryAlias, TableScan, Union, Unnest, Values, Window,
 };
 use datafusion::prelude::SessionContext;
-use datafusion_proto::bytes::{
-    logical_plan_from_bytes, logical_plan_from_bytes_with_extension_codec,
-};
+use datafusion_proto::bytes::logical_plan_from_bytes_with_extension_codec;
 use datafusion_proto::logical_plan::LogicalExtensionCodec;
-use flexbuffers::FlexbufferSerializer;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
@@ -165,121 +148,7 @@ pub struct InlineSnapshot {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SerializedLogicalPlan {
     serialized_bytes: Arc<Vec<u8>>,
-    // TODO upgrade DF
-    // Projection {
-    //     expr: Vec<SerializedExpr>,
-    //     input: Arc<SerializedLogicalPlan>,
-    //     schema: DFSchemaRef,
-    // },
-    // Filter {
-    //     predicate: SerializedExpr,
-    //     input: Arc<SerializedLogicalPlan>,
-    // },
-    // Aggregate {
-    //     input: Arc<SerializedLogicalPlan>,
-    //     group_expr: Vec<SerializedExpr>,
-    //     aggr_expr: Vec<SerializedExpr>,
-    //     schema: DFSchemaRef,
-    // },
-    // Sort {
-    //     expr: Vec<SerializedExpr>,
-    //     input: Arc<SerializedLogicalPlan>,
-    // },
-    // Union {
-    //     inputs: Vec<Arc<SerializedLogicalPlan>>,
-    //     schema: DFSchemaRef,
-    //     alias: Option<String>,
-    // },
-    // Join {
-    //     left: Arc<SerializedLogicalPlan>,
-    //     right: Arc<SerializedLogicalPlan>,
-    //     on: Vec<(Column, Column)>,
-    //     join_type: JoinType,
-    //     join_constraint: JoinConstraint,
-    //     schema: DFSchemaRef,
-    // },
-    // TableScan {
-    //     table_name: String,
-    //     source: SerializedTableSource,
-    //     projection: Option<Vec<usize>>,
-    //     projected_schema: DFSchemaRef,
-    //     filters: Vec<SerializedExpr>,
-    //     alias: Option<String>,
-    //     limit: Option<usize>,
-    // },
-    // EmptyRelation {
-    //     produce_one_row: bool,
-    //     schema: DFSchemaRef,
-    // },
-    // Limit {
-    //     n: usize,
-    //     input: Arc<SerializedLogicalPlan>,
-    // },
-    // Skip {
-    //     n: usize,
-    //     input: Arc<SerializedLogicalPlan>,
-    // },
-    // Repartition {
-    //     input: Arc<SerializedLogicalPlan>,
-    //     partitioning_scheme: SerializePartitioning,
-    // },
-    // Alias {
-    //     input: Arc<SerializedLogicalPlan>,
-    //     alias: String,
-    //     schema: DFSchemaRef,
-    // },
-    // ClusterSend {
-    //     input: Arc<SerializedLogicalPlan>,
-    //     snapshots: Vec<Snapshots>,
-    //     #[serde(default)]
-    //     limit_and_reverse: Option<(usize, bool)>,
-    // },
-    // ClusterAggregateTopK {
-    //     limit: usize,
-    //     input: Arc<SerializedLogicalPlan>,
-    //     group_expr: Vec<SerializedExpr>,
-    //     aggregate_expr: Vec<SerializedExpr>,
-    //     sort_columns: Vec<SortColumn>,
-    //     having_expr: Option<SerializedExpr>,
-    //     schema: DFSchemaRef,
-    //     snapshots: Vec<Snapshots>,
-    // },
-    // CrossJoin {
-    //     left: Arc<SerializedLogicalPlan>,
-    //     right: Arc<SerializedLogicalPlan>,
-    //     on: SerializedExpr,
-    //     join_schema: DFSchemaRef,
-    // },
-    // CrossJoinAgg {
-    //     left: Arc<SerializedLogicalPlan>,
-    //     right: Arc<SerializedLogicalPlan>,
-    //     on: SerializedExpr,
-    //     join_schema: DFSchemaRef,
-    //
-    //     group_expr: Vec<SerializedExpr>,
-    //     agg_expr: Vec<SerializedExpr>,
-    //     schema: DFSchemaRef,
-    // },
-    // RollingWindowAgg {
-    //     schema: DFSchemaRef,
-    //     input: Arc<SerializedLogicalPlan>,
-    //     dimension: Column,
-    //     partition_by: Vec<Column>,
-    //     from: SerializedExpr,
-    //     to: SerializedExpr,
-    //     every: SerializedExpr,
-    //     rolling_aggs: Vec<SerializedExpr>,
-    //     group_by_dimension: Option<SerializedExpr>,
-    //     aggs: Vec<SerializedExpr>,
-    // },
-    // Panic {},
 }
-
-// #[derive(Clone, Serialize, Deserialize, Debug)]
-// pub enum SerializePartitioning {
-//     RoundRobinBatch(usize),
-//     Hash(Vec<SerializedExpr>, usize),
-// }
 
 pub struct WorkerContext {
     remote_to_local_names: HashMap<String, String>,
@@ -288,230 +157,6 @@ pub struct WorkerContext {
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
 }
-
-// TODO upgrade DF
-// impl SerializedLogicalPlan {
-//     fn logical_plan(&self, worker_context: &WorkerContext) -> Result<LogicalPlan, CubeError> {
-//         debug_assert!(worker_context
-//             .worker_partition_ids
-//             .iter()
-//             .is_sorted_by_key(|(id, _)| id));
-//         Ok(match self {
-//             SerializedLogicalPlan::Projection {
-//                 expr,
-//                 input,
-//                 schema,
-//             } => LogicalPlan::Projection {
-//                 expr: expr.iter().map(|e| e.expr()).collect(),
-//                 input: Arc::new(input.logical_plan(worker_context)?),
-//                 schema: schema.clone(),
-//             },
-//             SerializedLogicalPlan::Filter { predicate, input } => LogicalPlan::Filter {
-//                 predicate: predicate.expr(),
-//                 input: Arc::new(input.logical_plan(worker_context)?),
-//             },
-//             SerializedLogicalPlan::Aggregate {
-//                 input,
-//                 group_expr,
-//                 aggr_expr,
-//                 schema,
-//             } => LogicalPlan::Aggregate {
-//                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
-//                 aggr_expr: aggr_expr.iter().map(|e| e.expr()).collect(),
-//                 input: Arc::new(input.logical_plan(worker_context)?),
-//                 schema: schema.clone(),
-//             },
-//             SerializedLogicalPlan::Sort { expr, input } => LogicalPlan::Sort {
-//                 expr: expr.iter().map(|e| e.expr()).collect(),
-//                 input: Arc::new(input.logical_plan(worker_context)?),
-//             },
-//             SerializedLogicalPlan::Union {
-//                 inputs,
-//                 schema,
-//                 alias,
-//             } => LogicalPlan::Union {
-//                 inputs: inputs
-//                     .iter()
-//                     .map(|p| -> Result<LogicalPlan, CubeError> {
-//                         Ok(p.logical_plan(worker_context)?)
-//                     })
-//                     .collect::<Result<Vec<_>, _>>()?,
-//                 schema: schema.clone(),
-//                 alias: alias.clone(),
-//             },
-//             SerializedLogicalPlan::TableScan {
-//                 table_name,
-//                 source,
-//                 projection,
-//                 projected_schema,
-//                 filters,
-//                 alias: _,
-//                 limit,
-//             } => LogicalPlan::TableScan {
-//                 table_name: table_name.clone(),
-//                 source: match source {
-//                     SerializedTableSource::CubeTable(v) => Arc::new(v.to_worker_table(
-//                         worker_context.remote_to_local_names.clone(),
-//                         worker_context.worker_partition_ids.clone(),
-//                         worker_context.chunk_id_to_record_batches.clone(),
-//                         worker_context.parquet_metadata_cache.clone(),
-//                     )),
-//                     SerializedTableSource::InlineTable(v) => Arc::new(
-//                         v.to_worker_table(worker_context.inline_table_ids_to_execute.clone()),
-//                     ),
-//                 },
-//                 projection: projection.clone(),
-//                 projected_schema: projected_schema.clone(),
-//                 filters: filters.iter().map(|e| e.expr()).collect(),
-//                 limit: limit.clone(),
-//             },
-//             SerializedLogicalPlan::EmptyRelation {
-//                 produce_one_row,
-//                 schema,
-//             } => LogicalPlan::EmptyRelation {
-//                 produce_one_row: *produce_one_row,
-//                 schema: schema.clone(),
-//             },
-//             SerializedLogicalPlan::Limit { n, input } => LogicalPlan::Limit {
-//                 n: *n,
-//                 input: Arc::new(input.logical_plan(worker_context)?),
-//             },
-//             SerializedLogicalPlan::Skip { n, input } => LogicalPlan::Skip {
-//                 n: *n,
-//                 input: Arc::new(input.logical_plan(worker_context)?),
-//             },
-//             SerializedLogicalPlan::Join {
-//                 left,
-//                 right,
-//                 on,
-//                 join_type,
-//                 join_constraint,
-//                 schema,
-//             } => LogicalPlan::Join {
-//                 left: Arc::new(left.logical_plan(worker_context)?),
-//                 right: Arc::new(right.logical_plan(worker_context)?),
-//                 on: on.clone(),
-//                 join_type: join_type.clone(),
-//                 join_constraint: *join_constraint,
-//                 schema: schema.clone(),
-//             },
-//             SerializedLogicalPlan::Repartition {
-//                 input,
-//                 partitioning_scheme,
-//             } => LogicalPlan::Repartition {
-//                 input: Arc::new(input.logical_plan(worker_context)?),
-//                 partitioning_scheme: match partitioning_scheme {
-//                     SerializePartitioning::RoundRobinBatch(s) => Partitioning::RoundRobinBatch(*s),
-//                     SerializePartitioning::Hash(e, s) => {
-//                         Partitioning::Hash(e.iter().map(|e| e.expr()).collect(), *s)
-//                     }
-//                 },
-//             },
-//             SerializedLogicalPlan::Alias {
-//                 input,
-//                 alias,
-//                 schema,
-//             } => LogicalPlan::Extension {
-//                 node: Arc::new(LogicalAlias {
-//                     input: input.logical_plan(worker_context)?,
-//                     alias: alias.clone(),
-//                     schema: schema.clone(),
-//                 }),
-//             },
-//             SerializedLogicalPlan::ClusterSend {
-//                 input,
-//                 snapshots,
-//                 limit_and_reverse,
-//             } => ClusterSendNode {
-//                 input: Arc::new(input.logical_plan(worker_context)?),
-//                 snapshots: snapshots.clone(),
-//                 limit_and_reverse: limit_and_reverse.clone(),
-//             }
-//             .into_plan(),
-//             SerializedLogicalPlan::ClusterAggregateTopK {
-//                 limit,
-//                 input,
-//                 group_expr,
-//                 aggregate_expr,
-//                 sort_columns,
-//                 having_expr,
-//                 schema,
-//                 snapshots,
-//             } => ClusterAggregateTopK {
-//                 limit: *limit,
-//                 input: Arc::new(input.logical_plan(worker_context)?),
-//                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
-//                 aggregate_expr: aggregate_expr.iter().map(|e| e.expr()).collect(),
-//                 order_by: sort_columns.clone(),
-//                 having_expr: having_expr.as_ref().map(|e| e.expr()),
-//                 schema: schema.clone(),
-//                 snapshots: snapshots.clone(),
-//             }
-//             .into_plan(),
-//             SerializedLogicalPlan::CrossJoin {
-//                 left,
-//                 right,
-//                 on,
-//                 join_schema,
-//             } => LogicalPlan::Extension {
-//                 node: Arc::new(SkewedLeftCrossJoin {
-//                     left: left.logical_plan(worker_context)?,
-//                     right: right.logical_plan(worker_context)?,
-//                     on: on.expr(),
-//                     schema: join_schema.clone(),
-//                 }),
-//             },
-//             SerializedLogicalPlan::CrossJoinAgg {
-//                 left,
-//                 right,
-//                 on,
-//                 join_schema,
-//                 group_expr,
-//                 agg_expr,
-//                 schema,
-//             } => LogicalPlan::Extension {
-//                 node: Arc::new(CrossJoinAgg {
-//                     join: SkewedLeftCrossJoin {
-//                         left: left.logical_plan(worker_context)?,
-//                         right: right.logical_plan(worker_context)?,
-//                         on: on.expr(),
-//                         schema: join_schema.clone(),
-//                     },
-//                     group_expr: group_expr.iter().map(|e| e.expr()).collect(),
-//                     agg_expr: agg_expr.iter().map(|e| e.expr()).collect(),
-//                     schema: schema.clone(),
-//                 }),
-//             },
-//             SerializedLogicalPlan::RollingWindowAgg {
-//                 schema,
-//                 input,
-//                 dimension,
-//                 partition_by,
-//                 from,
-//                 to,
-//                 every,
-//                 rolling_aggs,
-//                 group_by_dimension,
-//                 aggs,
-//             } => LogicalPlan::Extension {
-//                 node: Arc::new(RollingWindowAggregate {
-//                     schema: schema.clone(),
-//                     input: input.logical_plan(worker_context)?,
-//                     dimension: dimension.clone(),
-//                     from: from.expr(),
-//                     to: to.expr(),
-//                     every: every.expr(),
-//                     partition_by: partition_by.clone(),
-//                     rolling_aggs: exprs(&rolling_aggs),
-//                     group_by_dimension: group_by_dimension.as_ref().map(|d| d.expr()),
-//                     aggs: exprs(&aggs),
-//                 }),
-//             },
-//             SerializedLogicalPlan::Panic {} => LogicalPlan::Extension {
-//                 node: Arc::new(PanicWorkerNode {}),
-//             },
-//         })
-//     }
 
 fn is_empty_relation(plan: &LogicalPlan) -> Option<DFSchemaRef> {
     match plan {
@@ -544,10 +189,8 @@ fn wrap_pruned_union_if_necessary(
 
     let mut expr_list = Vec::<Expr>::with_capacity(inner_schema.fields().len());
     let mut projection_needed = false;
-    for (
-        i,
-        (up @ (union_table_reference, union_field), ip @ (inner_table_reference, inner_field)),
-    ) in union_schema.iter().zip(inner_schema.iter()).enumerate()
+    for (i, ((union_table_reference, union_field), ip @ (inner_table_reference, inner_field))) in
+        union_schema.iter().zip(inner_schema.iter()).enumerate()
     {
         if union_field.name() != inner_field.name() {
             return Err(CubeError::internal(format!("inner schema incompatible with union schema (name mismatch at index {}): inner_schema = {:?}; union_schema = {:?}", i, inner_schema, union_schema)));
@@ -1238,7 +881,7 @@ impl PreSerializedPlan {
                             outer_ref_columns,
                         })))
                     }
-                    node => Err(DataFusionError::Internal(
+                    _ => Err(DataFusionError::Internal(
                         "map_subqueries should pass a subquery node".to_string(),
                     )),
                 }
@@ -1247,188 +890,6 @@ impl PreSerializedPlan {
         Ok(res)
     }
 }
-
-// TODO upgrade DF
-// #[derive(Clone, Serialize, Deserialize, Debug)]
-// pub enum SerializedExpr {
-//     Alias(Box<SerializedExpr>, String),
-//     Column(String, Option<String>),
-//     ScalarVariable(Vec<String>),
-//     Literal(ScalarValue),
-//     BinaryExpr {
-//         left: Box<SerializedExpr>,
-//         op: Operator,
-//         right: Box<SerializedExpr>,
-//     },
-//     Not(Box<SerializedExpr>),
-//     IsNotNull(Box<SerializedExpr>),
-//     IsNull(Box<SerializedExpr>),
-//     Negative(Box<SerializedExpr>),
-//     Between {
-//         expr: Box<SerializedExpr>,
-//         negated: bool,
-//         low: Box<SerializedExpr>,
-//         high: Box<SerializedExpr>,
-//     },
-//     Case {
-//         /// Optional base expression that can be compared to literal values in the "when" expressions
-//         expr: Option<Box<SerializedExpr>>,
-//         /// One or more when/then expressions
-//         when_then_expr: Vec<(Box<SerializedExpr>, Box<SerializedExpr>)>,
-//         /// Optional "else" expression
-//         else_expr: Option<Box<SerializedExpr>>,
-//     },
-//     Cast {
-//         expr: Box<SerializedExpr>,
-//         data_type: DataType,
-//     },
-//     TryCast {
-//         expr: Box<SerializedExpr>,
-//         data_type: DataType,
-//     },
-//     Sort {
-//         expr: Box<SerializedExpr>,
-//         asc: bool,
-//         nulls_first: bool,
-//     },
-//     ScalarFunction {
-//         fun: functions::BuiltinScalarFunction,
-//         args: Vec<SerializedExpr>,
-//     },
-//     ScalarUDF {
-//         fun: CubeScalarUDFKind,
-//         args: Vec<SerializedExpr>,
-//     },
-//     AggregateFunction {
-//         fun: aggregates::AggregateFunction,
-//         args: Vec<SerializedExpr>,
-//         distinct: bool,
-//     },
-//     AggregateUDF {
-//         fun: CubeAggregateUDFKind,
-//         args: Vec<SerializedExpr>,
-//     },
-//     RollingAggregate {
-//         agg: Box<SerializedExpr>,
-//         start: WindowFrameBound,
-//         end: WindowFrameBound,
-//         offset_to_end: bool,
-//     },
-//     InList {
-//         expr: Box<SerializedExpr>,
-//         list: Vec<SerializedExpr>,
-//         negated: bool,
-//     },
-//     Wildcard,
-// }
-//
-// impl SerializedExpr {
-//     fn expr(&self) -> Expr {
-//         match self {
-//             SerializedExpr::Alias(e, a) => Expr::Alias(Box::new(e.expr()), a.to_string()),
-//             SerializedExpr::Column(c, a) => Expr::Column(Column {
-//                 name: c.clone(),
-//                 relation: a.clone(),
-//             }),
-//             SerializedExpr::ScalarVariable(v) => Expr::ScalarVariable(v.clone()),
-//             SerializedExpr::Literal(v) => Expr::Literal(v.clone()),
-//             SerializedExpr::BinaryExpr { left, op, right } => Expr::BinaryExpr {
-//                 left: Box::new(left.expr()),
-//                 op: op.clone(),
-//                 right: Box::new(right.expr()),
-//             },
-//             SerializedExpr::Not(e) => Expr::Not(Box::new(e.expr())),
-//             SerializedExpr::IsNotNull(e) => Expr::IsNotNull(Box::new(e.expr())),
-//             SerializedExpr::IsNull(e) => Expr::IsNull(Box::new(e.expr())),
-//             SerializedExpr::Cast { expr, data_type } => Expr::Cast {
-//                 expr: Box::new(expr.expr()),
-//                 data_type: data_type.clone(),
-//             },
-//             SerializedExpr::TryCast { expr, data_type } => Expr::TryCast {
-//                 expr: Box::new(expr.expr()),
-//                 data_type: data_type.clone(),
-//             },
-//             SerializedExpr::Sort {
-//                 expr,
-//                 asc,
-//                 nulls_first,
-//             } => Expr::Sort {
-//                 expr: Box::new(expr.expr()),
-//                 asc: *asc,
-//                 nulls_first: *nulls_first,
-//             },
-//             SerializedExpr::ScalarFunction { fun, args } => Expr::ScalarFunction {
-//                 fun: fun.clone(),
-//                 args: args.iter().map(|e| e.expr()).collect(),
-//             },
-//             SerializedExpr::ScalarUDF { fun, args } => Expr::ScalarUDF {
-//                 fun: Arc::new(scalar_udf_by_kind(*fun).descriptor()),
-//                 args: args.iter().map(|e| e.expr()).collect(),
-//             },
-//             SerializedExpr::AggregateFunction {
-//                 fun,
-//                 args,
-//                 distinct,
-//             } => Expr::AggregateFunction {
-//                 fun: fun.clone(),
-//                 args: args.iter().map(|e| e.expr()).collect(),
-//                 distinct: *distinct,
-//             },
-//             SerializedExpr::AggregateUDF { fun, args } => Expr::AggregateUDF {
-//                 fun: Arc::new(aggregate_udf_by_kind(*fun).descriptor()),
-//                 args: args.iter().map(|e| e.expr()).collect(),
-//             },
-//             SerializedExpr::Case {
-//                 expr,
-//                 else_expr,
-//                 when_then_expr,
-//             } => Expr::Case {
-//                 expr: expr.as_ref().map(|e| Box::new(e.expr())),
-//                 else_expr: else_expr.as_ref().map(|e| Box::new(e.expr())),
-//                 when_then_expr: when_then_expr
-//                     .iter()
-//                     .map(|(w, t)| (Box::new(w.expr()), Box::new(t.expr())))
-//                     .collect(),
-//             },
-//             SerializedExpr::Wildcard => Expr::Wildcard,
-//             SerializedExpr::Negative(value) => Expr::Negative(Box::new(value.expr())),
-//             SerializedExpr::Between {
-//                 expr,
-//                 negated,
-//                 low,
-//                 high,
-//             } => Expr::Between {
-//                 expr: Box::new(expr.expr()),
-//                 negated: *negated,
-//                 low: Box::new(low.expr()),
-//                 high: Box::new(high.expr()),
-//             },
-//             SerializedExpr::RollingAggregate {
-//                 agg,
-//                 start,
-//                 end,
-//                 offset_to_end,
-//             } => Expr::RollingAggregate {
-//                 agg: Box::new(agg.expr()),
-//                 start: start.clone(),
-//                 end: end.clone(),
-//                 offset: match offset_to_end {
-//                     false => RollingOffset::Start,
-//                     true => RollingOffset::End,
-//                 },
-//             },
-//             SerializedExpr::InList {
-//                 expr,
-//                 list,
-//                 negated,
-//             } => Expr::InList {
-//                 expr: Box::new(expr.expr()),
-//                 list: list.iter().map(|e| e.expr()).collect(),
-//                 negated: *negated,
-//             },
-//         }
-//     }
-// }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum SerializedTableSource {
@@ -1761,22 +1222,6 @@ impl SerializedPlan {
         plan.visit(&mut v).expect("no failures possible");
         return v.seen_data_scans;
     }
-
-    fn serialized_logical_plan(
-        plan: &LogicalPlan,
-    ) -> Result<SerializedLogicalPlan, DataFusionError> {
-        Ok(SerializedLogicalPlan {
-            serialized_bytes: Arc::new(
-                datafusion_proto::bytes::logical_plan_to_bytes_with_extension_codec(
-                    &plan,
-                    &CubeExtensionCodec {
-                        worker_context: None,
-                    },
-                )?
-                .to_vec(),
-            ),
-        })
-    }
 }
 
 impl Debug for CubeExtensionCodec {
@@ -1867,7 +1312,7 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
         ctx: &SessionContext,
     ) -> datafusion::common::Result<Arc<dyn TableProvider>> {
         use serde::Deserialize;
-        let mut r = flexbuffers::Reader::get_root(buf)
+        let r = flexbuffers::Reader::get_root(buf)
             .map_err(|e| DataFusionError::Execution(format!("try_decode_table_provider: {}", e)))?;
         let serialized = SerializedTableProvider::deserialize(r)
             .map_err(|e| DataFusionError::Execution(format!("try_decode_table_provider: {}", e)))?;
@@ -1931,8 +1376,3 @@ pub enum SerializedTableProvider {
     CubeTableLogical(CubeTableLogical),
     InlineTableProvider(InlineTableProvider),
 }
-
-// TODO upgrade DF
-// fn exprs(e: &[SerializedExpr]) -> Vec<Expr> {
-//     e.iter().map(|e| e.expr()).collect()
-// }
