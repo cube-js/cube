@@ -142,7 +142,7 @@ impl QueryPlanner for QueryPlannerImpl {
         inline_tables: &InlineTables,
         trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError> {
-        let ctx = self.execution_context().await?;
+        let ctx = self.execution_context()?;
 
         let state = Arc::new(ctx.state());
         let schema_provider = MetaStoreSchemaProvider::new(
@@ -168,6 +168,7 @@ impl QueryPlanner for QueryPlannerImpl {
                     show_aggregations: true,
                     show_output_hints: true,
                     show_check_memory_nodes: false,
+                    ..PPOptions::none()
                 }
             )
         );
@@ -183,6 +184,7 @@ impl QueryPlanner for QueryPlannerImpl {
                     show_aggregations: true,
                     show_output_hints: true,
                     show_check_memory_nodes: false,
+                    ..PPOptions::none()
                 }
             )
         );
@@ -211,7 +213,7 @@ impl QueryPlanner for QueryPlannerImpl {
     }
 
     async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError> {
-        let ctx = self.execution_context().await?;
+        let ctx = self.execution_context()?;
 
         let plan_ctx = ctx.clone();
         let plan_to_move = plan.clone();
@@ -271,8 +273,7 @@ impl QueryPlannerImpl {
         Self::execution_context_helper(SessionConfig::new())
     }
 
-    // TODO upgrade DF: Don't be async
-    async fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
+    fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
         Ok(Arc::new(Self::execution_context_helper(
             self.metadata_cache_factory.make_session_config(),
         )))

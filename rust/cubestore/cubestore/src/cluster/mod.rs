@@ -100,6 +100,7 @@ pub trait Cluster: DIService + Send + Sync {
         &self,
         node_name: &str,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<Vec<RecordBatch>, CubeError>;
 
     /// Runs explain analyze on a single worker node to get pretty printed physical plan
@@ -108,6 +109,7 @@ pub trait Cluster: DIService + Send + Sync {
         &self,
         node_name: &str,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<String, CubeError>;
 
     /// Like [run_select], but streams results as they are requested.
@@ -116,6 +118,7 @@ pub trait Cluster: DIService + Send + Sync {
         &self,
         node_name: &str,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<SendableRecordBatchStream, CubeError>;
 
     async fn available_nodes(&self) -> Result<Vec<String>, CubeError>;
@@ -213,10 +216,28 @@ pub struct ClusterImpl {
 
 crate::di_service!(ClusterImpl, [Cluster]);
 
+/// Parameters that the worker node uses to plan queries.  Generally, it needs to construct the same
+/// query plans as the router node (or if there are multiple levels of cluster send, the node from
+/// which it received the query).  We include the necessary information here.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct WorkerPlanningParams {
+    pub worker_partition_count: usize,
+}
+
+impl WorkerPlanningParams {
+    // TODO: We might simply avoid the need to call this function.
+    pub fn no_worker() -> WorkerPlanningParams {
+        WorkerPlanningParams {
+            worker_partition_count: 1,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WorkerMessage {
     Select(
         SerializedPlan,
+        WorkerPlanningParams,
         HashMap<String, String>,
         HashMap<u64, Vec<SerializedRecordBatchStream>>,
         Option<TraceIdAndSpanId>,
@@ -294,6 +315,7 @@ impl WorkerProcessing for WorkerProcessor {
         match args {
             WorkerMessage::Select(
                 plan_node,
+                worker_planning_params,
                 remote_to_local_names,
                 chunk_id_to_record_batches,
                 trace_id_and_span_id,
@@ -321,7 +343,12 @@ impl WorkerProcessing for WorkerProcessor {
                     let res = services
                         .query_executor
                         .clone()
-                        .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
+                        .execute_worker_plan(
+                            plan_node_to_send,
+                            worker_planning_params,
+                            remote_to_local_names,
+                            result,
+                        )
                         .await;
                     debug!(
                         "Running select in worker completed ({:?})",
@@ -469,9 +496,13 @@ impl Cluster for ClusterImpl {
         &self,
         node_name: &str,
         plan_node: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         let response = self
-            .send_or_process_locally(node_name, NetworkMessage::Select(plan_node))
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::Select(plan_node, worker_planning_params),
+            )
             .await?;
         match response {
             NetworkMessage::SelectResult(r) => {
@@ -485,9 +516,13 @@ impl Cluster for ClusterImpl {
         &self,
         node_name: &str,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<String, CubeError> {
         let response = self
-            .send_or_process_locally(node_name, NetworkMessage::ExplainAnalyze(plan))
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::ExplainAnalyze(plan, worker_planning_params),
+            )
             .await?;
         match response {
             NetworkMessage::ExplainAnalyzeResult(r) => r,
@@ -499,11 +534,12 @@ impl Cluster for ClusterImpl {
         &self,
         node_name: &str,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<SendableRecordBatchStream, CubeError> {
         self.this
             .upgrade()
             .unwrap()
-            .run_select_stream_impl(node_name, plan)
+            .run_select_stream_impl(node_name, plan, worker_planning_params)
             .await
     }
 
@@ -677,12 +713,14 @@ impl Cluster for ClusterImpl {
                     });
                 NetworkMessage::SelectResult(res)
             }
-            NetworkMessage::Select(plan) => {
-                let res = self.run_local_select_worker(plan).await;
+            NetworkMessage::Select(plan, planning_params) => {
+                let res = self.run_local_select_worker(plan, planning_params).await;
                 NetworkMessage::SelectResult(res)
             }
-            NetworkMessage::ExplainAnalyze(plan) => {
-                let res = self.run_local_explain_analyze_worker(plan).await;
+            NetworkMessage::ExplainAnalyze(plan, planning_params) => {
+                let res = self
+                    .run_local_explain_analyze_worker(plan, planning_params)
+                    .await;
                 NetworkMessage::ExplainAnalyzeResult(res)
             }
             NetworkMessage::WarmupDownload(remote_path, expected_file_size) => {
@@ -1214,6 +1252,7 @@ impl ClusterImpl {
     async fn run_local_select_worker(
         &self,
         plan_node: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         let wait_ms = self
             .process_rate_limiter
@@ -1226,7 +1265,9 @@ impl ClusterImpl {
             table_id: None,
             trace_obj: plan_node.trace_obj(),
         };
-        let res = self.run_local_select_worker_impl(plan_node).await;
+        let res = self
+            .run_local_select_worker_impl(plan_node, worker_planning_params)
+            .await;
         match res {
             Ok((schema, records, data_loaded_size)) => {
                 self.process_rate_limiter
@@ -1251,6 +1292,7 @@ impl ClusterImpl {
     async fn run_local_select_worker_impl(
         &self,
         plan_node: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>, usize), CubeError> {
         let start = SystemTime::now();
         debug!("Running select");
@@ -1330,6 +1372,7 @@ impl ClusterImpl {
                 res = Some(
                     pool.process(WorkerMessage::Select(
                         plan_node.clone(),
+                        worker_planning_params,
                         remote_to_local_names.clone(),
                         chunk_id_to_record_batches,
                         self.tracing_helper.trace_and_span_id(),
@@ -1349,6 +1392,7 @@ impl ClusterImpl {
                 .query_executor
                 .execute_worker_plan(
                     plan_node.clone(),
+                    worker_planning_params,
                     remote_to_local_names,
                     chunk_id_to_record_batches,
                 )
@@ -1364,6 +1408,7 @@ impl ClusterImpl {
     async fn run_local_explain_analyze_worker(
         &self,
         plan_node: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<String, CubeError> {
         let remote_to_local_names = self.warmup_select_worker_files(&plan_node).await?;
         let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
@@ -1375,7 +1420,12 @@ impl ClusterImpl {
 
         let res = self
             .query_executor
-            .pp_worker_plan(plan_node, remote_to_local_names, chunk_id_to_record_batches)
+            .pp_worker_plan(
+                plan_node,
+                worker_planning_params,
+                remote_to_local_names,
+                chunk_id_to_record_batches,
+            )
             .await;
 
         res
@@ -1498,8 +1548,11 @@ impl ClusterImpl {
 
     async fn start_stream_on_worker(self: Arc<Self>, m: NetworkMessage) -> Box<dyn MessageStream> {
         match m {
-            NetworkMessage::SelectStart(p) => {
-                let (schema, results) = match self.run_local_select_worker(p).await {
+            NetworkMessage::SelectStart(p, worker_planning_params) => {
+                let (schema, results) = match self
+                    .run_local_select_worker(p, worker_planning_params)
+                    .await
+                {
                     Err(e) => return Box::new(QueryStream::new_error(e)),
                     Ok(x) => x,
                 };
@@ -1513,8 +1566,9 @@ impl ClusterImpl {
         self: &Arc<Self>,
         node_name: &str,
         plan: SerializedPlan,
+        worker_planning_params: WorkerPlanningParams,
     ) -> Result<SendableRecordBatchStream, CubeError> {
-        let init_message = NetworkMessage::SelectStart(plan);
+        let init_message = NetworkMessage::SelectStart(plan, worker_planning_params);
         let mut c = self.call_streaming(node_name, init_message).await?;
         let schema = match c.receive().await? {
             NetworkMessage::SelectResultSchema(s) => s,

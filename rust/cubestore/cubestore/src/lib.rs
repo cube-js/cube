@@ -1,6 +1,7 @@
 // #![feature(test)]
 #![feature(async_closure)]
 #![feature(box_patterns)]
+#![feature(hash_set_entry)]
 // TODO upgrade DF
 // #![feature(vec_into_raw_parts)]
 // #![feature(hash_set_entry)]
