@@ -15,6 +15,7 @@ use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::{ExecutionPlan, InputOrderMode, PlanProperties};
+use datafusion::prelude::Expr;
 use itertools::{repeat_n, Itertools};
 use std::sync::Arc;
 
@@ -30,8 +31,8 @@ use crate::queryplanner::query_executor::{
 use crate::queryplanner::rolling::RollingWindowAggregate;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::tail_limit::TailLimitExec;
-use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::SortColumn;
+use crate::queryplanner::topk::{AggregateTopKExec, ClusterAggregateTopK};
 use crate::queryplanner::trace_data_loaded::TraceDataLoadedExec;
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::streaming::topic_table_provider::TopicTableProvider;
@@ -50,9 +51,35 @@ pub struct PPOptions {
     pub show_filters: bool,
     pub show_sort_by: bool,
     pub show_aggregations: bool,
+    // TODO: Maybe prettify output, name this show_schema.
+    pub debug_schema: bool,
     // Applies only to physical plan.
     pub show_output_hints: bool,
     pub show_check_memory_nodes: bool,
+}
+
+impl PPOptions {
+    pub fn not_everything() -> PPOptions {
+        PPOptions {
+            show_filters: true,
+            show_sort_by: true,
+            show_aggregations: true,
+            debug_schema: false,
+            show_output_hints: true,
+            show_check_memory_nodes: true,
+        }
+    }
+
+    pub fn truly_everything() -> PPOptions {
+        PPOptions {
+            debug_schema: true,
+            ..PPOptions::not_everything()
+        }
+    }
+
+    pub fn none() -> PPOptions {
+        PPOptions::default()
+    }
 }
 
 pub fn pp_phys_plan(p: &dyn ExecutionPlan) -> String {
@@ -124,7 +151,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                 LogicalPlan::Aggregate(Aggregate { aggr_expr, .. }) => {
                     self.output += "Aggregate";
                     if self.opts.show_aggregations {
-                        self.output += &format!(", aggs: {:?}", aggr_expr)
+                        self.output += &format!(", aggs: {}", pp_exprs(aggr_expr))
                     }
                 }
                 LogicalPlan::Sort(Sort { expr, fetch, .. }) => {
@@ -187,8 +214,25 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                     }
                 }
                 LogicalPlan::EmptyRelation(EmptyRelation { .. }) => self.output += "Empty",
-                LogicalPlan::Limit(Limit { .. }) => self.output += "Limit",
-                // LogicalPlan::Skip(Skip { .. }) => self.output += "Skip",
+                &LogicalPlan::Limit(Limit {
+                    skip,
+                    fetch,
+                    input: _,
+                }) => {
+                    if skip == 0 {
+                        if let Some(_) = fetch {
+                            self.output += "Limit";
+                        } else {
+                            self.output += "Limit infinity";
+                        }
+                    } else {
+                        if let Some(_) = fetch {
+                            self.output += "Skip, Limit";
+                        } else {
+                            self.output += "Skip";
+                        }
+                    }
+                }
                 // LogicalPlan::CreateExternalTable(CreateExternalTable { .. }) => self.output += "CreateExternalTable",
                 LogicalPlan::Explain(Explain { .. }) => self.output += "Explain",
                 LogicalPlan::Extension(Extension { node }) => {
@@ -212,7 +256,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                     {
                         self.output += &format!("ClusterAggregateTopK, limit: {}", topk.limit);
                         if self.opts.show_aggregations {
-                            self.output += &format!(", aggs: {:?}", topk.aggregate_expr)
+                            self.output += &format!(", aggs: {}", pp_exprs(&topk.aggregate_expr))
                         }
                         if self.opts.show_sort_by {
                             self.output += &format!(
@@ -283,6 +327,10 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                 }
             }
 
+            if self.opts.debug_schema {
+                self.output += &format!(", debug_schema: {:?}", plan.schema());
+            }
+
             self.level += 1;
             Ok(TreeNodeRecursion::Continue)
         }
@@ -332,7 +380,7 @@ fn pp_source(t: Arc<dyn TableProvider>) -> String {
     }
 }
 
-fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
+pub fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
     format!(
         "[{}]",
         cs.iter()
@@ -488,23 +536,22 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     })
                     .join(", ")
             );
-            // TODO upgrade DF
-            // } else if let Some(topk) = a.downcast_ref::<AggregateTopKExec>() {
-            //     *out += &format!("AggregateTopK, limit: {:?}", topk.limit);
-            //     if o.show_aggregations {
-            //         *out += &format!(", aggs: {:?}", topk.agg_expr);
-            //     }
-            //     if o.show_sort_by {
-            //         *out += &format!(
-            //             ", sortBy: {}",
-            //             pp_sort_columns(topk.key_len, &topk.order_by)
-            //         );
-            //     }
-            //     if o.show_filters {
-            //         if let Some(having) = &topk.having {
-            //             *out += &format!(", having: {}", having);
-            //         }
-            //     }
+        } else if let Some(topk) = a.downcast_ref::<AggregateTopKExec>() {
+            *out += &format!("AggregateTopK, limit: {:?}", topk.limit);
+            if o.show_aggregations {
+                *out += &format!(", aggs: {:?}", topk.agg_expr);
+            }
+            if o.show_sort_by {
+                *out += &format!(
+                    ", sortBy: {}",
+                    pp_sort_columns(topk.key_len, &topk.order_by)
+                );
+            }
+            if o.show_filters {
+                if let Some(having) = &topk.having {
+                    *out += &format!(", having: {}", having);
+                }
+            }
         } else if let Some(_) = a.downcast_ref::<PanicWorkerExec>() {
             *out += "PanicWorker";
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
@@ -628,6 +675,10 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 }
             }
         }
+
+        if o.debug_schema {
+            *out += &format!(", debug_schema: {:?}", p.schema());
+        }
     }
 }
 
@@ -644,4 +695,8 @@ fn pp_row_range(r: &RowRange) -> String {
         Some(e) => format!("{:?}", e.values()),
     };
     format!("[{},{})", s, e)
+}
+
+fn pp_exprs(v: &Vec<Expr>) -> String {
+    "[".to_owned() + &v.iter().map(|e: &Expr| format!("{}", e)).join(", ") + "]"
 }

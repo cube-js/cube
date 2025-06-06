@@ -32,8 +32,7 @@ use flatbuffers::bitflags::_core::any::Any;
 use flatbuffers::bitflags::_core::fmt::Formatter;
 use itertools::{EitherOrBoth, Itertools};
 
-use super::serialized_plan::PreSerializedPlan;
-use crate::cluster::Cluster;
+use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{
@@ -47,10 +46,13 @@ use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTableProvider};
 use crate::queryplanner::rolling::RollingWindowAggregateSerialized;
+use crate::queryplanner::serialized_plan::PreSerializedPlan;
 use crate::queryplanner::serialized_plan::{
     IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
 };
+use crate::queryplanner::topk::plan_topk;
 use crate::queryplanner::topk::ClusterAggregateTopK;
+use crate::queryplanner::topk::{materialize_topk, ClusterAggregateTopKSerialized};
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::{cmp_same_types, Row};
 use crate::CubeError;
@@ -62,8 +64,9 @@ use datafusion::execution::{SessionState, TaskContext};
 use datafusion::logical_expr::expr::Alias;
 use datafusion::logical_expr::utils::expr_to_columns;
 use datafusion::logical_expr::{
-    expr, Aggregate, BinaryExpr, Expr, Extension, Filter, Join, Limit, LogicalPlan, Operator,
-    Projection, Sort, SortExpr, SubqueryAlias, TableScan, Union, Unnest, UserDefinedLogicalNode,
+    expr, logical_plan, Aggregate, BinaryExpr, Expr, Extension, Filter, Join, Limit, LogicalPlan,
+    Operator, Projection, Sort, SortExpr, SubqueryAlias, TableScan, Union, Unnest,
+    UserDefinedLogicalNode,
 };
 use datafusion::physical_expr::{Distribution, LexRequirement};
 use datafusion::physical_plan::repartition::RepartitionExec;
@@ -841,10 +844,9 @@ impl PlanRewriter for ChooseIndex<'_> {
     ) -> Result<LogicalPlan, DataFusionError> {
         let p = self.choose_table_index(n, ctx)?;
         let mut p = pull_up_cluster_send(p)?;
-        // TODO upgrade DF
-        // if self.enable_topk {
-        //     p = materialize_topk(p)?;
-        // }
+        if self.enable_topk {
+            p = materialize_topk(p)?;
+        }
         Ok(p)
     }
 }
@@ -1369,7 +1371,7 @@ fn partition_filter_schema(index: &IdRow<Index>) -> datafusion::arrow::datatypes
     datafusion::arrow::datatypes::Schema::new(schema_fields)
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]
 pub enum Snapshot {
     Index(IndexSnapshot),
     Inline(InlineSnapshot),
@@ -1382,6 +1384,7 @@ pub enum ExtensionNodeSerialized {
     ClusterSend(ClusterSendSerialized),
     PanicWorker(PanicWorkerSerialized),
     RollingWindowAggregate(RollingWindowAggregateSerialized),
+    ClusterAggregateTopK(ClusterAggregateTopKSerialized),
 }
 
 #[derive(Debug, Clone)]
@@ -1611,6 +1614,8 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
 
 pub struct CubeExtensionPlanner {
     pub cluster: Option<Arc<dyn Cluster>>,
+    // Set on the workers.
+    pub worker_planning_params: Option<WorkerPlanningParams>,
     pub serialized_plan: Arc<PreSerializedPlan>,
 }
 
@@ -1671,15 +1676,15 @@ impl ExtensionPlanner for CubeExtensionPlanner {
                 false,
                 usize::MAX,
                 cs.limit_and_reverse.clone(),
-                find_cluster_send_cut_point.result.ok_or_else(|| {
+                Some(find_cluster_send_cut_point.result.ok_or_else(|| {
                     CubeError::internal("ClusterSend cut point not found".to_string())
-                })?,
+                })?),
+                /* required input ordering */ None,
             )?))
-            // TODO upgrade DF
-            // } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
-            //     assert_eq!(inputs.len(), 1);
-            //     let input = inputs.into_iter().next().unwrap();
-            //     Ok(Some(plan_topk(planner, self, topk, input.clone(), state)?))
+        } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
+            assert_eq!(inputs.len(), 1);
+            let input = inputs.iter().next().unwrap();
+            Ok(Some(plan_topk(planner, self, topk, input.clone(), state)?))
         } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
             assert_eq!(inputs.len(), 0);
             Ok(Some(plan_panic_worker()?))
@@ -1692,12 +1697,13 @@ impl ExtensionPlanner for CubeExtensionPlanner {
 impl CubeExtensionPlanner {
     pub fn plan_cluster_send(
         &self,
-        mut input: Arc<dyn ExecutionPlan>,
+        input: Arc<dyn ExecutionPlan>,
         snapshots: &Vec<Snapshots>,
         use_streaming: bool,
         max_batch_rows: usize,
         limit_and_reverse: Option<(usize, bool)>,
-        logical_plan_to_send: &LogicalPlan,
+        logical_plan_to_send: Option<&LogicalPlan>,
+        required_input_ordering: Option<LexRequirement>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         if snapshots.is_empty() {
             return Ok(Arc::new(EmptyExec::new(input.schema())));
@@ -1706,20 +1712,28 @@ impl CubeExtensionPlanner {
         if let Some(c) = self.cluster.as_ref() {
             Ok(Arc::new(ClusterSendExec::new(
                 c.clone(),
-                Arc::new(
-                    self.serialized_plan
-                        .replace_logical_plan(logical_plan_to_send.clone())?,
-                ),
+                if let Some(logical_plan_to_send) = logical_plan_to_send {
+                    Arc::new(
+                        self.serialized_plan
+                            .replace_logical_plan(logical_plan_to_send.clone())?,
+                    )
+                } else {
+                    self.serialized_plan.clone()
+                },
                 snapshots,
                 input,
                 use_streaming,
+                required_input_ordering,
             )?))
         } else {
-            Ok(Arc::new(WorkerExec {
+            let worker_planning_params = self.worker_planning_params.expect("cluster_send_partition_count must be set when CubeExtensionPlanner::cluster is None");
+            Ok(Arc::new(WorkerExec::new(
                 input,
                 max_batch_rows,
                 limit_and_reverse,
-            }))
+                required_input_ordering,
+                worker_planning_params,
+            )))
         }
     }
 }
@@ -1731,6 +1745,33 @@ pub struct WorkerExec {
     pub input: Arc<dyn ExecutionPlan>,
     pub max_batch_rows: usize,
     pub limit_and_reverse: Option<(usize, bool)>,
+    pub required_input_ordering: Option<LexRequirement>,
+    properties: PlanProperties,
+}
+
+impl WorkerExec {
+    pub fn new(
+        input: Arc<dyn ExecutionPlan>,
+        max_batch_rows: usize,
+        limit_and_reverse: Option<(usize, bool)>,
+        required_input_ordering: Option<LexRequirement>,
+        worker_planning_params: WorkerPlanningParams,
+    ) -> WorkerExec {
+        let properties =
+            input
+                .properties()
+                .clone()
+                .with_partitioning(Partitioning::UnknownPartitioning(
+                    worker_planning_params.worker_partition_count,
+                ));
+        WorkerExec {
+            input,
+            max_batch_rows,
+            limit_and_reverse,
+            required_input_ordering,
+            properties,
+        }
+    }
 }
 
 impl DisplayAs for WorkerExec {
@@ -1759,6 +1800,8 @@ impl ExecutionPlan for WorkerExec {
             input,
             max_batch_rows: self.max_batch_rows,
             limit_and_reverse: self.limit_and_reverse.clone(),
+            required_input_ordering: self.required_input_ordering.clone(),
+            properties: self.properties.clone(),
         }))
     }
 
@@ -1775,11 +1818,15 @@ impl ExecutionPlan for WorkerExec {
     }
 
     fn properties(&self) -> &PlanProperties {
-        self.input.properties()
+        &self.properties
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
         vec![Distribution::SinglePartition; self.children().len()]
+    }
+
+    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
+        vec![self.required_input_ordering.clone()]
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
@@ -1828,15 +1875,15 @@ pub mod tests {
     use crate::queryplanner::pretty_printers::PPOptions;
     use crate::queryplanner::query_executor::ClusterSendExec;
     use crate::queryplanner::serialized_plan::RowRange;
-    use crate::queryplanner::{pretty_printers, CubeTableLogical};
+    use crate::queryplanner::{pretty_printers, CubeTableLogical, QueryPlannerImpl};
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::table::{Row, TableValue};
     use crate::CubeError;
     use datafusion::config::ConfigOptions;
     use datafusion::error::DataFusionError;
-    use datafusion::execution::SessionState;
+    use datafusion::execution::{SessionState, SessionStateBuilder};
     use datafusion::logical_expr::{AggregateUDF, LogicalPlan, ScalarUDF, TableSource, WindowUDF};
-    use datafusion::prelude::SessionContext;
+    use datafusion::prelude::{SessionConfig, SessionContext};
     use datafusion::sql::TableReference;
     use std::collections::HashMap;
     use std::iter::FromIterator;
@@ -2008,17 +2055,17 @@ pub mod tests {
             &indices,
         );
         let plan = choose_index(plan, &indices).await.unwrap().0;
+
         assert_eq!(
             pretty_printers::pp_plan(&plan),
-            "Projection, [s.Orders.order_customer, SUM(s.Orders.order_amount)]\
-           \n  ClusterAggregateTopK, limit: 10\
-           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+            "ClusterAggregateTopK, limit: 10\
+            \n  Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // Projections should be handled properly.
         let plan = initial_plan(
             "SELECT order_customer `customer`, SUM(order_amount) `amount` FROM s.Orders \
-             GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+             GROUP BY 1 ORDER BY 2 DESC NULLS LAST LIMIT 10",
             &indices,
         );
         let plan = choose_index(plan, &indices).await.unwrap().0;
@@ -2026,12 +2073,12 @@ pub mod tests {
             pretty_printers::pp_plan(&plan),
             "Projection, [customer, amount]\
            \n  ClusterAggregateTopK, limit: 10\
-           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+           \n    Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         let plan = initial_plan(
             "SELECT SUM(order_amount) `amount`, order_customer `customer` FROM s.Orders \
-             GROUP BY 2 ORDER BY 1 DESC LIMIT 10",
+             GROUP BY 2 ORDER BY 1 DESC NULLS LAST LIMIT 10",
             &indices,
         );
         let plan = choose_index(plan, &indices).await.unwrap().0;
@@ -2041,7 +2088,7 @@ pub mod tests {
             pretty_printers::pp_plan_ext(&plan, &with_sort_by),
             "Projection, [amount, customer]\
            \n  ClusterAggregateTopK, limit: 10, sortBy: [2 desc null last]\
-           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+           \n    Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // Ascending order is also ok.
@@ -2055,15 +2102,15 @@ pub mod tests {
             pretty_printers::pp_plan_ext(&plan, &with_sort_by),
             "Projection, [customer, amount]\
            \n  ClusterAggregateTopK, limit: 10, sortBy: [2 null last]\
-           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+           \n    Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // MAX and MIN are ok, as well as multiple aggregation.
         let plan = initial_plan(
             "SELECT order_customer `customer`, SUM(order_amount) `amount`, \
                     MIN(order_amount) `min_amount`, MAX(order_amount) `max_amount` \
-             FROM s.Orders \
-             GROUP BY 1 ORDER BY 3 DESC, 2 ASC LIMIT 10",
+             FROM s.orders \
+             GROUP BY 1 ORDER BY 3 DESC NULLS LAST, 2 ASC LIMIT 10",
             &indices,
         );
         let mut verbose = with_sort_by;
@@ -2072,8 +2119,8 @@ pub mod tests {
         assert_eq!(
             pretty_printers::pp_plan_ext(&plan, &verbose),
             "Projection, [customer, amount, min_amount, max_amount]\
-           \n  ClusterAggregateTopK, limit: 10, aggs: [SUM(#s.Orders.order_amount), MIN(#s.Orders.order_amount), MAX(#s.Orders.order_amount)], sortBy: [3 desc null last, 2 null last]\
-           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+           \n  ClusterAggregateTopK, limit: 10, aggs: [sum(s.orders.order_amount), min(s.orders.order_amount), max(s.orders.order_amount)], sortBy: [3 desc null last, 2 null last]\
+           \n    Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // Should not introduce TopK by mistake in unsupported cases.
@@ -2311,7 +2358,7 @@ pub mod tests {
     fn make_test_indices(add_multi_indices: bool) -> TestIndices {
         const SCHEMA: u64 = 0;
         const PARTITIONED_INDEX: u64 = 0; // Only 1 partitioned index for now.
-        let mut i = TestIndices::default();
+        let mut i = TestIndices::new();
 
         let customers_cols = int_columns(&[
             "customer_id",
@@ -2475,11 +2522,15 @@ pub mod tests {
         let plan = SqlToRel::new(i)
             .statement_to_plan(DFStatement::Statement(Box::new(statement)))
             .unwrap();
-        SessionContext::new().state().optimize(&plan).unwrap()
+        QueryPlannerImpl::execution_context_helper(SessionConfig::new())
+            .state()
+            .optimize(&plan)
+            .unwrap()
     }
 
-    #[derive(Debug, Default)]
+    #[derive(Debug)]
     pub struct TestIndices {
+        session_state: Arc<SessionState>,
         tables: Vec<Table>,
         indices: Vec<Index>,
         partitions: Vec<Partition>,
@@ -2489,6 +2540,17 @@ pub mod tests {
     }
 
     impl TestIndices {
+        pub fn new() -> TestIndices {
+            TestIndices {
+                session_state: Arc::new(SessionStateBuilder::new().with_default_features().build()),
+                tables: Vec::new(),
+                indices: Vec::new(),
+                partitions: Vec::new(),
+                chunks: Vec::new(),
+                multi_partitions: Vec::new(),
+                config_options: ConfigOptions::default(),
+            }
+        }
         pub fn add_table(&mut self, t: Table) -> u64 {
             assert_eq!(t.get_schema_id(), 0);
             let table_id = self.tables.len() as u64;
@@ -2568,21 +2630,24 @@ pub mod tests {
                 .ok_or(DataFusionError::Plan(format!("Table not found {}", name)))
         }
 
-        fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
+        fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
             // Note that this is missing HLL functions.
-            None
+            let name = name.to_ascii_lowercase();
+            self.session_state.scalar_functions().get(&name).cloned()
         }
 
-        fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
+        fn get_aggregate_meta(&self, name_param: &str) -> Option<Arc<AggregateUDF>> {
             // Note that this is missing HLL functions.
-            None
+            let name = name_param.to_ascii_lowercase();
+            self.session_state.aggregate_functions().get(&name).cloned()
         }
 
         fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {
-            None
+            let name = name.to_ascii_lowercase();
+            self.session_state.window_functions().get(&name).cloned()
         }
 
-        fn get_variable_type(&self, variable_names: &[String]) -> Option<DataType> {
+        fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
             None
         }
 
@@ -2591,15 +2656,27 @@ pub mod tests {
         }
 
         fn udf_names(&self) -> Vec<String> {
-            Vec::new()
+            self.session_state
+                .scalar_functions()
+                .keys()
+                .cloned()
+                .collect()
         }
 
         fn udaf_names(&self) -> Vec<String> {
-            Vec::new()
+            self.session_state
+                .aggregate_functions()
+                .keys()
+                .cloned()
+                .collect()
         }
 
         fn udwf_names(&self) -> Vec<String> {
-            Vec::new()
+            self.session_state
+                .window_functions()
+                .keys()
+                .cloned()
+                .collect()
         }
     }
 

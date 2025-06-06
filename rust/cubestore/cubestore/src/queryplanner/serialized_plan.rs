@@ -1,3 +1,4 @@
+use crate::cluster::Cluster;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
@@ -18,6 +19,7 @@ use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::logical_expr::expr::{Alias, InSubquery};
 use datafusion::logical_expr::expr_rewriter::coerce_plan_expr_for_schema;
+use datafusion::physical_optimizer::topk_aggregation::TopKAggregation;
 use datafusion::physical_plan::aggregates;
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
@@ -1794,6 +1796,9 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
                 ExtensionNodeSerialized::RollingWindowAggregate(serialized) => Arc::new(
                     RollingWindowAggregate::from_serialized(serialized, inputs, ctx)?,
                 ),
+                ExtensionNodeSerialized::ClusterAggregateTopK(serialized) => Arc::new(
+                    ClusterAggregateTopK::from_serialized(serialized, inputs, ctx)?,
+                ),
             },
         })
     }
@@ -1813,6 +1818,10 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
             ExtensionNodeSerialized::RollingWindowAggregate(
                 rolling_window_aggregate.to_serialized()?,
             )
+        } else if let Some(topk_aggregate) =
+            node.node.as_any().downcast_ref::<ClusterAggregateTopK>()
+        {
+            ExtensionNodeSerialized::ClusterAggregateTopK(topk_aggregate.to_serialized()?)
         } else {
             todo!("{:?}", node)
         };
