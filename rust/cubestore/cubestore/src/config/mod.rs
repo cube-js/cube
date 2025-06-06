@@ -518,6 +518,8 @@ pub trait ConfigObj: DIService {
 
     fn dump_dir(&self) -> &Option<PathBuf>;
 
+    fn snapshots_deletion_batch_size(&self) -> u64;
+
     fn minimum_metastore_snapshots_count(&self) -> u64;
 
     fn metastore_snapshots_lifetime(&self) -> u64;
@@ -630,6 +632,7 @@ pub struct ConfigObjImpl {
     pub drop_ws_processing_messages_after_secs: u64,
     pub drop_ws_complete_messages_after_secs: u64,
     pub skip_kafka_parsing_errors: bool,
+    pub snapshots_deletion_batch_size: u64,
     pub minimum_metastore_snapshots_count: u64,
     pub metastore_snapshots_lifetime: u64,
     pub minimum_cachestore_snapshots_count: u64,
@@ -951,6 +954,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn dump_dir(&self) -> &Option<PathBuf> {
         &self.dump_dir
+    }
+
+    fn snapshots_deletion_batch_size(&self) -> u64 {
+        self.snapshots_deletion_batch_size
     }
 
     fn minimum_metastore_snapshots_count(&self) -> u64 {
@@ -1486,6 +1493,11 @@ impl Config {
                     10 * 60,
                 ),
                 skip_kafka_parsing_errors: env_parse("CUBESTORE_SKIP_KAFKA_PARSING_ERRORS", false),
+                // Presently, not useful to make more than upload_concurrency times constant
+                snapshots_deletion_batch_size: env_parse(
+                    "CUBESTORE_SNAPSHOTS_DELETION_BATCH_SIZE",
+                    80,
+                ),
                 minimum_metastore_snapshots_count: env_parse(
                     "CUBESTORE_MINIMUM_METASTORE_SNAPSHOTS_COUNT",
                     5,
@@ -1652,6 +1664,7 @@ impl Config {
                 drop_ws_processing_messages_after_secs: 60,
                 drop_ws_complete_messages_after_secs: 10,
                 skip_kafka_parsing_errors: false,
+                snapshots_deletion_batch_size: 80,
                 minimum_metastore_snapshots_count: 3,
                 metastore_snapshots_lifetime: 24 * 3600,
                 minimum_cachestore_snapshots_count: 3,

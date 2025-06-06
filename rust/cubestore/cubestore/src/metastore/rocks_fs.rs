@@ -55,7 +55,8 @@ pub struct BaseRocksStoreFs {
     name: &'static str,
     minimum_snapshots_count: u64,
     snapshots_lifetime: u64,
-    remote_files_cleanup_batch_size: u64,
+    // A copy of the upload-concurrency config -- we multiply this for our deletes.
+    snapshots_deletion_batch_size: u64,
 }
 
 impl BaseRocksStoreFs {
@@ -65,13 +66,13 @@ impl BaseRocksStoreFs {
     ) -> Arc<Self> {
         let minimum_snapshots_count = config.minimum_metastore_snapshots_count();
         let snapshots_lifetime = config.metastore_snapshots_lifetime();
-        let remote_files_cleanup_batch_size = config.remote_files_cleanup_batch_size();
+        let snapshots_deletion_batch_size = config.snapshots_deletion_batch_size();
         Arc::new(Self {
             remote_fs,
             name: "metastore",
             minimum_snapshots_count,
             snapshots_lifetime,
-            remote_files_cleanup_batch_size,
+            snapshots_deletion_batch_size,
         })
     }
     pub fn new_for_cachestore(
@@ -80,13 +81,13 @@ impl BaseRocksStoreFs {
     ) -> Arc<Self> {
         let minimum_snapshots_count = config.minimum_cachestore_snapshots_count();
         let snapshots_lifetime = config.cachestore_snapshots_lifetime();
-        let remote_files_cleanup_batch_size = config.remote_files_cleanup_batch_size();
+        let snapshots_deletion_batch_size = config.snapshots_deletion_batch_size();
         Arc::new(Self {
             remote_fs,
             name: "cachestore",
             minimum_snapshots_count,
             snapshots_lifetime,
-            remote_files_cleanup_batch_size,
+            snapshots_deletion_batch_size,
         })
     }
 
@@ -145,8 +146,8 @@ impl BaseRocksStoreFs {
         name: &str,
     ) -> Result<HashMap<u128, Vec<String>>, CubeError> {
         let existing_metastore_files = remote_fs.list(format!("{}-", name)).await?;
-        // Log a debug statement so that we can rule out the filename list itself being too large for memory.
-        log::debug!(
+        // Log an info statement so that we can rule out the filename list itself being too large for memory.
+        log::info!(
             "Listed existing {} files, count = {}",
             name,
             existing_metastore_files.len()
@@ -215,7 +216,7 @@ impl BaseRocksStoreFs {
         }
 
         for batch in to_delete.chunks(
-            self.remote_files_cleanup_batch_size
+            self.snapshots_deletion_batch_size
                 .try_into()
                 .unwrap_or(usize::MAX),
         ) {
