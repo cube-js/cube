@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use datafusion::arrow::array::{make_array, Array, ArrayRef, MutableArrayData};
 use datafusion::arrow::compute::concat_batches;
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::arrow::error::{ArrowError, Result as ArrowResult};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
@@ -36,7 +35,7 @@ impl TailLimitExec {
 }
 
 impl DisplayAs for TailLimitExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "TailLimitExec")
     }
 }

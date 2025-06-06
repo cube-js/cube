@@ -690,7 +690,7 @@ impl RollingOptimizerRule {
     }
 
     fn subquery_alias_rename(alias: &TableReference, column: Column) -> Column {
-        Column::new(Some(alias.table().clone()), column.name)
+        Column::new(Some(alias.table()), column.name)
     }
 }
 

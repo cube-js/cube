@@ -580,13 +580,11 @@ mod tests {
     use datafusion::arrow::datatypes::Field;
     use datafusion::common::{TableReference, ToDFSchema};
     use datafusion::config::ConfigOptions;
-    use datafusion::datasource::TableProvider;
     use datafusion::error::DataFusionError;
     use datafusion::logical_expr::{AggregateUDF, ScalarUDF, TableSource, WindowUDF};
     use datafusion::sql::planner::{ContextProvider, PlannerContext, SqlToRel};
     use smallvec::alloc::sync::Arc;
     use sqlparser::ast::{Query, Select, SelectItem, SetExpr, Statement as SQLStatement};
-    use std::fmt::format;
 
     #[test]
     fn test_simple_extract() {
@@ -1509,11 +1507,11 @@ mod tests {
             None
         }
 
-        fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {
+        fn get_window_meta(&self, _name: &str) -> Option<Arc<WindowUDF>> {
             None
         }
 
-        fn get_variable_type(&self, variable_names: &[String]) -> Option<DataType> {
+        fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
             None
         }
 

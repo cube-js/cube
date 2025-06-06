@@ -50,7 +50,7 @@ use crate::metastore::{
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::query_executor::{
-    batches_to_dataframe, find_topmost_cluster_send_exec, ClusterSendExec, QueryExecutor,
+    batches_to_dataframe, find_topmost_cluster_send_exec, QueryExecutor,
 };
 use crate::queryplanner::serialized_plan::{PreSerializedPlan, RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
@@ -77,7 +77,6 @@ pub mod parser;
 mod table_creator;
 
 use crate::cluster::rate_limiter::ProcessRateLimiter;
-use crate::queryplanner::metadata_cache::NoopParquetMetadataCache;
 use crate::sql::cachestore::CacheStoreSqlService;
 use crate::util::metrics;
 use mockall::automock;
@@ -755,7 +754,7 @@ impl SqlService for SqlServiceImpl {
                     } else {
                         None
                     }
-                };
+                }
                 let mut import_format = with_options
                     .iter()
                     .filter_map(filter_sql_option_key_value)
@@ -1749,7 +1748,6 @@ mod tests {
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
     use crate::table::TableValue;
-    use crate::util::int96::Int96;
     use regex::Regex;
 
     #[tokio::test]
