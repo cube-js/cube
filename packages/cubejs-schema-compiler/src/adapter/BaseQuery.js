@@ -1983,6 +1983,7 @@ export class BaseQuery {
         const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
         throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
       }
+
       if (collectedMeasures.length === 0 && m.isMemberExpression) {
         // `m` is member expression measure, but does not reference any other measure
         // Consider this dimensions-only measure. This can happen at least in 2 cases:
@@ -1993,7 +1994,16 @@ export class BaseQuery {
         // TODO return measure object for every measure
         return this.dimensionOnlyMeasureToHierarchy(context, m);
       }
-      const measureName = typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`;
+
+      let measureName;
+      if (typeof m.measure === 'string') {
+        measureName = m.measure;
+      } else if (m.isMemberExpression) {
+        // TODO expressionName vs definition?
+        measureName = m.expressionName;
+      } else {
+        measureName = `${m.measure.cubeName}.${m.measure.name}`;
+      }
       return [measureName, collectedMeasures];
     }));
   }
