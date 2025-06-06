@@ -382,17 +382,17 @@ impl SqlServiceImpl {
     ) -> Result<Arc<DataFrame>, CubeError> {
         fn extract_worker_plans(
             p: &Arc<dyn ExecutionPlan>,
-        ) -> Option<Vec<(String, PreSerializedPlan)>> {
+        ) -> Result<Option<Vec<(String, PreSerializedPlan)>>, CubeError> {
             if let Some(p) = p.as_any().downcast_ref::<ClusterSendExec>() {
-                Some(p.worker_plans())
+                Ok(Some(p.worker_plans()?))
             } else {
                 for c in p.children() {
-                    let res = extract_worker_plans(&c);
+                    let res = extract_worker_plans(&c)?;
                     if res.is_some() {
-                        return res;
+                        return Ok(res);
                     }
                 }
-                None
+                Ok(None)
             }
         }
 
@@ -437,7 +437,7 @@ impl SqlServiceImpl {
                         TableValue::String(pp_phys_plan(router_plan.as_ref())),
                     ]));
 
-                    if let Some(worker_plans) = extract_worker_plans(&router_plan) {
+                    if let Some(worker_plans) = extract_worker_plans(&router_plan)? {
                         let worker_futures = worker_plans
                             .into_iter()
                             .map(|(name, plan)| async move {
@@ -1179,7 +1179,7 @@ impl SqlService for SqlServiceImpl {
                                     })
                                     .collect(),
                                 context.inline_tables.into_iter().map(|i| i.id).collect(),
-                            );
+                            )?;
                         let worker_plan: SerializedPlan = worker_plan.to_serialized_plan()?;
                         let mut mocked_names = HashMap::new();
                         for (_, f, _, _) in worker_plan.files_to_download() {
