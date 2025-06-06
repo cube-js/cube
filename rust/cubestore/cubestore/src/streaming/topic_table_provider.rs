@@ -1,4 +1,5 @@
 use crate::metastore::Column;
+use crate::queryplanner::udfs::{registerable_arc_aggregate_udfs, registerable_arc_scalar_udfs};
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
@@ -12,10 +13,10 @@ use datafusion::common::TableReference;
 use datafusion::config::ConfigOptions;
 use datafusion::datasource::{provider_as_source, TableProvider, TableType};
 use datafusion::error::DataFusionError;
-use datafusion::logical_expr;
+use datafusion::execution::SessionStateDefaults;
 use datafusion::logical_expr::{
     AggregateUDF, Expr, ScalarUDF, ScalarUDFImpl, Signature, TableSource, TypeSignature,
-    Volatility, WindowUDF,
+    Volatility, Window, WindowUDF,
 };
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ColumnarValue;
@@ -23,6 +24,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use datafusion::scalar::ScalarValue;
 use datafusion::sql::planner::ContextProvider;
 use std::any::Any;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
@@ -31,6 +33,9 @@ pub struct TopicTableProvider {
     topic: String,
     schema: SchemaRef,
     config_options: ConfigOptions,
+    udfs: HashMap<String, Arc<ScalarUDF>>,
+    udafs: HashMap<String, Arc<AggregateUDF>>,
+    udwfs: HashMap<String, Arc<WindowUDF>>,
 }
 
 impl TopicTableProvider {
@@ -41,328 +46,42 @@ impl TopicTableProvider {
                 .map(|c| c.clone().into())
                 .collect::<Vec<Field>>(),
         ));
+        let mut udfs = SessionStateDefaults::default_scalar_functions();
+        udfs.append(&mut registerable_arc_scalar_udfs());
+        udfs.push(Arc::new(
+            ScalarUDF::new_from_impl(ParseTimestampFunc::new()),
+        ));
+        udfs.push(Arc::new(ScalarUDF::new_from_impl(ConvertTzFunc::new())));
+        udfs.push(Arc::new(ScalarUDF::new_from_impl(
+            FormatTimestampFunc::new(),
+        )));
+
+        let udfs = udfs
+            .into_iter()
+            .map(|udf| (udf.name().to_owned(), udf))
+            .collect();
+
+        let mut udafs = SessionStateDefaults::default_aggregate_functions();
+        udafs.append(&mut registerable_arc_aggregate_udfs());
+
+        let udafs = udafs
+            .into_iter()
+            .map(|udaf| (udaf.name().to_owned(), udaf))
+            .collect();
+
+        let udwfs = SessionStateDefaults::default_window_functions();
+        let udwfs = udwfs
+            .into_iter()
+            .map(|udwf| (udwf.name().to_owned(), udwf))
+            .collect();
         Self {
             topic,
             schema,
             config_options: ConfigOptions::default(),
+            udfs,
+            udafs,
+            udwfs,
         }
-    }
-
-    fn parse_timestamp_meta(&self) -> Arc<ScalarUDF> {
-        struct ParseTimestampFunc {
-            signature: Signature,
-        }
-
-        impl Debug for ParseTimestampFunc {
-            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                write!(f, "ParseTimestampFunc")
-            }
-        }
-
-        impl ScalarUDFImpl for ParseTimestampFunc {
-            fn as_any(&self) -> &dyn Any {
-                self
-            }
-
-            fn name(&self) -> &str {
-                "ParseTimestampFunc"
-            }
-
-            fn signature(&self) -> &Signature {
-                &self.signature
-            }
-
-            fn return_type(&self, _: &[DataType]) -> datafusion::common::Result<DataType> {
-                Ok(DataType::Timestamp(TimeUnit::Microsecond, None))
-            }
-
-            fn invoke(
-                &self,
-                inputs: &[ColumnarValue],
-            ) -> datafusion::common::Result<ColumnarValue> {
-                if inputs.len() < 2 || inputs.len() > 3 {
-                    return Err(DataFusionError::Execution(
-                        "Expected 2 or 3 arguments in PARSE_TIMESTAMP".to_string(),
-                    ));
-                }
-
-                let format = match &inputs[1] {
-                    ColumnarValue::Scalar(ScalarValue::Utf8(Some(v))) => sql_format_to_strformat(v),
-                    _ => {
-                        return Err(DataFusionError::Execution(
-                            "Only scalar arguments are supported as format in PARSE_TIMESTAMP"
-                                .to_string(),
-                        ));
-                    }
-                };
-                let tz: Tz = if inputs.len() == 3 {
-                    match &inputs[2] {
-                        ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
-                            s.parse().map_err(|_| {
-                                CubeError::user(format!(
-                                    "Incorrect timezone {} in PARSE_TIMESTAMP",
-                                    s
-                                ))
-                            })?
-                        }
-                        _ => {
-                            return Err(DataFusionError::Execution(
-                                "Only scalar arguments are supported as timezone in PARSE_TIMESTAMP"
-                                    .to_string(),
-                            ));
-                        }
-                    }
-                } else {
-                    Tz::UTC
-                };
-
-                match &inputs[0] {
-                    ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
-                        let ts = match tz.datetime_from_str(s, &format) {
-                            Ok(ts) => ts,
-                            Err(e) => {
-                                return Err(DataFusionError::Execution(format!(
-                                    "Error while parsing timestamp: {}",
-                                    e
-                                )));
-                            }
-                        };
-                        Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
-                            Some(ts.timestamp_micros()),
-                            None,
-                        )))
-                    }
-                    ColumnarValue::Array(t) if t.as_any().is::<StringArray>() => {
-                        let t = t.as_any().downcast_ref::<StringArray>().unwrap();
-                        Ok(ColumnarValue::Array(Arc::new(parse_timestamp_array(
-                            &t, &tz, &format,
-                        )?)))
-                    }
-                    _ => {
-                        return Err(DataFusionError::Execution(
-                            "First argument in PARSE_TIMESTAMP must be string or array of strings"
-                                .to_string(),
-                        ));
-                    }
-                }
-            }
-        }
-
-        Arc::new(ScalarUDF::new_from_impl(ParseTimestampFunc {
-            signature: Signature::one_of(
-                vec![
-                    TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Utf8]),
-                    TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
-                ],
-                Volatility::Stable,
-            ),
-        }))
-    }
-
-    fn convert_tz_meta(&self) -> Arc<ScalarUDF> {
-        struct ConvertTzFunc {
-            signature: Signature,
-        }
-
-        impl Debug for ConvertTzFunc {
-            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                write!(f, "ConvertTzFunc")
-            }
-        }
-
-        impl ScalarUDFImpl for ConvertTzFunc {
-            fn as_any(&self) -> &dyn Any {
-                self
-            }
-
-            fn name(&self) -> &str {
-                "ConvertTzFunc"
-            }
-
-            fn signature(&self) -> &Signature {
-                &self.signature
-            }
-
-            fn return_type(&self, _: &[DataType]) -> datafusion::common::Result<DataType> {
-                Ok(DataType::Timestamp(TimeUnit::Microsecond, None))
-            }
-
-            fn invoke(
-                &self,
-                inputs: &[ColumnarValue],
-            ) -> datafusion::common::Result<ColumnarValue> {
-                if inputs.len() != 3 {
-                    return Err(DataFusionError::Execution(
-                        "Expected 3 arguments in PARSE_TIMESTAMP".to_string(),
-                    ));
-                }
-
-                let from_tz: Tz = match &inputs[1] {
-                    ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
-                        s.parse().map_err(|_| {
-                            CubeError::user(format!("Incorrect timezone {} in PARSE_TIMESTAMP", s))
-                        })?
-                    }
-                    _ => {
-                        return Err(DataFusionError::Execution(
-                            "Only scalar arguments are supported as from_timezone in PARSE_TIMESTAMP"
-                                .to_string(),
-                        ));
-                    }
-                };
-
-                let to_tz: Tz = match &inputs[2] {
-                    ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
-                        s.parse().map_err(|_| {
-                            CubeError::user(format!("Incorrect timezone {} in PARSE_TIMESTAMP", s))
-                        })?
-                    }
-                    _ => {
-                        return Err(DataFusionError::Execution(
-                            "Only scalar arguments are supported as to_timezone in PARSE_TIMESTAMP"
-                                .to_string(),
-                        ));
-                    }
-                };
-                match &inputs[0] {
-                    ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(Some(t), None)) => {
-                        if from_tz == to_tz {
-                            Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
-                                Some(*t),
-                                None,
-                            )))
-                        } else {
-                            let time = Utc.timestamp_nanos(*t * 1000).naive_local();
-                            let from = match from_tz.from_local_datetime(&time).earliest() {
-                                Some(t) => t,
-                                None => {
-                                    return Err(DataFusionError::Execution(format!(
-                                        "Can't convert timezone for timestamp {}",
-                                        t
-                                    )));
-                                }
-                            };
-                            let result = from.with_timezone(&to_tz);
-                            Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
-                                Some(result.naive_local().timestamp_micros()),
-                                None,
-                            )))
-                        }
-                    }
-                    ColumnarValue::Array(t) if t.as_any().is::<TimestampMicrosecondArray>() => {
-                        let t = t
-                            .as_any()
-                            .downcast_ref::<TimestampMicrosecondArray>()
-                            .unwrap();
-                        Ok(ColumnarValue::Array(Arc::new(convert_tz_array(
-                            t, &from_tz, &to_tz,
-                        )?)))
-                    }
-                    _ => {
-                        return Err(DataFusionError::Execution(
-                            "First argument in CONVERT_TZ must be timestamp or array of timestamps"
-                                .to_string(),
-                        ));
-                    }
-                }
-            }
-        }
-
-        Arc::new(ScalarUDF::new_from_impl(ConvertTzFunc {
-            signature: Signature::exact(
-                vec![
-                    DataType::Timestamp(TimeUnit::Microsecond, None),
-                    DataType::Utf8,
-                    DataType::Utf8,
-                ],
-                Volatility::Stable,
-            ),
-        }))
-    }
-
-    fn format_timestamp_meta(&self) -> Arc<ScalarUDF> {
-        struct FormatTimestampFunc {
-            signature: Signature,
-        }
-
-        impl Debug for FormatTimestampFunc {
-            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                write!(f, "FormatTimestampFunc")
-            }
-        }
-
-        impl ScalarUDFImpl for FormatTimestampFunc {
-            fn as_any(&self) -> &dyn Any {
-                self
-            }
-
-            fn name(&self) -> &str {
-                "FormatTimestampFunc"
-            }
-
-            fn signature(&self) -> &Signature {
-                &self.signature
-            }
-
-            fn return_type(&self, _: &[DataType]) -> datafusion::common::Result<DataType> {
-                Ok(DataType::Utf8)
-            }
-
-            fn invoke(
-                &self,
-                inputs: &[ColumnarValue],
-            ) -> datafusion::common::Result<ColumnarValue> {
-                if inputs.len() != 2 {
-                    return Err(DataFusionError::Execution(
-                        "Expected 2 arguments in FORMAT_TIMESTAMP".to_string(),
-                    ));
-                }
-
-                let format = match &inputs[1] {
-                    ColumnarValue::Scalar(ScalarValue::Utf8(Some(v))) => sql_format_to_strformat(v),
-                    _ => {
-                        return Err(DataFusionError::Execution(
-                            "Only scalar arguments are supported as format in FORMAT_TIMESTAMP"
-                                .to_string(),
-                        ));
-                    }
-                };
-
-                match &inputs[0] {
-                    ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(Some(t), None)) => {
-                        let time = Utc.timestamp_nanos(*t * 1000).naive_local();
-                        Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(format!(
-                            "{}",
-                            time.format(&format)
-                        )))))
-                    }
-                    ColumnarValue::Array(t) if t.as_any().is::<TimestampMicrosecondArray>() => {
-                        let t = t
-                            .as_any()
-                            .downcast_ref::<TimestampMicrosecondArray>()
-                            .unwrap();
-                        Ok(ColumnarValue::Array(Arc::new(format_timestamp_array(
-                            &t, &format,
-                        )?)))
-                    }
-                    _ => {
-                        return Err(DataFusionError::Execution(
-                            "First argument in FORMAT_TIMESTAMP must be timestamp or array of timestamps".to_string(),
-                        ));
-                    }
-                }
-            }
-        }
-
-        Arc::new(ScalarUDF::new_from_impl(FormatTimestampFunc {
-            signature: Signature::exact(
-                vec![
-                    DataType::Timestamp(TimeUnit::Microsecond, None),
-                    DataType::Utf8,
-                ],
-                Volatility::Stable,
-            ),
-        }))
     }
 }
 
@@ -383,23 +102,18 @@ impl ContextProvider for TopicTableProvider {
     }
 
     fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
-        match name {
-            "parse_timestamp" | "PARSE_TIMESTAMP" => Some(self.parse_timestamp_meta()),
-            "convert_tz_ksql" | "CONVERT_TZ_KSQL" => Some(self.convert_tz_meta()),
-            "format_timestamp" | "FORMAT_TIMESTAMP" => Some(self.format_timestamp_meta()),
-            _ => None,
-        }
+        self.udfs.get(&name.to_ascii_lowercase()).cloned()
     }
 
-    fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
-        None
+    fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
+        self.udafs.get(&name.to_ascii_lowercase()).cloned()
     }
 
     fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {
-        None
+        self.udwfs.get(&name.to_ascii_lowercase()).cloned()
     }
 
-    fn get_variable_type(&self, variable_names: &[String]) -> Option<DataType> {
+    fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
         None
     }
 
@@ -408,20 +122,15 @@ impl ContextProvider for TopicTableProvider {
     }
 
     fn udf_names(&self) -> Vec<String> {
-        // TODO upgrade DF: We probably need to register the UDFs and have all the default UDFs.
-        vec![
-            "parse_timestamp".to_owned(),
-            "convert_tz_ksql".to_owned(),
-            "format_timestamp".to_owned(),
-        ]
+        self.udfs.keys().cloned().collect()
     }
 
     fn udaf_names(&self) -> Vec<String> {
-        Vec::new()
+        self.udafs.keys().cloned().collect()
     }
 
     fn udwf_names(&self) -> Vec<String> {
-        Vec::new()
+        self.udwfs.keys().cloned().collect()
     }
 }
 
@@ -489,6 +198,7 @@ fn parse_timestamp_array(
     }
     Ok(result.finish())
 }
+
 fn convert_tz_array(
     input: &TimestampMicrosecondArray,
     from_tz: &Tz,
@@ -543,4 +253,308 @@ fn format_timestamp_array(
         }
     }
     Ok(result.finish())
+}
+
+struct ParseTimestampFunc {
+    signature: Signature,
+}
+
+impl Debug for ParseTimestampFunc {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ParseTimestampFunc")
+    }
+}
+
+impl ParseTimestampFunc {
+    fn new() -> ParseTimestampFunc {
+        ParseTimestampFunc {
+            signature: Signature::one_of(
+                vec![
+                    TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Utf8]),
+                    TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+                ],
+                Volatility::Stable,
+            ),
+        }
+    }
+}
+
+impl ScalarUDFImpl for ParseTimestampFunc {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        "parse_timestamp"
+    }
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, _: &[DataType]) -> datafusion::common::Result<DataType> {
+        Ok(DataType::Timestamp(TimeUnit::Microsecond, None))
+    }
+
+    fn invoke(&self, inputs: &[ColumnarValue]) -> datafusion::common::Result<ColumnarValue> {
+        if inputs.len() < 2 || inputs.len() > 3 {
+            return Err(DataFusionError::Execution(
+                "Expected 2 or 3 arguments in PARSE_TIMESTAMP".to_string(),
+            ));
+        }
+
+        let format = match &inputs[1] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(v))) => sql_format_to_strformat(v),
+            _ => {
+                return Err(DataFusionError::Execution(
+                    "Only scalar arguments are supported as format in PARSE_TIMESTAMP".to_string(),
+                ));
+            }
+        };
+        let tz: Tz = if inputs.len() == 3 {
+            match &inputs[2] {
+                ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.parse().map_err(|_| {
+                    CubeError::user(format!("Incorrect timezone {} in PARSE_TIMESTAMP", s))
+                })?,
+                _ => {
+                    return Err(DataFusionError::Execution(
+                        "Only scalar arguments are supported as timezone in PARSE_TIMESTAMP"
+                            .to_string(),
+                    ));
+                }
+            }
+        } else {
+            Tz::UTC
+        };
+
+        match &inputs[0] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
+                let ts = match tz.datetime_from_str(s, &format) {
+                    Ok(ts) => ts,
+                    Err(e) => {
+                        return Err(DataFusionError::Execution(format!(
+                            "Error while parsing timestamp: {}",
+                            e
+                        )));
+                    }
+                };
+                Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
+                    Some(ts.timestamp_micros()),
+                    None,
+                )))
+            }
+            ColumnarValue::Array(t) if t.as_any().is::<StringArray>() => {
+                let t = t.as_any().downcast_ref::<StringArray>().unwrap();
+                Ok(ColumnarValue::Array(Arc::new(parse_timestamp_array(
+                    &t, &tz, &format,
+                )?)))
+            }
+            _ => {
+                return Err(DataFusionError::Execution(
+                    "First argument in PARSE_TIMESTAMP must be string or array of strings"
+                        .to_string(),
+                ));
+            }
+        }
+    }
+}
+
+struct ConvertTzFunc {
+    signature: Signature,
+}
+
+impl ConvertTzFunc {
+    fn new() -> ConvertTzFunc {
+        ConvertTzFunc {
+            signature: Signature::exact(
+                vec![
+                    DataType::Timestamp(TimeUnit::Microsecond, None),
+                    DataType::Utf8,
+                    DataType::Utf8,
+                ],
+                Volatility::Stable,
+            ),
+        }
+    }
+}
+
+impl Debug for ConvertTzFunc {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ConvertTzFunc")
+    }
+}
+
+impl ScalarUDFImpl for ConvertTzFunc {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        "convert_tz_ksql"
+    }
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, _: &[DataType]) -> datafusion::common::Result<DataType> {
+        Ok(DataType::Timestamp(TimeUnit::Microsecond, None))
+    }
+
+    fn invoke(&self, inputs: &[ColumnarValue]) -> datafusion::common::Result<ColumnarValue> {
+        if inputs.len() != 3 {
+            return Err(DataFusionError::Execution(
+                "Expected 3 arguments in CONVERT_TZ_KSQL".to_string(),
+            ));
+        }
+
+        let from_tz: Tz = match &inputs[1] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.parse().map_err(|_| {
+                CubeError::user(format!("Incorrect timezone {} in CONVERT_TZ_KSQL", s))
+            })?,
+            _ => {
+                return Err(DataFusionError::Execution(
+                    "Only scalar arguments are supported as from_timezone in CONVERT_TZ_KSQL"
+                        .to_string(),
+                ));
+            }
+        };
+
+        let to_tz: Tz = match &inputs[2] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.parse().map_err(|_| {
+                CubeError::user(format!("Incorrect timezone {} in CONVERT_TZ_KSQL", s))
+            })?,
+            _ => {
+                return Err(DataFusionError::Execution(
+                    "Only scalar arguments are supported as to_timezone in CONVERT_TZ_KSQL"
+                        .to_string(),
+                ));
+            }
+        };
+        match &inputs[0] {
+            ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(Some(t), None)) => {
+                if from_tz == to_tz {
+                    Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
+                        Some(*t),
+                        None,
+                    )))
+                } else {
+                    let time = Utc.timestamp_nanos(*t * 1000).naive_local();
+                    let from = match from_tz.from_local_datetime(&time).earliest() {
+                        Some(t) => t,
+                        None => {
+                            return Err(DataFusionError::Execution(format!(
+                                "Can't convert timezone for timestamp {}",
+                                t
+                            )));
+                        }
+                    };
+                    let result = from.with_timezone(&to_tz);
+                    Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
+                        Some(result.naive_local().timestamp_micros()),
+                        None,
+                    )))
+                }
+            }
+            ColumnarValue::Array(t) if t.as_any().is::<TimestampMicrosecondArray>() => {
+                let t = t
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .unwrap();
+                Ok(ColumnarValue::Array(Arc::new(convert_tz_array(
+                    t, &from_tz, &to_tz,
+                )?)))
+            }
+            _ => {
+                return Err(DataFusionError::Execution(
+                    "First argument in CONVERT_TZ_KSQL must be timestamp or array of timestamps"
+                        .to_string(),
+                ));
+            }
+        }
+    }
+}
+
+struct FormatTimestampFunc {
+    signature: Signature,
+}
+
+impl FormatTimestampFunc {
+    fn new() -> FormatTimestampFunc {
+        FormatTimestampFunc {
+            signature: Signature::exact(
+                vec![
+                    DataType::Timestamp(TimeUnit::Microsecond, None),
+                    DataType::Utf8,
+                ],
+                Volatility::Stable,
+            ),
+        }
+    }
+}
+
+impl Debug for FormatTimestampFunc {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FormatTimestampFunc")
+    }
+}
+
+impl ScalarUDFImpl for FormatTimestampFunc {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        "format_timestamp"
+    }
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, _: &[DataType]) -> datafusion::common::Result<DataType> {
+        Ok(DataType::Utf8)
+    }
+
+    fn invoke(&self, inputs: &[ColumnarValue]) -> datafusion::common::Result<ColumnarValue> {
+        if inputs.len() != 2 {
+            return Err(DataFusionError::Execution(
+                "Expected 2 arguments in FORMAT_TIMESTAMP".to_string(),
+            ));
+        }
+
+        let format = match &inputs[1] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(v))) => sql_format_to_strformat(v),
+            _ => {
+                return Err(DataFusionError::Execution(
+                    "Only scalar arguments are supported as format in FORMAT_TIMESTAMP".to_string(),
+                ));
+            }
+        };
+
+        match &inputs[0] {
+            ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(Some(t), None)) => {
+                let time = Utc.timestamp_nanos(*t * 1000).naive_local();
+                Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(format!(
+                    "{}",
+                    time.format(&format)
+                )))))
+            }
+            ColumnarValue::Array(t) if t.as_any().is::<TimestampMicrosecondArray>() => {
+                let t = t
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .unwrap();
+                Ok(ColumnarValue::Array(Arc::new(format_timestamp_array(
+                    &t, &format,
+                )?)))
+            }
+            _ => {
+                return Err(DataFusionError::Execution(
+                    "First argument in FORMAT_TIMESTAMP must be timestamp or array of timestamps"
+                        .to_string(),
+                ));
+            }
+        }
+    }
 }
