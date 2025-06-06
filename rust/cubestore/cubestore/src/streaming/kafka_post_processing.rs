@@ -95,7 +95,7 @@ impl KafkaPostProcessPlan {
             .clone()
             .with_new_children(vec![filter_input])?;
 
-        let task_context = QueryPlannerImpl::execution_context_helper(
+        let task_context = QueryPlannerImpl::make_execution_context(
             self.metadata_cache_factory.make_session_config(),
         )
         .task_ctx();
@@ -118,6 +118,7 @@ pub struct KafkaPostProcessPlanner {
     seq_column: Column,
     columns: Vec<Column>,
     source_columns: Vec<Column>,
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
 }
 
 impl KafkaPostProcessPlanner {
@@ -127,6 +128,7 @@ impl KafkaPostProcessPlanner {
         seq_column: Column,
         columns: Vec<Column>,
         source_columns: Option<Vec<Column>>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Self {
         let mut source_columns = source_columns.map_or_else(|| columns.clone(), |c| c);
 
@@ -143,6 +145,7 @@ impl KafkaPostProcessPlanner {
             seq_column,
             columns,
             source_columns,
+            metadata_cache_factory,
         }
     }
 
@@ -493,7 +496,9 @@ impl KafkaPostProcessPlanner {
                                 projection_input.clone(),
                             )?;
 
-                            let plan_ctx = QueryPlannerImpl::make_execution_context();
+                            let plan_ctx = QueryPlannerImpl::make_execution_context(
+                                self.metadata_cache_factory.make_session_config(),
+                            );
                             let state = plan_ctx.state().with_physical_optimizer_rules(vec![]);
 
                             let projection_phys_plan_without_new_children = state
@@ -518,7 +523,9 @@ impl KafkaPostProcessPlanner {
                     let projection_plan =
                         self.make_projection_plan(expr, schema.clone(), projection_input.clone())?;
 
-                    let plan_ctx = QueryPlannerImpl::make_execution_context();
+                    let plan_ctx = QueryPlannerImpl::make_execution_context(
+                        self.metadata_cache_factory.make_session_config(),
+                    );
                     let state = plan_ctx.state().with_physical_optimizer_rules(vec![]);
 
                     let projection_phys_plan = state
