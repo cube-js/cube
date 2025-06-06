@@ -414,6 +414,7 @@ mod tests {
     use super::*;
     use crate::metastore::{Column, ColumnType};
     use crate::queryplanner::query_executor::batches_to_dataframe;
+    use crate::queryplanner::sql_to_rel_options;
     use crate::sql::MySqlDialectWithBackTicks;
     use crate::streaming::topic_table_provider::TopicTableProvider;
     use datafusion::arrow::array::StringArray;
@@ -438,7 +439,7 @@ mod tests {
             .unwrap();
 
         let provider = TopicTableProvider::new("t".to_string(), &vec![]);
-        let query_planner = SqlToRel::new(&provider);
+        let query_planner = SqlToRel::new_with_options(&provider, sql_to_rel_options());
 
         let logical_plan = query_planner
             .statement_to_plan(DFStatement::Statement(Box::new(statement.clone())))
@@ -474,7 +475,7 @@ mod tests {
             .parse_statement()
             .unwrap();
 
-        let query_planner = SqlToRel::new(&provider);
+        let query_planner = SqlToRel::new_with_options(&provider, sql_to_rel_options());
 
         let logical_plan = query_planner
             .statement_to_plan(DFStatement::Statement(Box::new(statement.clone())))
