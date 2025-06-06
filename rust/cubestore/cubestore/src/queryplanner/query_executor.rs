@@ -17,7 +17,7 @@ use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, S
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::DataFrame;
 use crate::table::data::rows_to_columns;
-use crate::table::parquet::{parquet_source, CubestoreParquetMetadataCache};
+use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::telemetry::suboptimal_query_plan_event;
 use crate::util::memory::MemoryHandler;
@@ -36,11 +36,12 @@ use datafusion::arrow::ipc::writer::StreamWriter;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::catalog::Session;
 use datafusion::common::ToDFSchema;
+use datafusion::config::TableParquetOptions;
 use datafusion::datasource::listing::PartitionedFile;
 use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::datasource::physical_plan::parquet::ParquetExecBuilder;
+use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
 use datafusion::datasource::physical_plan::{
-    FileScanConfig, ParquetExec, ParquetFileReaderFactory, ParquetSource,
+    FileScanConfig, ParquetFileReaderFactory, ParquetSource,
 };
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
@@ -79,6 +80,7 @@ use datafusion::physical_plan::{
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemoryExec;
+use datafusion_datasource::source::DataSourceExec;
 use futures_util::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
@@ -397,7 +399,7 @@ impl QueryExecutorImpl {
         serialized_plan: Arc<PreSerializedPlan>,
     ) -> Result<Arc<SessionContext>, CubeError> {
         let runtime = Arc::new(RuntimeEnv::default());
-        let config = Self::session_config();
+        let config = self.session_config();
         let session_state = SessionStateBuilder::new()
             .with_config(config)
             .with_runtime_env(runtime)
@@ -451,7 +453,7 @@ impl QueryExecutorImpl {
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<SessionContext>, CubeError> {
         let runtime = Arc::new(RuntimeEnv::default());
-        let config = Self::session_config();
+        let config = self.session_config();
         let session_state = SessionStateBuilder::new()
             .with_config(config)
             .with_runtime_env(runtime)
@@ -470,8 +472,10 @@ impl QueryExecutorImpl {
         Ok(Arc::new(ctx))
     }
 
-    fn session_config() -> SessionConfig {
-        let mut config = SessionConfig::new()
+    fn session_config(&self) -> SessionConfig {
+        let mut config = self
+            .metadata_cache_factory
+            .make_session_config()
             .with_batch_size(4096)
             // TODO upgrade DF if less than 2 then there will be no MergeJoin. Decide on repartitioning.
             .with_target_partitions(2)
@@ -689,10 +693,21 @@ impl CubeTable {
                     .get(remote_path.as_str())
                     .expect(format!("Missing remote path {}", remote_path).as_str());
 
+                let parquet_source = ParquetSource::new(
+                    TableParquetOptions::default(),
+                    get_reader_options_customizer(state.config()),
+                )
+                .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                let parquet_source = if let Some(phys_pred) = &physical_predicate {
+                    parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
+                } else {
+                    parquet_source
+                };
+
                 let file_scan = FileScanConfig::new(
                     ObjectStoreUrl::local_filesystem(),
                     index_schema.clone(),
-                    parquet_source(),
+                    Arc::new(parquet_source),
                 )
                 .with_file(PartitionedFile::from_path(local_path.to_string())?)
                 .with_projection(index_projection_or_none_on_schema_match.clone())
@@ -711,16 +726,10 @@ impl CubeTable {
                         })
                         .collect::<Result<Vec<_>, _>>()?,
                 )]);
-                let parquet_exec_builder = ParquetExecBuilder::new(file_scan)
-                    .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
-                let parquet_exec_builder = if let Some(phys_pred) = &physical_predicate {
-                    parquet_exec_builder.with_predicate(phys_pred.clone())
-                } else {
-                    parquet_exec_builder
-                };
-                let parquet_exec = parquet_exec_builder.build();
 
-                let arc: Arc<dyn ExecutionPlan> = Arc::new(parquet_exec);
+                let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
+
+                let arc: Arc<dyn ExecutionPlan> = Arc::new(data_source_exec);
                 let arc = FilterByKeyRangeExec::issue_filters(arc, filter.clone(), key_len);
                 partition_execs.push(arc);
             }
@@ -764,7 +773,18 @@ impl CubeTable {
                         .get(&remote_path)
                         .expect(format!("Missing remote path {}", remote_path).as_str());
 
-                    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone(), parquet_source())
+                    let parquet_source = ParquetSource::new(
+                        TableParquetOptions::default(),
+                        get_reader_options_customizer(state.config()),
+                    )
+                    .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                    let parquet_source = if let Some(phys_pred) = &physical_predicate {
+                        parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
+                    } else {
+                        parquet_source
+                    };
+
+                    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone(), Arc::new(parquet_source))
                         .with_file(PartitionedFile::from_path(local_path.to_string())?)
                         .with_projection(index_projection_or_none_on_schema_match.clone())
                         .with_output_ordering(vec![LexOrdering::new((0..key_len).map(|i| -> Result<_, DataFusionError> { Ok(PhysicalSortExpr::new(
@@ -774,16 +794,9 @@ impl CubeTable {
                             SortOptions::default(),
                         ))}).collect::<Result<Vec<_>, _>>()?)])
                         ;
-                    let parquet_exec_builder = ParquetExecBuilder::new(file_scan)
-                        .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
-                    let parquet_exec_builder = if let Some(phys_pred) = &physical_predicate {
-                        parquet_exec_builder.with_predicate(phys_pred.clone())
-                    } else {
-                        parquet_exec_builder
-                    };
-                    let parquet_exec = parquet_exec_builder.build();
 
-                    Arc::new(parquet_exec)
+                    let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
+                    Arc::new(data_source_exec)
                 };
 
                 let node = FilterByKeyRangeExec::issue_filters(node, filter.clone(), key_len);
