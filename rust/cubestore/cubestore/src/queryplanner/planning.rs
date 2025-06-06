@@ -1877,7 +1877,9 @@ pub mod tests {
     use crate::queryplanner::pretty_printers::PPOptions;
     use crate::queryplanner::query_executor::ClusterSendExec;
     use crate::queryplanner::serialized_plan::RowRange;
-    use crate::queryplanner::{pretty_printers, CubeTableLogical, QueryPlannerImpl};
+    use crate::queryplanner::{
+        pretty_printers, sql_to_rel_options, CubeTableLogical, QueryPlannerImpl,
+    };
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::table::{Row, TableValue};
     use crate::CubeError;
@@ -1897,7 +1899,7 @@ pub mod tests {
         assert_eq!(
             pretty_printers::pp_plan(&plan),
             "Filter\
-            \n  Scan s.customers, source: CubeTableLogical, fields: *"
+            \n  Scan s.Customers, source: CubeTableLogical, fields: *"
         );
 
         let plan = choose_index(plan, &indices).await.unwrap().0;
@@ -1905,7 +1907,7 @@ pub mod tests {
             pretty_printers::pp_plan(&plan),
             "ClusterSend, indices: [[0]]\
             \n  Filter\
-            \n    Scan s.customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: *"
+            \n    Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: *"
         );
 
         let plan = initial_plan(
@@ -1919,7 +1921,7 @@ pub mod tests {
         let expected =
             "Aggregate\
             \n  ClusterSend, indices: [[2]]\
-            \n    Scan s.orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer]), fields: [order_id, order_customer]";
+            \n    Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer]), fields: [order_id, order_customer]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
         let plan = initial_plan(
             "SELECT order_customer, order_id \
@@ -1930,10 +1932,10 @@ pub mod tests {
         );
         let plan = choose_index(plan, &indices).await.unwrap().0;
         let expected =
-            "Projection, [s.orders.order_customer:order_customer, s.orders.order_id:order_id]\
+            "Projection, [s.Orders.order_customer:order_customer, s.Orders.order_id:order_id]\
             \n  Aggregate\
             \n    ClusterSend, indices: [[2]]\
-            \n      Scan s.orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer]), fields: [order_id, order_customer]";
+            \n      Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer]), fields: [order_id, order_customer]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
@@ -1949,7 +1951,7 @@ pub mod tests {
             "Aggregate\
             \n  ClusterSend, indices: [[3]]\
             \n    Filter\
-            \n      Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer, order_id]), fields: [order_id, order_customer]";
+            \n      Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer, order_id]), fields: [order_id, order_customer]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
@@ -1962,11 +1964,11 @@ pub mod tests {
         );
         let plan = choose_index(plan, &indices).await.unwrap().0;
         let expected =
-            "Projection, [s.orders.order_customer:order_customer, s.orders.order_id:order_id]\
+            "Projection, [s.Orders.order_customer:order_customer, s.Orders.order_id:order_id]\
             \n  Aggregate\
             \n    ClusterSend, indices: [[3]]\
             \n      Filter\
-            \n        Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer, order_id]), fields: [order_id, order_customer]";
+            \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer, order_id]), fields: [order_id, order_customer]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
@@ -1980,11 +1982,11 @@ pub mod tests {
         let plan = choose_index(plan, &indices).await.unwrap().0;
 
         let expected =
-            "Projection, [s.orders.order_customer:order_customer, s.orders.order_id:order_id]\
+            "Projection, [s.Orders.order_customer:order_customer, s.Orders.order_id:order_id]\
             \n  Aggregate\
             \n    ClusterSend, indices: [[2]]\
             \n      Filter\
-            \n        Scan s.orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer, order_product]), fields: [order_id, order_customer, order_product]";
+            \n        Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer, order_product]), fields: [order_id, order_customer, order_product]";
 
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
@@ -1998,10 +2000,10 @@ pub mod tests {
         let plan = choose_index(plan, &indices).await.unwrap().0;
         let expected =
             "ClusterSend, indices: [[3], [0]]\
-            \n  Projection, [s.orders.order_id:order_id, s.orders.order_amount:order_amount, s.customers.customer_name:customer_name]\
-            \n    Join on: [s.orders.order_customer = s.customers.customer_id]\
-            \n      Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_amount]\
-            \n      Scan s.customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]";
+            \n  Projection, [s.Orders.order_id:order_id, s.Orders.order_amount:order_amount, s.Customers.customer_name:customer_name]\
+            \n    Join on: [s.Orders.order_customer = s.Customers.customer_id]\
+            \n      Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_amount]\
+            \n      Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
@@ -2014,13 +2016,13 @@ pub mod tests {
         let plan = choose_index(plan, &indices).await.unwrap().0;
         let expected =
             "ClusterSend, indices: [[3], [0], [5]]\
-            \n  Projection, [s.orders.order_id:order_id, s.customers.customer_name:customer_name, s.products.product_name:product_name]\
-            \n    Join on: [s.orders.order_product = s.products.product_id]\
-            \n      Projection, [s.orders.order_id:order_id, s.orders.order_product:order_product, s.customers.customer_name:customer_name]\
-            \n        Join on: [s.orders.order_customer = s.customers.customer_id]\
-            \n          Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_product]\
-            \n          Scan s.customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
-            \n      Scan s.products, source: CubeTable(index: default:5:[]:sort_on[product_id]), fields: *";
+            \n  Projection, [s.Orders.order_id:order_id, s.Customers.customer_name:customer_name, s.Products.product_name:product_name]\
+            \n    Join on: [s.Orders.order_product = s.Products.product_id]\
+            \n      Projection, [s.Orders.order_id:order_id, s.Orders.order_product:order_product, s.Customers.customer_name:customer_name]\
+            \n        Join on: [s.Orders.order_customer = s.Customers.customer_id]\
+            \n          Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_product]\
+            \n          Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
+            \n      Scan s.Products, source: CubeTable(index: default:5:[]:sort_on[product_id]), fields: *";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
@@ -2035,16 +2037,16 @@ pub mod tests {
         let expected =
             "ClusterSend, indices: [[3], [0], [1]]\
             \n  Projection, [c2.customer_name:customer_name]\
-            \n    Join on: [s.orders.order_city = c2.customer_city]\
-            \n      Projection, [s.orders.order_city:order_city]\
-            \n        Join on: [s.orders.order_customer = c1.customer_id]\
-            \n          Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
+            \n    Join on: [s.Orders.order_city = c2.customer_city]\
+            \n      Projection, [s.Orders.order_city:order_city]\
+            \n        Join on: [s.Orders.order_customer = c1.customer_id]\
+            \n          Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
             \n          SubqueryAlias\
-            \n            Projection, [s.customers.customer_id:customer_id]\
+            \n            Projection, [s.Customers.customer_id:customer_id]\
             \n              Filter\
-            \n                Scan s.customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
+            \n                Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
             \n      SubqueryAlias\
-            \n        Scan s.customers, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [customer_name, customer_city]";
+            \n        Scan s.Customers, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [customer_name, customer_city]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
     }
 
@@ -2061,7 +2063,7 @@ pub mod tests {
         assert_eq!(
             pretty_printers::pp_plan(&plan),
             "ClusterAggregateTopK, limit: 10\
-            \n  Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+            \n  Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // Projections should be handled properly.
@@ -2075,7 +2077,7 @@ pub mod tests {
             pretty_printers::pp_plan(&plan),
             "Projection, [customer, amount]\
            \n  ClusterAggregateTopK, limit: 10\
-           \n    Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         let plan = initial_plan(
@@ -2090,7 +2092,7 @@ pub mod tests {
             pretty_printers::pp_plan_ext(&plan, &with_sort_by),
             "Projection, [amount, customer]\
            \n  ClusterAggregateTopK, limit: 10, sortBy: [2 desc null last]\
-           \n    Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // Ascending order is also ok.
@@ -2104,14 +2106,14 @@ pub mod tests {
             pretty_printers::pp_plan_ext(&plan, &with_sort_by),
             "Projection, [customer, amount]\
            \n  ClusterAggregateTopK, limit: 10, sortBy: [2 null last]\
-           \n    Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // MAX and MIN are ok, as well as multiple aggregation.
         let plan = initial_plan(
             "SELECT order_customer `customer`, SUM(order_amount) `amount`, \
                     MIN(order_amount) `min_amount`, MAX(order_amount) `max_amount` \
-             FROM s.orders \
+             FROM s.Orders \
              GROUP BY 1 ORDER BY 3 DESC NULLS LAST, 2 ASC LIMIT 10",
             &indices,
         );
@@ -2121,8 +2123,8 @@ pub mod tests {
         assert_eq!(
             pretty_printers::pp_plan_ext(&plan, &verbose),
             "Projection, [customer, amount, min_amount, max_amount]\
-           \n  ClusterAggregateTopK, limit: 10, aggs: [sum(s.orders.order_amount), min(s.orders.order_amount), max(s.orders.order_amount)], sortBy: [3 desc null last, 2 null last]\
-           \n    Scan s.orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+           \n  ClusterAggregateTopK, limit: 10, aggs: [sum(s.Orders.order_amount), min(s.Orders.order_amount), max(s.Orders.order_amount)], sortBy: [3 desc null last, 2 null last]\
+           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // Should not introduce TopK by mistake in unsupported cases.
@@ -2199,10 +2201,10 @@ pub mod tests {
 
         let pp = pretty_printers::pp_plan(&choose_index(plan.clone(), &indices).await.unwrap().0);
         assert_eq!(pp, "ClusterSend, indices: [[6], [2]]\
-                      \n  Projection, [s.customers.customer_name:customer_name, s.orders.order_city:order_city]\
-                      \n    Join on: [s.orders.order_customer = s.customers.customer_id]\
-                      \n      Scan s.orders, source: CubeTable(index: #mi0:6:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
-                      \n      Scan s.customers, source: CubeTable(index: #mi0:2:[]:sort_on[customer_id]), fields: [customer_id, customer_name]");
+                      \n  Projection, [s.Customers.customer_name:customer_name, s.Orders.order_city:order_city]\
+                      \n    Join on: [s.Orders.order_customer = s.Customers.customer_id]\
+                      \n      Scan s.Orders, source: CubeTable(index: #mi0:6:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
+                      \n      Scan s.Customers, source: CubeTable(index: #mi0:2:[]:sort_on[customer_id]), fields: [customer_id, customer_name]");
 
         // Add some multi-partitions and validate how it runs.
         indices
@@ -2260,10 +2262,10 @@ pub mod tests {
         let (with_index, meta) = choose_index(plan, &indices).await.unwrap();
         let pp = pretty_printers::pp_plan(&with_index);
         assert_eq!(pp, "ClusterSend, indices: [[6], [2]]\
-                      \n  Projection, [s.customers.customer_name:customer_name, s.orders.order_city:order_city]\
-                      \n    Join on: [s.orders.order_customer = s.customers.customer_id]\
-                      \n      Scan s.orders, source: CubeTable(index: #mi0:6:[5, 6, 7, 8, 9]:sort_on[order_customer]), fields: [order_customer, order_city]\
-                      \n      Scan s.customers, source: CubeTable(index: #mi0:2:[0, 1, 2, 3, 4]:sort_on[customer_id]), fields: [customer_id, customer_name]");
+                      \n  Projection, [s.Customers.customer_name:customer_name, s.Orders.order_city:order_city]\
+                      \n    Join on: [s.Orders.order_customer = s.Customers.customer_id]\
+                      \n      Scan s.Orders, source: CubeTable(index: #mi0:6:[5, 6, 7, 8, 9]:sort_on[order_customer]), fields: [order_customer, order_city]\
+                      \n      Scan s.Customers, source: CubeTable(index: #mi0:2:[0, 1, 2, 3, 4]:sort_on[customer_id]), fields: [customer_id, customer_name]");
 
         let c = Config::test("partitioned_index_join").update_config(|mut c| {
             c.server_name = "router".to_string();
@@ -2369,7 +2371,7 @@ pub mod tests {
             "customer_registered_date",
         ]);
         let customers = i.add_table(Table::new(
-            "customers".to_string(),
+            "Customers".to_string(),
             SCHEMA,
             customers_cols.clone(),
             None,
@@ -2421,7 +2423,7 @@ pub mod tests {
             "order_city",
         ]);
         let orders = i.add_table(Table::new(
-            "orders".to_string(),
+            "Orders".to_string(),
             SCHEMA,
             orders_cols.clone(),
             None,
@@ -2479,7 +2481,7 @@ pub mod tests {
         }
 
         i.add_table(Table::new(
-            "products".to_string(),
+            "Products".to_string(),
             SCHEMA,
             int_columns(&["product_id", "product_name"]),
             None,
@@ -2521,7 +2523,7 @@ pub mod tests {
             other => panic!("not a statement, actual {:?}", other),
         };
 
-        let plan = SqlToRel::new(i)
+        let plan = SqlToRel::new_with_options(i, sql_to_rel_options())
             .statement_to_plan(DFStatement::Statement(Box::new(statement)))
             .unwrap();
         QueryPlannerImpl::execution_context_helper(SessionConfig::new())

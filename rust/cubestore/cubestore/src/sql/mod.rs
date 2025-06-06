@@ -264,7 +264,10 @@ impl SqlServiceImpl {
                 IndexDef {
                     name,
                     multi_index: None,
-                    columns: columns.iter().map(|c| quoted_value_or_lower(&c)).collect(),
+                    columns: columns
+                        .iter()
+                        .map(|c| normalize_for_column_name(&c))
+                        .collect(),
                     index_type: IndexType::Regular, //TODO realize aggregate index here too
                 },
             )
@@ -288,13 +291,13 @@ impl SqlServiceImpl {
         for column in columns {
             let c = if let Some(item) = table_columns
                 .iter()
-                .find(|voc| *voc.get_name() == quoted_value_or_lower(&column))
+                .find(|voc| *voc.get_name() == normalize_for_column_name(&column))
             {
                 item
             } else {
                 return Err(CubeError::user(format!(
                     "Column {} is not present in table {}.{}.",
-                    quoted_value_or_lower(&column),
+                    normalize_for_column_name(&column),
                     schema_name,
                     table_name
                 )));
@@ -499,16 +502,36 @@ pub fn boolean_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<boo
         })
 }
 
-pub fn quoted_value_or_lower(ident: &Ident) -> String {
-    if ident.quote_style.is_some() {
-        ident.value.to_string()
-    } else {
-        ident.value.to_lowercase()
-    }
+/// Normalizes an ident used for a column name -- hypothetically, by calling `to_ascii_lowercase()`
+/// when it is unquoted.  But actually it does nothing -- unquoted column names are being treated
+/// case sensitively, repeating our behavior for the DF upgrade.  This function serves as a marker
+/// for specific places where we were calling `to_lowercase()` in the DF upgrade branch in case we
+/// want to change those back.
+///
+/// See also:  our function `sql_to_rel_options()`, which turns off unqualified ident normalization
+/// in DataFusion.
+pub fn normalize_for_column_name(ident: &Ident) -> String {
+    // Don't normalize.  We didn't pre-DF upgrade.
+    ident.value.clone()
+
+    // Uses to_ascii_lowercase on unquoted identifiers.
+    // datafusion::sql::planner::IdentNormalizer::new(true).normalize(ident.clone())
 }
 
-pub fn quoted_value_or_retain_case(ident: &Ident) -> String {
-    ident.value.to_string()
+/// Normalizes an ident used for "source" names -- hypothetically, this might call
+/// `to_ascii_lowercase()`, but actually it does nothing.  See comment for
+/// `normalize_for_column_name`.
+pub fn normalize_for_source_name(ident: &Ident) -> String {
+    ident.value.clone()
+}
+
+/// Normalizes an ident used for schema or table names.  This in particular ran into backwards
+/// compatibility issues with pre-DF-upgrade Cubestores, or pre-upgrade Cube instances.  Using
+/// `to_lowercase()` on unquoted identifiers used by CREATE SCHEMA didn't work so well because later
+/// queries to information_schema used mixed-case quoted string values.  See also comment for
+/// `normalize_for_column_name`.
+pub fn normalize_for_schema_table_or_index_name(ident: &Ident) -> String {
+    ident.value.clone()
 }
 
 #[derive(Debug)]
@@ -684,7 +707,7 @@ impl SqlService for SqlServiceImpl {
                     Some(&vec![metrics::format_tag("command", "create_schema")]),
                 );
 
-                let name = quoted_value_or_retain_case(&schema_name.0[0]);
+                let name = normalize_for_schema_table_or_index_name(&schema_name.0[0]);
                 let res = self.create_schema(name, if_not_exists).await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
             }
@@ -716,8 +739,8 @@ impl SqlService for SqlServiceImpl {
                         name
                     )));
                 }
-                let schema_name = &quoted_value_or_retain_case(&nv[0]);
-                let table_name = &quoted_value_or_retain_case(&nv[1]);
+                let schema_name = &normalize_for_schema_table_or_index_name(&nv[0]);
+                let table_name = &normalize_for_schema_table_or_index_name(&nv[1]);
                 let mut import_format = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "input_format")
@@ -889,8 +912,8 @@ impl SqlService for SqlServiceImpl {
                         table_name
                     )));
                 }
-                let schema_name = &quoted_value_or_retain_case(&table_name.0[0]);
-                let table_name = &quoted_value_or_retain_case(&table_name.0[1]);
+                let schema_name = &normalize_for_schema_table_or_index_name(&table_name.0[0]);
+                let table_name = &normalize_for_schema_table_or_index_name(&table_name.0[1]);
                 let name = name.ok_or(CubeError::user(format!(
                     "Index name is not defined during index creation for {}.{}",
                     schema_name, table_name
@@ -960,7 +983,7 @@ impl SqlService for SqlServiceImpl {
                     };
                     let source = self
                         .db
-                        .create_or_update_source(quoted_value_or_lower(&name), creds?)
+                        .create_or_update_source(normalize_for_source_name(&name), creds?)
                         .await?;
                     Ok(Arc::new(DataFrame::from(vec![source])))
                 } else {
@@ -1058,8 +1081,8 @@ impl SqlService for SqlServiceImpl {
                 if nv.len() != 2 {
                     return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", query)));
                 }
-                let schema_name = &quoted_value_or_retain_case(&nv[0]);
-                let table_name = &quoted_value_or_retain_case(&nv[1]);
+                let schema_name = &normalize_for_schema_table_or_index_name(&nv[0]);
+                let table_name = &normalize_for_schema_table_or_index_name(&nv[1]);
 
                 self.insert_data(schema_name.clone(), table_name.clone(), &columns, data)
                     .await?;
