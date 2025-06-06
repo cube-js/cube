@@ -2876,7 +2876,7 @@ async fn xirr(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap_err();
-    assert_eq!(r.elide_backtrace(), CubeError::internal("Arrow error: External error: Execution error: A result for XIRR couldn't be determined because the arguments are empty".to_owned()));
+    assert_eq!(r.elide_backtrace(), CubeError::internal("Execution error: A result for XIRR couldn't be determined because the arguments are empty".to_owned()));
 
     let r = service
         .exec_query(
@@ -2889,7 +2889,12 @@ async fn xirr(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap_err();
-    assert_eq!(r.elide_backtrace(), CubeError::internal("Arrow error: External error: Execution error: The XIRR function couldn't find a solution".to_owned()));
+    assert_eq!(
+        r.elide_backtrace(),
+        CubeError::internal(
+            "Execution error: The XIRR function couldn't find a solution".to_owned()
+        )
+    );
 
     // --- on_error testing ---
 
@@ -2927,7 +2932,7 @@ async fn xirr(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap_err();
-    assert_eq!(r.elide_backtrace(), CubeError::internal("Arrow error: External error: Execution error: A result for XIRR couldn't be determined because the arguments are empty".to_owned()));
+    assert_eq!(r.elide_backtrace(), CubeError::internal("Execution error: A result for XIRR couldn't be determined because the arguments are empty".to_owned()));
 
     let r = service
         .exec_query(
