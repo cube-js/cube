@@ -1,4 +1,5 @@
 use crate::queryplanner::hll::{Hll, HllUnion};
+use crate::queryplanner::udf_xirr::{XirrUDF, XIRR_UDAF_NAME};
 use crate::CubeError;
 use chrono::{Datelike, Duration, Months, NaiveDateTime};
 use datafusion::arrow::array::{
@@ -6,7 +7,6 @@ use datafusion::arrow::array::{
 };
 use datafusion::arrow::buffer::ScalarBuffer;
 use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
-use datafusion::common::internal_err;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::function::AccumulatorArgs;
 use datafusion::logical_expr::simplify::{ExprSimplifyResult, SimplifyInfo};
@@ -64,18 +64,14 @@ pub fn registerable_arc_scalar_udfs() -> Vec<Arc<ScalarUDF>> {
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeAggregateUDFKind {
     MergeHll, // merge(), accepting the HyperLogLog sketches.
-              // Xirr,
-}
-
-pub trait CubeAggregateUDF {
-    fn kind(&self) -> CubeAggregateUDFKind;
-    fn name(&self) -> &str;
-    fn descriptor(&self) -> AggregateUDF;
-    fn accumulator(&self) -> Box<dyn Accumulator>;
+    Xirr,
 }
 
 pub fn registerable_aggregate_udfs() -> Vec<AggregateUDF> {
-    vec![AggregateUDF::new_from_impl(HllMergeUDF::new())]
+    vec![
+        AggregateUDF::new_from_impl(HllMergeUDF::new()),
+        AggregateUDF::new_from_impl(XirrUDF::new()),
+    ]
 }
 
 pub fn registerable_arc_aggregate_udfs() -> Vec<Arc<AggregateUDF>> {
@@ -88,6 +84,7 @@ pub fn registerable_arc_aggregate_udfs() -> Vec<Arc<AggregateUDF>> {
 pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> AggregateUDF {
     match k {
         CubeAggregateUDFKind::MergeHll => AggregateUDF::new_from_impl(HllMergeUDF::new()),
+        CubeAggregateUDFKind::Xirr => AggregateUDF::new_from_impl(XirrUDF::new()),
     }
 }
 
@@ -96,9 +93,9 @@ pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
     if n == "merge" {
         return Some(CubeAggregateUDFKind::MergeHll);
     }
-    // if n == "XIRR" {
-    //     return Some(CubeAggregateUDFKind::Xirr);
-    // }
+    if n == XIRR_UDAF_NAME {
+        return Some(CubeAggregateUDFKind::Xirr);
+    }
     return None;
 }
 
