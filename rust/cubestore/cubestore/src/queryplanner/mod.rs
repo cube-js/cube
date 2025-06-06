@@ -19,6 +19,7 @@ pub mod trace_data_loaded;
 use rewrite_inlist_literals::RewriteInListLiterals;
 use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
+use udf_xirr::XIRR_UDAF_NAME;
 use udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
 mod filter_by_key_range;
 mod flatten_union;
@@ -30,7 +31,7 @@ mod rewrite_inlist_literals;
 mod rolling;
 #[cfg(test)]
 mod test_utils;
-// pub mod udf_xirr;
+pub mod udf_xirr;
 pub mod udfs;
 
 use crate::cachestore::CacheStore;
@@ -560,8 +561,8 @@ impl ContextProvider for MetaStoreSchemaProvider {
     }
 
     fn udaf_names(&self) -> Vec<String> {
-        // TODO upgrade DF: We shouldn't need "merge" here because we registered it (see get_aggregate_meta).
-        let mut res = vec!["merge".to_string()];
+        // TODO upgrade DF: We shouldn't need "merge" or "xirr" here because we registered it (see get_aggregate_meta).
+        let mut res = vec!["merge".to_string(), XIRR_UDAF_NAME.to_string()];
         res.extend(self.session_state.aggregate_functions().keys().cloned());
         res
     }
