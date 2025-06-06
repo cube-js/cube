@@ -244,7 +244,7 @@ impl QueryPlannerImpl {
 }
 
 impl QueryPlannerImpl {
-    pub fn execution_context_helper(config: SessionConfig) -> SessionContext {
+    pub fn make_execution_context(config: SessionConfig) -> SessionContext {
         let context = SessionContext::new_with_config(config);
         // TODO upgrade DF: build SessionContexts consistently -- that now means check all appropriate SessionContext constructors use this make_execution_context or execution_context function.
         for udaf in registerable_aggregate_udfs() {
@@ -258,20 +258,12 @@ impl QueryPlannerImpl {
 
         // TODO upgrade DF
         // context
-        // .with_metadata_cache_factory(self.metadata_cache_factory.clone())
-        // TODO upgrade DF
-        // context
         // .add_optimizer_rule(Arc::new(ProjectionAboveLimit {})),
         context
     }
 
-    pub fn make_execution_context() -> SessionContext {
-        // TODO upgrade DF: Remove this -- use metadata_cache_factory.make_session_config()
-        Self::execution_context_helper(SessionConfig::new())
-    }
-
     fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
-        Ok(Arc::new(Self::execution_context_helper(
+        Ok(Arc::new(Self::make_execution_context(
             self.metadata_cache_factory.make_session_config(),
         )))
     }

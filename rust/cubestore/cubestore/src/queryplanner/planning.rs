@@ -2581,7 +2581,7 @@ pub mod tests {
         let plan = SqlToRel::new_with_options(i, sql_to_rel_options())
             .statement_to_plan(DFStatement::Statement(Box::new(statement)))
             .unwrap();
-        QueryPlannerImpl::execution_context_helper(SessionConfig::new())
+        QueryPlannerImpl::make_execution_context(SessionConfig::new())
             .state()
             .optimize(&plan)
             .unwrap()

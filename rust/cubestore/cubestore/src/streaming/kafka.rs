@@ -70,6 +70,7 @@ impl KafkaStreamingSource {
                     seq_column,
                     columns.clone(),
                     source_columns,
+                    metadata_cache_factory.clone(),
                 );
                 let plan = planner
                     .build(select_statement.clone(), metadata_cache_factory)
