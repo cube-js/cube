@@ -80,6 +80,7 @@ use datafusion::physical_plan::{
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemoryExec;
+use datafusion_datasource::memory::MemorySourceConfig;
 use datafusion_datasource::source::DataSourceExec;
 use futures_util::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
@@ -98,7 +99,7 @@ use tracing::{instrument, Instrument};
 
 use super::serialized_plan::PreSerializedPlan;
 use super::udfs::{registerable_arc_aggregate_udfs, registerable_arc_scalar_udfs};
-use super::QueryPlannerImpl;
+use super::{try_make_memory_data_source, QueryPlannerImpl};
 
 #[automock]
 #[async_trait]
@@ -765,8 +766,8 @@ impl CubeTable {
                             )));
                         }
                     }
-                    Arc::new(
-                        MemoryExec::try_new(
+                    Arc::new(DataSourceExec::new(Arc::new(
+                        MemorySourceConfig::try_new(
                             &[record_batches.clone()],
                             index_schema.clone(),
                             index_projection_or_none_on_schema_match.clone(),
@@ -777,7 +778,7 @@ impl CubeTable {
                                 &index_projection_schema,
                             )?),
                         ])?,
-                    )
+                    )))
                 } else {
                     let remote_path = chunk.get_row().get_full_name(chunk.get_id());
                     let local_path = self
@@ -1810,11 +1811,11 @@ impl TableProvider for InlineTableProvider {
         // TODO batch_size
         let batches = dataframe_to_batches(self.data.as_ref(), 16384)?;
         let projection = projection.cloned();
-        Ok(Arc::new(MemoryExec::try_new(
+        Ok(try_make_memory_data_source(
             &vec![batches],
             schema.clone(),
             projection,
-        )?))
+        )?)
     }
 
     fn table_type(&self) -> TableType {
