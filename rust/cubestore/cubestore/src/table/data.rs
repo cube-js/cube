@@ -1,8 +1,8 @@
 use crate::metastore::{Column, ColumnType};
+use crate::queryplanner::try_make_memory_data_source;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
-use datafusion_datasource::memory::MemoryExec;
 use itertools::Itertools;
 use std::cmp::Ordering;
 
@@ -254,7 +254,7 @@ pub fn rows_to_columns(cols: &[Column], rows: &[Row]) -> Vec<ArrayRef> {
 pub fn to_stream(r: RecordBatch) -> SendableRecordBatchStream {
     let schema = r.schema();
     // TaskContext::default is OK here because it's a plain memory exec.
-    MemoryExec::try_new(&[vec![r]], schema, None)
+    try_make_memory_data_source(&[vec![r]], schema, None)
         .unwrap()
         .execute(0, Arc::new(TaskContext::default()))
         .unwrap()
