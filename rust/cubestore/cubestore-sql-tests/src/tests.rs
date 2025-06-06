@@ -3133,7 +3133,7 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         "PartiallySortedFinalAggregate, partitions: 1\
         \n  Worker, partitions: 1\
         \n    PartiallySortedPartialAggregate, partitions: 1\
-        \n      CoalesceBatchesExec, partitions: 1\
+        \n      CoalesceBatches, partitions: 1\
         \n        Filter, partitions: 1\
         \n          Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *, partitions: 1\
         \n            Sort, partitions: 1\
@@ -3151,7 +3151,7 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         "PartiallySortedFinalAggregate, partitions: 1\
         \n  Worker, partitions: 1\
         \n    PartiallySortedPartialAggregate, partitions: 1\
-        \n      CoalesceBatchesExec, partitions: 1\
+        \n      CoalesceBatches, partitions: 1\
         \n        Filter, partitions: 1\
         \n          Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *, partitions: 1\
         \n            Sort, partitions: 1\
@@ -3236,7 +3236,7 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
         \n  Worker, single_vals: [1]\
         \n    CoalescePartitions, single_vals: [1]\
         \n      Projection, [id3, id2], single_vals: [1]\
-        \n        CoalesceBatchesExec, single_vals: [0]\
+        \n        CoalesceBatches, single_vals: [0]\
         \n          Filter, single_vals: [0]\
         \n            Scan, index: default:1:[1], fields: [id2, id3]\
         \n              Empty"
@@ -3250,7 +3250,7 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [0]\
-        \n  CoalesceBatchesExec, sort_order: [0]\
+        \n  CoalesceBatches, sort_order: [0]\
         \n    Filter, sort_order: [0]\
         \n      Scan, index: default:1:[1]:sort_on[id1, id2], fields: *, sort_order: [0, 1, 2]\
         \n        Sort, sort_order: [0, 1, 2]\
@@ -3263,7 +3263,7 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [0, 1]\
-        \n  CoalesceBatchesExec, sort_order: [0, 1]\
+        \n  CoalesceBatches, sort_order: [0, 1]\
         \n    Filter, sort_order: [0, 1]\
         \n      CoalescePartitions, sort_order: [0, 1, 2]\
         \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
@@ -3322,13 +3322,13 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
            \n          CoalescePartitions\
            \n            Union\
            \n              CoalescePartitions\
-           \n                CoalesceBatchesExec\
+           \n                CoalesceBatches\
            \n                  Filter\
            \n                    Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
            \n                      Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
            \n                        Empty\
            \n              CoalescePartitions\
-           \n                CoalesceBatchesExec\
+           \n                CoalesceBatches\
            \n                  Filter\
            \n                    Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
            \n                      Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
@@ -3585,7 +3585,7 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "Worker\
-        \n  CoalesceBatchesExec\
+        \n  CoalesceBatches\
         \n    Filter\
         \n      CoalescePartitions\
         \n        Scan, index: default:1:[1], fields: [id, amount]\
@@ -3611,7 +3611,7 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         pp_phys_plan(p.worker.as_ref()),
         "Sort\
         \n  Worker\
-        \n    CoalesceBatchesExec\
+        \n    CoalesceBatches\
         \n      Filter\
         \n        CoalescePartitions\
         \n          Scan, index: default:1:[1], fields: [id, amount]\
@@ -3637,7 +3637,7 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         pp_phys_plan(p.worker.as_ref()),
         "GlobalLimit, n: 10\
         \n  Worker\
-        \n    CoalesceBatchesExec\
+        \n    CoalesceBatches\
         \n      Filter\
         \n        CoalescePartitions\
         \n          Scan, index: default:1:[1], fields: [id, amount]\
@@ -3730,7 +3730,7 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
         "SortedFinalAggregate\
         \n  Worker\
         \n    SortedPartialAggregate\
-        \n      CoalesceBatchesExec\
+        \n      CoalesceBatches\
         \n        Filter\
         \n          Scan, index: cb:2:[2]:sort_on[c, b], fields: [b, c, amount]\
         \n            Sort\
@@ -3754,7 +3754,7 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
         \n    Worker\
         \n      CoalescePartitions\
         \n        LinearPartialAggregate\
-        \n          CoalesceBatchesExec\
+        \n          CoalesceBatches\
         \n            Filter\
         \n              Scan, index: cb:2:[2], fields: [b, c, amount]\
         \n                Sort\
@@ -3779,7 +3779,7 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
         "SortedFinalAggregate\
         \n  Worker\
         \n    SortedPartialAggregate\
-        \n      CoalesceBatchesExec\
+        \n      CoalesceBatches\
         \n        Filter\
         \n          Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
         \n            Sort\
@@ -3949,7 +3949,7 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
             \n        MergeJoin, on: [product_id@1 = product_id@0]\
             \n          Projection, [order_id, product_id, customer_name]\
             \n            MergeJoin, on: [customer_id@1 = customer_id@0]\
-            \n              CoalesceBatchesExec\
+            \n              CoalesceBatches\
             \n                Filter, predicate: product_id@2 = 125\
             \n                  Scan, index: by_product_customer:3:[3]:sort_on[product_id, customer_id], fields: [order_id, customer_id, product_id], predicate: BinaryExpr(BinaryExpr { left: Column(Column { relation: None, name: \"product_id\" }), op: Eq, right: Literal(Int64(125)) })\
             \n                    Sort\
@@ -3957,7 +3957,7 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
             \n              Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
             \n                Sort\
             \n                  Empty\
-            \n          CoalesceBatchesExec\
+            \n          CoalesceBatches\
             \n            Filter, predicate: product_id@0 = 125\
             \n              Scan, index: default:5:[5]:sort_on[product_id], fields: *, predicate: BinaryExpr(BinaryExpr { left: Column(Column { relation: None, name: \"product_id\" }), op: Eq, right: Literal(Int64(125)) })\
             \n                Sort\
@@ -7574,7 +7574,7 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
         "SortedFinalAggregate\
         \n  Worker\
         \n    SortedPartialAggregate\
-        \n      CoalesceBatchesExec\
+        \n      CoalesceBatches\
         \n        Filter\
         \n          Scan, index: default:3:[3]:sort_on[a, b, c], fields: *\
         \n            Sort\
@@ -7620,7 +7620,7 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
         "SortedFinalAggregate\
         \n  Worker\
         \n    SortedPartialAggregate\
-        \n      CoalesceBatchesExec\
+        \n      CoalesceBatches\
         \n        Filter\
         \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
         \n            Sort\
