@@ -894,7 +894,7 @@ impl CubeTable {
                     )?)],
                 ),
                 Partitioning::UnknownPartitioning(partition_num),
-                EmissionType::Both, // TODO upgrade DF
+                EmissionType::Incremental,
                 Boundedness::Bounded,
             ),
         });
@@ -1084,7 +1084,7 @@ impl ExecutionPlan for CubeTableExec {
                     )?)],
                 ),
                 Partitioning::UnknownPartitioning(partition_count),
-                EmissionType::Both, // TODO upgrade DF
+                EmissionType::Incremental,
                 Boundedness::Bounded,
             ),
         }))
@@ -1348,7 +1348,7 @@ impl ClusterSendExec {
         PlanProperties::new(
             eq_properties,
             Partitioning::UnknownPartitioning(partitions_num),
-            EmissionType::Both, // TODO upgrade DF: Actually Final, unless we implement streaming, but check if that value has implications.
+            EmissionType::Both, // Or Final, but we should implement streaming.
             input_properties.boundedness.clone(),
         )
     }
