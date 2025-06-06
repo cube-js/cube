@@ -3358,7 +3358,7 @@ mod tests {
                 \n    Worker\
                 \n      CoalescePartitions\
                 \n        LinearPartialAggregate\
-                \n          CoalesceBatchesExec\
+                \n          CoalesceBatches\
                 \n            Filter\
                 \n              MergeSort\
                 \n                Scan, index: default:1:[1]:sort_on[num], fields: *\
@@ -4428,7 +4428,7 @@ mod tests {
                     .values()[2] {
                         TableValue::String(pp_plan) => {
                             let regex = Regex::new(
-                                r"LinearPartialAggregate\s+CoalesceBatchesExec\s+Filter\s+Scan, index: default:1:\[1\], fields: \[platform, age, amount\]\s+ParquetScan, files: \S*\.chunk\.parquet"
+                                r"LinearPartialAggregate\s+CoalesceBatches\s+Filter\s+Scan, index: default:1:\[1\], fields: \[platform, age, amount\]\s+ParquetScan, files: \S*\.chunk\.parquet"
                             ).unwrap();
                             let matches = regex.captures_iter(&pp_plan).count();
                             assert_eq!(matches, 1, "pp_plan = {}", pp_plan);
