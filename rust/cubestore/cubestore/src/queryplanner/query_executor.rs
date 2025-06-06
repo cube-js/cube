@@ -24,8 +24,8 @@ use async_trait::async_trait;
 use core::fmt;
 use datafusion::arrow::array::{
     make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array,
-    Int16Array, Int32Array, Int64Array, MutableArrayData, StringArray, TimestampMicrosecondArray,
-    TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
+    Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
+    TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
 use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
@@ -1929,6 +1929,13 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                         });
                     }
                 }
+                DataType::Null => {
+                    // Force the cast, just because.
+                    let _ = array.as_any().downcast_ref::<NullArray>().unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(TableValue::Null);
+                    }
+                }
                 x => panic!("Unsupported data type: {:?}", x),
             }
         }
@@ -1965,6 +1972,8 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         | DataType::UInt16
         | DataType::UInt32
         | DataType::UInt64 => Ok(ColumnType::Int),
+        // This fn is only used for converting to DataFrame, and cubesql does this (as if that's a reason)
+        DataType::Null => Ok(ColumnType::String),
         x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
     }
 }

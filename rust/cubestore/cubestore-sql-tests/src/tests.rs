@@ -1730,12 +1730,11 @@ async fn coalesce(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), vec![vec![TableValue::Int(1)]]);
-    // TODO: the type should be 'int' here. Hopefully not a problem in practice.
     let r = service
         .exec_query("SELECT coalesce(NULL, 2, 3)")
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), vec![vec![TableValue::String("2".to_string())]]);
+    assert_eq!(to_rows(&r), vec![vec![TableValue::Int(2)]]);
     let r = service
         .exec_query("SELECT coalesce(NULL, NULL, NULL)")
         .await
@@ -1754,20 +1753,11 @@ async fn coalesce(service: Box<dyn SqlClient>) {
             vec![TableValue::Null],
         ]
     );
-    // Coerces all args to text.
-    let r = service
+    // Type mismatch
+    service
         .exec_query("SELECT coalesce(n, v, s) FROM s.Data ORDER BY 1")
         .await
-        .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        vec![
-            vec![TableValue::String("1".to_string())],
-            vec![TableValue::String("3".to_string())],
-            vec![TableValue::String("baz".to_string())],
-            vec![TableValue::Null],
-        ]
-    );
+        .unwrap_err();
 
     let r = service
         .exec_query("SELECT coalesce(n+1,v+1,0) FROM s.Data ORDER BY 1")

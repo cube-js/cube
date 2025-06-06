@@ -16,7 +16,6 @@ mod topk;
 pub mod trace_data_loaded;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 use udfs::{aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_scalar_udfs};
-mod coalesce;
 mod filter_by_key_range;
 mod flatten_union;
 pub mod info_schema;
@@ -495,7 +494,6 @@ impl ContextProvider for MetaStoreSchemaProvider {
         // TODO upgrade DF
         let kind = match name {
             "cardinality" | "CARDINALITY" => CubeScalarUDFKind::HllCardinality,
-            // "coalesce" | "COALESCE" => CubeScalarUDFKind::Coalesce,
             "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
             "date_add" | "DATE_ADD" => CubeScalarUDFKind::DateAdd,
             "date_sub" | "DATE_SUB" => CubeScalarUDFKind::DateSub,
