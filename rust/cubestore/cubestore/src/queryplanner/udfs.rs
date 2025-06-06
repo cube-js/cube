@@ -27,7 +27,6 @@ use std::sync::Arc;
 pub enum CubeScalarUDFKind {
     HllCardinality, // cardinality(), accepting the HyperLogLog sketches.
     // Coalesce,
-    // Now,
     UnixTimestamp,
     DateAdd,
     DateSub,
@@ -38,7 +37,6 @@ pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Arc<ScalarUDF> {
     match k {
         CubeScalarUDFKind::HllCardinality => Arc::new(HllCardinality::descriptor()),
         // CubeScalarUDFKind::Coalesce => Box::new(Coalesce {}),
-        // CubeScalarUDFKind::Now => Box::new(Now {}),
         CubeScalarUDFKind::UnixTimestamp => {
             Arc::new(ScalarUDF::new_from_impl(UnixTimestamp::new()))
         }
@@ -72,9 +70,6 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     // if n == "COALESCE" {
     //     return Some(CubeScalarUDFKind::Coalesce);
     // }
-    // if n == "NOW" {
-    //     return Some(CubeScalarUDFKind::Now);
-    // }
     if n == "UNIX_TIMESTAMP" {
         return Some(CubeScalarUDFKind::UnixTimestamp);
     }
@@ -90,7 +85,7 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     // TODO upgrade DF: Remove this (once we are no longer in flux about naming casing of UDFs and UDAFs).
     if [
         "CARDINALITY",
-        /* "COALESCE", "NOW", */ "UNIX_TIMESTAMP",
+        /* "COALESCE", */ "UNIX_TIMESTAMP",
         "DATE_ADD",
         "DATE_SUB",
         "DATE_BIN",
@@ -179,39 +174,6 @@ pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
 //                 Ok(Arc::new(ts[0].clone()))
 //             }),
 //             fun: Arc::new(coalesce),
-//         };
-//     }
-// }
-
-// TODO upgrade DF - remove?
-// struct Now {}
-// impl Now {
-//     fn signature() -> Signature {
-//         Signature::Exact(Vec::new())
-//     }
-// }
-// impl CubeScalarUDF for Now {
-//     fn kind(&self) -> CubeScalarUDFKind {
-//         CubeScalarUDFKind::Now
-//     }
-//
-//     fn name(&self) -> &str {
-//         "NOW"
-//     }
-//
-//     fn descriptor(&self) -> ScalarUDF {
-//         return ScalarUDF {
-//             name: self.name().to_string(),
-//             signature: Self::signature(),
-//             return_type: Arc::new(|inputs| {
-//                 assert!(inputs.is_empty());
-//                 Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
-//             }),
-//             fun: Arc::new(|_| {
-//                 Err(DataFusionError::Internal(
-//                     "NOW() was not optimized away".to_string(),
-//                 ))
-//             }),
 //         };
 //     }
 // }
