@@ -610,12 +610,16 @@ export class BaseQuery {
   }
 
   /**
-   * Wrap specified column/table name with the double quote.
+   * Wrap specified column/table name with the double quote and escape quotes inside.
    * @param {string} name
    * @returns {string}
    */
   escapeColumnName(name) {
-    return `"${name}"`;
+    // Identifier is wrapped with double quotes
+    // https://ronsavage.github.io/SQL/sql-2003-2.bnf.html#delimited%20identifier
+    // Double quote inside is represented by double double quote
+    // https://ronsavage.github.io/SQL/sql-2003-2.bnf.html#doublequote%20symbol
+    return `"${name.replaceAll('"', '""')}"`;
   }
 
   /**
