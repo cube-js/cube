@@ -178,11 +178,11 @@ impl BaseDimension {
     pub fn is_sub_query(&self) -> bool {
         self.definition
             .as_ref()
-            .map_or(false, |def| def.static_data().sub_query.unwrap_or(false))
+            .is_some_and(|def| def.static_data().sub_query.unwrap_or(false))
     }
 
     pub fn propagate_filters_to_sub_query(&self) -> bool {
-        self.definition.as_ref().map_or(false, |def| {
+        self.definition.as_ref().is_some_and(|def| {
             def.static_data()
                 .propagate_filters_to_sub_query
                 .unwrap_or(false)

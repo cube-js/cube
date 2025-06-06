@@ -4,6 +4,7 @@ use std::ops::{Add, AddAssign, Neg, Sub};
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
+#[derive(Default)]
 pub struct SqlInterval {
     pub year: i32,
     pub month: i32,
@@ -151,20 +152,6 @@ impl Neg for SqlInterval {
             -self.minute,
             -self.second,
         )
-    }
-}
-
-impl Default for SqlInterval {
-    fn default() -> Self {
-        Self {
-            second: 0,
-            minute: 0,
-            hour: 0,
-            day: 0,
-            week: 0,
-            month: 0,
-            year: 0,
-        }
     }
 }
 

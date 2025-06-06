@@ -7,17 +7,11 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Default)]
 pub struct FiltersContext {
     pub use_local_tz: bool,
 }
 
-impl Default for FiltersContext {
-    fn default() -> Self {
-        Self {
-            use_local_tz: false,
-        }
-    }
-}
 
 pub struct VisitorContext {
     node_processor: Rc<dyn SqlNode>,

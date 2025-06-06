@@ -15,7 +15,7 @@ pub struct PlanSqlTemplates {
 pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
     name: "UnderscoreUpper",
     condition: |s, _| {
-        s.get(0) == Some(&"_")
+        s.first() == Some(&"_")
             && s.get(1)
                 .map(|c| c.to_uppercase() != c.to_lowercase() && *c == c.to_uppercase())
                 == Some(true)
@@ -32,7 +32,7 @@ fn grapheme_is_uppercase(c: &&str) -> bool {
 pub const UPPER_UPPER_BOUND: Boundary = Boundary {
     name: "UpperUpper",
     condition: |s, _| {
-        s.get(0).map(grapheme_is_uppercase) == Some(true)
+        s.first().map(grapheme_is_uppercase) == Some(true)
             && s.get(1).map(grapheme_is_uppercase) == Some(true)
     },
     arg: None,

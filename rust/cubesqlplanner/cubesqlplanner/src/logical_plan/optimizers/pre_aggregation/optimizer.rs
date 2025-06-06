@@ -23,7 +23,7 @@ impl MatchState {
         if matches!(self, MatchState::Partial) || matches!(other, MatchState::Partial) {
             return MatchState::Partial;
         }
-        return MatchState::Full;
+        MatchState::Full
     }
 }
 
@@ -233,9 +233,7 @@ impl PreAggregationOptimizer {
         }
 
         if let Some(multi_stage_item) = multi_stage_queries
-            .iter()
-            .cloned()
-            .find(|query| &query.name == multi_stage_name)
+            .iter().find(|&query| &query.name == multi_stage_name).cloned()
         {
             match &multi_stage_item.member_type {
                 MultiStageMemberLogicalType::LeafMeasure(multi_stage_leaf_measure) => self
@@ -432,7 +430,7 @@ impl PreAggregationOptimizer {
                             .map(|(d, _)| d.clone()),
                     )
                     .collect(),
-                measures: pre_aggregation.measures.iter().cloned().collect(),
+                measures: pre_aggregation.measures.to_vec(),
                 multiplied_measures: HashSet::new(),
             };
             let pre_aggregation = PreAggregation {
