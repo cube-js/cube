@@ -509,21 +509,18 @@ impl ContextProvider for MetaStoreSchemaProvider {
         return Some(scalar_udf_by_kind(kind));
     }
 
-    fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
+    fn get_aggregate_meta(&self, name_param: &str) -> Option<Arc<AggregateUDF>> {
         // HyperLogLog.
         // TODO: case-insensitive names.
+        /*
         let (_kind, name) = match name {
             "merge" | "MERGE" => (CubeAggregateUDFKind::MergeHll, "MERGE"),
             _ => return None,
         };
+        */
+        let name = name_param.to_ascii_lowercase();
 
-        let aggregate_udf_by_registry = self.session_state.aggregate_functions().get(name);
-
-        // TODO upgrade DF: Remove this assertion (and/or remove the kind lookup above).
-        assert!(
-            aggregate_udf_by_registry.is_some(),
-            "MERGE is not registered in SessionState"
-        );
+        let aggregate_udf_by_registry: Option<&Arc<AggregateUDF>> = self.session_state.aggregate_functions().get(&name);
 
         aggregate_udf_by_registry.map(|arc| arc.clone())
     }
