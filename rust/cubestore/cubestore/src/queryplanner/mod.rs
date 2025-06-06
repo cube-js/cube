@@ -265,6 +265,7 @@ impl QueryPlannerImpl {
     }
 
     pub fn make_execution_context() -> SessionContext {
+        // TODO upgrade DF: Remove this -- use metadata_cache_factory.make_session_config()
         Self::execution_context_helper(SessionConfig::new())
     }
 
