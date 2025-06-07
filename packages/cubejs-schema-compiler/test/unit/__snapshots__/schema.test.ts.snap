@@ -1,6 +1,100 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 1`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (no additions): accessPolicy 1`] = `
+Array [
+  Object {
+    "role": "*",
+    "rowLevel": Object {
+      "allowAll": true,
+    },
+  },
+  Object {
+    "conditions": Array [
+      Object {
+        "if": [Function],
+      },
+    ],
+    "memberLevel": Object {
+      "excludes": Array [
+        "status",
+      ],
+      "excludesMembers": Array [
+        "orders.status",
+      ],
+      "includes": "*",
+      "includesMembers": Array [
+        "orders.count",
+        "orders.id",
+        "orders.user_id",
+        "orders.status",
+        "orders.created_at",
+        "orders.completed_at",
+        "orders.sfUsers",
+      ],
+    },
+    "role": "admin",
+    "rowLevel": Object {
+      "filters": Array [
+        Object {
+          "member": [Function],
+          "memberReference": "orders.id",
+          "operator": "equals",
+          "values": [Function],
+        },
+      ],
+    },
+  },
+]
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (no additions): accessPolicy 2`] = `
+Array [
+  Object {
+    "role": "*",
+    "rowLevel": Object {
+      "allowAll": true,
+    },
+  },
+  Object {
+    "conditions": Array [
+      Object {
+        "if": [Function],
+      },
+    ],
+    "memberLevel": Object {
+      "excludes": Array [
+        "status",
+      ],
+      "excludesMembers": Array [
+        "ordersExt.status",
+      ],
+      "includes": "*",
+      "includesMembers": Array [
+        "ordersExt.count",
+        "ordersExt.id",
+        "ordersExt.user_id",
+        "ordersExt.status",
+        "ordersExt.created_at",
+        "ordersExt.completed_at",
+        "ordersExt.sfUsers",
+      ],
+    },
+    "role": "admin",
+    "rowLevel": Object {
+      "filters": Array [
+        Object {
+          "member": [Function],
+          "memberReference": "ordersExt.id",
+          "operator": "equals",
+          "values": [Function],
+        },
+      ],
+    },
+  },
+]
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): dimensions 1`] = `
 Object {
   "completed_at": Object {
     "ownedByCube": true,
@@ -31,7 +125,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 2`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): dimensions 2`] = `
 Object {
   "city": Object {
     "ownedByCube": true,
@@ -67,55 +161,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 3`] = `
-Object {
-  "count": Object {
-    "ownedByCube": true,
-    "type": "count",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 4`] = `
-Object {
-  "count": Object {
-    "ownedByCube": true,
-    "type": "count",
-  },
-  "count_distinct": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "countDistinct",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 5`] = `
-Object {
-  "sfUsers": Object {
-    "description": "SF users segment from createCubeSchema",
-    "ownedByCube": true,
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 6`] = `
-Object {
-  "anotherStatus": Object {
-    "description": "Just another one",
-    "ownedByCube": true,
-    "sql": [Function],
-  },
-  "sfUsers": Object {
-    "description": "SF users segment from createCubeSchema",
-    "ownedByCube": true,
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 7`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): hierarchies 1`] = `
 Object {
   "hello": Object {
     "levels": [Function],
@@ -124,7 +170,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 8`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): hierarchies 2`] = `
 Object {
   "ehlo": Object {
     "levels": [Function],
@@ -137,199 +183,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 9`] = `
-Object {
-  "countCreatedAt": Object {
-    "external": true,
-    "granularity": "day",
-    "measureReferences": [Function],
-    "partitionGranularity": "month",
-    "refreshKey": Object {
-      "every": "1 hour",
-    },
-    "scheduledRefresh": true,
-    "timeDimensionReference": [Function],
-    "type": "rollup",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 10`] = `
-Object {
-  "countCreatedAt": Object {
-    "external": true,
-    "granularity": "day",
-    "measureReferences": [Function],
-    "partitionGranularity": "month",
-    "refreshKey": Object {
-      "every": "1 hour",
-    },
-    "scheduledRefresh": true,
-    "timeDimensionReference": [Function],
-    "type": "rollup",
-  },
-  "mainPreAggs": Object {
-    "dimensionReferences": [Function],
-    "external": true,
-    "measureReferences": [Function],
-    "scheduledRefresh": true,
-    "type": "rollup",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 11`] = `
-Array [
-  Object {
-    "role": "*",
-    "rowLevel": Object {
-      "allowAll": true,
-    },
-  },
-  Object {
-    "conditions": Array [
-      Object {
-        "if": [Function],
-      },
-    ],
-    "memberLevel": Object {
-      "excludes": Array [
-        "status",
-      ],
-      "excludesMembers": Array [
-        "ordersExt.status",
-      ],
-      "includes": "*",
-      "includesMembers": Array [
-        "ordersExt.count",
-        "ordersExt.count_distinct",
-        "ordersExt.id",
-        "ordersExt.user_id",
-        "ordersExt.status",
-        "ordersExt.created_at",
-        "ordersExt.completed_at",
-        "ordersExt.city",
-        "ordersExt.sfUsers",
-        "ordersExt.anotherStatus",
-      ],
-    },
-    "role": "admin",
-    "rowLevel": Object {
-      "filters": Array [
-        Object {
-          "member": [Function],
-          "memberReference": "ordersExt.id",
-          "operator": "equals",
-          "values": [Function],
-        },
-      ],
-    },
-  },
-]
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 12`] = `
-Array [
-  Object {
-    "role": "*",
-    "rowLevel": Object {
-      "allowAll": true,
-    },
-  },
-  Object {
-    "conditions": Array [
-      Object {
-        "if": [Function],
-      },
-    ],
-    "memberLevel": Object {
-      "excludes": Array [
-        "status",
-      ],
-      "excludesMembers": Array [
-        "ordersExt.status",
-      ],
-      "includes": "*",
-      "includesMembers": Array [
-        "ordersExt.count",
-        "ordersExt.count_distinct",
-        "ordersExt.id",
-        "ordersExt.user_id",
-        "ordersExt.status",
-        "ordersExt.created_at",
-        "ordersExt.completed_at",
-        "ordersExt.city",
-        "ordersExt.sfUsers",
-        "ordersExt.anotherStatus",
-      ],
-    },
-    "role": "admin",
-    "rowLevel": Object {
-      "filters": Array [
-        Object {
-          "member": [Function],
-          "memberReference": "ordersExt.id",
-          "operator": "equals",
-          "values": [Function],
-        },
-      ],
-    },
-  },
-  Object {
-    "conditions": Array [
-      Object {
-        "if": [Function],
-      },
-    ],
-    "memberLevel": Object {
-      "excludes": Array [
-        "min",
-        "max",
-      ],
-      "excludesMembers": Array [
-        "ordersExt.min",
-        "ordersExt.max",
-      ],
-      "includes": "*",
-      "includesMembers": Array [
-        "ordersExt.count",
-        "ordersExt.count_distinct",
-        "ordersExt.id",
-        "ordersExt.user_id",
-        "ordersExt.status",
-        "ordersExt.created_at",
-        "ordersExt.completed_at",
-        "ordersExt.city",
-        "ordersExt.sfUsers",
-        "ordersExt.anotherStatus",
-      ],
-    },
-    "role": "manager",
-    "rowLevel": Object {
-      "filters": Array [
-        Object {
-          "or": Array [
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.location",
-              "operator": "startsWith",
-              "values": [Function],
-            },
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.location",
-              "operator": "startsWith",
-              "values": [Function],
-            },
-          ],
-        },
-      ],
-    },
-  },
-]
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 13`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): joins 1`] = `
 Object {
   "order_users": Object {
     "relationship": "belongsTo",
@@ -338,7 +192,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 14`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): joins 2`] = `
 Object {
   "line_items": Object {
     "relationship": "hasMany",
@@ -351,88 +205,19 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 1`] = `
-Object {
-  "completed_at": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "time",
-  },
-  "created_at": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "time",
-  },
-  "id": Object {
-    "ownedByCube": true,
-    "primaryKey": true,
-    "sql": [Function],
-    "type": "number",
-  },
-  "status": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "string",
-  },
-  "user_id": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "number",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 2`] = `
-Object {
-  "city": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "string",
-  },
-  "completed_at": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "time",
-  },
-  "created_at": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "time",
-  },
-  "id": Object {
-    "ownedByCube": true,
-    "primaryKey": true,
-    "sql": [Function],
-    "type": "number",
-  },
-  "status": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "string",
-  },
-  "user_id": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "number",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 3`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): measures 1`] = `
 Object {
   "count": Object {
     "ownedByCube": true,
-    "sql": [Function],
     "type": "count",
   },
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 4`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): measures 2`] = `
 Object {
   "count": Object {
     "ownedByCube": true,
-    "sql": [Function],
     "type": "count",
   },
   "count_distinct": Object {
@@ -443,57 +228,9 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 5`] = `
-Object {
-  "sfUsers": Object {
-    "description": "SF users segment from createCubeSchema",
-    "ownedByCube": true,
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 6`] = `
-Object {
-  "anotherStatus": Object {
-    "description": "Just another one",
-    "ownedByCube": true,
-    "sql": [Function],
-  },
-  "sfUsers": Object {
-    "description": "SF users segment from createCubeSchema",
-    "ownedByCube": true,
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 7`] = `
-Object {
-  "hello": Object {
-    "levels": [Function],
-    "title": "World",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 8`] = `
-Object {
-  "ehlo": Object {
-    "levels": [Function],
-    "title": "UnderGround",
-  },
-  "hello": Object {
-    "levels": [Function],
-    "title": "World",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 9`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): preAggregations 1`] = `
 Object {
   "countCreatedAt": Object {
-    "allowNonStrictDateRangeMatch": true,
     "external": true,
     "granularity": "day",
     "measureReferences": [Function],
@@ -508,10 +245,9 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 10`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): preAggregations 2`] = `
 Object {
   "countCreatedAt": Object {
-    "allowNonStrictDateRangeMatch": true,
     "external": true,
     "granularity": "day",
     "measureReferences": [Function],
@@ -533,7 +269,102 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 11`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): segments 1`] = `
+Object {
+  "sfUsers": Object {
+    "description": "SF users segment from createCubeSchema",
+    "ownedByCube": true,
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): segments 2`] = `
+Object {
+  "anotherStatus": Object {
+    "description": "Just another one",
+    "ownedByCube": true,
+    "sql": [Function],
+  },
+  "sfUsers": Object {
+    "description": "SF users segment from createCubeSchema",
+    "ownedByCube": true,
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (no additions): accessPolicy 1`] = `
+Array [
+  Object {
+    "role": "common",
+    "rowLevel": Object {
+      "allowAll": true,
+    },
+  },
+  Object {
+    "conditions": Array [
+      Object {
+        "if": [Function],
+      },
+    ],
+    "memberLevel": Object {
+      "excludesMembers": Array [],
+      "includes": Array [
+        "status",
+      ],
+      "includesMembers": Array [
+        "orders.status",
+      ],
+    },
+    "role": "admin",
+    "rowLevel": Object {
+      "filters": Array [
+        Object {
+          "member": [Function],
+          "memberReference": "orders.status",
+          "operator": "equals",
+          "values": [Function],
+        },
+        Object {
+          "or": Array [
+            Object {
+              "member": [Function],
+              "memberReference": "orders.created_at",
+              "operator": "notInDateRange",
+              "values": [Function],
+            },
+            Object {
+              "member": [Function],
+              "memberReference": "orders.created_at",
+              "operator": "equals",
+              "values": [Function],
+            },
+          ],
+        },
+        Object {
+          "and": Array [
+            Object {
+              "member": [Function],
+              "memberReference": "orders.completed_at",
+              "operator": "notInDateRange",
+              "values": [Function],
+            },
+            Object {
+              "member": [Function],
+              "memberReference": "orders.completed_at",
+              "operator": "equals",
+              "values": [Function],
+            },
+          ],
+        },
+      ],
+    },
+  },
+]
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (no additions): accessPolicy 2`] = `
 Array [
   Object {
     "role": "common",
@@ -603,150 +434,7 @@ Array [
 ]
 `;
 
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 12`] = `
-Array [
-  Object {
-    "role": "common",
-    "rowLevel": Object {
-      "allowAll": true,
-    },
-  },
-  Object {
-    "conditions": Array [
-      Object {
-        "if": [Function],
-      },
-    ],
-    "memberLevel": Object {
-      "excludesMembers": Array [],
-      "includes": Array [
-        "status",
-      ],
-      "includesMembers": Array [
-        "ordersExt.status",
-      ],
-    },
-    "role": "admin",
-    "rowLevel": Object {
-      "filters": Array [
-        Object {
-          "member": [Function],
-          "memberReference": "ordersExt.status",
-          "operator": "equals",
-          "values": [Function],
-        },
-        Object {
-          "or": Array [
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.created_at",
-              "operator": "notInDateRange",
-              "values": [Function],
-            },
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.created_at",
-              "operator": "equals",
-              "values": [Function],
-            },
-          ],
-        },
-        Object {
-          "and": Array [
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.completed_at",
-              "operator": "notInDateRange",
-              "values": [Function],
-            },
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.completed_at",
-              "operator": "equals",
-              "values": [Function],
-            },
-          ],
-        },
-      ],
-    },
-  },
-  Object {
-    "conditions": Array [
-      Object {
-        "if": [Function],
-      },
-    ],
-    "memberLevel": Object {
-      "excludes": Array [
-        "min",
-        "max",
-      ],
-      "excludesMembers": Array [
-        "ordersExt.min",
-        "ordersExt.max",
-      ],
-      "includes": "*",
-      "includesMembers": Array [
-        "ordersExt.count",
-        "ordersExt.count_distinct",
-        "ordersExt.id",
-        "ordersExt.user_id",
-        "ordersExt.status",
-        "ordersExt.created_at",
-        "ordersExt.completed_at",
-        "ordersExt.city",
-        "ordersExt.sfUsers",
-        "ordersExt.anotherStatus",
-      ],
-    },
-    "role": "manager",
-    "rowLevel": Object {
-      "filters": Array [
-        Object {
-          "or": Array [
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.location",
-              "operator": "startsWith",
-              "values": [Function],
-            },
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.location",
-              "operator": "startsWith",
-              "values": [Function],
-            },
-          ],
-        },
-      ],
-    },
-  },
-]
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 13`] = `
-Object {
-  "order_users": Object {
-    "relationship": "belongsTo",
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 14`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
-    "relationship": "belongsTo",
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 1`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): dimensions 1`] = `
 Object {
   "completed_at": Object {
     "ownedByCube": true,
@@ -777,7 +465,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 2`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): dimensions 2`] = `
 Object {
   "city": Object {
     "ownedByCube": true,
@@ -813,55 +501,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 3`] = `
-Object {
-  "count": Object {
-    "ownedByCube": true,
-    "type": "count",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 4`] = `
-Object {
-  "count": Object {
-    "ownedByCube": true,
-    "type": "count",
-  },
-  "count_distinct": Object {
-    "ownedByCube": true,
-    "sql": [Function],
-    "type": "countDistinct",
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 5`] = `
-Object {
-  "sfUsers": Object {
-    "description": "SF users segment from createCubeSchema",
-    "ownedByCube": true,
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 6`] = `
-Object {
-  "anotherStatus": Object {
-    "description": "Just another one",
-    "ownedByCube": true,
-    "sql": [Function],
-  },
-  "sfUsers": Object {
-    "description": "SF users segment from createCubeSchema",
-    "ownedByCube": true,
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 7`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): hierarchies 1`] = `
 Object {
   "hello": Object {
     "levels": [Function],
@@ -870,7 +510,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 8`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): hierarchies 2`] = `
 Object {
   "ehlo": Object {
     "levels": [Function],
@@ -883,9 +523,57 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 9`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): joins 1`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): joins 2`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): measures 1`] = `
+Object {
+  "count": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "count",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): measures 2`] = `
+Object {
+  "count": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "count",
+  },
+  "count_distinct": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "countDistinct",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): preAggregations 1`] = `
 Object {
   "countCreatedAt": Object {
+    "allowNonStrictDateRangeMatch": true,
     "external": true,
     "granularity": "day",
     "measureReferences": [Function],
@@ -900,9 +588,10 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 10`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): preAggregations 2`] = `
 Object {
   "countCreatedAt": Object {
+    "allowNonStrictDateRangeMatch": true,
     "external": true,
     "granularity": "day",
     "measureReferences": [Function],
@@ -924,7 +613,79 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 11`] = `
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): segments 1`] = `
+Object {
+  "sfUsers": Object {
+    "description": "SF users segment from createCubeSchema",
+    "ownedByCube": true,
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): segments 2`] = `
+Object {
+  "anotherStatus": Object {
+    "description": "Just another one",
+    "ownedByCube": true,
+    "sql": [Function],
+  },
+  "sfUsers": Object {
+    "description": "SF users segment from createCubeSchema",
+    "ownedByCube": true,
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (no additions): accessPolicy 1`] = `
+Array [
+  Object {
+    "role": "*",
+    "rowLevel": Object {
+      "allowAll": true,
+    },
+  },
+  Object {
+    "conditions": Array [
+      Object {
+        "if": [Function],
+      },
+    ],
+    "memberLevel": Object {
+      "excludes": Array [
+        "status",
+      ],
+      "excludesMembers": Array [
+        "orders.status",
+      ],
+      "includes": "*",
+      "includesMembers": Array [
+        "orders.count",
+        "orders.id",
+        "orders.user_id",
+        "orders.status",
+        "orders.created_at",
+        "orders.completed_at",
+        "orders.sfUsers",
+      ],
+    },
+    "role": "admin",
+    "rowLevel": Object {
+      "filters": Array [
+        Object {
+          "member": [Function],
+          "memberReference": "orders.id",
+          "operator": "equals",
+          "values": [Function],
+        },
+      ],
+    },
+  },
+]
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (no additions): accessPolicy 2`] = `
 Array [
   Object {
     "role": "*",
@@ -948,15 +709,12 @@ Array [
       "includes": "*",
       "includesMembers": Array [
         "ordersExt.count",
-        "ordersExt.count_distinct",
         "ordersExt.id",
         "ordersExt.user_id",
         "ordersExt.status",
         "ordersExt.created_at",
         "ordersExt.completed_at",
-        "ordersExt.city",
         "ordersExt.sfUsers",
-        "ordersExt.anotherStatus",
       ],
     },
     "role": "admin",
@@ -974,102 +732,7 @@ Array [
 ]
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 12`] = `
-Array [
-  Object {
-    "role": "*",
-    "rowLevel": Object {
-      "allowAll": true,
-    },
-  },
-  Object {
-    "conditions": Array [
-      Object {
-        "if": [Function],
-      },
-    ],
-    "memberLevel": Object {
-      "excludes": Array [
-        "status",
-      ],
-      "excludesMembers": Array [
-        "ordersExt.status",
-      ],
-      "includes": "*",
-      "includesMembers": Array [
-        "ordersExt.count",
-        "ordersExt.count_distinct",
-        "ordersExt.id",
-        "ordersExt.user_id",
-        "ordersExt.status",
-        "ordersExt.created_at",
-        "ordersExt.completed_at",
-        "ordersExt.city",
-        "ordersExt.sfUsers",
-        "ordersExt.anotherStatus",
-      ],
-    },
-    "role": "admin",
-    "rowLevel": Object {
-      "filters": Array [
-        Object {
-          "member": [Function],
-          "memberReference": "ordersExt.id",
-          "operator": "equals",
-          "values": [Function],
-        },
-      ],
-    },
-  },
-  Object {
-    "memberLevel": Object {
-      "excludes": Array [
-        "status",
-      ],
-      "excludesMembers": Array [
-        "ordersExt.status",
-      ],
-      "includesMembers": Array [
-        "ordersExt.count",
-        "ordersExt.count_distinct",
-        "ordersExt.id",
-        "ordersExt.user_id",
-        "ordersExt.status",
-        "ordersExt.created_at",
-        "ordersExt.completed_at",
-        "ordersExt.city",
-        "ordersExt.sfUsers",
-        "ordersExt.anotherStatus",
-      ],
-    },
-    "role": "manager",
-  },
-]
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 13`] = `
-Object {
-  "order_users": Object {
-    "relationship": "belongsTo",
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 14`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
-    "relationship": "belongsTo",
-    "sql": [Function],
-  },
-}
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 1`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): dimensions 1`] = `
 Object {
   "completed_at": Object {
     "ownedByCube": true,
@@ -1100,7 +763,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 2`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): dimensions 2`] = `
 Object {
   "city": Object {
     "ownedByCube": true,
@@ -1136,21 +799,63 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 3`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): hierarchies 1`] = `
+Object {
+  "hello": Object {
+    "levels": [Function],
+    "title": "World",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): hierarchies 2`] = `
+Object {
+  "ehlo": Object {
+    "levels": [Function],
+    "title": "UnderGround",
+  },
+  "hello": Object {
+    "levels": [Function],
+    "title": "World",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): joins 1`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): joins 2`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): measures 1`] = `
 Object {
   "count": Object {
     "ownedByCube": true,
-    "sql": [Function],
     "type": "count",
   },
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 4`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): measures 2`] = `
 Object {
   "count": Object {
     "ownedByCube": true,
-    "sql": [Function],
     "type": "count",
   },
   "count_distinct": Object {
@@ -1161,7 +866,48 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 5`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): preAggregations 1`] = `
+Object {
+  "countCreatedAt": Object {
+    "external": true,
+    "granularity": "day",
+    "measureReferences": [Function],
+    "partitionGranularity": "month",
+    "refreshKey": Object {
+      "every": "1 hour",
+    },
+    "scheduledRefresh": true,
+    "timeDimensionReference": [Function],
+    "type": "rollup",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): preAggregations 2`] = `
+Object {
+  "countCreatedAt": Object {
+    "external": true,
+    "granularity": "day",
+    "measureReferences": [Function],
+    "partitionGranularity": "month",
+    "refreshKey": Object {
+      "every": "1 hour",
+    },
+    "scheduledRefresh": true,
+    "timeDimensionReference": [Function],
+    "type": "rollup",
+  },
+  "mainPreAggs": Object {
+    "dimensionReferences": [Function],
+    "external": true,
+    "measureReferences": [Function],
+    "scheduledRefresh": true,
+    "type": "rollup",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): segments 1`] = `
 Object {
   "sfUsers": Object {
     "description": "SF users segment from createCubeSchema",
@@ -1171,7 +917,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 6`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): segments 2`] = `
 Object {
   "anotherStatus": Object {
     "description": "Just another one",
@@ -1186,7 +932,214 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 7`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (no additions): accessPolicy 1`] = `
+Array [
+  Object {
+    "role": "common",
+    "rowLevel": Object {
+      "allowAll": true,
+    },
+  },
+  Object {
+    "conditions": Array [
+      Object {
+        "if": [Function],
+      },
+    ],
+    "memberLevel": Object {
+      "excludesMembers": Array [],
+      "includes": Array [
+        "status",
+      ],
+      "includesMembers": Array [
+        "orders.status",
+      ],
+    },
+    "role": "admin",
+    "rowLevel": Object {
+      "filters": Array [
+        Object {
+          "member": [Function],
+          "memberReference": "orders.status",
+          "operator": "equals",
+          "values": [Function],
+        },
+        Object {
+          "or": Array [
+            Object {
+              "member": [Function],
+              "memberReference": "orders.created_at",
+              "operator": "notInDateRange",
+              "values": [Function],
+            },
+            Object {
+              "member": [Function],
+              "memberReference": "orders.created_at",
+              "operator": "equals",
+              "values": [Function],
+            },
+          ],
+        },
+        Object {
+          "and": Array [
+            Object {
+              "member": [Function],
+              "memberReference": "orders.completed_at",
+              "operator": "notInDateRange",
+              "values": [Function],
+            },
+            Object {
+              "member": [Function],
+              "memberReference": "orders.completed_at",
+              "operator": "equals",
+              "values": [Function],
+            },
+          ],
+        },
+      ],
+    },
+  },
+]
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (no additions): accessPolicy 2`] = `
+Array [
+  Object {
+    "role": "common",
+    "rowLevel": Object {
+      "allowAll": true,
+    },
+  },
+  Object {
+    "conditions": Array [
+      Object {
+        "if": [Function],
+      },
+    ],
+    "memberLevel": Object {
+      "excludesMembers": Array [],
+      "includes": Array [
+        "status",
+      ],
+      "includesMembers": Array [
+        "ordersExt.status",
+      ],
+    },
+    "role": "admin",
+    "rowLevel": Object {
+      "filters": Array [
+        Object {
+          "member": [Function],
+          "memberReference": "ordersExt.status",
+          "operator": "equals",
+          "values": [Function],
+        },
+        Object {
+          "or": Array [
+            Object {
+              "member": [Function],
+              "memberReference": "ordersExt.created_at",
+              "operator": "notInDateRange",
+              "values": [Function],
+            },
+            Object {
+              "member": [Function],
+              "memberReference": "ordersExt.created_at",
+              "operator": "equals",
+              "values": [Function],
+            },
+          ],
+        },
+        Object {
+          "and": Array [
+            Object {
+              "member": [Function],
+              "memberReference": "ordersExt.completed_at",
+              "operator": "notInDateRange",
+              "values": [Function],
+            },
+            Object {
+              "member": [Function],
+              "memberReference": "ordersExt.completed_at",
+              "operator": "equals",
+              "values": [Function],
+            },
+          ],
+        },
+      ],
+    },
+  },
+]
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): dimensions 1`] = `
+Object {
+  "completed_at": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "time",
+  },
+  "created_at": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "time",
+  },
+  "id": Object {
+    "ownedByCube": true,
+    "primaryKey": true,
+    "sql": [Function],
+    "type": "number",
+  },
+  "status": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "string",
+  },
+  "user_id": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "number",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): dimensions 2`] = `
+Object {
+  "city": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "string",
+  },
+  "completed_at": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "time",
+  },
+  "created_at": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "time",
+  },
+  "id": Object {
+    "ownedByCube": true,
+    "primaryKey": true,
+    "sql": [Function],
+    "type": "number",
+  },
+  "status": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "string",
+  },
+  "user_id": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "number",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): hierarchies 1`] = `
 Object {
   "hello": Object {
     "levels": [Function],
@@ -1195,7 +1148,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 8`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): hierarchies 2`] = `
 Object {
   "ehlo": Object {
     "levels": [Function],
@@ -1208,7 +1161,54 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 9`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): joins 1`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): joins 2`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): measures 1`] = `
+Object {
+  "count": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "count",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): measures 2`] = `
+Object {
+  "count": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "count",
+  },
+  "count_distinct": Object {
+    "ownedByCube": true,
+    "sql": [Function],
+    "type": "countDistinct",
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): preAggregations 1`] = `
 Object {
   "countCreatedAt": Object {
     "allowNonStrictDateRangeMatch": true,
@@ -1226,7 +1226,7 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 10`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): preAggregations 2`] = `
 Object {
   "countCreatedAt": Object {
     "allowNonStrictDateRangeMatch": true,
@@ -1251,186 +1251,26 @@ Object {
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 11`] = `
-Array [
-  Object {
-    "role": "common",
-    "rowLevel": Object {
-      "allowAll": true,
-    },
-  },
-  Object {
-    "conditions": Array [
-      Object {
-        "if": [Function],
-      },
-    ],
-    "memberLevel": Object {
-      "excludesMembers": Array [],
-      "includes": Array [
-        "status",
-      ],
-      "includesMembers": Array [
-        "ordersExt.status",
-      ],
-    },
-    "role": "admin",
-    "rowLevel": Object {
-      "filters": Array [
-        Object {
-          "member": [Function],
-          "memberReference": "ordersExt.status",
-          "operator": "equals",
-          "values": [Function],
-        },
-        Object {
-          "or": Array [
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.created_at",
-              "operator": "notInDateRange",
-              "values": [Function],
-            },
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.created_at",
-              "operator": "equals",
-              "values": [Function],
-            },
-          ],
-        },
-        Object {
-          "and": Array [
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.completed_at",
-              "operator": "notInDateRange",
-              "values": [Function],
-            },
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.completed_at",
-              "operator": "equals",
-              "values": [Function],
-            },
-          ],
-        },
-      ],
-    },
-  },
-]
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 12`] = `
-Array [
-  Object {
-    "role": "common",
-    "rowLevel": Object {
-      "allowAll": true,
-    },
-  },
-  Object {
-    "conditions": Array [
-      Object {
-        "if": [Function],
-      },
-    ],
-    "memberLevel": Object {
-      "excludesMembers": Array [],
-      "includes": Array [
-        "status",
-      ],
-      "includesMembers": Array [
-        "ordersExt.status",
-      ],
-    },
-    "role": "admin",
-    "rowLevel": Object {
-      "filters": Array [
-        Object {
-          "member": [Function],
-          "memberReference": "ordersExt.status",
-          "operator": "equals",
-          "values": [Function],
-        },
-        Object {
-          "or": Array [
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.created_at",
-              "operator": "notInDateRange",
-              "values": [Function],
-            },
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.created_at",
-              "operator": "equals",
-              "values": [Function],
-            },
-          ],
-        },
-        Object {
-          "and": Array [
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.completed_at",
-              "operator": "notInDateRange",
-              "values": [Function],
-            },
-            Object {
-              "member": [Function],
-              "memberReference": "ordersExt.completed_at",
-              "operator": "equals",
-              "values": [Function],
-            },
-          ],
-        },
-      ],
-    },
-  },
-  Object {
-    "memberLevel": Object {
-      "excludes": Array [
-        "status",
-      ],
-      "excludesMembers": Array [
-        "ordersExt.status",
-      ],
-      "includesMembers": Array [
-        "ordersExt.count",
-        "ordersExt.count_distinct",
-        "ordersExt.id",
-        "ordersExt.user_id",
-        "ordersExt.status",
-        "ordersExt.created_at",
-        "ordersExt.completed_at",
-        "ordersExt.city",
-        "ordersExt.sfUsers",
-        "ordersExt.anotherStatus",
-      ],
-    },
-    "role": "manager",
-  },
-]
-`;
-
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 13`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): segments 1`] = `
 Object {
-  "order_users": Object {
-    "relationship": "belongsTo",
+  "sfUsers": Object {
+    "description": "SF users segment from createCubeSchema",
+    "ownedByCube": true,
     "sql": [Function],
   },
 }
 `;
 
-exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 14`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): segments 2`] = `
 Object {
-  "line_items": Object {
-    "relationship": "hasMany",
+  "anotherStatus": Object {
+    "description": "Just another one",
+    "ownedByCube": true,
     "sql": [Function],
   },
-  "order_users": Object {
-    "relationship": "belongsTo",
+  "sfUsers": Object {
+    "description": "SF users segment from createCubeSchema",
+    "ownedByCube": true,
     "sql": [Function],
   },
 }

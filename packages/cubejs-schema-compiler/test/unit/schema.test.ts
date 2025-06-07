@@ -3,7 +3,7 @@ import path from 'path';
 import { prepareCompiler, prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createCubeSchema, createCubeSchemaWithCustomGranularitiesAndTimeShift, createCubeSchemaWithAccessPolicy } from './utils';
 
-const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'accessPolicy', 'joins'];
+const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'joins'];
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
@@ -796,6 +796,10 @@ describe('Schema Testing', () => {
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
       });
+
+      // accessPolicies are evaluated so they must ref cube's own members and not parent's ones.
+      expect(cubeA.accessPolicy).toMatchSnapshot('accessPolicy');
+      expect(cubeB.accessPolicy).toMatchSnapshot('accessPolicy');
     });
 
     it('CubeB.js correctly extends cubeA.js (with additions)', async () => {
@@ -841,8 +845,8 @@ describe('Schema Testing', () => {
       const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
-        expect(cubeA[c]).toMatchSnapshot();
-        expect(cubeB[c]).toMatchSnapshot();
+        expect(cubeA[c]).toMatchSnapshot(c);
+        expect(cubeB[c]).toMatchSnapshot(c);
       });
     });
 
@@ -884,6 +888,10 @@ describe('Schema Testing', () => {
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
       });
+
+      // accessPolicies are evaluated so they must ref cube's own members and not parent's ones.
+      expect(cubeA.accessPolicy).toMatchSnapshot('accessPolicy');
+      expect(cubeB.accessPolicy).toMatchSnapshot('accessPolicy');
     });
 
     it('CubeB.yml correctly extends cubeA.yml (with additions)', async () => {
@@ -929,8 +937,8 @@ describe('Schema Testing', () => {
       const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
-        expect(cubeA[c]).toMatchSnapshot();
-        expect(cubeB[c]).toMatchSnapshot();
+        expect(cubeA[c]).toMatchSnapshot(c);
+        expect(cubeB[c]).toMatchSnapshot(c);
       });
     });
 
@@ -972,6 +980,10 @@ describe('Schema Testing', () => {
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
       });
+
+      // accessPolicies are evaluated so they must ref cube's own members and not parent's ones.
+      expect(cubeA.accessPolicy).toMatchSnapshot('accessPolicy');
+      expect(cubeB.accessPolicy).toMatchSnapshot('accessPolicy');
     });
 
     it('CubeB.yml correctly extends cubeA.js (with additions)', async () => {
@@ -1017,8 +1029,8 @@ describe('Schema Testing', () => {
       const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
-        expect(cubeA[c]).toMatchSnapshot();
-        expect(cubeB[c]).toMatchSnapshot();
+        expect(cubeA[c]).toMatchSnapshot(c);
+        expect(cubeB[c]).toMatchSnapshot(c);
       });
     });
 
@@ -1056,6 +1068,10 @@ describe('Schema Testing', () => {
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
       });
+
+      // accessPolicies are evaluated so they must ref cube's own members and not parent's ones.
+      expect(cubeA.accessPolicy).toMatchSnapshot('accessPolicy');
+      expect(cubeB.accessPolicy).toMatchSnapshot('accessPolicy');
     });
 
     it('CubeB.js correctly extends cubeA.yml (with additions)', async () => {
@@ -1101,8 +1117,8 @@ describe('Schema Testing', () => {
       const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
-        expect(cubeA[c]).toMatchSnapshot();
-        expect(cubeB[c]).toMatchSnapshot();
+        expect(cubeA[c]).toMatchSnapshot(c);
+        expect(cubeB[c]).toMatchSnapshot(c);
       });
     });
 
