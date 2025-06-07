@@ -273,41 +273,13 @@ impl RemoteFs for GCSRemoteFs {
         &self,
         remote_prefix: String,
     ) -> Result<Vec<RemoteFile>, CubeError> {
-        let prefix = self.gcs_path(&remote_prefix);
-        let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
         let leading_slash = self.leading_slash_regex();
-        let result = list
-            .map(|objects| -> Result<Vec<RemoteFile>, CubeError> {
-                Ok(objects?
-                    .into_iter()
-                    .map(|obj| RemoteFile {
-                        remote_path: Self::object_key_to_remote_path(&leading_slash, &obj.name),
-                        updated: obj.updated.clone(),
-                        file_size: obj.size,
-                    })
-                    .collect())
-            })
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .flatten()
-            .flatten()
-            .collect::<Vec<_>>();
-        let mut pages_count = result.len() / 1_000;
-        if result.len() % 1_000 > 0 {
-            pages_count += 1;
-        }
-        if pages_count > 100 {
-            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
-        }
-        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
-            pages_count as i64,
-            Some(&vec![
-                "operation:list".to_string(),
-                "driver:gcs".to_string(),
-            ]),
-        );
-        Ok(result)
+        self.list_with_metadata_and_map(remote_prefix, |obj: Object| RemoteFile {
+            remote_path: Self::object_key_to_remote_path(&leading_slash, &obj.name),
+            updated: obj.updated.clone(),
+            file_size: obj.size,
+        })
+        .await
     }
 
     async fn local_path(&self) -> Result<String, CubeError> {
