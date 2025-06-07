@@ -275,7 +275,7 @@ impl RemoteFs for GCSRemoteFs {
         let leading_slash = self.leading_slash_regex();
         self.list_with_metadata_and_map(remote_prefix, |obj: Object| RemoteFile {
             remote_path: Self::object_key_to_remote_path(&leading_slash, &obj.name),
-            updated: obj.updated.clone(),
+            updated: obj.updated,
             file_size: obj.size,
         })
         .await
