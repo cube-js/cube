@@ -12,8 +12,10 @@ import { LightweightSymbolResolver } from './LightweightSymbolResolver';
 import { LightweightNodeCubeDictionary } from './LightweightNodeCubeDictionary';
 
 type TransferContent = {
-  fileName: string;
-  content: string;
+  files: {
+    fileName: string;
+    content: string;
+  }[];
   transpilers: string[];
   cubeNames: string[];
   cubeSymbols: Record<string, Record<string, boolean>>;
@@ -34,26 +36,28 @@ const transpile = (data: TransferContent) => {
   cubeDictionary.setCubeNames(data.cubeNames);
   cubeSymbols.setSymbols(data.cubeSymbols);
 
-  const ast = parse(
-    data.content,
-    {
-      sourceFilename: data.fileName,
-      sourceType: 'module',
-      plugins: ['objectRestSpread']
-    },
-  );
+  const content = data.files.map((file) => {
+    const ast = parse(
+      file.content,
+      {
+        sourceFilename: file.fileName,
+        sourceType: 'module',
+        plugins: ['objectRestSpread']
+      },
+    );
 
-  errorsReport.inFile(data);
-  data.transpilers.forEach(transpilerName => {
-    if (transpilers[transpilerName]) {
-      babelTraverse(ast, transpilers[transpilerName].traverseObject(errorsReport));
-    } else {
-      throw new Error(`Transpiler ${transpilerName} not supported`);
-    }
+    errorsReport.inFile(file);
+    data.transpilers.forEach(transpilerName => {
+      if (transpilers[transpilerName]) {
+        babelTraverse(ast, transpilers[transpilerName].traverseObject(errorsReport));
+      } else {
+        throw new Error(`Transpiler ${transpilerName} not supported`);
+      }
+    });
+    errorsReport.exitFile();
+
+    return babelGenerator(ast, {}, file.content).code;
   });
-  errorsReport.exitFile();
-
-  const content = babelGenerator(ast, {}, data.content).code;
 
   return {
     content,
