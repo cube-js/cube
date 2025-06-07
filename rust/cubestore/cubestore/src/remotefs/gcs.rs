@@ -275,13 +275,13 @@ impl RemoteFs for GCSRemoteFs {
     ) -> Result<Vec<RemoteFile>, CubeError> {
         let prefix = self.gcs_path(&remote_prefix);
         let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
-        let leading_slash = Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap();
+        let leading_slash = self.leading_slash_regex();
         let result = list
             .map(|objects| -> Result<Vec<RemoteFile>, CubeError> {
                 Ok(objects?
                     .into_iter()
                     .map(|obj| RemoteFile {
-                        remote_path: leading_slash.replace(&obj.name, NoExpand("")).to_string(),
+                        remote_path: Self::object_key_to_remote_path(&leading_slash, &obj.name),
                         updated: obj.updated.clone(),
                         file_size: obj.size,
                     })
@@ -321,7 +321,17 @@ impl RemoteFs for GCSRemoteFs {
     }
 }
 
+struct LeadingSlash(Regex);
+
 impl GCSRemoteFs {
+    fn leading_slash_regex(&self) -> LeadingSlash {
+        LeadingSlash(Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap())
+    }
+
+    fn object_key_to_remote_path(leading_slash: &LeadingSlash, obj_name: &String) -> String {
+        leading_slash.0.replace(&obj_name, NoExpand("")).to_string()
+    }
+
     async fn list_with_metadata_and_map<T, F>(
         &self,
         remote_prefix: String,
