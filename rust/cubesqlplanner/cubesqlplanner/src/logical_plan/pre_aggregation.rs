@@ -1,4 +1,5 @@
 use super::*;
+use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::planner::sql_evaluator::MemberSymbol;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -13,6 +14,7 @@ pub struct PreAggregation {
     pub granularity: Option<String>,
     pub table_name: String,
     pub cube_name: String,
+    pub pre_aggregation_obj: Rc<dyn PreAggregationObj>,
 }
 
 impl PrettyPrint for PreAggregation {

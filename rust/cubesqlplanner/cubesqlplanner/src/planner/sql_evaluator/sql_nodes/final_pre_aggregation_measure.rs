@@ -52,9 +52,7 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                     if ev.measure_type() == "count" || ev.measure_type() == "sum" {
                         format!("sum({})", pre_aggregation_measure)
                     } else if ev.measure_type() == "countDistinctApprox" {
-                        query_tools
-                            .base_tools()
-                            .count_distinct_approx(pre_aggregation_measure)?
+                        templates.count_distinct_approx(pre_aggregation_measure)?
                     } else if ev.measure_type() == "min" || ev.measure_type() == "max" {
                         format!("{}({})", ev.measure_type(), pre_aggregation_measure)
                     } else {

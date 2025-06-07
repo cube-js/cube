@@ -44,7 +44,6 @@ impl TimeSeries {
             && self.granularity.is_predefined_granularity()
         {
             let interval_description = templates
-                .base_tools()
                 .interval_and_minimal_time_unit(self.granularity.granularity_interval().clone())?;
             if interval_description.len() != 2 {
                 return Err(CubeError::internal(
