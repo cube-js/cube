@@ -306,46 +306,26 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
-        Ok(self
-            .list_with_metadata(remote_prefix)
-            .await?
-            .into_iter()
-            .map(|f| f.remote_path)
-            .collect::<Vec<_>>())
+        let leading_subpath = self.leading_subpath_regex();
+        self.list_with_metadata_and_map(remote_prefix, |o: s3::serde_types::Object| {
+            Ok(Self::object_key_to_remote_path(&leading_subpath, &o.key))
+        })
+        .await
     }
 
     async fn list_with_metadata(
         &self,
         remote_prefix: String,
     ) -> Result<Vec<RemoteFile>, CubeError> {
-        let path = self.s3_path(&remote_prefix);
-        let bucket = self.bucket.load();
-        let list = bucket.list(path, None).await?;
-        let pages_count = list.len();
-        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
-            pages_count as i64,
-            Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
-        );
-        if pages_count > 100 {
-            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
-        }
-        let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
-        let result = list
-            .iter()
-            .flat_map(|res| {
-                res.contents
-                    .iter()
-                    .map(|o| -> Result<RemoteFile, CubeError> {
-                        Ok(RemoteFile {
-                            remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
-                            updated: DateTime::parse_from_rfc3339(&o.last_modified)?
-                                .with_timezone(&Utc),
-                            file_size: o.size,
-                        })
-                    })
+        let leading_subpath = self.leading_subpath_regex();
+        self.list_with_metadata_and_map(remote_prefix, |o: s3::serde_types::Object| {
+            Ok(RemoteFile {
+                remote_path: Self::object_key_to_remote_path(&leading_subpath, &o.key),
+                updated: DateTime::parse_from_rfc3339(&o.last_modified)?.with_timezone(&Utc),
+                file_size: o.size,
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(result)
+        })
+        .await
     }
 
     async fn local_path(&self) -> Result<String, CubeError> {
@@ -359,7 +339,42 @@ impl RemoteFs for S3RemoteFs {
     }
 }
 
+struct LeadingSubpath(Regex);
+
 impl S3RemoteFs {
+    fn leading_subpath_regex(&self) -> LeadingSubpath {
+        LeadingSubpath(Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap())
+    }
+
+    fn object_key_to_remote_path(leading_subpath: &LeadingSubpath, o_key: &String) -> String {
+        leading_subpath.0.replace(o_key, NoExpand("")).to_string()
+    }
+
+    async fn list_with_metadata_and_map<T, F>(
+        &self,
+        remote_prefix: String,
+        f: F,
+    ) -> Result<Vec<T>, CubeError>
+    where
+        F: FnMut(s3::serde_types::Object) -> Result<T, CubeError> + Copy,
+    {
+        let path = self.s3_path(&remote_prefix);
+        let bucket = self.bucket.load();
+        let list = bucket.list(path, None).await?;
+        let pages_count = list.len();
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages_count as i64,
+            Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
+        );
+        if pages_count > 100 {
+            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
+        }
+        let result = list
+            .into_iter()
+            .flat_map(|res| res.contents.into_iter().map(f))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(result)
+    }
     fn s3_path(&self, remote_path: &str) -> String {
         format!(
             "{}{}",
