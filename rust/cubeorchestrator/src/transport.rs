@@ -90,6 +90,21 @@ pub enum CompareDateRangeType {
     Multi(Vec<Vec<String>>),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct ExtendedDimensionFormat {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(rename = "type")]
+    pub format_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum DimensionFormat {
+    Single(String),
+    Extended(ExtendedDimensionFormat),
+}
+
 // We can do nothing with JS functions here,
 // but to keep DTOs in sync with reality, let's keep it.
 pub type JsFunction = String;
@@ -164,7 +179,7 @@ pub struct ConfigItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub member_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
+    pub format: Option<DimensionFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -198,7 +213,7 @@ pub struct AnnotatedConfigItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub member_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
+    pub format: Option<DimensionFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
