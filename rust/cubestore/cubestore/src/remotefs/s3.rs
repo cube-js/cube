@@ -306,9 +306,9 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
-        let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
+        let leading_slash = self.leading_slash_regex();
         self.list_with_metadata_and_map(remote_prefix, |o: s3::serde_types::Object| {
-            Ok(leading_slash.replace(&o.key, NoExpand("")).to_string())
+            Ok(Self::object_key_to_remote_path(&leading_slash, &o.key))
         })
         .await
     }
@@ -317,11 +317,10 @@ impl RemoteFs for S3RemoteFs {
         &self,
         remote_prefix: String,
     ) -> Result<Vec<RemoteFile>, CubeError> {
-        let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
-
+        let leading_slash = self.leading_slash_regex();
         self.list_with_metadata_and_map(remote_prefix, |o: s3::serde_types::Object| {
             Ok(RemoteFile {
-                remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
+                remote_path: Self::object_key_to_remote_path(&leading_slash, &o.key),
                 updated: DateTime::parse_from_rfc3339(&o.last_modified)?.with_timezone(&Utc),
                 file_size: o.size,
             })
@@ -340,7 +339,17 @@ impl RemoteFs for S3RemoteFs {
     }
 }
 
+struct LeadingSlash(Regex);
+
 impl S3RemoteFs {
+    fn leading_slash_regex(&self) -> LeadingSlash {
+        LeadingSlash(Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap())
+    }
+
+    fn object_key_to_remote_path(leading_slash: &LeadingSlash, o_key: &String) -> String {
+        leading_slash.0.replace(o_key, NoExpand("")).to_string()
+    }
+
     async fn list_with_metadata_and_map<T, F>(
         &self,
         remote_prefix: String,
