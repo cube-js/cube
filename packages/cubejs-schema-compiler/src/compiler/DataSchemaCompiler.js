@@ -4,9 +4,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import syntaxCheck from 'syntax-error';
-import { parse } from '@babel/parser';
-import babelGenerator from '@babel/generator';
-import babelTraverse from '@babel/traverse';
 import R from 'ramda';
 import workerpool from 'workerpool';
 
@@ -114,12 +111,11 @@ export class DataSchemaCompiler {
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
     this.errorsReport = errorsReport;
 
-    const transpilationWorkerThreads = getEnv('transpilationWorkerThreads');
     const transpilationNative = getEnv('transpilationNative');
     const transpilationNativeThreadsCount = getThreadsCount();
     const { compilerId } = this;
 
-    if (!transpilationNative && transpilationWorkerThreads) {
+    if (!transpilationNative) {
       const wc = getEnv('transpilationWorkerThreadsCount');
       this.workerPool = workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
@@ -132,32 +128,27 @@ export class DataSchemaCompiler {
      * @returns {Promise<*>}
      */
     const transpile = async (stage) => {
-      let cubeNames;
-      let cubeSymbols;
-      let transpilerNames;
       let results;
 
-      if (transpilationNative || transpilationWorkerThreads) {
-        cubeNames = Object.keys(this.cubeDictionary.byId);
-        // We need only cubes and all its member names for transpiling.
-        // Cubes doesn't change during transpiling, but are changed during compilation phase,
-        // so we can prepare them once for every phase.
-        // Communication between main and worker threads uses
-        // The structured clone algorithm (@see https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)
-        // which doesn't allow passing any function objects, so we need to sanitize the symbols.
-        // Communication with native backend also involves deserialization.
-        cubeSymbols = Object.fromEntries(
-          Object.entries(this.cubeSymbols.symbols)
-            .map(
-              ([key, value]) => [key, Object.fromEntries(
-                Object.keys(value).map((k) => [k, true]),
-              )],
-            ),
-        );
+      const cubeNames = Object.keys(this.cubeDictionary.byId);
+      // We need only cubes and all its member names for transpiling.
+      // Cubes doesn't change during transpiling, but are changed during compilation phase,
+      // so we can prepare them once for every phase.
+      // Communication between main and worker threads uses
+      // The structured clone algorithm (@see https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)
+      // which doesn't allow passing any function objects, so we need to sanitize the symbols.
+      // Communication with native backend also involves deserialization.
+      const cubeSymbols = Object.fromEntries(
+        Object.entries(this.cubeSymbols.symbols)
+          .map(
+            ([key, value]) => [key, Object.fromEntries(
+              Object.keys(value).map((k) => [k, true]),
+            )],
+          ),
+      );
 
-        // Transpilers are the same for all files within phase.
-        transpilerNames = this.transpilers.map(t => t.constructor.name);
-      }
+      // Transpilers are the same for all files within phase.
+      const transpilerNames = this.transpilers.map(t => t.constructor.name);
 
       if (transpilationNative) {
         // Warming up swc compiler cache
@@ -192,10 +183,8 @@ export class DataSchemaCompiler {
         }
 
         results = (await Promise.all([...nonJsFilesTasks, ...JsFilesTasks])).flat();
-      } else if (transpilationWorkerThreads) {
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       } else {
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, {})));
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       }
 
       return results.filter(f => !!f);
@@ -225,7 +214,7 @@ export class DataSchemaCompiler {
             errorsReport,
             { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {}, compilerId: this.compilerId, stage: 0 }
           );
-        } else if (transpilationWorkerThreads && this.workerPool) {
+        } else if (this.workerPool) {
           this.workerPool.terminate();
         }
 
@@ -334,7 +323,7 @@ export class DataSchemaCompiler {
         errorsReport.exitFile();
 
         return { ...file, content: res[0].code };
-      } else if (getEnv('transpilationWorkerThreads')) {
+      } else {
         const data = {
           fileName: file.fileName,
           content: file.content,
@@ -348,24 +337,6 @@ export class DataSchemaCompiler {
         errorsReport.addWarnings(res.warnings);
 
         return { ...file, content: res.content };
-      } else {
-        const ast = parse(
-          file.content,
-          {
-            sourceFilename: file.fileName,
-            sourceType: 'module',
-            plugins: ['objectRestSpread'],
-          },
-        );
-
-        errorsReport.inFile(file);
-        this.transpilers.forEach((t) => {
-          babelTraverse(ast, t.traverseObject(errorsReport));
-        });
-        errorsReport.exitFile();
-
-        const content = babelGenerator(ast, {}, file.content).code;
-        return { ...file, content };
       }
     } catch (e) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
