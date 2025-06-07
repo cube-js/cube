@@ -261,12 +261,11 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
-        Ok(self
-            .list_with_metadata(remote_prefix)
-            .await?
-            .into_iter()
-            .map(|f| f.remote_path)
-            .collect::<Vec<_>>())
+        let leading_slash = self.leading_slash_regex();
+        self.list_with_metadata_and_map(remote_prefix, |obj: Object| {
+            Self::object_key_to_remote_path(&leading_slash, &obj.name)
+        })
+        .await
     }
 
     async fn list_with_metadata(
