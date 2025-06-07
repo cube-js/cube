@@ -306,12 +306,11 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
-        Ok(self
-            .list_with_metadata(remote_prefix)
-            .await?
-            .into_iter()
-            .map(|f| f.remote_path)
-            .collect::<Vec<_>>())
+        let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
+        self.list_with_metadata_and_map(remote_prefix, |o: s3::serde_types::Object| {
+            Ok(leading_slash.replace(&o.key, NoExpand("")).to_string())
+        })
+        .await
     }
 
     async fn list_with_metadata(
