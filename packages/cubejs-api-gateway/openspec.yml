@@ -173,7 +173,9 @@ components:
         members:
           type: array
           items:
-            type: "string"
+            oneOf:
+              - type: string
+              - $ref: "#/components/schemas/V1CubeMetaFolder"
     V1CubeMetaHierarchy:
       type: "object"
       required:
