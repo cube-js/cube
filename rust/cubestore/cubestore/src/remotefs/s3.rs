@@ -318,34 +318,16 @@ impl RemoteFs for S3RemoteFs {
         &self,
         remote_prefix: String,
     ) -> Result<Vec<RemoteFile>, CubeError> {
-        let path = self.s3_path(&remote_prefix);
-        let bucket = self.bucket.load();
-        let list = bucket.list(path, None).await?;
-        let pages_count = list.len();
-        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
-            pages_count as i64,
-            Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
-        );
-        if pages_count > 100 {
-            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
-        }
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
-        let result = list
-            .iter()
-            .flat_map(|res| {
-                res.contents
-                    .iter()
-                    .map(|o| -> Result<RemoteFile, CubeError> {
-                        Ok(RemoteFile {
-                            remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
-                            updated: DateTime::parse_from_rfc3339(&o.last_modified)?
-                                .with_timezone(&Utc),
-                            file_size: o.size,
-                        })
-                    })
+
+        self.list_with_metadata_and_map(remote_prefix, |o: s3::serde_types::Object| {
+            Ok(RemoteFile {
+                remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
+                updated: DateTime::parse_from_rfc3339(&o.last_modified)?.with_timezone(&Utc),
+                file_size: o.size,
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(result)
+        })
+        .await
     }
 
     async fn local_path(&self) -> Result<String, CubeError> {
