@@ -1679,7 +1679,7 @@ mod tests {
     use crate::metastore::{BaseRocksStoreFs, RocksMetaStore, RowKey, TableId};
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
-    use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
+    use crate::remotefs::{ExtendedRemoteFs, LocalDirRemoteFs, RemoteFile, RemoteFs};
     use crate::store::ChunkStore;
 
     use super::*;
@@ -2054,6 +2054,9 @@ mod tests {
             self.0.local_file(remote_path).await
         }
     }
+
+    #[async_trait::async_trait]
+    impl ExtendedRemoteFs for FailingRemoteFs {}
 
     #[tokio::test]
     async fn create_table_if_not_exists() {
