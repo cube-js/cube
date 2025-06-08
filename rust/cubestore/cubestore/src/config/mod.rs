@@ -28,7 +28,7 @@ use crate::remotefs::gcs::GCSRemoteFs;
 use crate::remotefs::minio::MINIORemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+use crate::remotefs::{ExtendedRemoteFs, LocalDirRemoteFs, RemoteFs};
 use crate::scheduler::SchedulerImpl;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::{SqlService, SqlServiceImpl};
@@ -1907,7 +1907,8 @@ impl Config {
             self.injector
                 .register("cachestore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                    let original_remote_fs = i.get_service("original_remote_fs").await;
+                    let original_remote_fs: Arc<dyn ExtendedRemoteFs> =
+                        i.get_service("original_remote_fs").await;
                     let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_cachestore(
                         original_remote_fs,
                         i.get_service_typed().await,
@@ -1982,7 +1983,8 @@ impl Config {
             self.injector
                 .register("metastore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                    let original_remote_fs = i.get_service("original_remote_fs").await;
+                    let original_remote_fs: Arc<dyn ExtendedRemoteFs> =
+                        i.get_service("original_remote_fs").await;
                     let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_metastore(
                         original_remote_fs,
                         i.get_service_typed().await,

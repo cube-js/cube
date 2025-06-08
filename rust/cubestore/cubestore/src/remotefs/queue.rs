@@ -1,6 +1,6 @@
 use crate::config::ConfigObj;
 use crate::di_service;
-use crate::remotefs::{CommonRemoteFsUtils, RemoteFile, RemoteFs};
+use crate::remotefs::{CommonRemoteFsUtils, ExtendedRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -8,6 +8,7 @@ use core::fmt;
 use datafusion::cube_ext;
 use deadqueue::unlimited;
 use futures::future::join_all;
+use futures::stream::BoxStream;
 use log::error;
 use smallvec::alloc::fmt::Formatter;
 use std::collections::HashSet;
@@ -18,7 +19,7 @@ use tokio::sync::{broadcast, watch, RwLock};
 
 pub struct QueueRemoteFs {
     config: Arc<dyn ConfigObj>,
-    remote_fs: Arc<dyn RemoteFs>,
+    remote_fs: Arc<dyn ExtendedRemoteFs>,
     upload_queue: unlimited::Queue<RemoteFsOp>,
     download_queue: unlimited::Queue<RemoteFsOp>,
     // TODO not used
@@ -56,10 +57,10 @@ pub enum RemoteFsOpResult {
     Download(String, Result<String, CubeError>),
 }
 
-di_service!(QueueRemoteFs, [RemoteFs]);
+di_service!(QueueRemoteFs, [RemoteFs, ExtendedRemoteFs]);
 
 impl QueueRemoteFs {
-    pub fn new(config: Arc<dyn ConfigObj>, remote_fs: Arc<dyn RemoteFs>) -> Arc<Self> {
+    pub fn new(config: Arc<dyn ConfigObj>, remote_fs: Arc<dyn ExtendedRemoteFs>) -> Arc<Self> {
         let (stopped_tx, stopped_rx) = watch::channel(false);
         let (tx, rx) = broadcast::channel(16384);
         Arc::new(Self {
@@ -340,6 +341,16 @@ impl RemoteFs for QueueRemoteFs {
     }
 }
 
+#[async_trait]
+impl ExtendedRemoteFs for QueueRemoteFs {
+    async fn list_by_page(
+        &self,
+        remote_prefix: String,
+    ) -> Result<BoxStream<Result<Vec<String>, CubeError>>, CubeError> {
+        self.remote_fs.list_by_page(remote_prefix).await
+    }
+}
+
 impl QueueRemoteFs {
     async fn check_file_size(
         remote_path: &str,
@@ -386,7 +397,7 @@ mod test {
         }
     }
 
-    di_service!(MockFs, [RemoteFs]);
+    di_service!(MockFs, [RemoteFs, ExtendedRemoteFs]);
 
     #[async_trait]
     impl RemoteFs for MockFs {
@@ -473,6 +484,9 @@ mod test {
             self.base_fs.local_file(remote_path).await
         }
     }
+
+    #[async_trait]
+    impl ExtendedRemoteFs for MockFs {}
 
     fn make_test_csv() -> std::path::PathBuf {
         let dir = env::temp_dir();

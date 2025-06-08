@@ -1,5 +1,6 @@
 use crate::app_metrics;
 use crate::di_service;
+use crate::remotefs::ExtendedRemoteFs;
 use crate::remotefs::{CommonRemoteFsUtils, LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
@@ -115,7 +116,7 @@ impl GCSRemoteFs {
     }
 }
 
-di_service!(GCSRemoteFs, [RemoteFs]);
+di_service!(GCSRemoteFs, [RemoteFs, ExtendedRemoteFs]);
 
 #[async_trait]
 impl RemoteFs for GCSRemoteFs {
@@ -291,6 +292,10 @@ impl RemoteFs for GCSRemoteFs {
         Ok(buf.to_str().unwrap().to_string())
     }
 }
+
+// TODO: Make a faster implementation
+#[async_trait]
+impl ExtendedRemoteFs for GCSRemoteFs {}
 
 struct LeadingSubpath(Regex);
 
