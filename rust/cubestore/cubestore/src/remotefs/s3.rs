@@ -307,7 +307,7 @@ impl RemoteFs for S3RemoteFs {
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
         let leading_subpath = self.leading_subpath_regex();
-        self.list_with_metadata_and_map(remote_prefix, |o: s3::serde_types::Object| {
+        self.list_objects_and_map(remote_prefix, |o: s3::serde_types::Object| {
             Ok(Self::object_key_to_remote_path(&leading_subpath, &o.key))
         })
         .await
@@ -318,7 +318,7 @@ impl RemoteFs for S3RemoteFs {
         remote_prefix: String,
     ) -> Result<Vec<RemoteFile>, CubeError> {
         let leading_subpath = self.leading_subpath_regex();
-        self.list_with_metadata_and_map(remote_prefix, |o: s3::serde_types::Object| {
+        self.list_objects_and_map(remote_prefix, |o: s3::serde_types::Object| {
             Ok(RemoteFile {
                 remote_path: Self::object_key_to_remote_path(&leading_subpath, &o.key),
                 updated: DateTime::parse_from_rfc3339(&o.last_modified)?.with_timezone(&Utc),
@@ -350,18 +350,37 @@ impl S3RemoteFs {
         leading_subpath.0.replace(o_key, NoExpand("")).to_string()
     }
 
-    async fn list_with_metadata_and_map<T, F>(
+    async fn list_objects_and_map<T, F>(
         &self,
         remote_prefix: String,
-        f: F,
+        mut f: F,
     ) -> Result<Vec<T>, CubeError>
     where
         F: FnMut(s3::serde_types::Object) -> Result<T, CubeError> + Copy,
     {
         let path = self.s3_path(&remote_prefix);
         let bucket = self.bucket.load();
-        let list = bucket.list(path, None).await?;
-        let pages_count = list.len();
+        let mut mapped_results = Vec::new();
+        let mut continuation_token = None;
+        let mut pages_count: i64 = 0;
+
+        loop {
+            let (result, _) = bucket
+                .list_page(path.clone(), None, continuation_token, None, None)
+                .await?;
+
+            pages_count += 1;
+
+            for obj in result.contents.into_iter() {
+                mapped_results.push(f(obj)?);
+            }
+
+            continuation_token = result.next_continuation_token;
+            if continuation_token.is_none() {
+                break;
+            }
+        }
+
         app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
             pages_count as i64,
             Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
@@ -369,12 +388,9 @@ impl S3RemoteFs {
         if pages_count > 100 {
             log::warn!("S3 list returned more than 100 pages: {}", pages_count);
         }
-        let result = list
-            .into_iter()
-            .flat_map(|res| res.contents.into_iter().map(f))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(result)
+        Ok(mapped_results)
     }
+
     fn s3_path(&self, remote_path: &str) -> String {
         format!(
             "{}{}",
