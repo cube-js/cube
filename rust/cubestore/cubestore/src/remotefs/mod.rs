@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::cube_ext;
 use futures::future::BoxFuture;
+use futures::stream::BoxStream;
 use futures::FutureExt;
 use log::debug;
 use serde::{Deserialize, Serialize};
@@ -80,6 +81,27 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
     async fn local_path(&self) -> Result<String, CubeError>;
 
     async fn local_file(&self, remote_path: String) -> Result<String, CubeError>;
+}
+
+/// This has `RemoteFs` methods that can't be used in a cuberpc::service.
+#[async_trait]
+pub trait ExtendedRemoteFs: DIService + RemoteFs {
+    /// Like `Remotefs::list` but returns the resulting set of strings with a Stream of filenames in
+    /// pages.  Note that the default implementation returns all the pages in a single batch.
+    async fn list_by_page(
+        &self,
+        remote_prefix: String,
+    ) -> Result<BoxStream<Result<Vec<String>, CubeError>>, CubeError> {
+        // Note, this implementation doesn't actually paginate.
+        let list: Vec<String> = self.list(remote_prefix).await?;
+
+        let stream: BoxStream<_> = if list.is_empty() {
+            Box::pin(futures::stream::empty())
+        } else {
+            Box::pin(futures::stream::once(async { Ok(list) }))
+        };
+        Ok(stream)
+    }
 }
 
 pub struct CommonRemoteFsUtils;
@@ -184,7 +206,7 @@ impl LocalDirRemoteFs {
     }
 }
 
-di_service!(LocalDirRemoteFs, [RemoteFs]);
+di_service!(LocalDirRemoteFs, [RemoteFs, ExtendedRemoteFs]);
 di_service!(RemoteFsRpcClient, [RemoteFs]);
 
 #[async_trait]
@@ -361,6 +383,9 @@ impl RemoteFs for LocalDirRemoteFs {
         Ok(buf.to_str().unwrap().to_string())
     }
 }
+
+#[async_trait]
+impl ExtendedRemoteFs for LocalDirRemoteFs {}
 
 impl LocalDirRemoteFs {
     fn remove_empty_paths_boxed(

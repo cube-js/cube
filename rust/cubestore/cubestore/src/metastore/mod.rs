@@ -6546,8 +6546,9 @@ mod tests {
 
     #[tokio::test]
     async fn delete_old_snapshots() {
+        let metastore_snapshots_lifetime_secs = 1;
         let config = Config::test("delete_old_snapshots").update_config(|mut obj| {
-            obj.metastore_snapshots_lifetime = 1;
+            obj.metastore_snapshots_lifetime = metastore_snapshots_lifetime_secs;
             obj.minimum_metastore_snapshots_count = 2;
             obj
         });
@@ -6616,14 +6617,22 @@ mod tests {
                     .await
                     .unwrap();
 
-            assert_eq!(uploaded3.len(), 3);
+            assert_eq!(
+                uploaded3.len(),
+                3,
+                "uploaded3 keys: {}",
+                uploaded3.keys().join(", ")
+            );
 
             meta_store
                 .create_schema("foo4".to_string(), false)
                 .await
                 .unwrap();
 
-            tokio::time::sleep(Duration::from_millis(1100)).await;
+            tokio::time::sleep(Duration::from_millis(
+                metastore_snapshots_lifetime_secs * 1000 + 100,
+            ))
+            .await;
             meta_store.upload_check_point().await.unwrap();
 
             let uploaded4 =
