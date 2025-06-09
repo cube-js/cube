@@ -30,7 +30,7 @@ import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
 import { DevServer } from './DevServer';
-import agentCollect from './agentCollect';
+import { agentCollect } from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
 import { prodLogger, devLogger } from './logger';
 import { OptsHandler } from './OptsHandler';
@@ -58,7 +58,8 @@ import type {
   LoggerFn,
   DriverConfig,
   ScheduledRefreshTimeZonesFn,
-  ContextToCubeStoreRouterIdFn, LoggerEventParams,
+  ContextToCubeStoreRouterIdFn,
+  LoggerFnParams,
 } from './types';
 import {
   ContextToOrchestratorIdFn,
@@ -230,7 +231,7 @@ export class CubejsServerCore {
 
     this.startScheduledRefreshTimer();
 
-    this.event = async (event, props: LoggerEventParams) => {
+    this.event = async (event, props: LoggerFnParams) => {
       if (!this.options.telemetry) {
         return;
       }
