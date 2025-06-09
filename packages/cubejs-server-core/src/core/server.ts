@@ -14,7 +14,6 @@ import {
   CancelableInterval,
   createCancelableInterval,
   formatDuration,
-  getAnonymousId,
   getEnv,
   assertDataSource,
   getRealType,
@@ -59,7 +58,7 @@ import type {
   LoggerFn,
   DriverConfig,
   ScheduledRefreshTimeZonesFn,
-  ContextToCubeStoreRouterIdFn,
+  ContextToCubeStoreRouterIdFn, LoggerEventParams,
 } from './types';
 import {
   ContextToOrchestratorIdFn,
@@ -171,8 +170,6 @@ export class CubejsServerCore {
 
   public projectFingerprint: string | null = null;
 
-  public anonymousId: string | null = null;
-
   public coreServerVersion: string | null = null;
 
   protected contextAcceptor: ContextAcceptor;
@@ -233,7 +230,7 @@ export class CubejsServerCore {
 
     this.startScheduledRefreshTimer();
 
-    this.event = async (name, props) => {
+    this.event = async (event, props: LoggerEventParams) => {
       if (!this.options.telemetry) {
         return;
       }
@@ -248,15 +245,12 @@ export class CubejsServerCore {
         }
       }
 
-      if (!this.anonymousId) {
-        this.anonymousId = getAnonymousId();
-      }
-
       const internalExceptionsEnv = getEnv('internalExceptions');
 
       try {
         await track({
-          event: name,
+          timestamp: new Date().toJSON(),
+          event,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
           dockerVersion: getEnv('dockerImageVersion'),
@@ -410,7 +404,12 @@ export class CubejsServerCore {
     if (agentEndpointUrl) {
       const oldLogger = this.logger;
       this.preAgentLogger = oldLogger;
+
       this.logger = (msg, params) => {
+        // Filling timestamp as much as earlier as we can, otherwise it can be incorrect. Because next code is async
+        // with await points which can be delayed with Node.js micro-tasking.
+        params.timestamp = params.timestamp || new Date().toJSON();
+
         oldLogger(msg, params);
         agentCollect(
           {

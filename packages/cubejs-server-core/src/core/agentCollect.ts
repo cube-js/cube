@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import WebSocket from 'ws';
 import zlib from 'zlib';
 import { promisify } from 'util';
+import {LoggerFn} from "./types";
 
 const deflate = promisify(zlib.deflate);
 interface AgentTransport {
@@ -175,11 +176,11 @@ const clearTransport = () => {
   agentInterval = null;
 };
 
-export default async (event: Record<string, any>, endpointUrl: string, logger: any) => {
+export default async (event: Record<string, any>, endpointUrl: string, logger: LoggerFn) => {
   trackEvents.push({
+    timestamp: new Date().toJSON(),
     ...event,
     id: crypto.randomBytes(16).toString('hex'),
-    timestamp: new Date().toJSON(),
     instanceId: getEnv('instanceId'),
   });
   lastEvent = new Date();

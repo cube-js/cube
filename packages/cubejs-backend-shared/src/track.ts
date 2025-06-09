@@ -5,14 +5,16 @@ import { internalExceptions } from './errors';
 
 export type BaseEvent = {
   event: string,
+  timestamp: string,
   [key: string]: any,
 };
 
-export type Event = BaseEvent & {
+export type Event = {
   id: string,
   clientTimestamp: string,
   anonymousId: string,
   platform: string,
+  arch: string,
   nodeVersion: string,
   sentFrom: 'backend';
 };
@@ -79,8 +81,8 @@ export async function track(opts: BaseEvent) {
 
   trackEvents.push({
     ...opts,
+    clientTimestamp: opts.timestamp || new Date().toJSON(),
     id: crypto.randomBytes(16).toString('hex'),
-    clientTimestamp: new Date().toJSON(),
     platform: process.platform,
     arch: process.arch,
     nodeVersion: process.version,
