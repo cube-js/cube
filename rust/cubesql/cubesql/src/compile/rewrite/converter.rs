@@ -2,8 +2,8 @@ pub use super::rewriter::CubeRunner;
 use crate::{
     compile::{
         engine::df::{
-            scan::{CubeScanNode, CubeScanOptions, MemberField, WrappedSelectNode},
-            wrapper::CubeScanWrapperNode,
+            scan::{CubeScanNode, CubeScanOptions, MemberField},
+            wrapper::{CubeScanWrapperNode, WrappedSelectNode},
         },
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -12,11 +12,11 @@ use crate::{
             AggregateFunctionExprDistinct, AggregateFunctionExprFun, AggregateSplit,
             AggregateUDFExprFun, AliasExprAlias, AnyExprAll, AnyExprOp, BetweenExprNegated,
             BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
-            CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, CubeScanWrapped,
-            DimensionName, EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
-            EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
-            FilterOpOp, GroupingSetExprType, GroupingSetType, InListExprNegated,
-            InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
+            CubeScanAliasToCube, CubeScanJoinHints, CubeScanLimit, CubeScanOffset,
+            CubeScanUngrouped, CubeScanWrapped, DimensionName, EmptyRelationDerivedSourceTableName,
+            EmptyRelationIsWrappable, EmptyRelationProduceOneRow, FilterMemberMember,
+            FilterMemberOp, FilterMemberValues, FilterOpOp, GroupingSetExprType, GroupingSetType,
+            InListExprNegated, InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
             JoinNullEqualsNull, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
             LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
             LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
@@ -416,6 +416,7 @@ impl LogicalPlanToLanguageConverter {
                 fun,
                 args,
                 distinct,
+                within_group,
             } => {
                 let fun = add_expr_data_node!(graph, fun, AggregateFunctionExprFun);
                 let args = add_expr_list_node!(
@@ -426,8 +427,18 @@ impl LogicalPlanToLanguageConverter {
                     flat_list
                 );
                 let distinct = add_expr_data_node!(graph, distinct, AggregateFunctionExprDistinct);
+                let within_group = add_expr_list_node!(
+                    graph,
+                    within_group.as_ref().unwrap_or(&vec![]),
+                    query_params,
+                    AggregateFunctionExprWithinGroup,
+                    flat_list
+                );
                 graph.add(LogicalPlanLanguage::AggregateFunctionExpr([
-                    fun, args, distinct,
+                    fun,
+                    args,
+                    distinct,
+                    within_group,
                 ]))
             }
             Expr::WindowFunction {
@@ -1136,10 +1147,20 @@ pub fn node_to_expr(
             let args =
                 match_expr_list_node!(node_by_id, to_expr, params[1], AggregateFunctionExprArgs);
             let distinct = match_data_node!(node_by_id, params[2], AggregateFunctionExprDistinct);
+            let within_group = match_expr_list_node!(
+                node_by_id,
+                to_expr,
+                params[3],
+                AggregateFunctionExprWithinGroup
+            );
             Expr::AggregateFunction {
                 fun,
                 args,
                 distinct,
+                within_group: match within_group.len() {
+                    0 => None,
+                    _ => Some(within_group),
+                },
             }
         }
         LogicalPlanLanguage::WindowFunctionExpr(params) => {
@@ -1583,7 +1604,7 @@ impl LanguageToLogicalPlanConverter {
                                     data_type,
                                     true,
                                 ),
-                                MemberField::Member(measure.to_string()),
+                                MemberField::regular(measure.to_string()),
                             ));
                         }
                         LogicalPlanLanguage::TimeDimension(params) => {
@@ -1609,7 +1630,7 @@ impl LanguageToLogicalPlanConverter {
                             if !query_time_dimensions.contains(&query_time_dimension) {
                                 query_time_dimensions.push(query_time_dimension);
                             }
-                            if let Some(granularity) = &granularity {
+                            if let Some(granularity) = granularity {
                                 fields.push((
                                     DFField::new(
                                         expr_relation(&expr),
@@ -1618,7 +1639,7 @@ impl LanguageToLogicalPlanConverter {
                                         DataType::Timestamp(TimeUnit::Nanosecond, None),
                                         true,
                                     ),
-                                    MemberField::Member(format!("{}.{}", dimension, granularity)),
+                                    MemberField::time_dimension(dimension.to_string(), granularity),
                                 ));
                             }
                         }
@@ -1641,7 +1662,7 @@ impl LanguageToLogicalPlanConverter {
                                     data_type,
                                     true,
                                 ),
-                                MemberField::Member(dimension),
+                                MemberField::regular(dimension),
                             ));
                         }
                         LogicalPlanLanguage::Segment(params) => {
@@ -1740,7 +1761,7 @@ impl LanguageToLogicalPlanConverter {
                                                     column.get_column_type().to_arrow(),
                                                     true,
                                                 ),
-                                                MemberField::Member(
+                                                MemberField::regular(
                                                     column.member_name().to_string(),
                                                 ),
                                             ));
@@ -1783,7 +1804,7 @@ impl LanguageToLogicalPlanConverter {
                                     query_time_dimensions,
                                     filters,
                                     node_by_id,
-                                    !is_in_or || !is_and_op,
+                                    is_in_or || !is_and_op,
                                 )?;
                                 match op.as_str() {
                                     "and" => {
@@ -2000,6 +2021,12 @@ impl LanguageToLogicalPlanConverter {
 
                 if ungrouped {
                     query.ungrouped = Some(true);
+                }
+
+                let join_hints =
+                    match_data_node!(node_by_id, cube_scan_params[10], CubeScanJoinHints);
+                if join_hints.len() > 0 {
+                    query.join_hints = Some(join_hints);
                 }
 
                 query.order = if !query_order.is_empty() {

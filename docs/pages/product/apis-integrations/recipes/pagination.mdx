@@ -1,0 +1,161 @@
+# Implementing pagination
+
+## Use case
+
+We want to display a table of data with hundreds of rows. To make the table
+easier to digest and to improve the performance of the query, we'll use
+pagination. With the recipe below, we'll get the orders list sorted by the order
+number. Every page will have 5 orders.
+
+## Data modeling
+
+We have the following data model:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: number
+        sql: number
+        type: number
+
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
+  dimensions: {
+    number: {
+      sql: `number`,
+      type: `number`,
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+## Query
+
+To select orders that belong to a particular page, we can use the `limit` and
+`offset` query properties. First, let's get the number of all orders that we
+have.
+
+```json
+{
+  "measures": ["orders.count"]
+}
+```
+
+Then, let's retrieve first batch (page) of five orders:
+
+```json
+{
+  "dimensions": ["orders.number"],
+  "order": {
+    "orders.number": "asc"
+  },
+  "limit": 5
+}
+```
+
+Now, let's retrieve the second batch (page) of five orders:
+
+```json
+{
+  "dimensions": ["orders.number"],
+  "order": {
+    "orders.number": "asc"
+  },
+  "limit": 5,
+  "offset": 5
+}
+```
+
+## Result
+
+We have received five orders per query and can use them as we want.
+
+```javascript
+// Orders count:
+
+[
+  {
+    "orders.count": "10000",
+  },
+];
+```
+
+```javascript
+// The first five orders:
+
+[
+  {
+    "orders.number": 1,
+  },
+  {
+    "orders.number": 2,
+  },
+  {
+    "orders.number": 3,
+  },
+  {
+    "orders.number": 4,
+  },
+  {
+    "orders.number": 5,
+  },
+];
+```
+
+```javascript
+// The next five orders:
+
+[
+  {
+    "orders.number": 6,
+  },
+  {
+    "orders.number": 7,
+  },
+  {
+    "orders.number": 8,
+  },
+  {
+    "orders.number": 9,
+  },
+  {
+    "orders.number": 10,
+  },
+];
+```
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/pagination)
+or run it with the `docker-compose up` command. You'll see the result, including
+queried data, in the console.

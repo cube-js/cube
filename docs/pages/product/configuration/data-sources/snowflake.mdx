@@ -4,6 +4,21 @@
 
 ## Prerequisites
 
+<InfoBox>
+
+In order to connect Cube to Snowflake, you need to grant certain permissions to the Snowflake role
+used by Cube. Cube requires the role to have `USAGE` on databases and schemas
+and `SELECT` on tables. An example configuration:
+```
+GRANT USAGE ON DATABASE ABC TO ROLE XYZ;
+GRANT USAGE ON ALL SCHEMAS IN DATABASE ABC TO ROLE XYZ;
+GRANT USAGE ON FUTURE SCHEMAS IN DATABASE ABC TO ROLE XYZ;
+GRANT SELECT ON ALL TABLES IN DATABASE ABC TO ROLE XYZ;
+GRANT SELECT ON FUTURE TABLES IN DATABASE ABC TO ROLE XYZ;
+```
+
+</InfoBox>
+
 - [Account/Server URL][snowflake-docs-account-id] for Snowflake.
 - User name and password or an RSA private key for the Snowflake account.
 - Optionally, the warehouse name, the user role, and the database name.
@@ -181,7 +196,7 @@ connections are made over HTTPS.
 [google-cloud-storage]: https://cloud.google.com/storage
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/
 [snowflake-docs-account-id]:

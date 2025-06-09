@@ -329,6 +329,28 @@ Array [
 ]
 `;
 
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 13`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions) 14`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 1`] = `
 Object {
   "completed_at": Object {
@@ -702,6 +724,28 @@ Array [
 ]
 `;
 
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 13`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 14`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 1`] = `
 Object {
   "completed_at": Object {
@@ -1001,6 +1045,28 @@ Array [
     "role": "manager",
   },
 ]
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 13`] = `
+Object {
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
+`;
+
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions) 14`] = `
+Object {
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+}
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 1`] = `
@@ -1348,64 +1414,25 @@ Array [
 ]
 `;
 
-exports[`Schema Testing Views extends custom granularities and timeshifts 1`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 13`] = `
 Object {
-  "aliasMember": "orders.createdAt",
-  "description": undefined,
-  "format": undefined,
-  "granularities": Object {
-    "half_year": Object {
-      "interval": "6 months",
-      "title": "6 month intervals",
-    },
-    "half_year_by_1st_april": Object {
-      "interval": "6 months",
-      "offset": "3 months",
-      "title": "Half year from Apr to Oct",
-    },
-    "half_year_by_1st_june": Object {
-      "interval": "6 months",
-      "origin": "2020-06-01 10:00:00",
-    },
-    "half_year_by_1st_march": Object {
-      "interval": "6 months",
-      "origin": "2020-03-01",
-    },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
   },
-  "meta": undefined,
-  "ownedByCube": false,
-  "sql": [Function],
-  "title": undefined,
-  "type": "time",
 }
 `;
 
-exports[`Schema Testing Views extends custom granularities and timeshifts 2`] = `
+exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 14`] = `
 Object {
-  "aggType": "count",
-  "aliasMember": "orders.count_shifted_year",
-  "description": undefined,
-  "format": undefined,
-  "meta": undefined,
-  "multiStage": true,
-  "ownedByCube": false,
-  "sql": [Function],
-  "timeShift": Array [
-    Object {
-      "interval": "1 year",
-      "timeDimension": [Function],
-      "type": "prior",
-    },
-  ],
-  "timeShiftReferences": Array [
-    Object {
-      "interval": "1 year",
-      "timeDimension": "createdAt",
-      "type": "prior",
-    },
-  ],
-  "title": undefined,
-  "type": "number",
+  "line_items": Object {
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  "order_users": Object {
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
 }
 `;
 
@@ -1507,6 +1534,7 @@ Object {
   },
   "evaluatedHierarchies": Array [
     Object {
+      "aliasMember": "orders.hello",
       "levels": Array [
         "orders_view.my_beloved_status",
       ],
@@ -1570,6 +1598,239 @@ Object {
   },
   "name": "orders_view",
   "preAggregations": Object {},
+  "rawCubes": [Function],
+  "rawFolders": [Function],
   "segments": Object {},
 }
+`;
+
+exports[`Schema Testing Views extends custom granularities and timeshifts 1`] = `
+Object {
+  "aliasMember": "orders.createdAt",
+  "description": undefined,
+  "format": undefined,
+  "granularities": Object {
+    "half_year": Object {
+      "interval": "6 months",
+      "title": "6 month intervals",
+    },
+    "half_year_by_1st_april": Object {
+      "interval": "6 months",
+      "offset": "3 months",
+      "title": "Half year from Apr to Oct",
+    },
+    "half_year_by_1st_june": Object {
+      "interval": "6 months",
+      "origin": "2020-06-01 10:00:00",
+    },
+    "half_year_by_1st_march": Object {
+      "interval": "6 months",
+      "origin": "2020-03-01",
+    },
+  },
+  "meta": undefined,
+  "ownedByCube": false,
+  "sql": [Function],
+  "title": undefined,
+  "type": "time",
+}
+`;
+
+exports[`Schema Testing Views extends custom granularities and timeshifts 2`] = `
+Object {
+  "aggType": "count",
+  "aliasMember": "orders.count_shifted_year",
+  "description": undefined,
+  "format": undefined,
+  "meta": undefined,
+  "multiStage": true,
+  "ownedByCube": false,
+  "sql": [Function],
+  "timeShift": Array [
+    Object {
+      "interval": "1 year",
+      "timeDimension": [Function],
+      "type": "prior",
+    },
+  ],
+  "timeShiftReferences": Array [
+    Object {
+      "interval": "1 year",
+      "timeDimension": "createdAt",
+      "type": "prior",
+    },
+  ],
+  "title": undefined,
+  "type": "number",
+}
+`;
+
+exports[`Schema Testing Views views extends views 1`] = `
+Object {
+  "renamed_orders_id": Object {
+    "aliasMember": "orders.id",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+  "renamed_orders_number": Object {
+    "aliasMember": "orders.number",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+  "renamed_orders_status": Object {
+    "aliasMember": "orders.status",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
+  "users_age": Object {
+    "aliasMember": "users.age",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+  "users_city": Object {
+    "aliasMember": "users.city",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
+  "users_gender": Object {
+    "aliasMember": "users.gender",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
+  "users_renamed_in_view3_gender": Object {
+    "aliasMember": "users.gender",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
+  "users_state": Object {
+    "aliasMember": "users.state",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
+}
+`;
+
+exports[`Schema Testing Views views extends views 2`] = `
+Object {
+  "renamed_orders_count": Object {
+    "aggType": "count",
+    "aliasMember": "orders.count",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+}
+`;
+
+exports[`Schema Testing Views views extends views 3`] = `
+Object {
+  "renamed_orders_count": Object {
+    "aggType": "count",
+    "aliasMember": "orders.count",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+}
+`;
+
+exports[`Schema Testing Views views extends views 4`] = `
+Object {
+  "renamed_orders_orders_hierarchy": Object {
+    "levels": [Function],
+    "title": undefined,
+  },
+  "renamed_orders_some_other_hierarchy": Object {
+    "levels": [Function],
+    "title": "Some other hierarchy",
+  },
+}
+`;
+
+exports[`Schema Testing Views views extends views 5`] = `
+Array [
+  Object {
+    "includes": Array [
+      Object {
+        "memberPath": "users.age",
+        "name": "users_age",
+        "type": "dimensions",
+      },
+      Object {
+        "memberPath": "users.state",
+        "name": "users_state",
+        "type": "dimensions",
+      },
+      Object {
+        "memberPath": "orders.status",
+        "name": "renamed_orders_status",
+        "type": "dimensions",
+      },
+    ],
+    "name": "folder1",
+  },
+  Object {
+    "includes": Array [
+      Object {
+        "memberPath": "users.city",
+        "name": "users_city",
+        "type": "dimensions",
+      },
+      Object {
+        "memberPath": "users.gender",
+        "name": "users_renamed_in_view3_gender",
+        "type": "dimensions",
+      },
+    ],
+    "name": "folder2",
+  },
+]
 `;

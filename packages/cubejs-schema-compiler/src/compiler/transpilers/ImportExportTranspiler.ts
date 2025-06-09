@@ -49,23 +49,56 @@ export class ImportExportTranspiler implements TranspilerInterface {
             });
           }
         });
-        const addExportCall = t.callExpression(t.identifier('addExport'), [t.objectExpression(<t.ObjectProperty[]>declarations)]);
+
         if ('declaration' in path.node && path.node.declaration) {
-          path.replaceWithMultiple([
-            path.node.declaration,
-            t.callExpression(t.identifier('addExport'), [
-              t.objectExpression(
-                // @ts-ignore
-                path.get('declaration').get('declarations').map(d => t.objectProperty(
-                  d.get('id').node,
-                  d.get('id').node
-                ))
-              )
-            ])
-          ]);
-        } else {
-          path.replaceWith(addExportCall);
+          const decl = path.get('declaration');
+
+          // If its FunctionDeclaration or ClassDeclaration
+          if (
+            t.isFunctionDeclaration(decl.node) ||
+            t.isClassDeclaration(decl.node)
+          ) {
+            const name = decl.node.id;
+            if (!name) {
+              reporter.syntaxError({
+                message: 'Exported function/class must have a name',
+                loc: decl.node.loc,
+              });
+              return;
+            }
+
+            path.replaceWithMultiple([
+              decl.node,
+              t.callExpression(t.identifier('addExport'), [
+                t.objectExpression([t.objectProperty(name, name)])
+              ])
+            ]);
+            return;
+          }
+
+          // VariableDeclaration (export const foo = ...)
+          if (t.isVariableDeclaration(decl.node)) {
+            path.replaceWithMultiple([
+              decl.node,
+              t.callExpression(t.identifier('addExport'), [
+                t.objectExpression(
+                  // @ts-ignore
+                  decl.get('declarations').map(d => t.objectProperty(d.get('id').node, d.get('id').node))
+                )
+              ])
+            ]);
+            return;
+          }
+
+          reporter.syntaxError({
+            message: `Unsupported export declaration of type '${decl.node?.type}'`,
+            loc: decl.node?.loc,
+          });
+          return;
         }
+
+        const addExportCall = t.callExpression(t.identifier('addExport'), [t.objectExpression(<t.ObjectProperty[]>declarations)]);
+        path.replaceWith(addExportCall);
       },
       ExportDefaultDeclaration(path) {
         // @ts-ignore

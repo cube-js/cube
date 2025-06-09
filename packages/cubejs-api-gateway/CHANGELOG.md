@@ -3,6 +3,64 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.20](https://github.com/cube-js/cube/compare/v1.3.19...v1.3.20) (2025-06-06)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
+
+### Features
+
+- Expose aliasMember for hierarchy in View ([#9636](https://github.com/cube-js/cube/issues/9636)) ([737caab](https://github.com/cube-js/cube/commit/737caabf2a43bc28ea0ad90085f44ffbaa1b292b))
+
+## [1.3.18](https://github.com/cube-js/cube/compare/v1.3.17...v1.3.18) (2025-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.17](https://github.com/cube-js/cube/compare/v1.3.16...v1.3.17) (2025-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.15](https://github.com/cube-js/cube/compare/v1.3.14...v1.3.15) (2025-05-15)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.14](https://github.com/cube-js/cube/compare/v1.3.13...v1.3.14) (2025-05-13)
+
+### Features
+
+- Rewrite joins from SQL as query-level join hints ([#9561](https://github.com/cube-js/cube/issues/9561)) ([2b2ac1c](https://github.com/cube-js/cube/commit/2b2ac1c47898f4f6bf67ebae658f90b768c63a7a))
+
+## [1.3.13](https://github.com/cube-js/cube/compare/v1.3.12...v1.3.13) (2025-05-12)
+
+### Features
+
+- introduce "protocol" and "method" props for request param in checkSqlAuth ([#9525](https://github.com/cube-js/cube/issues/9525)) ([401a845](https://github.com/cube-js/cube/commit/401a84584f418e2b4bdabe13766ac213646e0924))
+
+## [1.3.12](https://github.com/cube-js/cube/compare/v1.3.11...v1.3.12) (2025-05-08)
+
+### Bug Fixes
+
+- **query-orchestrator:** Correct local date parsing for partition start/end queries ([#9543](https://github.com/cube-js/cube/issues/9543)) ([20dd8ad](https://github.com/cube-js/cube/commit/20dd8ad10f6ad0fc2538aecd0ff82cd43f6ff680))
+
+## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
+
+### Features
+
+- **cubesql:** Data source per member ([#9537](https://github.com/cube-js/cube/issues/9537)) ([c0be00c](https://github.com/cube-js/cube/commit/c0be00cd4e5239b52116e38e0f5bf8d846e57090))
+
+## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
 ## [1.3.8](https://github.com/cube-js/cube/compare/v1.3.7...v1.3.8) (2025-04-24)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

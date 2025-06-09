@@ -4,8 +4,22 @@ use crate::python::neon_py::*;
 use crate::python::python_model::CubePythonModel;
 use crate::python::runtime::py_runtime_init;
 use neon::prelude::*;
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PyString, PyTuple};
+use std::path::Path;
+
+fn extend_sys_path(py: Python, file_name: &String) -> PyResult<()> {
+    let sys_path = py.import("sys")?.getattr("path")?.downcast::<PyList>()?;
+
+    let config_dir = Path::new(&file_name)
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    let config_dir_str = config_dir.to_str().unwrap_or(".");
+
+    sys_path.insert(0, PyString::new(py, config_dir_str))?;
+    Ok(())
+}
 
 fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let file_content_arg = cx.argument::<JsString>(0)?.value(&mut cx);
@@ -20,6 +34,8 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubeConfigPy> {
+        extend_sys_path(py, &options_file_name)?;
+
         let cube_code = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"
@@ -30,8 +46,15 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         let settings_py = if config_module.hasattr("config")? {
             config_module.getattr("config")?
         } else {
-            // backward compatibility
-            config_module.getattr("settings")?
+            // backward compatibility, was used in private preview, not as Public API
+            // TODO: Remove after 1.4
+            if config_module.hasattr("settings")? {
+                config_module.getattr("settings")?
+            } else {
+                return Err(PyErr::new::<PyException, String>(
+                    "`cube.py` configuration file must define the 'config' attribute. Did you forget to add the `from cube import config` import?".to_string(),
+                ));
+            }
         };
 
         let mut cube_conf = CubeConfigPy::new();
@@ -61,6 +84,8 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
     py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubePythonModel> {
+        extend_sys_path(py, &model_file_name)?;
+
         let cube_code = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"
@@ -102,6 +127,8 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 );
             }
         } else {
+            // backward compatibility, was used in private preview, not as Public API
+            // TODO: Remove after 1.4
             let inspect_module = py.import("inspect")?;
             let args = (model_module, inspect_module.getattr("isfunction")?);
             let functions_with_names = inspect_module

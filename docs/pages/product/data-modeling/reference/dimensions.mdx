@@ -1,0 +1,719 @@
+# Dimensions
+
+You can use the `dimensions` parameter within [cubes][ref-ref-cubes] to define dimensions.
+You can think about a dimension as an attribute related to a measure, e.g. the measure `user_count`
+can have dimensions like `country`, `age`, `occupation`, etc.
+
+Any dimension should have the following parameters: [`name`](#name), [`sql`](#sql), and [`type`](#type).
+
+Dimensions can be also organized into [hierarchies][ref-ref-hierarchies].
+
+## Parameters
+
+### `name`
+
+The `name` parameter serves as the identifier of a dimension. It must be unique
+among all dimensions, measures, and segments within a cube and follow the
+[naming conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  dimensions: {
+    price: {
+      sql: `price`,
+      type: `number`,
+    },
+
+    brand_name: {
+      sql: `brand_name`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+
+    dimensions:
+      - name: price
+        sql: price
+        type: number
+
+      - name: brand_name
+        sql: brand_name
+        type: string
+
+
+```
+
+</CodeTabs>
+
+### `case`
+
+The `case` statement is used to define dimensions based on SQL conditions.
+
+The `when` parameters declares a series of `sql` conditions and `labels`
+that are returned if the condition is truthy. The `else` parameter declares
+the default `label` that would be returned if there's no truthy `sql`
+condition.
+
+The following example will create a `size` dimension with values
+`xl`, `xxl`, and `Unknown`:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    size: {
+      type: `string`,
+      case: {
+        when: [
+          { sql: `${CUBE}.size_value = 'xl-en'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xl'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xxl-en'`, label: `xxl` },
+          { sql: `${CUBE}.size_value = 'xxl'`, label: `xxl` },
+        ],
+        else: { label: `Unknown` },
+      },
+    },
+  },
+});
+
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: size
+        type: string
+        case:
+          when:
+            - sql: "{CUBE}.size_value = 'xl-en'"
+              label: xl
+            - sql: "{CUBE}.size_value = 'xl'"
+              label: xl
+            - sql: "{CUBE}.size_value = 'xxl-en'"
+              label: xxl
+            - sql: "{CUBE}.size_value = 'xxl'"
+              label: xxl
+          else:
+            label: Unknown
+```
+
+</CodeTabs>
+
+The `label` property can be defined dynamically as an object with a `sql`
+property in JavaScript models:
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    size: {
+      type: `string`,
+      case: {
+        when: [
+          {
+            sql: `${CUBE}.meta_value = 'xl-en'`,
+            label: { sql: `${CUBE}.english_size` },
+          },
+          {
+            sql: `${CUBE}.meta_value = 'xl'`,
+            label: { sql: `${CUBE}.euro_size` },
+          },
+          {
+            sql: `${CUBE}.meta_value = 'xxl-en'`,
+            label: { sql: `${CUBE}.english_size` },
+          },
+          {
+            sql: `${CUBE}.meta_value = 'xxl'`,
+            label: { sql: `${CUBE}.euro_size` },
+          },
+        ],
+        else: { label: `Unknown` },
+      },
+    },
+  },
+});
+```
+
+### `description`
+
+This parameter provides a human-readable description of a dimension.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    comment: {
+      description: `Comments for orders`,
+      sql: `comments`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        description: Comments for orders
+        sql: comments
+        type: string
+```
+
+</CodeTabs>
+
+### `format`
+
+`format` is an optional parameter. It is used to format the output of dimensions
+in different ways, for example, a link for `external_url`. Please refer to the
+[Dimension Formats][ref-schema-ref-dims-formats] for the full list of supported
+formats.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    total: {
+      sql: `amount`,
+      type: `number`,
+      format: `currency`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: total
+        sql: amount
+        type: number
+        format: currency
+```
+
+</CodeTabs>
+
+### `meta`
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      meta: {
+        any: "value",
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        meta:
+          any: value
+```
+
+</CodeTabs>
+
+### `primary_key`
+
+Specify if a dimension is a primary key for a cube. The default value is
+`false`.
+
+A primary key is used to make [joins][ref-schema-ref-joins] work properly.
+
+<InfoBox>
+
+Setting `primary_key` to `true` will change the default value of the [`public`
+parameter](#public) to `false`. If you still want `public` to be `true`, set it
+explicitly.
+
+</InfoBox>
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+```
+
+</CodeTabs>
+
+It is possible to have more than one primary key dimension in a cube if you'd
+like them all to be parts of a composite key:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  sql: `
+    SELECT 1 AS column_a, 1 AS column_b UNION ALL
+    SELECT 2 AS column_a, 1 AS column_b UNION ALL
+    SELECT 1 AS column_a, 2 AS column_b UNION ALL
+    SELECT 2 AS column_a, 2 AS column_b
+  `,
+
+  dimensions: {
+    composite_key_a: {
+      sql: `column_a`,
+      type: `number`,
+      primary_key: true
+    },
+
+    composite_key_b: {
+      sql: `column_b`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: products
+    sql: >
+      SELECT 1 AS column_a, 1 AS column_b UNION ALL
+      SELECT 2 AS column_a, 1 AS column_b UNION ALL
+      SELECT 1 AS column_a, 2 AS column_b UNION ALL
+      SELECT 2 AS column_a, 2 AS column_b
+
+    dimensions:
+      - name: composite_key_a
+        sql: column_a
+        type: number
+        primary_key: true
+
+      - name: composite_key_b
+        sql: column_b
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+```
+
+</CodeTabs>
+
+Querying the `count` measure of the cube shown above will generate the following
+SQL to the upstream data source:
+
+```sql
+SELECT
+  count(
+    CAST("product".column_a as TEXT) || CAST("product".column_b as TEXT)
+  ) "product__count"
+FROM (
+  SELECT 1 AS column_a, 1 AS column_b UNION ALL
+  SELECT 2 AS column_a, 1 AS column_b UNION ALL
+  SELECT 1 AS column_a, 2 AS column_b UNION ALL
+  SELECT 2 AS column_a, 2 AS column_b
+) AS "product"
+```
+
+### `propagate_filters_to_sub_query`
+
+When this statement is set to `true`, the filters applied to the query will be
+passed to the [subquery][self-subquery].
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      sub_query: true,
+      propagate_filters_to_sub_query: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+        propagate_filters_to_sub_query: true
+```
+
+</CodeTabs>
+
+### `public`
+
+The `public` parameter is used to manage the visibility of a dimension. Valid
+values for `public` are `true` and `false`. When set to `false`, this dimension
+**cannot** be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    comment: {
+      sql: `comment`,
+      type: `string`,
+      public: false
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        sql: comment
+        type: string
+        public: false
+```
+
+</CodeTabs>
+
+### `sql`
+
+`sql` is a required parameter. It can take any valid SQL expression depending on
+the `type` of the dimension. Please refer to the [Dimension
+Types][ref-schema-ref-dims-types] to understand what the `sql` parameter should
+be for a given dimension type.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+### `sub_query`
+
+The `sub_query` statement allows you to reference a measure in a dimension. It's
+an advanced concept and you can learn more about it [here][ref-subquery].
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      sub_query: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+```
+
+</CodeTabs>
+
+### `title`
+
+You can use the `title` parameter to change a dimension's displayed name. By
+default, Cube will humanize your dimension key to create a display name. In
+order to override default behavior, please use the `title` property:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    meta_value: {
+      title: `Size`,
+      sql: `meta_value`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: meta_value
+        title: Size
+        sql: meta_value
+        type: string
+```
+
+</CodeTabs>
+
+### `type`
+
+`type` is a required parameter. There are various types that can be assigned to
+a dimension. Please refer to the [Dimension Types][ref-schema-ref-dims-types]
+for the full list of dimension types.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    rating: {
+      sql: `rating`,
+      type: `number`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: rating
+        sql: rating
+        type: number
+```
+
+</CodeTabs>
+
+### `granularities`
+
+By default, the following granularities are available for time dimensions:
+`year`, `quarter`, `month`, `week` (starting on Monday), `day`, `hour`, `minute`,
+`second`.
+
+You can use the `granularities` parameter with any dimension of the [type
+`time`][ref-time-dimensions] to define one or more custom granularities, such as
+a *week starting on Sunday* or a *fiscal year*.
+
+<ReferenceBox>
+
+See [this recipe][ref-custom-granularity-recipe] for more custom granularity
+examples.
+
+</ReferenceBox>
+
+<WarningBox>
+
+Custom granularities are supported for the following [data sources][ref-data-sources]:
+Amazon Athena, Amazon Redshift, DuckDB, Databricks, Google BigQuery, ClickHouse, Microsoft SQL Server, MySQL, Postgres, and Snowflake.
+Please [file an issue](https://github.com/cube-js/cube/issues) if you need support for another data source.
+
+</WarningBox>
+
+For each custom granularity, the `interval` parameter is required. It specifies
+the duration of the time interval and has the following format:
+`quantity unit [quantity unit...]`, e.g., `5 days` or `1 year 6 months`.
+
+Optionally, a custom granularity might use the `offset` parameter to specify how
+the time interval is shifted forward or backward in time. It has the same
+format as `interval`, however, you can also provide negative quantities, e.g.,
+`-1 day` or `1 month -10 days`.
+
+Alternatively, instead of `offset`, you can provide the `origin` parameter.
+When `origin` is provided, time intervals will be shifted in a way that one of
+them will match the provided origin. It accepts an ISO 8601-compliant [date time
+string][link-date-time-string], e.g., `2024-01-02` or `2024-01-02T12:00:00.000Z`.
+
+Optionally, a custom granularity might have the `title` parameter with a
+human-friendly description.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT '2025-01-01T00:12:00.000Z'::TIMESTAMP AS time UNION ALL
+      SELECT '2025-02-01T00:15:00.000Z'::TIMESTAMP AS time UNION ALL
+      SELECT '2025-03-01T00:18:00.000Z'::TIMESTAMP AS time
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+
+        granularities:
+          - name: quarter_hour
+            interval: 15 minutes
+
+          - name: week_starting_on_sunday
+            interval: 1 week
+            offset: -1 day
+
+          - name: fiscal_year_starting_on_april_01
+            title: Corporate and government fiscal year in the United Kingdom
+            interval: 1 year
+            origin: "2025-04-01"
+            # You have to use quotes here to make `origin` a valid YAML string 
+```
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT '2025-01-01T00:12:00.000Z'::TIMESTAMP AS time UNION ALL
+    SELECT '2025-02-01T00:15:00.000Z'::TIMESTAMP AS time UNION ALL
+    SELECT '2025-03-01T00:18:00.000Z'::TIMESTAMP AS time
+  `,
+
+  dimensions: {
+    time: {
+      sql: `time`,
+      type: `time`,
+      granularities: {
+        quarter_hour: {
+          interval: `15 minutes`
+        },
+        week_starting_on_sunday: {
+          interval: `1 week`,
+          offset: `-1 day`
+        },
+        fiscal_year_starting_on_april_01: {
+          title: `Corporate and government fiscal year in the United Kingdom`,
+          interval: `1 year`,
+          origin: `2025-04-01`
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+
+[ref-ref-cubes]: /product/data-modeling/reference/cube
+[ref-schema-ref-joins]: /product/data-modeling/reference/joins
+[ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
+[self-subquery]: #sub-query
+[ref-naming]: /product/data-modeling/syntax#naming
+[ref-schema-ref-dims-types]:
+  /product/data-modeling/reference/types-and-formats#dimension-types
+[ref-schema-ref-dims-formats]:
+  /product/data-modeling/reference/types-and-formats#dimension-formats
+[ref-playground]: /product/workspace/playground
+[ref-apis]: /product/apis-integrations
+[ref-time-dimensions]: /product/data-modeling/reference/types-and-formats#time-1
+[link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
+[ref-custom-granularity-recipe]: /product/data-modeling/recipes/custom-granularity
+[ref-ref-hierarchies]: /product/data-modeling/reference/hierarchies
+[ref-data-sources]: /product/configuration/data-sources

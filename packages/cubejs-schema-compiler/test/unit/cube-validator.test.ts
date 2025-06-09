@@ -251,27 +251,136 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeTruthy();
   });
 
-  it('measures alternatives', async () => {
-    const cubeValidator = new CubeValidator(new CubeSymbols());
-    const cube = {
-      name: 'name',
-      sql: () => '',
-      fileName: 'fileName',
-      measures: {
-        number: {
-          type: 'suma'
+  describe('Measures', () => {
+    it('measures alternatives', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          number: {
+            type: 'suma'
+          }
         }
-      }
-    };
+      };
 
-    const validationResult = cubeValidator.validate(cube, {
-      error: (message: any, _e: any) => {
-        console.log(message);
-        expect(message).toContain('must be one of [count, number,');
-      }
-    } as any);
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('must be one of [count, number,');
+        }
+      } as any);
 
-    expect(validationResult.error).toBeTruthy();
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('2 timeShifts, 1 without timeDimension', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          measure_with_time_shift: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            timeShift: [
+              {
+                timeDimension: () => '',
+                interval: '1 day',
+                type: 'prior',
+              },
+              {
+                interval: '1 day',
+                type: 'prior',
+              }
+            ]
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('(measures.measure_with_time_shift.timeShift[1].timeDimension) is required');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('3 timeShifts', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          measure_with_time_shift: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            timeShift: [
+              {
+                timeDimension: () => '',
+                interval: '1 day',
+                type: 'prior',
+              },
+              {
+                timeDimension: () => '',
+                interval: '1 year',
+                type: 'next',
+              },
+              {
+                timeDimension: () => '',
+                interval: '1 week',
+                type: 'prior',
+              }
+            ]
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+        }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('1 timeShift without timeDimension', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          measure_with_time_shift: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            timeShift: [
+              {
+                interval: '1 day',
+                type: 'prior',
+              }
+            ]
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+        }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
   });
 
   it('OriginalSqlSchema', async () => {

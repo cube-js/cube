@@ -3,6 +3,7 @@ import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
 import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
+import { testWithPreAggregation } from './pre-aggregation-utils';
 
 describe('Multiple join paths', () => {
   jest.setTimeout(200000);
@@ -20,7 +21,8 @@ describe('Multiple join paths', () => {
     // └-->F-------┘
     // View, pre-aggregations and all interesting parts should use ADEX path
     // It should NOT be the shortest one from A to X (that's AFX), nor first in join edges declaration (that's ABCX)
-    // All join conditions would be essentially `FALSE`, but with different syntax, to be able to test SQL generation
+    // All join conditions would be essentially `TRUE` for ADEX joins and `FALSE` for everything else
+    // But they would use different syntax, to be able to test SQL generation
     // Also, there should be only one way to cover cubes A and D with joins: A->D join
 
     // TODO in this model queries like [A.a_id, X.x_id] become ambiguous, probably we want to handle this better
@@ -37,7 +39,7 @@ describe('Multiple join paths', () => {
           },
           D: {
             relationship: 'many_to_one',
-            sql: "'A' = 'D'",
+            sql: "'A' = 'D' OR TRUE",
           },
           F: {
             relationship: 'many_to_one',
@@ -78,7 +80,6 @@ describe('Multiple join paths', () => {
               a_id,
               A.D.d_id,
               A.D.d_name_for_join_paths,
-              // D.d_id,
               A.D.E.X.x_id,
             ],
             measures: [
@@ -88,6 +89,19 @@ describe('Multiple join paths', () => {
               a_seg,
               A.D.d_seg,
               A.D.E.X.x_seg,
+            ],
+            timeDimension: A.D.E.X.x_time,
+            granularity: 'day',
+          },
+
+          adex_cumulative_with_join_paths: {
+            type: 'rollup',
+            dimensions: [
+              a_id,
+              A.D.E.X.x_id,
+            ],
+            measures: [
+              A.D.E.X.x_cumulative_sum,
             ],
             timeDimension: A.D.E.X.x_time,
             granularity: 'day',
@@ -183,7 +197,7 @@ describe('Multiple join paths', () => {
         joins: {
           E: {
             relationship: 'many_to_one',
-            sql: "'D' = 'E'",
+            sql: "'D' = 'E' OR TRUE",
           },
         },
 
@@ -228,7 +242,7 @@ describe('Multiple join paths', () => {
         joins: {
           X: {
             relationship: 'many_to_one',
-            sql: "'E' = 'X'",
+            sql: "'E' = 'X' OR TRUE",
           },
         },
 
@@ -318,6 +332,13 @@ describe('Multiple join paths', () => {
           x_sum: {
             sql: 'x_value',
             type: 'sum',
+          },
+          x_cumulative_sum: {
+            sql: 'x_value',
+            type: 'sum',
+            rolling_window: {
+                trailing: 'unbounded',
+            },
           },
         },
 
@@ -515,34 +536,137 @@ describe('Multiple join paths', () => {
       expect(preAggregation).toBeDefined();
     });
 
-    const preAggregationIds = [
-      'A.adex_with_join_paths',
-      'A.ad_without_join_paths',
+    function makeReferenceQueryFor(preAggregationId: string, withDateRange: boolean = false): PostgresQuery {
+      const preAggregations = cubeEvaluator.preAggregations({
+        preAggregationIds: [preAggregationId]
+      });
+
+      expect(preAggregations.length).toBe(1);
+      const preAggregation = preAggregations[0];
+
+      if (withDateRange) {
+        preAggregation.references.timeDimensions = preAggregation.references.timeDimensions.map(td => ({
+          ...td,
+          dateRange: ['1970-01-01', '1970-01-02'],
+        }));
+      }
+
+      return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        ...preAggregation.references,
+        preAggregationId: preAggregation.id,
+        preAggregationsSchema: '',
+        timezone: 'UTC',
+      });
+    }
+
+    const preAggregationTests = [
+      {
+        preAggregationId: 'A.adex_with_join_paths',
+        addTimeRange: false,
+        expectedData: [
+          {
+            a__a_id: 1,
+            a__a_seg: false,
+            a__a_sum: '100',
+            d__d_id: 1,
+            d__d_name_for_join_paths: 'foo',
+            d__d_seg: false,
+            x__x_id: 1,
+            x__x_seg: false,
+            x__x_time_day: '1970-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+      {
+        preAggregationId: 'A.adex_cumulative_with_join_paths',
+        addTimeRange: true,
+        expectedData: [
+          {
+            a__a_id: 1,
+            x__x_cumulative_sum: '100',
+            x__x_id: 1,
+            x__x_time_day: '1970-01-01T00:00:00.000Z',
+          },
+          {
+            a__a_id: 1,
+            x__x_cumulative_sum: '100',
+            x__x_id: 1,
+            x__x_time_day: '1970-01-02T00:00:00.000Z',
+          },
+        ],
+      },
+      {
+        preAggregationId: 'A.ad_without_join_paths',
+        addTimeRange: false,
+        expectedData: [
+          {
+            a__a_id: 1,
+            a__a_seg: false,
+            a__a_sum: '100',
+            d__d_id: 1,
+            d__d_name_for_no_join_paths: 'foo',
+            d__d_seg: false,
+            d__d_time_day: '1970-01-01T00:00:00.000Z',
+          },
+        ],
+      },
     ];
-    for (const preAggregationId of preAggregationIds) {
+    for (const { preAggregationId, addTimeRange, expectedData } of preAggregationTests) {
       // eslint-disable-next-line no-loop-func
       it(`pre-aggregation ${preAggregationId} should match its own references`, async () => {
-        const preAggregations = cubeEvaluator.preAggregations({});
-
-        const preAggregation = preAggregations
-          .find(p => p.id === preAggregationId);
-        if (preAggregation === undefined) {
-          throw expect(preAggregation).toBeDefined();
-        }
-
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-          ...preAggregation.references,
-          preAggregationId: preAggregation.id,
-        });
+        // Always not using range, because reference query would have no range to start from
+        // but should match pre-aggregation anyway
+        const query = makeReferenceQueryFor(preAggregationId);
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-        const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregation.id);
+        const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
+        if (preAggregationFromQuery === undefined) {
+          throw expect(preAggregationFromQuery).toBeDefined();
+        }
+      });
+
+      // eslint-disable-next-line no-loop-func
+      it(`pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
+        // Adding date range for rolling window measure
+        const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
+
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
         if (preAggregationFromQuery === undefined) {
           throw expect(preAggregationFromQuery).toBeDefined();
         }
 
-        expect(preAggregationFromQuery.preAggregationId).toBe(preAggregationId);
+        const res = await testWithPreAggregation(preAggregationFromQuery, query);
+        expect(res).toEqual(expectedData);
       });
     }
+  });
+
+  describe('Query level join hints', () => {
+    it('should respect query level join hints', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: [
+          'A.a_id',
+          'X.x_name_ref',
+        ],
+        joinHints: [
+          ['A', 'D'],
+          ['D', 'E'],
+          ['E', 'X'],
+        ],
+      });
+
+      const [sql, _params] = query.buildSqlAndParams();
+
+      expect(sql).toMatch(/ON 'A' = 'D'/);
+      expect(sql).toMatch(/ON 'D' = 'E'/);
+      expect(sql).toMatch(/ON 'E' = 'X'/);
+      expect(sql).not.toMatch(/ON 'A' = 'B'/);
+      expect(sql).not.toMatch(/ON 'B' = 'C'/);
+      expect(sql).not.toMatch(/ON 'C' = 'X'/);
+      expect(sql).not.toMatch(/ON 'A' = 'F'/);
+      expect(sql).not.toMatch(/ON 'F' = 'X'/);
+    });
   });
 });

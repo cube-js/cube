@@ -182,6 +182,7 @@ impl<'a> DependenciesBuilder<'a> {
                         base_evaluator.clone(),
                         Some(granularity.clone()),
                         Some(granularity_obj),
+                        None,
                     )));
                 granularities.insert(granularity.clone(), member_evaluator);
             } else {
@@ -287,17 +288,7 @@ impl<'a> DependenciesBuilder<'a> {
         name: &String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let dep_full_name = format!("{}.{}", cube_name, name);
-        //FIXME avoid cloning
-        let dep_path = vec![cube_name.clone(), name.clone()];
-        if self.cube_evaluator.is_measure(dep_path.clone())? {
-            Ok(self.compiler.add_measure_evaluator(dep_full_name)?)
-        } else if self.cube_evaluator.is_dimension(dep_path.clone())? {
-            Ok(self.compiler.add_dimension_evaluator(dep_full_name)?)
-        } else {
-            Err(CubeError::internal(format!(
-                "Cannot resolve dependency {} of member {}.{}",
-                name, cube_name, name
-            )))
-        }
+        self.compiler
+            .add_auto_resolved_member_evaluator(dep_full_name)
     }
 }

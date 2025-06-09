@@ -1,0 +1,163 @@
+# Daily, Weekly, Monthly Active Users (DAU, WAU, MAU)
+
+## Use case
+
+We want to know the customer engagement of our store. To do this, we need to use
+an [Active Users metric](https://en.wikipedia.org/wiki/Active_users).
+
+## Data modeling
+
+Daily, weekly, and monthly active users are commonly referred to as DAU, WAU,
+MAU. To get these metrics, we need to use a rolling time frame to calculate a
+daily count of how many users interacted with the product or website in the
+prior day, 7 days, or 30 days. Also, we can build other metrics on top of these
+basic metrics. For example, the WAU to MAU ratio, which we can add by using
+already defined `weekly_active_users` and `monthly_active_users`.
+
+To calculate daily, weekly, or monthly active users we’re going to use the
+[`rolling_window`](/product/data-modeling/reference/measures#rolling_window)
+measure parameter.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: active_users
+    sql: >
+      SELECT user_id, created_at FROM public.orders
+
+    measures:
+      - name: monthly_active_users
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: 30 day
+          offset: start
+
+      - name: weekly_active_users
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: 7 day
+          offset: start
+
+      - name: daily_active_users
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: 1 day
+          offset: start
+
+      - name: wau_to_mau
+        title: WAU to MAU
+        type: number
+        sql:
+          "100.000 * {weekly_active_users} / NULLIF({monthly_active_users}, 0)"
+        format: percent
+
+    dimensions:
+      - name: created_at
+        type: time
+        sql: created_at
+```
+
+```javascript
+cube(`active_users`, {
+  sql: `SELECT user_id, created_at
+    FROM public.orders`,
+
+  measures: {
+    monthly_active_users: {
+      sql: `user_id`,
+      type: `count_distinct`,
+      rolling_window: {
+        trailing: `30 day`,
+        offset: `start`,
+      },
+    },
+
+    weekly_active_users: {
+      sql: `user_id`,
+      type: `count_distinct`,
+      rolling_window: {
+        trailing: `7 day`,
+        offset: `start`,
+      },
+    },
+
+    daily_active_users: {
+      sql: `user_id`,
+      type: `count_distinct`,
+      rolling_window: {
+        trailing: `1 day`,
+        offset: `start`,
+      },
+    },
+
+    wau_to_mau: {
+      title: `WAU to MAU`,
+      sql: `100.000 * ${weekly_active_users} / NULLIF(${monthly_active_users}, 0)`,
+      type: `number`,
+      format: `percent`,
+    },
+  },
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+## Query
+
+We should set a `timeDimensions` with the `dateRange`.
+
+```bash
+curl cube:4000/cubejs-api/v1/load \
+  'query={
+    "measures": [
+      "active_users.monthly_active_users",
+      "active_users.weekly_active_users",
+      "active_users.daily_active_users",
+      "active_users.wau_to_mau"
+    ],
+    "timeDimensions": [
+      {
+        "dimension": "active_users.created_at",
+        "dateRange": [
+          "2020-01-01",
+          "2020-12-31"
+        ]
+      }
+    ]
+  }'
+```
+
+## Result
+
+We got the data with our daily, weekly, and monthly active users.
+
+```json
+{
+  "data": [
+    {
+      "active_users.monthly_active_users": "22",
+      "active_users.weekly_active_users": "4",
+      "active_users.daily_active_users": "0",
+      "active_users.wau_to_mau": "18.1818181818181818"
+    }
+  ]
+}
+```
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/active-users)
+or run it with the `docker-compose up` command. You'll see the result, including
+queried data, in the console.

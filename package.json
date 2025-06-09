@@ -14,7 +14,7 @@
     ]
   },
   "scripts": {
-    "build": "rollup -c",
+    "build": "yarn lerna run build:client-core && rollup -c",
     "watch": "rollup -c -w",
     "watch-local": "CUBEJS_API_URL=http://localhost:6020/cubejs-api/v1 rollup -c -w",
     "lint:npm": "yarn npmPkgJsonLint packages/*/package.json rust/package.json",
@@ -26,9 +26,8 @@
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
-    "@typescript-eslint/eslint-plugin": "^4.17.0",
     "core-js": "^3.34.0",
-    "lerna": "^8.2.1"
+    "lerna": "^8.2.2"
   },
   "files": [
     "src",
@@ -44,7 +43,9 @@
     "@rollup/plugin-alias": "^3.1.2",
     "@rollup/plugin-babel": "^5.3.0",
     "@rollup/plugin-commonjs": "^17.1.0",
+    "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^11.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
     "@types/fs-extra": "^9.0.1",
     "@types/jest": "^27",
     "flush-promises": "^1.0.2",
@@ -57,6 +58,7 @@
     "rimraf": "^3.0.2",
     "rollup": "2.53.1",
     "rollup-plugin-peer-deps-external": "^2.2.4",
+    "rollup-plugin-tsconfig-paths": "^1.5.2",
     "typescript": "~5.2.2"
   },
   "repository": {

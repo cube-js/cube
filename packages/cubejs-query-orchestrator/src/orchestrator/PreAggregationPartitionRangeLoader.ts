@@ -9,7 +9,7 @@ import {
   utcToLocalTimeZone,
   timeSeries,
   localTimestampToUtc,
-  parseLocalDate,
+  parseUtcIntoLocalDate,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
@@ -526,7 +526,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   public static extractDate(data: any, timezone: string, timestampFormat: string = DEFAULT_TS_FORMAT): string {
-    return parseLocalDate(data, timezone, timestampFormat);
+    return parseUtcIntoLocalDate(data, timezone, timestampFormat);
   }
 
   public static readonly FROM_PARTITION_RANGE = FROM_PARTITION_RANGE;

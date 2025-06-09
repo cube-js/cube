@@ -9,16 +9,17 @@ const suite = native.isFallbackBuild() ? xdescribe : describe;
 const darwinSuite = process.platform === 'darwin' && !native.isFallbackBuild() ? describe : xdescribe;
 
 async function loadConfigurationFile(fileName: string) {
-  const content = await fs.readFile(path.join(process.cwd(), 'test', fileName), 'utf8');
+  const fullFileName = path.join(process.cwd(), 'test', fileName);
+  const content = await fs.readFile(fullFileName, 'utf8');
   console.log('content', {
     content,
-    fileName
+    fileName: fullFileName
   });
 
   const config = await native.pythonLoadConfig(
     content,
     {
-      fileName
+      fileName: fullFileName
     }
   );
 
@@ -26,6 +27,26 @@ async function loadConfigurationFile(fileName: string) {
 
   return config;
 }
+
+const nativeInstance = new native.NativeInstance();
+
+suite('Python Models', () => {
+  test('models import', async () => {
+    const fullFileName = path.join(process.cwd(), 'test', 'globals.py');
+    const content = await fs.readFile(fullFileName, 'utf8');
+
+    // Just checking it won't fail
+    await nativeInstance.loadPythonContext(fullFileName, content);
+  });
+
+  test('models import with sys.path changed', async () => {
+    const fullFileName = path.join(process.cwd(), 'test', 'globals_w_import_path.py');
+    const content = await fs.readFile(fullFileName, 'utf8');
+
+    // Just checking it won't fail
+    await nativeInstance.loadPythonContext(fullFileName, content);
+  });
+});
 
 suite('Python Config', () => {
   let config: PyConfiguration;

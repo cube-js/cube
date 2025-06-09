@@ -602,6 +602,34 @@ export class CompilerApi {
       ).reduce((a, b) => ({ ...a, ...b }), {});
   }
 
+  async memberToDataSource(query) {
+    const { cubeEvaluator } = await this.getCompilers({ requestId: query.requestId });
+
+    const entries = cubeEvaluator
+      .cubeNames()
+      .flatMap(cube => {
+        const cubeDef = cubeEvaluator.cubeFromPath(cube);
+        if (cubeDef.isView) {
+          const viewName = cubeDef.name;
+          return cubeDef.includedMembers.map(included => {
+            const memberName = `${viewName}.${included.name}`;
+            const refCubeDef = cubeEvaluator.cubeFromPath(included.memberPath);
+            const dataSource = refCubeDef.dataSource ?? 'default';
+            return [memberName, dataSource];
+          });
+        } else {
+          const cubeName = cubeDef.name;
+          const dataSource = cubeDef.dataSource ?? 'default';
+          return [
+            ...Object.keys(cubeDef.dimensions),
+            ...Object.keys(cubeDef.measures),
+            ...Object.keys(cubeDef.segments),
+          ].map(mem => [`${cubeName}.${mem}`, dataSource]);
+        }
+      });
+    return Object.fromEntries(entries);
+  }
+
   async dataSources(orchestratorApi, query) {
     const cubeNameToDataSource = await this.cubeNameToDataSource(query || { requestId: `datasources-${uuidv4()}` });
 

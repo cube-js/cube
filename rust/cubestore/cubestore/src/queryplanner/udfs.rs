@@ -1,5 +1,6 @@
 use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
 use crate::queryplanner::hll::{Hll, HllUnion};
+use crate::queryplanner::udf_xirr::create_xirr_udaf;
 use crate::CubeError;
 use chrono::{Datelike, Duration, Months, NaiveDateTime, TimeZone, Utc};
 use datafusion::arrow::array::{
@@ -17,6 +18,8 @@ use serde_derive::{Deserialize, Serialize};
 use smallvec::smallvec;
 use smallvec::SmallVec;
 use std::sync::Arc;
+
+use super::udf_xirr::XirrAccumulator;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeScalarUDFKind {
@@ -76,6 +79,7 @@ pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeAggregateUDFKind {
     MergeHll, // merge(), accepting the HyperLogLog sketches.
+    Xirr,
 }
 
 pub trait CubeAggregateUDF {
@@ -88,6 +92,7 @@ pub trait CubeAggregateUDF {
 pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> Box<dyn CubeAggregateUDF> {
     match k {
         CubeAggregateUDFKind::MergeHll => Box::new(HllMergeUDF {}),
+        CubeAggregateUDFKind::Xirr => Box::new(XirrUDF {}),
     }
 }
 
@@ -95,6 +100,9 @@ pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> Box<dyn CubeAggregateUD
 pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
     if n == "MERGE" {
         return Some(CubeAggregateUDFKind::MergeHll);
+    }
+    if n == "XIRR" {
+        return Some(CubeAggregateUDFKind::Xirr);
     }
     return None;
 }
@@ -580,6 +588,22 @@ impl CubeAggregateUDF for HllMergeUDF {
     }
     fn accumulator(&self) -> Box<dyn Accumulator> {
         return Box::new(HllMergeAccumulator { acc: None });
+    }
+}
+
+struct XirrUDF {}
+impl CubeAggregateUDF for XirrUDF {
+    fn kind(&self) -> CubeAggregateUDFKind {
+        CubeAggregateUDFKind::Xirr
+    }
+    fn name(&self) -> &str {
+        "XIRR"
+    }
+    fn descriptor(&self) -> AggregateUDF {
+        create_xirr_udaf()
+    }
+    fn accumulator(&self) -> Box<dyn Accumulator> {
+        return Box::new(XirrAccumulator::new());
     }
 }
 

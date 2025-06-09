@@ -381,19 +381,27 @@ export default {
         };
 
         this.chartType = chartType || this.chartType;
-        this.pivotConfig = ResultSet.getNormalizedPivotConfig(
+        let pivot = ResultSet.getNormalizedPivotConfig(
           validatedQuery,
           pivotConfig !== undefined ? pivotConfig : this.pivotConfig
         );
-        this.copyQueryFromProps(validatedQuery);
+        if (!equals(pivot, this.pivotConfig)) {
+          this.pivotConfig = pivot;
+        }
+
+        if (!areQueriesEqual(this.prevValidatedQuery, validatedQuery)) {
+          this.copyQueryFromProps(validatedQuery);
+        }
       }
 
       // query heuristics should only apply on query change (not applied to the initial query)
-      if (this.prevValidatedQuery !== null) {
+      if (this.prevValidatedQuery !== null && isQueryPresent(validatedQuery)) {
         this.skipHeuristics = false;
       }
 
-      this.prevValidatedQuery = validatedQuery;
+      if (!areQueriesEqual(this.prevValidatedQuery, validatedQuery)) {
+        this.prevValidatedQuery = validatedQuery;
+      }
       return validatedQuery;
     },
   },
@@ -648,8 +656,8 @@ export default {
             .dryRun(query, {
               mutexObj: this.mutex,
             })
-            .then(({ pivotQuery }) => {
-              const pivotConfig = ResultSet.getNormalizedPivotConfig(pivotQuery, this.pivotConfig);
+            .then((result) => {
+              const pivotConfig = ResultSet.getNormalizedPivotConfig(result?.pivotQuery, this.pivotConfig);
 
               if (!equals(pivotConfig, this.pivotConfig)) {
                 this.pivotConfig = pivotConfig;

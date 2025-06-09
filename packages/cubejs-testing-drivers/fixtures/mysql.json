@@ -12,7 +12,8 @@
       "CUBEJS_PG_SQL_PORT": "5656",
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
-      "CUBESQL_SQL_PUSH_DOWN": "true"
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}"
     },
     "depends_on": ["data"],
     "links": ["data"],
@@ -130,6 +131,13 @@
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
+    "---------------------------------------",
+    "Requires Tesseract.                    ",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD",
+    "querying BigECommerce: rolling window YTD without date range",
 
     "---------------------------------------",
     "Custom Granularities                   ",
@@ -148,6 +156,7 @@
     "SQL API: Rollup over exprs",
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
-    "SQL API: Extended nested Rollup over asterisk"
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: SQL push down push to cube quoted alias"
   ]
 }

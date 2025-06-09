@@ -12,6 +12,8 @@ interface CreateCubeSchemaOptions {
 
 export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown, joins }: CreateCubeSchemaOptions): string {
   return `
+    // Useless comment for compilation, but is checked in
+    // CubeSchemaConverter tests
     cube('${name}', {
         description: 'test cube from createCubeSchema',
 
@@ -366,9 +368,9 @@ export function createCubeSchemaWithCustomGranularitiesAndTimeShift(name: string
         }
       })
 
-      view(\`orders_view\`, {
+      view(\`${name}_view\`, {
         cubes: [{
-          join_path: orders,
+          join_path: ${name},
           includes: '*'
         }]
       })`;
@@ -424,6 +426,8 @@ export function createSchemaYamlForGroupFilterParamsTests(cubeDefSql: string): s
 
 export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
   return `
+    # Useless comment for compilation, but is checked in
+    # CubeSchemaConverter tests
     cubes:
       - name: ${name}
         sql_table: ${sqlTable}

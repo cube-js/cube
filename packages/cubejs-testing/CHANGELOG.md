@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.20](https://github.com/cube-js/cube/compare/v1.3.19...v1.3.20) (2025-06-06)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.3.18](https://github.com/cube-js/cube/compare/v1.3.17...v1.3.18) (2025-05-27)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.3.17](https://github.com/cube-js/cube/compare/v1.3.16...v1.3.17) (2025-05-22)
+
+### Bug Fixes
+
+- **schema-compiler:** Avoid mutating context on first occasion of TD with granularity ([#9592](https://github.com/cube-js/cube/issues/9592)) ([93027d8](https://github.com/cube-js/cube/commit/93027d8bcb7f0e76d25679aeccad446ee9d265ad))
+- **schema-compiler:** Fix rolling window queries with expressions from SQL API ([#9603](https://github.com/cube-js/cube/issues/9603)) ([43f47d8](https://github.com/cube-js/cube/commit/43f47d890a5c17416dd818b1712d54cb958ee95c))
+
+## [1.3.16](https://github.com/cube-js/cube/compare/v1.3.15...v1.3.16) (2025-05-19)
+
+### Bug Fixes
+
+- **schema-compiler:** Collect join hints from subquery join conditions ([#9554](https://github.com/cube-js/cube/issues/9554)) ([cbf0bfd](https://github.com/cube-js/cube/commit/cbf0bfddafc8629ce7d09d9b73d8b60da6d7bafb))
+
+## [1.3.15](https://github.com/cube-js/cube/compare/v1.3.14...v1.3.15) (2025-05-15)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.3.14](https://github.com/cube-js/cube/compare/v1.3.13...v1.3.14) (2025-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.3.13](https://github.com/cube-js/cube/compare/v1.3.12...v1.3.13) (2025-05-12)
+
+### Features
+
+- introduce "protocol" and "method" props for request param in checkSqlAuth ([#9525](https://github.com/cube-js/cube/issues/9525)) ([401a845](https://github.com/cube-js/cube/commit/401a84584f418e2b4bdabe13766ac213646e0924))
+
+## [1.3.12](https://github.com/cube-js/cube/compare/v1.3.11...v1.3.12) (2025-05-08)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
+
+### Features
+
+- **cubesql:** Data source per member ([#9537](https://github.com/cube-js/cube/issues/9537)) ([c0be00c](https://github.com/cube-js/cube/commit/c0be00cd4e5239b52116e38e0f5bf8d846e57090))
+
+## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
 ## [1.3.8](https://github.com/cube-js/cube/compare/v1.3.7...v1.3.8) (2025-04-24)
 
 **Note:** Version bump only for package @cubejs-backend/testing

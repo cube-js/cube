@@ -7270,6 +7270,14 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: SQL push down push to cube quoted alias 1`] = `
+Array [
+  Object {
+    "result": true,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Simple Rollup: simple_rollup 1`] = `
 Array [
   Object {
@@ -8069,6 +8077,51 @@ Array [
     "orderDate": null,
     "orderId": null,
     "rowId": null,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Timeshift measure from cube 1`] = `
+Array [
+  Object {
+    "orderDate": 2020-02-01T00:00:00.000Z,
+    "totalQuantity": 2,
+    "totalQuantityPriorMonth": 6,
+  },
+  Object {
+    "orderDate": 2020-03-01T00:00:00.000Z,
+    "totalQuantity": 13,
+    "totalQuantityPriorMonth": 2,
+  },
+  Object {
+    "orderDate": 2020-04-01T00:00:00.000Z,
+    "totalQuantity": 3,
+    "totalQuantityPriorMonth": 13,
+  },
+  Object {
+    "orderDate": 2020-05-01T00:00:00.000Z,
+    "totalQuantity": 15,
+    "totalQuantityPriorMonth": 3,
+  },
+  Object {
+    "orderDate": 2020-06-01T00:00:00.000Z,
+    "totalQuantity": 18,
+    "totalQuantityPriorMonth": 15,
+  },
+  Object {
+    "orderDate": 2020-10-01T00:00:00.000Z,
+    "totalQuantity": 11,
+    "totalQuantityPriorMonth": 27,
+  },
+  Object {
+    "orderDate": 2020-11-01T00:00:00.000Z,
+    "totalQuantity": 43,
+    "totalQuantityPriorMonth": 11,
+  },
+  Object {
+    "orderDate": 2020-12-01T00:00:00.000Z,
+    "totalQuantity": 22,
+    "totalQuantityPriorMonth": 43,
   },
 ]
 `;

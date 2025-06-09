@@ -134,6 +134,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
         t("hyperloglog_databricks", hyperloglog_databricks),
+        t("xirr", xirr),
         t(
             "aggregate_index_hll_databricks",
             aggregate_index_hll_databricks,
@@ -2800,6 +2801,122 @@ async fn hyperloglog_databricks(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[(1, 4), (2, 4), (3, 20)]));
+}
+
+async fn xirr(service: Box<dyn SqlClient>) {
+    // XIRR result may differ between platforms, so we truncate the results with LEFT(_, 10).
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment, date)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, -10000.0 AS payment
+            UNION ALL
+            SELECT '2014-03-01'::date AS date, 2750.0 AS payment
+            UNION ALL
+            SELECT '2014-10-30'::date AS date, 4250.0 AS payment
+            UNION ALL
+            SELECT '2015-02-15'::date AS date, 3250.0 AS payment
+            UNION ALL
+            SELECT '2015-04-01'::date AS date, 2750.0 AS payment
+        ) AS "t"
+        "#,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), rows(&["0.37485859"]));
+
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment, date)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, -10000.0 AS payment
+        ) AS "t"
+        WHERE 0 = 1
+        "#,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(r.elide_backtrace(), CubeError::internal("Arrow error: External error: Execution error: A result for XIRR couldn't be determined because the arguments are empty".to_owned()));
+
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment, date)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, 10000.0 AS payment
+        ) AS "t"
+        "#,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(r.elide_backtrace(), CubeError::internal("Arrow error: External error: Execution error: The XIRR function couldn't find a solution".to_owned()));
+
+    // --- on_error testing ---
+
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment, date, 0, NULL::double)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, -10000.0 AS payment
+            UNION ALL
+            SELECT '2014-03-01'::date AS date, 2750.0 AS payment
+            UNION ALL
+            SELECT '2014-10-30'::date AS date, 4250.0 AS payment
+            UNION ALL
+            SELECT '2015-02-15'::date AS date, 3250.0 AS payment
+            UNION ALL
+            SELECT '2015-04-01'::date AS date, 2750.0 AS payment
+        ) AS "t"
+        "#,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), rows(&["0.37485859"]));
+
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment, date, 0, NULL::double)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, -10000.0 AS payment
+        ) AS "t"
+        WHERE 0 = 1
+        "#,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(r.elide_backtrace(), CubeError::internal("Arrow error: External error: Execution error: A result for XIRR couldn't be determined because the arguments are empty".to_owned()));
+
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment, date, 0, NULL::double)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, 10000.0 AS payment
+        ) AS "t"
+        "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[()]));
+
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment, date, 0, 12345)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, 10000.0 AS payment
+        ) AS "t"
+        "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["12345.0"]));
 }
 
 async fn aggregate_index_hll_databricks(service: Box<dyn SqlClient>) {

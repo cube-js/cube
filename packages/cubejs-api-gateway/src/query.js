@@ -162,6 +162,8 @@ const subqueryJoin = Joi.object().keys({
   alias: Joi.string(),
 });
 
+const joinHint = Joi.array().items(Joi.string());
+
 const querySchema = Joi.object().keys({
   // TODO add member expression alternatives only for SQL API queries?
   measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
@@ -189,6 +191,7 @@ const querySchema = Joi.object().keys({
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
   subqueryJoins: Joi.array().items(subqueryJoin),
+  joinHints: Joi.array().items(joinHint),
 });
 
 const normalizeQueryOrder = order => {

@@ -1,0 +1,248 @@
+# Accelerating non-additive measures
+
+## Use case
+
+We want to run queries against
+[pre-aggregations](/product/caching#pre-aggregations) only to ensure our
+application's superior performance. Usually, accelerating a query is as simple
+as including its measures and dimensions to the pre-aggregation
+[definition](/product/data-modeling/reference/pre-aggregations#measures).
+
+[Non-additive](/product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-non-additivity)
+measures (e.g., average values or distinct counts) are a special case.
+Pre-aggregations with such measures are less likely to be
+[selected](/product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation)
+to accelerate a query. However, there are a few ways to work around that.
+
+## Data modeling
+
+Let's explore the `users` cube that contains various measures describing users'
+age:
+
+- count of unique age values (`distinct_ages`)
+- average age (`avg_age`)
+- 90th [percentile][ref-percentile-recipe] of age (`p90_age`)
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    measures:
+      - name: distinct_ages
+        sql: age
+        type: count_distinct
+
+      - name: avg_age
+        sql: age
+        type: avg
+
+      - name: p90_age
+        sql: PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY age)
+        type: number
+```
+
+```javascript
+cube(`users`, {
+  measures: {
+    distinct_ages: {
+      sql: `age`,
+      type: `count_distinct`,
+    },
+
+    avg_age: {
+      sql: `age`,
+      type: `avg`,
+    },
+
+    p90_age: {
+      sql: `PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY age)`,
+      type: `number`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+All of these measures are non-additive. Practically speaking, it means that the
+pre-aggregation below would only accelerate a query that fully matches its
+definition:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - distinct_ages
+          - avg_age
+          - p90_age
+        dimensions:
+          - gender
+```
+
+```javascript
+cube(`users`, {
+  // ...
+  pre_aggregations: {
+    main: {
+      measures: [distinct_ages, avg_age, p90_age],
+      dimensions: [gender],
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+This query will match the pre-aggregation above and, thus, will be accelerated:
+
+```json
+{
+  "measures": ["users.distinct_ages", "users.avg_age", "users.p90_age"],
+  "dimensions": ["users.gender"]
+}
+```
+
+Meanwhile, the query below won't match the same pre-aggregation because it
+contains non-additive measures and omits the `gender` dimension. It won't be
+accelerated:
+
+```json
+{
+  "measures": ["users.distinct_ages", "users.avg_age", "users.p90_age"]
+}
+```
+
+Let's explore some possible workarounds.
+
+### Replacing with approximate additive measures
+
+Often, non-additive `count_distinct` measures can be changed to have the
+[`count_distinct_approx` type](/product/data-modeling/reference/types-and-formats#count_distinct_approx)
+which will make them additive and orders of magnitude more performant. This
+`count_distinct_approx` measures can be used in pre-aggregations. However, there
+are two drawbacks:
+
+- This type is approximate, so the measures might yield slightly different
+  results compared to their `count_distinct` counterparts. Please consult with
+  your database's documentation to learn more.
+- The `count_distinct_approx` is not supported with all databases. Currently,
+  Cube supports it for Athena, BigQuery, and Snowflake.
+
+For example, the `distinct_ages` measure can be rewritten as follows:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+
+    measures:
+      - name: distinct_ages
+        sql: age
+        type: count_distinct_approx
+```
+
+```javascript
+cube(`users`, {
+  measures: {
+    distinct_ages: {
+      sql: `age`,
+      type: `count_distinct_approx`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+### Decomposing into a formula with additive measures
+
+Non-additive `avg` measures can be rewritten as
+[calculated measures](/product/data-modeling/reference/measures#calculated-measures)
+that reference additive measures only. Then, this additive measures can be used
+in pre-aggregations. Please note, however, that you shouldn't include `avg_age`
+measure in your pre-aggregation as it renders it non-additive.
+
+For example, the `avg_age` measure can be rewritten as follows:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+
+    measures:
+      - name: avg_age
+        sql: "{age_sum} / {count}"
+        type: number
+
+      - name: age_sum
+        sql: age
+        type: sum
+
+      - name: count
+        type: count
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - age_sum
+          - count
+        dimensions:
+          - gender
+```
+
+```javascript
+cube(`users`, {
+  measures: {
+    avg_age: {
+      sql: `${age_sum} / ${count}`,
+      type: `number`,
+    },
+
+    age_sum: {
+      sql: `age`,
+      type: `sum`,
+    },
+
+    count: {
+      type: `count`,
+    },
+  },
+
+  pre_aggregations: {
+    main: {
+      measures: [age_sum, count],
+      dimensions: [gender],
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+### Providing multiple pre-aggregations
+
+If the two workarounds described above don't apply to your use case, feel free
+to create additional pre-aggregations with definitions that fully match your
+queries with non-additive measures. You will get a performance boost at the
+expense of a slightly increased overall pre-aggregation build time and space
+consumed.
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/non-additivity)
+or run it with the `docker-compose up` command. You'll see the result, including
+queried data, in the console.
+
+
+[ref-percentile-recipe]: /product/data-modeling/recipes/percentiles

@@ -18,17 +18,24 @@ use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub struct OrderByItem {
-    name: String,
+    member_evaluator: Rc<MemberSymbol>,
     desc: bool,
 }
 
 impl OrderByItem {
-    pub fn new(name: String, desc: bool) -> Self {
-        Self { name, desc }
+    pub fn new(member_evaluator: Rc<MemberSymbol>, desc: bool) -> Self {
+        Self {
+            member_evaluator,
+            desc,
+        }
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> String {
+        self.member_evaluator.full_name()
+    }
+
+    pub fn member_symbol(&self) -> Rc<MemberSymbol> {
+        self.member_evaluator.clone()
     }
 
     pub fn desc(&self) -> bool {
@@ -70,6 +77,8 @@ pub struct QueryProperties {
     ignore_cumulative: bool,
     ungrouped: bool,
     multi_fact_join_groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>,
+    pre_aggregation_query: bool,
+    total_query: bool,
 }
 
 impl QueryProperties {
@@ -260,8 +269,21 @@ impl QueryProperties {
         let order_by = if let Some(order) = &options.static_data().order {
             order
                 .iter()
-                .map(|o| OrderByItem::new(o.id.clone(), o.is_desc()))
-                .collect_vec()
+                .map(|o| -> Result<_, CubeError> {
+                    let evaluator = if let Some(found) =
+                        dimensions.iter().find(|d| d.name() == &o.id)
+                    {
+                        found.member_evaluator().clone()
+                    } else if let Some(found) = time_dimensions.iter().find(|d| d.name() == &o.id) {
+                        found.member_evaluator().clone()
+                    } else if let Some(found) = measures.iter().find(|d| d.name() == &o.id) {
+                        found.member_evaluator().clone()
+                    } else {
+                        evaluator_compiler.add_auto_resolved_member_evaluator(o.id.clone())?
+                    };
+                    Ok(OrderByItem::new(evaluator, o.is_desc()))
+                })
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             Self::default_order(&dimensions, &time_dimensions, &measures)
         };
@@ -289,6 +311,9 @@ impl QueryProperties {
             &segments,
         )?;
 
+        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        let total_query = options.static_data().total_query.unwrap_or(false);
+
         Ok(Rc::new(Self {
             measures,
             dimensions,
@@ -304,6 +329,8 @@ impl QueryProperties {
             ignore_cumulative: false,
             ungrouped,
             multi_fact_join_groups,
+            pre_aggregation_query,
+            total_query,
         }))
     }
 
@@ -321,6 +348,8 @@ impl QueryProperties {
         offset: Option<usize>,
         ignore_cumulative: bool,
         ungrouped: bool,
+        pre_aggregation_query: bool,
+        total_query: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -354,6 +383,8 @@ impl QueryProperties {
             ignore_cumulative,
             ungrouped,
             multi_fact_join_groups,
+            pre_aggregation_query,
+            total_query,
         }))
     }
 
@@ -371,6 +402,10 @@ impl QueryProperties {
             &self.measures_filters,
             &self.segments,
         )
+    }
+
+    pub fn is_total_query(&self) -> bool {
+        self.total_query
     }
 
     pub fn compute_join_multi_fact_groups(
@@ -482,6 +517,27 @@ impl QueryProperties {
         &self.dimensions
     }
 
+    pub fn dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn time_dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.time_dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn measure_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.measures
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
     pub fn time_dimensions(&self) -> &Vec<Rc<BaseTimeDimension>> {
         &self.time_dimensions
     }
@@ -517,6 +573,10 @@ impl QueryProperties {
 
     pub fn ungrouped(&self) -> bool {
         self.ungrouped
+    }
+
+    pub fn is_pre_aggregation_query(&self) -> bool {
+        self.pre_aggregation_query
     }
 
     pub fn all_filters(&self) -> Option<Filter> {
@@ -597,19 +657,42 @@ impl QueryProperties {
         }
     }
     pub fn all_member_symbols(&self, exclude_time_dimensions: bool) -> Vec<Rc<MemberSymbol>> {
-        let mut members = BaseMemberHelper::extract_symbols_from_members(
-            &self.all_members(exclude_time_dimensions),
-        );
-        for filter_item in self.dimensions_filters.iter() {
-            filter_item.find_all_member_evaluators(&mut members);
+        self.get_member_symbols(!exclude_time_dimensions, true, true, true, &vec![])
+    }
+
+    pub fn get_member_symbols(
+        &self,
+        include_time_dimensions: bool,
+        include_dimensions: bool,
+        include_measures: bool,
+        include_filters: bool,
+        additional_symbols: &Vec<Rc<MemberSymbol>>,
+    ) -> Vec<Rc<MemberSymbol>> {
+        let mut members = additional_symbols.clone();
+        if include_time_dimensions {
+            members.append(&mut self.time_dimension_symbols());
         }
-        for filter_item in self.measures_filters.iter() {
-            filter_item.find_all_member_evaluators(&mut members);
+        if include_dimensions {
+            members.append(&mut self.dimension_symbols());
+        }
+        if include_measures {
+            members.append(&mut self.measure_symbols());
+        }
+        if include_filters {
+            self.fill_all_filter_symbols(&mut members);
         }
         members
             .into_iter()
             .unique_by(|m| m.full_name())
             .collect_vec()
+    }
+
+    pub fn fill_all_filter_symbols(&self, members: &mut Vec<Rc<MemberSymbol>>) {
+        if let Some(all_filters) = self.all_filters() {
+            for filter_item in all_filters.items.iter() {
+                filter_item.find_all_member_evaluators(members);
+            }
+        }
     }
 
     pub fn group_by(&self) -> Vec<Expr> {
@@ -635,11 +718,20 @@ impl QueryProperties {
     ) -> Vec<OrderByItem> {
         let mut result = Vec::new();
         if let Some(granularity_dim) = time_dimensions.iter().find(|d| d.has_granularity()) {
-            result.push(OrderByItem::new(granularity_dim.full_name(), false));
+            result.push(OrderByItem::new(
+                granularity_dim.member_evaluator().clone(),
+                false,
+            ));
         } else if !measures.is_empty() && !dimensions.is_empty() {
-            result.push(OrderByItem::new(measures[0].full_name(), true));
+            result.push(OrderByItem::new(
+                measures[0].member_evaluator().clone(),
+                true,
+            ));
         } else if !dimensions.is_empty() {
-            result.push(OrderByItem::new(dimensions[0].full_name(), false));
+            result.push(OrderByItem::new(
+                dimensions[0].member_evaluator().clone(),
+                false,
+            ));
         }
         result
     }
@@ -697,7 +789,10 @@ impl QueryProperties {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.all_used_measures()?;
         for m in measures.iter() {
-            if has_multi_stage_members(m.member_evaluator(), self.ignore_cumulative)? {
+            if has_multi_stage_members(
+                m.member_evaluator(),
+                self.ignore_cumulative || self.pre_aggregation_query,
+            )? {
                 result.multi_stage_measures.push(m.clone())
             } else {
                 let join = self

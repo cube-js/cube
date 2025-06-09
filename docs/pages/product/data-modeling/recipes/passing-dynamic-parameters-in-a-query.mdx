@@ -1,0 +1,247 @@
+# Passing dynamic parameters in a query
+
+## Use case
+
+In some cases we may want to let a user select a filter value and be able to 
+use that value in calculations without filtering the entire query.
+
+In this example, we want to know the ratio between the number of people in a particular city and
+the total number of women in the country. The user can specify the city for the
+filter. The trick is to get the value of the city from the user and use it in
+the calculation. In the recipe below, we can learn how to join the data table
+with itself and reshape the dataset!
+
+<WarningBox>
+
+This pattern only allows users to choose from values that already exist in the data set. Rather than injecting arbitrary user input into the query, this method involves filtering the data based on the user's input and utilizing a single value result in a calculation.
+
+</WarningBox>
+
+## Data modeling
+
+Essentially what we will be doing is allowing the user to select a specific city value, then cross joining that value with the rows in the data table. 
+This will maintain the orginal number of rows in the dataset while adding a new column that has the value that the user chose. 
+This will allow us to use that value in our calculations.
+In this case, we will use that value to filter a single metric so that we can compare that metric with the whole population.
+
+Let's explore the `users` cube data that contains various information about
+users, including city and gender:
+
+| id  | city     | gender | name            |
+| --- | -------- | ------ | --------------- |
+| 1   | Seattle  | female | Wendell Hamill  |
+| 2   | Chicago  | male   | Rahsaan Collins |
+| 3   | New York | female | Megane O'Kon    |
+| ... | ...      | ...    | ...             |
+
+To calculate the ratio between the number of women in a particular city and the
+total number of people in the country, we need to define three measures, one of 
+which uses the city value that the user chose. 
+
+In order to prevent filtering the whole dataset with the user-selected value, 
+we will need to define a new dimension that, when filtered on, only filters a specific part of the query. 
+We will use this new filter field along with the [`FILTER_PARAMS`][ref-filter-params] 
+parameter in the sql of the cube. This will allow us to apply to the filter to a subquery 
+rather than the whole query so that it doesn't affect other calculations.
+In this use case, we can join the data table with itself to create a new city_filter 
+column with a single value that the user chose so that we can use it in other calculations.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql: >
+      WITH data AS (
+        SELECT
+          users.id AS id,
+          users.city AS city,
+          users.gender AS gender
+        FROM public.users
+      ),
+      cities AS (
+        SELECT city
+        FROM data
+        WHERE {FILTER_PARAMS.users.city.filter('city')}
+      ),
+      grouped AS (
+        SELECT
+          cities.city AS city_filter,
+          data.id AS id,
+          data.city AS city,
+          data.gender AS gender
+        FROM cities, data
+        GROUP BY 1, 2, 3, 4
+      )
+      SELECT *
+      FROM grouped
+
+    measures:
+      - name: total_number_of_women
+        sql: id
+        type: count
+        filters:
+          - sql: "gender = 'female'"
+
+      - name: number_of_people_of_any_gender_in_the_city:
+        sql: id
+        type: count
+        filters:
+          - sql: "city = city_filter"
+
+      - name: ratio
+        title: Ratio Women in the City to Total Number of People
+        sql: >
+          1.0 * {number_of_people_of_any_gender_in_the_city} /
+          {total_number_of_women}
+        type: number
+
+    dimensions:
+      - name: city_filter
+        sql: city_filter
+        type: string
+```
+
+```javascript
+cube(`users`, {
+  sql: `
+    WITH data AS (
+      SELECT
+        users.id AS id,
+        users.city AS city,
+        users.gender AS gender
+      FROM public.users
+    ),
+
+    cities AS (
+      SELECT city
+      FROM data
+      WHERE ${FILTER_PARAMS.users.city.filter('city')}
+    ),
+
+    grouped AS (
+      SELECT
+        cities.city AS city_filter,
+        data.id AS id,
+        data.city AS city,
+        data.gender AS gender
+      FROM cities, data
+      GROUP BY 1, 2, 3, 4
+    )
+
+    SELECT *
+    FROM grouped
+  `,
+
+  measures: {
+    total_number_of_women: {
+      sql: "id",
+      type: "count",
+      filters: [{ sql: `${CUBE}.gender = 'female'` }],
+    },
+
+    number_of_people_of_any_gender_in_the_city: {
+      sql: "id",
+      type: "count",
+      filters: [{ sql: `${CUBE}.city = ${CUBE}.city_filter` }],
+    },
+
+    ratio: {
+      title: "Ratio Women in the City to Total Number of People",
+      sql: `
+        1.0 * ${CUBE.number_of_people_of_any_gender_in_the_city} /
+        ${CUBE.total_number_of_women}`,
+      type: `number`,
+    },
+  },
+
+  dimensions: {
+    city_filter: {
+      sql: `city_filter`,
+      type: `string`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+The above code shows very clearly what is happening, but it is even simplier to define the sql parameter in the following way:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql: >
+      WITH 
+      city AS (
+        SELECT DISTINCT city AS city_filter
+        FROM public.users
+        WHERE {FILTER_PARAMS.users.city.filter('city')}
+        )
+      SELECT city.city_filter, users.*
+      FROM city, public.users
+```
+
+```javascript
+cube(`users`, {
+  sql: `
+    WITH 
+    city AS (
+      SELECT DISTINCT city AS city_filter
+      FROM public.users
+      WHERE {FILTER_PARAMS.users.city.filter('city')}
+      )
+    SELECT city.city_filter, users.*
+    FROM city, public.users
+  `,
+```
+
+</CodeTabs>
+
+## Query
+
+To get the ratio result depending on the city, we need to pass the value via a
+filter in the query:
+
+```json
+{
+  "measures": [
+    "users.total_number_of_women",
+    "users.number_of_people_of_any_gender_in_the_city",
+    "users.ratio"
+  ],
+  "filters": [
+    {
+      "member": "users.city_filter",
+      "operator": "equals",
+      "values": ["Seattle"]
+    }
+  ]
+}
+```
+
+## Result
+
+By joining the data table with itself and using the dimensions defined above, we
+can get the ratio we wanted to achieve:
+
+```json
+[
+  {
+    "users.total_number_of_women": "259",
+    "users.number_of_people_of_any_gender_in_the_city": "99",
+    "users.ratio": "0.38223938223938223938"
+  }
+]
+```
+
+## Source code
+
+Please feel free to check out the
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/passing-dynamic-parameters-in-query)
+or run it with the `docker-compose up` command. You'll see the result, including
+queried data, in the console.
+
+[ref-filter-params]: /product/data-modeling/reference/context-variables#filter_params

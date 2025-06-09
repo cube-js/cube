@@ -83,10 +83,6 @@ export class KsqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  public partitionInvalidateKeyQueries(cube: string, preAggregation: any) {
-    return [];
-  }
-
   public preAggregationStartEndQueries(cube: string, preAggregation: any) {
     if (preAggregation.partitionGranularity) {
       if (!preAggregation.refreshRangeStart) {
@@ -97,7 +93,7 @@ export class KsqlQuery extends BaseQuery {
       }
     }
     const res = this.evaluateSymbolSqlWithContext(() => [
-      
+
       preAggregation.refreshRangeStart && [this.evaluateSql(cube, preAggregation.refreshRangeStart.sql, {}), [], { external: true }],
       preAggregation.refreshRangeEnd && [this.evaluateSql(cube, preAggregation.refreshRangeEnd.sql, {}), [], { external: true }]
     ], { preAggregationQuery: true });

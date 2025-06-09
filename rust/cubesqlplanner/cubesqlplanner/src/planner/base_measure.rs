@@ -1,9 +1,7 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::{MeasureTimeShift, MemberExpressionSymbol, MemberSymbol, SqlCall};
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
-use crate::cube_bridge::measure_definition::{
-    MeasureDefinition, RollingWindow, TimeShiftReference,
-};
+use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::fmt::{Debug, Formatter};
@@ -135,12 +133,12 @@ impl BaseMeasure {
         member_expression_definition: Option<String>,
         query_tools: Rc<QueryTools>,
     ) -> Result<Rc<Self>, CubeError> {
-        let member_expression_symbol = MemberExpressionSymbol::new(
+        let member_expression_symbol = MemberExpressionSymbol::try_new(
             cube_name.clone(),
             name.clone(),
             expression,
             member_expression_definition.clone(),
-        );
+        )?;
         let full_name = member_expression_symbol.full_name();
         let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
         let default_alias = PlanSqlTemplates::alias_name(&name);
@@ -208,12 +206,6 @@ impl BaseMeasure {
             "number" | "string" | "time" | "boolean" => true,
             _ => false,
         }
-    }
-
-    pub fn time_shift_references(&self) -> Option<Vec<TimeShiftReference>> {
-        self.definition
-            .as_ref()
-            .map_or(None, |d| d.static_data().time_shift_references.clone())
     }
 
     pub fn time_shifts(&self) -> Vec<MeasureTimeShift> {

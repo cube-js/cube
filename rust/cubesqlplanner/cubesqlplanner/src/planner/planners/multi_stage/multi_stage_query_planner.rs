@@ -3,18 +3,16 @@ use super::{
     MultiStageLeafMemberType, MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
     MultiStageQueryDescription, RollingWindowPlanner,
 };
-use crate::plan::{Cte, From, Schema, Select, SelectBuilder};
+use crate::logical_plan::*;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::BaseMember;
 use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MultiStageQueryPlanner {
@@ -34,7 +32,16 @@ impl MultiStageQueryPlanner {
             query_properties,
         }
     }
-    pub fn plan_queries(&self) -> Result<(Vec<Rc<Cte>>, Vec<Rc<Select>>), CubeError> {
+
+    pub fn plan_queries(
+        &self,
+    ) -> Result<
+        (
+            Vec<Rc<LogicalMultiStageMember>>,
+            Vec<Rc<MultiStageSubqueryRef>>,
+        ),
+        CubeError,
+    > {
         let multi_stage_members = self
             .query_properties
             .all_members(false)
@@ -56,57 +63,50 @@ impl MultiStageQueryPlanner {
             self.query_properties.dimensions().clone(),
             self.query_properties.time_dimensions_filters().clone(),
             self.query_properties.dimensions_filters().clone(),
-            self.query_properties.measures_filters().clone(),
+            vec![], //TODO: We do not pass measures filters to CTE queries. This seems correct, but we need to check
             self.query_properties.segments().clone(),
         );
 
         let top_level_ctes = multi_stage_members
             .into_iter()
             .map(|memb| -> Result<_, CubeError> {
-                Ok(self
-                    .make_queries_descriptions(
-                        memb.member_evaluator().clone(),
-                        state.clone(),
-                        &mut descriptions,
-                    )?
-                    .alias()
-                    .clone())
+                let description = self.make_queries_descriptions(
+                    memb.member_evaluator().clone(),
+                    state.clone(),
+                    &mut descriptions,
+                )?;
+                let result = (
+                    description.alias().clone(),
+                    vec![description.member_node().clone()],
+                );
+                Ok(result)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let mut cte_schemas = HashMap::new();
         let all_queries = descriptions
             .into_iter()
             .map(|descr| -> Result<_, CubeError> {
-                let res = MultiStageMemberQueryPlanner::new(
+                let planner = MultiStageMemberQueryPlanner::new(
                     self.query_tools.clone(),
                     self.query_properties.clone(),
                     descr.clone(),
-                )
-                .plan_query(&cte_schemas)?;
-                cte_schemas.insert(descr.alias().clone(), res.query().schema());
+                );
+                let res = planner.plan_logical_query()?;
                 Ok(res)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let cte_joins = top_level_ctes
+        let top_level_ctes = top_level_ctes
             .iter()
-            .map(|alias| self.cte_select(alias, &cte_schemas))
+            .map(|(alias, symbols)| {
+                Rc::new(MultiStageSubqueryRef {
+                    name: alias.clone(),
+                    symbols: symbols.clone(),
+                })
+            })
             .collect_vec();
 
-        Ok((all_queries, cte_joins))
-    }
-
-    pub fn cte_select(
-        &self,
-        alias: &String,
-        cte_schemas: &HashMap<String, Rc<Schema>>,
-    ) -> Rc<Select> {
-        let schema = cte_schemas.get(alias).unwrap().clone();
-        let select_builder =
-            SelectBuilder::new(From::new_from_table_reference(alias.clone(), schema, None));
-
-        Rc::new(select_builder.build(SqlNodesFactory::new()))
+        Ok((all_queries, top_level_ctes))
     }
 
     fn create_multi_stage_inode_member(
@@ -130,12 +130,22 @@ impl MultiStageQueryPlanner {
                 MultiStageInodeMemberType::Rank | MultiStageInodeMemberType::Calculate => true,
                 _ => self.query_properties.ungrouped(),
             };
+            let (reduce_by, add_group_by, group_by) =
+                if let Ok(measure_symbol) = measure.member_evaluator().as_measure() {
+                    (
+                        measure_symbol.reduce_by().clone().unwrap_or_default(),
+                        measure_symbol.add_group_by().clone().unwrap_or_default(),
+                        measure_symbol.group_by().clone(),
+                    )
+                } else {
+                    (vec![], vec![], None)
+                };
             (
                 MultiStageInodeMember::new(
                     member_type,
-                    measure.reduce_by().clone().unwrap_or_default(),
-                    measure.add_group_by().clone().unwrap_or_default(),
-                    measure.group_by().clone(),
+                    reduce_by,
+                    add_group_by,
+                    group_by,
                     time_shifts,
                 ),
                 is_ungrupped,
@@ -161,6 +171,7 @@ impl MultiStageQueryPlanner {
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
+        let member = member.resolve_reference_chain();
         let member_name = member.full_name();
         if let Some(exists) = descriptions
             .iter()
@@ -177,7 +188,7 @@ impl MultiStageQueryPlanner {
             return Ok(rolling_window_query);
         }
 
-        let childs = member_childs(&member)?;
+        let childs = member_childs(&member, true)?;
         let has_multi_stage_members = has_multi_stage_members(&member, false)?;
         let description = if childs.is_empty() || !has_multi_stage_members {
             if has_multi_stage_members {
@@ -203,9 +214,11 @@ impl MultiStageQueryPlanner {
                 self.create_multi_stage_inode_member(member.clone())?;
 
             let dimensions_to_add = multi_stage_member
-                .add_group_by()
+                .add_group_by_symbols()
                 .iter()
-                .map(|name| self.compile_dimension(name))
+                .map(|symbol| {
+                    BaseDimension::try_new_required(symbol.clone(), self.query_tools.clone())
+                })
                 .collect::<Result<Vec<_>, _>>()?;
 
             let new_state = if !dimensions_to_add.is_empty()
@@ -252,12 +265,5 @@ impl MultiStageQueryPlanner {
 
         descriptions.push(description.clone());
         Ok(description)
-    }
-
-    fn compile_dimension(&self, name: &String) -> Result<Rc<BaseDimension>, CubeError> {
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        let evaluator = evaluator_compiler.add_dimension_evaluator(name.clone())?;
-        BaseDimension::try_new_required(evaluator, self.query_tools.clone())
     }
 }

@@ -84,12 +84,28 @@ views:
         includes:
           - age
           - state
+          - gender
     folders:
       - name: folder1
         includes:
           - users_age
           - users_state
           - renamed_orders_status
+  - name: test_view3
+    extends: test_view2
+    cubes:
+      - join_path: users
+        prefix: true
+        includes:
+          - city
+          - name: gender
+            alias: renamed_in_view3_gender
+    folders:
+      - name: folder2
+        includes:
+          - users_city
+          - users_renamed_in_view3_gender
+
   # - name: empty_view
   #   cubes:
   #     - join_path: orders

@@ -100,6 +100,7 @@ function interfaceMethods() {
 
       return {
         cubeNameToDataSource: {},
+        memberToDataSource: {},
         dataSourceToSqlGenerator: {},
       };
     }),
@@ -200,6 +201,8 @@ describe('SQLInterface', () => {
           request: {
             id: expect.any(String),
             meta: null,
+            method: expect.any(String),
+            protocol: expect.any(String),
           },
           user: user || null,
           password:
@@ -257,6 +260,8 @@ describe('SQLInterface', () => {
         request: {
           id: expect.any(String),
           meta: null,
+          method: expect.any(String),
+          protocol: expect.any(String),
         },
         user: 'allowed_user',
         password: 'password_for_allowed_user',

@@ -1,4 +1,5 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
 use convert_case::{Boundary, Case, Casing};
@@ -9,9 +10,10 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
+    base_tools: Rc<dyn BaseTools>,
 }
 pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
-    name: "LowerUpper",
+    name: "UnderscoreUpper",
     condition: |s, _| {
         s.get(0) == Some(&"_")
             && s.get(1)
@@ -23,15 +25,31 @@ pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
     len: 0,
 };
 
+fn grapheme_is_uppercase(c: &&str) -> bool {
+    c.to_uppercase() != c.to_lowercase() && *c == c.to_uppercase()
+}
+
+pub const UPPER_UPPER_BOUND: Boundary = Boundary {
+    name: "UpperUpper",
+    condition: |s, _| {
+        s.get(0).map(grapheme_is_uppercase) == Some(true)
+            && s.get(1).map(grapheme_is_uppercase) == Some(true)
+    },
+    arg: None,
+    start: 1,
+    len: 0,
+};
+
 impl PlanSqlTemplates {
-    pub fn new(render: Rc<dyn SqlTemplatesRender>) -> Self {
-        Self { render }
+    pub fn new(render: Rc<dyn SqlTemplatesRender>, base_tools: Rc<dyn BaseTools>) -> Self {
+        Self { render, base_tools }
     }
 
     pub fn alias_name(name: &str) -> String {
         let res = name
             .with_boundaries(&[
                 UNDERSCORE_UPPER_BOUND,
+                UPPER_UPPER_BOUND,
                 Boundary::LOWER_UPPER,
                 Boundary::DIGIT_UPPER,
                 Boundary::ACRONYM,
@@ -39,6 +57,10 @@ impl PlanSqlTemplates {
             .to_case(Case::Snake)
             .replace(".", "__");
         res
+    }
+
+    pub fn base_tools(&self) -> &Rc<dyn BaseTools> {
+        &self.base_tools
     }
 
     pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
@@ -52,27 +74,6 @@ impl PlanSqlTemplates {
             Self::alias_name(cube_name),
             Self::alias_name(name),
             suffix
-        )
-    }
-
-    //FIXME duplicated with filter templates
-    pub fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
-        self.render.render_template(
-            &"expressions/add_interval",
-            context! {
-                date => date,
-                interval => interval
-            },
-        )
-    }
-
-    pub fn sub_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
-        self.render.render_template(
-            &"expressions/sub_interval",
-            context! {
-                date => date,
-                interval => interval
-            },
         )
     }
 
@@ -358,10 +359,31 @@ impl PlanSqlTemplates {
         start: &str,
         end: &str,
         granularity: &str,
+        granularity_offset: &Option<String>,
+        minimal_time_unit: &str,
     ) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/generated_time_series_select",
-            context! { start => start, end => end, granularity => granularity },
+            context! { start => start, end => end, granularity => granularity, granularity_offset => granularity_offset, minimal_time_unit => minimal_time_unit },
+        )
+    }
+    pub fn generated_time_series_with_cte_range_source(
+        &self,
+        range_source: &str,
+        min_name: &str,
+        max_name: &str,
+        granularity: &str,
+        minimal_time_unit: &str,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "statements/generated_time_series_with_cte_range_source",
+            context! {
+                range_source => range_source,
+                min_name => min_name,
+                max_name => max_name,
+                granularity => granularity,
+                minimal_time_unit => minimal_time_unit,
+            },
         )
     }
 

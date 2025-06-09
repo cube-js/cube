@@ -4,6 +4,7 @@
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
 
+import fetch from 'node-fetch';
 import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
 import {
   DatabaseStructure,
@@ -20,6 +21,7 @@ import { JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-drive
 import { DatabricksQuery } from './DatabricksQuery';
 import {
   extractAndRemoveUidPwdFromJdbcUrl,
+  parseDatabricksJdbcUrl,
   resolveJDBCDriver
 } from './helpers';
 
@@ -89,6 +91,16 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     token?: string,
 
     /**
+     * Databricks OAuth Client ID.
+     */
+    oauthClientId?: string,
+
+    /**
+     * Databricks OAuth Client Secret.
+     */
+    oauthClientSecret?: string,
+
+    /**
      * Azure tenant Id
      */
     azureTenantId?: string,
@@ -124,6 +136,11 @@ type ColumnInfo = {
   type: GenericDataBaseType;
 };
 
+export type ParsedConnectionProperties = {
+  host: string,
+  warehouseId: string,
+};
+
 const DatabricksToGenericType: Record<string, string> = {
   binary: 'hll_datasketches',
   'decimal(10,0)': 'bigint',
@@ -142,6 +159,12 @@ export class DatabricksDriver extends JDBCDriver {
    * Driver Configuration.
    */
   protected readonly config: DatabricksDriverConfiguration;
+
+  private readonly parsedConnectionProperties: ParsedConnectionProperties;
+
+  private accessToken: string | undefined;
+
+  private accessTokenExpires: number = 0;
 
   public static dialectClass() {
     return DatabricksQuery;
@@ -183,7 +206,7 @@ export class DatabricksDriver extends JDBCDriver {
     let showSparkProtocolWarn = false;
     let url: string =
       conf?.url ||
-      getEnv('databrickUrl', { dataSource }) ||
+      getEnv('databricksUrl', { dataSource }) ||
       getEnv('jdbcUrl', { dataSource });
     if (url.indexOf('jdbc:spark://') !== -1) {
       showSparkProtocolWarn = true;
@@ -191,6 +214,39 @@ export class DatabricksDriver extends JDBCDriver {
     }
 
     const [uid, pwd, cleanedUrl] = extractAndRemoveUidPwdFromJdbcUrl(url);
+    const passwd = conf?.token ||
+          getEnv('databricksToken', { dataSource }) ||
+          pwd;
+    const oauthClientId = conf?.oauthClientId || getEnv('databricksOAuthClientId', { dataSource });
+    const oauthClientSecret = conf?.oauthClientSecret || getEnv('databricksOAuthClientSecret', { dataSource });
+
+    if (oauthClientId && !oauthClientSecret) {
+      throw new Error('Invalid credentials: No OAuth Client Secret provided');
+    } else if (!oauthClientId && oauthClientSecret) {
+      throw new Error('Invalid credentials: No OAuth Client ID provided');
+    } else if (!oauthClientId && !oauthClientSecret && !passwd) {
+      throw new Error('No credentials provided');
+    }
+
+    let authProps: Record<string, any> = {};
+
+    // OAuth has an advantage over UID+PWD
+    // For magic numbers below - see Databricks docs:
+    // https://docs.databricks.com/aws/en/integrations/jdbc-oss/configure#authenticate-the-driver
+    if (oauthClientId) {
+      authProps = {
+        OAuth2ClientID: oauthClientId,
+        OAuth2Secret: oauthClientSecret,
+        AuthMech: 11,
+        Auth_Flow: 1,
+      };
+    } else {
+      authProps = {
+        UID: uid,
+        PWD: passwd,
+        AuthMech: 3,
+      };
+    }
 
     const config: DatabricksDriverConfiguration = {
       ...conf,
@@ -199,11 +255,7 @@ export class DatabricksDriver extends JDBCDriver {
       drivername: 'com.databricks.client.jdbc.Driver',
       customClassPath: undefined,
       properties: {
-        UID: uid,
-        PWD:
-          conf?.token ||
-          getEnv('databrickToken', { dataSource }) ||
-          pwd,
+        ...authProps,
         UserAgentEntry: 'CubeDev_Cube',
       },
       catalog:
@@ -262,38 +314,97 @@ export class DatabricksDriver extends JDBCDriver {
 
     super(config);
     this.config = config;
+    this.parsedConnectionProperties = parseDatabricksJdbcUrl(url);
     this.showSparkProtocolWarn = showSparkProtocolWarn;
   }
 
-  /**
-   * @override
-   */
-  public readOnly() {
+  public override readOnly() {
     return !!this.config.readOnly;
   }
 
-  /**
-   * @override
-   */
-  public capabilities(): DriverCapabilities {
+  public override capabilities(): DriverCapabilities {
     return {
       unloadWithoutTempTable: true,
       incrementalSchemaLoading: true
     };
   }
 
-  /**
-   * @override
-   */
-  public setLogger(logger: any) {
+  public override setLogger(logger: any) {
     super.setLogger(logger);
     this.showDeprecations();
   }
 
-  /**
-   * @override
-   */
-  public async loadPreAggregationIntoTable(
+  private async fetchAccessToken(): Promise<void> {
+    // Need to exchange client ID + Secret => Access token
+
+    const basicAuth = Buffer.from(`${this.config.properties.OAuth2ClientID}:${this.config.properties.OAuth2Secret}`).toString('base64');
+
+    const res = await fetch(`https://${this.parsedConnectionProperties.host}/oidc/v1/token`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        scope: 'all-apis',
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to get access token: ${res.statusText}`);
+    }
+
+    const resp = await res.json();
+
+    this.accessToken = resp.access_token;
+    this.accessTokenExpires = Date.now() + resp.expires_in * 1000 - 60_000;
+  }
+
+  private async getValidAccessToken(): Promise<string> {
+    if (
+      !this.accessToken ||
+      !this.accessTokenExpires ||
+      Date.now() >= this.accessTokenExpires
+    ) {
+      await this.fetchAccessToken();
+    }
+    return this.accessToken!;
+  }
+
+  public override async testConnection() {
+    let token: string;
+
+    // Databricks docs on accessing REST API
+    // https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m
+    if (this.config.properties.OAuth2Secret) {
+      const at = await this.getValidAccessToken();
+      token = `Bearer ${at}`;
+    } else {
+      token = `Bearer ${this.config.properties.PWD}`;
+    }
+
+    const res = await fetch(`https://${this.parsedConnectionProperties.host}/api/2.0/sql/warehouses/${this.parsedConnectionProperties.warehouseId}`, {
+      headers: { Authorization: token },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Databricks API error: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+
+    if (['DELETING', 'DELETED'].includes(data.state)) {
+      throw new Error(`Warehouse is being deleted (current state: ${data.state})`);
+    }
+
+    // There is also DEGRADED status, but it doesn't mean that cluster is 100% not working...
+    if (data.health?.status === 'FAILED') {
+      throw new Error(`Warehouse is unhealthy: ${data.health?.summary}. Details: ${data.health?.details}`);
+    }
+  }
+
+  public override async loadPreAggregationIntoTable(
     preAggregationTableName: string,
     loadSql: string,
     params: unknown[],
@@ -320,10 +431,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
   }
 
-  /**
-   * @override
-   */
-  public async query<R = unknown>(
+  public override async query<R = unknown>(
     query: string,
     values: unknown[],
   ): Promise<R[]> {
@@ -357,10 +465,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
   }
 
-  /**
-   * @override
-   */
-  public dropTable(tableName: string, options?: QueryOptions): Promise<unknown> {
+  public override dropTable(tableName: string, options?: QueryOptions): Promise<unknown> {
     const tableFullName = `${
       this.config?.catalog ? `${this.config.catalog}.` : ''
     }${tableName}`;
@@ -392,10 +497,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
   }
 
-  /**
-   * @override
-   */
-  protected async getCustomClassPath() {
+  protected override async getCustomClassPath() {
     return resolveJDBCDriver();
   }
 
@@ -709,10 +811,6 @@ export class DatabricksDriver extends JDBCDriver {
     // s3://real-bucket-name
     // wasbs://real-container-name@account.blob.core.windows.net
     // The extractors in BaseDriver expect just clean bucket name
-    const url = new URL(this.config.exportBucket || '');
-    const prefix = url.pathname.slice(1);
-    const delimiter = (prefix && !prefix.endsWith('/')) ? '/' : '';
-    const objectSearchPrefix = `${prefix}${delimiter}${tableName}`;
 
     if (this.config.bucketType === 'azure') {
       const {
@@ -721,14 +819,22 @@ export class DatabricksDriver extends JDBCDriver {
         azureTenantId: tenantId,
         azureClientSecret: clientSecret
       } = this.config;
+
+      const { bucketName, path, username } = this.parseBucketUrl(this.config.exportBucket);
+      const azureBucketPath = `${bucketName}/${username}`;
+      const exportPrefix = path ? `${path}/${tableName}` : tableName;
+
       return this.extractFilesFromAzure(
         { azureKey, clientId, tenantId, clientSecret },
         // Databricks uses different bucket address form, so we need to transform it
         // to the one understandable by extractFilesFromAzure implementation
-        `${url.host}/${url.username}`,
-        objectSearchPrefix,
+        azureBucketPath,
+        exportPrefix,
       );
     } else if (this.config.bucketType === 's3') {
+      const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket);
+      const exportPrefix = path ? `${path}/${tableName}` : tableName;
+
       return this.extractUnloadedFilesFromS3(
         {
           credentials: {
@@ -737,14 +843,17 @@ export class DatabricksDriver extends JDBCDriver {
           },
           region: this.config.awsRegion || '',
         },
-        url.host,
-        objectSearchPrefix,
+        bucketName,
+        exportPrefix,
       );
     } else if (this.config.bucketType === 'gcs') {
+      const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket);
+      const exportPrefix = path ? `${path}/${tableName}` : tableName;
+
       return this.extractFilesFromGCS(
         { credentials: this.config.gcsCredentials },
-        url.host,
-        objectSearchPrefix,
+        bucketName,
+        exportPrefix,
       );
     } else {
       throw new Error(`Unsupported export bucket type: ${

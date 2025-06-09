@@ -267,13 +267,15 @@ impl SqlResultCache {
     ) -> Result<Arc<DataFrame>, CubeError> {
         if let Some(receiver) = &mut receiver {
             loop {
+                // Currently we should never loop -- we only send sender a `Some(_)` value.
                 receiver.changed().await?;
-                let x = receiver.borrow();
+                let x = receiver.borrow_and_update();
                 let value = x.as_ref();
                 if let Some(value) = value {
                     trace!("Using cache for '{}'", query);
                     return value.clone();
                 }
+                log::warn!("Queue query cache is (impossibly) looping for '{}'", query);
             }
         }
         panic!("Unexpected state: wait receiver expected but cache was empty")

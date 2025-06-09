@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { prepareCompiler, prepareJsCompiler } from './PrepareCompiler';
+import { prepareCompiler, prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createCubeSchema, createCubeSchemaWithCustomGranularitiesAndTimeShift, createCubeSchemaWithAccessPolicy } from './utils';
 
-const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'accessPolicy'];
+const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'accessPolicy', 'joins'];
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
@@ -532,6 +532,22 @@ describe('Schema Testing', () => {
       expect(measures.count_shifted_year).toMatchSnapshot();
     });
 
+    it('views extends views', async () => {
+      const modelContent = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/folders.yml'),
+        'utf8'
+      );
+      const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+      await compiler.compile();
+
+      const testView3 = metaTransformer.cubeEvaluator.evaluatedCubes.test_view3;
+      expect(testView3.dimensions).toMatchSnapshot();
+      expect(testView3.measures).toMatchSnapshot();
+      expect(testView3.measures).toMatchSnapshot();
+      expect(testView3.hierarchies).toMatchSnapshot();
+      expect(testView3.folders).toMatchSnapshot();
+    });
+
     it('throws errors for incorrect referenced includes members', async () => {
       const orders = fs.readFileSync(
         path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
@@ -791,6 +807,10 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
         'utf8'
       );
+      const orderLineItems = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/line_items.yml'),
+        'utf8'
+      );
       const ordersExt = fs.readFileSync(
         path.join(process.cwd(), '/test/unit/fixtures/orders_ext.js'),
         'utf8'
@@ -808,6 +828,10 @@ describe('Schema Testing', () => {
         {
           content: orderUsers,
           fileName: 'order_users.yml',
+        },
+        {
+          content: orderLineItems,
+          fileName: 'line_items.yml',
         },
       ]);
       await compiler.compile();
@@ -871,6 +895,10 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
         'utf8'
       );
+      const orderLineItems = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/line_items.yml'),
+        'utf8'
+      );
       const ordersExt = fs.readFileSync(
         path.join(process.cwd(), '/test/unit/fixtures/orders_ext.yml'),
         'utf8'
@@ -888,6 +916,10 @@ describe('Schema Testing', () => {
         {
           content: orderUsers,
           fileName: 'order_users.yml',
+        },
+        {
+          content: orderLineItems,
+          fileName: 'line_items.yml',
         },
       ]);
       await compiler.compile();
@@ -951,6 +983,10 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
         'utf8'
       );
+      const orderLineItems = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/line_items.yml'),
+        'utf8'
+      );
       const ordersExt = fs.readFileSync(
         path.join(process.cwd(), '/test/unit/fixtures/orders_ext.yml'),
         'utf8'
@@ -968,6 +1004,10 @@ describe('Schema Testing', () => {
         {
           content: orderUsers,
           fileName: 'order_users.yml',
+        },
+        {
+          content: orderLineItems,
+          fileName: 'line_items.yml',
         },
       ]);
       await compiler.compile();
@@ -1027,6 +1067,10 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
         'utf8'
       );
+      const orderLineItems = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/line_items.yml'),
+        'utf8'
+      );
       const ordersExt = fs.readFileSync(
         path.join(process.cwd(), '/test/unit/fixtures/orders_ext.js'),
         'utf8'
@@ -1044,6 +1088,10 @@ describe('Schema Testing', () => {
         {
           content: orderUsers,
           fileName: 'order_users.yml',
+        },
+        {
+          content: orderLineItems,
+          fileName: 'line_items.yml',
         },
       ]);
       await compiler.compile();

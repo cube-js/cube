@@ -1,6 +1,6 @@
 import type { BaseQuery } from './BaseQuery';
 import type { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluator';
-import { CubeSymbols } from "../compiler/CubeSymbols";
+import { CubeSymbols } from '../compiler/CubeSymbols';
 
 export class BaseDimension {
   public readonly expression: any;
@@ -126,7 +126,7 @@ export class BaseDimension {
     return this.dimensionDefinition().fieldType;
   }
 
-  public path() {
+  public path(): string[] | null {
     if (this.expression) {
       return null;
     }
@@ -138,10 +138,10 @@ export class BaseDimension {
     return this.query.cubeEvaluator.parsePath('dimensions', this.dimension);
   }
 
-  public expressionPath() {
+  public expressionPath(): string {
     if (this.expression) {
-      return `expr:${this.expression.expressionName}`;
+      return `expr:${this.expressionName}`;
     }
-    return this.query.cubeEvaluator.pathFromArray(this.path());
+    return this.query.cubeEvaluator.pathFromArray(this.path() as string[]);
   }
 }

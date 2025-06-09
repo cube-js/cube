@@ -666,6 +666,34 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot('join grouped on coalesce');
     });
 
+    test('join with grouped query and empty members', async () => {
+      const query = `
+        SELECT
+          top_orders.status
+        FROM
+          "Orders"
+          INNER JOIN
+          (
+            SELECT
+              status,
+              SUM(totalAmount)
+            FROM
+              "Orders"
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 2
+          ) top_orders
+        ON
+          "Orders".status = top_orders.status
+        GROUP BY 1
+        ORDER BY 1
+        `;
+
+      const res = await connection.query(query);
+      // Expect only top statuses 2 by total amount: processed and shipped
+      expect(res.rows).toMatchSnapshot('join grouped empty members');
+    });
+
     test('where segment is false', async () => {
       const query =
         'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
@@ -857,6 +885,34 @@ filter_subq AS (
 
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot('measure-with-ad-hoc-filters-and-original-measure');
+    });
+
+    /// Query references `updatedAt` in three places: in outer projection, in grouping key and in window
+    /// Incoming query is consistent: all three references same column
+    /// This tests that generated SQL for pushdown remains consistent:
+    /// whatever is present in grouping key should be present in window expression
+    /// Interesting part here is that single column (and member expression) contains
+    /// two different TD, one with granularity and one without, and both have to match grouping key
+    test('member expression with granularity and raw time dimensions', async () => {
+      const query = `
+        SELECT
+          DATE_TRUNC('qtr', createdAt) AS quarter,
+          updatedAt,
+          SUM(CASE
+                WHEN sum(totalAmount) IS NOT NULL THEN sum(totalAmount)
+                ELSE 0
+          END) OVER (
+            PARTITION BY DATE_TRUNC('qtr', createdAt)
+            ORDER BY updatedAt
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ) AS total
+        FROM Orders
+        GROUP BY
+          1, 2
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot();
     });
   });
 });
