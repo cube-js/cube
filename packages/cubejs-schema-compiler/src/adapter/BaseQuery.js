@@ -418,10 +418,29 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
+      let joinHints = this.collectJoinHints();
+      // let joinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+
+      // One cube may join the other cube via transitive joined cubes,
+      // members from which are referenced in the join `on` clauses.
+      // We need to collect such join hints and push them upfront of the joining one.
+      // It is important to use queryLevelJoinHints during the calculation if it is set.
+
+      const prevJoins = this.join;
+
+      let newJoin = this.joinGraph.buildJoin([...this.queryLevelJoinHints, ...joinHints]);
+      while (!R.equals(this.join, newJoin)) {
+        this.join = newJoin;
+        joinHints = R.uniq([joinHints[0], ...this.collectJoinHintsFromMembers(this.joinMembersFromJoin()), ...joinHints]);
+        newJoin = this.joinGraph.buildJoin([...this.queryLevelJoinHints, ...joinHints]);
+      }
+
       this.collectedJoinHints = [
         ...this.queryLevelJoinHints,
-        ...this.collectJoinHints(),
+        ...joinHints,
       ];
+
+      this.join = prevJoins;
     }
     return this.collectedJoinHints;
   }
@@ -2417,7 +2436,20 @@ export class BaseQuery {
     } else if (s.patchedMeasure?.patchedFrom) {
       return [s.patchedMeasure.patchedFrom.cubeName].concat(this.evaluateSymbolSql(s.patchedMeasure.patchedFrom.cubeName, s.patchedMeasure.patchedFrom.name, s.definition()));
     } else {
-      return this.evaluateSql(s.cube().name, s.definition().sql);
+      const res = this.evaluateSql(s.cube().name, s.definition().sql);
+      if (s.isJoinCondition) {
+        // In a join between Cube A and Cube B, sql() may reference members from other cubes.
+        // These referenced cubes must be added as join hints before Cube B to ensure correct SQL generation.
+        const targetCube = s.targetCubeName();
+        const { joinHints } = this.safeEvaluateSymbolContext();
+        let targetIdx = joinHints.findIndex(e => e === targetCube);
+        while (targetIdx > -1) {
+          joinHints.splice(targetIdx, 1);
+          targetIdx = joinHints.findIndex(e => e === targetCube);
+        }
+        joinHints.push(targetCube);
+      }
+      return res;
     }
   }
 
@@ -2454,21 +2486,25 @@ export class BaseQuery {
       };
     });
 
-    const joinMembers = this.join ? this.join.joins.map(j => ({
-      getMembers: () => [{
-        path: () => null,
-        cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
-        definition: () => j.join,
-      }]
-    })) : [];
-
     const membersToCollectFrom = [
       ...this.allMembersConcat(excludeTimeDimensions),
-      ...joinMembers,
+      ...this.joinMembersFromJoin(),
       ...customSubQueryJoinMembers,
     ];
 
     return this.collectJoinHintsFromMembers(membersToCollectFrom);
+  }
+
+  joinMembersFromJoin() {
+    return this.join ? this.join.joins.map(j => ({
+      getMembers: () => [{
+        path: () => null,
+        cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
+        definition: () => j.join,
+        isJoinCondition: true,
+        targetCubeName: () => j.originalTo,
+      }]
+    })) : [];
   }
 
   collectJoinHintsFromMembers(members) {
@@ -2786,7 +2822,7 @@ export class BaseQuery {
 
   pushJoinHints(joinHints) {
     if (this.safeEvaluateSymbolContext().joinHints && joinHints) {
-      if (joinHints.length === 1) {
+      if (Array.isArray(joinHints) && joinHints.length === 1) {
         [joinHints] = joinHints;
       }
       this.safeEvaluateSymbolContext().joinHints.push(joinHints);

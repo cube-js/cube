@@ -773,6 +773,9 @@ export class CubeSymbols {
 
   protected joinHints() {
     const { joinHints } = this.resolveSymbolsCallContext || {};
+    if (Array.isArray(joinHints)) {
+      return R.uniq(joinHints);
+    }
     return joinHints;
   }
 
@@ -879,7 +882,7 @@ export class CubeSymbols {
       } else if (this.symbols[cubeName]?.[name]) {
         cube = this.cubeReferenceProxy(
           cubeName,
-          undefined,
+          collectJoinHints ? [] : undefined,
           name
         );
       }
