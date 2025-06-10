@@ -418,8 +418,10 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
-      let joinHints = this.collectJoinHints();
-      // let joinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      // let joinHints = this.collectJoinHints();
+      const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
+      let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin());
 
       // One cube may join the other cube via transitive joined cubes,
       // members from which are referenced in the join `on` clauses.
@@ -428,16 +430,28 @@ export class BaseQuery {
 
       const prevJoins = this.join;
 
-      let newJoin = this.joinGraph.buildJoin([...this.queryLevelJoinHints, ...joinHints]);
+      let newJoin = this.joinGraph.buildJoin([
+        ...this.queryLevelJoinHints,
+        ...allMembersJoinHints,
+        ...joinMembersJoinHints,
+        ...customSubQueryJoinHints,
+      ]);
       while (!R.equals(this.join, newJoin)) {
         this.join = newJoin;
-        joinHints = R.uniq([joinHints[0], ...this.collectJoinHintsFromMembers(this.joinMembersFromJoin()), ...joinHints]);
-        newJoin = this.joinGraph.buildJoin([...this.queryLevelJoinHints, ...joinHints]);
+        joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin());
+        newJoin = this.joinGraph.buildJoin([
+          ...this.queryLevelJoinHints,
+          ...allMembersJoinHints,
+          ...joinMembersJoinHints,
+          ...customSubQueryJoinHints,
+        ]);
       }
 
       this.collectedJoinHints = [
         ...this.queryLevelJoinHints,
-        ...joinHints,
+        ...allMembersJoinHints,
+        ...joinMembersJoinHints,
+        ...customSubQueryJoinHints,
       ];
 
       this.join = prevJoins;
@@ -2471,7 +2485,17 @@ export class BaseQuery {
    * @returns {Array<Array<string>>}
    */
   collectJoinHints(excludeTimeDimensions = false) {
-    const customSubQueryJoinMembers = this.customSubQueryJoins.map(j => {
+    const membersToCollectFrom = [
+      ...this.allMembersConcat(excludeTimeDimensions),
+      ...this.joinMembersFromJoin(),
+      ...this.joinMembersFromCustomSubQuery(),
+    ];
+
+    return this.collectJoinHintsFromMembers(membersToCollectFrom);
+  }
+
+  joinMembersFromCustomSubQuery() {
+    return this.customSubQueryJoins.map(j => {
       const res = {
         path: () => null,
         cube: () => this.cubeEvaluator.cubeFromPath(j.on.cubeName),
@@ -2485,14 +2509,6 @@ export class BaseQuery {
         getMembers: () => [res],
       };
     });
-
-    const membersToCollectFrom = [
-      ...this.allMembersConcat(excludeTimeDimensions),
-      ...this.joinMembersFromJoin(),
-      ...customSubQueryJoinMembers,
-    ];
-
-    return this.collectJoinHintsFromMembers(membersToCollectFrom);
   }
 
   joinMembersFromJoin() {
