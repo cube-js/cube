@@ -418,7 +418,7 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
-      // let joinHints = this.collectJoinHints();
+      // this.collectedJoinHints = this.collectJoinHints();
       const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
       const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
       let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin());
@@ -436,7 +436,7 @@ export class BaseQuery {
         ...joinMembersJoinHints,
         ...customSubQueryJoinHints,
       ]);
-      while (!R.equals(this.join, newJoin)) {
+      while (newJoin?.joins.length > 0 && !R.equals(this.join, newJoin)) {
         this.join = newJoin;
         joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin());
         newJoin = this.joinGraph.buildJoin([
@@ -2462,6 +2462,26 @@ export class BaseQuery {
           targetIdx = joinHints.findIndex(e => e === targetCube);
         }
         joinHints.push(targetCube);
+
+        // Special processing is required when one cube extends another, because in this case
+        // cube names collected during joins evaluation might belong to ancestors which are out of scope of
+        // the current query and thus will lead to `Can't find join path to join cubes` error.
+        // To work around this we change the all ancestors cube names in collected join hints to the original one.
+        if (s.cube().extends) {
+          const cubeName = s.cube().name;
+          let parentCube = this.cubeEvaluator.resolveSymbolsCall(s.cube().extends, (name) => this.cubeEvaluator.cubeFromPath(name));
+          while (parentCube) {
+            // eslint-disable-next-line no-loop-func
+            joinHints.forEach((item, index, array) => {
+              if (item === parentCube.name) {
+                array[index] = cubeName;
+              }
+            });
+            parentCube = parentCube.extends ?
+              this.cubeEvaluator.resolveSymbolsCall(parentCube.extends, (name) => this.cubeEvaluator.cubeFromPath(name))
+              : null;
+          }
+        }
       }
       return res;
     }
