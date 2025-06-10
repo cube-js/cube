@@ -450,6 +450,62 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription[0].invalidateKeyQueries[0][1]).toEqual(['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']);
   });
 
+  it('pre-aggregation match for only td query', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'orders',
+            sql_table: 'orders',
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [
+              {
+                name: 'created_at',
+                sql: 'created_at',
+                type: 'time',
+              },
+              {
+                name: 'status',
+                sql: 'status',
+                type: 'string',
+              }
+            ],
+            preAggregations: [
+              {
+                name: 'simple',
+                measures: ['count'],
+                dimensions: ['status'],
+                timeDimension: 'CUBE.created_at',
+                granularity: 'day',
+              },
+            ]
+          }
+        ]
+      })
+    );
+
+    await compiler.compile();
+
+    // It's important to provide a queryFactory, as it triggers flow
+    // with paramAllocator reset in BaseQuery->newSubQueryForCube()
+    const queryFactory = new QueryFactory({ orders: PostgresQuery });
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      timeDimensions: [{
+        dimension: 'orders.created_at',
+        granularity: 'day',
+      }],
+      queryFactory
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    expect(preAggregationsDescription.length).toEqual(1);
+    expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.simple');
+  });
+
   describe('rollup with multiplied measure', () => {
     let compiler;
     let cubeEvaluator;
