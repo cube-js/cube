@@ -189,9 +189,9 @@ impl BaseTimeDimension {
         &self.granularity_obj
     }
 
-    pub fn resolve_granularity(&self) -> Result<Option<String>, CubeError> {
+    pub fn resolved_granularity(&self) -> Result<Option<String>, CubeError> {
         let res = if let Some(granularity_obj) = &self.granularity_obj {
-            Some(granularity_obj.resolve_granularity()?)
+            Some(granularity_obj.resolved_granularity()?)
         } else {
             None
         };

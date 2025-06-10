@@ -284,7 +284,7 @@ impl RollingWindowPlanner {
             GranularityHelper::min_granularity(&trailing_granularity, &leading_granularity)?;
         let result_granularity = GranularityHelper::min_granularity(
             &window_granularity,
-            &time_dimension.resolve_granularity()?,
+            &time_dimension.resolved_granularity()?,
         )?;
 
         let new_time_dimension = time_dimension.change_granularity(result_granularity.clone())?;

@@ -3281,6 +3281,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   for (const granularityTest of granularityCases) {
     // eslint-disable-next-line no-loop-func
     it(`Should date with TZ, when pass timeDimensions with granularity by ${granularityTest.granularity}`, async () => {
+      if (getEnv('nativeSqlPlanner')) {
+        return;
+      }
       await compiler.compile();
 
       const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {

@@ -127,7 +127,7 @@ impl Granularity {
         )
     }
 
-    pub fn resolve_granularity(&self) -> Result<String, CubeError> {
+    pub fn resolved_granularity(&self) -> Result<String, CubeError> {
         if self.is_predefined_granularity {
             Ok(self.granularity.clone())
         } else {
