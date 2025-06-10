@@ -1012,6 +1012,73 @@ describe('SQL Generation', () => {
       })
     );
 
+    it('BigQuery timestamp literal regression test - should not double-wrap DATETIME(TIMESTAMP())', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BigqueryQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [{
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2025-06-03', '2025-06-10']
+        }],
+        filters: [],
+        timezone: 'UTC'
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const sql = queryAndParams[0];
+      
+      // Should contain TIMESTAMP() but NOT DATETIME(TIMESTAMP())
+      expect(sql).toContain('TIMESTAMP(');
+      expect(sql).not.toContain('DATETIME(TIMESTAMP(');
+      // Should contain correct BigQuery timestamp comparison syntax with parameters
+      expect(sql).toContain('TIMESTAMP(?)');
+      // Should contain the properly formatted DATETIME function without double wrapping
+      expect(sql).toContain('DATETIME(`cards`.created_at, \'UTC\')');
+    });
+
+    it('BigQuery SQL pushdown timestamp literal test - should not double-wrap DATETIME(TIMESTAMP())', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BigqueryQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [{
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2025-06-03', '2025-06-10']
+        }],
+        filters: [{
+          member: 'cards.createdAt',
+          operator: 'inDateRange',
+          values: ['2025-06-03', '2025-06-10']
+        }],
+        timezone: 'UTC',
+        // Simulate SQL pushdown scenario with external query context
+        ungrouped: true
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const sql = queryAndParams[0];
+      
+      console.log('Generated SQL pushdown:', sql);
+      
+      // Should contain TIMESTAMP() but NOT DATETIME(TIMESTAMP()) in pushdown context
+      expect(sql).toContain('TIMESTAMP(');
+      expect(sql).not.toContain('DATETIME(TIMESTAMP(');
+      // Should contain correct BigQuery timestamp comparison syntax with parameters
+      expect(sql).toContain('TIMESTAMP(?)');
+      // Should contain the properly formatted DATETIME function without double wrapping
+      expect(sql).toContain('DATETIME(`cards`.created_at, \'UTC\')');
+      // Should handle date range filters correctly in pushdown context
+      expect(sql).toMatch(/DATETIME\(`cards`\.created_at, 'UTC'\) >= TIMESTAMP\(\?\)/);
+      expect(sql).toMatch(/DATETIME\(`cards`\.created_at, 'UTC'\) <= TIMESTAMP\(\?\)/);
+    });
+
     it('Test time series with 6 digits timestamp precision - bigquery', async () => {
       await compilers.compiler.compile();
 
