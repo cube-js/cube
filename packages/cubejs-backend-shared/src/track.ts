@@ -5,7 +5,7 @@ import { internalExceptions } from './errors';
 
 export type BaseEvent = {
   event: string,
-  // it's possible to fill timestamp at place of logging, otherwise it will be automatically
+  // It's possible to fill timestamp at the place of logging, otherwise, it will be filled in automatically
   timestamp?: string,
   [key: string]: any,
 };
