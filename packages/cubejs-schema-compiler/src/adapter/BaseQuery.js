@@ -419,40 +419,38 @@ export class BaseQuery {
   get allJoinHints() {
     if (!this.collectedJoinHints) {
       // this.collectedJoinHints = this.collectJoinHints();
-      const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      const [rootOfJoin, ...allMembersJoinHints] = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
       const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
       let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin());
 
       // One cube may join the other cube via transitive joined cubes,
       // members from which are referenced in the join `on` clauses.
-      // We need to collect such join hints and push them upfront of the joining one.
+      // We need to collect such join hints and push them upfront of the joining one
+      // but only if they don't exist yet. Cause in other case we might affect what
+      // join path will be constructed in join graph.
       // It is important to use queryLevelJoinHints during the calculation if it is set.
+
+      const constructJP = () => {
+        const filteredJoinMembersJoinHints = joinMembersJoinHints.filter(m => !allMembersJoinHints.includes(m));
+        return [
+          ...this.queryLevelJoinHints,
+          rootOfJoin,
+          ...filteredJoinMembersJoinHints,
+          ...allMembersJoinHints,
+          ...customSubQueryJoinHints,
+        ];
+      };
 
       const prevJoins = this.join;
 
-      let newJoin = this.joinGraph.buildJoin([
-        ...this.queryLevelJoinHints,
-        ...allMembersJoinHints,
-        ...joinMembersJoinHints,
-        ...customSubQueryJoinHints,
-      ]);
+      let newJoin = this.joinGraph.buildJoin(constructJP());
       while (newJoin?.joins.length > 0 && !R.equals(this.join, newJoin)) {
         this.join = newJoin;
         joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin());
-        newJoin = this.joinGraph.buildJoin([
-          ...this.queryLevelJoinHints,
-          ...allMembersJoinHints,
-          ...joinMembersJoinHints,
-          ...customSubQueryJoinHints,
-        ]);
+        newJoin = this.joinGraph.buildJoin(constructJP());
       }
 
-      this.collectedJoinHints = [
-        ...this.queryLevelJoinHints,
-        ...allMembersJoinHints,
-        ...joinMembersJoinHints,
-        ...customSubQueryJoinHints,
-      ];
+      this.collectedJoinHints = constructJP();
 
       this.join = prevJoins;
     }
