@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.21](https://github.com/cube-js/cube/compare/v1.3.20...v1.3.21) (2025-06-10)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix pre-aggregation for time dimension matching ([#9669](https://github.com/cube-js/cube/issues/9669)) ([0914e1e](https://github.com/cube-js/cube/commit/0914e1ed89b7d1cf8f3bf8dc19858aeaf4b779a7))
+
 ## [1.3.20](https://github.com/cube-js/cube/compare/v1.3.19...v1.3.20) (2025-06-06)
 
 ### Bug Fixes

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.21](https://github.com/cube-js/cube.js/compare/v1.3.20...v1.3.21) (2025-06-10)
+
+### Bug Fixes
+
+- **client-vue3:** Prevent heuristic call when initial query is empty in computed property validateQuery ([#9656](https://github.com/cube-js/cube.js/issues/9656)) ([622b266](https://github.com/cube-js/cube.js/commit/622b26601e6bde3f15fb1cfc5ff53daff5cb6ed9))
+
 ## [1.3.20](https://github.com/cube-js/cube.js/compare/v1.3.19...v1.3.20) (2025-06-06)
 
 **Note:** Version bump only for package @cubejs-client/vue3
