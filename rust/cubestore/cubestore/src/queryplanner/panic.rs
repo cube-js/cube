@@ -122,7 +122,7 @@ impl PanicWorkerExec {
             properties: PlanProperties::new(
                 EquivalenceProperties::new(Arc::new(Schema::empty())),
                 Partitioning::UnknownPartitioning(1),
-                EmissionType::Both, // Well, neither.
+                EmissionType::Incremental, // Not really applicable.
                 Boundedness::Bounded,
             ),
         }

@@ -70,7 +70,7 @@ impl TableProvider for InfoSchemaQueryCacheTableProvider {
             properties: PlanProperties::new(
                 EquivalenceProperties::new(schema),
                 Partitioning::UnknownPartitioning(1),
-                EmissionType::Both, // TODO upgrade DF: which?
+                EmissionType::Final,
                 Boundedness::Bounded,
             ),
         };
