@@ -191,7 +191,8 @@ impl CompilerCache for CompilerCacheImpl {
                 .get(&(compiler_id, protocol.clone()))
                 .cloned()
         };
-        // Double checked locking
+
+        // Double-checked locking
         let cache_entry = if let Some(cache_entry) = cache_entry {
             cache_entry
         } else {
