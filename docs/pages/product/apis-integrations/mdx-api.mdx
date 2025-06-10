@@ -40,6 +40,19 @@ To enable or disable the MDX API on a specific deployment, go to <Btn>Settings</
 in the Cube Cloud sidebar, then <Btn>Configuration</Btn>, and then toggle the
 <Btn>Enable MDX API</Btn> option.
 
+### Performance considerations
+
+To ensure the best user experience in Excel, the MDX API should be able to respond to
+requests with a subsecond latency. Consider the following recommendations:
+
+- The [deployment][ref-deployment] should be collocated with users, so deploy it a region
+that is closest to your users.
+- Queries should hit [pre-aggregations][ref-pre-aggregations] whenever possible. Consider
+turning on the [rollup-only mode][ref-rollup-only-mode] to disallow queries that go
+directly to the upstream data source.
+- If some queries still go to the upstream data source, it should respond with a
+subsecond latency. Consider tuning the concurrency and quotas to achieve that.
+
 ## Using MDX API with Excel
 
 <InfoBox>
@@ -179,3 +192,6 @@ Authentication and authorization work the same as for the [SQL API](/product/api
 [ref-hierarchies]: /product/data-modeling/reference/hierarchies
 [ref-folders]: /product/data-modeling/reference/view#folders
 [ref-views]: /product/data-modeling/concepts#views
+[ref-deployment]: /product/deployment/cloud/deployments
+[ref-pre-aggregations]: /product/caching/using-pre-aggregations
+[ref-rollup-only-mode]: /product/caching/using-pre-aggregations#rollup-only-mode
