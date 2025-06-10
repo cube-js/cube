@@ -2403,7 +2403,7 @@ export class BaseQuery {
    */
   collectCubeNames() {
     return this.collectFromMembers(
-      [],
+      false,
       this.collectCubeNamesFor.bind(this),
       'collectCubeNamesFor'
     );
