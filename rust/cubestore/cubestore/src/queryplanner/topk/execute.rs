@@ -84,7 +84,7 @@ impl AggregateTopKExec {
         let cache = PlanProperties::new(
             EquivalenceProperties::new(schema.clone()),
             Partitioning::UnknownPartitioning(1),
-            EmissionType::Both, // TODO upgrade DF
+            EmissionType::Final,
             Boundedness::Bounded,
         );
 

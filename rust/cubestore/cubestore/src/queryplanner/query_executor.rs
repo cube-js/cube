@@ -1052,11 +1052,6 @@ impl ExecutionPlan for CubeTableExec {
         self.schema.clone()
     }
 
-    // TODO upgrade DF
-    // fn output_partitioning(&self) -> Partitioning {
-    //     Partitioning::UnknownPartitioning(self.partition_execs.len())
-    // }
-
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         self.partition_execs.iter().collect()
     }
@@ -1347,7 +1342,7 @@ impl ClusterSendExec {
         PlanProperties::new(
             eq_properties,
             Partitioning::UnknownPartitioning(partitions_num),
-            EmissionType::Both, // Or Final, but we should implement streaming.
+            EmissionType::Final, // We should implement streaming.
             input_properties.boundedness.clone(),
         )
     }
