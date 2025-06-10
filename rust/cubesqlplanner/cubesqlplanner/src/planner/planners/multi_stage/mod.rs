@@ -5,7 +5,7 @@ mod multi_stage_query_planner;
 mod query_description;
 mod rolling_window_planner;
 
-pub use applied_state::MultiStageAppliedState;
+pub use applied_state::*;
 pub use member::*;
 pub use member_query_planner::MultiStageMemberQueryPlanner;
 pub use multi_stage_query_planner::MultiStageQueryPlanner;

@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{MeasureTimeShift, MemberExpressionSymbol, MemberSymbol, SqlCall};
+use super::sql_evaluator::{MeasureTimeShifts, MemberExpressionSymbol, MemberSymbol, SqlCall};
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
 use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -208,10 +208,10 @@ impl BaseMeasure {
         }
     }
 
-    pub fn time_shifts(&self) -> Vec<MeasureTimeShift> {
+    pub fn time_shift(&self) -> Option<MeasureTimeShifts> {
         match self.member_evaluator.as_ref() {
-            MemberSymbol::Measure(measure_symbol) => measure_symbol.time_shifts().clone(),
-            _ => vec![],
+            MemberSymbol::Measure(measure_symbol) => measure_symbol.time_shift().clone(),
+            _ => None,
         }
     }
 

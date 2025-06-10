@@ -39,18 +39,24 @@ impl MeasureOrderBy {
 }
 
 #[derive(Clone, Debug)]
-pub struct MeasureTimeShift {
+pub struct DimensionTimeShift {
     pub interval: SqlInterval,
     pub dimension: Rc<MemberSymbol>,
 }
 
-impl PartialEq for MeasureTimeShift {
+impl PartialEq for DimensionTimeShift {
     fn eq(&self, other: &Self) -> bool {
         self.interval == other.interval && self.dimension.full_name() == other.dimension.full_name()
     }
 }
 
-impl Eq for MeasureTimeShift {}
+impl Eq for DimensionTimeShift {}
+
+#[derive(Clone, Debug)]
+pub enum MeasureTimeShifts {
+    Dimensions(Vec<DimensionTimeShift>),
+    Common(SqlInterval),
+}
 
 #[derive(Clone)]
 pub struct MeasureSymbol {
@@ -60,7 +66,7 @@ pub struct MeasureSymbol {
     is_reference: bool,
     measure_filters: Vec<Rc<SqlCall>>,
     measure_drill_filters: Vec<Rc<SqlCall>>,
-    time_shifts: Vec<MeasureTimeShift>,
+    time_shift: Option<MeasureTimeShifts>,
     measure_order_by: Vec<MeasureOrderBy>,
     reduce_by: Option<Vec<Rc<MemberSymbol>>>,
     add_group_by: Option<Vec<Rc<MemberSymbol>>>,
@@ -80,7 +86,7 @@ impl MeasureSymbol {
         definition: Rc<dyn MeasureDefinition>,
         measure_filters: Vec<Rc<SqlCall>>,
         measure_drill_filters: Vec<Rc<SqlCall>>,
-        time_shifts: Vec<MeasureTimeShift>,
+        time_shift: Option<MeasureTimeShifts>,
         measure_order_by: Vec<MeasureOrderBy>,
         reduce_by: Option<Vec<Rc<MemberSymbol>>>,
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
@@ -96,7 +102,7 @@ impl MeasureSymbol {
             measure_filters,
             measure_drill_filters,
             measure_order_by,
-            time_shifts,
+            time_shift,
             is_splitted_source: false,
             reduce_by,
             add_group_by,
@@ -116,8 +122,8 @@ impl MeasureSymbol {
         &self.pk_sqls
     }
 
-    pub fn time_shifts(&self) -> &Vec<MeasureTimeShift> {
-        &self.time_shifts
+    pub fn time_shift(&self) -> &Option<MeasureTimeShifts> {
+        &self.time_shift
     }
 
     pub fn is_calculated(&self) -> bool {
@@ -430,19 +436,21 @@ impl SymbolFactory for MeasureSymbolFactory {
             false
         };
 
-        let time_shifts =
-            if let Some(time_shift_references) = &definition.static_data().time_shift_references {
-                let mut shifts: HashMap<String, MeasureTimeShift> = HashMap::new();
-                for shift_ref in time_shift_references.iter() {
-                    let interval = shift_ref.interval.parse::<SqlInterval>()?;
-                    let interval =
-                        if shift_ref.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
-                            -interval
-                        } else {
-                            interval
-                        };
-                    let dimension =
-                        compiler.add_dimension_evaluator(shift_ref.time_dimension.clone())?;
+        let time_shifts = if let Some(time_shift_references) =
+            &definition.static_data().time_shift_references
+        {
+            let mut shifts: HashMap<String, DimensionTimeShift> = HashMap::new();
+            let mut common_shift = None;
+            for shift_ref in time_shift_references.iter() {
+                let interval = shift_ref.interval.parse::<SqlInterval>()?;
+                let interval =
+                    if shift_ref.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
+                        -interval
+                    } else {
+                        interval
+                    };
+                if let Some(time_dimension) = &shift_ref.time_dimension {
+                    let dimension = compiler.add_dimension_evaluator(time_dimension.clone())?;
                     let dimension = find_owned_by_cube_child(&dimension)?;
                     let dimension_name = dimension.full_name();
                     if let Some(exists) = shifts.get(&dimension_name) {
@@ -455,17 +463,38 @@ impl SymbolFactory for MeasureSymbolFactory {
                     } else {
                         shifts.insert(
                             dimension_name,
-                            MeasureTimeShift {
+                            DimensionTimeShift {
                                 interval: interval.clone(),
                                 dimension: dimension.clone(),
                             },
                         );
                     };
+                } else {
+                    if common_shift.is_none() {
+                        common_shift = Some(interval);
+                    } else {
+                        if common_shift != Some(interval) {
+                            return Err(CubeError::user(format!(
+                                    "Measure can contain only one common time_shift (without time_dimension).",
+                                )));
+                        }
+                    }
                 }
-                shifts.into_values().collect_vec()
+            }
+            if common_shift.is_some() && !shifts.is_empty() {
+                return Err(CubeError::user(format!(
+                        "Measure cannot mix common time_shifts (without time_dimension) with dimension-specific ones.",
+                    )));
+            } else if common_shift.is_some() {
+                Some(MeasureTimeShifts::Common(common_shift.unwrap()))
             } else {
-                vec![]
-            };
+                Some(MeasureTimeShifts::Dimensions(
+                    shifts.into_values().collect_vec(),
+                ))
+            }
+        } else {
+            None
+        };
 
         let reduce_by = if let Some(reduce_by) = &definition.static_data().reduce_by_references {
             let symbols = reduce_by
@@ -514,7 +543,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && !is_multi_stage
                 && measure_filters.is_empty()
                 && measure_drill_filters.is_empty()
-                && time_shifts.is_empty()
+                && time_shifts.is_none()
                 && measure_order_by.is_empty()
                 && reduce_by.is_none()
                 && add_group_by.is_none()

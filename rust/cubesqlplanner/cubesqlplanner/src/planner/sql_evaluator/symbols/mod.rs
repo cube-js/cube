@@ -13,7 +13,9 @@ pub use dimension_symbol::{
     DimensionCaseDefinition, DimensionCaseWhenItem, DimensionSymbol, DimensionSymbolFactory,
     DimenstionCaseLabel,
 };
-pub use measure_symbol::{MeasureSymbol, MeasureSymbolFactory, MeasureTimeShift};
+pub use measure_symbol::{
+    DimensionTimeShift, MeasureSymbol, MeasureSymbolFactory, MeasureTimeShifts,
+};
 pub use member_expression_symbol::MemberExpressionSymbol;
 pub use member_symbol::MemberSymbol;
 pub use symbol_factory::SymbolFactory;

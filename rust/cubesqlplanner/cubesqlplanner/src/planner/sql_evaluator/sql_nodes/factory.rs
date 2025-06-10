@@ -6,13 +6,13 @@ use super::{
     TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
-use crate::planner::sql_evaluator::MeasureTimeShift;
+use crate::planner::planners::multi_stage::TimeShiftState;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct SqlNodesFactory {
-    time_shifts: HashMap<String, MeasureTimeShift>,
+    time_shifts: TimeShiftState,
     ungrouped: bool,
     ungrouped_measure: bool,
     count_approx_as_state: bool,
@@ -33,7 +33,7 @@ pub struct SqlNodesFactory {
 impl SqlNodesFactory {
     pub fn new() -> Self {
         Self {
-            time_shifts: HashMap::new(),
+            time_shifts: TimeShiftState::default(),
             ungrouped: false,
             ungrouped_measure: false,
             count_approx_as_state: false,
@@ -52,7 +52,7 @@ impl SqlNodesFactory {
         }
     }
 
-    pub fn set_time_shifts(&mut self, time_shifts: HashMap<String, MeasureTimeShift>) {
+    pub fn set_time_shifts(&mut self, time_shifts: TimeShiftState) {
         self.time_shifts = time_shifts;
     }
 
@@ -262,7 +262,7 @@ impl SqlNodesFactory {
         let input: Rc<dyn SqlNode> =
             AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
 
-        let input = if !&self.time_shifts.is_empty() {
+        let input = if !self.time_shifts.is_empty() {
             TimeShiftSqlNode::new(self.time_shifts.clone(), input)
         } else {
             input

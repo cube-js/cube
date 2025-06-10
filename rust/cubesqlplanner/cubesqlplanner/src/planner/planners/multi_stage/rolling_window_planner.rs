@@ -127,7 +127,7 @@ impl RollingWindowPlanner {
                     vec![],
                     vec![],
                     None,
-                    vec![],
+                    None,
                 );
 
                 let description = MultiStageQueryDescription::new(

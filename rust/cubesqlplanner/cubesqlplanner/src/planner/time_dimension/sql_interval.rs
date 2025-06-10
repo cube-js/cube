@@ -3,7 +3,7 @@ use itertools::Itertools;
 use std::ops::{Add, AddAssign, Neg, Sub};
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq, Default)]
+#[derive(Default, Debug, PartialEq, Clone, Hash, Eq)]
 pub struct SqlInterval {
     pub year: i32,
     pub month: i32,
@@ -112,8 +112,8 @@ impl Add for SqlInterval {
     }
 }
 
-impl AddAssign for SqlInterval {
-    fn add_assign(&mut self, other: SqlInterval) {
+impl AddAssign<&SqlInterval> for SqlInterval {
+    fn add_assign(&mut self, other: &SqlInterval) {
         self.year += other.year;
         self.month += other.month;
         self.week += other.week;
@@ -121,6 +121,12 @@ impl AddAssign for SqlInterval {
         self.hour += other.hour;
         self.minute += other.minute;
         self.second += other.second;
+    }
+}
+
+impl AddAssign<SqlInterval> for SqlInterval {
+    fn add_assign(&mut self, other: SqlInterval) {
+        *self += &other;
     }
 }
 
