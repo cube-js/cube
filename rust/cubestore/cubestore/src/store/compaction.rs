@@ -678,6 +678,13 @@ impl CompactionService for CompactionServiceImpl {
             .metadata_cache_factory
             .cache_factory()
             .make_session_config();
+        const MAX_BATCH_ROWS: usize = 2048;
+        // Set batch size to 2048 to avoid overflow in case where, perhaps, we might get repeated
+        // large string values, such that the default value, 8192, could produce an array too big
+        // for i32 string array offsets in a SortPreservingMergeExecStream that is constructed in
+        // `merge_chunks`.  In pre-DF-upgrade Cubestore, MergeSortExec used a local variable,
+        // MAX_BATCH_ROWS = 4096, which might be small enough.
+        let session_config = session_config.with_batch_size(MAX_BATCH_ROWS);
 
         // Merge and write rows.
         let schema = Arc::new(arrow_schema(index.get_row()));
