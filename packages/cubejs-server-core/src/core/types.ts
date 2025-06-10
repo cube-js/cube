@@ -168,7 +168,7 @@ export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseD
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type LoggerFnParams = {
-  // it's possible to fill timestamp at place of logging, otherwise it will be automatically
+  // It's possible to fill timestamp at the place of logging, otherwise, it will be filled in automatically
   timestamp?: string,
   [key: string]: any,
 };
