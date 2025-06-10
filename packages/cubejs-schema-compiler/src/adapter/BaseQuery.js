@@ -418,7 +418,6 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
-      // this.collectedJoinHints = this.collectJoinHints();
       const [rootOfJoin, ...allMembersJoinHints] = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
       const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
       let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(this.join));
