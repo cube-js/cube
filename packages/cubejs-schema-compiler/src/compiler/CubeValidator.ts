@@ -790,6 +790,19 @@ const cubeSchema = inherit(baseSchema, {
   'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });
 
+const folderSchema = Joi.object().keys({
+  name: Joi.string().required(),
+  includes: Joi.alternatives([
+    Joi.string().valid('*'),
+    Joi.array().items(
+      Joi.alternatives([
+        Joi.string().required(),
+        Joi.link('#folderSchema'), // Can contain nested folders
+      ]),
+    ),
+  ]).required(),
+}).id('folderSchema');
+
 const viewSchema = inherit(baseSchema, {
   isView: Joi.boolean().strict(),
   cubes: Joi.array().items(
@@ -817,13 +830,7 @@ const viewSchema = inherit(baseSchema, {
       'object.oxor': 'Using split together with prefix is not supported'
     })
   ),
-  folders: Joi.array().items(Joi.object().keys({
-    name: Joi.string().required(),
-    includes: Joi.alternatives([
-      Joi.string().valid('*'),
-      Joi.array().items(Joi.string().required())
-    ]).required(),
-  })),
+  folders: Joi.array().items(folderSchema),
 });
 
 function formatErrorMessageFromDetails(explain, d) {

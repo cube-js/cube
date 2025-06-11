@@ -1816,6 +1816,7 @@ Array [
       },
     ],
     "name": "folder1",
+    "type": "folder",
   },
   Object {
     "includes": Array [
@@ -1831,6 +1832,7 @@ Array [
       },
     ],
     "name": "folder2",
+    "type": "folder",
   },
 ]
 `;
