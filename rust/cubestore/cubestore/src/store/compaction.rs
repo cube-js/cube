@@ -447,6 +447,11 @@ impl CompactionServiceImpl {
         Ok(())
     }
 }
+
+/// The batch size used by CompactionServiceImpl::compact.  Based on MAX_BATCH_ROWS=4096 of the
+/// pre-DF-upgrade's MergeSortExec, but even smaller to be farther from potential i32 overflow.
+const COMPACT_BATCH_SIZE: usize = 2048;
+
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(
@@ -600,9 +605,12 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
 
+        // We use COMPACT_BATCH_SIZE instead of ROW_GROUP_SIZE for this write, to avoid i32 Utf8 arrow
+        // array offset overflow in some (unusual) cases.
+        // TODO: Simply lowering the size is not great.
         let store = ParquetTableStore::new(
             index.get_row().clone(),
-            ROW_GROUP_SIZE,
+            COMPACT_BATCH_SIZE,
             self.metadata_cache_factory.clone(),
         );
         let old_partition_remote = match &new_chunk {
@@ -678,13 +686,12 @@ impl CompactionService for CompactionServiceImpl {
             .metadata_cache_factory
             .cache_factory()
             .make_session_config();
-        const MAX_BATCH_ROWS: usize = 2048;
         // Set batch size to 2048 to avoid overflow in case where, perhaps, we might get repeated
         // large string values, such that the default value, 8192, could produce an array too big
         // for i32 string array offsets in a SortPreservingMergeExecStream that is constructed in
         // `merge_chunks`.  In pre-DF-upgrade Cubestore, MergeSortExec used a local variable,
         // MAX_BATCH_ROWS = 4096, which might be small enough.
-        let session_config = session_config.with_batch_size(MAX_BATCH_ROWS);
+        let session_config = session_config.with_batch_size(COMPACT_BATCH_SIZE);
 
         // Merge and write rows.
         let schema = Arc::new(arrow_schema(index.get_row()));
@@ -1302,15 +1309,18 @@ async fn write_to_files_impl(
 ) -> Result<(), CubeError> {
     let schema = Arc::new(store.arrow_schema());
     let writer_props = store.writer_props(table).await?;
-    let mut writers = files.into_iter().map(move |f| -> Result<_, CubeError> {
-        Ok(ArrowWriter::try_new(
-            File::create(f)?,
-            schema.clone(),
-            Some(writer_props.clone()),
-        )?)
-    });
+    let mut writers = files
+        .clone()
+        .into_iter()
+        .map(move |f| -> Result<_, CubeError> {
+            Ok(ArrowWriter::try_new(
+                File::create(f)?,
+                schema.clone(),
+                Some(writer_props.clone()),
+            )?)
+        });
 
-    let (write_tx, mut write_rx) = tokio::sync::mpsc::channel(1);
+    let (write_tx, mut write_rx) = tokio::sync::mpsc::channel::<(usize, RecordBatch)>(1);
     let io_job = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
         let mut writer = writers.next().transpose()?.unwrap();
         let mut current_writer_i = 0;
@@ -1330,27 +1340,58 @@ async fn write_to_files_impl(
         Ok(())
     });
 
-    let mut writer_i = 0;
-    let mut process_row_group = move |b: RecordBatch| -> Result<_, CubeError> {
-        match pick_writer(&b) {
-            WriteBatchTo::Current => Ok(((writer_i, b), None)),
-            WriteBatchTo::Next {
-                rows_for_current: n,
-            } => {
-                let current_writer = writer_i;
-                writer_i += 1; // Next iteration will write into the next file.
-                Ok((
-                    (current_writer, b.slice(0, n)),
-                    Some(b.slice(n, b.num_rows() - n)),
-                ))
+    let mut writer_i: usize = 0;
+    let mut process_row_group =
+        move |b: RecordBatch| -> ((usize, RecordBatch), Option<RecordBatch>) {
+            match pick_writer(&b) {
+                WriteBatchTo::Current => ((writer_i, b), None),
+                WriteBatchTo::Next {
+                    rows_for_current: n,
+                } => {
+                    let current_writer = writer_i;
+                    writer_i += 1; // Next iteration will write into the next file.
+                    (
+                        (current_writer, b.slice(0, n)),
+                        Some(b.slice(n, b.num_rows() - n)),
+                    )
+                }
+            }
+        };
+    let err = redistribute(records, store.row_group_size(), move |b| {
+        // See if we get an array using more than 512 MB and log it.  With COMPACT_BATCH_SIZE=2048,
+        // this means a default batch size of 8192 might, or our row group size of 16384 really might,
+        // get i32 offset overflow when used in an Arrow array.
+
+        // First figure out what to log.  (Normally we don't allocate or log anything.)
+        let mut loggable_overlongs = Vec::new();
+        {
+            for (column, field) in b.columns().iter().zip(b.schema_ref().fields().iter()) {
+                let memory_size = column.get_buffer_memory_size();
+                if memory_size > 512 * 1024 * 1024 {
+                    loggable_overlongs.push((field.name().clone(), memory_size, column.len()))
+                }
             }
         }
-    };
-    let err = redistribute(records, ROW_GROUP_SIZE, move |b| {
+
         let r = process_row_group(b);
+
+        // Then, now that we know what file names the rows would be written into, log anything we need to log.
+        for (column_name, memory_size, length) in loggable_overlongs {
+            // *out of bounds write index* provably can't happen (if pick_writer has nothing wrong with it) but let's not make logging break things.
+            let oob = "*out of bounds write index*";
+            match r {
+                ((write_i, _), None) => {
+                    log::warn!("Column {} has large memory size {} with length = {}, writing to file '#{}'", column_name, memory_size, length, files.get(write_i).map(String::as_str).unwrap_or(oob));
+                },
+                ((write_i, _), Some(_)) => {
+                    log::warn!("Column {} has large memory size {} with length = {}, writing across file '#{}' and '#{}'", column_name, memory_size, length, files.get(write_i).map(String::as_str).unwrap_or(oob), files.get(write_i + 1).map(String::as_str).unwrap_or(oob));
+                }
+            }
+        }
+
         let write_tx = write_tx.clone();
         async move {
-            let (to_write, to_return) = r?;
+            let (to_write, to_return) = r;
             write_tx.send(to_write).await?;
             return Ok(to_return);
         }
