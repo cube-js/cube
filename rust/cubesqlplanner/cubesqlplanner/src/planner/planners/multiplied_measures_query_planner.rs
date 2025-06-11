@@ -299,7 +299,7 @@ impl MultipliedMeasuresQueryPlanner {
             schema,
             filter: logical_filter,
             offset: self.query_properties.offset(),
-            limit: self.query_properties.row_limit(),
+            limit: None,
             ungrouped: self.query_properties.ungrouped(),
             dimension_subqueries: subquery_dimension_queries,
             source: SimpleQuerySource::LogicalJoin(source),
