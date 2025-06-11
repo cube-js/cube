@@ -128,6 +128,10 @@ impl ParquetTableStore {
         arrow_schema(&self.table)
     }
 
+    pub fn row_group_size(&self) -> usize {
+        self.row_group_size
+    }
+
     pub async fn writer_props(&self, table: &IdRow<Table>) -> Result<WriterProperties, CubeError> {
         self.metadata_cache_factory
             .build_writer_props(
