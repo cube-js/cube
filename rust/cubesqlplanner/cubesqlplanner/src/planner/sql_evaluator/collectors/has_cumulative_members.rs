@@ -26,13 +26,10 @@ impl TraversalVisitor for HasCumulativeMembersCollector {
         _path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
-        match node.as_ref() {
-            MemberSymbol::Measure(s) => {
-                if s.is_rolling_window() {
-                    self.has_cumulative_members = true;
-                }
+        if let MemberSymbol::Measure(s) = node.as_ref() {
+            if s.is_rolling_window() {
+                self.has_cumulative_members = true;
             }
-            _ => {}
         };
         if self.has_cumulative_members {
             Ok(None)

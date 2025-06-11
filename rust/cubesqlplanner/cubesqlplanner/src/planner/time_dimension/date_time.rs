@@ -117,7 +117,7 @@ impl QueryDateTime {
 
     pub fn add_duration(&self, duration: Duration) -> Result<Self, CubeError> {
         let mut native = self.naive_local();
-        native = native + duration;
+        native += duration;
         Self::from_local_date_time(self.date_time.timezone(), native)
     }
 

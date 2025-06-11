@@ -479,7 +479,7 @@ impl QueryProperties {
             .into_values()
             .map(|measures_and_join| {
                 (
-                    measures_and_join.iter().next().unwrap().1 .1.clone(),
+                    measures_and_join.first().unwrap().1 .1.clone(),
                     measures_and_join
                         .into_iter()
                         .flat_map(|m| m.0)
@@ -506,7 +506,7 @@ impl QueryProperties {
                     .join(", ")
             )));
         }
-        Ok(self.multi_fact_join_groups.iter().next().unwrap().0.clone())
+        Ok(self.multi_fact_join_groups.first().unwrap().0.clone())
     }
 
     pub fn measures(&self) -> &Vec<Rc<BaseMeasure>> {
@@ -797,8 +797,7 @@ impl QueryProperties {
             } else {
                 let join = self
                     .compute_join_multi_fact_groups_with_measures(&vec![m.clone()])?
-                    .iter()
-                    .next()
+                    .first()
                     .expect("No join groups returned for single measure multi-fact join group")
                     .0
                     .clone();
@@ -845,11 +844,7 @@ impl QueryProperties {
             }
             FilterItem::Item(item) => {
                 let item_member_name = item.member_name();
-                if measures
-                    .iter()
-                    .find(|m| m.full_name() == item_member_name)
-                    .is_none()
-                {
+                if !measures.iter().any(|m| m.full_name() == item_member_name) {
                     measures.push(BaseMeasure::try_new_required(
                         item.member_evaluator().clone(),
                         self.query_tools.clone(),
