@@ -330,7 +330,7 @@ export class BaseQuery {
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
-    this.canUseNativeSqlPlannerPreAggregation = true;
+    this.canUseNativeSqlPlannerPreAggregation = false;
     if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
       const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
 
