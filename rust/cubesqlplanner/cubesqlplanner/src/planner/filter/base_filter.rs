@@ -669,7 +669,7 @@ impl BaseFilter {
         }
         let from = self.format_from_date(value, plan_templates)?;
 
-        let res = if use_db_time_zone && &from != FROM_PARTITION_RANGE {
+        let res = if use_db_time_zone && from != FROM_PARTITION_RANGE {
             plan_templates.in_db_time_zone(from)?
         } else {
             from
@@ -688,7 +688,7 @@ impl BaseFilter {
         }
         let from = self.format_to_date(value, plan_templates)?;
 
-        let res = if use_db_time_zone && &from != TO_PARTITION_RANGE {
+        let res = if use_db_time_zone && from != TO_PARTITION_RANGE {
             plan_templates.in_db_time_zone(from)?
         } else {
             from
