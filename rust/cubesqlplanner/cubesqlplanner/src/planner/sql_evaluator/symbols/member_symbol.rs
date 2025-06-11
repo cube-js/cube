@@ -9,6 +9,7 @@ use crate::planner::{BaseMember, MemberSymbolRef};
 use std::fmt::Debug;
 use std::rc::Rc;
 
+#[allow(clippy::large_enum_variant)]
 pub enum MemberSymbol {
     Dimension(DimensionSymbol),
     TimeDimension(TimeDimensionSymbol),

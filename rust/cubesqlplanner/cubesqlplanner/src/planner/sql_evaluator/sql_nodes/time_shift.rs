@@ -47,7 +47,7 @@ impl SqlNode for TimeShiftSqlNode {
                         .shifts
                         .common_time_shift
                         .clone()
-                        .unwrap_or(SqlInterval::default());
+                        .unwrap_or_default();
                     if let Some(shift) = self.shifts.dimensions_shifts.get(&ev.full_name()) {
                         interval += &shift.interval;
                     }
