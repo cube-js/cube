@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:22.16.0-bookworm-slim as builder
+FROM node:22.16.0-bookworm-slim AS builder
 
 WORKDIR /cube
 COPY . .
