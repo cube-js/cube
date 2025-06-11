@@ -263,7 +263,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let is_sql_direct_ref = if let Some(sql) = &sql {
-            sql.is_direct_reference()?
+            sql.is_direct_reference(compiler.base_tools())?
         } else {
             false
         };

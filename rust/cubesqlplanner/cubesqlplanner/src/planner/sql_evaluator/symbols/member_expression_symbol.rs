@@ -1,4 +1,5 @@
 use super::MemberSymbol;
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -25,9 +26,12 @@ impl MemberExpressionSymbol {
         name: String,
         expression: MemberExpressionExpression,
         definition: Option<String>,
+        base_tools: Rc<dyn BaseTools>,
     ) -> Result<Self, CubeError> {
         let is_reference = match &expression {
-            MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference()?,
+            MemberExpressionExpression::SqlCall(sql_call) => {
+                sql_call.is_direct_reference(base_tools.clone())?
+            }
             MemberExpressionExpression::PatchedSymbol(_symbol) => false,
         };
         Ok(Self {
@@ -57,7 +61,6 @@ impl MemberExpressionSymbol {
         Ok(sql)
     }
 
-
     pub fn full_name(&self) -> String {
         format!("expr:{}.{}", self.cube_name, self.name)
     }
@@ -80,8 +83,12 @@ impl MemberExpressionSymbol {
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         match &self.expression {
-            MemberExpressionExpression::SqlCall(sql_call) => sql_call.extract_symbol_deps(&mut deps),
-            MemberExpressionExpression::PatchedSymbol(member_symbol) => deps.push(member_symbol.clone()),
+            MemberExpressionExpression::SqlCall(sql_call) => {
+                sql_call.extract_symbol_deps(&mut deps)
+            }
+            MemberExpressionExpression::PatchedSymbol(member_symbol) => {
+                deps.push(member_symbol.clone())
+            }
         }
         deps
     }
@@ -89,8 +96,12 @@ impl MemberExpressionSymbol {
     pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
         let mut deps = vec![];
         match &self.expression {
-            MemberExpressionExpression::SqlCall(sql_call) => sql_call.extract_symbol_deps_with_path(&mut deps),
-            MemberExpressionExpression::PatchedSymbol(member_symbol) => deps.push((member_symbol.clone(), vec![])),
+            MemberExpressionExpression::SqlCall(sql_call) => {
+                sql_call.extract_symbol_deps_with_path(&mut deps)
+            }
+            MemberExpressionExpression::PatchedSymbol(member_symbol) => {
+                deps.push((member_symbol.clone(), vec![]))
+            }
         }
         deps
     }

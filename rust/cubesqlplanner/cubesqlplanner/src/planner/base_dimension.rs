@@ -129,6 +129,7 @@ impl BaseDimension {
             name.clone(),
             MemberExpressionExpression::SqlCall(expression),
             member_expression_definition.clone(),
+            query_tools.base_tools().clone(),
         )?;
         let full_name = member_expression_symbol.full_name();
         let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
