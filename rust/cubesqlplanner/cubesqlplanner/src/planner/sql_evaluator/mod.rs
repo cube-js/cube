@@ -17,6 +17,7 @@ pub use symbols::{
     CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
     DimensionCaseDefinition, DimensionCaseWhenItem, DimensionSymbol, DimensionSymbolFactory,
     DimensionTimeShift, DimenstionCaseLabel, MeasureSymbol, MeasureSymbolFactory,
-    MeasureTimeShifts, MemberExpressionSymbol, MemberSymbol, SymbolFactory, TimeDimensionSymbol,
+    MeasureTimeShifts, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
+    SymbolFactory, TimeDimensionSymbol,
 };
 pub use visitor::TraversalVisitor;

@@ -3,6 +3,7 @@ use crate::logical_plan::DimensionSubQuery;
 use crate::plan::{FilterItem, QualifiedColumnName};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions;
+use crate::planner::sql_evaluator::MemberExpressionExpression;
 use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure, BaseMember};
 use cubenativeutils::CubeError;
@@ -71,7 +72,7 @@ impl DimensionSubqueryPlanner {
         let primary_keys_dimensions = self.utils.primary_keys_dimensions(&cube_name)?;
         let expression = subquery_dimension.sql_call()?;
         let measure = BaseMeasure::try_new_from_expression(
-            expression,
+            MemberExpressionExpression::SqlCall(expression),
             cube_name.clone(),
             dim_name.clone(),
             None,

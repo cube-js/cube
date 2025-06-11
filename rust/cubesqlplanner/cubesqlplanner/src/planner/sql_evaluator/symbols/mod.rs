@@ -16,7 +16,7 @@ pub use dimension_symbol::{
 pub use measure_symbol::{
     DimensionTimeShift, MeasureSymbol, MeasureSymbolFactory, MeasureTimeShifts,
 };
-pub use member_expression_symbol::MemberExpressionSymbol;
+pub use member_expression_symbol::{MemberExpressionExpression, MemberExpressionSymbol};
 pub use member_symbol::MemberSymbol;
 pub use symbol_factory::SymbolFactory;
 pub use time_dimension_symbol::TimeDimensionSymbol;

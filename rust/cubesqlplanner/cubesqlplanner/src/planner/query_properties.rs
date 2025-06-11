@@ -1,6 +1,8 @@
 use super::filter::compiler::FilterCompiler;
 use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
+use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
+use crate::planner::sql_evaluator::MemberExpressionExpression;
 
 use super::sql_evaluator::MemberSymbol;
 use super::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
@@ -111,8 +113,16 @@ impl QueryProperties {
                             } else {
                                 "".to_string()
                             };
-                        let expression_evaluator = evaluator_compiler
-                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        let expression_evaluator = match member_expression.expression()? {
+                            MemberExpressionExpressionDef::Sql(sql) => {
+                                evaluator_compiler.compile_sql_call(&cube_name, sql)?
+                            }
+                            MemberExpressionExpressionDef::Struct(_) => {
+                                return Err(CubeError::user(format!(
+                                    "Expression struct not supported for dimension"
+                                )));
+                            }
+                        };
                         BaseDimension::try_new_from_expression(
                             expression_evaluator,
                             cube_name,
@@ -165,13 +175,45 @@ impl QueryProperties {
                         let name =
                             if let Some(name) = &member_expression.static_data().expression_name {
                                 name.clone()
+                            } else if let Some(name) = &member_expression.static_data().name {
+                                format!("{}.{}", cube_name, name)
                             } else {
                                 "".to_string()
                             };
-                        let expression_evaluator = evaluator_compiler
-                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        let expression = match member_expression.expression()? {
+                            MemberExpressionExpressionDef::Sql(sql) => {
+                                MemberExpressionExpression::SqlCall(
+                                    evaluator_compiler.compile_sql_call(&cube_name, sql)?,
+                                )
+                            }
+                            MemberExpressionExpressionDef::Struct(expr) => {
+                                if expr.static_data().expression_type != "PatchMeasure" {
+                                    return Err(CubeError::user(format!("Only `PatchMeasure` type of memeber expression is supported")));
+                                }
+
+                                if let Some(source_measure) = &expr.static_data().source_measure {
+
+                                    let new_measure_type = expr.static_data().replace_aggregation_type.clone();
+                                    let mut filters_to_add = vec![];
+                                    if let Some(add_filters) = expr.add_filters()? {
+                                        for filter in add_filters.iter() {
+                                            let node = evaluator_compiler.compile_sql_call(&cube_name, filter.sql()?)?;
+                                            filters_to_add.push(node);
+                                        }
+                                    }
+                                    let source_measure_compiled = evaluator_compiler.add_measure_evaluator(source_measure.clone())?;
+                                    let patched_measure = source_measure_compiled.as_measure()?.new_patched(new_measure_type, filters_to_add)?;
+                                    let patched_symbol = Rc::new(MemberSymbol::Measure(patched_measure));
+                                    MemberExpressionExpression::PatchedSymbol(patched_symbol)
+
+                                } else {
+                                    return Err(CubeError::user(format!("Source measure is required for `PatchMeasure` type of memeber expression")));
+                                }
+
+                            }
+                        };
                         BaseMeasure::try_new_from_expression(
-                            expression_evaluator,
+                            expression,
                             cube_name,
                             name,
                             member_expression.static_data().definition.clone(),
@@ -230,8 +272,16 @@ impl QueryProperties {
                             } else {
                                 "".to_string()
                             };
-                            let expression_evaluator = evaluator_compiler
-                                .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                            let expression_evaluator = match member_expression.expression()? {
+                                MemberExpressionExpressionDef::Sql(sql) => {
+                                    evaluator_compiler.compile_sql_call(&cube_name, sql)?
+                                }
+                                MemberExpressionExpressionDef::Struct(_) => {
+                                    return Err(CubeError::user(format!(
+                                        "Expression struct not supported for dimension"
+                                    )));
+                                }
+                            };
                             BaseSegment::try_new(
                                 expression_evaluator,
                                 cube_name,
@@ -811,7 +861,7 @@ impl QueryProperties {
                             .rendered_as_multiplied_measures
                             .insert(item.measure.full_name());
                     }
-                    if item.multiplied && !item.measure.can_used_as_addictive_in_multplied()? {
+                    if item.multiplied && !item.measure.can_used_as_addictive_in_multplied() {
                         result.multiplied_measures.push(item.measure.clone());
                     } else {
                         result.regular_measures.push(item.measure.clone());

@@ -1,5 +1,5 @@
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{MemberExpressionSymbol, MemberSymbol, SqlCall};
+use crate::planner::sql_evaluator::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol, SqlCall};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
@@ -28,7 +28,7 @@ impl BaseSegment {
         query_tools: Rc<QueryTools>,
     ) -> Result<Rc<Self>, CubeError> {
         let member_expression_symbol =
-            MemberExpressionSymbol::try_new(cube_name.clone(), name.clone(), expression, None)?;
+            MemberExpressionSymbol::try_new(cube_name.clone(), name.clone(), MemberExpressionExpression::SqlCall(expression), None)?;
         let full_name = full_name.unwrap_or(member_expression_symbol.full_name());
         let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
 

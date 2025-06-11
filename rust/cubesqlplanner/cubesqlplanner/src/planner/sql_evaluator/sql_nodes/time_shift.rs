@@ -55,9 +55,7 @@ impl SqlNode for TimeShiftSqlNode {
                         input
                     } else {
                         let shift = interval.to_sql();
-                        let res = templates
-                            .base_tools()
-                            .add_timestamp_interval(input, shift)?;
+                        let res = templates.add_timestamp_interval(input, shift)?;
                         format!("({})", res)
                     }
                 } else {

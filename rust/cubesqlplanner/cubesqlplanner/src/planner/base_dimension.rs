@@ -2,6 +2,7 @@ use super::query_tools::QueryTools;
 use super::sql_evaluator::{MemberExpressionSymbol, MemberSymbol, SqlCall};
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
+use crate::planner::sql_evaluator::MemberExpressionExpression;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -126,7 +127,7 @@ impl BaseDimension {
         let member_expression_symbol = MemberExpressionSymbol::try_new(
             cube_name.clone(),
             name.clone(),
-            expression,
+            MemberExpressionExpression::SqlCall(expression),
             member_expression_definition.clone(),
         )?;
         let full_name = member_expression_symbol.full_name();

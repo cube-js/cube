@@ -1,8 +1,6 @@
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::measure_definition::{
-    MeasureDefinition, RollingWindow, TimeShiftReference,
-};
+use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
@@ -62,7 +60,10 @@ pub enum MeasureTimeShifts {
 pub struct MeasureSymbol {
     cube_name: String,
     name: String,
-    definition: Rc<dyn MeasureDefinition>,
+    owned_by_cube: bool,
+    measure_type: String,
+    rolling_window: Option<RollingWindow>,
+    is_multi_stage: bool,
     is_reference: bool,
     measure_filters: Vec<Rc<SqlCall>>,
     measure_drill_filters: Vec<Rc<SqlCall>>,
@@ -92,16 +93,23 @@ impl MeasureSymbol {
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         group_by: Option<Vec<Rc<MemberSymbol>>>,
     ) -> Self {
+        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
+        let measure_type = definition.static_data().measure_type.clone();
+        let rolling_window = definition.static_data().rolling_window.clone();
+        let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
         Self {
             cube_name,
             name,
             member_sql,
             is_reference,
             pk_sqls,
-            definition,
+            owned_by_cube,
+            measure_type,
+            rolling_window,
             measure_filters,
             measure_drill_filters,
             measure_order_by,
+            is_multi_stage,
             time_shift,
             is_splitted_source: false,
             reduce_by,
@@ -109,6 +117,161 @@ impl MeasureSymbol {
             group_by,
         }
     }
+
+    pub fn new_patched(
+        &self,
+        new_measure_type: Option<String>,
+        add_filters: Vec<Rc<SqlCall>>,
+    ) -> Result<Self, CubeError> {
+        let result_measure_type = if let Some(new_measure_type) = new_measure_type {
+            match self.measure_type.as_str() {
+                "sum" | "avg" | "min" | "max" => match new_measure_type.as_str() {
+                    "sum" | "avg" | "min" | "max" | "count_distinct" | "count_distinct_approx" => {}
+                    _ => {
+                        return Err(CubeError::user(format!(
+                            "Unsupported measure type replacement for {}: {} => {}",
+                            self.name, self.measure_type, new_measure_type
+                        )))
+                    }
+                },
+                "count_distinct" | "count_distinct_approx" => match new_measure_type.as_str() {
+                    "count_distinct" | "count_distinct_approx" => {}
+                    _ => {
+                        return Err(CubeError::user(format!(
+                            "Unsupported measure type replacement for {}: {} => {}",
+                            self.name, self.measure_type, new_measure_type
+                        )))
+                    }
+                },
+
+                _ => {
+                    return Err(CubeError::user(format!(
+                        "Unsupported measure type replacement for {}: {} => {}",
+                        self.name, self.measure_type, new_measure_type
+                    )))
+                }
+            }
+            new_measure_type
+        } else {
+            self.measure_type.clone()
+        };
+
+        let mut measure_filters = self.measure_filters.clone();
+        if !add_filters.is_empty() {
+            match result_measure_type.as_str() {
+                "sum"
+                | "avg"
+                | "min"
+                | "max"
+                | "count"
+                | "count_distinct"
+                | "count_distinct_approx" => {}
+                _ => {
+                    return Err(CubeError::user(format!(
+                        "Unsupported additional filters for measure {} type {}",
+                        self.name, result_measure_type
+                    )))
+                }
+            }
+            measure_filters.extend(add_filters.into_iter());
+        }
+        Ok(Self {
+            cube_name: self.cube_name.clone(),
+            name: self.name.clone(),
+            owned_by_cube: self.owned_by_cube,
+            measure_type: result_measure_type,
+            rolling_window: self.rolling_window.clone(),
+            is_multi_stage: self.is_multi_stage,
+            is_reference: self.is_reference,
+            measure_filters,
+            measure_drill_filters: self.measure_drill_filters.clone(),
+            time_shift: self.time_shift.clone(),
+            measure_order_by: self.measure_order_by.clone(),
+            reduce_by: self.reduce_by.clone(),
+            add_group_by: self.add_group_by.clone(),
+            group_by: self.group_by.clone(),
+            member_sql: self.member_sql.clone(),
+            pk_sqls: self.pk_sqls.clone(),
+            is_splitted_source: self.is_splitted_source,
+        })
+    }
+    /*
+        let resultMeasureType = source.type;
+    if (newMeasureType !== null) {
+      switch (source.type) {
+        case 'sum':
+        case 'avg':
+        case 'min':
+        case 'max':
+          switch (newMeasureType) {
+            case 'sum':
+            case 'avg':
+            case 'min':
+            case 'max':
+            case 'count_distinct':
+            case 'count_distinct_approx':
+              // Can change from avg/... to count_distinct
+              // Latter does not care what input value is
+              // ok, do nothing
+              break;
+            default:
+              throw new UserError(
+                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+              );
+          }
+          break;
+        case 'count_distinct':
+        case 'count_distinct_approx':
+          switch (newMeasureType) {
+            case 'count_distinct':
+            case 'count_distinct_approx':
+              // ok, do nothing
+              break;
+            default:
+              // Can not change from count_distinct to avg/...
+              // Latter do care what input value is, and original measure can be defined on strings
+              throw new UserError(
+                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+              );
+          }
+          break;
+        default:
+          // Can not change from string, time, boolean, number
+          // Aggregation is already included in SQL, it's hard to patch that
+          // Can not change from count
+          // There's no SQL at all
+          throw new UserError(
+            `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+          );
+      }
+
+      resultMeasureType = newMeasureType;
+    }
+
+    const resultFilters = source.filters ?? [];
+
+    if (addFilters.length > 0) {
+      switch (resultMeasureType) {
+        case 'sum':
+        case 'avg':
+        case 'min':
+        case 'max':
+        case 'count':
+        case 'count_distinct':
+        case 'count_distinct_approx':
+          // ok, do nothing
+          break;
+        default:
+          // Can not add filters to string, time, boolean, number
+          // Aggregation is already included in SQL, it's hard to patch that
+          throw new UserError(
+            `Unsupported additional filters for measure ${sourceMeasure} type ${source.type}`
+          );
+      }
+
+      resultFilters.push(...addFilters);
+    }
+     */
 
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.cube_name, self.name)
@@ -127,7 +290,7 @@ impl MeasureSymbol {
     }
 
     pub fn is_calculated(&self) -> bool {
-        Self::is_calculated_type(&self.definition.static_data().measure_type)
+        Self::is_calculated_type(&self.measure_type)
     }
 
     pub fn is_calculated_type(measure_type: &str) -> bool {
@@ -230,11 +393,18 @@ impl MeasureSymbol {
         cubes
     }
 
+    pub fn can_used_as_addictive_in_multplied(&self) -> bool {
+        if &self.measure_type == "countDistinct" || &self.measure_type == "countDistinctApprox" {
+            true
+        } else if &self.measure_type == "count" && self.member_sql.is_none() {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn owned_by_cube(&self) -> bool {
-        self.definition()
-            .static_data()
-            .owned_by_cube
-            .unwrap_or(true)
+        self.owned_by_cube
     }
 
     pub fn is_reference(&self) -> bool {
@@ -253,11 +423,11 @@ impl MeasureSymbol {
     }
 
     pub fn measure_type(&self) -> &String {
-        &self.definition.static_data().measure_type
+        &self.measure_type
     }
 
     pub fn rolling_window(&self) -> &Option<RollingWindow> {
-        &self.definition.static_data().rolling_window
+        &self.rolling_window
     }
 
     pub fn is_rolling_window(&self) -> bool {
@@ -284,10 +454,6 @@ impl MeasureSymbol {
         &self.measure_order_by
     }
 
-    pub fn definition(&self) -> Rc<dyn MeasureDefinition> {
-        self.definition.clone()
-    }
-
     pub fn reduce_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
         &self.reduce_by
     }
@@ -300,12 +466,8 @@ impl MeasureSymbol {
         &self.group_by
     }
 
-    pub fn time_shift_references(&self) -> &Option<Vec<TimeShiftReference>> {
-        &self.definition.static_data().time_shift_references
-    }
-
     pub fn is_multi_stage(&self) -> bool {
-        self.definition.static_data().multi_stage.unwrap_or(false)
+        self.is_multi_stage
     }
 
     pub fn cube_name(&self) -> &String {
