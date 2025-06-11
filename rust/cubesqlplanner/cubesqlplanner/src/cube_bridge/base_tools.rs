@@ -1,4 +1,5 @@
 use super::base_query_options::FilterItem;
+use super::driver_tools::{DriverTools, NativeDriverTools};
 use super::filter_group::{FilterGroup, NativeFilterGroup};
 use super::filter_params::{FilterParams, NativeFilterParams};
 use super::pre_aggregation_obj::{NativePreAggregationObj, PreAggregationObj};
@@ -16,12 +17,7 @@ use std::rc::Rc;
 
 #[nativebridge::native_bridge]
 pub trait BaseTools {
-    fn convert_tz(&self, field: String) -> Result<String, CubeError>;
-    fn time_grouped_column(
-        &self,
-        granularity: String,
-        dimension: String,
-    ) -> Result<String, CubeError>;
+    fn driver_tools(&self, external: bool) -> Result<Rc<dyn DriverTools>, CubeError>;
     fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError>;
     fn security_context_for_rust(&self) -> Result<Rc<dyn SecurityContext>, CubeError>;
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError>;
@@ -33,10 +29,6 @@ pub trait BaseTools {
         &self,
         used_filters: Option<Vec<FilterItem>>,
     ) -> Result<Rc<dyn FilterGroup>, CubeError>;
-    fn timestamp_precision(&self) -> Result<u32, CubeError>;
-    fn time_stamp_cast(&self, field: String) -> Result<String, CubeError>; //TODO move to templates
-    fn date_time_cast(&self, field: String) -> Result<String, CubeError>; //TODO move to templates
-    fn in_db_time_zone(&self, date: String) -> Result<String, CubeError>;
     fn generate_time_series(
         &self,
         granularity: String,
@@ -49,23 +41,8 @@ pub trait BaseTools {
         origin: String,
     ) -> Result<Vec<Vec<String>>, CubeError>;
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
-    fn subtract_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
-    fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
-    fn add_timestamp_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
     fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError>;
     fn interval_and_minimal_time_unit(&self, interval: String) -> Result<Vec<String>, CubeError>;
-    //===== TODO Move to templates
-    fn hll_init(&self, sql: String) -> Result<String, CubeError>;
-    fn hll_merge(&self, sql: String) -> Result<String, CubeError>;
-    fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError>;
-    fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError>;
-    fn date_bin(
-        &self,
-        interval: String,
-        source: String,
-        origin: String,
-    ) -> Result<String, CubeError>;
-
     fn get_pre_aggregation_by_name(
         &self,
         cube_name: String,

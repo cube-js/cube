@@ -52,9 +52,7 @@ impl RegularRollingWindowJoinCondition {
             };
 
             let trailing_start = if let Some(trailing_interval) = &self.trailing_interval {
-                templates
-                    .base_tools()
-                    .subtract_interval(start_date, trailing_interval.clone())?
+                templates.subtract_interval(start_date, trailing_interval.clone())?
             } else {
                 start_date
             };
@@ -72,9 +70,7 @@ impl RegularRollingWindowJoinCondition {
             };
 
             let leading_end = if let Some(leading_interval) = &self.leading_interval {
-                templates
-                    .base_tools()
-                    .add_interval(end_date, leading_interval.clone())?
+                templates.add_interval(end_date, leading_interval.clone())?
             } else {
                 end_date
             };
@@ -121,7 +117,7 @@ pub struct ToDateRollingWindowJoinCondition {
     time_series_source: String,
     granularity: String,
     time_dimension: Expr,
-    query_tools: Rc<QueryTools>,
+    _query_tools: Rc<QueryTools>,
 }
 
 impl ToDateRollingWindowJoinCondition {
@@ -135,7 +131,7 @@ impl ToDateRollingWindowJoinCondition {
             time_series_source,
             granularity,
             time_dimension,
-            query_tools,
+            _query_tools: query_tools,
         }
     }
 
@@ -150,10 +146,7 @@ impl ToDateRollingWindowJoinCondition {
             templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
         let date_to =
             templates.column_reference(&Some(self.time_series_source.clone()), "date_from")?;
-        let grouped_from = self
-            .query_tools
-            .base_tools()
-            .time_grouped_column(self.granularity.clone(), date_from)?;
+        let grouped_from = templates.time_grouped_column(self.granularity.clone(), date_from)?;
         let result = format!("{date_column} >= {grouped_from} and {date_column} <= {date_to}");
         Ok(result)
     }
