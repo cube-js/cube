@@ -530,14 +530,15 @@ export class CubeEvaluator extends CubeSymbols {
       if (member.sql && !member.subQuery) {
         const funcArgs = this.funcArguments(member.sql);
         const { cubeReferencesUsed, evaluatedSql, pathReferencesUsed } = this.collectUsedCubeReferences(cube.name, member.sql);
-        // We won't check for FILTER_PARAMS here as it shouldn't affect ownership and it should obey the same reference rules.
+        // We won't check for FILTER_PARAMS here as it shouldn't affect ownership, and it should obey the same reference rules.
         // To affect ownership FILTER_PARAMS can be declared as `${FILTER_PARAMS.Foo.bar.filter(`${Foo.bar}`)}`.
         // It isn't owned if there are non {CUBE} references
         if (funcArgs.length > 0 && cubeReferencesUsed.length === 0) {
           ownedByCube = false;
         }
         // Aliases one to one some another member as in case of views
-        if (!ownedByCube && !member.filters && CubeSymbols.isCalculatedMeasureType(member.type) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
+        // Note: Segments do not have type set
+        if (!ownedByCube && !member.filters && (!member.type || CubeSymbols.isCalculatedMeasureType(member.type)) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
           aliasMember = this.pathFromArray(pathReferencesUsed[0]);
         }
         const foreignCubes = cubeReferencesUsed.filter(usedCube => usedCube !== cube.name);
