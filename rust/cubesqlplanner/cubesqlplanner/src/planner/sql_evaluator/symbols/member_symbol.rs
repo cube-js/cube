@@ -197,6 +197,16 @@ impl MemberSymbol {
         }
     }
 
+    pub fn as_member_expression(&self) -> Result<&MemberExpressionSymbol, CubeError> {
+        match self {
+            Self::MemberExpression(m) => Ok(m),
+            _ => Err(CubeError::internal(format!(
+                "{} is not a member expression",
+                self.full_name()
+            ))),
+        }
+    }
+
     pub fn alias_suffix(&self) -> Option<String> {
         match self {
             Self::TimeDimension(d) => Some(d.alias_suffix()),

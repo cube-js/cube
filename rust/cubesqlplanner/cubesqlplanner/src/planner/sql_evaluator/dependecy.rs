@@ -88,7 +88,7 @@ impl<'a> DependenciesBuilder<'a> {
     ) -> Result<Vec<Dependency>, CubeError> {
         let call_deps = if member_sql.need_deps_resolve() {
             self.cube_evaluator
-                .resolve_symbols_call_deps(cube_name.clone(), member_sql)?
+                .resolve_symbols_call_deps(cube_name.clone(), member_sql.clone())?
         } else {
             vec![]
         };
@@ -104,13 +104,13 @@ impl<'a> DependenciesBuilder<'a> {
                 result.push(context_dep);
                 continue;
             }
-            if childs[i].is_empty() {
+            if self.check_cube_exists(&dep.name)? {
+                let dep = self.build_cube_dependency(&cube_name, i, &call_deps, &childs)?;
+                result.push(Dependency::CubeDependency(dep));
+            } else if childs[i].is_empty() {
                 result.push(Dependency::SymbolDependency(
                     self.build_evaluator(&cube_name, &dep.name)?,
                 ));
-            } else if self.check_cube_exists(&dep.name)? {
-                let dep = self.build_cube_dependency(&cube_name, i, &call_deps, &childs)?;
-                result.push(Dependency::CubeDependency(dep));
             } else {
                 //Assuming this is a time dimension with an explicit granularity
                 let dep =
@@ -288,7 +288,9 @@ impl<'a> DependenciesBuilder<'a> {
         name: &String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let dep_full_name = format!("{}.{}", cube_name, name);
-        self.compiler
-            .add_auto_resolved_member_evaluator(dep_full_name)
+        let res = self
+            .compiler
+            .add_auto_resolved_member_evaluator(dep_full_name.clone())?;
+        Ok(res)
     }
 }

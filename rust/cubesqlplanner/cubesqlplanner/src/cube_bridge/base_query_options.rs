@@ -1,4 +1,5 @@
 use super::join_graph::{JoinGraph, NativeJoinGraph};
+use super::join_hints::JoinHintItem;
 use super::options_member::OptionsMember;
 use crate::cube_bridge::base_tools::{BaseTools, NativeBaseTools};
 use crate::cube_bridge::evaluator::{CubeEvaluator, NativeCubeEvaluator};
@@ -81,4 +82,6 @@ pub trait BaseQueryOptions {
     fn base_tools(&self) -> Result<Rc<dyn BaseTools>, CubeError>;
     #[nbridge(field)]
     fn join_graph(&self) -> Result<Rc<dyn JoinGraph>, CubeError>;
+    #[nbridge(field, optional, vec)]
+    fn join_hints(&self) -> Result<Option<Vec<JoinHintItem>>, CubeError>;
 }

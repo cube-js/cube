@@ -806,6 +806,7 @@ export class BaseQuery {
       exportAnnotatedSql: exportAnnotatedSql === true,
       preAggregationQuery: this.options.preAggregationQuery,
       totalQuery: this.options.totalQuery,
+      joinHints: this.options.joinHints,
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);

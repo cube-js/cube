@@ -65,6 +65,7 @@ pub struct MeasureSymbol {
     rolling_window: Option<RollingWindow>,
     is_multi_stage: bool,
     is_reference: bool,
+    is_view: bool,
     measure_filters: Vec<Rc<SqlCall>>,
     measure_drill_filters: Vec<Rc<SqlCall>>,
     time_shift: Option<MeasureTimeShifts>,
@@ -83,6 +84,7 @@ impl MeasureSymbol {
         name: String,
         member_sql: Option<Rc<SqlCall>>,
         is_reference: bool,
+        is_view: bool,
         pk_sqls: Vec<Rc<SqlCall>>,
         definition: Rc<dyn MeasureDefinition>,
         measure_filters: Vec<Rc<SqlCall>>,
@@ -102,6 +104,7 @@ impl MeasureSymbol {
             name,
             member_sql,
             is_reference,
+            is_view,
             pk_sqls,
             owned_by_cube,
             measure_type,
@@ -183,6 +186,7 @@ impl MeasureSymbol {
             rolling_window: self.rolling_window.clone(),
             is_multi_stage: self.is_multi_stage,
             is_reference: self.is_reference,
+            is_view: self.is_view,
             measure_filters,
             measure_drill_filters: self.measure_drill_filters.clone(),
             time_shift: self.time_shift.clone(),
@@ -195,83 +199,6 @@ impl MeasureSymbol {
             is_splitted_source: self.is_splitted_source,
         })
     }
-    /*
-        let resultMeasureType = source.type;
-    if (newMeasureType !== null) {
-      switch (source.type) {
-        case 'sum':
-        case 'avg':
-        case 'min':
-        case 'max':
-          switch (newMeasureType) {
-            case 'sum':
-            case 'avg':
-            case 'min':
-            case 'max':
-            case 'count_distinct':
-            case 'count_distinct_approx':
-              // Can change from avg/... to count_distinct
-              // Latter does not care what input value is
-              // ok, do nothing
-              break;
-            default:
-              throw new UserError(
-                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
-              );
-          }
-          break;
-        case 'count_distinct':
-        case 'count_distinct_approx':
-          switch (newMeasureType) {
-            case 'count_distinct':
-            case 'count_distinct_approx':
-              // ok, do nothing
-              break;
-            default:
-              // Can not change from count_distinct to avg/...
-              // Latter do care what input value is, and original measure can be defined on strings
-              throw new UserError(
-                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
-              );
-          }
-          break;
-        default:
-          // Can not change from string, time, boolean, number
-          // Aggregation is already included in SQL, it's hard to patch that
-          // Can not change from count
-          // There's no SQL at all
-          throw new UserError(
-            `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
-          );
-      }
-
-      resultMeasureType = newMeasureType;
-    }
-
-    const resultFilters = source.filters ?? [];
-
-    if (addFilters.length > 0) {
-      switch (resultMeasureType) {
-        case 'sum':
-        case 'avg':
-        case 'min':
-        case 'max':
-        case 'count':
-        case 'count_distinct':
-        case 'count_distinct_approx':
-          // ok, do nothing
-          break;
-        default:
-          // Can not add filters to string, time, boolean, number
-          // Aggregation is already included in SQL, it's hard to patch that
-          throw new UserError(
-            `Unsupported additional filters for measure ${sourceMeasure} type ${source.type}`
-          );
-      }
-
-      resultFilters.push(...addFilters);
-    }
-     */
 
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.cube_name, self.name)
@@ -409,6 +336,10 @@ impl MeasureSymbol {
 
     pub fn is_reference(&self) -> bool {
         self.is_reference
+    }
+
+    pub fn is_view(&self) -> bool {
+        self.is_view
     }
 
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
@@ -716,6 +647,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             name,
             sql,
             is_reference,
+            is_view,
             pk_sqls,
             definition,
             measure_filters,

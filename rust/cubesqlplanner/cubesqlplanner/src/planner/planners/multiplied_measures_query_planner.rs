@@ -67,6 +67,10 @@ impl MultipliedMeasuresQueryPlanner {
             .into_iter()
             .into_group_map_by(|m| m.cube_name().clone())
         {
+            let measures = measures
+                .into_iter()
+                .map(|m| m.measure().clone())
+                .collect_vec();
             let join_multi_fact_groups = self
                 .query_properties
                 .compute_join_multi_fact_groups_with_measures(&measures)?;
@@ -91,7 +95,12 @@ impl MultipliedMeasuresQueryPlanner {
             let all_measures = full_key_aggregate_measures
                 .regular_measures
                 .iter()
-                .chain(full_key_aggregate_measures.multiplied_measures.iter())
+                .chain(
+                    full_key_aggregate_measures
+                        .multiplied_measures
+                        .iter()
+                        .map(|m| m.measure()),
+                )
                 .map(|m| m.member_evaluator().clone())
                 .collect_vec();
             let schema = Rc::new(LogicalSchema {

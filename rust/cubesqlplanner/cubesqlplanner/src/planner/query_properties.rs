@@ -1,6 +1,7 @@
 use super::filter::compiler::FilterCompiler;
 use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
+use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
 use crate::planner::sql_evaluator::MemberExpressionExpression;
 
@@ -45,9 +46,29 @@ impl OrderByItem {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct MultipliedMeasure {
+    measure: Rc<BaseMeasure>,
+    cube_name: String, //May differ from cube_name of the measure for a member_expression that refers to a dimension.
+}
+
+impl MultipliedMeasure {
+    pub fn new(measure: Rc<BaseMeasure>, cube_name: String) -> Rc<Self> {
+        Rc::new(Self { measure, cube_name })
+    }
+
+    pub fn measure(&self) -> &Rc<BaseMeasure> {
+        &self.measure
+    }
+
+    pub fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+}
+
 #[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
-    pub multiplied_measures: Vec<Rc<BaseMeasure>>,
+    pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
     pub regular_measures: Vec<Rc<BaseMeasure>>,
     pub multi_stage_measures: Vec<Rc<BaseMeasure>>,
     pub rendered_as_multiplied_measures: HashSet<String>,
@@ -81,6 +102,7 @@ pub struct QueryProperties {
     multi_fact_join_groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>,
     pre_aggregation_query: bool,
     total_query: bool,
+    query_join_hints: Rc<Vec<JoinHintItem>>,
 }
 
 impl QueryProperties {
@@ -350,7 +372,10 @@ impl QueryProperties {
         };
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
 
+        let query_join_hints = Rc::new(options.join_hints()?.unwrap_or_default());
+
         let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
+            query_join_hints.clone(),
             query_tools.clone(),
             &measures,
             &dimensions,
@@ -381,6 +406,7 @@ impl QueryProperties {
             multi_fact_join_groups,
             pre_aggregation_query,
             total_query,
+            query_join_hints,
         }))
     }
 
@@ -400,6 +426,7 @@ impl QueryProperties {
         ungrouped: bool,
         pre_aggregation_query: bool,
         total_query: bool,
+        query_join_hints: Rc<Vec<JoinHintItem>>,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -408,6 +435,7 @@ impl QueryProperties {
         };
 
         let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
+            query_join_hints.clone(),
             query_tools.clone(),
             &measures,
             &dimensions,
@@ -435,6 +463,7 @@ impl QueryProperties {
             multi_fact_join_groups,
             pre_aggregation_query,
             total_query,
+            query_join_hints,
         }))
     }
 
@@ -443,6 +472,7 @@ impl QueryProperties {
         measures: &Vec<Rc<BaseMeasure>>,
     ) -> Result<Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>, CubeError> {
         Self::compute_join_multi_fact_groups(
+            self.query_join_hints.clone(),
             self.query_tools.clone(),
             measures,
             &self.dimensions,
@@ -459,6 +489,7 @@ impl QueryProperties {
     }
 
     pub fn compute_join_multi_fact_groups(
+        query_join_hints: Rc<Vec<JoinHintItem>>,
         query_tools: Rc<QueryTools>,
         measures: &Vec<Rc<BaseMeasure>>,
         dimensions: &Vec<Rc<BaseDimension>>,
@@ -487,7 +518,7 @@ impl QueryProperties {
             .cached_data_mut()
             .join_hints_for_filter_item_vec(&measures_filters)?;
 
-        let mut dimension_and_filter_join_hints_concat = Vec::new();
+        let mut dimension_and_filter_join_hints_concat = vec![query_join_hints];
 
         dimension_and_filter_join_hints_concat.extend(dimensions_join_hints.into_iter());
         dimension_and_filter_join_hints_concat.extend(time_dimensions_join_hints.into_iter());
@@ -606,6 +637,10 @@ impl QueryProperties {
 
     pub fn row_limit(&self) -> Option<usize> {
         self.row_limit
+    }
+
+    pub fn query_join_hints(&self) -> &Rc<Vec<JoinHintItem>> {
+        &self.query_join_hints
     }
 
     pub fn offset(&self) -> Option<usize> {
@@ -862,7 +897,9 @@ impl QueryProperties {
                             .insert(item.measure.full_name());
                     }
                     if item.multiplied && !item.measure.can_used_as_addictive_in_multplied() {
-                        result.multiplied_measures.push(item.measure.clone());
+                        result
+                            .multiplied_measures
+                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_name));
                     } else {
                         result.regular_measures.push(item.measure.clone());
                     }

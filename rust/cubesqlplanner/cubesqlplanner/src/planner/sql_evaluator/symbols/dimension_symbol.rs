@@ -33,6 +33,7 @@ pub struct DimensionSymbol {
     case: Option<DimensionCaseDefinition>,
     definition: Rc<dyn DimensionDefinition>,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
+    is_view: bool,
 }
 
 impl DimensionSymbol {
@@ -41,6 +42,7 @@ impl DimensionSymbol {
         name: String,
         member_sql: Option<Rc<SqlCall>>,
         is_reference: bool,
+        is_view: bool,
         latitude: Option<Rc<SqlCall>>,
         longitude: Option<Rc<SqlCall>>,
         case: Option<DimensionCaseDefinition>,
@@ -55,6 +57,7 @@ impl DimensionSymbol {
             longitude,
             definition,
             case,
+            is_view,
         }
     }
 
@@ -114,6 +117,10 @@ impl DimensionSymbol {
 
     pub fn is_reference(&self) -> bool {
         self.is_reference
+    }
+
+    pub fn is_view(&self) -> bool {
+        self.is_view
     }
 
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
@@ -331,6 +338,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             name,
             sql,
             is_reference,
+            is_view,
             latitude,
             longitude,
             case,
