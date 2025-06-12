@@ -627,7 +627,7 @@ class CubeApi {
         query,
         signal: options?.signal
       }),
-      (response: any) => (Array.isArray(response) ? response.map((body) => new SqlQuery(body)) : new SqlQuery(response)),
+      (response: any) => (Array.isArray(response) ? response.map((body) => new SqlQuery(body.sql)) : new SqlQuery(response.sql)),
       options,
       callback
     );
