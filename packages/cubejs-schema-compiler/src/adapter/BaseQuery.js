@@ -366,6 +366,17 @@ export class BaseQuery {
     try {
       // TODO allJoinHints should contain join hints form pre-agg
       this.join = this.joinGraph.buildJoin(this.allJoinHints);
+      /**
+       * @type {Record<string, string[]>}
+       */
+      const queryJoinGraph = {};
+      for (const { originalFrom, originalTo } of (this.join?.joins || [])) {
+        if (!queryJoinGraph[originalFrom]) {
+          queryJoinGraph[originalFrom] = [];
+        }
+        queryJoinGraph[originalFrom].push(originalTo);
+      }
+      this.joinGraphPaths = queryJoinGraph || {};
     } catch (e) {
       if (this.useNativeSqlPlanner) {
         // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
@@ -4965,7 +4976,10 @@ export class BaseQuery {
    */
   backAliasMembers(members) {
     const query = this;
-    return Object.fromEntries(members.flatMap(
+
+    const buildJoinPath = this.buildJoinPathFn();
+
+    const aliases = Object.fromEntries(members.flatMap(
       member => {
         const collectedMembers = query.evaluateSymbolSqlWithContext(
           () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
@@ -4983,5 +4997,83 @@ export class BaseQuery {
           .map(d => [query.cubeEvaluator.byPathAnyType(d).aliasMember, memberPath]);
       }
     ));
+
+    /**
+     * @type {Record<string, string>}
+     */
+    const res = {};
+    for (const [original, alias] of Object.entries(aliases)) {
+      const [cube, field] = original.split('.');
+      const path = buildJoinPath(cube);
+
+      const [aliasCube, aliasField] = alias.split('.');
+      const aliasPath = aliasCube !== cube ? buildJoinPath(aliasCube) : path;
+
+      if (path) {
+        res[`${path}.${field}`] = aliasPath ? `${aliasPath}.${aliasField}` : alias;
+      }
+
+      // Aliases might come from proxied members, in such cases
+      // we need to map them to originals too
+      if (aliasPath) {
+        res[original] = `${aliasPath}.${aliasField}`;
+      }
+    }
+
+    return res;
+  }
+
+  buildJoinPathFn() {
+    const query = this;
+    const { root } = this.join || {};
+
+    return (target) => {
+      const visited = new Set();
+      const path = [];
+
+      /**
+       * @param {string} node
+       * @returns {boolean}
+       */
+      function dfs(node) {
+        if (node === target) {
+          path.push(node);
+          return true;
+        }
+
+        if (visited.has(node)) return false;
+        visited.add(node);
+
+        const neighbors = query.joinGraphPaths[node] || [];
+        for (const neighbor of neighbors) {
+          if (dfs(neighbor)) {
+            path.unshift(node);
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      return dfs(root) ? path.join('.') : null;
+    };
+  }
+
+  resolveFullMemberPathFn() {
+    const { root: queryJoinRoot } = this.join || {};
+
+    const buildJoinPath = this.buildJoinPathFn();
+
+    return (member) => {
+      const [cube, field] = member.split('.');
+      if (!cube || !field) return member;
+
+      if (cube === queryJoinRoot.root) {
+        return member;
+      }
+
+      const path = buildJoinPath(cube);
+      return path ? `${path}.${field}` : member;
+    };
   }
 }
