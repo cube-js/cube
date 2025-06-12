@@ -2380,7 +2380,7 @@ describe('PreAggregations', () => {
         [
           { visitors__source: 'google', vc__count: '1' },
           { visitors__source: 'some', vc__count: '5' },
-          { visitors__source: null, vc__count: null },
+          { visitors__source: null, vc__count: '0' },
         ],
       );
     });
@@ -2421,7 +2421,7 @@ describe('PreAggregations', () => {
           { visitors__source: 'google', cards__visitor_id: 3, vc__count: '1' },
           { visitors__source: 'some', cards__visitor_id: 1, vc__count: '3' },
           { visitors__source: 'some', cards__visitor_id: null, vc__count: '2' },
-          { visitors__source: null, cards__visitor_id: null, vc__count: null },
+          { visitors__source: null, cards__visitor_id: null, vc__count: '0' },
         ],
       );
     });
