@@ -307,7 +307,7 @@ impl MultipliedMeasuresQueryPlanner {
         let query = SimpleQuery {
             schema,
             filter: logical_filter,
-            offset: self.query_properties.offset(),
+            offset: None,
             limit: None,
             ungrouped: self.query_properties.ungrouped(),
             dimension_subqueries: subquery_dimension_queries,

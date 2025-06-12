@@ -43,11 +43,7 @@ impl SqlNode for TimeShiftSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() && ev.dimension_type() == "time" {
-                    let mut interval = self
-                        .shifts
-                        .common_time_shift
-                        .clone()
-                        .unwrap_or_default();
+                    let mut interval = self.shifts.common_time_shift.clone().unwrap_or_default();
                     if let Some(shift) = self.shifts.dimensions_shifts.get(&ev.full_name()) {
                         interval += &shift.interval;
                     }
