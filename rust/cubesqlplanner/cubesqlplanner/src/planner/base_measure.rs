@@ -139,7 +139,7 @@ impl BaseMeasure {
             query_tools.base_tools().clone(),
         )?;
         let full_name = member_expression_symbol.full_name();
-        let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
+        let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);
         let default_alias = PlanSqlTemplates::alias_name(&name);
         Ok(Rc::new(Self {
             measure: full_name,
@@ -215,11 +215,11 @@ impl BaseMeasure {
         self.is_rolling_window() || self.is_running_total()
     }
 
-    pub fn measure_type(&self) -> &str {
+    pub fn measure_type(&self) -> String {
         if let Ok(measure_symbol) = self.member_evaluator.as_measure() {
-            measure_symbol.measure_type()
+            measure_symbol.measure_type().clone()
         } else {
-            "number"
+            "number".to_string()
         }
     }
 

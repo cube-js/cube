@@ -23,21 +23,21 @@ impl TimeDimensionSymbol {
         granularity: Option<String>,
         granularity_obj: Option<Granularity>,
         date_range: Option<(String, String)>,
-    ) -> Self {
+    ) -> Rc<Self> {
         let name_suffix = if let Some(granularity) = &granularity {
             granularity.clone()
         } else {
             "day".to_string()
         };
         let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
-        Self {
+        Rc::new(Self {
             base_symbol,
             granularity,
             granularity_obj,
             full_name,
             date_range,
             alias_suffix: name_suffix,
-        }
+        })
     }
 
     pub fn base_symbol(&self) -> &Rc<MemberSymbol> {
@@ -84,7 +84,7 @@ impl TimeDimensionSymbol {
                             self.granularity_obj.clone(),
                             self.date_range.clone(),
                         );
-                        Rc::new(MemberSymbol::TimeDimension(result))
+                        MemberSymbol::new_time_dimension(result)
                     } else {
                         s.clone()
                     }
@@ -118,7 +118,7 @@ impl TimeDimensionSymbol {
                 self.granularity_obj.clone(),
                 self.date_range.clone(),
             );
-            Some(Rc::new(MemberSymbol::TimeDimension(new_time_dim)))
+            Some(MemberSymbol::new_time_dimension(new_time_dim))
         } else {
             None
         }

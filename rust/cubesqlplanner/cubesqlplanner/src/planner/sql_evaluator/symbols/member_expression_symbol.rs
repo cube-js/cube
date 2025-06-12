@@ -1,9 +1,11 @@
 use super::MemberSymbol;
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 pub enum MemberExpressionExpression {
@@ -27,20 +29,20 @@ impl MemberExpressionSymbol {
         expression: MemberExpressionExpression,
         definition: Option<String>,
         base_tools: Rc<dyn BaseTools>,
-    ) -> Result<Self, CubeError> {
+    ) -> Result<Rc<Self>, CubeError> {
         let is_reference = match &expression {
             MemberExpressionExpression::SqlCall(sql_call) => {
                 sql_call.is_direct_reference(base_tools.clone())?
             }
             MemberExpressionExpression::PatchedSymbol(_symbol) => false,
         };
-        Ok(Self {
+        Ok(Rc::new(Self {
             cube_name,
             name,
             expression,
             definition,
             is_reference,
-        })
+        }))
     }
 
     pub fn evaluate_sql(
@@ -104,6 +106,21 @@ impl MemberExpressionSymbol {
             }
         }
         deps
+    }
+
+    pub fn cube_names_if_dimension_only_expression(
+        self: Rc<Self>,
+    ) -> Result<Option<Vec<String>>, CubeError> {
+        let childs = member_childs(&MemberSymbol::new_member_expression(self), true)?;
+        if childs.iter().any(|s| !s.is_dimension()) {
+            Ok(None)
+        } else {
+            let cube_names = childs
+                .into_iter()
+                .map(|child| child.cube_name())
+                .collect_vec();
+            Ok(Some(cube_names))
+        }
     }
 
     pub fn cube_name(&self) -> &String {

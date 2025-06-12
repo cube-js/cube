@@ -9,14 +9,13 @@ use crate::planner::{BaseMember, MemberSymbolRef};
 use std::fmt::Debug;
 use std::rc::Rc;
 
-#[allow(clippy::large_enum_variant)]
 pub enum MemberSymbol {
-    Dimension(DimensionSymbol),
-    TimeDimension(TimeDimensionSymbol),
-    Measure(MeasureSymbol),
-    CubeName(CubeNameSymbol),
-    CubeTable(CubeTableSymbol),
-    MemberExpression(MemberExpressionSymbol),
+    Dimension(Rc<DimensionSymbol>),
+    TimeDimension(Rc<TimeDimensionSymbol>),
+    Measure(Rc<MeasureSymbol>),
+    CubeName(Rc<CubeNameSymbol>),
+    CubeTable(Rc<CubeTableSymbol>),
+    MemberExpression(Rc<MemberExpressionSymbol>),
 }
 
 impl Debug for MemberSymbol {
@@ -39,20 +38,28 @@ impl Debug for MemberSymbol {
 }
 
 impl MemberSymbol {
-    pub fn new_measure(symbol: MeasureSymbol) -> Rc<Self> {
+    pub fn new_measure(symbol: Rc<MeasureSymbol>) -> Rc<Self> {
         Rc::new(Self::Measure(symbol))
     }
 
-    pub fn new_dimension(symbol: DimensionSymbol) -> Rc<Self> {
+    pub fn new_dimension(symbol: Rc<DimensionSymbol>) -> Rc<Self> {
         Rc::new(Self::Dimension(symbol))
     }
 
-    pub fn new_cube_name(symbol: CubeNameSymbol) -> Rc<Self> {
+    pub fn new_cube_name(symbol: Rc<CubeNameSymbol>) -> Rc<Self> {
         Rc::new(Self::CubeName(symbol))
     }
 
-    pub fn new_cube_table(symbol: CubeTableSymbol) -> Rc<Self> {
+    pub fn new_cube_table(symbol: Rc<CubeTableSymbol>) -> Rc<Self> {
         Rc::new(Self::CubeTable(symbol))
+    }
+
+    pub fn new_member_expression(symbol: Rc<MemberExpressionSymbol>) -> Rc<Self> {
+        Rc::new(Self::MemberExpression(symbol))
+    }
+
+    pub fn new_time_dimension(symbol: Rc<TimeDimensionSymbol>) -> Rc<Self> {
+        Rc::new(Self::TimeDimension(symbol))
     }
 
     pub fn full_name(&self) -> String {
@@ -167,9 +174,9 @@ impl MemberSymbol {
         }
     }
 
-    pub fn as_time_dimension(&self) -> Result<&TimeDimensionSymbol, CubeError> {
+    pub fn as_time_dimension(&self) -> Result<Rc<TimeDimensionSymbol>, CubeError> {
         match self {
-            Self::TimeDimension(d) => Ok(d),
+            Self::TimeDimension(d) => Ok(d.clone()),
             _ => Err(CubeError::internal(format!(
                 "{} is not a time dimension",
                 self.full_name()
@@ -177,9 +184,9 @@ impl MemberSymbol {
         }
     }
 
-    pub fn as_dimension(&self) -> Result<&DimensionSymbol, CubeError> {
+    pub fn as_dimension(&self) -> Result<Rc<DimensionSymbol>, CubeError> {
         match self {
-            Self::Dimension(d) => Ok(d),
+            Self::Dimension(d) => Ok(d.clone()),
             _ => Err(CubeError::internal(format!(
                 "{} is not a dimension",
                 self.full_name()
@@ -187,9 +194,9 @@ impl MemberSymbol {
         }
     }
 
-    pub fn as_measure(&self) -> Result<&MeasureSymbol, CubeError> {
+    pub fn as_measure(&self) -> Result<Rc<MeasureSymbol>, CubeError> {
         match self {
-            Self::Measure(m) => Ok(m),
+            Self::Measure(m) => Ok(m.clone()),
             _ => Err(CubeError::internal(format!(
                 "{} is not a measure",
                 self.full_name()
@@ -197,9 +204,9 @@ impl MemberSymbol {
         }
     }
 
-    pub fn as_member_expression(&self) -> Result<&MemberExpressionSymbol, CubeError> {
+    pub fn as_member_expression(&self) -> Result<Rc<MemberExpressionSymbol>, CubeError> {
         match self {
-            Self::MemberExpression(m) => Ok(m),
+            Self::MemberExpression(m) => Ok(m.clone()),
             _ => Err(CubeError::internal(format!(
                 "{} is not a member expression",
                 self.full_name()

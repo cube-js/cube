@@ -132,7 +132,7 @@ impl BaseDimension {
             query_tools.base_tools().clone(),
         )?;
         let full_name = member_expression_symbol.full_name();
-        let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
+        let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);
         let default_alias = PlanSqlTemplates::alias_name(&name);
 
         Ok(Rc::new(Self {

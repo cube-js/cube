@@ -177,13 +177,12 @@ impl<'a> DependenciesBuilder<'a> {
                 &dep.name,
                 Some(granularity.clone()),
             )? {
-                let member_evaluator =
-                    Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
-                        base_evaluator.clone(),
-                        Some(granularity.clone()),
-                        Some(granularity_obj),
-                        None,
-                    )));
+                let member_evaluator = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+                    base_evaluator.clone(),
+                    Some(granularity.clone()),
+                    Some(granularity_obj),
+                    None,
+                ));
                 granularities.insert(granularity.clone(), member_evaluator);
             } else {
                 return Err(CubeError::user(format!(

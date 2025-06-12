@@ -37,7 +37,7 @@ impl BaseSegment {
             query_tools.base_tools().clone(),
         )?;
         let full_name = full_name.unwrap_or(member_expression_symbol.full_name());
-        let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
+        let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);
 
         Ok(Rc::new(Self {
             full_name,

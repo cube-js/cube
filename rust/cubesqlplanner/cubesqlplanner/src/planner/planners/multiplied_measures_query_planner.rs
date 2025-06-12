@@ -200,7 +200,17 @@ impl MultipliedMeasuresQueryPlanner {
         key_cube_name: &String,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
-            let cubes = collect_cube_names(measure.member_evaluator())?;
+            let member_expression_over_dimensions_cubes =
+                if let Ok(member_expression) = measure.member_evaluator().as_member_expression() {
+                    member_expression.cube_names_if_dimension_only_expression()?
+                } else {
+                    None
+                };
+            let cubes = if let Some(cubes) = member_expression_over_dimensions_cubes {
+                cubes
+            } else {
+                collect_cube_names(measure.member_evaluator())?
+            };
             let join_hints = collect_join_hints(measure.member_evaluator())?;
             if cubes.iter().any(|cube| cube != key_cube_name) {
                 let measures_join = self.query_tools.join_graph().build_join(join_hints)?;

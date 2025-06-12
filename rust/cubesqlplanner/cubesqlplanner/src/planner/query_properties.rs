@@ -225,7 +225,7 @@ impl QueryProperties {
                                     }
                                     let source_measure_compiled = evaluator_compiler.add_measure_evaluator(source_measure.clone())?;
                                     let patched_measure = source_measure_compiled.as_measure()?.new_patched(new_measure_type, filters_to_add)?;
-                                    let patched_symbol = Rc::new(MemberSymbol::Measure(patched_measure));
+                                    let patched_symbol = MemberSymbol::new_measure(patched_measure);
                                     MemberExpressionExpression::PatchedSymbol(patched_symbol)
 
                                 } else {

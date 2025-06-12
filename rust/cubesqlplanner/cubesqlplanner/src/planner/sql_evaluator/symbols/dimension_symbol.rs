@@ -47,8 +47,8 @@ impl DimensionSymbol {
         longitude: Option<Rc<SqlCall>>,
         case: Option<DimensionCaseDefinition>,
         definition: Rc<dyn DimensionDefinition>,
-    ) -> Self {
-        Self {
+    ) -> Rc<Self> {
+        Rc::new(Self {
             cube_name,
             name,
             member_sql,
@@ -58,7 +58,7 @@ impl DimensionSymbol {
             definition,
             case,
             is_view,
-        }
+        })
     }
 
     pub fn evaluate_sql(

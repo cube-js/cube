@@ -94,12 +94,12 @@ impl MeasureSymbol {
         reduce_by: Option<Vec<Rc<MemberSymbol>>>,
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         group_by: Option<Vec<Rc<MemberSymbol>>>,
-    ) -> Self {
+    ) -> Rc<Self> {
         let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
         let measure_type = definition.static_data().measure_type.clone();
         let rolling_window = definition.static_data().rolling_window.clone();
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
-        Self {
+        Rc::new(Self {
             cube_name,
             name,
             member_sql,
@@ -118,14 +118,14 @@ impl MeasureSymbol {
             reduce_by,
             add_group_by,
             group_by,
-        }
+        })
     }
 
     pub fn new_patched(
         &self,
         new_measure_type: Option<String>,
         add_filters: Vec<Rc<SqlCall>>,
-    ) -> Result<Self, CubeError> {
+    ) -> Result<Rc<Self>, CubeError> {
         let result_measure_type = if let Some(new_measure_type) = new_measure_type {
             match self.measure_type.as_str() {
                 "sum" | "avg" | "min" | "max" => match new_measure_type.as_str() {
@@ -178,7 +178,7 @@ impl MeasureSymbol {
             }
             measure_filters.extend(add_filters.into_iter());
         }
-        Ok(Self {
+        Ok(Rc::new(Self {
             cube_name: self.cube_name.clone(),
             name: self.name.clone(),
             owned_by_cube: self.owned_by_cube,
@@ -197,7 +197,7 @@ impl MeasureSymbol {
             member_sql: self.member_sql.clone(),
             pk_sqls: self.pk_sqls.clone(),
             is_splitted_source: self.is_splitted_source,
-        })
+        }))
     }
 
     pub fn full_name(&self) -> String {
