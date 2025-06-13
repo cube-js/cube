@@ -1201,7 +1201,7 @@ describe('PreAggregations', () => {
     });
   });
 
-  it('non-match because of join tree difference', async () => {
+  it('non-match because of join tree difference (through the view)', async () => {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
@@ -1256,6 +1256,33 @@ describe('PreAggregations', () => {
           },
         ]
       );
+    });
+  });
+
+  it('non-match because of requesting only joined cube members', async () => {
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['visitor_checkins.source'],
+      order: [{
+        id: 'visitor_checkins.source'
+      }],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect((<any>query).preAggregations.preAggregationForQuery).toBeUndefined();
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual([
+        {
+          vc__source: 'google',
+        },
+        {
+          vc__source: null,
+        },
+      ]);
     });
   });
 
