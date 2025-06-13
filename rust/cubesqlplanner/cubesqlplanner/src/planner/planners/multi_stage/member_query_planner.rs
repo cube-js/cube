@@ -16,7 +16,7 @@ use std::rc::Rc;
 
 pub struct MultiStageMemberQueryPlanner {
     query_tools: Rc<QueryTools>,
-    _query_properties: Rc<QueryProperties>,
+    query_properties: Rc<QueryProperties>,
     description: Rc<MultiStageQueryDescription>,
 }
 
@@ -28,7 +28,7 @@ impl MultiStageMemberQueryPlanner {
     ) -> Self {
         Self {
             query_tools,
-            _query_properties: query_properties,
+            query_properties,
             description,
         }
     }
@@ -73,6 +73,7 @@ impl MultiStageMemberQueryPlanner {
             true,
             false,
             false,
+            Rc::new(vec![]),
         )?;
 
         let simple_query_planer =
@@ -266,6 +267,7 @@ impl MultiStageMemberQueryPlanner {
             self.description.member().is_ungrupped(),
             false,
             false,
+            self.query_properties.query_join_hints().clone(),
         )?;
 
         let query_planner =

@@ -75,11 +75,11 @@ impl BaseFilter {
         })
     }
 
-    pub fn member_evaluator(&self) -> &Rc<MemberSymbol> {
+    pub fn member_evaluator(&self) -> Rc<MemberSymbol> {
         if let Ok(time_dimension) = self.member_evaluator.as_time_dimension() {
-            time_dimension.base_symbol()
+            time_dimension.base_symbol().clone()
         } else {
-            &self.member_evaluator
+            self.member_evaluator.clone()
         }
     }
 
@@ -395,8 +395,8 @@ impl BaseFilter {
         &self,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<(String, String), CubeError> {
-        let from_expr = format!("min(date_from)");
-        let to_expr = format!("max(date_to)");
+        let from_expr = format!("min({})", plan_templates.quote_identifier("date_from")?);
+        let to_expr = format!("max({})", plan_templates.quote_identifier("date_to")?);
         let alias = format!("value");
         let time_series_cte_name = format!("time_series"); // FIXME May be should be passed as parameter
 

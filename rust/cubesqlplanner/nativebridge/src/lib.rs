@@ -14,6 +14,18 @@ use syn::{
 pub fn native_bridge(args: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
     let mut svc = parse_macro_input!(input as NativeService);
     let args = parse_macro_input!(args with Punctuated::<Meta, syn::Token![,]>::parse_terminated);
+    for arg in args.iter() {
+        match arg {
+            Meta::Path(p) => {
+                if p.is_ident("without_imports") {
+                    svc.without_imports = true;
+                } else {
+                    svc.static_data_type = Some(p.clone())
+                }
+            }
+            _ => {}
+        }
+    }
     if args.len() > 0 {
         let arg = args.first().unwrap();
         match arg {
@@ -29,6 +41,7 @@ struct NativeService {
     ident: Ident,
     methods: Vec<NativeMethod>,
     pub static_data_type: Option<Path>,
+    pub without_imports: bool,
 }
 
 enum NativeMethodType {
@@ -119,6 +132,7 @@ impl Parse for NativeService {
                     ident: trait_item.ident.clone(),
                     methods,
                     static_data_type: None,
+                    without_imports: false,
                 }
             }
             x => {
@@ -373,10 +387,14 @@ impl NativeService {
     }
 
     fn imports(&self) -> proc_macro2::TokenStream {
-        quote! {
-            use cubenativeutils::wrappers::inner_types::InnerTypes;
-            use cubenativeutils::wrappers::object::NativeStruct;
+        let mut imports = quote! {};
+        if !self.without_imports {
+            imports.extend(quote! {
+                use cubenativeutils::wrappers::inner_types::InnerTypes;
+                use cubenativeutils::wrappers::object::NativeStruct;
+            });
         }
+        imports
     }
 
     fn original_trait(&self) -> proc_macro2::TokenStream {

@@ -142,6 +142,7 @@ impl QueryTools {
         };
         let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
             cube_evaluator.clone(),
+            base_tools.clone(),
             timezone.clone(),
         )));
         Ok(Rc::new(Self {

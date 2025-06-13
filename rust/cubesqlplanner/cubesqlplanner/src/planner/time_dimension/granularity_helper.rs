@@ -58,8 +58,10 @@ impl GranularityHelper {
         let first = Ok(dimensions[0].clone());
         dimensions.iter().skip(1).fold(first, |acc, d| match acc {
             Ok(min_dim) => {
-                let min_granularity =
-                    Self::min_granularity(&min_dim.get_granularity(), &d.get_granularity())?;
+                let min_granularity = Self::min_granularity(
+                    &min_dim.resolved_granularity()?,
+                    &d.resolved_granularity()?,
+                )?;
                 if min_granularity == min_dim.get_granularity() {
                     Ok(min_dim)
                 } else {

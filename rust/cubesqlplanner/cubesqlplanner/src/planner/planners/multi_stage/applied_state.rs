@@ -1,12 +1,24 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
-use crate::planner::sql_evaluator::{MeasureTimeShift, MemberSymbol};
-use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
+use crate::planner::sql_evaluator::{DimensionTimeShift, MeasureTimeShifts, MemberSymbol};
+use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension, SqlInterval};
 use itertools::Itertools;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
+
+#[derive(Clone, Default, Debug)]
+pub struct TimeShiftState {
+    pub dimensions_shifts: HashMap<String, DimensionTimeShift>,
+    pub common_time_shift: Option<SqlInterval>,
+}
+
+impl TimeShiftState {
+    pub fn is_empty(&self) -> bool {
+        self.dimensions_shifts.is_empty() && self.common_time_shift.is_none()
+    }
+}
 
 #[derive(Clone)]
 pub struct MultiStageAppliedState {
@@ -16,7 +28,7 @@ pub struct MultiStageAppliedState {
     dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
     segments: Vec<FilterItem>,
-    time_shifts: HashMap<String, MeasureTimeShift>,
+    time_shifts: TimeShiftState,
 }
 
 impl MultiStageAppliedState {
@@ -35,7 +47,7 @@ impl MultiStageAppliedState {
             dimensions_filters,
             measures_filters,
             segments,
-            time_shifts: HashMap::new(),
+            time_shifts: TimeShiftState::default(),
         })
     }
 
@@ -61,17 +73,34 @@ impl MultiStageAppliedState {
             .collect_vec();
     }
 
-    pub fn add_time_shifts(&mut self, time_shifts: Vec<MeasureTimeShift>) {
-        for ts in time_shifts.into_iter() {
-            if let Some(exists) = self.time_shifts.get_mut(&ts.dimension.full_name()) {
-                exists.interval += ts.interval;
-            } else {
-                self.time_shifts.insert(ts.dimension.full_name(), ts);
+    pub fn add_time_shifts(&mut self, time_shifts: MeasureTimeShifts) {
+        match time_shifts {
+            MeasureTimeShifts::Dimensions(dimensions) => {
+                for ts in dimensions.into_iter() {
+                    if let Some(exists) = self
+                        .time_shifts
+                        .dimensions_shifts
+                        .get_mut(&ts.dimension.full_name())
+                    {
+                        exists.interval += ts.interval;
+                    } else {
+                        self.time_shifts
+                            .dimensions_shifts
+                            .insert(ts.dimension.full_name(), ts);
+                    }
+                }
+            }
+            MeasureTimeShifts::Common(interval) => {
+                if let Some(common) = self.time_shifts.common_time_shift.as_mut() {
+                    *common += interval;
+                } else {
+                    self.time_shifts.common_time_shift = Some(interval);
+                }
             }
         }
     }
 
-    pub fn time_shifts(&self) -> &HashMap<String, MeasureTimeShift> {
+    pub fn time_shifts(&self) -> &TimeShiftState {
         &self.time_shifts
     }
 
@@ -314,7 +343,8 @@ impl PartialEq for MultiStageAppliedState {
             && self.time_dimensions_filters == other.time_dimensions_filters
             && self.dimensions_filters == other.dimensions_filters
             && self.measures_filters == other.measures_filters
-            && self.time_shifts == other.time_shifts
+            && self.time_shifts.common_time_shift == other.time_shifts.common_time_shift
+            && self.time_shifts.dimensions_shifts == other.time_shifts.dimensions_shifts
     }
 }
 

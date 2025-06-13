@@ -53,7 +53,10 @@ impl PrettyPrint for MultiStageAppliedState {
         }
 
         result.println("time_shifts:", &state);
-        for (_, time_shift) in self.time_shifts().iter() {
+        if let Some(common) = &self.time_shifts().common_time_shift {
+            result.println(&format!("- common: {}", common.to_sql()), &details_state);
+        }
+        for (_, time_shift) in self.time_shifts().dimensions_shifts.iter() {
             result.println(
                 &format!(
                     "- {}: {}",

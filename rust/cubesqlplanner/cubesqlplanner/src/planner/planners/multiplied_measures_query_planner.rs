@@ -67,6 +67,10 @@ impl MultipliedMeasuresQueryPlanner {
             .into_iter()
             .into_group_map_by(|m| m.cube_name().clone())
         {
+            let measures = measures
+                .into_iter()
+                .map(|m| m.measure().clone())
+                .collect_vec();
             let join_multi_fact_groups = self
                 .query_properties
                 .compute_join_multi_fact_groups_with_measures(&measures)?;
@@ -91,7 +95,12 @@ impl MultipliedMeasuresQueryPlanner {
             let all_measures = full_key_aggregate_measures
                 .regular_measures
                 .iter()
-                .chain(full_key_aggregate_measures.multiplied_measures.iter())
+                .chain(
+                    full_key_aggregate_measures
+                        .multiplied_measures
+                        .iter()
+                        .map(|m| m.measure()),
+                )
                 .map(|m| m.member_evaluator().clone())
                 .collect_vec();
             let schema = Rc::new(LogicalSchema {
@@ -191,7 +200,17 @@ impl MultipliedMeasuresQueryPlanner {
         key_cube_name: &String,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
-            let cubes = collect_cube_names(measure.member_evaluator())?;
+            let member_expression_over_dimensions_cubes =
+                if let Ok(member_expression) = measure.member_evaluator().as_member_expression() {
+                    member_expression.cube_names_if_dimension_only_expression()?
+                } else {
+                    None
+                };
+            let cubes = if let Some(cubes) = member_expression_over_dimensions_cubes {
+                cubes
+            } else {
+                collect_cube_names(measure.member_evaluator())?
+            };
             let join_hints = collect_join_hints(measure.member_evaluator())?;
             if cubes.iter().any(|cube| cube != key_cube_name) {
                 let measures_join = self.query_tools.join_graph().build_join(join_hints)?;
@@ -298,8 +317,8 @@ impl MultipliedMeasuresQueryPlanner {
         let query = SimpleQuery {
             schema,
             filter: logical_filter,
-            offset: self.query_properties.offset(),
-            limit: self.query_properties.row_limit(),
+            offset: None,
+            limit: None,
             ungrouped: self.query_properties.ungrouped(),
             dimension_subqueries: subquery_dimension_queries,
             source: SimpleQuerySource::LogicalJoin(source),
