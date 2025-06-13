@@ -1276,6 +1276,12 @@ export class PreAggregations {
         const aggregateMeasures = preAggQuery?.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
         references.multipliedMeasures = aggregateMeasures?.multipliedMeasures?.map(m => m.measure);
         if (preAggQuery) {
+          // We need to build a join tree for all references, so they would always include full join path
+          // even for preaggregation references without join path. It is necessary to be able to match
+          // query and preaggregation based on full join tree. But we can not update
+          // references.{dimensions,measures,timeDimensions} directly, because it will break
+          // evaluation of references in the query on later stages.
+          // So we store full named members separately and use them in canUsePreAggregation functions.
           references.joinTree = preAggQuery.join;
           const root = references.joinTree?.root || '';
           references.fullNameMeasures = references.measures.map(m => (m.startsWith(root) ? m : `${root}.${m}`));
