@@ -164,8 +164,9 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         }
       }
     }
-    const useCredentialChain = getEnv('duckdbS3UseCredentialChain', this.config);
-    if (useCredentialChain === 'true' || useCredentialChain === true) {
+
+    const useCredentialChain = this.config.duckdbS3UseCredentialChain || getEnv('duckdbS3UseCredentialChain', this.config);
+    if (useCredentialChain) {
       try {
         await execAsync('CREATE SECRET (TYPE S3, PROVIDER \'CREDENTIAL_CHAIN\')');
       } catch (e) {
