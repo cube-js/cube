@@ -68,6 +68,8 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
   protected client: any;
 
+  protected useSelectTestConnection: boolean;
+
   /**
    * Class constructor.
    */
@@ -85,6 +87,8 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     if (authToken && dbPassword) {
       throw new Error('Both user/password and auth token are set. Please remove password or token.');
     }
+
+    this.useSelectTestConnection = getEnv('dbUseSelectTestConnection', { dataSource });
 
     this.config = {
       host: getEnv('dbHost', { dataSource }),
@@ -109,6 +113,10 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection(): Promise<void> {
+    if (this.useSelectTestConnection) {
+      return this.testConnectionViaSelect();
+    }
+
     return new Promise((resolve, reject) => {
       // Get node list of presto cluster and return it.
       // @see https://prestodb.io/docs/current/rest/node.html
@@ -120,6 +128,11 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         }
       });
     });
+  }
+
+  protected async testConnectionViaSelect() {
+    const query = SqlString.format('SELECT 1', []);
+    await this.queryPromised(query, false);
   }
 
   public query(query: string, values: unknown[]): Promise<any[]> {

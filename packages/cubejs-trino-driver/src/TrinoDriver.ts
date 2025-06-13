@@ -11,7 +11,12 @@ export class TrinoDriver extends PrestoDriver {
     return PrestodbQuery;
   }
 
+  // eslint-disable-next-line consistent-return
   public override async testConnection(): Promise<void> {
+    if (this.useSelectTestConnection) {
+      return this.testConnectionViaSelect();
+    }
+
     const { host, port, ssl, basic_auth: basicAuth, custom_auth: customAuth } = this.config;
     const protocol = ssl ? 'https' : 'http';
     const url = `${protocol}://${host}:${port}/v1/info`;
