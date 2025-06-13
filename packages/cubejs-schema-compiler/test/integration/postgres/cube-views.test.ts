@@ -6,6 +6,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Cube Views', () => {
   jest.setTimeout(200000);
 
+  // language=JavaScript
   const { compiler, joinGraph, cubeEvaluator, metaTransformer } = prepareJsCompiler(`
 cube(\`Orders\`, {
   sql: \`

@@ -429,7 +429,7 @@ export class BaseQuery {
       // join path will be constructed in join graph.
       // It is important to use queryLevelJoinHints during the calculation if it is set.
 
-      const constructJP = () => {
+      const constructJH = () => {
         const filteredJoinMembersJoinHints = joinMembersJoinHints.filter(m => !allMembersJoinHints.includes(m));
         return [
           ...this.queryLevelJoinHints,
@@ -441,15 +441,15 @@ export class BaseQuery {
       };
 
       let prevJoins = this.join;
-      let newJoin = this.joinGraph.buildJoin(constructJP());
+      let newJoin = this.joinGraph.buildJoin(constructJH());
 
       while (newJoin?.joins.length > 0 && !R.equals(prevJoins, newJoin)) {
         prevJoins = newJoin;
         joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
-        newJoin = this.joinGraph.buildJoin(constructJP());
+        newJoin = this.joinGraph.buildJoin(constructJH());
       }
 
-      this.collectedJoinHints = R.uniq(constructJP());
+      this.collectedJoinHints = R.uniq(constructJH());
     }
     return this.collectedJoinHints;
   }
