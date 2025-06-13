@@ -10,15 +10,17 @@ export type SqlData = {
   rollupMatchResults: any[];
 };
 
-export default class SqlQuery {
-  private readonly sqlQuery: SqlData;
+type SqlQueryWrapper = { sql: SqlData };
 
-  public constructor(sqlQuery: SqlData) {
+export default class SqlQuery {
+  private readonly sqlQuery: SqlQueryWrapper;
+
+  public constructor(sqlQuery: SqlQueryWrapper) {
     this.sqlQuery = sqlQuery;
   }
 
   public rawQuery(): SqlData {
-    return this.sqlQuery;
+    return this.sqlQuery.sql;
   }
 
   public sql(): string {
