@@ -474,7 +474,10 @@ export class BaseQuery {
         return true;
       };
 
-      while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoins, newJoin)) {
+      // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
+      let cnt = 0;
+
+      while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoins, newJoin) && cnt < 10000) {
         prevJoins = newJoin;
         joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
         if (!isOrderPreserved(prevJoinMembersJoinHints, joinMembersJoinHints)) {
@@ -482,6 +485,7 @@ export class BaseQuery {
         }
         newJoin = this.joinGraph.buildJoin(constructJH());
         prevJoinMembersJoinHints = joinMembersJoinHints;
+        cnt++;
       }
 
       this.collectedJoinHints = R.uniq(constructJH());
