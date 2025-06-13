@@ -11,6 +11,7 @@ import { testWithPreAggregation } from './pre-aggregation-utils';
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
 
+  // language=JavaScript
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
@@ -4090,7 +4091,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
 
   describe('Transitive join paths', () => {
     // eslint-disable-next-line @typescript-eslint/no-shadow
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const { compiler, joinGraph, cubeEvaluator } =
+      // language=yaml
+      prepareYamlCompiler(`
 cubes:
   - name: merchant_dims
     sql: |
