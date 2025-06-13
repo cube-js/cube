@@ -4188,7 +4188,104 @@ cubes:
       - name: amount_sum
         sql: amount
         type: sum
-    `);
+
+# Join loop for testing transitive joins
+  - name: alpha_facts
+    sql: |
+      (
+        SELECT DATE '2023-01-01' AS reporting_date, 1 AS a_id, 10 AS b_id, 100 AS amount
+        UNION ALL
+        SELECT DATE '2023-01-02' AS reporting_date, 2 AS a_id, 20 AS b_id, 150 AS amount
+      )
+    joins:
+      - name: beta_dims
+        relationship: many_to_one
+        sql: "{CUBE}.a_id = {beta_dims.a_id}"
+      - name: gamma_dims
+        relationship: many_to_one
+        sql: "{CUBE}.b_id = {gamma_dims.b_id}"
+      - name: delta_bridge
+        relationship: many_to_one
+        sql: "{beta_dims.a_name} = {delta_bridge.a_name} AND {gamma_dims.b_name} = {delta_bridge.b_name}"
+    dimensions:
+      - name: reporting_date
+        sql: reporting_date
+        type: time
+        primary_key: true
+      - name: a_id
+        sql: a_id
+        type: number
+        primary_key: true
+      - name: b_id
+        sql: b_id
+        type: number
+        primary_key: true
+      - name: channel
+        sql: "{delta_bridge.channel}"
+        type: string
+    measures:
+      - name: amount_sum
+        sql: amount
+        type: sum
+
+  - name: beta_dims
+    sql: |
+      (
+        SELECT 1 AS a_id, 'Alpha1' AS a_name
+        UNION ALL
+        SELECT 2 AS a_id, 'Alpha2' AS a_name
+      )
+    dimensions:
+      - name: a_id
+        sql: a_id
+        type: number
+        primary_key: true
+      - name: a_name
+        sql: a_name
+        type: string
+
+  - name: gamma_dims
+    sql: |
+      (
+        SELECT 10 AS b_id, 'Beta1' AS b_name
+        UNION ALL
+        SELECT 20 AS b_id, 'Beta2' AS b_name
+      )
+    dimensions:
+      - name: b_id
+        sql: b_id
+        type: number
+        primary_key: true
+      - name: b_name
+        sql: b_name
+        type: string
+
+  - name: delta_bridge
+    sql: |
+      (
+        SELECT 'Alpha1' AS a_name, 'Beta1' AS b_name, 'Organic' AS channel
+        UNION ALL
+        SELECT 'Alpha1' AS a_name, 'Beta2' AS b_name, 'Paid' AS channel
+        UNION ALL
+        SELECT 'Alpha2' AS a_name, 'Beta1' AS b_name, 'Referral' AS channel
+      )
+    joins:
+      - name: gamma_dims
+        relationship: many_to_one
+        sql: "{CUBE}.b_name = {gamma_dims.b_name}"
+    dimensions:
+      - name: a_name
+        sql: a_name
+        type: string
+        primary_key: true
+      - name: b_name
+        sql: "{gamma_dims.b_name}"
+        type: string
+        primary_key: true
+      - name: channel
+        sql: channel
+        type: string
+      `);
 
     it('querying cube dimension that require transitive joins', async () => {
       await compiler.compile();
@@ -4229,6 +4326,30 @@ cubes:
           test_facts__reporting_date: '2023-01-02T00:00:00.000Z',
         },
       ]);
+    });
+
+    it('querying cube with transitive joins with loop', async () => {
+      await compiler.compile();
+
+      try {
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+          measures: [],
+          dimensions: [
+            'alpha_facts.reporting_date',
+            'delta_bridge.b_name',
+            'alpha_facts.channel'
+          ],
+          order: [{
+            id: 'alpha_facts.reporting_date'
+          }],
+          timezone: 'America/Los_Angeles'
+        });
+
+        await dbRunner.testQuery(query.buildSqlAndParams());
+        throw new Error('Should have thrown an error');
+      } catch (err: any) {
+        expect(err.message).toContain('Can not construct joins for the query, potential loop detected');
+      }
     });
   });
 });
