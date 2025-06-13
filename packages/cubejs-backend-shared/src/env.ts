@@ -1784,6 +1784,7 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return [];
   },
+
   duckdbCommunityExtensions: ({
     dataSource
   }: {
@@ -1797,6 +1798,17 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return [];
   },
+
+  duckdbS3UseCredentialChain: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN', dataSource)
+    ]
+  ),
+
   /** ***************************************************************
    * Presto/Trino Driver                                                  *
    **************************************************************** */

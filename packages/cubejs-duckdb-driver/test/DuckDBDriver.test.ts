@@ -73,4 +73,23 @@ describe('DuckDBDriver', () => {
       { id: '3', created: '2020-03-03T03:03:03.333Z', created_date: '2020-03-03T00:00:00.000Z', price: '300' }
     ]);
   });
+
+  test('should execute CREATE SECRET when duckdbS3UseCredentialChain is set', async () => {
+    process.env.duckdbS3UseCredentialChain = 'true';
+
+    // Create a new driver instance to pick up the environment variable
+    const driverWithCredentialChain = new DuckDBDriver({});
+
+    // Mock the execAsync method to spy on it
+    const execAsyncSpy = jest.spyOn((driverWithCredentialChain as any), 'execAsync');
+
+    await driverWithCredentialChain.testConnection();
+
+    expect(execAsyncSpy).toHaveBeenCalledWith(`CREATE SECRET (TYPE S3, PROVIDER 'CREDENTIAL_CHAIN')`);
+
+    // Clean up
+    delete process.env.duckdbS3UseCredentialChain;
+    execAsyncSpy.mockRestore();
+    await driverWithCredentialChain.release();
+  });
 });
