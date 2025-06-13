@@ -35,12 +35,12 @@ impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFu
             .into_iter()
             .map(|arg| -> Result<_, CubeError> { Ok(arg.into_object().get_object()) })
             .collect::<Result<Vec<_>, _>>()?;
-        let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
-            let null = cx.null();
-            neon_object
-                .call(cx, null, neon_args)
-                .map_err(|_| CubeError::internal("Failed to call function ".to_string()))
-        })??;
+        let neon_reuslt =
+            self.object
+                .map_neon_object_with_safe_call_fn(|cx, neon_object, safe_call_fn| {
+                    let null = cx.null();
+                    safe_call_fn.safe_call(cx, neon_object, null, neon_args)
+                })??;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),
             neon_reuslt,
