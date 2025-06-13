@@ -182,7 +182,9 @@ Object {
 `;
 
 exports[`GraphQL Schema with camelCase GraphQL query 6: query CubeQuery {
-  cube(where: { orders: { createdAt: { inDateRange: "2 weeks ago to now" } } }) {
+  cube(
+    where: { orders: { createdAt: { inDateRange: "2 weeks ago to now" } } }
+  ) {
     orders {
       count
       createdAt {
@@ -298,8 +300,7 @@ exports[`GraphQL Schema with camelCase GraphQL query 9: query CubeQuery {
       status
     }
   }
-}
- 1`] = `
+} 1`] = `
 Object {
   "dimensions": Array [
     "Orders.status",
@@ -335,6 +336,37 @@ Object {
   ],
   "measures": Array [
     "Orders.count",
+  ],
+}
+`;
+
+exports[`GraphQL Schema with camelCase GraphQL query 10: query CubeQuery {
+  cube(where: { orders: { createdAt: { inDateRange: "This year" } } }) {
+    orders(orderBy: { createdAt: asc }) {
+      count
+      createdAt {
+        year
+      }
+    }
+  }
+}
+ 1`] = `
+Object {
+  "measures": Array [
+    "Orders.count",
+  ],
+  "order": Array [
+    Array [
+      "Orders.createdAt",
+      "asc",
+    ],
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dateRange": "This year",
+      "dimension": "Orders.createdAt",
+      "granularity": "year",
+    },
   ],
 }
 `;
@@ -521,7 +553,9 @@ Object {
 `;
 
 exports[`GraphQL Schema with snake_case GraphQL query 6: query CubeQuery {
-  cube(where: { orders: { created_at: { inDateRange: "2 weeks ago to now" } } }) {
+  cube(
+    where: { orders: { created_at: { inDateRange: "2 weeks ago to now" } } }
+  ) {
     orders {
       count
       created_at {
@@ -637,8 +671,7 @@ exports[`GraphQL Schema with snake_case GraphQL query 9: query CubeQuery {
       status
     }
   }
-}
- 1`] = `
+} 1`] = `
 Object {
   "dimensions": Array [
     "orders.status",
@@ -674,6 +707,37 @@ Object {
   ],
   "measures": Array [
     "orders.count",
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 10: query CubeQuery {
+  cube(where: { orders: { created_at: { inDateRange: "This year" } } }) {
+    orders(orderBy: { created_at: asc }) {
+      count
+      created_at {
+        year
+      }
+    }
+  }
+}
+ 1`] = `
+Object {
+  "measures": Array [
+    "orders.count",
+  ],
+  "order": Array [
+    Array [
+      "orders.created_at",
+      "asc",
+    ],
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dateRange": "This year",
+      "dimension": "orders.created_at",
+      "granularity": "year",
+    },
   ],
 }
 `;
