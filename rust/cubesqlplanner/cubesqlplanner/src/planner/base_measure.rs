@@ -152,7 +152,7 @@ impl BaseMeasure {
         }))
     }
 
-    pub fn can_used_as_addictive_in_multplied(&self) -> bool {
+    pub fn can_be_used_as_additive_in_multplied(&self) -> bool {
         if let Ok(measure_symbol) = self.member_evaluator.as_measure() {
             measure_symbol.can_used_as_addictive_in_multplied()
         } else {

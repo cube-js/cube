@@ -896,7 +896,7 @@ impl QueryProperties {
                             .rendered_as_multiplied_measures
                             .insert(item.measure.full_name());
                     }
-                    if item.multiplied && !item.measure.can_used_as_addictive_in_multplied() {
+                    if item.multiplied && !item.measure.can_be_used_as_additive_in_multplied() {
                         result
                             .multiplied_measures
                             .push(MultipliedMeasure::new(item.measure.clone(), item.cube_name));
