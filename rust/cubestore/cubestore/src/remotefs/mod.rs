@@ -91,7 +91,7 @@ pub trait ExtendedRemoteFs: DIService + RemoteFs {
     async fn list_by_page(
         &self,
         remote_prefix: String,
-    ) -> Result<BoxStream<Result<Vec<String>, CubeError>>, CubeError> {
+    ) -> Result<BoxStream<'static, Result<Vec<String>, CubeError>>, CubeError> {
         // Note, this implementation doesn't actually paginate.
         let list: Vec<String> = self.list(remote_prefix).await?;
 
