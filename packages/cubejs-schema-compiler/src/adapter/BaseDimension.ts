@@ -142,6 +142,11 @@ export class BaseDimension {
     if (this.expression) {
       return `expr:${this.expressionName}`;
     }
-    return this.query.cubeEvaluator.pathFromArray(this.path() as string[]);
+    const path = this.path();
+    if (path === null) {
+      // Sanity check, this should not actually happen because we checked this.expression earlier
+      throw new Error('Unexpected null path');
+    }
+    return this.query.cubeEvaluator.pathFromArray(path);
   }
 }

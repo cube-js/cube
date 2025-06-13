@@ -273,7 +273,7 @@ describe('PreAggregations', () => {
           measures: [count],
           dimensions: [visitor_checkins.source],
           timeDimension: createdAt,
-          granularity: 'day',
+          granularity: 'day'
         }
       }
     })
@@ -377,6 +377,13 @@ describe('PreAggregations', () => {
       sql: \`
       select * from cards
       \`,
+
+      joins: {
+        visitor_checkins: {
+          relationship: 'one_to_many',
+          sql: \`\${CUBE.visitorId} = \${visitor_checkins.visitor_id}\`
+        }
+      },
 
       measures: {
         count: {
@@ -518,6 +525,23 @@ describe('PreAggregations', () => {
         join_path: visitors,
         includes: '*'
       }]
+    });
+
+    view('cards_visitors_checkins_view', {
+      cubes: [
+        {
+          join_path: visitors,
+          includes: ['count', 'createdAt']
+        },
+        {
+          join_path: visitors.cards,
+          includes: [{ name: 'visitorId', alias: 'visitorIdFromCards'}]
+        },
+        {
+          join_path: visitors.cards.visitor_checkins,
+          includes: ['source']
+        }
+      ]
     });
     `);
 
@@ -1174,6 +1198,91 @@ describe('PreAggregations', () => {
           },
         ]
       );
+    });
+  });
+
+  it('non-match because of join tree difference (through the view)', async () => {
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'cards_visitors_checkins_view.count'
+      ],
+      dimensions: ['cards_visitors_checkins_view.source'],
+      timeDimensions: [{
+        dimension: 'cards_visitors_checkins_view.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      order: [{
+        id: 'cards_visitors_checkins_view.createdAt'
+      }, {
+        id: 'cards_visitors_checkins_view.source'
+      }],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect((<any>query).preAggregations.preAggregationForQuery).toBeUndefined();
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [
+          {
+            cards_visitors_checkins_view__count: '1',
+            cards_visitors_checkins_view__created_at_day: '2017-01-02T00:00:00.000Z',
+            cards_visitors_checkins_view__source: 'google',
+          },
+          {
+            cards_visitors_checkins_view__count: '1',
+            cards_visitors_checkins_view__created_at_day: '2017-01-02T00:00:00.000Z',
+            cards_visitors_checkins_view__source: null,
+          },
+          {
+            cards_visitors_checkins_view__count: '1',
+            cards_visitors_checkins_view__created_at_day: '2017-01-04T00:00:00.000Z',
+            cards_visitors_checkins_view__source: null,
+          },
+          {
+            cards_visitors_checkins_view__count: '1',
+            cards_visitors_checkins_view__created_at_day: '2017-01-05T00:00:00.000Z',
+            cards_visitors_checkins_view__source: null,
+          },
+          {
+            cards_visitors_checkins_view__count: '2',
+            cards_visitors_checkins_view__created_at_day: '2017-01-06T00:00:00.000Z',
+            cards_visitors_checkins_view__source: null,
+          },
+        ]
+      );
+    });
+  });
+
+  it('non-match because of requesting only joined cube members', async () => {
+    await compiler.compile();
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['visitor_checkins.source'],
+      order: [{
+        id: 'visitor_checkins.source'
+      }],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect((<any>query).preAggregations.preAggregationForQuery).toBeUndefined();
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual([
+        {
+          vc__source: 'google',
+        },
+        {
+          vc__source: null,
+        },
+      ]);
     });
   });
 
@@ -2138,6 +2247,7 @@ describe('PreAggregations', () => {
       order: [{
         id: 'visitors.source',
       }],
+      timezone: 'UTC',
     });
 
     const queryAndParams = query.buildSqlAndParams();
@@ -2157,7 +2267,7 @@ describe('PreAggregations', () => {
         [
           { visitors__source: 'google', vc__count: '1' },
           { visitors__source: 'some', vc__count: '5' },
-          { visitors__source: null, vc__count: null },
+          { visitors__source: null, vc__count: '0' },
         ],
       );
     });
@@ -2177,6 +2287,7 @@ describe('PreAggregations', () => {
       }, {
         id: 'cards.visitorId',
       }],
+      timezone: 'UTC',
     });
 
     const queryAndParams = query.buildSqlAndParams();
@@ -2197,7 +2308,7 @@ describe('PreAggregations', () => {
           { visitors__source: 'google', cards__visitor_id: 3, vc__count: '1' },
           { visitors__source: 'some', cards__visitor_id: 1, vc__count: '3' },
           { visitors__source: 'some', cards__visitor_id: null, vc__count: '2' },
-          { visitors__source: null, cards__visitor_id: null, vc__count: null },
+          { visitors__source: null, cards__visitor_id: null, vc__count: '0' },
         ],
       );
     });
