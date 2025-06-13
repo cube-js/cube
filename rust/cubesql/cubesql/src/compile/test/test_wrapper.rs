@@ -925,9 +925,9 @@ async fn test_case_wrapper_with_system_fields() {
             .wrapped_sql
             .sql
             .contains(
-                "\\\"cubeName\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"user\\\""
+                "\\\"cubeName\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"__user\\\""
             ),
-        r#"SQL contains `\"cubeName\":\"KibanaSampleDataEcommerce\",\"alias\":\"user\"` {}"#,
+        r#"SQL contains `\"cubeName\":\"KibanaSampleDataEcommerce\",\"alias\":\"__user\"` {}"#,
         logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
     );
 

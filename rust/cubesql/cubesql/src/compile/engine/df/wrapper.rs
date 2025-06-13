@@ -416,10 +416,7 @@ impl Remapper {
             LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9_]").unwrap());
 
         let alias = start_from;
-        let mut truncated_alias = NON_ID_REGEX
-            .replace_all(&alias, "_")
-            .trim_start_matches("_")
-            .to_lowercase();
+        let mut truncated_alias = NON_ID_REGEX.replace_all(&alias, "_").to_lowercase();
         truncated_alias.truncate(16);
         let mut alias = truncated_alias.clone();
         for i in 1..10000 {
