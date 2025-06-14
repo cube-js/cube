@@ -1,16 +1,16 @@
-export type SqlQueryTuple = [string, any[], any];
+export type SqlQueryTuple = [string, any[], any?];
 
 export type SqlData = {
   aliasNameToMember: Record<string, string>;
   cacheKeyQueries: SqlQueryTuple[];
-  dataSource: boolean;
+  dataSource: string;
   external: boolean;
   sql: SqlQueryTuple;
   preAggregations: any[];
   rollupMatchResults: any[];
 };
 
-type SqlQueryWrapper = { sql: SqlData };
+export type SqlQueryWrapper = { sql: SqlData };
 
 export default class SqlQuery {
   private readonly sqlQuery: SqlQueryWrapper;
