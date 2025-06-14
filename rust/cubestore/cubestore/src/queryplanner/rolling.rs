@@ -65,8 +65,6 @@ pub struct RollingWindowAggregate {
 
 impl PartialOrd for RollingWindowAggregate {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // TODO upgrade DF: Figure out what dyn_ord is used for.
-
         macro_rules! exit_early {
             ( $x:expr ) => {{
                 let res = $x;
@@ -109,6 +107,7 @@ impl PartialOrd for RollingWindowAggregate {
         exit_early!(lower_bound.partial_cmp(&other.lower_bound)?);
         exit_early!(upper_bound.partial_cmp(&other.upper_bound)?);
         exit_early!(upper_bound.partial_cmp(&other.upper_bound)?);
+        exit_early!(offset_to_end.cmp(&other.offset_to_end));
 
         if schema.eq(&other.schema) {
             Some(Ordering::Equal)
@@ -157,6 +156,8 @@ impl RollingWindowAggregate {
         rolling_aggs_alias: &Vec<String>,
         from: &Expr,
     ) -> Result<DFSchemaRef, CubeError> {
+        // TODO upgrade DF: Remove unused variable `dimension`
+        let _ = dimension;
         let fields = exprlist_to_fields(
             vec![from.clone()]
                 .into_iter()
@@ -521,8 +522,8 @@ impl ExtensionPlanner for RollingWindowPlanner {
             .map(|e| -> Result<_, DataFusionError> {
                 match e {
                     Expr::AggregateFunction(AggregateFunction {
-                        func,
-                        params: AggregateFunctionParams { args, .. },
+                        func: _,
+                        params: AggregateFunctionParams { args: _, .. },
                     }) => {
                         let (agg, _, _) = create_aggregate_expr_and_maybe_filter(
                             e,
@@ -632,7 +633,7 @@ pub struct RollingWindowAggExec {
 }
 
 impl DisplayAs for RollingWindowAggExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "RollingWindowAggExec")
     }
 }
@@ -786,7 +787,7 @@ impl ExecutionPlan for RollingWindowAggExec {
                 .iter()
                 .map(|a| ScalarValue::try_from(a.field().data_type()))
                 .collect::<Result<Vec<_>, _>>()?;
-            let mut out_extra_aggs = plan.aggs.iter().map(|a| Vec::new()).collect::<Vec<_>>();
+            let mut out_extra_aggs = vec![Vec::<ScalarValue>::new(); plan.aggs.len()];
             // let other_cols_data = other_cols.iter().map(|c| c.to_data()).collect::<Vec<_>>();
             // let mut out_other = other_cols_data
             //     .iter()
@@ -1019,7 +1020,7 @@ impl ExecutionPlan for RollingWindowAggExec {
             for i in 0..accumulators.len() {
                 // let null = accumulators[i].evaluate()?;
 
-                for j in 0..num_empty_dims {
+                for _j in 0..num_empty_dims {
                     let inputs = agg_inputs[i].iter().map(|a| a.slice(0, 0)).collect_vec();
                     accumulators[i].update_batch(inputs.as_slice(), &[], None, group_index + 1)?;
                     group_index += 1;
