@@ -16970,4 +16970,56 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             displayable(physical_plan.as_ref()).indent()
         );
     }
+
+    #[tokio::test]
+    async fn test_bigquery_timestamp_literal_regression() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let bq_templates = vec![
+            ("expressions/timestamp_literal".to_string(), "TIMESTAMP('{{ value }}')".to_string()),
+        ];
+        
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT COUNT(*) AS count_orders, LOWER(customer_gender) AS gender
+            FROM KibanaSampleDataEcommerce
+            WHERE order_date >= TIMESTAMP '2025-06-03 00:00:00'
+              AND order_date <= TIMESTAMP '2025-06-10 23:59:59'
+              AND LOWER(customer_gender) = 'test'
+            GROUP BY LOWER(customer_gender)
+            ORDER BY 1 DESC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            bq_templates,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        
+        println!("Generated BigQuery SQL: {}", sql);
+        
+        // Should contain TIMESTAMP() but NOT DATETIME(TIMESTAMP())
+        assert!(sql.contains("TIMESTAMP("));
+        assert!(!sql.contains("DATETIME(TIMESTAMP("));
+        
+        // Should contain correct BigQuery timestamp literal syntax
+        assert!(sql.contains("TIMESTAMP('2025-06-03T00:00:00.000Z')"));
+        assert!(sql.contains("TIMESTAMP('2025-06-10T23:59:59.000Z')"));
+        
+        // The key test: ensure we don't have the double-wrapping issue
+        // In the broken version, BigQuery would generate DATETIME(TIMESTAMP()) instead of just TIMESTAMP()
+        // Our fix ensures timestamp literals are not double-wrapped
+        assert!(!sql.contains("DATETIME(TIMESTAMP("));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
 }
