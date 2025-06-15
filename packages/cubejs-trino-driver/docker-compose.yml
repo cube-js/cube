@@ -1,0 +1,13 @@
+version: '2.2'
+
+services:
+  coordinator:
+    image: trinodb/trino
+    ports:
+      - "8080:8080"
+    container_name: "coordinator"
+    healthcheck:
+      test: "trino --execute 'SELECT 1' || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5

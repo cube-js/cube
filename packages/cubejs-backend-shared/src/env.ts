@@ -338,6 +338,33 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Use `SELECT 1` query for testConnection.
+   * It might be used in any driver where there is a specific testConnection
+   * like a REST call, but for some reason it's not possible to use it in
+   * deployment environment.
+   */
+  dbUseSelectTestConnection: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_USE_SELECT_TEST_CONNECTION', dataSource)
+    ] || 'false';
+    if (val.toLocaleLowerCase() === 'true') {
+      return true;
+    } else if (val.toLowerCase() === 'false') {
+      return false;
+    } else {
+      throw new TypeError(
+        `The ${
+          keyByDataSource('CUBEJS_DB_USE_SELECT_TEST_CONNECTION', dataSource)
+        } must be either 'true' or 'false'.`
+      );
+    }
+  },
+
+  /**
    * Kafka host for direct downloads from ksqlDb
    */
   dbKafkaHost: ({ dataSource }: {

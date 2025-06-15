@@ -412,7 +412,7 @@ jobs:
       matrix:
         node-version: [22.x]
         db: [
-            'athena', 'bigquery', 'snowflake',
+            'athena', 'bigquery', 'snowflake', 'trino',
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
             'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio', 'vertica'
         ]
