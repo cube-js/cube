@@ -64,7 +64,7 @@ impl SqlInterval {
             res.push(format!("{} year", self.year));
         }
         if self.month != 0 {
-            res.push(format!("{} montH", self.month));
+            res.push(format!("{} month", self.month));
         }
         if self.week != 0 {
             res.push(format!("{} week", self.week));
