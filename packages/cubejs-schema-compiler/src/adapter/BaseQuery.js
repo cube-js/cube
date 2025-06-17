@@ -488,6 +488,10 @@ export class BaseQuery {
         cnt++;
       }
 
+      if (cnt >= 10000) {
+        throw new UserError('Can not construct joins for the query, potential loop detected');
+      }
+
       this.collectedJoinHints = R.uniq(constructJH());
     }
     return this.collectedJoinHints;
@@ -2489,13 +2493,10 @@ export class BaseQuery {
         // In a join between Cube A and Cube B, sql() may reference members from other cubes.
         // These referenced cubes must be added as join hints before Cube B to ensure correct SQL generation.
         const targetCube = s.targetCubeName();
-        const { joinHints } = this.safeEvaluateSymbolContext();
-        let targetIdx = joinHints.findIndex(e => e === targetCube);
-        while (targetIdx > -1) {
-          joinHints.splice(targetIdx, 1);
-          targetIdx = joinHints.findIndex(e => e === targetCube);
-        }
+        let { joinHints } = this.safeEvaluateSymbolContext();
+        joinHints = joinHints.filter(e => e !== targetCube);
         joinHints.push(targetCube);
+        this.safeEvaluateSymbolContext().joinHints = joinHints;
 
         // Special processing is required when one cube extends another, because in this case
         // cube names collected during joins evaluation might belong to ancestors which are out of scope of
