@@ -124,7 +124,7 @@ impl MultiStageQueryPlanner {
                 MultiStageInodeMemberType::Calculate
             };
 
-            let time_shifts = measure.time_shifts();
+            let time_shift = measure.time_shift();
 
             let is_ungrupped = match &member_type {
                 MultiStageInodeMemberType::Rank | MultiStageInodeMemberType::Calculate => true,
@@ -146,7 +146,7 @@ impl MultiStageQueryPlanner {
                     reduce_by,
                     add_group_by,
                     group_by,
-                    time_shifts,
+                    time_shift,
                 ),
                 is_ungrupped,
             )
@@ -157,7 +157,7 @@ impl MultiStageQueryPlanner {
                     vec![],
                     vec![],
                     None,
-                    vec![],
+                    None,
                 ),
                 self.query_properties.ungrouped(),
             )
@@ -222,15 +222,15 @@ impl MultiStageQueryPlanner {
                 .collect::<Result<Vec<_>, _>>()?;
 
             let new_state = if !dimensions_to_add.is_empty()
-                || !multi_stage_member.time_shifts().is_empty()
+                || multi_stage_member.time_shift().is_some()
                 || state.has_filters_for_member(&member_name)
             {
                 let mut new_state = state.clone_state();
                 if !dimensions_to_add.is_empty() {
                     new_state.add_dimensions(dimensions_to_add);
                 }
-                if !multi_stage_member.time_shifts().is_empty() {
-                    new_state.add_time_shifts(multi_stage_member.time_shifts().clone());
+                if let Some(time_shift) = multi_stage_member.time_shift() {
+                    new_state.add_time_shifts(time_shift.clone());
                 }
                 if state.has_filters_for_member(&member_name) {
                     new_state.remove_filter_for_member(&member_name);

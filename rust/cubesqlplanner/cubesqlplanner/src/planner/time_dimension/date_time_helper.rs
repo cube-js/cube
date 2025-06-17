@@ -1,6 +1,3 @@
-use std::rc::Rc;
-
-use crate::planner::query_tools::QueryTools;
 use chrono::{DateTime, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -63,7 +60,7 @@ impl QueryDateTimeHelper {
 
         // Ensure `high` is a valid local time (expand if needed)
         while let LocalResult::None = tz.from_local_datetime(&high) {
-            high = high + max_offset;
+            high += max_offset;
         }
 
         // Binary search for the first valid local time >= `naive`
@@ -92,8 +89,7 @@ impl QueryDateTimeHelper {
         }
     }
 
-    pub fn format_from_date(date: &str, query_tools: Rc<QueryTools>) -> Result<String, CubeError> {
-        let precision = query_tools.base_tools().timestamp_precision()?;
+    pub fn format_from_date(date: &str, precision: u32) -> Result<String, CubeError> {
         if precision == 3 {
             if DATE_TIME_LOCAL_MS_RE.is_match(date) {
                 return Ok(date.to_string());
@@ -121,8 +117,7 @@ impl QueryDateTimeHelper {
         Ok(date.to_string())
     }
 
-    pub fn format_to_date(date: &str, query_tools: Rc<QueryTools>) -> Result<String, CubeError> {
-        let precision = query_tools.base_tools().timestamp_precision()?;
+    pub fn format_to_date(date: &str, precision: u32) -> Result<String, CubeError> {
         if precision == 3 {
             if DATE_TIME_LOCAL_MS_RE.is_match(date) {
                 return Ok(date.to_string());

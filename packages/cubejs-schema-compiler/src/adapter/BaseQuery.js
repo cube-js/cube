@@ -332,8 +332,9 @@ export class BaseQuery {
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
     this.canUseNativeSqlPlannerPreAggregation = false;
     if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
-      const hasMultiStageMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true }).multiStageMembers.length > 0;
-      this.canUseNativeSqlPlannerPreAggregation = hasMultiStageMeasures;
+      const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
+
+      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0 || fullAggregateMeasures.cumulativeMeasures.length > 0;
     }
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
@@ -775,6 +776,13 @@ export class BaseQuery {
     );
   }
 
+  driverTools(external) {
+    if (external && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      return this.externalQuery();
+    }
+    return this;
+  }
+
   buildSqlAndParamsRust(exportAnnotatedSql) {
     const order = this.options.order && R.pipe(
       R.map((hash) => ((!hash || !hash.id) ? null : hash)),
@@ -798,6 +806,7 @@ export class BaseQuery {
       exportAnnotatedSql: exportAnnotatedSql === true,
       preAggregationQuery: this.options.preAggregationQuery,
       totalQuery: this.options.totalQuery,
+      joinHints: this.options.joinHints,
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
@@ -2403,7 +2412,7 @@ export class BaseQuery {
    */
   collectCubeNames() {
     return this.collectFromMembers(
-      [],
+      false,
       this.collectCubeNamesFor.bind(this),
       'collectCubeNamesFor'
     );

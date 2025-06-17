@@ -142,18 +142,15 @@ impl QueryTools {
         };
         let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
             cube_evaluator.clone(),
+            base_tools.clone(),
             timezone.clone(),
         )));
-        let sql_templates = PlanSqlTemplates::new(templates_render.clone(), base_tools.clone());
         Ok(Rc::new(Self {
             cube_evaluator,
             base_tools,
             join_graph,
             templates_render,
-            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(
-                sql_templates,
-                export_annotated_sql,
-            ))),
+            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
             evaluator_compiler,
             cached_data: RefCell::new(QueryToolsCachedData::new()),
             timezone,
@@ -164,8 +161,9 @@ impl QueryTools {
         &self.cube_evaluator
     }
 
-    pub fn plan_sql_templates(&self) -> PlanSqlTemplates {
-        PlanSqlTemplates::new(self.templates_render.clone(), self.base_tools.clone())
+    pub fn plan_sql_templates(&self, external: bool) -> Result<PlanSqlTemplates, CubeError> {
+        let driver_tools = self.base_tools.driver_tools(external)?;
+        PlanSqlTemplates::try_new(driver_tools)
     }
 
     pub fn base_tools(&self) -> &Rc<dyn BaseTools> {
@@ -240,12 +238,14 @@ impl QueryTools {
         &self,
         sql: &str,
         should_reuse_params: bool,
+        templates: &PlanSqlTemplates,
     ) -> Result<(String, Vec<String>), CubeError> {
         let native_allocated_params = self.base_tools.get_allocated_params()?;
         self.params_allocator.borrow().build_sql_and_params(
             sql,
             native_allocated_params,
             should_reuse_params,
+            templates,
         )
     }
 }

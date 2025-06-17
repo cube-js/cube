@@ -3,7 +3,7 @@ use itertools::Itertools;
 use std::ops::{Add, AddAssign, Neg, Sub};
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq)]
+#[derive(Default, Debug, PartialEq, Clone, Hash, Eq)]
 pub struct SqlInterval {
     pub year: i32,
     pub month: i32,
@@ -64,7 +64,7 @@ impl SqlInterval {
             res.push(format!("{} year", self.year));
         }
         if self.month != 0 {
-            res.push(format!("{} montH", self.month));
+            res.push(format!("{} month", self.month));
         }
         if self.week != 0 {
             res.push(format!("{} week", self.week));
@@ -112,8 +112,8 @@ impl Add for SqlInterval {
     }
 }
 
-impl AddAssign for SqlInterval {
-    fn add_assign(&mut self, other: SqlInterval) {
+impl AddAssign<&SqlInterval> for SqlInterval {
+    fn add_assign(&mut self, other: &SqlInterval) {
         self.year += other.year;
         self.month += other.month;
         self.week += other.week;
@@ -121,6 +121,12 @@ impl AddAssign for SqlInterval {
         self.hour += other.hour;
         self.minute += other.minute;
         self.second += other.second;
+    }
+}
+
+impl AddAssign<SqlInterval> for SqlInterval {
+    fn add_assign(&mut self, other: SqlInterval) {
+        *self += &other;
     }
 }
 
@@ -151,20 +157,6 @@ impl Neg for SqlInterval {
             -self.minute,
             -self.second,
         )
-    }
-}
-
-impl Default for SqlInterval {
-    fn default() -> Self {
-        Self {
-            second: 0,
-            minute: 0,
-            hour: 0,
-            day: 0,
-            week: 0,
-            month: 0,
-            year: 0,
-        }
     }
 }
 

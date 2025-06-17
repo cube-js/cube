@@ -1,8 +1,6 @@
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::measure_definition::{
-    MeasureDefinition, RollingWindow, TimeShiftReference,
-};
+use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
@@ -39,28 +37,38 @@ impl MeasureOrderBy {
 }
 
 #[derive(Clone, Debug)]
-pub struct MeasureTimeShift {
+pub struct DimensionTimeShift {
     pub interval: SqlInterval,
     pub dimension: Rc<MemberSymbol>,
 }
 
-impl PartialEq for MeasureTimeShift {
+impl PartialEq for DimensionTimeShift {
     fn eq(&self, other: &Self) -> bool {
         self.interval == other.interval && self.dimension.full_name() == other.dimension.full_name()
     }
 }
 
-impl Eq for MeasureTimeShift {}
+impl Eq for DimensionTimeShift {}
+
+#[derive(Clone, Debug)]
+pub enum MeasureTimeShifts {
+    Dimensions(Vec<DimensionTimeShift>),
+    Common(SqlInterval),
+}
 
 #[derive(Clone)]
 pub struct MeasureSymbol {
     cube_name: String,
     name: String,
-    definition: Rc<dyn MeasureDefinition>,
+    owned_by_cube: bool,
+    measure_type: String,
+    rolling_window: Option<RollingWindow>,
+    is_multi_stage: bool,
     is_reference: bool,
+    is_view: bool,
     measure_filters: Vec<Rc<SqlCall>>,
     measure_drill_filters: Vec<Rc<SqlCall>>,
-    time_shifts: Vec<MeasureTimeShift>,
+    time_shift: Option<MeasureTimeShifts>,
     measure_order_by: Vec<MeasureOrderBy>,
     reduce_by: Option<Vec<Rc<MemberSymbol>>>,
     add_group_by: Option<Vec<Rc<MemberSymbol>>>,
@@ -76,32 +84,120 @@ impl MeasureSymbol {
         name: String,
         member_sql: Option<Rc<SqlCall>>,
         is_reference: bool,
+        is_view: bool,
         pk_sqls: Vec<Rc<SqlCall>>,
         definition: Rc<dyn MeasureDefinition>,
         measure_filters: Vec<Rc<SqlCall>>,
         measure_drill_filters: Vec<Rc<SqlCall>>,
-        time_shifts: Vec<MeasureTimeShift>,
+        time_shift: Option<MeasureTimeShifts>,
         measure_order_by: Vec<MeasureOrderBy>,
         reduce_by: Option<Vec<Rc<MemberSymbol>>>,
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         group_by: Option<Vec<Rc<MemberSymbol>>>,
-    ) -> Self {
-        Self {
+    ) -> Rc<Self> {
+        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
+        let measure_type = definition.static_data().measure_type.clone();
+        let rolling_window = definition.static_data().rolling_window.clone();
+        let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+        Rc::new(Self {
             cube_name,
             name,
             member_sql,
             is_reference,
+            is_view,
             pk_sqls,
-            definition,
+            owned_by_cube,
+            measure_type,
+            rolling_window,
             measure_filters,
             measure_drill_filters,
             measure_order_by,
-            time_shifts,
+            is_multi_stage,
+            time_shift,
             is_splitted_source: false,
             reduce_by,
             add_group_by,
             group_by,
+        })
+    }
+
+    pub fn new_patched(
+        &self,
+        new_measure_type: Option<String>,
+        add_filters: Vec<Rc<SqlCall>>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let result_measure_type = if let Some(new_measure_type) = new_measure_type {
+            match self.measure_type.as_str() {
+                "sum" | "avg" | "min" | "max" => match new_measure_type.as_str() {
+                    "sum" | "avg" | "min" | "max" | "count_distinct" | "count_distinct_approx" => {}
+                    _ => {
+                        return Err(CubeError::user(format!(
+                            "Unsupported measure type replacement for {}: {} => {}",
+                            self.name, self.measure_type, new_measure_type
+                        )))
+                    }
+                },
+                "count_distinct" | "count_distinct_approx" => match new_measure_type.as_str() {
+                    "count_distinct" | "count_distinct_approx" => {}
+                    _ => {
+                        return Err(CubeError::user(format!(
+                            "Unsupported measure type replacement for {}: {} => {}",
+                            self.name, self.measure_type, new_measure_type
+                        )))
+                    }
+                },
+
+                _ => {
+                    return Err(CubeError::user(format!(
+                        "Unsupported measure type replacement for {}: {} => {}",
+                        self.name, self.measure_type, new_measure_type
+                    )))
+                }
+            }
+            new_measure_type
+        } else {
+            self.measure_type.clone()
+        };
+
+        let mut measure_filters = self.measure_filters.clone();
+        if !add_filters.is_empty() {
+            match result_measure_type.as_str() {
+                "sum"
+                | "avg"
+                | "min"
+                | "max"
+                | "count"
+                | "count_distinct"
+                | "count_distinct_approx" => {}
+                _ => {
+                    return Err(CubeError::user(format!(
+                        "Unsupported additional filters for measure {} type {}",
+                        self.name, result_measure_type
+                    )))
+                }
+            }
+            measure_filters.extend(add_filters.into_iter());
         }
+        Ok(Rc::new(Self {
+            cube_name: self.cube_name.clone(),
+            name: self.name.clone(),
+            owned_by_cube: self.owned_by_cube,
+            measure_type: result_measure_type,
+            rolling_window: self.rolling_window.clone(),
+            is_multi_stage: self.is_multi_stage,
+            is_reference: self.is_reference,
+            is_view: self.is_view,
+            measure_filters,
+            measure_drill_filters: self.measure_drill_filters.clone(),
+            time_shift: self.time_shift.clone(),
+            measure_order_by: self.measure_order_by.clone(),
+            reduce_by: self.reduce_by.clone(),
+            add_group_by: self.add_group_by.clone(),
+            group_by: self.group_by.clone(),
+            member_sql: self.member_sql.clone(),
+            pk_sqls: self.pk_sqls.clone(),
+            is_splitted_source: self.is_splitted_source,
+        }))
     }
 
     pub fn full_name(&self) -> String {
@@ -116,12 +212,12 @@ impl MeasureSymbol {
         &self.pk_sqls
     }
 
-    pub fn time_shifts(&self) -> &Vec<MeasureTimeShift> {
-        &self.time_shifts
+    pub fn time_shift(&self) -> &Option<MeasureTimeShifts> {
+        &self.time_shift
     }
 
     pub fn is_calculated(&self) -> bool {
-        Self::is_calculated_type(&self.definition.static_data().measure_type)
+        Self::is_calculated_type(&self.measure_type)
     }
 
     pub fn is_calculated_type(measure_type: &str) -> bool {
@@ -224,15 +320,26 @@ impl MeasureSymbol {
         cubes
     }
 
+    pub fn can_used_as_addictive_in_multplied(&self) -> bool {
+        if &self.measure_type == "countDistinct" || &self.measure_type == "countDistinctApprox" {
+            true
+        } else if &self.measure_type == "count" && self.member_sql.is_none() {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn owned_by_cube(&self) -> bool {
-        self.definition()
-            .static_data()
-            .owned_by_cube
-            .unwrap_or(true)
+        self.owned_by_cube
     }
 
     pub fn is_reference(&self) -> bool {
         self.is_reference
+    }
+
+    pub fn is_view(&self) -> bool {
+        self.is_view
     }
 
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
@@ -247,11 +354,11 @@ impl MeasureSymbol {
     }
 
     pub fn measure_type(&self) -> &String {
-        &self.definition.static_data().measure_type
+        &self.measure_type
     }
 
     pub fn rolling_window(&self) -> &Option<RollingWindow> {
-        &self.definition.static_data().rolling_window
+        &self.rolling_window
     }
 
     pub fn is_rolling_window(&self) -> bool {
@@ -278,10 +385,6 @@ impl MeasureSymbol {
         &self.measure_order_by
     }
 
-    pub fn definition(&self) -> Rc<dyn MeasureDefinition> {
-        self.definition.clone()
-    }
-
     pub fn reduce_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
         &self.reduce_by
     }
@@ -294,12 +397,8 @@ impl MeasureSymbol {
         &self.group_by
     }
 
-    pub fn time_shift_references(&self) -> &Option<Vec<TimeShiftReference>> {
-        &self.definition.static_data().time_shift_references
-    }
-
     pub fn is_multi_stage(&self) -> bool {
-        self.definition.static_data().multi_stage.unwrap_or(false)
+        self.is_multi_stage
     }
 
     pub fn cube_name(&self) -> &String {
@@ -425,24 +524,26 @@ impl SymbolFactory for MeasureSymbolFactory {
         };
 
         let is_sql_is_direct_ref = if let Some(sql) = &sql {
-            sql.is_direct_reference()?
+            sql.is_direct_reference(compiler.base_tools())?
         } else {
             false
         };
 
-        let time_shifts =
-            if let Some(time_shift_references) = &definition.static_data().time_shift_references {
-                let mut shifts: HashMap<String, MeasureTimeShift> = HashMap::new();
-                for shift_ref in time_shift_references.iter() {
-                    let interval = shift_ref.interval.parse::<SqlInterval>()?;
-                    let interval =
-                        if shift_ref.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
-                            -interval
-                        } else {
-                            interval
-                        };
-                    let dimension =
-                        compiler.add_dimension_evaluator(shift_ref.time_dimension.clone())?;
+        let time_shifts = if let Some(time_shift_references) =
+            &definition.static_data().time_shift_references
+        {
+            let mut shifts: HashMap<String, DimensionTimeShift> = HashMap::new();
+            let mut common_shift = None;
+            for shift_ref in time_shift_references.iter() {
+                let interval = shift_ref.interval.parse::<SqlInterval>()?;
+                let interval =
+                    if shift_ref.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
+                        -interval
+                    } else {
+                        interval
+                    };
+                if let Some(time_dimension) = &shift_ref.time_dimension {
+                    let dimension = compiler.add_dimension_evaluator(time_dimension.clone())?;
                     let dimension = find_owned_by_cube_child(&dimension)?;
                     let dimension_name = dimension.full_name();
                     if let Some(exists) = shifts.get(&dimension_name) {
@@ -455,17 +556,38 @@ impl SymbolFactory for MeasureSymbolFactory {
                     } else {
                         shifts.insert(
                             dimension_name,
-                            MeasureTimeShift {
+                            DimensionTimeShift {
                                 interval: interval.clone(),
                                 dimension: dimension.clone(),
                             },
                         );
                     };
+                } else {
+                    if common_shift.is_none() {
+                        common_shift = Some(interval);
+                    } else {
+                        if common_shift != Some(interval) {
+                            return Err(CubeError::user(format!(
+                                    "Measure can contain only one common time_shift (without time_dimension).",
+                                )));
+                        }
+                    }
                 }
-                shifts.into_values().collect_vec()
+            }
+            if common_shift.is_some() && !shifts.is_empty() {
+                return Err(CubeError::user(format!(
+                        "Measure cannot mix common time_shifts (without time_dimension) with dimension-specific ones.",
+                    )));
+            } else if common_shift.is_some() {
+                Some(MeasureTimeShifts::Common(common_shift.unwrap()))
             } else {
-                vec![]
-            };
+                Some(MeasureTimeShifts::Dimensions(
+                    shifts.into_values().collect_vec(),
+                ))
+            }
+        } else {
+            None
+        };
 
         let reduce_by = if let Some(reduce_by) = &definition.static_data().reduce_by_references {
             let symbols = reduce_by
@@ -514,7 +636,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && !is_multi_stage
                 && measure_filters.is_empty()
                 && measure_drill_filters.is_empty()
-                && time_shifts.is_empty()
+                && time_shifts.is_none()
                 && measure_order_by.is_empty()
                 && reduce_by.is_none()
                 && add_group_by.is_none()
@@ -525,6 +647,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             name,
             sql,
             is_reference,
+            is_view,
             pk_sqls,
             definition,
             measure_filters,

@@ -1798,7 +1798,7 @@ const variables: Record<string, (...args: any) => any> = {
     return [];
   },
   /** ***************************************************************
-   * Presto Driver                                                  *
+   * Presto/Trino Driver                                                  *
    **************************************************************** */
 
   /**
@@ -1814,12 +1814,25 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Presto/Trino Auth Token
+   */
+  prestoAuthToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PRESTO_AUTH_TOKEN', dataSource)
+    ]
+  ),
+
   /** ***************************************************************
    * Pinot Driver                                                  *
    **************************************************************** */
 
   /**
-   * Pinot / Startree Auth Token
+   * Pinot/Startree Auth Token
    */
   pinotAuthToken: ({
     dataSource,

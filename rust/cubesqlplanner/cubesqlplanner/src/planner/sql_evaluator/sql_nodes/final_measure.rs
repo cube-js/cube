@@ -64,9 +64,9 @@ impl SqlNode for FinalMeasureSqlNode {
                     input
                 } else if ev.measure_type() == "countDistinctApprox" {
                     if self.count_approx_as_state {
-                        query_tools.base_tools().hll_init(input)?
+                        templates.hll_init(input)?
                     } else {
-                        query_tools.base_tools().count_distinct_approx(input)?
+                        templates.count_distinct_approx(input)?
                     }
                 } else if self.is_count_distinct(ev) {
                     templates.count_distinct(&input)?

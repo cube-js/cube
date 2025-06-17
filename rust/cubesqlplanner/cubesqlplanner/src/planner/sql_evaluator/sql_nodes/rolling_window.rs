@@ -44,7 +44,7 @@ impl SqlNode for RollingWindowNode {
                         templates,
                     )?;
                     if m.measure_type() == "countDistinctApprox" {
-                        query_tools.base_tools().hll_cardinality_merge(input)?
+                        templates.hll_cardinality_merge(input)?
                     } else {
                         if m.measure_type() == "sum"
                             || m.measure_type() == "count"

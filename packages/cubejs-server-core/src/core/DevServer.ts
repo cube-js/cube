@@ -11,7 +11,7 @@ import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
 import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
-import { executeCommand, getEnv, keyByDataSource, packageExists } from '@cubejs-backend/shared';
+import { executeCommand, getAnonymousId, getEnv, keyByDataSource, packageExists } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
@@ -115,7 +115,7 @@ export class DevServer {
       res.json({
         cubejsToken,
         basePath: options.basePath,
-        anonymousId: this.cubejsServer.anonymousId,
+        anonymousId: getAnonymousId(),
         coreServerVersion: this.cubejsServer.coreServerVersion,
         dockerVersion: this.options.dockerVersion || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,

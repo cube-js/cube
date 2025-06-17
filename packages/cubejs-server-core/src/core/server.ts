@@ -14,7 +14,6 @@ import {
   CancelableInterval,
   createCancelableInterval,
   formatDuration,
-  getAnonymousId,
   getEnv,
   assertDataSource,
   getRealType,
@@ -31,7 +30,7 @@ import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
 import { DevServer } from './DevServer';
-import agentCollect from './agentCollect';
+import { agentCollect } from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
 import { prodLogger, devLogger } from './logger';
 import { OptsHandler } from './OptsHandler';
@@ -60,6 +59,7 @@ import type {
   DriverConfig,
   ScheduledRefreshTimeZonesFn,
   ContextToCubeStoreRouterIdFn,
+  LoggerFnParams,
 } from './types';
 import {
   ContextToOrchestratorIdFn,
@@ -171,8 +171,6 @@ export class CubejsServerCore {
 
   public projectFingerprint: string | null = null;
 
-  public anonymousId: string | null = null;
-
   public coreServerVersion: string | null = null;
 
   protected contextAcceptor: ContextAcceptor;
@@ -233,7 +231,7 @@ export class CubejsServerCore {
 
     this.startScheduledRefreshTimer();
 
-    this.event = async (name, props) => {
+    this.event = async (event, props: LoggerFnParams) => {
       if (!this.options.telemetry) {
         return;
       }
@@ -248,15 +246,12 @@ export class CubejsServerCore {
         }
       }
 
-      if (!this.anonymousId) {
-        this.anonymousId = getAnonymousId();
-      }
-
       const internalExceptionsEnv = getEnv('internalExceptions');
 
       try {
         await track({
-          event: name,
+          timestamp: new Date().toJSON(),
+          event,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
           dockerVersion: getEnv('dockerImageVersion'),
@@ -410,7 +405,12 @@ export class CubejsServerCore {
     if (agentEndpointUrl) {
       const oldLogger = this.logger;
       this.preAgentLogger = oldLogger;
+
       this.logger = (msg, params) => {
+        // Filling timestamp as much as earlier as we can, otherwise it can be incorrect. Because next code is async
+        // with await points which can be delayed with Node.js micro-tasking.
+        params.timestamp = params.timestamp || new Date().toJSON();
+
         oldLogger(msg, params);
         agentCollect(
           {

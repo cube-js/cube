@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.21](https://github.com/cube-js/cube/compare/v1.3.20...v1.3.21) (2025-06-10)
+
+### Bug Fixes
+
+- Report more accurate time to APM on heavy used deployments ([#9667](https://github.com/cube-js/cube/issues/9667)) ([a900c78](https://github.com/cube-js/cube/commit/a900c787d3724ebdd241cb0e4f4562e37f81ce14))
+
+## [1.3.20](https://github.com/cube-js/cube/compare/v1.3.19...v1.3.20) (2025-06-06)
+
+### Bug Fixes
+
+- **cubesql:** Fix Tableau relative dates ([#9641](https://github.com/cube-js/cube/issues/9641)) ([18ec4fc](https://github.com/cube-js/cube/commit/18ec4fc4fcd9ea94799241dc3f8ce9c7ac531b4a))
+
+### Features
+
+- **cubesql:** Support `PERCENTILE_CONT` SQL push down ([#8697](https://github.com/cube-js/cube/issues/8697)) ([577a09f](https://github.com/cube-js/cube/commit/577a09f498085ca5a7950467e602dee54691e88e))
+
 ## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
 
 ### Bug Fixes

@@ -23,21 +23,21 @@ impl TimeDimensionSymbol {
         granularity: Option<String>,
         granularity_obj: Option<Granularity>,
         date_range: Option<(String, String)>,
-    ) -> Self {
+    ) -> Rc<Self> {
         let name_suffix = if let Some(granularity) = &granularity {
             granularity.clone()
         } else {
             "day".to_string()
         };
         let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
-        Self {
+        Rc::new(Self {
             base_symbol,
             granularity,
             granularity_obj,
             full_name,
             date_range,
             alias_suffix: name_suffix,
-        }
+        })
     }
 
     pub fn base_symbol(&self) -> &Rc<MemberSymbol> {
@@ -84,7 +84,7 @@ impl TimeDimensionSymbol {
                             self.granularity_obj.clone(),
                             self.date_range.clone(),
                         );
-                        Rc::new(MemberSymbol::TimeDimension(result))
+                        MemberSymbol::new_time_dimension(result)
                     } else {
                         s.clone()
                     }
@@ -118,7 +118,7 @@ impl TimeDimensionSymbol {
                 self.granularity_obj.clone(),
                 self.date_range.clone(),
             );
-            Some(Rc::new(MemberSymbol::TimeDimension(new_time_dim)))
+            Some(MemberSymbol::new_time_dimension(new_time_dim))
         } else {
             None
         }
@@ -134,10 +134,8 @@ impl TimeDimensionSymbol {
     ) -> Result<Option<String>, CubeError> {
         if let Some(date_range) = &self.date_range {
             let tz = query_tools.timezone();
-            let from_date_str =
-                QueryDateTimeHelper::format_from_date(&date_range.0, query_tools.clone())?;
-            let to_date_str =
-                QueryDateTimeHelper::format_to_date(&date_range.1, query_tools.clone())?;
+            let from_date_str = QueryDateTimeHelper::format_from_date(&date_range.0, 3)?;
+            let to_date_str = QueryDateTimeHelper::format_to_date(&date_range.1, 3)?;
             let start = QueryDateTime::from_date_str(tz, &from_date_str)?;
             let end = QueryDateTime::from_date_str(tz, &to_date_str)?;
             let end = end.add_duration(Duration::milliseconds(1))?;

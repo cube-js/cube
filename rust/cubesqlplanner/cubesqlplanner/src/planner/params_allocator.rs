@@ -9,15 +9,13 @@ lazy_static! {
     static ref PARAMS_MATCH_RE: Regex = Regex::new(r"\$_(\d+)_\$").unwrap();
 }
 pub struct ParamsAllocator {
-    sql_templates: PlanSqlTemplates,
     params: Vec<String>,
     export_annotated_sql: bool,
 }
 
 impl ParamsAllocator {
-    pub fn new(sql_templates: PlanSqlTemplates, export_annotated_sql: bool) -> ParamsAllocator {
+    pub fn new(export_annotated_sql: bool) -> ParamsAllocator {
         ParamsAllocator {
-            sql_templates,
             params: Vec::new(),
             export_annotated_sql,
         }
@@ -41,6 +39,7 @@ impl ParamsAllocator {
         sql: &str,
         native_allocated_params: Vec<String>,
         should_reuse_params: bool,
+        templates: &PlanSqlTemplates,
     ) -> Result<(String, Vec<String>), CubeError> {
         let (sql, params) = self.add_native_allocated_params(sql, &native_allocated_params)?;
         let mut params_in_sql_order = Vec::new();
@@ -61,7 +60,7 @@ impl ParamsAllocator {
                     if self.export_annotated_sql {
                         format!("${}$", new_index)
                     } else {
-                        match self.sql_templates.param(new_index) {
+                        match templates.param(new_index) {
                             Ok(res) => res,
                             Err(e) => {
                                 if error.is_none() {
@@ -79,7 +78,7 @@ impl ParamsAllocator {
                     let ind: usize = caps[1].to_string().parse().unwrap();
                     let index = params_in_sql_order.len();
                     params_in_sql_order.push(params[ind].clone());
-                    match self.sql_templates.param(index) {
+                    match templates.param(index) {
                         Ok(res) => res,
                         Err(e) => {
                             if error.is_none() {

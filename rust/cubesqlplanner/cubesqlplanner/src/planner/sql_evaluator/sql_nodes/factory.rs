@@ -6,17 +6,18 @@ use super::{
     TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
-use crate::planner::sql_evaluator::MeasureTimeShift;
+use crate::planner::planners::multi_stage::TimeShiftState;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct SqlNodesFactory {
-    time_shifts: HashMap<String, MeasureTimeShift>,
+    time_shifts: TimeShiftState,
     ungrouped: bool,
     ungrouped_measure: bool,
     count_approx_as_state: bool,
     render_references: HashMap<String, QualifiedColumnName>,
+    pre_aggregation_dimensions_references: HashMap<String, QualifiedColumnName>,
     pre_aggregation_measures_references: HashMap<String, QualifiedColumnName>,
     rendered_as_multiplied_measures: HashSet<String>,
     ungrouped_measure_references: HashMap<String, QualifiedColumnName>,
@@ -32,11 +33,12 @@ pub struct SqlNodesFactory {
 impl SqlNodesFactory {
     pub fn new() -> Self {
         Self {
-            time_shifts: HashMap::new(),
+            time_shifts: TimeShiftState::default(),
             ungrouped: false,
             ungrouped_measure: false,
             count_approx_as_state: false,
             render_references: HashMap::new(),
+            pre_aggregation_dimensions_references: HashMap::new(),
             pre_aggregation_measures_references: HashMap::new(),
             ungrouped_measure_references: HashMap::new(),
             cube_name_references: HashMap::new(),
@@ -50,7 +52,7 @@ impl SqlNodesFactory {
         }
     }
 
-    pub fn set_time_shifts(&mut self, time_shifts: HashMap<String, MeasureTimeShift>) {
+    pub fn set_time_shifts(&mut self, time_shifts: TimeShiftState) {
         self.time_shifts = time_shifts;
     }
 
@@ -80,6 +82,13 @@ impl SqlNodesFactory {
 
     pub fn set_rendered_as_multiplied_measures(&mut self, value: HashSet<String>) {
         self.rendered_as_multiplied_measures = value;
+    }
+
+    pub fn set_pre_aggregation_dimensions_references(
+        &mut self,
+        value: HashMap<String, QualifiedColumnName>,
+    ) {
+        self.pre_aggregation_dimensions_references = value;
     }
 
     pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<String, String>) {
@@ -240,15 +249,20 @@ impl SqlNodesFactory {
     }
 
     fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+        let input = if !self.pre_aggregation_dimensions_references.is_empty() {
+            RenderReferencesSqlNode::new(input, self.pre_aggregation_dimensions_references.clone())
+        } else {
+            let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
+            let input: Rc<dyn SqlNode> = CaseDimensionSqlNode::new(input);
+            input
+        };
         let input: Rc<dyn SqlNode> =
             TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
-        let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
-        let input: Rc<dyn SqlNode> = CaseDimensionSqlNode::new(input);
 
         let input: Rc<dyn SqlNode> =
             AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
 
-        let input = if !&self.time_shifts.is_empty() {
+        let input = if !self.time_shifts.is_empty() {
             TimeShiftSqlNode::new(self.time_shifts.clone(), input)
         } else {
             input

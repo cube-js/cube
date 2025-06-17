@@ -1,5 +1,4 @@
 use super::*;
-use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::logical_plan::*;
 use crate::plan::FilterItem;
 use crate::planner::query_tools::QueryTools;
@@ -23,13 +22,13 @@ impl MatchState {
         if matches!(self, MatchState::Partial) || matches!(other, MatchState::Partial) {
             return MatchState::Partial;
         }
-        return MatchState::Full;
+        MatchState::Full
     }
 }
 
 pub struct PreAggregationOptimizer {
     query_tools: Rc<QueryTools>,
-    used_pre_aggregations: HashMap<(String, String), Rc<dyn PreAggregationObj>>,
+    used_pre_aggregations: HashMap<(String, String), Rc<PreAggregation>>,
 }
 
 impl PreAggregationOptimizer {
@@ -71,7 +70,7 @@ impl PreAggregationOptimizer {
         Ok(None)
     }
 
-    pub fn get_used_pre_aggregations(&self) -> Vec<Rc<dyn PreAggregationObj>> {
+    pub fn get_used_pre_aggregations(&self) -> Vec<Rc<PreAggregation>> {
         self.used_pre_aggregations.values().cloned().collect()
     }
 
@@ -234,8 +233,8 @@ impl PreAggregationOptimizer {
 
         if let Some(multi_stage_item) = multi_stage_queries
             .iter()
+            .find(|&query| &query.name == multi_stage_name)
             .cloned()
-            .find(|query| &query.name == multi_stage_name)
         {
             match &multi_stage_item.member_type {
                 MultiStageMemberLogicalType::LeafMeasure(multi_stage_leaf_measure) => self
@@ -432,7 +431,7 @@ impl PreAggregationOptimizer {
                             .map(|(d, _)| d.clone()),
                     )
                     .collect(),
-                measures: pre_aggregation.measures.iter().cloned().collect(),
+                measures: pre_aggregation.measures.to_vec(),
                 multiplied_measures: HashSet::new(),
             };
             let pre_aggregation = PreAggregation {
@@ -445,15 +444,14 @@ impl PreAggregationOptimizer {
                 granularity: pre_aggregation.granularity.clone(),
                 table_name: table_name.clone(),
                 cube_name: pre_aggregation.cube_name.clone(),
+                pre_aggregation_obj,
             };
+            let result = Rc::new(pre_aggregation);
             self.used_pre_aggregations.insert(
-                (
-                    pre_aggregation.cube_name.clone(),
-                    pre_aggregation.name.clone(),
-                ),
-                pre_aggregation_obj.clone(),
+                (result.cube_name.clone(), result.name.clone()),
+                result.clone(),
             );
-            Ok(Rc::new(pre_aggregation))
+            Ok(result)
         } else {
             Err(CubeError::internal(format!(
                 "Cannot find pre aggregation object for cube {} and name {}",

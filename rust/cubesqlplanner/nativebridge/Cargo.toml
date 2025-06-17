@@ -25,3 +25,17 @@ features = ["full"]
 
 [dependencies.async-trait]
 version = "0.1.42"
+
+# Code in cubesqlplanner workspace is not ready for full-blown clippy
+# So we disable some rules to enable per-rule latch in CI, not for a whole clippy run
+# Feel free to remove any rule from here and fix all warnings with it
+# Or to write a comment why rule should stay disabled
+[lints.clippy]
+cmp_owned = "allow"
+collapsible_match = "allow"
+len_zero = "allow"
+let_and_return = "allow"
+needless_borrow = "allow"
+ptr_arg = "allow"
+redundant_closure = "allow"
+single_match = "allow"

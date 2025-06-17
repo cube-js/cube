@@ -585,6 +585,18 @@ fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
                     .unwrap()?,
             ));
 
+        let safe_call_fn = neon_context_holder
+            .with_context(|cx| {
+                if let Ok(func) = cx.argument::<JsFunction>(1) {
+                    Some(func)
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+
+        neon_context_holder.set_safe_call_fn(safe_call_fn).unwrap();
+
         let context_holder = NativeContextHolder::<NeonInnerTypes<FunctionContext<'static>>>::new(
             neon_context_holder,
         );

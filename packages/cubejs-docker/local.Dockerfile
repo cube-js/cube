@@ -1,6 +1,6 @@
 ARG DEV_BUILD_IMAGE=cubejs/cube:build
 
-FROM $DEV_BUILD_IMAGE as build
+FROM $DEV_BUILD_IMAGE AS build
 FROM node:22.16.0-bookworm-slim
 
 ARG IMAGE_VERSION=dev

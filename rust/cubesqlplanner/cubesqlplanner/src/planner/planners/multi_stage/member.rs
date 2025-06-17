@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::{MeasureTimeShift, MemberSymbol};
+use crate::planner::sql_evaluator::{MeasureTimeShifts, MemberSymbol};
 use crate::planner::BaseTimeDimension;
 use std::rc::Rc;
 
@@ -99,7 +99,7 @@ pub struct MultiStageInodeMember {
     reduce_by: Vec<Rc<MemberSymbol>>,
     add_group_by: Vec<Rc<MemberSymbol>>,
     group_by: Option<Vec<Rc<MemberSymbol>>>,
-    time_shifts: Vec<MeasureTimeShift>,
+    time_shift: Option<MeasureTimeShifts>,
 }
 
 impl MultiStageInodeMember {
@@ -108,14 +108,14 @@ impl MultiStageInodeMember {
         reduce_by: Vec<Rc<MemberSymbol>>,
         add_group_by: Vec<Rc<MemberSymbol>>,
         group_by: Option<Vec<Rc<MemberSymbol>>>,
-        time_shifts: Vec<MeasureTimeShift>,
+        time_shift: Option<MeasureTimeShifts>,
     ) -> Self {
         Self {
             inode_type,
             reduce_by,
             add_group_by,
             group_by,
-            time_shifts,
+            time_shift,
         }
     }
 
@@ -149,8 +149,8 @@ impl MultiStageInodeMember {
         &self.group_by
     }
 
-    pub fn time_shifts(&self) -> &Vec<MeasureTimeShift> {
-        &self.time_shifts
+    pub fn time_shift(&self) -> &Option<MeasureTimeShifts> {
+        &self.time_shift
     }
 }
 

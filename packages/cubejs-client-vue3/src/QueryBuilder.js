@@ -395,7 +395,7 @@ export default {
       }
 
       // query heuristics should only apply on query change (not applied to the initial query)
-      if (this.prevValidatedQuery !== null) {
+      if (this.prevValidatedQuery !== null && isQueryPresent(validatedQuery)) {
         this.skipHeuristics = false;
       }
 

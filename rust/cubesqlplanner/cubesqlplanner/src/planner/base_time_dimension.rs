@@ -65,7 +65,7 @@ impl BaseMember for BaseTimeDimension {
 impl BaseTimeDimension {
     pub fn try_new_from_td_symbol(
         query_tools: Rc<QueryTools>,
-        td_symbol: &TimeDimensionSymbol,
+        td_symbol: Rc<TimeDimensionSymbol>,
     ) -> Result<Rc<Self>, CubeError> {
         let dimension =
             BaseDimension::try_new_required(td_symbol.base_symbol().clone(), query_tools.clone())?;
@@ -79,7 +79,7 @@ impl BaseTimeDimension {
             &Some(alias_suffix.clone()),
             query_tools.clone(),
         )?;
-        let member_evaluator = Rc::new(MemberSymbol::TimeDimension(td_symbol.clone()));
+        let member_evaluator = MemberSymbol::new_time_dimension(td_symbol.clone());
 
         Ok(Rc::new(Self {
             dimension,
@@ -128,12 +128,12 @@ impl BaseTimeDimension {
         } else {
             None
         };
-        let member_evaluator = Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
+        let member_evaluator = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
             member_evaluator.clone(),
             granularity.clone(),
             granularity_obj.clone(),
             date_range_tuple,
-        )));
+        ));
         Ok(Rc::new(Self {
             dimension,
             query_tools,
@@ -163,12 +163,12 @@ impl BaseTimeDimension {
         } else {
             None
         };
-        let member_evaluator = Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
+        let member_evaluator = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
             self.dimension.member_evaluator(),
             new_granularity.clone(),
             new_granularity_obj.clone(),
             date_range_tuple,
-        )));
+        ));
         Ok(Rc::new(Self {
             dimension: self.dimension.clone(),
             granularity_obj: new_granularity_obj,
@@ -189,9 +189,9 @@ impl BaseTimeDimension {
         &self.granularity_obj
     }
 
-    pub fn resolve_granularity(&self) -> Result<Option<String>, CubeError> {
+    pub fn resolved_granularity(&self) -> Result<Option<String>, CubeError> {
         let res = if let Some(granularity_obj) = &self.granularity_obj {
-            Some(granularity_obj.resolve_granularity()?)
+            Some(granularity_obj.resolved_granularity()?)
         } else {
             None
         };

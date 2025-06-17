@@ -4,6 +4,7 @@ use super::dependecy::{
 use super::sql_nodes::SqlNode;
 use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::member_sql::{ContextSymbolArg, MemberSql, MemberSqlArg, MemberSqlStruct};
 use crate::plan::{Filter, FilterItem};
 use crate::planner::query_tools::QueryTools;
@@ -45,7 +46,7 @@ impl SqlCall {
         self.member_sql.call(args)
     }
 
-    pub fn is_direct_reference(&self) -> Result<bool, CubeError> {
+    pub fn is_direct_reference(&self, base_tools: Rc<dyn BaseTools>) -> Result<bool, CubeError> {
         let dependencies = self.get_dependencies();
         if dependencies.len() != 1 {
             return Ok(false);
@@ -56,11 +57,11 @@ impl SqlCall {
         let args = self
             .deps
             .iter()
-            .map(|d| self.evaluate_single_dep_for_ref_check(&d))
+            .map(|d| self.evaluate_single_dep_for_ref_check(&d, base_tools.clone()))
             .collect::<Result<Vec<_>, _>>()?;
         let eval_result = self.member_sql.call(args)?;
 
-        Ok(eval_result.trim() == &reference_candidate.full_name())
+        Ok(eval_result.trim() == reference_candidate.full_name())
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
@@ -180,11 +181,8 @@ impl SqlCall {
         result.push(cube_dep.cube_symbol.name());
 
         for (_, v) in cube_dep.properties.iter() {
-            match v {
-                CubeDepProperty::CubeDependency(cube_dep) => {
-                    self.extract_cube_deps_from_cube_dep(cube_dep, result)
-                }
-                _ => {}
+            if let CubeDepProperty::CubeDependency(cube_dep) = v {
+                self.extract_cube_deps_from_cube_dep(cube_dep, result)
             };
         }
     }
@@ -193,6 +191,7 @@ impl SqlCall {
     fn evaluate_single_dep_for_ref_check(
         &self,
         dep: &Dependency,
+        base_tools: Rc<dyn BaseTools>,
     ) -> Result<MemberSqlArg, CubeError> {
         match dep {
             Dependency::SymbolDependency(dep) => Ok(MemberSqlArg::String(dep.full_name())),
@@ -200,7 +199,26 @@ impl SqlCall {
                 self.evaluate_time_dimesion_dep_for_ref_check(dep)
             }
             Dependency::CubeDependency(dep) => self.evaluate_cube_dep_for_ref_check(dep),
-            Dependency::ContextDependency(_) => Ok(MemberSqlArg::String(format!("Context Symbol"))),
+            Dependency::ContextDependency(dep) => match dep {
+                ContextSymbolDep::SecurityContext => Ok(MemberSqlArg::ContextSymbol(
+                    ContextSymbolArg::SecurityContext(base_tools.security_context_for_rust()?),
+                )),
+                ContextSymbolDep::FilterParams => {
+                    let r = base_tools.filters_proxy_for_rust(None)?;
+                    Ok(MemberSqlArg::ContextSymbol(ContextSymbolArg::FilterParams(
+                        r,
+                    )))
+                }
+                ContextSymbolDep::FilterGroup => {
+                    let r = base_tools.filter_group_function_for_rust(None)?;
+                    Ok(MemberSqlArg::ContextSymbol(ContextSymbolArg::FilterGroup(
+                        r,
+                    )))
+                }
+                ContextSymbolDep::SqlUtils => Ok(MemberSqlArg::ContextSymbol(
+                    ContextSymbolArg::SqlUtils(base_tools.sql_utils_for_rust()?),
+                )),
+            },
         }
     }
 

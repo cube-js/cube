@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.21](https://github.com/cube-js/cube/compare/v1.3.20...v1.3.21) (2025-06-10)
+
+### Bug Fixes
+
+- Report more accurate time to APM on heavy used deployments ([#9667](https://github.com/cube-js/cube/issues/9667)) ([a900c78](https://github.com/cube-js/cube/commit/a900c787d3724ebdd241cb0e4f4562e37f81ce14))
+
+## [1.3.20](https://github.com/cube-js/cube/compare/v1.3.19...v1.3.20) (2025-06-06)
+
+### Features
+
+- **databricks-jdbc-driver:** Support M2M OAuth Authentication ([#9651](https://github.com/cube-js/cube/issues/9651)) ([71c1022](https://github.com/cube-js/cube/commit/71c10226f7c797e8b63df248fc704f2a2f1b7452))
+- **prestodb-driver, trino-driver:** Support custom auth headers (JWT) ([#9660](https://github.com/cube-js/cube/issues/9660)) ([3219695](https://github.com/cube-js/cube/commit/32196950d2c54ce482f686ae61c978a0c375e2f8))
+
 ## [1.3.19](https://github.com/cube-js/cube/compare/v1.3.18...v1.3.19) (2025-06-02)
 
 **Note:** Version bump only for package @cubejs-backend/shared
