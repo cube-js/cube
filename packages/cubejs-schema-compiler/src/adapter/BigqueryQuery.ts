@@ -215,6 +215,67 @@ export class BigqueryQuery extends BaseQuery {
     return `UNIX_SECONDS(${this.nowTimestampSql()})`;
   }
 
+  /**
+   * Should be protected, but BaseQuery is in js
+   * Overridden from BaseQuery to support BigQuery strict data types for
+   * joining conditions (note timeStampCast)
+   */
+  public override runningTotalDateJoinCondition() {
+    return this.timeDimensions
+      .map(
+        d => [
+          d,
+          (_dateFrom: string, dateTo: string, dateField: string, dimensionDateFrom: string, _dimensionDateTo: string) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
+        ]
+      );
+  }
+
+  /**
+   * Should be protected, but BaseQuery is in js
+   * Overridden from BaseQuery to support BigQuery strict data types for
+   * joining conditions (note timeStampCast)
+   */
+  public override rollingWindowToDateJoinCondition(granularity) {
+    return this.timeDimensions
+      .filter(td => td.granularity)
+      .map(
+        d => [
+          d,
+          (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, _isFromStartToEnd: boolean) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
+        ]
+      );
+  }
+
+  /**
+   * Should be protected, but BaseQuery is in js
+   * Overridden from BaseQuery to support BigQuery strict data types for
+   * joining conditions (note timeStampCast)
+   */
+  public override rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
+    offset = offset || 'end';
+    return this.timeDimensions
+      .filter(td => td.granularity)
+      .map(
+        d => [d, (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, isFromStartToEnd: boolean) => {
+        // dateFrom based window
+          const conditions: string[] = [];
+          if (trailingInterval !== 'unbounded') {
+            const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
+            const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
+            const sign = offset === 'start' ? '>=' : '>';
+            conditions.push(`${dateField} ${sign} ${this.timeStampCast(trailingStart)}`);
+          }
+          if (leadingInterval !== 'unbounded') {
+            const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
+            const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
+            const sign = offset === 'end' ? '<=' : '<';
+            conditions.push(`${dateField} ${sign} ${this.timeStampCast(leadingEnd)}`);
+          }
+          return conditions.length ? conditions.join(' AND ') : '1 = 1';
+        }]
+      );
+  }
+
   // Should be protected, but BaseQuery is in js
   public override dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
     return dateJoinCondition.map(

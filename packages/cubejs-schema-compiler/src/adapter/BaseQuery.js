@@ -958,7 +958,7 @@ export class BaseQuery {
       .map(
         d => [
           d,
-          (_dateFrom, dateTo, dateField, dimensionDateFrom, _dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
+          (_dateFrom, dateTo, dateField, dimensionDateFrom, _dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
         ]
       );
   }
@@ -969,7 +969,7 @@ export class BaseQuery {
       .map(
         d => [
           d,
-          (dateFrom, dateTo, dateField, _dimensionDateFrom, _dimensionDateTo, _isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
+          (dateFrom, dateTo, dateField, _dimensionDateFrom, _dimensionDateTo, _isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
         ]
       );
   }
@@ -979,20 +979,20 @@ export class BaseQuery {
     return this.timeDimensions
       .filter(td => td.granularity)
       .map(
-        d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+        d => [d, (dateFrom, dateTo, dateField, _dimensionDateFrom, _dimensionDateTo, isFromStartToEnd) => {
         // dateFrom based window
           const conditions = [];
           if (trailingInterval !== 'unbounded') {
             const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
             const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
             const sign = offset === 'start' ? '>=' : '>';
-            conditions.push(`${dateField} ${sign} ${this.timeStampCast(trailingStart)}`);
+            conditions.push(`${dateField} ${sign} ${trailingStart}`);
           }
           if (leadingInterval !== 'unbounded') {
             const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
             const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
             const sign = offset === 'end' ? '<=' : '<';
-            conditions.push(`${dateField} ${sign} ${this.timeStampCast(leadingEnd)}`);
+            conditions.push(`${dateField} ${sign} ${leadingEnd}`);
           }
           return conditions.length ? conditions.join(' AND ') : '1 = 1';
         }]
@@ -1828,8 +1828,11 @@ export class BaseQuery {
       .join(', ');
   }
 
-  // BigQuery has strict date type and can not automatically convert between date
-  // and timestamp, so we override dateFromStartToEndConditionSql() in BigQuery Dialect
+  /**
+   * BigQuery has strict date type and can not automatically convert between date
+   * and timestamp, so we override dateFromStartToEndConditionSql() in BigQuery Dialect
+   * @protected
+   */
   dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
     return dateJoinCondition.map(
       // TODO Consider adding strict definitions of local and UTC time type
