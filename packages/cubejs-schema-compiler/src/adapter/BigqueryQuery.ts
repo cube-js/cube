@@ -182,29 +182,29 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    return `DATETIME_SUB(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
-  }
-
-  public addInterval(date, interval) {
-    return `DATETIME_ADD(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
-  }
-
-  public subtractTimestampInterval(date, interval) {
     const [intervalFormatted, timeUnit] = this.formatInterval(interval);
-    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit)) {
+    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
       return this.timeStampCast(`DATETIME_SUB(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
     }
 
     return `TIMESTAMP_SUB(${date}, INTERVAL ${intervalFormatted})`;
   }
 
-  public addTimestampInterval(date, interval) {
+  public addInterval(date, interval) {
     const [intervalFormatted, timeUnit] = this.formatInterval(interval);
-    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit)) {
+    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
       return this.timeStampCast(`DATETIME_ADD(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
     }
 
     return `TIMESTAMP_ADD(${date}, INTERVAL ${intervalFormatted})`;
+  }
+
+  public subtractTimestampInterval(timestamp, interval) {
+    return this.subtractInterval(timestamp, interval);
+  }
+
+  public addTimestampInterval(timestamp, interval) {
+    return this.addInterval(timestamp, interval);
   }
 
   public nowTimestampSql() {
