@@ -2118,5 +2118,25 @@ from
       `);
       expect(res.rows).toMatchSnapshot();
     });
+
+    executePg('SQL API: Date/time comparison with SQL push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT MEASURE(BigECommerce.rollingCountBy2Day)
+        FROM BigECommerce
+        WHERE BigECommerce.orderDate < CAST('2021-01-01' AS TIMESTAMP) AND
+              LOWER("city") = 'columbus'
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    executePg('SQL API: Date/time comparison with date_trunc with SQL push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT MEASURE(BigECommerce.rollingCountBy2Week)
+        FROM BigECommerce
+        WHERE date_trunc('day', BigECommerce.orderDate) < CAST('2021-01-01' AS TIMESTAMP) AND
+              LOWER("city") = 'columbus'
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
   });
 }
