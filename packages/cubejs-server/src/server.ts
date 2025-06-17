@@ -36,6 +36,8 @@ export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions
   webSockets?: boolean;
   http?: HttpOptions;
   gracefulShutdown?: number;
+  serverKeepAliveTimeout?: number;
+  serverHeadersTimeout?: number;
 }
 
 type RequireOne<T, K extends keyof T> = {
