@@ -215,6 +215,29 @@ export class BigqueryQuery extends BaseQuery {
     return `UNIX_SECONDS(${this.nowTimestampSql()})`;
   }
 
+  // Should be protected, but BaseQuery is in js
+  public override dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
+    return dateJoinCondition.map(
+      ([d, f]) => ({
+        filterToWhere: () => {
+          const timeSeries = d.timeSeries();
+          return f(
+            isFromStartToEnd ?
+              this.timeStampCast(this.paramAllocator.allocateParam(timeSeries[0][0])) :
+              `${this.timeStampInClientTz(d.dateFromParam())}`,
+            isFromStartToEnd ?
+              this.timeStampCast(this.paramAllocator.allocateParam(timeSeries[timeSeries.length - 1][1])) :
+              `${this.timeStampInClientTz(d.dateToParam())}`,
+            `${fromRollup ? this.dimensionSql(d) : d.convertedToTz()}`,
+            `${this.timeStampInClientTz(d.dateFromParam())}`,
+            `${this.timeStampInClientTz(d.dateToParam())}`,
+            isFromStartToEnd
+          );
+        }
+      })
+    );
+  }
+
   // eslint-disable-next-line no-unused-vars
   public preAggregationLoadSql(cube, preAggregation, tableName) {
     return this.preAggregationSql(cube, preAggregation);
@@ -250,7 +273,7 @@ export class BigqueryQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
-    templates.functions.DATETRUNC = 'DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part|upper == \'WEEK\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %})';
+    templates.functions.DATETRUNC = 'TIMESTAMP(DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part|upper == \'WEEK\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %}))';
     templates.functions.LOG = 'LOG({{ args_concat }}{% if args[1] is undefined %}, 10{% endif %})';
     templates.functions.BTRIM = 'TRIM({{ args_concat }})';
     templates.functions.STRPOS = 'STRPOS({{ args_concat }})';
@@ -263,7 +286,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
-    templates.expressions.timestamp_literal = 'DATETIME(TIMESTAMP(\'{{ value }}\'))';
+    templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     delete templates.expressions.ilike;
     delete templates.expressions.like_escape;
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';

@@ -1788,8 +1788,12 @@ export class BaseQuery {
     const dateJoinConditionSql =
       dateJoinCondition.map(
         ([d, f]) => f(
-          `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`,
-          `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_to')}`,
+          // Time-series table is generated differently in different dialects,
+          // but some dialects (like BigQuery) require strict date types and can not automatically convert
+          // between date and timestamp for comparisons, at the same time, time dimensions are expected to be
+          // timestamps, so we need to align types for join conditions/comparisons.
+          this.timeStampCast(`${d.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`),
+          this.timeStampCast(`${d.dateSeriesAliasName()}.${this.escapeColumnName('date_to')}`),
           `${baseQueryAlias}.${d.aliasName()}`,
           `'${d.dateFromFormatted()}'`,
           `'${d.dateToFormatted()}'`
@@ -1822,9 +1826,10 @@ export class BaseQuery {
       .join(', ');
   }
 
+  // BigQuery has strict date type and can not automatically convert between date
+  // and timestamp, so we override dateFromStartToEndConditionSql() in BigQuery Dialect
   dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
     return dateJoinCondition.map(
-      // TODO these weird conversions to be strict typed for big query.
       // TODO Consider adding strict definitions of local and UTC time type
       ([d, f]) => ({
         filterToWhere: () => {
