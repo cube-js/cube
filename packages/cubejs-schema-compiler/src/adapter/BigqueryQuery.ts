@@ -42,7 +42,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public convertTz(field) {
-    return `DATETIME(${this.timeStampCast(field)}, '${this.timezone}')`;
+    return `TIMESTAMP(DATETIME(${field}), '${this.timezone}')`;
   }
 
   public timeStampCast(value) {
@@ -58,7 +58,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public timeGroupedColumn(granularity, dimension) {
-    return `DATETIME_TRUNC(${dimension}, ${GRANULARITY_TO_INTERVAL[granularity]})`;
+    return this.timeStampCast(`DATETIME_TRUNC(${dimension}, ${GRANULARITY_TO_INTERVAL[granularity]})`);
   }
 
   /**
@@ -72,7 +72,7 @@ export class BigqueryQuery extends BaseQuery {
 
     return `(${this.dateTimeCast(`'${origin}'`)} + INTERVAL ${intervalFormatted} *
       CAST(FLOOR(
-        DATETIME_DIFF(${source}, ${this.dateTimeCast(`'${origin}'`)}, ${timeUnit}) /
+        DATETIME_DIFF(${this.dateTimeCast(source)}, ${this.dateTimeCast(`'${origin}'`)}, ${timeUnit}) /
         DATETIME_DIFF(${beginOfTime} + INTERVAL ${intervalFormatted}, ${beginOfTime}, ${timeUnit})
       ) AS INT64))`;
   }
