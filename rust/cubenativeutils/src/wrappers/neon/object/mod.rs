@@ -1,7 +1,16 @@
 pub mod base_types;
 pub mod neon_array;
 pub mod neon_function;
+pub mod neon_object;
 pub mod neon_struct;
+pub mod object_root_holder;
+pub mod primitive_root_holder;
+pub mod root_holder;
+
+use neon_object::*;
+use object_root_holder::*;
+use primitive_root_holder::*;
+use root_holder::*;
 
 use self::{
     base_types::{NeonBoolean, NeonNumber, NeonString},
@@ -52,19 +61,6 @@ impl<C: Context<'static> + 'static, V: Value + 'static> NeonTypeHandle<C, V> {
         F: FnOnce(&mut C, &Handle<'static, V>) -> T,
     {
         self.context.with_context(|cx| f(cx, &self.object))
-    }
-
-    pub fn map_downcast_neon_object<JT: Value, T, F>(&self, f: F) -> Result<T, CubeError>
-    where
-        F: FnOnce(&mut C, &Handle<'static, JT>) -> Result<T, CubeError>,
-    {
-        self.context.with_context(|cx| {
-            let obj = self
-                .object
-                .downcast::<JT, _>(cx)
-                .map_err(|_| CubeError::internal("Downcast error".to_string()))?;
-            f(cx, &obj)
-        })?
     }
 
     pub fn map_neon_object_with_safe_call_fn<T, F>(&self, f: F) -> Result<T, CubeError>

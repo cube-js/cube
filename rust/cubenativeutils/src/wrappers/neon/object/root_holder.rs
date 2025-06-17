@@ -1,0 +1,106 @@
+use super::{ObjectNeonTypeHolder, PrimitiveNeonTypeHolder};
+use crate::wrappers::neon::context::ContextHolder;
+use cubesql::CubeError;
+use neon::prelude::*;
+pub trait Upcast<C: Context<'static> + 'static> {
+    fn upcast(self) -> RootHolder<C>;
+}
+
+macro_rules! impl_upcast {
+    ($($holder:ty => $variant:ident),+ $(,)?) => {
+        $(
+            impl<C: Context<'static> + 'static> Upcast<C> for $holder {
+                fn upcast(self) -> RootHolder<C> {
+                    RootHolder::$variant(self)
+                }
+            }
+        )+
+    };
+}
+
+macro_rules! match_js_value_type {
+    ($context:expr, $value:expr, $cx:expr, {
+        $($variant:ident => $js_type:ty => $holder_type:ident),+ $(,)?
+    }) => {
+        $(
+            if $value.is_a::<$js_type, _>($cx) {
+                return Ok(RootHolder::$variant($holder_type::new(
+                    $context.clone(),
+                    $value
+                        .downcast::<$js_type, _>($cx)
+                        .map_err(|_| CubeError::internal("Downcast error".to_string()))?,
+                )?));
+            }
+        )+
+    };
+}
+
+macro_rules! define_into_method {
+    ($method_name:ident, $variant:ident, $holder_type:ty, $error_msg:expr) => {
+        pub fn $method_name(self) -> Result<$holder_type, CubeError> {
+            match self {
+                Self::$variant(v) => Ok(v),
+                _ => Err(CubeError::internal($error_msg.to_string())),
+            }
+        }
+    };
+}
+
+impl_upcast!(
+    PrimitiveNeonTypeHolder<C, JsNull> => Null,
+    PrimitiveNeonTypeHolder<C, JsUndefined> => Undefined,
+    PrimitiveNeonTypeHolder<C, JsBoolean> => Boolean,
+    PrimitiveNeonTypeHolder<C, JsNumber> => Number,
+    PrimitiveNeonTypeHolder<C, JsString> => String,
+    ObjectNeonTypeHolder<C, JsArray> => Array,
+    ObjectNeonTypeHolder<C, JsFunction> => Function,
+    ObjectNeonTypeHolder<C, JsObject> => Struct,
+);
+
+pub enum RootHolder<C: Context<'static> + 'static> {
+    Null(PrimitiveNeonTypeHolder<C, JsNull>),
+    Undefined(PrimitiveNeonTypeHolder<C, JsUndefined>),
+    Boolean(PrimitiveNeonTypeHolder<C, JsBoolean>),
+    Number(PrimitiveNeonTypeHolder<C, JsNumber>),
+    String(PrimitiveNeonTypeHolder<C, JsString>),
+    Array(ObjectNeonTypeHolder<C, JsArray>),
+    Function(ObjectNeonTypeHolder<C, JsFunction>),
+    Struct(ObjectNeonTypeHolder<C, JsObject>),
+}
+
+impl<C: Context<'static> + 'static> RootHolder<C> {
+    pub fn new(
+        context: ContextHolder<C>,
+        value: Handle<'static, JsValue>,
+    ) -> Result<Self, CubeError> {
+        context.with_context(|cx| {
+            match_js_value_type!(context, value, cx, {
+                Null => JsNull => PrimitiveNeonTypeHolder,
+                Undefined => JsUndefined => PrimitiveNeonTypeHolder,
+                Boolean => JsBoolean => PrimitiveNeonTypeHolder,
+                Number => JsNumber => PrimitiveNeonTypeHolder,
+                String => JsString => PrimitiveNeonTypeHolder,
+                Array => JsArray => ObjectNeonTypeHolder,
+                Function => JsFunction => ObjectNeonTypeHolder,
+                Struct => JsObject => ObjectNeonTypeHolder,
+            });
+
+            Err(CubeError::internal(format!(
+                "Unsupported JsValue {:?}",
+                value
+            )))
+        })?
+    }
+    pub fn from_typed<T: Upcast<C>>(typed_holder: T) -> Self {
+        T::upcast(typed_holder)
+    }
+
+    define_into_method!(into_null, Null, PrimitiveNeonTypeHolder<C, JsNull>, "Object is not the Null object");
+    define_into_method!(into_undefined, Undefined, PrimitiveNeonTypeHolder<C, JsUndefined>, "Object is not the Undefined object");
+    define_into_method!(into_boolean, Boolean, PrimitiveNeonTypeHolder<C, JsBoolean>, "Object is not the Boolean object");
+    define_into_method!(into_number, Number, PrimitiveNeonTypeHolder<C, JsNumber>, "Object is not the Number object");
+    define_into_method!(into_string, String, PrimitiveNeonTypeHolder<C, JsString>, "Object is not the String object");
+    define_into_method!(into_array, Array, ObjectNeonTypeHolder<C, JsArray>, "Object is not the Array object");
+    define_into_method!(into_function, Function, ObjectNeonTypeHolder<C, JsFunction>, "Object is not the Function object");
+    define_into_method!(into_struct, Struct, ObjectNeonTypeHolder<C, JsObject>, "Object is not the Struct object");
+}
