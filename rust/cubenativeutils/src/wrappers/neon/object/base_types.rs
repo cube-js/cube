@@ -1,4 +1,5 @@
 use super::{NeonObject, NeonTypeHandle};
+use super::primitive_root_holder::*;
 use crate::wrappers::neon::inner_types::NeonInnerTypes;
 use std::marker::PhantomData;
 

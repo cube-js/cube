@@ -121,7 +121,7 @@ impl<C: Context<'static> + 'static, V: Value + NeonPrimitiveMapping + 'static>
         Ok(Self { context, value })
     }
 
-    fn get_context(&self) -> ContextHolder<C> {
+    pub fn get_context(&self) -> ContextHolder<C> {
         self.context.clone()
     }
 

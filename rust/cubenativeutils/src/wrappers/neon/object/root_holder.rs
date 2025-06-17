@@ -95,6 +95,19 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
         T::upcast(typed_holder)
     }
 
+    pub fn get_context(&self) -> ContextHolder<C> {
+        match self {
+            Self::Null(v) => v.get_context(),
+            Self::Undefined(v) => v.get_context(),
+            Self::Boolean(v) => v.get_context(),
+            Self::Number(v) => v.get_context(),
+            Self::String(v) => v.get_context(),
+            Self::Array(v) => v.get_context(),
+            Self::Function(v) => v.get_context(),
+            Self::Struct(v) => v.get_context(),
+        }
+    }
+
     define_into_method!(into_null, Null, PrimitiveNeonTypeHolder<C, JsNull>, "Object is not the Null object");
     define_into_method!(into_undefined, Undefined, PrimitiveNeonTypeHolder<C, JsUndefined>, "Object is not the Undefined object");
     define_into_method!(into_boolean, Boolean, PrimitiveNeonTypeHolder<C, JsBoolean>, "Object is not the Boolean object");
