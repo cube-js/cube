@@ -3380,16 +3380,15 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
            \n        LinearSingleAggregate\
            \n          CoalescePartitions\
            \n            Union\
+           \n              CoalesceBatches\
+           \n                Filter\
+           \n                  Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                    Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
+           \n                      Empty\
            \n              CoalescePartitions\
            \n                CoalesceBatches\
            \n                  Filter\
-           \n                    Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
-           \n                      Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
-           \n                        Empty\
-           \n              CoalescePartitions\
-           \n                CoalesceBatches\
-           \n                  Filter\
-           \n                    Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n                    Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2, 3, 4]\
            \n                      Sort, by: [allowed@0, site_id@1, url@2, day@3, hits@4], sort_order: [0, 1, 2, 3, 4]\
            \n                        Empty"
     );
