@@ -1,21 +1,23 @@
 use crate::wrappers::neon::context::{ContextHolder, SafeCallFn};
 use cubesql::CubeError;
 use neon::prelude::*;
-use std::mem::MaybeUninit;
 use std::rc::Rc;
 
-#[derive(Clone)]
 pub struct ObjectNeonTypeHolder<C: Context<'static>, V: Object + 'static> {
     context: ContextHolder<C>,
     value: Option<Rc<Root<V>>>,
 }
 impl<C: Context<'static> + 'static, V: Object + 'static> ObjectNeonTypeHolder<C, V> {
-    pub fn new(context: ContextHolder<C>, object: Handle<'static, V>) -> Result<Self, CubeError> {
-        let value = context.with_context(|cx| object.root(cx))?;
-        Ok(Self {
+    pub fn new(
+        context: ContextHolder<C>,
+        object: Handle<'static, V>,
+        cx: &mut C,
+    ) -> Self {
+        let value = object.root(cx);
+        Self {
             context,
             value: Some(Rc::new(value)),
-        })
+        }
     }
 
     pub fn get_context(&self) -> ContextHolder<C> {
@@ -61,6 +63,15 @@ impl<C: Context<'static>, V: Object + 'static> Drop for ObjectNeonTypeHolder<C, 
                     log::error!("Error while dropping Neon Root: {}", e)
                 }
             }
+        }
+    }
+}
+
+impl<C: Context<'static>, V: Object + 'static> Clone for ObjectNeonTypeHolder<C, V> {
+    fn clone(&self) -> Self {
+        Self {
+            context: self.context.clone(),
+            value: self.value.clone(),
         }
     }
 }

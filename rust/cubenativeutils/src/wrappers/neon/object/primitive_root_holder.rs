@@ -1,7 +1,6 @@
 use crate::wrappers::neon::context::{ContextHolder, SafeCallFn};
 use cubesql::CubeError;
 use neon::prelude::*;
-use std::rc::Rc;
 
 pub trait NeonPrimitiveMapping: Value {
     type NativeType: Clone;
@@ -116,9 +115,13 @@ pub struct PrimitiveNeonTypeHolder<C: Context<'static>, V: NeonPrimitiveMapping 
 impl<C: Context<'static> + 'static, V: Value + NeonPrimitiveMapping + 'static>
     PrimitiveNeonTypeHolder<C, V>
 {
-    pub fn new(context: ContextHolder<C>, object: Handle<'static, V>) -> Result<Self, CubeError> {
-        let value = context.with_context(|cx| V::from_neon(cx, &object))?;
-        Ok(Self { context, value })
+    pub fn new(
+        context: ContextHolder<C>,
+        object: Handle<'static, V>,
+        cx: &mut C,
+    ) -> Self {
+        let value = V::from_neon(cx, &object);
+        Self { context, value }
     }
 
     pub fn get_context(&self) -> ContextHolder<C> {
@@ -148,27 +151,15 @@ impl<C: Context<'static> + 'static, V: Value + NeonPrimitiveMapping + 'static>
     pub fn into_object(self) -> Result<Handle<'static, V>, CubeError> {
         self.context.with_context(|cx| V::to_neon(cx, &self.value))
     }
+}
 
-    /* pub fn upcast(&self) -> NeonObject<C> {
-        NeonObject::new(self.context.clone(), self.object.upcast())
+impl<C: Context<'static>, V: NeonPrimitiveMapping + 'static> Clone
+    for PrimitiveNeonTypeHolder<C, V>
+{
+    fn clone(&self) -> Self {
+        Self {
+            context: self.context.clone(),
+            value: self.value.clone(),
+        }
     }
-
-    pub fn map_neon_object<T, F>(&self, f: F) -> Result<T, CubeError>
-    where
-        F: FnOnce(&mut C, &Handle<'static, V>) -> T,
-    {
-        self.context.with_context(|cx| f(cx, &self.object))
-    }
-
-    pub fn map_neon_object_with_safe_call_fn<T, F>(&self, f: F) -> Result<T, CubeError>
-    where
-        F: FnOnce(&mut C, &Handle<'static, V>, SafeCallFn) -> T,
-    {
-        self.context
-            .with_context_and_safe_fn(|cx, safe_call_fn| f(cx, &self.object, safe_call_fn))
-    }
-
-    pub fn is_a<U: Value>(&self) -> Result<bool, CubeError> {
-        self.context.with_context(|cx| self.object.is_a::<U, _>(cx))
-    } */
 }

@@ -20,16 +20,18 @@ macro_rules! impl_upcast {
 
 macro_rules! match_js_value_type {
     ($context:expr, $value:expr, $cx:expr, {
-        $($variant:ident => $js_type:ty => $holder_type:ident),+ $(,)?
+       $($variant:ident => $js_type:ty => $holder_type:ident),+ $(,)?
     }) => {
         $(
             if $value.is_a::<$js_type, _>($cx) {
+                let downcasted = $value
+                    .downcast::<$js_type, _>($cx)
+                    .map_err(|_| CubeError::internal("Downcast error".to_string()))?;
                 return Ok(RootHolder::$variant($holder_type::new(
                     $context.clone(),
-                    $value
-                        .downcast::<$js_type, _>($cx)
-                        .map_err(|_| CubeError::internal("Downcast error".to_string()))?,
-                )?));
+                    downcasted,
+                    $cx
+                )));
             }
         )+
     };
@@ -116,4 +118,19 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
     define_into_method!(into_array, Array, ObjectNeonTypeHolder<C, JsArray>, "Object is not the Array object");
     define_into_method!(into_function, Function, ObjectNeonTypeHolder<C, JsFunction>, "Object is not the Function object");
     define_into_method!(into_struct, Struct, ObjectNeonTypeHolder<C, JsObject>, "Object is not the Struct object");
+}
+
+impl<C: Context<'static> + 'static> Clone for RootHolder<C> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Null(v) => Self::Null(v.clone()),
+            Self::Undefined(v) => Self::Undefined(v.clone()),
+            Self::Boolean(v) => Self::Boolean(v.clone()),
+            Self::Number(v) => Self::Number(v.clone()),
+            Self::String(v) => Self::String(v.clone()),
+            Self::Array(v) => Self::Array(v.clone()),
+            Self::Function(v) => Self::Function(v.clone()),
+            Self::Struct(v) => Self::Struct(v.clone()),
+        }
+    }
 }
