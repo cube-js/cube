@@ -958,8 +958,7 @@ export class BaseQuery {
       .map(
         d => [
           d,
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
+          (_dateFrom, dateTo, dateField, dimensionDateFrom, _dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
         ]
       );
   }
@@ -970,7 +969,7 @@ export class BaseQuery {
       .map(
         d => [
           d,
-          (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
+          (dateFrom, dateTo, dateField, _dimensionDateFrom, _dimensionDateTo, _isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
         ]
       );
   }
@@ -987,13 +986,13 @@ export class BaseQuery {
             const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
             const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
             const sign = offset === 'start' ? '>=' : '>';
-            conditions.push(`${dateField} ${sign} ${trailingStart}`);
+            conditions.push(`${dateField} ${sign} ${this.timeStampCast(trailingStart)}`);
           }
           if (leadingInterval !== 'unbounded') {
             const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
             const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
             const sign = offset === 'end' ? '<=' : '<';
-            conditions.push(`${dateField} ${sign} ${leadingEnd}`);
+            conditions.push(`${dateField} ${sign} ${this.timeStampCast(leadingEnd)}`);
           }
           return conditions.length ? conditions.join(' AND ') : '1 = 1';
         }]
@@ -1792,8 +1791,11 @@ export class BaseQuery {
           // but some dialects (like BigQuery) require strict date types and can not automatically convert
           // between date and timestamp for comparisons, at the same time, time dimensions are expected to be
           // timestamps, so we need to align types for join conditions/comparisons.
-          this.timeStampCast(`${d.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`),
-          this.timeStampCast(`${d.dateSeriesAliasName()}.${this.escapeColumnName('date_to')}`),
+          // But we can't do it here, as it would break interval maths used in some types of
+          // rolling window join conditions in some dialects (like Redshift), so we need to
+          // do casts granularly in rolling window join conditions functions.
+          `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`,
+          `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_to')}`,
           `${baseQueryAlias}.${d.aliasName()}`,
           `'${d.dateFromFormatted()}'`,
           `'${d.dateToFormatted()}'`
