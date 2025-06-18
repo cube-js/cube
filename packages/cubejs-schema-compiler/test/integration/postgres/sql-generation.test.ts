@@ -231,6 +231,12 @@ describe('SQL Generation', () => {
           type: 'sum',
           add_group_by: [visitors.created_at],
         },
+        revenue_sum_group_by_granularity: {
+          multi_stage: true,
+          sql: \`\${revenue}\`,
+          type: 'number',
+          add_group_by: [visitors.created_at.month],
+        },
         revenue_rank: {
           multi_stage: true,
           type: \`rank\`,
@@ -3458,6 +3464,33 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       visitors__updated_at_day: '2017-01-25T00:00:00.000Z',
       visitors__adjusted_rank_sum: null,
       visitors__visitor_revenue: null
+    }]
+  ));
+
+  it('multi stage revenue_sum_group_by_granularity and group by td with granularity', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue_sum_group_by_granularity'],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source'
+      }],
+      timezone: 'UTC',
+    },
+    [{
+      visitors__revenue_sum_group_by_granularity: '300',
+      visitors__source: 'google',
+    },
+    {
+      visitors__revenue_sum_group_by_granularity: '300',
+      visitors__source: 'some',
+    },
+    {
+      visitors__revenue_sum_group_by_granularity: '900',
+      visitors__source: null,
+    },
+    {
+      visitors__revenue_sum_group_by_granularity: '500',
+      visitors__source: null,
     }]
   ));
 

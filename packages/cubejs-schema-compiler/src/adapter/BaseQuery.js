@@ -1462,7 +1462,22 @@ export class BaseQuery {
     const memberDef = member.definition();
     // TODO can addGroupBy replaced by something else?
     if (memberDef.addGroupByReferences) {
-      queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
+      const dims = memberDef.addGroupByReferences.reduce((acc, cur) => {
+        const pathArr = cur.split('.');
+        // addGroupBy may include time dimension with granularity
+        // But we don't need it as time dimension
+        if (pathArr.length > 2) {
+          pathArr.splice(2, 0, 'granularities');
+          acc.push(pathArr.join('.'));
+        } else {
+          acc.push(cur);
+        }
+        return acc;
+      }, []);
+      queryContext = {
+        ...queryContext,
+        dimensions: R.uniq(queryContext.dimensions.concat(dims)),
+      };
     }
     if (memberDef.timeShiftReferences?.length) {
       let { commonTimeShift } = queryContext;
