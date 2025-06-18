@@ -1784,6 +1784,7 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return [];
   },
+
   duckdbCommunityExtensions: ({
     dataSource
   }: {
@@ -1797,6 +1798,36 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return [];
   },
+
+  duckdbS3UseCredentialChain: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN', dataSource)
+    ];
+
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return false;
+    }
+  },
+
   /** ***************************************************************
    * Presto/Trino Driver                                                  *
    **************************************************************** */
