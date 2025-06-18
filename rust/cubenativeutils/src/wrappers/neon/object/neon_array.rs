@@ -47,7 +47,10 @@ impl<C: Context<'static> + 'static> NativeArray<NeonInnerTypes<C>> for NeonArray
         neon_vec
             .into_iter()
             .map(|o| -> Result<_, CubeError> {
-                Ok(NativeObjectHandle::new(NeonObject::new(self.object.get_context(), o)?))
+                Ok(NativeObjectHandle::new(NeonObject::new(
+                    self.object.get_context(),
+                    o,
+                )?))
             })
             .collect::<Result<Vec<_>, _>>()
     }

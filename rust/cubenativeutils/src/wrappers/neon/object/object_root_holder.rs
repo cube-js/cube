@@ -8,11 +8,7 @@ pub struct ObjectNeonTypeHolder<C: Context<'static>, V: Object + 'static> {
     value: Option<Rc<Root<V>>>,
 }
 impl<C: Context<'static> + 'static, V: Object + 'static> ObjectNeonTypeHolder<C, V> {
-    pub fn new(
-        context: ContextHolder<C>,
-        object: Handle<'static, V>,
-        cx: &mut C,
-    ) -> Self {
+    pub fn new(context: ContextHolder<C>, object: Handle<'static, V>, cx: &mut C) -> Self {
         let value = object.root(cx);
         Self {
             context,

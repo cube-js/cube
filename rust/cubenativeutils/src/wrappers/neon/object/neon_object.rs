@@ -5,10 +5,7 @@ use super::{
     neon_struct::NeonStruct,
     RootHolder,
 };
-use crate::wrappers::neon::{
-    context::ContextHolder,
-    inner_types::NeonInnerTypes,
-};
+use crate::wrappers::neon::{context::ContextHolder, inner_types::NeonInnerTypes};
 use crate::wrappers::object::NativeObject;
 use cubesql::CubeError;
 use neon::prelude::*;

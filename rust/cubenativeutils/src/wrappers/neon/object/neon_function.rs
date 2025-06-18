@@ -1,4 +1,4 @@
-use super::{NeonObject, RootHolder, ObjectNeonTypeHolder};
+use super::{NeonObject, ObjectNeonTypeHolder, RootHolder};
 use crate::wrappers::{
     neon::inner_types::NeonInnerTypes,
     object::{NativeFunction, NativeType},

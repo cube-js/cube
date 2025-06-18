@@ -115,11 +115,7 @@ pub struct PrimitiveNeonTypeHolder<C: Context<'static>, V: NeonPrimitiveMapping 
 impl<C: Context<'static> + 'static, V: Value + NeonPrimitiveMapping + 'static>
     PrimitiveNeonTypeHolder<C, V>
 {
-    pub fn new(
-        context: ContextHolder<C>,
-        object: Handle<'static, V>,
-        cx: &mut C,
-    ) -> Self {
+    pub fn new(context: ContextHolder<C>, object: Handle<'static, V>, cx: &mut C) -> Self {
         let value = V::from_neon(cx, &object);
         Self { context, value }
     }
