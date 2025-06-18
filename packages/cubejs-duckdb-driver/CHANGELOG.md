@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.22](https://github.com/cube-js/cube/compare/v1.3.21...v1.3.22) (2025-06-18)
+
+### Features
+
+- **duckdb-driver:** Add support for using default credential provider chain for duckdb s3 access ([#9679](https://github.com/cube-js/cube/issues/9679)) ([89f54e9](https://github.com/cube-js/cube/commit/89f54e91af72e5d671268472d3ff04ebb841d1ed))
+
 ## [1.3.21](https://github.com/cube-js/cube/compare/v1.3.20...v1.3.21) (2025-06-10)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

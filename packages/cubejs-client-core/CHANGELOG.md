@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.22](https://github.com/cube-js/cube/compare/v1.3.21...v1.3.22) (2025-06-18)
+
+### Bug Fixes
+
+- **client-core:** Fix for the issue with Generated SQL tab in playground ([#9675](https://github.com/cube-js/cube/issues/9675)) ([17570d4](https://github.com/cube-js/cube/commit/17570d42a70292a58baba963fd3f8106816a2824))
+
 ## [1.3.21](https://github.com/cube-js/cube/compare/v1.3.20...v1.3.21) (2025-06-10)
 
 **Note:** Version bump only for package @cubejs-client/core

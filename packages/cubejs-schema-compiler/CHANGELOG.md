@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.22](https://github.com/cube-js/cube/compare/v1.3.21...v1.3.22) (2025-06-18)
+
+### Bug Fixes
+
+- **cubejs-cli:** Fix validate command ([#9666](https://github.com/cube-js/cube/issues/9666)) ([b2bc99f](https://github.com/cube-js/cube/commit/b2bc99f3f29a8ba3ad1b07ded6379881668f596a))
+- **schema-compiler:** Case insensitive filter for ClickHouse ([#9373](https://github.com/cube-js/cube/issues/9373)) ([273d277](https://github.com/cube-js/cube/commit/273d277e1058feff36796c48cf0fb315a8211ced))
+- **schema-compiler:** Fix Access Policy inheritance ([#9648](https://github.com/cube-js/cube/issues/9648)) ([896af5e](https://github.com/cube-js/cube/commit/896af5eaeccec00c88463fa518e98bf374acdc9b))
+- **tesseract:** Fix rolling window external pre-aggregation ([#9625](https://github.com/cube-js/cube/issues/9625)) ([aae3b05](https://github.com/cube-js/cube/commit/aae3b05f49222009f57e407c52d7288bb33b9b8a))
+- **tesseract:** Fix rolling window with few time dimensions, filter_group in segments and member expressions ([#9673](https://github.com/cube-js/cube/issues/9673)) ([98d334b](https://github.com/cube-js/cube/commit/98d334bb8ee4debe49b428c92581f63596f3f56c))
+
+### Features
+
+- **schema-compiler:** Add support for time dimensions with granularities in multi-stage measures add_group_by ([#9657](https://github.com/cube-js/cube/issues/9657)) ([6700b43](https://github.com/cube-js/cube/commit/6700b432cc22d71b4b8ef650e835ba0cb33cf91c))
+
 ## [1.3.21](https://github.com/cube-js/cube/compare/v1.3.20...v1.3.21) (2025-06-10)
 
 ### Bug Fixes
