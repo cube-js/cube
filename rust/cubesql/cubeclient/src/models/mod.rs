@@ -6,6 +6,8 @@ pub mod v1_cube_meta_dimension_granularity;
 pub use self::v1_cube_meta_dimension_granularity::V1CubeMetaDimensionGranularity;
 pub mod v1_cube_meta_folder;
 pub use self::v1_cube_meta_folder::V1CubeMetaFolder;
+pub mod v1_cube_meta_folder_members_inner;
+pub use self::v1_cube_meta_folder_members_inner::V1CubeMetaFolderMembersInner;
 pub mod v1_cube_meta_hierarchy;
 pub use self::v1_cube_meta_hierarchy::V1CubeMetaHierarchy;
 pub mod v1_cube_meta_join;
