@@ -6,7 +6,6 @@ import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
 import { QueryType } from './types/enums';
-import { PreAggsJobsRequest } from "./types/request";
 
 const getQueryGranularity = (queries) => R.pipe(
   R.map(({ timeDimensions }) => timeDimensions[0]?.granularity),
@@ -184,8 +183,8 @@ const querySchema = Joi.object().keys({
   ),
   segments: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
   timezone: Joi.string(),
-  limit: Joi.number().integer().min(0),
-  offset: Joi.number().integer().min(0),
+  limit: Joi.number().integer().strict().min(0),
+  offset: Joi.number().integer().strict().min(0),
   total: Joi.boolean(),
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean(),
