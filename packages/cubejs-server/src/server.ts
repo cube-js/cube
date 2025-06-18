@@ -36,6 +36,8 @@ export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions
   webSockets?: boolean;
   http?: HttpOptions;
   gracefulShutdown?: number;
+  serverKeepAliveTimeout?: number;
+  serverHeadersTimeout?: number;
 }
 
 type RequireOne<T, K extends keyof T> = {
@@ -47,7 +49,7 @@ type RequireOne<T, K extends keyof T> = {
 export class CubejsServer {
   protected readonly core: CubeCore;
 
-  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort'>;
+  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort' | 'serverHeadersTimeout' | 'serverKeepAliveTimeout'>;
 
   protected server: GracefulHttpServer | null = null;
 
@@ -64,6 +66,8 @@ export class CubejsServer {
       sqlPort: config.sqlPort || getEnv('sqlPort'),
       pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort'),
       gatewayPort: config.gatewayPort || getEnv('nativeApiGatewayPort'),
+      serverHeadersTimeout: config.serverHeadersTimeout ?? getEnv('serverHeadersTimeout'),
+      serverKeepAliveTimeout: config.serverKeepAliveTimeout ?? getEnv('serverKeepAliveTimeout'),
       http: {
         ...config.http,
         cors: {
@@ -112,6 +116,14 @@ export class CubejsServer {
       if (this.config.sqlPort || this.config.pgSqlPort) {
         this.sqlServer = this.core.initSQLServer();
         await this.sqlServer.init(this.config);
+      }
+
+      if (this.config.serverKeepAliveTimeout) {
+        this.server.keepAliveTimeout = this.config.serverKeepAliveTimeout;
+      }
+
+      if (this.config.serverHeadersTimeout) {
+        this.server.headersTimeout = this.config.serverHeadersTimeout;
       }
 
       const PORT = getEnv('port');

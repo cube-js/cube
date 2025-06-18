@@ -1136,6 +1136,26 @@ Until v0.35, the default value was `schema`.
 It can be also set using the [`schema_path` configuration
 option](/product/configuration/reference/config#schema_path).
 
+## `CUBEJS_SERVER_HEADERS_TIMEOUT`
+
+The number of milliseconds to limit the amount of time the parser will wait
+to receive the complete HTTP headers.
+If the timeout expires, the server responds with status 408 without
+forwarding the request to the request listener and then closes the connection.
+
+| Possible Values                           | Default in Development   | Default in Production    |
+| ----------------------------------------- | ------------------------ | ------------------------ |
+| A valid number or string representing one | NodeJS's version default | NodeJS's version default |
+
+## `CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT`
+
+The number of milliseconds of inactivity a server needs to wait for additional incoming data,
+after it has finished writing the last response, before a socket will be destroyed.
+
+| Possible Values                           | Default in Development   | Default in Production    |
+| ----------------------------------------- | ------------------------ | ------------------------ |
+| A valid number or string representing one | NodeJS's version default | NodeJS's version default |
+
 ## `CUBEJS_SQL_USER`
 
 A username required to access the [SQL API][ref-sql-api].
