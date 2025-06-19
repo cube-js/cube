@@ -148,8 +148,8 @@ pub struct CacheEvictionManager {
     persist_batch_size: usize,
     eviction_batch_size: usize,
     eviction_below_threshold: u8,
-    /// Proactive deletion of keys with upcoming expiration in the next N seconds. + It checks size, because
-    /// it can be useless to delete keys with small size, because it can lead to a drop of refresh keys or touch flags
+    /// Proactive deletion of keys with upcoming expiration in the next N seconds. + it checks size, because
+    /// possible it can lead to a drop of refresh keys or touch flags
     eviction_proactive_size_threshold: u32,
     eviction_proactive_ttl_threshold: u32,
     compaction_trigger_size: u64,
