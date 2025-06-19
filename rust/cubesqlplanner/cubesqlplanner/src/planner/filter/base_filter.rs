@@ -397,6 +397,8 @@ impl BaseFilter {
     ) -> Result<(String, String), CubeError> {
         let from_expr = format!("min({})", plan_templates.quote_identifier("date_from")?);
         let to_expr = format!("max({})", plan_templates.quote_identifier("date_to")?);
+        let from_expr = plan_templates.time_stamp_cast(from_expr)?;
+        let to_expr = plan_templates.time_stamp_cast(to_expr)?;
         let alias = format!("value");
         let time_series_cte_name = format!("time_series"); // FIXME May be should be passed as parameter
 
