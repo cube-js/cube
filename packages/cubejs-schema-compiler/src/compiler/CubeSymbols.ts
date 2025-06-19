@@ -31,6 +31,7 @@ interface CubeDefinition {
   excludes?: any;
   cubes?: any;
   isView?: boolean;
+  calendar?: boolean;
   isSplitView?: boolean;
   includedMembers?: any[];
 }
