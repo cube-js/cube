@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.23](https://github.com/cube-js/cube/compare/v1.3.22...v1.3.23) (2025-06-19)
+
+### Bug Fixes
+
+- **api-gateway:** Fix request validation (offset & limit must be numbers strictly) ([#9686](https://github.com/cube-js/cube/issues/9686)) ([b94470f](https://github.com/cube-js/cube/commit/b94470f07d2bd56f6396fe7fa269837c973af59d))
+
 ## [1.3.22](https://github.com/cube-js/cube/compare/v1.3.21...v1.3.22) (2025-06-18)
 
 ### Bug Fixes

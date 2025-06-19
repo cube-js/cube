@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.23](https://github.com/cube-js/cube/compare/v1.3.22...v1.3.23) (2025-06-19)
+
+### Bug Fixes
+
+- **cubesql:** Split meta on `CAST` over `__user` column ([#9690](https://github.com/cube-js/cube/issues/9690)) ([1685c1b](https://github.com/cube-js/cube/commit/1685c1b6dc6331855a9cd6e41ee4c7de8e185a8e))
+
 ## [1.3.22](https://github.com/cube-js/cube/compare/v1.3.21...v1.3.22) (2025-06-18)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

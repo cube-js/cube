@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.23](https://github.com/cube-js/cube/compare/v1.3.22...v1.3.23) (2025-06-19)
+
+### Bug Fixes
+
+- **api-gateway:** Fix request validation (offset & limit must be numbers strictly) ([#9686](https://github.com/cube-js/cube/issues/9686)) ([b94470f](https://github.com/cube-js/cube/commit/b94470f07d2bd56f6396fe7fa269837c973af59d))
+- **backend-native:** Use the lowest granularity for data-transform td with granularity fallback ([#9640](https://github.com/cube-js/cube/issues/9640)) ([59210da](https://github.com/cube-js/cube/commit/59210da8c3edabaced373b83679bac17b0843ef4))
+- **cubesql:** Split meta on `CAST` over `__user` column ([#9690](https://github.com/cube-js/cube/issues/9690)) ([1685c1b](https://github.com/cube-js/cube/commit/1685c1b6dc6331855a9cd6e41ee4c7de8e185a8e))
+
+### Features
+
+- **server:** Add server config for headers and keep alive timeouts ([#9309](https://github.com/cube-js/cube/issues/9309)) ([8fd2c42](https://github.com/cube-js/cube/commit/8fd2c42c708c0be6863197849cfd3f10b7e51215))
+
 ## [1.3.22](https://github.com/cube-js/cube/compare/v1.3.21...v1.3.22) (2025-06-18)
 
 ### Bug Fixes
