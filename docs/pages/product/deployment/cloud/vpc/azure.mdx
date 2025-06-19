@@ -1,15 +1,5 @@
 # Connecting with a VPC on Azure
 
-## Prerequisites
-
-To allow Cube Cloud to connect to a Virtual Network on Azure, the following
-information is required:
-
-- **Virtual Network Name:** This can be found in the Virtual Networks section of
-  the [Azure Portal][azure-console].
-- **Tenant ID:** This can be found under&nbsp;<Btn>Azure Active Directory</Btn>
-  →&nbsp;<Btn>Properties</Btn> →&nbsp;<Btn>Tenant ID</Btn> in the [Azure Portal][azure-console].
-
 ## Setup
 
 For cross-tenant peering in Azure, you are supposed to assign the peering role
@@ -91,6 +81,9 @@ information:
 - **Tenant ID:** You can find it in&nbsp;<Btn>Azure Active Directory</Btn>
   →&nbsp;<Btn>Properties</Btn> →&nbsp;<Btn>Tenant ID</Btn> section of
   [Azure Portal][azure-console].
+- **Dedicated Infrastructure Region:** VPC Peering requires Cube to be hosted 
+  in [dedicated infrastructure][dedicated-infra]. Please specify what region 
+  the Cube Cloud dedicated infrastructure should be hosted in.
 
 ## Supported Regions
 
@@ -99,3 +92,4 @@ We support all general-purpose regions. Cube Store is currently located only in
 proximity to it.
 
 [azure-console]: https://portal.azure.com
+[dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
