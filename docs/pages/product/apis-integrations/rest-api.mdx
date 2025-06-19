@@ -184,12 +184,12 @@ configuration in the `cube.js` file, assuming that service accounts have
 module.exports = {
   contextToApiScopes: (securityContext, defaultScopes) => {
     if (securityContext.service) {
-      return ["meta", ...defaultScopes];
+      return ["meta", ...defaultScopes]
     }
 
-    return defaultScopes;
-  },
-};
+    return defaultScopes
+  }
+}
 ```
 
 ### CORS
@@ -205,10 +205,10 @@ following configuration in the `cube.js` file:
 module.exports = {
   http: {
     cors: {
-      origin: "https://example.com",
-    },
-  },
-};
+      origin: "https://example.com"
+    }
+  }
+}
 ```
 
 ## Prerequisites

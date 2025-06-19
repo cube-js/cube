@@ -89,10 +89,10 @@ In Node.js, the following code shows how to generate a token which will expire
 in 30 days. We recommend using the `jsonwebtoken` package for this.
 
 ```javascript
-const jwt = require("jsonwebtoken");
-const CUBE_API_SECRET = "secret";
+const jwt = require("jsonwebtoken")
+const CUBE_API_SECRET = "secret"
 
-const cubeToken = jwt.sign({}, CUBE_API_SECRET, { expiresIn: "30d" });
+const cubeToken = jwt.sign({}, CUBE_API_SECRET, { expiresIn: "30d" })
 ```
 
 Then, in a web server or cloud function, create a route which generates and
@@ -102,41 +102,43 @@ your token using your own user authentication and authorization:
 ```javascript
 app.use((req, res, next) => {
   if (!req.user) {
-    res.redirect("/login");
-    return;
+    res.redirect("/login")
+    return
   }
-  next();
-});
+
+  next()
+})
 
 app.get("/auth/cubejs-token", (req, res) => {
   res.json({
     // Take note: Cube expects the JWT payload to contain an object!
     token: jwt.sign(req.user, process.env.CUBEJS_API_SECRET, {
-      expiresIn: "1d",
-    }),
-  });
-});
+      expiresIn: "1d"
+    })
+  })
+})
 ```
 
 Then, on the client side, (assuming the user is signed in), fetch a token from
 the web server:
 
 ```javascript
-let apiTokenPromise;
+let apiTokenPromise
 
 const cubeApi = cube(
   () => {
     if (!apiTokenPromise) {
       apiTokenPromise = fetch(`${API_URL}/auth/cubejs-token`)
         .then((res) => res.json())
-        .then((r) => r.token);
+        .then((r) => r.token)
     }
-    return apiTokenPromise;
+    
+    return apiTokenPromise
   },
   {
-    apiUrl: `${API_URL}/cubejs-api/v1`,
+    apiUrl: `${API_URL}/cubejs-api/v1`
   }
-);
+)
 ```
 
 You can optionally store this token in local storage or in a cookie, so that you
@@ -163,9 +165,9 @@ Add the following to your `cube.js` configuration file:
 ```javascript
 module.exports = {
   jwt: {
-    key: "<JWK_AS_STRING>",
-  },
-};
+    key: "<JWK_AS_STRING>"
+  }
+}
 ```
 
 Or configure the same using environment variables:
@@ -188,9 +190,9 @@ Add the following to your `cube.js` configuration file:
 ```javascript
 module.exports = {
   jwt: {
-    jwkUrl: "<URL_TO_JWKS_JSON>",
-  },
-};
+    jwkUrl: "<URL_TO_JWKS_JSON>"
+  }
+}
 ```
 
 Or configure the same using environment variables:
@@ -210,9 +212,9 @@ module.exports = {
   jwt: {
     audience: "<AUDIENCE_FROM_IDENTITY_PROVIDER>",
     issuer: ["<ISSUER_FROM_IDENTITY_PROVIDER>"],
-    subject: "<SUBJECT_FROM_IDENTITY_PROVIDER>",
-  },
-};
+    subject: "<SUBJECT_FROM_IDENTITY_PROVIDER>"
+  }
+}
 ```
 
 Using environment variables:
@@ -231,9 +233,9 @@ namespace in your `cube.js` configuration file:
 ```javascript
 module.exports = {
   jwt: {
-    claimsNamespace: "my-custom-namespace",
-  },
-};
+    claimsNamespace: "my-custom-namespace"
+  }
+}
 ```
 
 

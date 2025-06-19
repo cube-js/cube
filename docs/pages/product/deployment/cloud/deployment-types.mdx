@@ -148,9 +148,9 @@ def context_to_app_id(ctx: dict) -> str:
 ```js
 module.exports = {
   contextToAppId: ({ securityContext }) => {
-    return `CUBE_APP_${securityContext.tenant_id}`;
+    return `CUBE_APP_${securityContext.tenant_id}`
   }
-};
+}
 ```
 
 </CodeTabs>

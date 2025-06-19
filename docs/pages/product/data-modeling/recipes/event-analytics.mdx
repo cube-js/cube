@@ -74,8 +74,8 @@ cube(`events`, {
       , p.context_page_path as page_path
       , p.referrer as referrer
     FROM javascript.pages as p
-    `,
-});
+    `
+})
 ```
 
 ```yaml
@@ -118,16 +118,16 @@ cube("events", {
   measures: {
     count: {
       sql: `event_id`,
-      type: `count`,
+      type: `count`
     },
 
     page_views_count: {
       sql: `event_id`,
       type: `count`,
-      filters: [{ sql: `${CUBE}.event = 'pageview'` }],
-    },
-  },
-});
+      filters: [{ sql: `${CUBE}.event = 'pageview'` }]
+    }
+  }
+})
 ```
 
 ```yaml
@@ -162,26 +162,26 @@ cube("events", {
     anonymous_id: {
       sql: `anonymous_id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     event_id: {
       sql: `event_id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     timestamp: {
       sql: `timestamp`,
-      type: `time`,
+      type: `time`
     },
 
     event: {
       sql: `event`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -257,8 +257,8 @@ cube(`sessions`, {
       FROM ${events.sql()} AS e
     ) AS event
     WHERE (event.inactivity_time > 30 OR event.inactivity_time IS NULL)
-    `,
-});
+    `
+})
 ```
 
 ```yaml
@@ -298,34 +298,34 @@ cube("sessions", {
   measures: {
     count: {
       sql: `session_id`,
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     anonymous_id: {
       sql: `anonymous_id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     session_id: {
       sql: `session_id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     start_at: {
       sql: `session_start_at`,
-      type: `time`,
+      type: `time`
     },
 
     next_start_at: {
       sql: `next_session_start_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -384,10 +384,10 @@ cube("events", {
         ${events.anonymous_id} = ${sessions.anonymous_id}
         AND ${events.timestamp} >= ${sessions.start_at}
         AND (${events.timestamp} < ${sessions.next_start_at} or ${sessions.next_start_at} is null)
-      `,
-    },
-  },
-});
+      `
+    }
+  }
+})
 ```
 
 ```yaml
@@ -419,10 +419,10 @@ cube("events", {
     last_event_timestamp: {
       sql: `timestamp`,
       type: `max`,
-      public: false,
-    },
-  },
-});
+      public: false
+    }
+  }
+})
 
 cube("sessions", {
   // ...,
@@ -432,7 +432,7 @@ cube("sessions", {
       sql: `${events.last_event_timestamp}`,
       type: `time`,
       sub_query: true,
-      public: false,
+      public: false
     },
 
     end_at: {
@@ -440,22 +440,22 @@ cube("sessions", {
          THEN ${CUBE}.next_session_start_at
          ELSE ${end_raw} + INTERVAL '30 minutes'
          END`,
-      type: `time`,
+      type: `time`
     },
 
     duration_minutes: {
       sql: `datediff(minutes, ${CUBE}.session_start_at, ${end_at})`,
-      type: `number`,
-    },
+      type: `number`
+    }
   },
 
   measures: {
     average_duration_minutes: {
       type: `avg`,
-      sql: `${duration_minutes}`,
-    },
-  },
-});
+      sql: `${duration_minutes}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -523,21 +523,21 @@ cube(`identifies`, {
     id: {
       sql: `user_id || '-' || anonymous_id`,
       type: `string`,
-      primary_key: true,
+      primary_key: true
     },
 
     anonymous_id: {
       sql: `anonymous_id`,
-      type: `number`,
+      type: `number`
     },
 
     user_id: {
       sql: `user_id`,
       type: `number`,
-      format: `id`,
-    },
-  },
-});
+      format: `id`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -576,10 +576,10 @@ cube("sessions", {
   joins: {
     identifies: {
       relationship: `many_to_one`,
-      sql: `${identifies.anonymous_id} = ${sessions.anonymous_id}`,
-    },
-  },
-});
+      sql: `${identifies.anonymous_id} = ${sessions.anonymous_id}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -608,10 +608,10 @@ cube("sessions", {
   dimensions: {
     user_id: {
       sql: `coalesce(${identifies.user_id}, ${CUBE}.anonymous_id)`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -638,15 +638,15 @@ cube("sessions", {
   measures: {
     users_count: {
       sql: `${user_id}`,
-      type: `count_distinct`,
+      type: `count_distinct`
     },
 
     average_sessions_per_user: {
       sql: `${count}::NUMERIC / NULLIF(${users_count}, 0)`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -688,10 +688,10 @@ cube("sessions", {
     number_events: {
       sql: `${events.count}`,
       type: `number`,
-      sub_query: true,
-    },
-  },
-});
+      sub_query: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -725,9 +725,9 @@ cube("sessions", {
       type: `string`,
       case: {
         when: [{ sql: `${number_events} = 1`, label: `True` }],
-        else: { label: `False` },
-      },
-    },
+        else: { label: `False` }
+      }
+    }
   },
 
   measures: {
@@ -736,18 +736,18 @@ cube("sessions", {
       type: `count`,
       filters: [
         {
-          sql: `${is_bounced} = 'True'`,
-        },
-      ],
+          sql: `${is_bounced} = 'True'`
+        }
+      ]
     },
 
     bounce_rate: {
       sql: `100.00 * ${bounced_count} / NULLIF(${count}, 0)`,
       type: `number`,
-      format: `percent`,
-    },
-  },
-});
+      format: `percent`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -791,10 +791,10 @@ cube("sessions", {
   measures: {
     first_referrer: {
       type: `string`,
-      sql: `first_referrer`,
-    },
-  },
-});
+      sql: `first_referrer`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -828,9 +828,9 @@ cube("sessions", {
       type: `string`,
       case: {
         when: [{ sql: `${CUBE}.session_sequence = 1`, label: `First` }],
-        else: { label: `Repeat` },
-      },
-    },
+        else: { label: `Repeat` }
+      }
+    }
   },
 
   measures: {
@@ -838,17 +838,17 @@ cube("sessions", {
       description: `Repeat Sessions Count`,
       sql: `session_id`,
       type: `count`,
-      filters: [{ sql: `${is_first} = 'Repeat'` }],
+      filters: [{ sql: `${is_first} = 'Repeat'` }]
     },
 
     repeat_percent: {
       description: `Percent of Repeat Sessions`,
       sql: `100.00 * ${repeat_count} / NULLIF(${count}, 0)`,
       type: `number`,
-      format: `percent`,
-    },
-  },
-});
+      format: `percent`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -897,10 +897,10 @@ cube("events", {
     form_submitted_count: {
       sql: `event_id`,
       type: `count`,
-      filters: [{ sql: `${CUBE}.event = 'form_submitted'` }],
-    },
-  },
-});
+      filters: [{ sql: `${CUBE}.event = 'form_submitted'` }]
+    }
+  }
+})
 ```
 
 ```yaml
@@ -931,10 +931,10 @@ cube("sessions", {
     form_submitted_count: {
       sql: `${events.form_submitted_count}`,
       type: `number`,
-      sub_query: true,
-    },
-  },
-});
+      sub_query: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -966,10 +966,10 @@ cube("sessions", {
     with_form_submitted_count: {
       type: `count`,
       sql: `session_id`,
-      filters: [{ sql: `${form_submitted_count} > 0` }],
-    },
-  },
-});
+      filters: [{ sql: `${form_submitted_count} > 0` }]
+    }
+  }
+})
 ```
 
 ```yaml

@@ -38,22 +38,22 @@ cube(`orders`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     number: {
       sql: `number`,
-      type: `number`,
+      type: `number`
     },
 
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -104,9 +104,9 @@ We have received five orders per query and can use them as we want.
 
 [
   {
-    "orders.count": "10000",
-  },
-];
+    "orders.count": "10000"
+  }
+]
 ```
 
 ```javascript
@@ -114,21 +114,21 @@ We have received five orders per query and can use them as we want.
 
 [
   {
-    "orders.number": 1,
+    "orders.number": 1
   },
   {
-    "orders.number": 2,
+    "orders.number": 2
   },
   {
-    "orders.number": 3,
+    "orders.number": 3
   },
   {
-    "orders.number": 4,
+    "orders.number": 4
   },
   {
-    "orders.number": 5,
-  },
-];
+    "orders.number": 5
+  }
+]
 ```
 
 ```javascript
@@ -136,21 +136,21 @@ We have received five orders per query and can use them as we want.
 
 [
   {
-    "orders.number": 6,
+    "orders.number": 6
   },
   {
-    "orders.number": 7,
+    "orders.number": 7
   },
   {
-    "orders.number": 8,
+    "orders.number": 8
   },
   {
-    "orders.number": 9,
+    "orders.number": 9
   },
   {
-    "orders.number": 10,
-  },
-];
+    "orders.number": 10
+  }
+]
 ```
 
 ## Source code

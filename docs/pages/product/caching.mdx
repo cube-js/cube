@@ -78,25 +78,25 @@ cube(`orders`, {
   measures: {
     total_amount: {
       sql: `amount`,
-      type: `sum`,
-    },
+      type: `sum`
+    }
   },
 
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
+      type: `time`
+    }
   },
 
   pre_aggregations: {
     amount_by_created: {
       measures: [total_amount],
       time_dimension: created_at,
-      granularity: `month`,
-    },
-  },
-});
+      granularity: `month`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -144,9 +144,9 @@ cubes:
 ```javascript
 cube(`orders`, {
   refresh_key: {
-    every: `5 minute`,
-  },
-});
+    every: `5 minute`
+  }
+})
 ```
 
 </CodeTabs>
@@ -171,9 +171,9 @@ cube(`orders`, {
   // ...
 
   refresh_key: {
-    sql: `SELECT MAX(created_at) FROM orders`,
-  },
-});
+    sql: `SELECT MAX(created_at) FROM orders`
+  }
+})
 ```
 
 </CodeTabs>

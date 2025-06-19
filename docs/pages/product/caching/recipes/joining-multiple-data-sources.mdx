@@ -23,8 +23,8 @@ module.exports = {
         host: "demo-db-recipes.cube.dev",
         user: "cube",
         password: "12345",
-        port: "5432",
-      };
+        port: "5432"
+      }
     }
 
     if (dataSource === "products") {
@@ -34,13 +34,13 @@ module.exports = {
         host: "demo-db-recipes.cube.dev",
         user: "cube",
         password: "12345",
-        port: "5432",
-      };
+        port: "5432"
+      }
     }
 
-    throw new Error("dataSource is undefined");
-  },
-};
+    throw new Error("dataSource is undefined")
+  }
+}
 ```
 
 ## Data modeling
@@ -86,21 +86,21 @@ cube("products", {
       dimensions: [name, supplier_id],
       indexes: {
         category_index: {
-          columns: [supplier_id],
-        },
-      },
-    },
+          columns: [supplier_id]
+        }
+      }
+    }
   },
 
   joins: {
     suppliers: {
       sql: `${supplier_id} = ${suppliers.id}`,
-      relationship: `many_to_one`,
-    },
+      relationship: `many_to_one`
+    }
   },
 
   // ...
-});
+})
 ```
 
 </CodeTabs>
@@ -135,12 +135,12 @@ cube("suppliers", {
       dimensions: [id, company, email],
       indexes: {
         category_index: {
-          columns: [id],
-        },
-      },
-    },
-  },
-});
+          columns: [id]
+        }
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -175,10 +175,10 @@ cube("products", {
     combined_rollup: {
       type: `rollup_join`,
       dimensions: [suppliers.email, suppliers.company, name],
-      rollups: [suppliers.suppliers_rollup, products_rollup],
-    },
-  },
-});
+      rollups: [suppliers.suppliers_rollup, products_rollup]
+    }
+  }
+})
 ```
 
 </CodeTabs>

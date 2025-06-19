@@ -61,14 +61,14 @@ Cube][ref-config-auth0].
 
 ```javascript
 function (user, context, callback) {
-  const namespace = "http://localhost:4000/";
+  const namespace = "http://localhost:4000/"
   context.accessToken[namespace] =
-    {
-      'company_id': 'company1',
-      'user_id': user.user_id,
-      'roles': ['user'],
-    };
-  callback(null, user, context);
+  {
+    'company_id': 'company1',
+    'user_id': user.user_id,
+    'roles': ['user']
+  }
+  callback(null, user, context)
 }
 ```
 

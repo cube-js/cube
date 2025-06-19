@@ -12,10 +12,10 @@ cube(`my_cube`, {
   joins: {
     target_cube: {
       relationship: `one_to_one` || `one_to_many` || `many_to_one`,
-      sql: `SQL ON clause`,
-    },
-  },
-});
+      sql: `SQL ON clause`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -67,10 +67,10 @@ cube(`orders`, {
   joins: {
     products: {
       relationship: `many_to_one`,
-      sql: `${CUBE.id} = ${products.order_id}`,
-    },
-  },
-});
+      sql: `${CUBE.id} = ${products.order_id}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -142,10 +142,10 @@ cube(`users`, {
   joins: {
     profiles: {
       relationship: `one_to_one`,
-      sql: `${CUBE}.id = ${profiles.user_id}`,
-    },
-  },
-});
+      sql: `${CUBE}.id = ${profiles.user_id}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -179,10 +179,10 @@ cube(`authors`, {
   joins: {
     books: {
       relationship: `one_to_many`,
-      sql: `${CUBE}.id = ${books.author_id}`,
-    },
-  },
-});
+      sql: `${CUBE}.id = ${books.author_id}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -218,10 +218,10 @@ cube(`orders`, {
   joins: {
     customers: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.customer_id = ${customers.id}`,
-    },
-  },
-});
+      sql: `${CUBE}.customer_id = ${customers.id}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -254,10 +254,10 @@ cube(`orders`, {
       relationship: `many_to_one`,
       // The `customer_id` column of the `orders` cube corresponds to the
       // `id` dimension of the `customers` cube
-      sql: `${CUBE}.customer_id = ${customers.id}`,
-    },
-  },
-});
+      sql: `${CUBE}.customer_id = ${customers.id}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -296,10 +296,10 @@ cube(`orders`, {
     customer_id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
-    },
-  },
-});
+      primary_key: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -334,10 +334,10 @@ cube(`orders`, {
       sql: `id`,
       type: `number`,
       primary_key: true,
-      public: true,
-    },
-  },
-});
+      public: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -375,10 +375,10 @@ cube(`users`, {
     id: {
       sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
       type: `string`,
-      primary_key: true,
-    },
-  },
-});
+      primary_key: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -429,17 +429,17 @@ cube(`orders`, {
   joins: {
     customers: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.customer_id = ${customers.id}`,
-    },
-  },
-});
+      sql: `${CUBE}.customer_id = ${customers.id}`
+    }
+  }
+})
 
 cube(`customers`, {
   sql_table: `customers`
 
   measures: {
     count: {
-      type: `count`,
+      type: `count`
     }
   },
 
@@ -450,7 +450,7 @@ cube(`customers`, {
       primary_key: true
     }
   }
-});
+})
 ```
 
 ```yaml
@@ -527,10 +527,10 @@ cube(`users`, {
   dimensions: {
     name: {
       sql: `${CUBE}.name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -567,16 +567,16 @@ cube(`a`, {
   joins: {
     b: {
       sql: `${a}.b_id = ${b.id}`,
-      relationship: `many_to_one`,
-    },
+      relationship: `many_to_one`
+    }
   },
 
   measures: {
     count: {
-      type: `count`,
-    },
-  },
-});
+      type: `count`
+    }
+  }
+})
 
 cube(`b`, {
   // ...
@@ -584,10 +584,10 @@ cube(`b`, {
   joins: {
     c: {
       sql: `${b}.c_id = ${c.id}`,
-      relationship: `many_to_one`,
-    },
-  },
-});
+      relationship: `many_to_one`
+    }
+  }
+})
 
 cube(`c`, {
   // ...
@@ -595,10 +595,10 @@ cube(`c`, {
   dimensions: {
     category: {
       sql: `category`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml

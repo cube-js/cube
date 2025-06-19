@@ -12,10 +12,10 @@ cube(`users`, {
   // ...
   segments: {
     sf_users: {
-      sql: `${CUBE}.location = 'San Francisco'`,
-    },
-  },
-});
+      sql: `${CUBE}.location = 'San Francisco'`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -43,10 +43,10 @@ cube(`users`, {
       sql: `
         ${CUBE}.location = 'San Francisco' OR
         ${CUBE}.state = 'CA'
-      `,
-    },
-  },
-});
+      `
+    }
+  }
+})
 ```
 
 ```yaml
@@ -68,8 +68,8 @@ As with other cube member definitions, segments can be
 ```javascript
 const userSegments = {
   sf_users: ["San Francisco", "CA"],
-  ny_users: ["New York City", "NY"],
-};
+  ny_users: ["New York City", "NY"]
+}
 
 cube(`users`, {
   // ...
@@ -78,12 +78,12 @@ cube(`users`, {
     ...Object.keys(userSegments)
       .map((segment) => ({
         [segment]: {
-          sql: `${CUBE}.location = '${userSegments[segment][0]}' or ${CUBE}.state = '${userSegments[segment][1]}'`,
-        },
+          sql: `${CUBE}.location = '${userSegments[segment][0]}' or ${CUBE}.state = '${userSegments[segment][1]}'`
+        }
       }))
-      .reduce((a, b) => ({ ...a, ...b })),
-  },
-});
+      .reduce((a, b) => ({ ...a, ...b }))
+  }
+})
 ```
 
 After defining a segment, you can pass it in [query object][ref-backend-query]:
@@ -111,10 +111,10 @@ cube(`users`, {
 
   segments: {
     sf_users: {
-      sql: `${CUBE}.location = 'San Francisco'`,
-    },
-  },
-});
+      sql: `${CUBE}.location = 'San Francisco'`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -176,10 +176,10 @@ cube(`users`, {
   segments: {
     sf_users: {
       sql: `${CUBE}.location = 'San Francisco'`,
-      public: false,
-    },
-  },
-});
+      public: false
+    }
+  }
+})
 ```
 
 ```yaml
@@ -206,10 +206,10 @@ cube(`users`, {
 
   segments: {
     sf_users: {
-      sql: `${CUBE}.location = 'San Francisco'`,
-    },
-  },
-});
+      sql: `${CUBE}.location = 'San Francisco'`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -240,16 +240,16 @@ cube(`users`, {
   dimensions: {
     location: {
       sql: `location`,
-      type: `string`,
-    },
+      type: `string`
+    }
   },
 
   segments: {
     sf_users: {
-      sql: `${CUBE}.location = 'San Francisco'`,
-    },
-  },
-});
+      sql: `${CUBE}.location = 'San Francisco'`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -311,10 +311,10 @@ cube(`users`, {
       sql: `
         ${CUBE}.location = 'San Francisco' OR
         ${CUBE}.location like '%New York%'
-      `,
-    },
-  },
-});
+      `
+    }
+  }
+})
 ```
 
 ```yaml

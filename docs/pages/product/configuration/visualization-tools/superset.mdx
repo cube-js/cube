@@ -74,22 +74,22 @@ cube(`orders`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     status: {
       sql: `status`,
-      type: `string`,
+      type: `string`
     },
 
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>

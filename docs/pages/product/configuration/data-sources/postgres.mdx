@@ -103,15 +103,15 @@ As a workaround, you can set `rejectUnauthorized` option to `false` in the Cube
 Postgres driver:
 
 ```javascript
-const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const PostgresDriver = require("@cubejs-backend/postgres-driver")
 module.exports = {
   driverFactory: () =>
     new PostgresDriver({
       ssl: {
-        rejectUnauthorized: false,
-      },
-    }),
-};
+        rejectUnauthorized: false
+      }
+    })
+}
 ```
 
 [aws-docs-rds-ssl]:

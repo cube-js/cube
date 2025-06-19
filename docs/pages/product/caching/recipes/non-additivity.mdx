@@ -49,20 +49,20 @@ cube(`users`, {
   measures: {
     distinct_ages: {
       sql: `age`,
-      type: `count_distinct`,
+      type: `count_distinct`
     },
 
     avg_age: {
       sql: `age`,
-      type: `avg`,
+      type: `avg`
     },
 
     p90_age: {
       sql: `PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY age)`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -93,10 +93,10 @@ cube(`users`, {
   pre_aggregations: {
     main: {
       measures: [distinct_ages, avg_age, p90_age],
-      dimensions: [gender],
-    },
-  },
-});
+      dimensions: [gender]
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -155,10 +155,10 @@ cube(`users`, {
   measures: {
     distinct_ages: {
       sql: `age`,
-      type: `count_distinct_approx`,
-    },
-  },
-});
+      type: `count_distinct_approx`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -205,26 +205,26 @@ cube(`users`, {
   measures: {
     avg_age: {
       sql: `${age_sum} / ${count}`,
-      type: `number`,
+      type: `number`
     },
 
     age_sum: {
       sql: `age`,
-      type: `sum`,
+      type: `sum`
     },
 
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   pre_aggregations: {
     main: {
       measures: [age_sum, count],
-      dimensions: [gender],
-    },
-  },
-});
+      dimensions: [gender]
+    }
+  }
+})
 ```
 
 </CodeTabs>

@@ -95,8 +95,8 @@ cube(`monthly_retention`, {
       GROUP BY 1,2
     ) as data
   ON data.activity_month = months_list.activity_month
-  AND data.user_id = users.id`,
-});
+  AND data.user_id = users.id`
+})
 ```
 
 </CodeTabs>
@@ -157,14 +157,14 @@ cube(`monthly_retention`, {
     total_count: {
       sql: `user_id`,
       type: `count_distinct`,
-      public: false,
+      public: false
     },
 
     total_active_count: {
       sql: `user_id`,
       type: `count_distinct`,
       filters: [{ sql: `${CUBE}.monthly_pageviews > 0` }],
-      drill_members: [users.id, users.email],
+      drill_members: [users.id, users.email]
     },
 
     percentage_of_active: {
@@ -175,11 +175,11 @@ cube(`monthly_retention`, {
         users.email,
         bots.team,
         bots.last_seen,
-        percentage_of_active,
-      ],
-    },
-  },
-});
+        percentage_of_active
+      ]
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -211,15 +211,15 @@ cube(`monthly_retention`, {
   dimensions: {
     months_since_signup: {
       sql: `DATEDIFF('month', ${CUBE}.signup_month, ${CUBE}.activity_month)`,
-      type: `number`,
+      type: `number`
     },
 
     signup_date: {
       sql: `(signup_month AT TIME ZONE 'America/Los_Angeles')`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>

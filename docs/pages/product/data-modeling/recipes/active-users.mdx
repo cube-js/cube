@@ -72,8 +72,8 @@ cube(`active_users`, {
       type: `count_distinct`,
       rolling_window: {
         trailing: `30 day`,
-        offset: `start`,
-      },
+        offset: `start`
+      }
     },
 
     weekly_active_users: {
@@ -81,8 +81,8 @@ cube(`active_users`, {
       type: `count_distinct`,
       rolling_window: {
         trailing: `7 day`,
-        offset: `start`,
-      },
+        offset: `start`
+      }
     },
 
     daily_active_users: {
@@ -90,25 +90,25 @@ cube(`active_users`, {
       type: `count_distinct`,
       rolling_window: {
         trailing: `1 day`,
-        offset: `start`,
-      },
+        offset: `start`
+      }
     },
 
     wau_to_mau: {
       title: `WAU to MAU`,
       sql: `100.000 * ${weekly_active_users} / NULLIF(${monthly_active_users}, 0)`,
       type: `number`,
-      format: `percent`,
-    },
+      format: `percent`
+    }
   },
 
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>

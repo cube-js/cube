@@ -11,7 +11,7 @@ that only users with a `department` claim in their JWT can query it.
 ```javascript
 module.exports = {
   contextToAppId: ({ securityContext }) => {
-    return `CUBE_APP_${securityContext.company}`;
+    return `CUBE_APP_${securityContext.company}`
   },
   extendContext: ({ securityContext }) => {
     return {
@@ -65,7 +65,7 @@ cube(`orders`, {
   public: false,
 
   // ...
-});
+})
 
 // users.js
 cube(`users`, {
@@ -73,7 +73,7 @@ cube(`users`, {
   public: false,
 
   // ...
-});
+})
 
 // total_revenue_per_customer.js
 view(`total_revenue_per_customer`, {

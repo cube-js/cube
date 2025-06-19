@@ -22,15 +22,15 @@ cube(`orders`, {
   measures: {
     count: {
       sql: `id`,
-      type: `count`,
+      type: `count`
     },
 
     total_amount: {
       sql: `amount`,
-      type: `sum`,
-    },
-  },
-});
+      type: `sum`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -66,10 +66,10 @@ cube(`orders`, {
     orders_count: {
       sql: `id`,
       type: `count`,
-      description: `Count of all orders`,
-    },
-  },
-});
+      description: `Count of all orders`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -105,10 +105,10 @@ cube(`orders`, {
     revenue: {
       type: `sum`,
       sql: `price`,
-      drill_members: [id, price, status, products.name, products.id],
-    },
-  },
-});
+      drill_members: [id, price, status, products.name, products.id]
+    }
+  }
+})
 ```
 
 ```yaml
@@ -145,10 +145,10 @@ cube(`orders`, {
     orders_completed_count: {
       sql: `id`,
       type: `count`,
-      filters: [{ sql: `${CUBE}.status = 'completed'` }],
-    },
-  },
-});
+      filters: [{ sql: `${CUBE}.status = 'completed'` }]
+    }
+  }
+})
 ```
 
 ```yaml
@@ -183,10 +183,10 @@ cube(`orders`, {
     total: {
       sql: `amount`,
       type: `sum`,
-      format: `currency`,
-    },
-  },
-});
+      format: `currency`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -218,11 +218,11 @@ cube(`orders`, {
       type: `sum`,
       sql: `price`,
       meta: {
-        any: "value",
-      },
-    },
-  },
-});
+        any: "value"
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -293,11 +293,11 @@ cube(`orders`, {
       sql: `id`,
       type: `count`,
       rolling_window: {
-        trailing: `1 month`,
-      },
-    },
-  },
-});
+        trailing: `1 month`
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -327,11 +327,11 @@ cube(`orders`, {
     cumulative_count: {
       type: `count`,
       rolling_window: {
-        trailing: `unbounded`,
-      },
-    },
-  },
-});
+        trailing: `unbounded`
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -364,10 +364,10 @@ cube(`orders`, {
     orders_count: {
       sql: `id`,
       type: `count`,
-      public: false,
-    },
-  },
-});
+      public: false
+    }
+  }
+})
 ```
 
 ```yaml
@@ -400,10 +400,10 @@ cube(`orders`, {
   measures: {
     users_count: {
       sql: `COUNT(*)`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -443,10 +443,10 @@ cube(`orders`, {
     orders_count: {
       title: `Number of Orders Placed`,
       sql: `id`,
-      type: `count`,
-    },
-  },
-});
+      type: `count`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -479,10 +479,10 @@ cube(`orders`, {
   measures: {
     orders_count: {
       sql: `id`,
-      type: `count`,
-    },
-  },
-});
+      type: `count`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -514,10 +514,10 @@ cube(`orders`, {
     purchases_to_created_account_ratio: {
       sql: `${purchases} / ${users.count} * 100.0`,
       type: `number`,
-      format: `percent`,
-    },
-  },
-});
+      format: `percent`
+    }
+  }
+})
 ```
 
 ```yaml
