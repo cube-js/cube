@@ -18,6 +18,15 @@ pub static DATA_QUERIES_CACHE_SIZE: Gauge = metrics::gauge("cs.sql.query.data.ca
 // Approximate total weighted size of entries in this cache.
 pub static DATA_QUERIES_CACHE_WEIGHT: Gauge = metrics::gauge("cs.sql.query.data.cache.weight");
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
+pub static DATA_QUERY_LOGICAL_PLAN_OPTIMIZE_TIME_MS: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.logical_plan_optimize.ms");
+pub static DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_MS: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.choose_index_and_workers.ms");
+pub static DATA_QUERY_CREATE_ROUTER_PHYSICAL_PLAN_MS: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.router_plan.ms");
+pub static DATA_QUERY_CREATE_WORKER_PHYSICAL_PLAN_MS: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.worker_plan.ms");
+
 /// Incoming SQL queries that only read metadata or do trivial computations.
 pub static META_QUERIES: Counter = metrics::counter("cs.sql.query.meta");
 pub static META_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.meta.ms");
