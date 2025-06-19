@@ -702,4 +702,13 @@ impl PlanSqlTemplates {
             },
         )
     }
+    pub fn rolling_window_expr_timestamp_cast(&self, value: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/rolling_window_expr_timestamp_cast",
+            context! {
+                value => value
+
+            },
+        )
+    }
 }

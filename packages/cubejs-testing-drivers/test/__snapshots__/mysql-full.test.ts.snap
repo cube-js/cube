@@ -7395,3 +7395,11 @@ Array [
   },
 ]
 `;
+
+exports[`Queries with the @cubejs-backend/mysql-driver SQL API: Date/time comparison with SQL push down 1`] = `
+Array [
+  Object {
+    "measure(BigECommerce.rollingCountBy2Day)": "12",
+  },
+]
+`;

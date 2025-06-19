@@ -958,8 +958,7 @@ export class BaseQuery {
       .map(
         d => [
           d,
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
+          (_dateFrom, dateTo, dateField, dimensionDateFrom, _dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
         ]
       );
   }
@@ -970,7 +969,7 @@ export class BaseQuery {
       .map(
         d => [
           d,
-          (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
+          (dateFrom, dateTo, dateField, _dimensionDateFrom, _dimensionDateTo, _isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
         ]
       );
   }
@@ -980,7 +979,7 @@ export class BaseQuery {
     return this.timeDimensions
       .filter(td => td.granularity)
       .map(
-        d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+        d => [d, (dateFrom, dateTo, dateField, _dimensionDateFrom, _dimensionDateTo, isFromStartToEnd) => {
         // dateFrom based window
           const conditions = [];
           if (trailingInterval !== 'unbounded') {
@@ -1803,6 +1802,13 @@ export class BaseQuery {
     const dateJoinConditionSql =
       dateJoinCondition.map(
         ([d, f]) => f(
+          // Time-series table is generated differently in different dialects,
+          // but some dialects (like BigQuery) require strict date types and can not automatically convert
+          // between date and timestamp for comparisons, at the same time, time dimensions are expected to be
+          // timestamps, so we need to align types for join conditions/comparisons.
+          // But we can't do it here, as it would break interval maths used in some types of
+          // rolling window join conditions in some dialects (like Redshift), so we need to
+          // do casts granularly in rolling window join conditions functions.
           `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`,
           `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_to')}`,
           `${baseQueryAlias}.${d.aliasName()}`,
@@ -1837,9 +1843,13 @@ export class BaseQuery {
       .join(', ');
   }
 
+  /**
+   * BigQuery has strict date type and can not automatically convert between date
+   * and timestamp, so we override dateFromStartToEndConditionSql() in BigQuery Dialect
+   * @protected
+   */
   dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
     return dateJoinCondition.map(
-      // TODO these weird conversions to be strict typed for big query.
       // TODO Consider adding strict definitions of local and UTC time type
       ([d, f]) => ({
         filterToWhere: () => {
@@ -3921,6 +3931,7 @@ export class BaseQuery {
         like_escape: '{{ like_expr }} ESCAPE {{ escape_char }}',
         within_group: '{{ fun_sql }} WITHIN GROUP (ORDER BY {{ within_group_concat }})',
         concat_strings: '{{ strings | join(\' || \' ) }}',
+        rolling_window_expr_timestamp_cast: '{{ value }}'
       },
       tesseract: {
         ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}', // May require different overloads in Tesseract than the ilike from expressions used in SQLAPI.
