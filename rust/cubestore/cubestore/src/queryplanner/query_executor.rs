@@ -171,7 +171,10 @@ impl QueryExecutor for QueryExecutorImpl {
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
         let trace_obj = plan.trace_obj();
+        let create_router_physical_plan_time = SystemTime::now();
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
+        app_metrics::DATA_QUERY_CREATE_ROUTER_PHYSICAL_PLAN_MS
+            .report(create_router_physical_plan_time.elapsed()?.as_millis() as i64);
         let split_plan = physical_plan;
 
         trace!(
@@ -237,6 +240,7 @@ impl QueryExecutor for QueryExecutorImpl {
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError> {
         let data_loaded_size = DataLoadedSize::new();
+        let create_worker_physical_plan_time = SystemTime::now();
         let (physical_plan, logical_plan) = self
             .worker_plan(
                 plan,
@@ -246,6 +250,9 @@ impl QueryExecutor for QueryExecutorImpl {
                 Some(data_loaded_size.clone()),
             )
             .await?;
+        app_metrics::DATA_QUERY_CREATE_WORKER_PHYSICAL_PLAN_MS
+            .report(create_worker_physical_plan_time.elapsed()?.as_millis() as i64);
+
         let worker_plan;
         let max_batch_rows;
         if let Some((p, s)) = get_worker_plan(&physical_plan) {
