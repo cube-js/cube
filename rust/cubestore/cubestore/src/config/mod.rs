@@ -464,7 +464,9 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_persist_batch_size(&self) -> usize;
 
-    fn cachestore_cache_eviction_min_ttl_threshold(&self) -> u32;
+    fn cachestore_cache_eviction_proactive_size_threshold(&self) -> u32;
+
+    fn cachestore_cache_eviction_proactive_ttl_threshold(&self) -> u32;
 
     fn cachestore_cache_ttl_notify_channel(&self) -> usize;
 
@@ -609,7 +611,8 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_eviction_batch_size: usize,
     pub cachestore_cache_eviction_below_threshold: u8,
     pub cachestore_cache_persist_batch_size: usize,
-    pub cachestore_cache_eviction_min_ttl_threshold: u32,
+    pub cachestore_cache_eviction_proactive_size_threshold: u32,
+    pub cachestore_cache_eviction_proactive_ttl_threshold: u32,
     pub cachestore_cache_ttl_notify_channel: usize,
     pub cachestore_cache_ttl_buffer_max_size: usize,
     pub upload_concurrency: u64,
@@ -855,8 +858,8 @@ impl ConfigObj for ConfigObjImpl {
         self.cachestore_cache_persist_batch_size
     }
 
-    fn cachestore_cache_eviction_min_ttl_threshold(&self) -> u32 {
-        self.cachestore_cache_eviction_min_ttl_threshold
+    fn cachestore_cache_eviction_proactive_ttl_threshold(&self) -> u32 {
+        self.cachestore_cache_eviction_proactive_ttl_threshold
     }
 
     fn cachestore_cache_ttl_notify_channel(&self) -> usize {
@@ -1026,6 +1029,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
         self.cachestore_cache_eviction_below_threshold
+    }
+
+    fn cachestore_cache_eviction_proactive_size_threshold(&self) -> u32 {
+        self.cachestore_cache_eviction_proactive_size_threshold
     }
 }
 
@@ -1421,8 +1428,16 @@ impl Config {
                     "CUBESTORE_CACHE_PERSIST_BATCH_SIZE",
                     150,
                 ),
-                cachestore_cache_eviction_min_ttl_threshold: env_parse_duration(
-                    "CUBESTORE_CACHE_EVICTION_TTL_THRESHOLD",
+                cachestore_cache_eviction_proactive_size_threshold: env_parse_duration(
+                    "CUBESTORE_CACHE_EVICTION_PROACTIVE_SIZE_THRESHOLD",
+                    // 256 kb
+                    256 << 10,
+                    Some(cachestore_cache_max_entry_size as u32),
+                    // It's not allowed to be less than 128 kb, because it can proactively evict refresh keys
+                    Some(128 << 10),
+                ),
+                cachestore_cache_eviction_proactive_ttl_threshold: env_parse_duration(
+                    "CUBESTORE_CACHE_EVICTION_PROACTIVE_TTL_THRESHOLD",
                     5,
                     Some(5 * 60),
                     Some(0),
@@ -1636,7 +1651,8 @@ impl Config {
                 cachestore_cache_eviction_batch_size: 150,
                 cachestore_cache_eviction_below_threshold: 15,
                 cachestore_cache_persist_batch_size: 200,
-                cachestore_cache_eviction_min_ttl_threshold: 5,
+                cachestore_cache_eviction_proactive_size_threshold: 4096,
+                cachestore_cache_eviction_proactive_ttl_threshold: 5,
                 cachestore_cache_ttl_notify_channel: 4_096,
                 cachestore_cache_ttl_buffer_max_size: 16_384,
                 upload_concurrency: 4,
