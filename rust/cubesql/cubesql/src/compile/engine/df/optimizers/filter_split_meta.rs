@@ -249,7 +249,8 @@ fn is_meta_predicate(predicate: &Expr) -> bool {
 
 /// Determines if the provided expression is meta column reference.
 /// Currently, only `__user` is considered a meta column.
-/// Additionally, `Lower` function over a meta column is also considered a meta column.
+/// Additionally, `Lower` function over a meta column or casting meta column
+/// is also considered a meta column.
 fn is_meta_column(expr: &Expr) -> bool {
     match expr {
         Expr::Column(Column { name, .. }) => name.eq_ignore_ascii_case("__user"),
@@ -259,6 +260,7 @@ fn is_meta_column(expr: &Expr) -> bool {
             }
             false
         }
+        Expr::Cast { expr, .. } => is_meta_column(expr),
         _ => false,
     }
 }
