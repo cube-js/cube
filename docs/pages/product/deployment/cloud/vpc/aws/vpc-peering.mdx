@@ -18,6 +18,9 @@ information is required:
   example, `vpc-0099aazz`
 - **AWS VPC CIDR:** The [CIDR block][wiki-cidr-block] of the VPC that Cube Cloud
   will connect to, for example, `10.0.0.0/16`
+- **Dedicated Infrastructure Region:** VPC Peering requires Cube to be hosted in 
+  [dedicated infrastructure][dedicated-infra]. Please specify what region the Cube Cloud 
+  dedicated infrastructure should be hosted in.
 
 ## Setup
 
@@ -129,6 +132,7 @@ Customer Success Manager and share with them the following:
 [aws-docs-vpc-peering]:
   https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html
 [aws-docs-vpc-security-group]: https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html
+[dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
 [wiki-cidr-block]:
   https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_blocks
 
