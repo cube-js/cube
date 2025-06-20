@@ -52,7 +52,7 @@ impl SqlNode for TimeDimensionNode {
                             templates,
                         );
                     }
-                    
+
                     let converted_tz = if self
                         .dimensions_with_ignored_timezone
                         .contains(&ev.full_name())

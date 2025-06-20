@@ -1,10 +1,10 @@
-use std::rc::Rc;
 use super::{GranularityHelper, QueryDateTime, SqlInterval};
+use crate::planner::sql_evaluator::SqlCall;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::rc::Rc;
 use std::str::FromStr;
-use crate::planner::sql_evaluator::SqlCall;
 
 #[derive(Clone)]
 pub struct Granularity {
@@ -50,9 +50,9 @@ impl Granularity {
                 is_predefined_granularity: false,
                 is_natural_aligned: false,
                 calendar_sql,
-            })
+            });
         }
-        
+
         let origin = if let Some(origin) = origin {
             QueryDateTime::from_date_str(timezone, &origin)?
         } else if let Some(offset) = &granularity_offset {
@@ -97,7 +97,7 @@ impl Granularity {
     pub fn granularity_offset(&self) -> &Option<String> {
         &self.granularity_offset
     }
-    
+
     pub fn calendar_sql(&self) -> &Option<Rc<SqlCall>> {
         &self.calendar_sql
     }

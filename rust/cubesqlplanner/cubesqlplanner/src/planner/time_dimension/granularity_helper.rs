@@ -1,4 +1,5 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
+use crate::planner::sql_evaluator::Compiler;
 use crate::planner::BaseTimeDimension;
 use crate::planner::Granularity;
 use chrono::prelude::*;
@@ -8,7 +9,6 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::planner::sql_evaluator::Compiler;
 
 pub struct GranularityHelper {}
 
@@ -234,7 +234,9 @@ impl GranularityHelper {
             let granularity_definition = cube_evaluator.resolve_granularity(path)?;
             let gran_eval_sql = if let Some(gran_sql) = granularity_definition.sql()? {
                 Some(compiler.compile_sql_call(&cube_name, gran_sql)?)
-            } else { None };
+            } else {
+                None
+            };
 
             if gran_eval_sql.is_some() || !Self::is_predefined_granularity(&granularity) {
                 Some(Granularity::try_new_custom(
@@ -243,7 +245,7 @@ impl GranularityHelper {
                     granularity_definition.static_data().origin.clone(),
                     granularity_definition.static_data().interval.clone(),
                     granularity_definition.static_data().offset.clone(),
-                    gran_eval_sql
+                    gran_eval_sql,
                 )?)
             } else {
                 Some(Granularity::try_new_predefined(
