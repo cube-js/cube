@@ -5,6 +5,7 @@ export interface FileContent {
   fileName: string;
   content: string;
   readOnly?: boolean;
+  isModule?: boolean;
 }
 
 export interface SchemaFileRepository {
@@ -24,7 +25,7 @@ export class FileRepository implements SchemaFileRepository {
 
   protected async getFiles(dir: string, fileList: string[] = []): Promise<string[]> {
     let files: string[] = [];
-    
+
     try {
       const fullPath = path.join(this.localPath(), dir);
       await fs.ensureDir(fullPath);

@@ -37,7 +37,7 @@ export class YamlCompiler {
   ) {
   }
 
-  protected getJinjaEngine(): JinjaEngine {
+  public getJinjaEngine(): JinjaEngine {
     if (this.jinjaEngine) {
       return this.jinjaEngine;
     }
