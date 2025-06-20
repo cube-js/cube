@@ -416,6 +416,11 @@ jobs:
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
             'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio', 'vertica'
         ]
+        use_tesseract_sql_planner: [ false ]
+        include:
+          - db: postgres
+            node-version: 22.x
+            use_tesseract_sql_planner: true
       fail-fast: false
 
     steps:
@@ -481,6 +486,8 @@ jobs:
           (contains(env.CLOUD_DATABASES, matrix.db) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
           (!contains(env.CLOUD_DATABASES, matrix.db))
         env:
+          CUBEJS_TESSERACT_SQL_PLANNER: ${{ matrix.use_tesseract_sql_planner }}
+
           # Firebolt Integration
           DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ENGINE_NAME: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ENGINE_NAME }}
           DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_NAME: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_NAME }}
