@@ -21,7 +21,7 @@ for creating and managing an Endpoint Service.
 
 Cube Cloud needs to be added to the list of principals allowed to discover your Endpoint Service.
 To do so, please go to <Btn>AWS Console</Btn> -> <Btn>VPC</Btn> -> <Btn>Endpoint Services</Btn> -> <Btn>Your service</Btn> -> <Btn>Allow principals</Btn>
-and add `arn:aws:iam::331376342520` to the list.
+and add `arn:aws:iam::331376342520:root` to the list.
 
 ## Gathering required information
 
@@ -31,8 +31,8 @@ To request establishing a PrivateLink connection, please share the following inf
 - **Reference Name** for the record (such as "Snowflake-prod" or "clickhouse-dev")
 - **Ports**: a list of ports that will be accessed through this connection
 - **DNS Name** (optional): an internal DNS name of the upstream service in case SSL needs to be supported
-- **Dedicated Infrastructure Region:** VPC Peering requires Cube to be hosted in 
-    [dedicated infrastructure][dedicated-infra]. Please specify what region the Cube Cloud 
+- **Dedicated Infrastructure Region:** VPC Peering requires Cube to be hosted in
+    [dedicated infrastructure][dedicated-infra]. Please specify what region the Cube Cloud
     dedicated infrastructure should be hosted in.
 
 
