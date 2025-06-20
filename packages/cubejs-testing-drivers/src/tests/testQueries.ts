@@ -26,6 +26,8 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
+    const isTesseractEnv = process.env.DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER && process.env.DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER.toLowerCase() === 'true';
+
     const fixtures = getFixtures(type, extendedEnv);
     let client: CubeApi;
     let driver: BaseDriver;
@@ -65,7 +67,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
 
     function execute(name: string, test: () => Promise<void>) {
-      if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+      if (!isTesseractEnv && fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+        it.skip(name, test);
+      } else if (isTesseractEnv && fixtures.tesseractSkip && fixtures.tesseractSkip.indexOf(name) >= 0) {
         it.skip(name, test);
       } else {
         it(name, test);
