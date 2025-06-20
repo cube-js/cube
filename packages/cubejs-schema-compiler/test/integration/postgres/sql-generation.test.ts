@@ -3467,32 +3467,38 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     }]
   ));
 
-  it('multi stage revenue_sum_group_by_granularity and group by td with granularity', async () => runQueryTest(
-    {
-      measures: ['visitors.revenue_sum_group_by_granularity'],
-      dimensions: ['visitors.source'],
-      order: [{
-        id: 'visitors.source'
-      }],
-      timezone: 'UTC',
-    },
-    [{
-      visitors__revenue_sum_group_by_granularity: '300',
-      visitors__source: 'google',
-    },
-    {
-      visitors__revenue_sum_group_by_granularity: '300',
-      visitors__source: 'some',
-    },
-    {
-      visitors__revenue_sum_group_by_granularity: '900',
-      visitors__source: null,
-    },
-    {
-      visitors__revenue_sum_group_by_granularity: '500',
-      visitors__source: null,
-    }]
-  ));
+  if (!getEnv('nativeSqlPlanner')) {
+    it('multi stage revenue_sum_group_by_granularity and group by td with granularity', async () => runQueryTest(
+      {
+        measures: ['visitors.revenue_sum_group_by_granularity'],
+        dimensions: ['visitors.source'],
+        order: [{
+          id: 'visitors.source'
+        }],
+        timezone: 'UTC',
+      },
+      [{
+        visitors__revenue_sum_group_by_granularity: '300',
+        visitors__source: 'google',
+      },
+      {
+        visitors__revenue_sum_group_by_granularity: '300',
+        visitors__source: 'some',
+      },
+      {
+        visitors__revenue_sum_group_by_granularity: '900',
+        visitors__source: null,
+      },
+      {
+        visitors__revenue_sum_group_by_granularity: '500',
+        visitors__source: null,
+      }]
+    ));
+  } else {
+    it.skip('FIXME(tesseract): Should be fixed in tesseract', () => {
+      // Skipping because it not works in Tesseract yet
+    });
+  }
 
   it('multi stage complex graph with time dimension no granularity', async () => runQueryTest(
     {

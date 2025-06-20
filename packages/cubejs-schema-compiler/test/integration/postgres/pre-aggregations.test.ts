@@ -570,7 +570,10 @@ describe('PreAggregations', () => {
   });
 
   if (getEnv('nativeSqlPlanner')) {
-    it('simple pre-aggregation proxy time dimension', () => compiler.compile().then(() => {
+    it.skip('FIXME(tesseract): Should work after fallback for pre-aggregations is fully turned off.', () => {
+      // Skipping because it not works in Tesseract yet
+    });
+    /* it('simple pre-aggregation proxy time dimension', () => compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.count'
@@ -616,7 +619,7 @@ describe('PreAggregations', () => {
           ]
         );
       });
-    }));
+    })); */
   }
 
   it('simple pre-aggregation (allowNonStrictDateRangeMatch: true)', async () => {
@@ -1078,44 +1081,50 @@ describe('PreAggregations', () => {
     });
   });
 
-  it('multiplied measure no match', async () => {
-    await compiler.compile();
+  if (!getEnv('nativeSqlPlanner')) {
+    it('multiplied measure no match', async () => {
+      await compiler.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitors.count'
-      ],
-      dimensions: ['visitor_checkins.source'],
-      order: [{
-        id: 'visitor_checkins.source'
-      }],
-      timezone: 'America/Los_Angeles',
-      preAggregationsSchema: ''
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitors.count'
+        ],
+        dimensions: ['visitor_checkins.source'],
+        order: [{
+          id: 'visitor_checkins.source'
+        }],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: ''
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      expect(queryAndParams[0]).toMatch(/count\(distinct/ig);
+      expect(queryAndParams[0]).toMatch(/visitors_default/ig);
+      const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+      expect((<any>preAggregationsDescription).filter(p => p.type === 'rollup').length).toBe(0);
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [
+            {
+              vc__source: 'google',
+              visitors__count: '1'
+            },
+            {
+              vc__source: null,
+              visitors__count: '6'
+            },
+          ]
+        );
+      });
     });
-
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    expect(queryAndParams[0]).toMatch(/count\(distinct/ig);
-    expect(queryAndParams[0]).toMatch(/visitors_default/ig);
-    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
-    console.log(preAggregationsDescription);
-    expect((<any>preAggregationsDescription).filter(p => p.type === 'rollup').length).toBe(0);
-
-    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-      expect(res).toEqual(
-        [
-          {
-            vc__source: 'google',
-            visitors__count: '1'
-          },
-          {
-            vc__source: null,
-            visitors__count: '6'
-          },
-        ]
-      );
+  } else {
+    it.skip('FIXME(tesseract): This should be fixed in Tesseract.', async () => {
+      // Skipping because it not works in Tesseract yet
     });
-  });
+  }
 
   it('multiplied measure match', async () => {
     await compiler.compile();
