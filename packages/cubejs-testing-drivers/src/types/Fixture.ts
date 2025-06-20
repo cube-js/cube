@@ -31,4 +31,5 @@ export type Fixture = {
     [cube: string]: [{ name: string, [prop: string]: unknown }],
   },
   skip?: string[],
+  tesseractSkip?: string[],
 };
