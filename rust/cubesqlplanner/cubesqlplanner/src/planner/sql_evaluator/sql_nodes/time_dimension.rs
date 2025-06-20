@@ -44,6 +44,15 @@ impl SqlNode for TimeDimensionNode {
         match node.as_ref() {
             MemberSymbol::TimeDimension(ev) => {
                 let res = if let Some(granularity_obj) = ev.granularity_obj() {
+                    if let Some(calendar_sql) = granularity_obj.calendar_sql() {
+                        return calendar_sql.eval(
+                            visitor,
+                            node_processor.clone(),
+                            query_tools.clone(),
+                            templates,
+                        );
+                    }
+                    
                     let converted_tz = if self
                         .dimensions_with_ignored_timezone
                         .contains(&ev.full_name())
