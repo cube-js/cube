@@ -414,7 +414,7 @@ export type CubeMember = TCubeMeasure | TCubeDimension | TCubeSegment;
 
 export type TCubeFolder = {
   name: string;
-  members: string[];
+  members: (string | TCubeFolder)[];
 };
 
 export type TCubeHierarchy = {
