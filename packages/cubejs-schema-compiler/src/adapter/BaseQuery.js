@@ -22,7 +22,8 @@ import {
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
   timeSeriesFromCustomInterval,
-  parseSqlInterval
+  parseSqlInterval,
+  findMinGranularityDimension
 } from '@cubejs-backend/shared';
 
 import { CubeSymbols } from '../compiler/CubeSymbols';
@@ -508,8 +509,9 @@ export class BaseQuery {
 
       res.push({ id, desc: true });
     } else if (this.dimensions.length > 0) {
+      const dim = this.dimensions[0];
       res.push({
-        id: this.dimensions[0].dimension,
+        id: dim.expressionName ?? dim.dimension,
         desc: false,
       });
     }
@@ -2578,8 +2580,9 @@ export class BaseQuery {
   }
 
   /**
-   * XXX: String as return value is added because of HiveQuery.getFieldIndex()
-   * @param id
+   * XXX: String as return value is added because of HiveQuery.getFieldIndex() and DatabricksQuery.getFieldIndex()
+   * @protected
+   * @param {string} id member name in form of "cube.member[.granularity]"
    * @returns {number|string|null}
    */
   getFieldIndex(id) {
@@ -2587,18 +2590,41 @@ export class BaseQuery {
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
 
-    let index;
+    let index = -1;
+    const path = id.split('.');
 
-    index = this.dimensionsForSelect()
+    // Granularity is specified
+    if (path.length === 3) {
+      const memberName = path.slice(0, 2).join('.');
+      const granularity = path[2];
+
+      index = this.timeDimensions
+        // Not all time dimensions are used in select list, some are just filters,
+        // but they exist in this.timeDimensions, so need to filter them out
+        .filter(d => d.selectColumns())
+        .findIndex(
+          d => (
+            (equalIgnoreCase(d.dimension, memberName) && (d.granularityObj?.granularity === granularity)) ||
+            equalIgnoreCase(d.expressionName, memberName)
+          )
+        );
+
+      if (index > -1) {
+        return index + 1;
+      }
+
+      // TODO IT would be nice to log a warning that requested member wasn't found, but we don't have a logger here
+      return null;
+    }
+
+    const dimensionsForSelect = this.dimensionsForSelect()
       // Not all time dimensions are used in select list, some are just filters,
       // but they exist in this.timeDimensions, so need to filter them out
-      .filter(d => d.selectColumns())
-      .findIndex(
-        d => equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)
-      );
+      .filter(d => d.selectColumns());
 
-    if (index > -1) {
-      return index + 1;
+    const found = findMinGranularityDimension(id, dimensionsForSelect);
+    if (found?.index > -1) {
+      return found.index + 1;
     }
 
     index = this.measures.findIndex(
@@ -2613,6 +2639,69 @@ export class BaseQuery {
     return null;
   }
 
+  /**
+   * @protected
+   * @param {string} id member name in form of "cube.member[.granularity]"
+   * @returns {null|string}
+   */
+  getFieldAlias(id) {
+    const equalIgnoreCase = (a, b) => (
+      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
+    );
+
+    let field;
+
+    const path = id.split('.');
+
+    // Granularity is specified
+    if (path.length === 3) {
+      const memberName = path.slice(0, 2).join('.');
+      const granularity = path[2];
+
+      field = this.timeDimensions
+        // Not all time dimensions are used in select list, some are just filters,
+        // but they exist in this.timeDimensions, so need to filter them out
+        .filter(d => d.selectColumns())
+        .find(
+          d => (
+            (equalIgnoreCase(d.dimension, memberName) && (d.granularityObj?.granularity === granularity)) ||
+            equalIgnoreCase(d.expressionName, memberName)
+          )
+        );
+
+      if (field) {
+        return field.aliasName();
+      }
+
+      return null;
+    }
+
+    const dimensionsForSelect = this.dimensionsForSelect()
+      // Not all time dimensions are used in select list, some are just filters,
+      // but they exist in this.timeDimensions, so need to filter them out
+      .filter(d => d.selectColumns());
+
+    const found = findMinGranularityDimension(id, dimensionsForSelect);
+
+    if (found?.dimension) {
+      return found.dimension.aliasName();
+    }
+
+    field = this.measures.find(
+      (d) => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
+    );
+
+    if (field) {
+      return field.aliasName();
+    }
+
+    return null;
+  }
+
+  /**
+   * @param {{ id: string, desc: boolean }} hash
+   * @returns {string|null}
+   */
   orderHashToString(hash) {
     if (!hash || !hash.id) {
       return null;

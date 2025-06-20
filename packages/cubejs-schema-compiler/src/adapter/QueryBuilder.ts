@@ -40,9 +40,9 @@ const ADAPTERS = {
   cubestore: CubeStoreQuery,
 };
 
-export const queryClass = (dbType, dialectClass) => dialectClass || ADAPTERS[dbType];
+export const queryClass = (dbType: string, dialectClass) => dialectClass || ADAPTERS[dbType];
 
-export const createQuery = (compilers, dbType, queryOptions) => {
+export const createQuery = (compilers, dbType: string, queryOptions: any) => {
   if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
     return null;
   }
