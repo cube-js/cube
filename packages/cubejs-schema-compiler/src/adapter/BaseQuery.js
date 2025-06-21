@@ -419,10 +419,81 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
-      this.collectedJoinHints = [
-        ...this.queryLevelJoinHints,
-        ...this.collectJoinHints(),
-      ];
+      const [rootOfJoin, ...allMembersJoinHints] = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
+      let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(this.join));
+
+      // One cube may join the other cube via transitive joined cubes,
+      // members from which are referenced in the join `on` clauses.
+      // We need to collect such join hints and push them upfront of the joining one
+      // but only if they don't exist yet. Cause in other case we might affect what
+      // join path will be constructed in join graph.
+      // It is important to use queryLevelJoinHints during the calculation if it is set.
+
+      const constructJH = () => {
+        const filteredJoinMembersJoinHints = joinMembersJoinHints.filter(m => !allMembersJoinHints.includes(m));
+        return [
+          ...this.queryLevelJoinHints,
+          ...(rootOfJoin ? [rootOfJoin] : []),
+          ...filteredJoinMembersJoinHints,
+          ...allMembersJoinHints,
+          ...customSubQueryJoinHints,
+        ];
+      };
+
+      let prevJoins = this.join;
+      let prevJoinMembersJoinHints = joinMembersJoinHints;
+      let newJoin = this.joinGraph.buildJoin(constructJH());
+
+      const isOrderPreserved = (base, updated) => {
+        const common = base.filter(value => updated.includes(value));
+        const bFiltered = updated.filter(value => common.includes(value));
+
+        return common.every((x, i) => x === bFiltered[i]);
+      };
+
+      const isJoinTreesEqual = (a, b) => {
+        if (!a || !b || a.root !== b.root || a.joins.length !== b.joins.length) {
+          return false;
+        }
+
+        // We don't care about the order of joins on the same level, so
+        // we can compare them as sets.
+        const aJoinsSet = new Set(a.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
+        const bJoinsSet = new Set(b.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
+
+        if (aJoinsSet.size !== bJoinsSet.size) {
+          return false;
+        }
+
+        for (const val of aJoinsSet) {
+          if (!bJoinsSet.has(val)) {
+            return false;
+          }
+        }
+
+        return true;
+      };
+
+      // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
+      let cnt = 0;
+
+      while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoins, newJoin) && cnt < 10000) {
+        prevJoins = newJoin;
+        joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
+        if (!isOrderPreserved(prevJoinMembersJoinHints, joinMembersJoinHints)) {
+          throw new UserError(`Can not construct joins for the query, potential loop detected: ${prevJoinMembersJoinHints.join('->')} vs ${joinMembersJoinHints.join('->')}`);
+        }
+        newJoin = this.joinGraph.buildJoin(constructJH());
+        prevJoinMembersJoinHints = joinMembersJoinHints;
+        cnt++;
+      }
+
+      if (cnt >= 10000) {
+        throw new UserError('Can not construct joins for the query, potential loop detected');
+      }
+
+      this.collectedJoinHints = R.uniq(constructJH());
     }
     return this.collectedJoinHints;
   }
@@ -2429,7 +2500,17 @@ export class BaseQuery {
     } else if (s.patchedMeasure?.patchedFrom) {
       return [s.patchedMeasure.patchedFrom.cubeName].concat(this.evaluateSymbolSql(s.patchedMeasure.patchedFrom.cubeName, s.patchedMeasure.patchedFrom.name, s.definition()));
     } else {
-      return this.evaluateSql(s.cube().name, s.definition().sql);
+      const res = this.evaluateSql(s.cube().name, s.definition().sql);
+      if (s.isJoinCondition) {
+        // In a join between Cube A and Cube B, sql() may reference members from other cubes.
+        // These referenced cubes must be added as join hints before Cube B to ensure correct SQL generation.
+        const targetCube = s.targetCubeName();
+        let { joinHints } = this.safeEvaluateSymbolContext();
+        joinHints = joinHints.filter(e => e !== targetCube);
+        joinHints.push(targetCube);
+        this.safeEvaluateSymbolContext().joinHints = joinHints;
+      }
+      return res;
     }
   }
 
@@ -2451,7 +2532,17 @@ export class BaseQuery {
    * @returns {Array<Array<string>>}
    */
   collectJoinHints(excludeTimeDimensions = false) {
-    const customSubQueryJoinMembers = this.customSubQueryJoins.map(j => {
+    const membersToCollectFrom = [
+      ...this.allMembersConcat(excludeTimeDimensions),
+      ...this.joinMembersFromJoin(this.join),
+      ...this.joinMembersFromCustomSubQuery(),
+    ];
+
+    return this.collectJoinHintsFromMembers(membersToCollectFrom);
+  }
+
+  joinMembersFromCustomSubQuery() {
+    return this.customSubQueryJoins.map(j => {
       const res = {
         path: () => null,
         cube: () => this.cubeEvaluator.cubeFromPath(j.on.cubeName),
@@ -2465,22 +2556,18 @@ export class BaseQuery {
         getMembers: () => [res],
       };
     });
+  }
 
-    const joinMembers = this.join ? this.join.joins.map(j => ({
+  joinMembersFromJoin(join) {
+    return join ? join.joins.map(j => ({
       getMembers: () => [{
         path: () => null,
         cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
         definition: () => j.join,
+        isJoinCondition: true,
+        targetCubeName: () => j.originalTo,
       }]
     })) : [];
-
-    const membersToCollectFrom = [
-      ...this.allMembersConcat(excludeTimeDimensions),
-      ...joinMembers,
-      ...customSubQueryJoinMembers,
-    ];
-
-    return this.collectJoinHintsFromMembers(membersToCollectFrom);
   }
 
   collectJoinHintsFromMembers(members) {
@@ -2885,7 +2972,7 @@ export class BaseQuery {
 
   pushJoinHints(joinHints) {
     if (this.safeEvaluateSymbolContext().joinHints && joinHints) {
-      if (joinHints.length === 1) {
+      if (Array.isArray(joinHints) && joinHints.length === 1) {
         [joinHints] = joinHints;
       }
       this.safeEvaluateSymbolContext().joinHints.push(joinHints);
