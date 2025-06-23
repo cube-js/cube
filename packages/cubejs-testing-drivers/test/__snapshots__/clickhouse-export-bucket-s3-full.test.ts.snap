@@ -1673,7 +1673,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/clickhouse-driver export-bucket-s3 SQL API: post-aggregate percentage of total: post_aggregate_percentage_of_total 1`] = `
+exports[`Queries with the @cubejs-backend/clickhouse-driver export-bucket-s3 SQL API: post-aggregate percentage of total 1`] = `
 Array [
   Object {
     "SUM(BigECommerce.percentageOfTotalForStatus)": 100,

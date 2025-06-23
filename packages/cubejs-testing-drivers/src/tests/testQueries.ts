@@ -1916,7 +1916,7 @@ from
     from
       "public"."BigECommerce" "BigECommerce"
   `);
-      expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: reuse params', async (connection) => {
@@ -1951,7 +1951,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('simple_rollup');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Complex Rollup', async (connection) => {
@@ -1965,7 +1965,7 @@ from
     order by 1, 2, 3, 4
 
   `);
-      expect(res.rows).toMatchSnapshot('complex_rollup');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Rollup with aliases', async (connection) => {
@@ -1979,7 +1979,7 @@ from
     order by 1, 2, 3, 4
 
   `);
-      expect(res.rows).toMatchSnapshot('rollup_with_aliases');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Rollup over exprs', async (connection) => {
@@ -1993,7 +1993,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('rollup_over_exprs');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Nested Rollup', async (connection) => {
@@ -2012,7 +2012,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Nested Rollup with aliases', async (connection) => {
@@ -2031,7 +2031,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup_with_aliases');
+      expect(res.rows).toMatchSnapshot();
     });
     executePg('SQL API: Nested Rollup over asterisk', async (connection) => {
       const res = await connection.query(`
@@ -2046,7 +2046,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup_over_asterisk');
+      expect(res.rows).toMatchSnapshot();
     });
     executePg('SQL API: Extended nested Rollup over asterisk', async (connection) => {
       const res = await connection.query(`
@@ -2065,7 +2065,7 @@ from
     ) q2 ORDER BY q2.order, q2.row DESC limit 100
 
   `);
-      expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asterisk');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: metabase count cast to float32 from push down', async (connection) => {
