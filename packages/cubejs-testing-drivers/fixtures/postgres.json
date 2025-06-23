@@ -167,6 +167,8 @@
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension",
     "pre-aggregations Customers: running total without time dimension",
     "querying BigECommerce: totalProfitYearAgo",
     "SQL API: post-aggregate percentage of total",

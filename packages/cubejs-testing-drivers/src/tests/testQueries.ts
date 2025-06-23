@@ -1,5 +1,6 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import { randomBytes } from 'crypto';
+import { get } from 'env-var';
 import { Client as PgClient } from 'pg';
 import { BaseDriver } from '@cubejs-backend/base-driver';
 import cubejs, { CubeApi } from '@cubejs-client/core';
@@ -26,7 +27,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
-    const isTesseractEnv = process.env.DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER && process.env.DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER.toLowerCase() === 'true';
+    const isTesseractEnv =get('DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool();// process.env.DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER && process.env.DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER.toLowerCase() === 'true';
 
     const fixtures = getFixtures(type, extendedEnv);
     let client: CubeApi;
@@ -77,7 +78,11 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
 
     function executePg(name: string, test: (connection: PgClient) => Promise<void>) {
-      if (!fixtures.cube.ports[1] || fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+      if (!isTesseractEnv && fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+        it.skip(name, () => {
+          // nothing to do
+        });
+      } else if (isTesseractEnv && fixtures.tesseractSkip && fixtures.tesseractSkip.indexOf(name) >= 0) {
         it.skip(name, () => {
           // nothing to do
         });
