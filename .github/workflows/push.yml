@@ -514,13 +514,13 @@ jobs:
           ./.github/actions/codecov-fix.sh
       - name: Combine all fixed LCOV files
         run: |
-          echo "" > ./combined-integration-${{ matrix.db }}.lcov
+          echo "" > ./combined-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}.lcov
           find ./packages -type f -name lcov.fixed.info -exec cat {} + >> ./combined-integration-${{ matrix.db }}.lcov || true
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-integration-${{ matrix.db }}
-          path: ./combined-integration-${{ matrix.db }}.lcov
+          name: coverage-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}
+          path: ./combined-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}.lcov
 
   integration-smoke:
     needs: [latest-tag-sha, build-cubestore, build-native-linux]
