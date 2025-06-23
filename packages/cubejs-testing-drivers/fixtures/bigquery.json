@@ -178,6 +178,8 @@
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension",
     "pre-aggregations Customers: running total without time dimension",
     "querying BigECommerce: null boolean",
     "querying BigECommerce: rolling count_distinct_approx window by 2 day",
