@@ -92,10 +92,12 @@ export class HiveQuery extends BaseQuery {
   }
 
   public getFieldIndex(id) {
-    const dimension = this.dimensionsForSelect().find(d => d.dimension === id);
-    if (dimension) {
-      return super.getFieldIndex(id);
+    const idx = super.getFieldIndex(id);
+
+    if (idx !== null) {
+      return idx;
     }
+
     return this.escapeColumnName(this.aliasName(id));
   }
 

@@ -26,7 +26,7 @@ describe('PreAggregations', () => {
 
         cards: {
           relationship: 'hasMany',
-          sql: \`\${visitors.id} = \${cards.visitorId}\`
+          sql: \`\${CUBE.id} = \${cards.visitorId}\`
         }
       },
 

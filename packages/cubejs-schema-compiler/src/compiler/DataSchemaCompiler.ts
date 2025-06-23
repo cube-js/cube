@@ -9,12 +9,19 @@ import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
 import workerpool from 'workerpool';
+import { LRUCache } from 'lru-cache';
 
-import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
-import { transpileJs } from '@cubejs-backend/native';
+import { FileContent, getEnv, isNativeSupported, SchemaFileRepository } from '@cubejs-backend/shared';
+import { NativeInstance, PythonCtx, transpileJs } from '@cubejs-backend/native';
 import { UserError } from './UserError';
-import { ErrorReporter } from './ErrorReporter';
-import { CONTEXT_SYMBOLS } from './CubeSymbols';
+import { ErrorReporter, ErrorReporterOptions, SyntaxErrorInterface } from './ErrorReporter';
+import { CONTEXT_SYMBOLS, CubeSymbols } from './CubeSymbols';
+import { ViewCompilationGate } from './ViewCompilationGate';
+import { TranspilerInterface } from './transpilers';
+import { CompilerInterface } from './PrepareCompiler';
+import { YamlCompiler } from './YamlCompiler';
+import { CubeDictionary } from './CubeDictionary';
+import { CompilerCache } from './CompilerCache';
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
@@ -37,8 +44,108 @@ const getThreadsCount = () => {
   return 3; // Default (like the workerpool do)
 };
 
+export type DataSchemaCompilerOptions = {
+  compilerCache: CompilerCache;
+  omitErrors?: boolean;
+  extensions?: Record<string, any>;
+  filesToCompile?: string[];
+  nativeInstance: NativeInstance;
+  cubeFactory: Function;
+  cubeDictionary: CubeDictionary;
+  cubeSymbols: CubeSymbols;
+  cubeCompilers?: CompilerInterface[];
+  contextCompilers?: CompilerInterface[];
+  transpilers?: TranspilerInterface[];
+  viewCompilers?: CompilerInterface[];
+  viewCompilationGate: ViewCompilationGate;
+  cubeNameCompilers?: CompilerInterface[];
+  preTranspileCubeCompilers?: CompilerInterface[];
+  yamlCompiler: YamlCompiler;
+  errorReport?: ErrorReporterOptions;
+  compilerId?: string;
+  standalone?: boolean;
+  compileContext?: any;
+  allowNodeRequire?: boolean;
+  compiledScriptCache: LRUCache<string, vm.Script>;
+};
+
+export type TranspileOptions = {
+  cubeNames?: string[];
+  cubeSymbols?: Record<string, Record<string, boolean>>;
+  contextSymbols?: Record<string, string>;
+  transpilerNames?: string[];
+  compilerId?: string;
+  stage?: 0 | 1 | 2 | 3;
+};
+
+export type CompileStage = 0 | 1 | 2 | 3;
+
+type CompileCubeFilesCompilers = {
+  cubeCompilers?: CompilerInterface[];
+  contextCompilers?: CompilerInterface[];
+};
+
 export class DataSchemaCompiler {
-  constructor(repository, options = {}) {
+  private readonly repository: SchemaFileRepository;
+
+  private readonly cubeCompilers: CompilerInterface[];
+
+  private readonly contextCompilers: CompilerInterface[];
+
+  private readonly transpilers: TranspilerInterface[];
+
+  private readonly viewCompilers: CompilerInterface[];
+
+  private readonly preTranspileCubeCompilers: CompilerInterface[];
+
+  private readonly viewCompilationGate: ViewCompilationGate;
+
+  private readonly cubeNameCompilers: CompilerInterface[];
+
+  private readonly extensions: Record<string, any>;
+
+  private readonly cubeDictionary: CubeDictionary;
+
+  private readonly cubeSymbols: CubeSymbols;
+
+  // Actually should be something like
+  // createCube(cubeDefinition: CubeDefinition): CubeDefinitionExtended
+  private readonly cubeFactory: CallableFunction;
+
+  private readonly filesToCompile: string[];
+
+  private readonly omitErrors: boolean;
+
+  private readonly allowNodeRequire: boolean;
+
+  private readonly compilerCache: CompilerCache;
+
+  private readonly compileContext: any;
+
+  private errorReportOptions: ErrorReporterOptions | undefined;
+
+  private errorsReporter: ErrorReporter | undefined;
+
+  private readonly standalone: boolean;
+
+  private readonly nativeInstance: NativeInstance;
+
+  private readonly yamlCompiler: YamlCompiler;
+
+  private pythonContext: PythonCtx | null;
+
+  private workerPool: workerpool.Pool | null;
+
+  private readonly compilerId: string;
+
+  private readonly compiledScriptCache: LRUCache<string, vm.Script>;
+
+  // FIXME: Is public only because of tests, should be private
+  public compilePromise: any;
+
+  private currentQuery: any;
+
+  public constructor(repository: SchemaFileRepository, options: DataSchemaCompilerOptions) {
     this.repository = repository;
     this.cubeCompilers = options.cubeCompilers || [];
     this.contextCompilers = options.contextCompilers || [];
@@ -51,23 +158,23 @@ export class DataSchemaCompiler {
     this.cubeDictionary = options.cubeDictionary;
     this.cubeSymbols = options.cubeSymbols;
     this.cubeFactory = options.cubeFactory;
-    this.filesToCompile = options.filesToCompile;
-    this.omitErrors = options.omitErrors;
-    this.allowNodeRequire = options.allowNodeRequire;
+    this.filesToCompile = options.filesToCompile || [];
+    this.omitErrors = options.omitErrors || false;
+    this.allowNodeRequire = options.allowNodeRequire || false;
     this.compileContext = options.compileContext;
     this.compilerCache = options.compilerCache;
-    this.errorReport = options.errorReport;
-    this.standalone = options.standalone;
+    this.errorReportOptions = options.errorReport;
+    this.standalone = options.standalone || false;
     this.nativeInstance = options.nativeInstance;
     this.yamlCompiler = options.yamlCompiler;
     this.yamlCompiler.dataSchemaCompiler = this;
     this.pythonContext = null;
     this.workerPool = null;
-    this.compilerId = options.compilerId;
+    this.compilerId = options.compilerId || 'default';
     this.compiledScriptCache = options.compiledScriptCache;
   }
 
-  compileObjects(compileServices, objects, errorsReport) {
+  public compileObjects(compileServices, objects, errorsReport: ErrorReporter) {
     try {
       return compileServices
         .map((compileService) => (() => compileService.compile(objects, errorsReport)))
@@ -81,10 +188,7 @@ export class DataSchemaCompiler {
     }
   }
 
-  /**
-   * @protected
-   */
-  async loadPythonContext(files, nsFileName) {
+  protected async loadPythonContext(files, nsFileName) {
     const ns = files.find((f) => f.fileName === nsFileName);
     if (ns) {
       return this.nativeInstance.loadPythonContext(
@@ -94,25 +198,23 @@ export class DataSchemaCompiler {
     }
 
     return {
+      __type: 'PythonCtx',
       filters: {},
       variables: {},
       functions: {}
-    };
+    } as PythonCtx;
   }
 
-  /**
-   * @protected
-   */
-  async doCompile() {
+  protected async doCompile() {
     const files = await this.repository.dataSchemaFiles();
 
     this.pythonContext = await this.loadPythonContext(files, 'globals.py');
     this.yamlCompiler.initFromPythonContext(this.pythonContext);
 
-    const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
+    const toCompile = files.filter((f) => !this.filesToCompile || !this.filesToCompile.length || this.filesToCompile.indexOf(f.fileName) !== -1);
 
-    const errorsReport = new ErrorReporter(null, [], this.errorReport);
-    this.errorsReport = errorsReport;
+    const errorsReport = new ErrorReporter(null, [], this.errorReportOptions);
+    this.errorsReporter = errorsReport;
 
     const transpilationWorkerThreads = getEnv('transpilationWorkerThreads');
     const transpilationNative = getEnv('transpilationNative');
@@ -127,14 +229,10 @@ export class DataSchemaCompiler {
       );
     }
 
-    /**
-     * @param stage Number
-     * @returns {Promise<*>}
-     */
-    const transpile = async (stage) => {
-      let cubeNames;
-      let cubeSymbols;
-      let transpilerNames;
+    const transpile = async (stage: CompileStage) => {
+      let cubeNames: string[] = [];
+      let cubeSymbols: Record<string, Record<string, boolean>> = {};
+      let transpilerNames: string[] = [];
       let results;
 
       if (transpilationNative || transpilationWorkerThreads) {
@@ -147,9 +245,9 @@ export class DataSchemaCompiler {
         // which doesn't allow passing any function objects, so we need to sanitize the symbols.
         // Communication with native backend also involves deserialization.
         cubeSymbols = Object.fromEntries(
-          Object.entries(this.cubeSymbols.symbols)
+          Object.entries(this.cubeSymbols.symbols as Record<string, Record<string, any>>)
             .map(
-              ([key, value]) => [key, Object.fromEntries(
+              ([key, value]: [string, Record<string, any>]) => [key, Object.fromEntries(
                 Object.keys(value).map((k) => [k, true]),
               )],
             ),
@@ -201,7 +299,7 @@ export class DataSchemaCompiler {
       return results.filter(f => !!f);
     };
 
-    const compilePhase = async (compilers, stage) => this.compileCubeFiles(compilers, await transpile(stage), errorsReport);
+    const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => this.compileCubeFiles(compilers, await transpile(stage), errorsReport);
 
     return compilePhase({ cubeCompilers: this.cubeNameCompilers }, 0)
       .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }, 1))
@@ -220,20 +318,18 @@ export class DataSchemaCompiler {
             content: ';',
           };
 
-          return this.transpileJsFile(
+          this.transpileJsFile(
             dummyFile,
             errorsReport,
             { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {}, compilerId: this.compilerId, stage: 0 }
-          );
+          ).then(() => undefined);
         } else if (transpilationWorkerThreads && this.workerPool) {
           this.workerPool.terminate();
         }
-
-        return Promise.resolve();
       });
   }
 
-  compile() {
+  public compile() {
     if (!this.compilePromise) {
       this.compilePromise = this.doCompile().then((res) => {
         if (!this.omitErrors) {
@@ -246,7 +342,7 @@ export class DataSchemaCompiler {
     return this.compilePromise;
   }
 
-  async transpileFile(file, errorsReport, options) {
+  private async transpileFile(file: FileContent, errorsReport: ErrorReporter, options: TranspileOptions = {}) {
     if (file.fileName.endsWith('.jinja') ||
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
       // TODO do Jinja syntax check with jinja compiler
@@ -275,21 +371,21 @@ export class DataSchemaCompiler {
    * Right now it is used only for transpilation in native,
    * so no checks for transpilation type inside this method
    */
-  async transpileJsFilesBulk(files, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }) {
+  private async transpileJsFilesBulk(files: FileContent[], errorsReport: ErrorReporter, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions) {
     // for bulk processing this data may be optimized even more by passing transpilerNames, compilerId only once for a bulk
     // but this requires more complex logic to be implemented in the native side.
     // And comparing to the file content sizes, a few bytes of JSON data is not a big deal here
     const reqDataArr = files.map(file => ({
       fileName: file.fileName,
       fileContent: file.content,
-      transpilers: transpilerNames,
-      compilerId,
+      transpilers: transpilerNames || [],
+      compilerId: compilerId || '',
       ...(cubeNames && {
         metaData: {
           cubeNames,
-          cubeSymbols,
-          contextSymbols,
-          stage
+          cubeSymbols: cubeSymbols || {},
+          contextSymbols: contextSymbols || {},
+          stage: stage || 0 as CompileStage,
         },
       }),
     }));
@@ -302,27 +398,27 @@ export class DataSchemaCompiler {
         return undefined;
       }
       errorsReport.addErrors(res[index].errors);
-      errorsReport.addWarnings(res[index].warnings);
+      errorsReport.addWarnings(res[index].warnings as unknown as SyntaxErrorInterface[]);
       errorsReport.exitFile();
 
       return { ...file, content: res[index].code };
     });
   }
 
-  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }) {
+  private async transpileJsFile(file: FileContent, errorsReport: ErrorReporter, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions) {
     try {
       if (getEnv('transpilationNative')) {
         const reqData = {
           fileName: file.fileName,
           fileContent: file.content,
-          transpilers: transpilerNames,
-          compilerId,
+          transpilers: transpilerNames || [],
+          compilerId: compilerId || '',
           ...(cubeNames && {
             metaData: {
               cubeNames,
-              cubeSymbols,
-              contextSymbols,
-              stage
+              cubeSymbols: cubeSymbols || {},
+              contextSymbols: contextSymbols || {},
+              stage: stage || 0 as CompileStage,
             },
           }),
         };
@@ -330,7 +426,7 @@ export class DataSchemaCompiler {
         errorsReport.inFile(file);
         const res = await transpileJs([reqData]);
         errorsReport.addErrors(res[0].errors);
-        errorsReport.addWarnings(res[0].warnings);
+        errorsReport.addWarnings(res[0].warnings as unknown as SyntaxErrorInterface[]);
         errorsReport.exitFile();
 
         return { ...file, content: res[0].code };
@@ -343,7 +439,7 @@ export class DataSchemaCompiler {
           cubeSymbols,
         };
 
-        const res = await this.workerPool.exec('transpile', [data]);
+        const res = await this.workerPool!.exec('transpile', [data]);
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
 
@@ -367,11 +463,12 @@ export class DataSchemaCompiler {
         const content = babelGenerator(ast, {}, file.content).code;
         return { ...file, content };
       }
-    } catch (e) {
+    } catch (e: any) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
-        const line = file.content.split('\n')[e.loc.line - 1];
-        const spaces = Array(e.loc.column).fill(' ').join('');
-        errorsReport.error(`Syntax error during '${file.fileName}' parsing: ${e.message}:\n${line}\n${spaces}^`);
+        const err = e as SyntaxErrorInterface;
+        const line = file.content.split('\n')[(err.loc?.start?.line || 1) - 1];
+        const spaces = Array(err.loc?.start.column).fill(' ').join('');
+        errorsReport.error(`Syntax error during '${file.fileName}' parsing: ${err.message}:\n${line}\n${spaces}^`);
       } else {
         errorsReport.error(e);
       }
@@ -379,7 +476,7 @@ export class DataSchemaCompiler {
     return undefined;
   }
 
-  withQuery(query, fn) {
+  public withQuery(query, fn) {
     const oldQuery = this.currentQuery;
     this.currentQuery = query;
     try {
@@ -389,11 +486,11 @@ export class DataSchemaCompiler {
     }
   }
 
-  contextQuery() {
+  public contextQuery() {
     return this.currentQuery;
   }
 
-  async compileCubeFiles(compilers, toCompile, errorsReport) {
+  private async compileCubeFiles(compilers: CompileCubeFilesCompilers, toCompile: FileContent[], errorsReport: ErrorReporter) {
     const cubes = [];
     const exports = {};
     const contexts = [];
@@ -413,17 +510,17 @@ export class DataSchemaCompiler {
           asyncModules
         );
       });
-    await asyncModules.reduce((a, b) => a.then(() => b()), Promise.resolve());
+    await asyncModules.reduce((a: Promise<void>, b: CallableFunction) => a.then(() => b()), Promise.resolve());
     return this.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
       .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport));
   }
 
-  throwIfAnyErrors() {
-    this.errorsReport.throwIfAny();
+  public throwIfAnyErrors() {
+    this.errorsReporter?.throwIfAny();
   }
 
-  compileFile(
-    file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules, { doSyntaxCheck } = { doSyntaxCheck: false }
+  private compileFile(
+    file: FileContent, errorsReport: ErrorReporter, cubes, exports, contexts, toCompile, compiledFiles, asyncModules, { doSyntaxCheck } = { doSyntaxCheck: false }
   ) {
     if (compiledFiles[file.fileName]) {
       return;
@@ -449,26 +546,26 @@ export class DataSchemaCompiler {
         toCompile,
         compiledFiles,
         this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
-        this.pythonContext
+        this.pythonContext!
       ));
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }
   }
 
-  getJsScript(file) {
+  private getJsScript(file: FileContent): vm.Script {
     const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
 
     if (this.compiledScriptCache.has(cacheKey)) {
-      return this.compiledScriptCache.get(cacheKey);
+      return this.compiledScriptCache.get(cacheKey)!;
     }
 
-    const script = new vm.Script(file.content, { filename: file.fileName, timeout: 15000 });
+    const script = new vm.Script(file.content, { filename: file.fileName });
     this.compiledScriptCache.set(cacheKey, script);
     return script;
   }
 
-  compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck } = { doSyntaxCheck: false }) {
+  public compileJsFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck } = { doSyntaxCheck: false }) {
     if (doSyntaxCheck) {
       // There is no need to run syntax check for data model files
       // because they were checked during transpilation/transformation phase
@@ -545,14 +642,14 @@ export class DataSchemaCompiler {
 
   // Alias "securityContext" with "security_context" (snake case version)
   // to support snake case based data models
-  cloneCompileContextWithGetterAlias(compileContext) {
+  private cloneCompileContextWithGetterAlias(compileContext) {
     const ctx = compileContext || {};
     const clone = R.clone(ctx);
     clone.security_context = ctx.securityContext;
     return clone;
   }
 
-  standaloneCompileContextProxy() {
+  private standaloneCompileContextProxy() {
     return new Proxy({}, {
       get: () => {
         throw new UserError('COMPILE_CONTEXT can\'t be used unless contextToAppId is defined. Please see https://cube.dev/docs/config#options-reference-context-to-app-id.');
@@ -560,7 +657,7 @@ export class DataSchemaCompiler {
     });
   }
 
-  resolveModuleFile(currentFile, modulePath, toCompile, errorsReport) {
+  private resolveModuleFile(currentFile: FileContent, modulePath: string, toCompile: FileContent[], errorsReport: ErrorReporter) {
     const localImport = modulePath.match(/^\.\/(.*)$/);
 
     if (!currentFile.isModule && localImport) {
@@ -614,7 +711,7 @@ export class DataSchemaCompiler {
     return this.readModuleFile(absPath, errorsReport);
   }
 
-  readModuleFile(absPath, errorsReport) {
+  private readModuleFile(absPath: string, errorsReport: ErrorReporter) {
     const nodeModulesPath = path.resolve('node_modules');
     if (!moduleFileCache[absPath]) {
       const content = fs.readFileSync(absPath, 'utf-8');
@@ -632,7 +729,7 @@ export class DataSchemaCompiler {
     return moduleFileCache[absPath];
   }
 
-  isWhiteListedPackage(packagePath) {
+  private isWhiteListedPackage(packagePath: string): boolean {
     return packagePath.indexOf('-schema') !== -1 &&
       (packagePath.indexOf('-schema') === packagePath.length - '-schema'.length);
   }

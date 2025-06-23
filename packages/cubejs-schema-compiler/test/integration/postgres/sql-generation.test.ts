@@ -3,7 +3,7 @@ import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { PrestodbQuery } from '../../../src/adapter/PrestodbQuery';
-import { prepareJsCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler, prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
 import { testWithPreAggregation } from './pre-aggregation-utils';
@@ -11,6 +11,7 @@ import { testWithPreAggregation } from './pre-aggregation-utils';
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
 
+  // language=JavaScript
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
@@ -4092,5 +4093,281 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         visitors__google_revenue: '600',
       }]
     );
+  });
+
+  describe('Transitive join paths', () => {
+    // eslint-disable-next-line @typescript-eslint/no-shadow
+    const { compiler, joinGraph, cubeEvaluator } =
+      // language=yaml
+      prepareYamlCompiler(`
+cubes:
+  - name: merchant_dims
+    sql: |
+      (
+        SELECT 101 AS merchant_sk, 'M1' AS merchant_id
+        UNION ALL
+        SELECT 102 AS merchant_sk, 'M2' AS merchant_id
+      )
+    dimensions:
+      - name: merchant_sk
+        sql: merchant_sk
+        type: number
+        primary_key: true
+      - name: merchant_id
+        sql: merchant_id
+        type: string
+
+  - name: product_dims
+    sql: |
+      (
+        SELECT 201 AS product_sk, 'P1' AS product_id
+        UNION ALL
+        SELECT 202 AS product_sk, 'P2' AS product_id
+      )
+    dimensions:
+      - name: product_sk
+        sql: product_sk
+        type: number
+        primary_key: true
+      - name: product_id
+        sql: product_id
+        type: string
+
+  - name: merchant_and_product_dims
+    sql: |
+      (
+        SELECT 'M1' AS merchant_id, 'P1' AS product_id, 'Organic' AS acquisition_channel
+        UNION ALL
+        SELECT 'M1' AS merchant_id, 'P2' AS product_id, 'Paid' AS acquisition_channel
+        UNION ALL
+        SELECT 'M2' AS merchant_id, 'P1' AS product_id, 'Referral' AS acquisition_channel
+      )
+    dimensions:
+      - name: product_id
+        sql: product_id
+        type: string
+        primary_key: true
+      - name: merchant_id
+        sql: merchant_id
+        type: string
+        primary_key: true
+      - name: acquisition_channel
+        sql: acquisition_channel
+        type: string
+
+  - name: test_facts
+    sql: |
+      (
+        SELECT DATE '2023-01-01' AS reporting_date, 101 AS merchant_sk, 201 AS product_sk, 100 AS amount
+        UNION ALL
+        SELECT DATE '2023-01-01' AS reporting_date, 101 AS merchant_sk, 202 AS product_sk, 150 AS amount
+        UNION ALL
+        SELECT DATE '2023-01-02' AS reporting_date, 102 AS merchant_sk, 201 AS product_sk, 200 AS amount
+      )
+    joins:
+      - name: merchant_dims
+        relationship: many_to_one
+        sql: "{CUBE}.merchant_sk = {merchant_dims.merchant_sk}"
+      - name: product_dims
+        relationship: many_to_one
+        sql: "{CUBE}.product_sk = {product_dims.product_sk}"
+      - name: merchant_and_product_dims # This join depends on merchant_dims and product_dims
+        relationship: many_to_one
+        sql: "{merchant_dims.merchant_id} = {merchant_and_product_dims.merchant_id} AND {product_dims.product_id} = {merchant_and_product_dims.product_id}"
+    dimensions:
+      - name: reporting_date
+        sql: reporting_date
+        type: time
+        primary_key: true
+      - name: merchant_sk
+        sql: merchant_sk
+        type: number
+        primary_key: true
+      - name: product_sk
+        sql: product_sk
+        type: number
+        primary_key: true
+      - name: acquisition_channel # This dimension triggers the join to merchant_and_product_dims
+        sql: "{merchant_and_product_dims.acquisition_channel}"
+        type: string
+    measures:
+      - name: amount_sum
+        sql: amount
+        type: sum
+
+# Join loop for testing transitive joins
+  - name: alpha_facts
+    sql: |
+      (
+        SELECT DATE '2023-01-01' AS reporting_date, 1 AS a_id, 10 AS b_id, 100 AS amount
+        UNION ALL
+        SELECT DATE '2023-01-02' AS reporting_date, 2 AS a_id, 20 AS b_id, 150 AS amount
+      )
+    joins:
+      - name: beta_dims
+        relationship: many_to_one
+        sql: "{CUBE}.a_id = {beta_dims.a_id}"
+      - name: gamma_dims
+        relationship: many_to_one
+        sql: "{CUBE}.b_id = {gamma_dims.b_id}"
+      - name: delta_bridge
+        relationship: many_to_one
+        sql: "{beta_dims.a_name} = {delta_bridge.a_name} AND {gamma_dims.b_name} = {delta_bridge.b_name}"
+    dimensions:
+      - name: reporting_date
+        sql: reporting_date
+        type: time
+        primary_key: true
+      - name: a_id
+        sql: a_id
+        type: number
+        primary_key: true
+      - name: b_id
+        sql: b_id
+        type: number
+        primary_key: true
+      - name: channel
+        sql: "{delta_bridge.channel}"
+        type: string
+    measures:
+      - name: amount_sum
+        sql: amount
+        type: sum
+
+  - name: beta_dims
+    sql: |
+      (
+        SELECT 1 AS a_id, 'Alpha1' AS a_name
+        UNION ALL
+        SELECT 2 AS a_id, 'Alpha2' AS a_name
+      )
+    dimensions:
+      - name: a_id
+        sql: a_id
+        type: number
+        primary_key: true
+      - name: a_name
+        sql: a_name
+        type: string
+
+  - name: gamma_dims
+    sql: |
+      (
+        SELECT 10 AS b_id, 'Beta1' AS b_name
+        UNION ALL
+        SELECT 20 AS b_id, 'Beta2' AS b_name
+      )
+    dimensions:
+      - name: b_id
+        sql: b_id
+        type: number
+        primary_key: true
+      - name: b_name
+        sql: b_name
+        type: string
+
+  - name: delta_bridge
+    sql: |
+      (
+        SELECT 'Alpha1' AS a_name, 'Beta1' AS b_name, 'Organic' AS channel
+        UNION ALL
+        SELECT 'Alpha1' AS a_name, 'Beta2' AS b_name, 'Paid' AS channel
+        UNION ALL
+        SELECT 'Alpha2' AS a_name, 'Beta1' AS b_name, 'Referral' AS channel
+      )
+    joins:
+      - name: gamma_dims
+        relationship: many_to_one
+        sql: "{CUBE}.b_name = {gamma_dims.b_name}"
+    dimensions:
+      - name: a_name
+        sql: a_name
+        type: string
+        primary_key: true
+      - name: b_name
+        sql: "{gamma_dims.b_name}"
+        type: string
+        primary_key: true
+      - name: channel
+        sql: channel
+        type: string
+      `);
+
+    if (!getEnv('nativeSqlPlanner')) {
+      it('querying cube dimension that require transitive joins', async () => {
+        await compiler.compile();
+        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+          measures: [],
+          dimensions: [
+            'test_facts.reporting_date',
+            'test_facts.merchant_sk',
+            'test_facts.product_sk',
+            'test_facts.acquisition_channel'
+          ],
+          order: [{
+            id: 'test_facts.acquisition_channel'
+          }],
+          timezone: 'America/Los_Angeles'
+        });
+
+        const res = await dbRunner.testQuery(query.buildSqlAndParams());
+        console.log(JSON.stringify(res));
+
+        expect(res).toEqual([
+          {
+            test_facts__acquisition_channel: 'Organic',
+            test_facts__merchant_sk: 101,
+            test_facts__product_sk: 201,
+            test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
+          },
+          {
+            test_facts__acquisition_channel: 'Paid',
+            test_facts__merchant_sk: 101,
+            test_facts__product_sk: 202,
+            test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
+          },
+          {
+            test_facts__acquisition_channel: 'Referral',
+            test_facts__merchant_sk: 102,
+            test_facts__product_sk: 201,
+            test_facts__reporting_date: '2023-01-02T00:00:00.000Z',
+          },
+        ]);
+      });
+    } else {
+      it.skip('querying cube dimension that require transitive joins', async () => {
+        // FIXME should be implemented in Tesseract
+      });
+    }
+
+    if (!getEnv('nativeSqlPlanner')) {
+      it('querying cube with transitive joins with loop', async () => {
+        await compiler.compile();
+
+        try {
+          const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+            measures: [],
+            dimensions: [
+              'alpha_facts.reporting_date',
+              'delta_bridge.b_name',
+              'alpha_facts.channel'
+            ],
+            order: [{
+              id: 'alpha_facts.reporting_date'
+            }],
+            timezone: 'America/Los_Angeles'
+          });
+
+          await dbRunner.testQuery(query.buildSqlAndParams());
+          throw new Error('Should have thrown an error');
+        } catch (err: any) {
+          expect(err.message).toContain('Can not construct joins for the query, potential loop detected');
+        }
+      });
+    } else {
+      it.skip('querying cube dimension that require transitive joins', async () => {
+        // FIXME should be implemented in Tesseract
+      });
+    }
   });
 });

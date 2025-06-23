@@ -123,33 +123,7 @@ export class ClickHouseQuery extends BaseQuery {
       .join(' AND ');
   }
 
-  public getFieldAlias(id) {
-    const equalIgnoreCase = (a, b) => (
-      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
-    );
-
-    let field;
-
-    field = this.dimensionsForSelect().find(
-      d => equalIgnoreCase(d.dimension, id),
-    );
-
-    if (field) {
-      return field.aliasName();
-    }
-
-    field = this.measures.find(
-      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
-    );
-
-    if (field) {
-      return field.aliasName();
-    }
-
-    return null;
-  }
-
-  public orderHashToString(hash) {
+  public override orderHashToString(hash: { id: string, desc: boolean }) {
     //
     // ClickHouse doesn't support order by index column, so map these to the alias names
     //

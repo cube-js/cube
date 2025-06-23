@@ -23,6 +23,7 @@ import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
 import { YamlCompiler } from './YamlCompiler';
 import { ViewCompilationGate } from './ViewCompilationGate';
+import type { ErrorReporter } from './ErrorReporter';
 
 export type PrepareCompilerOptions = {
   nativeInstance?: NativeInstance,
@@ -36,6 +37,10 @@ export type PrepareCompilerOptions = {
   adapter?: string;
   compiledScriptCache?: LRUCache<string, vm.Script>;
 };
+
+export interface CompilerInterface {
+  compile: (cubes: any[], errorReporter: ErrorReporter) => void;
+}
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}) => {
   const nativeInstance = options.nativeInstance || new NativeInstance();
