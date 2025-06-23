@@ -27,7 +27,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
-    const isTesseractEnv =get('DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool();// process.env.DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER && process.env.DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER.toLowerCase() === 'true';
+    const isTesseractEnv = get('DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool();
 
     const fixtures = getFixtures(type, extendedEnv);
     let client: CubeApi;
