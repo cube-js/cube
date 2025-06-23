@@ -3064,7 +3064,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup with aliases: nested_rollup_with_aliases 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup with aliases 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
@@ -3867,7 +3867,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup: nested_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
