@@ -1,5 +1,339 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Schema Testing Calendar Cubes Valid calendar cubes: customCalendarJsCube 1`] = `
+Object {
+  "accessPolicy": undefined,
+  "allDefinitions": [Function],
+  "calendar": true,
+  "dimensions": Object {
+    "date_val": Object {
+      "ownedByCube": true,
+      "primaryKey": true,
+      "shown": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_month_number": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_month_short_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_quarter_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_week_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_week_end_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_week_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year_month_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year_month_number": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "number",
+    },
+    "fiscal_year_period_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "number",
+    },
+    "retail_date": Object {
+      "granularities": Object {
+        "month": Object {
+          "sql": [Function],
+        },
+        "quarter": Object {
+          "sql": [Function],
+        },
+        "week": Object {
+          "sql": [Function],
+        },
+        "year": Object {
+          "sql": [Function],
+        },
+      },
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_month_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_month_long_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_quarter_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_in_month": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_year_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_year_end_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_year_week": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+  },
+  "fileName": "custom_calendar.js",
+  "hierarchies": Object {},
+  "joins": Object {},
+  "measures": Object {
+    "count": Object {
+      "ownedByCube": true,
+      "type": "count",
+    },
+  },
+  "name": "custom_calendar_js",
+  "preAggregations": Object {},
+  "rawCubes": [Function],
+  "rawFolders": [Function],
+  "segments": Object {},
+  "sql": [Function],
+}
+`;
+
+exports[`Schema Testing Calendar Cubes Valid calendar cubes: customCalendarYamlCube 1`] = `
+Object {
+  "accessPolicy": undefined,
+  "allDefinitions": [Function],
+  "calendar": true,
+  "dimensions": Object {
+    "date_val": Object {
+      "ownedByCube": true,
+      "primaryKey": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_month_number": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_month_short_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_quarter_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_week_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_week_end_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_week_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year_month_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year_month_number": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "number",
+    },
+    "fiscal_year_period_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "number",
+    },
+    "retail_date": Object {
+      "granularities": Object {
+        "fortnight": Object {
+          "interval": "2 week",
+          "origin": "2025-01-01",
+        },
+        "month": Object {
+          "sql": [Function],
+        },
+        "quarter": Object {
+          "sql": [Function],
+        },
+        "week": Object {
+          "sql": [Function],
+        },
+        "year": Object {
+          "sql": [Function],
+        },
+      },
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_month_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_month_long_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_quarter_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_in_month": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_year_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_year_end_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_year_week": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+  },
+  "evaluatedHierarchies": Array [
+    Object {
+      "levels": Array [
+        "custom_calendar.fiscal_year",
+        "custom_calendar.fiscal_quarter_year",
+        "custom_calendar.fiscal_month_number",
+      ],
+      "name": "Fiscal_Calendar_Hierarchy",
+      "title": "Fiscal Calendar Hierarchy",
+    },
+    Object {
+      "levels": Array [
+        "custom_calendar.retail_year",
+        "custom_calendar.retail_month_long_name",
+        "custom_calendar.retail_week_name",
+      ],
+      "name": "Retail_Calendar_Hierarchy",
+      "title": "Retail Calendar Hierarchy",
+    },
+  ],
+  "fileName": "custom_calendar.yml",
+  "hierarchies": Object {
+    "Fiscal_Calendar_Hierarchy": Object {
+      "levels": [Function],
+      "title": "Fiscal Calendar Hierarchy",
+    },
+    "Retail_Calendar_Hierarchy": Object {
+      "levels": [Function],
+      "title": "Retail Calendar Hierarchy",
+    },
+  },
+  "joins": Object {},
+  "measures": Object {
+    "count": Object {
+      "ownedByCube": true,
+      "type": "count",
+    },
+  },
+  "name": "custom_calendar",
+  "preAggregations": Object {},
+  "rawCubes": [Function],
+  "rawFolders": [Function],
+  "segments": Object {},
+  "sqlTable": [Function],
+}
+`;
+
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (no additions): accessPolicy 1`] = `
 Array [
   Object {

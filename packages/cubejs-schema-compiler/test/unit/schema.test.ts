@@ -1232,4 +1232,100 @@ describe('Schema Testing', () => {
       }
     });
   });
+
+  describe('Calendar Cubes', () => {
+    it('Valid calendar cubes', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/calendar_orders.yml'),
+        'utf8'
+      );
+      const customCalendarJs = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/custom_calendar.js'),
+        'utf8'
+      );
+      const customCalendarYaml = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/custom_calendar.yml'),
+        'utf8'
+      );
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'calendar_orders.yml',
+        },
+        {
+          content: customCalendarJs,
+          fileName: 'custom_calendar.js',
+        },
+        {
+          content: customCalendarYaml,
+          fileName: 'custom_calendar.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const customCalendarJsCube = cubeEvaluator.cubeFromPath('custom_calendar_js');
+      const customCalendarYamlCube = cubeEvaluator.cubeFromPath('custom_calendar');
+
+      expect(customCalendarJsCube).toMatchSnapshot('customCalendarJsCube');
+      expect(customCalendarYamlCube).toMatchSnapshot('customCalendarYamlCube');
+    });
+
+    it('CubeB.js correctly extends cubeA.js (no additions)', async () => {
+      const customCalendarJs = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/custom_calendar.js'),
+        'utf8'
+      );
+      const customCalendarJsExt = 'cube(\'custom_calendar_js_ext\', { extends: custom_calendar_js })';
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: customCalendarJs,
+          fileName: 'custom_calendar.js',
+        },
+        {
+          content: customCalendarJsExt,
+          fileName: 'custom_calendar_ext.js',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('custom_calendar_js');
+      const cubeB = cubeEvaluator.cubeFromPath('custom_calendar_js_ext');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+
+    it('CubeB.yml correctly extends cubeA.js (no additions)', async () => {
+      const customCalendarYaml = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/custom_calendar.yml'),
+        'utf8'
+      );
+      const customCalendarJsExt = 'cube(\'custom_calendar_js_ext\', { extends: custom_calendar })';
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: customCalendarYaml,
+          fileName: 'custom_calendar.yml',
+        },
+        {
+          content: customCalendarJsExt,
+          fileName: 'custom_calendar_ext.js',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('custom_calendar');
+      const cubeB = cubeEvaluator.cubeFromPath('custom_calendar_js_ext');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+  });
 });
