@@ -84,10 +84,10 @@ export class PostgresQuery extends BaseQuery {
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.statements.generated_time_series_select = 'SELECT d AS "date_from",\n' +
       'd + interval {{ granularity }} - interval \'1 millisecond\' AS "date_to" \n' +
-      'FROM generate_series({{ start }}::timestamp, {{ end }}:: timestamp, \'{{ granularity }}\'::interval) d ';
+      'FROM generate_series({{ start }}::timestamp, {{ end }}:: timestamp, {{ granularity }}::interval) d ';
     templates.statements.generated_time_series_with_cte_range_source = 'SELECT d AS "date_from",\n' +
       'd + interval {{ granularity }} - interval \'1 millisecond\' AS "date_to" \n' +
-      'FROM {{ range_source }}, LATERAL generate_series({{ range_source }}.{{ min_name }}, {{ range_source }}.{{ max_name }}, \'{{ granularity }}\'::interval) d ';
+      'FROM {{ range_source }}, LATERAL generate_series({{ range_source }}.{{ min_name }}, {{ range_source }}.{{ max_name }}, {{ granularity }}::interval) d ';
     return templates;
   }
 
