@@ -37,6 +37,23 @@ cubes:
             interval: 2 week
             origin: "2025-01-01"
 
+        # This is similar to the syntax shown above for custom granularities.
+        # New `time_shift` parameter is introduced for time dimensions,
+        # with `interval`, `type`, and `sql` parameters
+        time_shift:
+          - interval: 1 month
+            type: prior
+            sql: "{CUBE.retail_date_prev_month}"
+
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE.retail_date_prev_year}"
+
+          # All needed intervals should be defined explicitly
+          - interval: 2 year
+            type: prior
+            sql: "{CUBE.retail_date_prev_prev_year}"
+
       - name: retail_year
         sql: "{CUBE}.retail_year_name"
         type: string
@@ -76,6 +93,18 @@ cubes:
       - name: retail_week_in_month
         sql: "{CUBE}.retail_week_in_month"
         type: string
+
+      - name: retail_date_prev_month
+        sql: "{CUBE}.retail_date_prev_month"
+        type: time
+
+      - name: retail_date_prev_year
+        sql: "{CUBE}.retail_date_prev_year"
+        type: time
+
+      - name: retail_date_prev_prev_year
+        sql: "{CUBE}.retail_date_prev_prev_year"
+        type: time
 
     ##### Fiscal Dates ####
 

@@ -575,7 +575,7 @@ const timeShiftItemRequired = Joi.object({
 });
 
 const timeShiftItemOptional = Joi.object({
-  timeDimension: Joi.func(), // не required
+  timeDimension: Joi.func(), // not required
   interval: regexTimeInterval.required(),
   type: Joi.string().valid('next', 'prior').required(),
 });
@@ -661,6 +661,17 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
     type: Joi.any().valid('number').required(),
     sql: Joi.func().required(),
     addGroupBy: Joi.func(),
+  }),
+  // TODO should be valid only for calendar cubes, but this requires significant refactoring
+  // of all schemas. Left for the future when we'll switch to zod.
+  inherit(BaseDimensionWithoutSubQuery, {
+    type: Joi.any().valid('time').required(),
+    sql: Joi.func().required(),
+    timeShift: Joi.array().items(Joi.object({
+      interval: regexTimeInterval.required(),
+      type: Joi.string().valid('next', 'prior').required(),
+      sql: Joi.func().required(),
+    })),
   })
 ));
 

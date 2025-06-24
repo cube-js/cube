@@ -80,7 +80,39 @@ Object {
       },
       "ownedByCube": true,
       "sql": [Function],
+      "timeShift": Array [
+        Object {
+          "interval": "1 month",
+          "sql": [Function],
+          "type": "prior",
+        },
+        Object {
+          "interval": "1 year",
+          "sql": [Function],
+          "type": "prior",
+        },
+        Object {
+          "interval": "2 year",
+          "sql": [Function],
+          "type": "prior",
+        },
+      ],
       "type": "time",
+    },
+    "retail_date_prev_month": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_date_prev_prev_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_date_prev_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
     },
     "retail_month_begin_date": Object {
       "ownedByCube": true,
@@ -232,6 +264,38 @@ Object {
           "sql": [Function],
         },
       },
+      "ownedByCube": true,
+      "sql": [Function],
+      "timeShift": Array [
+        Object {
+          "interval": "1 month",
+          "sql": [Function],
+          "type": "prior",
+        },
+        Object {
+          "interval": "1 year",
+          "sql": [Function],
+          "type": "prior",
+        },
+        Object {
+          "interval": "2 year",
+          "sql": [Function],
+          "type": "prior",
+        },
+      ],
+      "type": "time",
+    },
+    "retail_date_prev_month": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_date_prev_prev_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_date_prev_year": Object {
       "ownedByCube": true,
       "sql": [Function],
       "type": "time",
