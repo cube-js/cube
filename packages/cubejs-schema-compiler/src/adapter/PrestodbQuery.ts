@@ -138,9 +138,16 @@ export class PrestodbQuery extends BaseQuery {
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     delete templates.functions.PERCENTILECONT;
-    templates.statements.select = 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
-      'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
+    templates.statements.select = '{% if ctes %} WITH \n' +
+          '{{ ctes | join(\',\n\') }}\n' +
+          '{% endif %}' +
+      'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }}  {% if from %}\n' +
+      'FROM (\n  {{ from }}\n) AS {{ from_alias }} {% elif from_prepared %}\n' +
+      'FROM {{ from_prepared }}' +
+      '{% endif %}' +
+      '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +
+      '{% if having %}\nHAVING {{ having }}{% endif %}' +
       '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
       '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}' +
       '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
