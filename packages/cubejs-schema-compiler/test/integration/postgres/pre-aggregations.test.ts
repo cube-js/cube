@@ -570,8 +570,8 @@ describe('PreAggregations', () => {
   });
 
   if (getEnv('nativeSqlPlanner')) {
-    it.skip('FIXME(tesseract): Should work after fallback for pre-aggregations is fully turned off.', () => {
-      // Skipping because it not works in Tesseract yet
+    it.skip('FIXME(tesseract): simple pre-aggregation proxy time dimension', () => {
+      // Should work after fallback for pre-aggregations is fully turned off
     });
     /* it('simple pre-aggregation proxy time dimension', () => compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -1121,8 +1121,9 @@ describe('PreAggregations', () => {
       });
     });
   } else {
-    it.skip('FIXME(tesseract): This should be fixed in Tesseract.', async () => {
-      // Skipping because it not works in Tesseract yet
+    it.skip('FIXME(tesseract): multiplied measure no match', async () => {
+      // This should be fixed in Tesseract.
+
     });
   }
 

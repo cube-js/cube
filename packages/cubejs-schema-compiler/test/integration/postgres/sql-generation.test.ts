@@ -3496,8 +3496,8 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       }]
     ));
   } else {
-    it.skip('FIXME(tesseract): Should be fixed in tesseract', () => {
-      // Skipping because it not works in Tesseract yet
+    it.skip('FIXME(tesseract): multi stage revenue_sum_group_by_granularity and group by td with granularity', () => {
+      // Should be fixed in tesseract
     });
   }
 

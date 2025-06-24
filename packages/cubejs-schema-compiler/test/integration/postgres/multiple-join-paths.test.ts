@@ -627,8 +627,8 @@ describe('Multiple join paths', () => {
           }
         });
       } else {
-        it.skip('FIXME(tesseract): This should be implemented in Tesseract.', async () => {
-          // Skipping because it not works in Tesseract yet
+        it.skip(`FIXME(tesseract): pre-aggregation ${preAggregationId} should match its own references`, async () => {
+          // This should be implemented in Tesseract.
         });
       }
 
@@ -648,8 +648,8 @@ describe('Multiple join paths', () => {
           expect(res).toEqual(expectedData);
         });
       } else {
-        it.skip('FIXME(tesseract): This should be implemented in Tesseract.', async () => {
-          // Skipping because it not works in Tesseract yet
+        it.skip(`FIXME(tesseract): pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
+          // This should be implemented in Tesseract.
         });
       }
     }
