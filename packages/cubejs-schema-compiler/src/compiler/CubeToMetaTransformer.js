@@ -2,8 +2,9 @@ import inflection from 'inflection';
 import R from 'ramda';
 import camelCase from 'camelcase';
 
+import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
-import { BaseMeasure, BaseQuery } from '../adapter';
+import { BaseMeasure } from '../adapter';
 
 export class CubeToMetaTransformer {
   /**
@@ -108,6 +109,7 @@ export class CubeToMetaTransformer {
         )(cube.segments || {}),
         hierarchies: (cube.evaluatedHierarchies || []).map((it) => ({
           ...it,
+          aliasMember: it.aliasMember,
           public: it.public ?? true,
           name: `${cube.name}.${it.name}`,
         })),
@@ -168,7 +170,7 @@ export class CubeToMetaTransformer {
       cubeName, drillMembers, { originalSorting: true }
     )) || [];
 
-    const type = BaseQuery.toMemberDataType(nameToMetric[1].type);
+    const type = CubeSymbols.toMemberDataType(nameToMetric[1].type);
 
     return {
       name,

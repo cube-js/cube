@@ -5,7 +5,6 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         wrapper_replacer_context, LikeExprEscapeChar, LikeExprLikeType, LikeType,
-        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -48,6 +47,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -59,6 +59,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     "?escape_char",
@@ -78,51 +79,49 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
-                self.transform_like_expr("?alias_to_cube", "?like_type", "?escape_char"),
+                self.transform_like_expr("?input_data_source", "?like_type", "?escape_char"),
             ),
         ]);
     }
 
     fn transform_like_expr(
         &self,
-        alias_to_cube_var: &'static str,
+        input_data_source_var: &'static str,
         like_type_var: &'static str,
         escape_char_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let like_type_var = var!(like_type_var);
         let escape_char_var = var!(escape_char_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                WrapperReplacerContextAliasToCube
-            ) {
-                let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube)
-                else {
-                    continue;
-                };
+            let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var)
+            else {
+                return false;
+            };
 
-                let templates = &sql_generator.get_sql_templates().templates;
-
-                for escape_char in var_iter!(egraph[subst[escape_char_var]], LikeExprEscapeChar) {
-                    if escape_char.is_some() {
-                        if !templates.contains_key("expressions/like_escape") {
-                            continue;
-                        }
+            for escape_char in var_iter!(egraph[subst[escape_char_var]], LikeExprEscapeChar) {
+                if escape_char.is_some() {
+                    if !Self::can_rewrite_template(&data_source, &meta, "expressions/like_escape") {
+                        continue;
                     }
+                }
 
-                    for like_type in var_iter!(egraph[subst[like_type_var]], LikeExprLikeType) {
-                        let expression_name = match like_type {
-                            LikeType::Like => "like",
-                            LikeType::ILike => "ilike",
-                            _ => continue,
-                        };
-                        if templates.contains_key(&format!("expressions/{}", expression_name)) {
-                            return true;
-                        }
+                for like_type in var_iter!(egraph[subst[like_type_var]], LikeExprLikeType) {
+                    let expression_name = match like_type {
+                        LikeType::Like => "like",
+                        LikeType::ILike => "ilike",
+                        _ => continue,
+                    };
+                    if Self::can_rewrite_template(
+                        &data_source,
+                        &meta,
+                        &format!("expressions/{}", expression_name),
+                    ) {
+                        return true;
                     }
                 }
             }

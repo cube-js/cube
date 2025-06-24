@@ -16,7 +16,7 @@ in Cube, such as cubes, views, measures, and dimensions.
 Semantic Layer Sync will synchronize all public cubes and views with connected
 BI tools. We recommend making your cubes private and only exposing views. Both
 cubes and views are public by default. To make cubes private, set the
-[public](/reference/data-model/cube#public) parameter to `false`.
+[public](/product/data-modeling/reference/cube#public) parameter to `false`.
 
 ```yaml
 cubes:
@@ -73,12 +73,12 @@ module.exports = {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
           url: "superset.example.com",
-          database: "Cube Cloud: production-deployment",
-        },
-      },
-    ];
-  },
-};
+          database: "Cube Cloud: production-deployment"
+        }
+      }
+    ]
+  }
+}
 ```
 
 </CodeTabs>

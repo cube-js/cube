@@ -1,25 +1,30 @@
 use crate::{
-    compile::rewrite::{
-        aggregate,
-        analysis::LogicalPlanData,
-        cube_scan_wrapper, grouping_set_expr, original_expr_name, rewrite,
-        rewriter::{CubeEGraph, CubeRewrite},
-        rules::{members::MemberRules, wrapper::WrapperRules},
-        subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
-        wrapped_select_aggr_expr_empty_tail, wrapped_select_filter_expr_empty_tail,
-        wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
-        wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
-        wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
-        wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        wrapper_replacer_context, AggregateFunctionExprDistinct, AggregateFunctionExprFun,
-        AliasExprAlias, ColumnExprColumn, ListType, LogicalPlanLanguage, WrappedSelectPushToCube,
-        WrapperReplacerContextAliasToCube, WrapperReplacerContextPushToCube,
+    compile::{
+        engine::udf::{MEASURE_UDAF_NAME, PATCH_MEASURE_UDAF_NAME},
+        rewrite::{
+            agg_fun_expr, agg_fun_expr_within_group_empty_tail, aggregate, alias_expr,
+            analysis::ConstantFolding,
+            binary_expr, case_expr, column_expr, cube_scan_wrapper, grouping_set_expr,
+            literal_null, original_expr_name, rewrite,
+            rewriter::{CubeEGraph, CubeRewrite},
+            rules::{members::MemberRules, wrapper::WrapperRules},
+            subquery, transforming_chain_rewrite, transforming_rewrite, udaf_expr, wrapped_select,
+            wrapped_select_aggr_expr_empty_tail, wrapped_select_filter_expr_empty_tail,
+            wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
+            wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
+            wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
+            wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer,
+            wrapper_pushdown_replacer, wrapper_replacer_context, AggregateFunctionExprDistinct,
+            AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, ColumnExprColumn,
+            ListType, LiteralExprValue, LogicalPlanData, LogicalPlanLanguage,
+            WrappedSelectPushToCube, WrapperReplacerContextPushToCube,
+        },
     },
     copy_flag,
-    transport::V1CubeMetaMeasureExt,
+    transport::{MetaContext, V1CubeMetaMeasureExt},
     var, var_iter,
 };
-use datafusion::logical_plan::Column;
+use datafusion::{logical_plan::Column, scalar::ScalarValue};
 use egg::{Subst, Var};
 use std::ops::IndexMut;
 
@@ -39,6 +44,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -59,6 +65,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -70,6 +77,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pushdown_replacer(
@@ -81,6 +89,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pushdown_replacer(
@@ -92,6 +101,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -103,6 +113,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -114,6 +125,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -125,6 +137,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -136,6 +149,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
@@ -150,6 +164,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         "WrappedSelectAlias:None",
@@ -177,6 +192,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
                 grouping_set_expr(
@@ -189,11 +205,12 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     "?type",
                 ),
-                self.check_rollup_allowed("?alias_to_cube"),
+                self.check_rollup_allowed("?input_data_source"),
             ),
             rewrite(
                 "wrapper-groupping-set-pull-up",
@@ -207,6 +224,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     "?type",
@@ -220,6 +238,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
             ),
@@ -246,11 +265,12 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     vec![("?aggr_expr", aggr_expr)],
                     wrapper_pullup_replacer(
-                        "?measure",
+                        alias_expr("?out_measure_expr", "?out_measure_alias"),
                         wrapper_replacer_context(
                             "?alias_to_cube",
                             "WrapperReplacerContextPushToCube:true",
@@ -258,6 +278,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "?ungrouped_scan",
+                            "?input_data_source",
                         ),
                     ),
                     self.pushdown_measure(
@@ -267,7 +288,8 @@ impl WrapperRules {
                         distinct,
                         cast_data_type,
                         "?cube_members",
-                        "?measure",
+                        "?out_measure_expr",
+                        "?out_measure_alias",
                     ),
                 )
             },
@@ -314,6 +336,93 @@ impl WrapperRules {
                 "GroupingSetExprMembers",
             );
         }
+
+        // incoming structure: agg_fun(?name, case(?cond, (?when_value, measure_column)))
+        // optional "else null" is fine
+        // only single when-then
+        rules.extend(vec![
+            transforming_chain_rewrite(
+                "wrapper-push-down-aggregation-over-filtered-measure",
+                wrapper_pushdown_replacer("?aggr_expr", "?context"),
+                vec![
+                    (
+                        "?aggr_expr",
+                        agg_fun_expr(
+                            "?fun",
+                            vec![case_expr(
+                                Some("?case_expr".to_string()),
+                                vec![("?literal".to_string(), column_expr("?measure_column"))],
+                                // TODO make `ELSE NULL` optional and/or add generic rewrite to normalize it
+                                Some(literal_null()),
+                            )],
+                            "?distinct",
+                            agg_fun_expr_within_group_empty_tail(),
+                        ),
+                    ),
+                    (
+                        "?context",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                            "?input_data_source",
+                        ),
+                    ),
+                ],
+                alias_expr(
+                    udaf_expr(
+                        PATCH_MEASURE_UDAF_NAME,
+                        vec![
+                            column_expr("?measure_column"),
+                            "?replace_agg_type".to_string(),
+                            wrapper_pushdown_replacer(
+                                // = is a proper way to filter here:
+                                // CASE NULL WHEN ... will return null
+                                // So NULL in ?case_expr is equivalent to hitting ELSE branch
+                                // TODO add "is not null" to cond? just to make is always boolean
+                                binary_expr("?case_expr", "=", "?literal"),
+                                "?context",
+                            ),
+                        ],
+                    ),
+                    "?out_measure_alias",
+                ),
+                self.transform_filtered_measure(
+                    "?aggr_expr",
+                    "?literal",
+                    "?measure_column",
+                    "?fun",
+                    "?cube_members",
+                    "?replace_agg_type",
+                    "?out_measure_alias",
+                ),
+            ),
+            rewrite(
+                "wrapper-pull-up-aggregation-over-filtered-measure",
+                udaf_expr(
+                    PATCH_MEASURE_UDAF_NAME,
+                    vec![
+                        column_expr("?measure_column"),
+                        "?new_agg_type".to_string(),
+                        wrapper_pullup_replacer("?filter_expr", "?context"),
+                    ],
+                ),
+                wrapper_pullup_replacer(
+                    udaf_expr(
+                        PATCH_MEASURE_UDAF_NAME,
+                        vec![
+                            column_expr("?measure_column"),
+                            "?new_agg_type".to_string(),
+                            "?filter_expr".to_string(),
+                        ],
+                    ),
+                    "?context",
+                ),
+            ),
+        ]);
     }
 
     pub fn aggregate_rules_subquery(&self, rules: &mut Vec<CubeRewrite>) {
@@ -331,6 +440,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -354,6 +464,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pushdown_replacer(
@@ -365,6 +476,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pushdown_replacer(
@@ -376,6 +488,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pushdown_replacer(
@@ -387,6 +500,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -398,6 +512,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -409,6 +524,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -420,6 +536,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -431,6 +548,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapped_select_having_expr_empty_tail(),
@@ -445,6 +563,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     "WrappedSelectAlias:None",
@@ -455,7 +574,7 @@ impl WrapperRules {
                 "CubeScanWrapperFinalized:false",
             ),
             self.transform_aggregate_subquery(
-                "?alias_to_cube",
+                "?input_data_source",
                 "?group_expr",
                 "?aggr_expr",
                 "?push_to_cube",
@@ -484,6 +603,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -495,6 +615,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -506,6 +627,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -517,6 +639,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -528,6 +651,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -539,6 +663,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -550,6 +675,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -561,6 +687,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
@@ -576,6 +703,7 @@ impl WrapperRules {
                                 "?cube_members",
                                 "?grouped_subqueries",
                                 "?ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         "WrappedSelectAlias:None",
@@ -601,6 +729,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -612,6 +741,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pushdown_replacer(
@@ -623,6 +753,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pushdown_replacer(
@@ -634,6 +765,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -645,6 +777,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -656,6 +789,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -667,6 +801,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapper_pullup_replacer(
@@ -678,6 +813,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     wrapped_select_having_expr_empty_tail(),
@@ -692,6 +828,7 @@ impl WrapperRules {
                             "?cube_members",
                             "?grouped_subqueries",
                             "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
                         ),
                     ),
                     "WrappedSelectAlias:None",
@@ -729,25 +866,20 @@ impl WrapperRules {
 
     fn transform_aggregate_subquery(
         &self,
-        alias_to_cube_var: &'static str,
+        input_data_source_var: &'static str,
         group_expr_var: &'static str,
         aggr_expr_var: &'static str,
         push_to_cube_var: &'static str,
         select_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let group_expr_var = var!(group_expr_var);
         let aggr_expr_var = var!(aggr_expr_var);
         let push_to_cube_var = var!(push_to_cube_var);
         let select_push_to_cube_var = var!(select_push_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            if Self::transform_check_subquery_allowed(
-                egraph,
-                subst,
-                meta.clone(),
-                alias_to_cube_var,
-            ) {
+            if Self::transform_check_subquery_allowed(egraph, subst, &meta, input_data_source_var) {
                 Self::transform_aggregate_impl(
                     egraph,
                     subst,
@@ -793,29 +925,216 @@ impl WrapperRules {
 
     fn check_rollup_allowed(
         &self,
-        alias_to_cube_var: &'static str,
+        input_data_source_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                WrapperReplacerContextAliasToCube
-            )
-            .cloned()
+            let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var)
+            else {
+                return false;
+            };
+
+            // TODO check supported operators
+            Self::can_rewrite_template(&data_source, &meta, "expressions/rollup")
+        }
+    }
+
+    fn insert_regular_measure(
+        egraph: &mut CubeEGraph,
+        subst: &mut Subst,
+        column: Column,
+        alias: String,
+        out_expr_var: Var,
+        out_alias_var: Var,
+    ) {
+        let column_expr_column = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+            ColumnExprColumn(column),
+        ));
+        let column_expr = egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
+        let udaf_name_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExprFun(
+            AggregateUDFExprFun(MEASURE_UDAF_NAME.to_string()),
+        ));
+        let udaf_args_expr =
+            egraph.add(LogicalPlanLanguage::AggregateUDFExprArgs(vec![column_expr]));
+        let udaf_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExpr([
+            udaf_name_expr,
+            udaf_args_expr,
+        ]));
+
+        subst.insert(out_expr_var, udaf_expr);
+
+        let alias_expr_alias =
+            egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(alias)));
+        subst.insert(out_alias_var, alias_expr_alias);
+    }
+
+    fn insert_patch_measure(
+        egraph: &mut CubeEGraph,
+        subst: &mut Subst,
+        column: Column,
+        call_agg_type: Option<String>,
+        alias: String,
+        out_expr_var: Option<Var>,
+        out_replace_agg_type: Option<Var>,
+        out_alias_var: Var,
+    ) {
+        let column_expr_column = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+            ColumnExprColumn(column),
+        ));
+        let column_expr = egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
+        let new_aggregation_value = match call_agg_type {
+            Some(call_agg_type) => egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                LiteralExprValue(ScalarValue::Utf8(Some(call_agg_type))),
+            )),
+            None => egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                ScalarValue::Null,
+            ))),
+        };
+        let new_aggregation_expr =
+            egraph.add(LogicalPlanLanguage::LiteralExpr([new_aggregation_value]));
+
+        if let Some(out_replace_agg_type) = out_replace_agg_type {
+            subst.insert(out_replace_agg_type, new_aggregation_expr);
+        }
+
+        let add_filters_value = egraph.add(LogicalPlanLanguage::LiteralExprValue(
+            LiteralExprValue(ScalarValue::Null),
+        ));
+        let add_filters_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([add_filters_value]));
+        let udaf_name_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExprFun(
+            AggregateUDFExprFun(PATCH_MEASURE_UDAF_NAME.to_string()),
+        ));
+        let udaf_args_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExprArgs(vec![
+            column_expr,
+            new_aggregation_expr,
+            add_filters_expr,
+        ]));
+        let udaf_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExpr([
+            udaf_name_expr,
+            udaf_args_expr,
+        ]));
+
+        if let Some(out_expr_var) = out_expr_var {
+            subst.insert(out_expr_var, udaf_expr);
+        }
+
+        let alias_expr_alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+            alias.clone(),
+        )));
+        subst.insert(out_alias_var, alias_expr_alias);
+    }
+
+    fn pushdown_measure_impl(
+        egraph: &mut CubeEGraph,
+        subst: &mut Subst,
+        original_expr_var: Var,
+        column_var: Option<Var>,
+        fun_name_var: Option<Var>,
+        distinct_var: Option<Var>,
+        cube_members_var: Var,
+        out_expr_var: Var,
+        out_alias_var: Var,
+        meta: &MetaContext,
+        disable_strict_agg_type_match: bool,
+    ) -> bool {
+        let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) else {
+            return false;
+        };
+
+        for fun in fun_name_var
+            .map(|fun_var| {
+                var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
+                    .map(|fun| Some(fun.clone()))
+                    .collect()
+            })
+            .unwrap_or(vec![None])
+        {
+            for distinct in distinct_var
+                .map(|distinct_var| {
+                    var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
+                        .map(|d| *d)
+                        .collect()
+                })
+                .unwrap_or(vec![false])
             {
-                if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube) {
-                    if sql_generator
-                        .get_sql_templates()
-                        .templates
-                        .contains_key("expressions/rollup")
-                    {
-                        return true;
+                let call_agg_type = MemberRules::get_agg_type(fun.as_ref(), distinct);
+
+                let column_iter = if let Some(column_var) = column_var {
+                    var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                        .cloned()
+                        .collect()
+                } else {
+                    vec![Column::from_name(MemberRules::default_count_measure_name())]
+                };
+
+                if let Some(member_names_to_expr) = &mut egraph
+                    .index_mut(subst[cube_members_var])
+                    .data
+                    .member_name_to_expr
+                {
+                    for column in column_iter {
+                        if let Some((&(Some(ref member), _, _), _)) =
+                            LogicalPlanData::do_find_member_by_alias(
+                                member_names_to_expr,
+                                &column.name,
+                            )
+                        {
+                            if let Some(measure) = meta.find_measure_with_name(member) {
+                                let Some(call_agg_type) = &call_agg_type else {
+                                    // call_agg_type is None, rewrite as is
+                                    Self::insert_regular_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        alias,
+                                        out_expr_var,
+                                        out_alias_var,
+                                    );
+
+                                    return true;
+                                };
+
+                                if measure
+                                    .is_same_agg_type(call_agg_type, disable_strict_agg_type_match)
+                                {
+                                    Self::insert_regular_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        alias,
+                                        out_expr_var,
+                                        out_alias_var,
+                                    );
+
+                                    return true;
+                                }
+
+                                if measure.allow_replace_agg_type(
+                                    call_agg_type,
+                                    disable_strict_agg_type_match,
+                                ) {
+                                    Self::insert_patch_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        Some(call_agg_type.clone()),
+                                        alias,
+                                        Some(out_expr_var),
+                                        None,
+                                        out_alias_var,
+                                    );
+
+                                    return true;
+                                }
+                            }
+                        }
                     }
                 }
             }
-            false
         }
+
+        false
     }
 
     fn pushdown_measure(
@@ -827,7 +1146,8 @@ impl WrapperRules {
         // TODO support cast push downs
         _cast_data_type_var: Option<&'static str>,
         cube_members_var: &'static str,
-        measure_out_var: &'static str,
+        out_expr_var: &'static str,
+        out_alias_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
         let column_var = column_var.map(|v| var!(v));
@@ -835,81 +1155,138 @@ impl WrapperRules {
         let distinct_var = distinct_var.map(|v| var!(v));
         // let cast_data_type_var = cast_data_type_var.map(|v| var!(v));
         let cube_members_var = var!(cube_members_var);
-        let measure_out_var = var!(measure_out_var);
+        let out_expr_var = var!(out_expr_var);
+        let out_alias_var = var!(out_alias_var);
         let meta = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
-            if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
-                for fun in fun_name_var
-                    .map(|fun_var| {
-                        var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
-                            .map(|fun| Some(fun.clone()))
-                            .collect()
-                    })
-                    .unwrap_or(vec![None])
+            Self::pushdown_measure_impl(
+                egraph,
+                subst,
+                original_expr_var,
+                column_var,
+                fun_name_var,
+                distinct_var,
+                cube_members_var,
+                out_expr_var,
+                out_alias_var,
+                &meta,
+                disable_strict_agg_type_match,
+            )
+        }
+    }
+
+    fn transform_filtered_measure(
+        &self,
+        aggr_expr_var: &'static str,
+        literal_var: &'static str,
+        column_var: &'static str,
+        fun_name_var: &'static str,
+        cube_members_var: &'static str,
+        replace_agg_type_var: &'static str,
+        out_measure_alias_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let aggr_expr_var = var!(aggr_expr_var);
+        let literal_var = var!(literal_var);
+        let column_var = var!(column_var);
+        let fun_name_var = var!(fun_name_var);
+        let cube_members_var = var!(cube_members_var);
+        let replace_agg_type_var = var!(replace_agg_type_var);
+        let out_measure_alias_var = var!(out_measure_alias_var);
+
+        let meta = self.meta_context.clone();
+        let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
+
+        move |egraph, subst| {
+            match &egraph[subst[literal_var]].data.constant {
+                Some(ConstantFolding::Scalar(_)) => {
+                    // Do nothing
+                }
+                _ => {
+                    return false;
+                }
+            }
+
+            let Some(alias) = original_expr_name(egraph, subst[aggr_expr_var]) else {
+                return false;
+            };
+
+            for fun in var_iter!(egraph[subst[fun_name_var]], AggregateFunctionExprFun)
+                .cloned()
+                .collect::<Vec<_>>()
+            {
+                let call_agg_type = MemberRules::get_agg_type(Some(&fun), false);
+
+                let column_iter = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                    .cloned()
+                    .collect::<Vec<_>>();
+
+                if let Some(member_names_to_expr) = &mut egraph
+                    .index_mut(subst[cube_members_var])
+                    .data
+                    .member_name_to_expr
                 {
-                    for distinct in distinct_var
-                        .map(|distinct_var| {
-                            var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
-                                .map(|d| *d)
-                                .collect()
-                        })
-                        .unwrap_or(vec![false])
-                    {
-                        let call_agg_type = MemberRules::get_agg_type(fun.as_ref(), distinct);
-
-                        let column_iter = if let Some(column_var) = column_var {
-                            var_iter!(egraph[subst[column_var]], ColumnExprColumn)
-                                .cloned()
-                                .collect()
-                        } else {
-                            vec![Column::from_name(MemberRules::default_count_measure_name())]
-                        };
-
-                        if let Some(member_names_to_expr) = &mut egraph
-                            .index_mut(subst[cube_members_var])
-                            .data
-                            .member_name_to_expr
+                    for column in column_iter {
+                        if let Some((&(Some(ref member), _, _), _)) =
+                            LogicalPlanData::do_find_member_by_alias(
+                                member_names_to_expr,
+                                &column.name,
+                            )
                         {
-                            for column in column_iter {
-                                if let Some((&(Some(ref member), _, _), _)) =
-                                    LogicalPlanData::do_find_member_by_alias(
-                                        member_names_to_expr,
-                                        &column.name,
-                                    )
+                            if let Some(measure) = meta.find_measure_with_name(member) {
+                                if !measure.allow_add_filter(call_agg_type.as_deref()) {
+                                    continue;
+                                }
+
+                                let Some(call_agg_type) = &call_agg_type else {
+                                    // call_agg_type is None, rewrite as is
+                                    Self::insert_patch_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        None,
+                                        alias,
+                                        None,
+                                        Some(replace_agg_type_var),
+                                        out_measure_alias_var,
+                                    );
+
+                                    return true;
+                                };
+
+                                if measure
+                                    .is_same_agg_type(call_agg_type, disable_strict_agg_type_match)
                                 {
-                                    if let Some(measure) = meta.find_measure_with_name(member) {
-                                        if call_agg_type.is_none()
-                                            || measure.is_same_agg_type(
-                                                call_agg_type.as_ref().unwrap(),
-                                                disable_strict_agg_type_match,
-                                            )
-                                        {
-                                            let column_expr_column =
-                                                egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                                                    ColumnExprColumn(column.clone()),
-                                                ));
+                                    Self::insert_patch_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        None,
+                                        alias,
+                                        None,
+                                        Some(replace_agg_type_var),
+                                        out_measure_alias_var,
+                                    );
 
-                                            let column_expr =
-                                                egraph.add(LogicalPlanLanguage::ColumnExpr([
-                                                    column_expr_column,
-                                                ]));
-                                            let alias_expr_alias =
-                                                egraph.add(LogicalPlanLanguage::AliasExprAlias(
-                                                    AliasExprAlias(alias.clone()),
-                                                ));
+                                    return true;
+                                }
 
-                                            let alias_expr =
-                                                egraph.add(LogicalPlanLanguage::AliasExpr([
-                                                    column_expr,
-                                                    alias_expr_alias,
-                                                ]));
+                                if measure.allow_replace_agg_type(
+                                    call_agg_type,
+                                    disable_strict_agg_type_match,
+                                ) {
+                                    Self::insert_patch_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        Some(call_agg_type.clone()),
+                                        alias,
+                                        None,
+                                        Some(replace_agg_type_var),
+                                        out_measure_alias_var,
+                                    );
 
-                                            subst.insert(measure_out_var, alias_expr);
-
-                                            return true;
-                                        }
-                                    }
+                                    return true;
                                 }
                             }
                         }
@@ -918,6 +1295,8 @@ impl WrapperRules {
             }
 
             false
+
+            // TODO share code with Self::pushdown_measure: locate cube and measure, check that ?fun matches measure, etc
         }
     }
 }

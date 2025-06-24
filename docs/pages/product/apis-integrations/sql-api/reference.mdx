@@ -150,7 +150,8 @@ SHOW ALL;
 ## SQL functions and operators
 
 SQL API currently implements a subset of functions and operators [supported by
-PostgreSQL][link-postgres-funcs].
+PostgreSQL][link-postgres-funcs]. Additionally, it supports a few [custom
+functions](#custom-functions).
 
 ### Comparison operators
 
@@ -407,12 +408,24 @@ of the PostgreSQL documentation.
 | `IN` | Returns `TRUE` if a left-side value matches **any** of right-side values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `NOT IN` | Returns `TRUE` if a left-side value matches **none** of right-side values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 
+### Custom functions
+
+| Function | Description |
+| --- | --- |
+| `XIRR` | Calculates the [internal rate of return][link-xirr] for a series of cash flows |
+
+<ReferenceBox>
+
+See the [XIRR recipe](/product/data-modeling/recipes/xirr) for more details.
+
+</ReferenceBox>
+
 
 [ref-qpd]: /product/apis-integrations/sql-api/query-format#query-pushdown
 [ref-qpp]: /product/apis-integrations/sql-api/query-format#query-post-processing
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-sql-api-aggregate-functions]: /product/apis-integrations/sql-api/query-format#aggregate-functions
-
 [link-postgres-funcs]: https://www.postgresql.org/docs/current/functions.html
 [link-github-sql-api]: https://github.com/cube-js/cube/issues?q=is%3Aopen+is%3Aissue+label%3Aapi%3Asql
 [link-github-new-sql-api-issue]: https://github.com/cube-js/cube/issues/new?assignees=&labels=&projects=&template=sql_api_query_issue.md&title=
+[link-xirr]: https://support.microsoft.com/en-us/office/xirr-function-de1242ec-6477-445b-b11b-a303ad9adc9d

@@ -122,12 +122,14 @@ export type SQLInterfaceOptions = {
 
 export interface TransformConfig {
   fileName: string;
+  fileContent: string;
   transpilers: string[];
   compilerId: string;
   metaData?: {
     cubeNames: string[];
     cubeSymbols: Record<string, Record<string, boolean>>;
     contextSymbols: Record<string, string>;
+    stage: 0 | 1 | 2 | 3;
   }
 }
 
@@ -448,8 +450,18 @@ export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
 
 export const buildSqlAndParams = (cubeEvaluator: any): String => {
   const native = loadNative();
-
-  return native.buildSqlAndParams(cubeEvaluator);
+  const safeCallFn = (fn: Function, thisArg: any, ...args: any[]) => {
+    try {
+      return {
+        result: fn.apply(thisArg, args),
+      };
+    } catch (e: any) {
+      return {
+        error: e.toString(),
+      };
+    }
+  };
+  return native.buildSqlAndParams(cubeEvaluator, safeCallFn);
 };
 
 export type ResultRow = Record<string, string>;
@@ -495,11 +507,11 @@ export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[]
   return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
 };
 
-export const transpileJs = async (content: String, metadata: TransformConfig): Promise<TransformResponse> => {
+export const transpileJs = async (transpileRequests: TransformConfig[]): Promise<TransformResponse[]> => {
   const native = loadNative();
 
   if (native.transpileJs) {
-    return native.transpileJs(content, metadata);
+    return native.transpileJs(transpileRequests);
   }
 
   throw new Error('TranspileJs native implementation not found!');

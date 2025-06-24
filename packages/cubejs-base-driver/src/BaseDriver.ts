@@ -95,6 +95,21 @@ export type GoogleStorageClientConfig = {
   credentials: any,
 };
 
+export type ParsedBucketUrl = {
+  /**
+   * may be 's3', 'wasbs', 'gs', 'azure', etc
+   */
+  schema?: string;
+  bucketName: string;
+  /**
+   * prefix/path without leading and trailing / or empty string if not presented
+   */
+  path: string;
+  username?: string;
+  password?: string;
+  original: string;
+};
+
 const sortByKeys = (unordered: any) => {
   const ordered: any = {};
 
@@ -375,9 +390,9 @@ export abstract class BaseDriver implements DriverInterface {
     return undefined;
   }
 
-  abstract testConnection(): Promise<void>;
+  public abstract testConnection(): Promise<void>;
 
-  abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
+  public abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async streamQuery(sql: string, values: string[]): Promise<stream.Readable> {
@@ -408,7 +423,7 @@ export abstract class BaseDriver implements DriverInterface {
     };
   }
 
-  public readOnly() {
+  public readOnly(): boolean {
     return false;
   }
 
@@ -693,6 +708,44 @@ export abstract class BaseDriver implements DriverInterface {
 
   public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
+  }
+
+  /**
+   * Returns parsed bucket structure.
+   * Supported variants:
+   *   s3://my-bucket-name/prefix/longer/
+   *   s3://my-bucket-name
+   *   my-bucket-name/some-path
+   *   my-bucket-name
+   *   wasbs://real-container-name@account.blob.core.windows.net
+   */
+  protected parseBucketUrl(input: string | null | undefined): ParsedBucketUrl {
+    const original = input?.trim() || '';
+
+    if (!original) {
+      return {
+        bucketName: '',
+        path: '',
+        original,
+      };
+    }
+
+    const hasSchema = /^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//.test(original);
+    const normalized = hasSchema ? original : `schema://${original}`;
+
+    const url = new URL(normalized);
+
+    const path = url.pathname.replace(/^\/+|\/+$/g, '');
+    const schema = url.protocol.replace(/:$/, '');
+
+    return {
+      schema: schema || undefined,
+      bucketName: url.hostname,
+      path,
+      username: url.username || undefined,
+      password: url.password || undefined,
+      original,
+    };
   }
 
   /**

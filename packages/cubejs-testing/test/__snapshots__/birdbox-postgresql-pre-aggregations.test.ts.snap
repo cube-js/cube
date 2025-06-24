@@ -5,7 +5,7 @@ exports[`postgresql-cubestore HTTP Transport Empty partitions: Empty partitions 
 exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension No Granularity: Rolling Mixed With Dimension No Granularity 1`] = `
 Array [
   Object {
-    "visitors.checkinsRollingTotal": null,
+    "visitors.checkinsRollingTotal": "5",
     "visitors.source": "some",
   },
 ]
@@ -101,6 +101,118 @@ Array [
     "visitors.count": "1",
     "visitors.createdAt": "2017-01-05T00:00:00.000",
     "visitors.createdAt.day": "2017-01-05T00:00:00.000",
+  },
+]
+`;
+
+exports[`postgresql-cubestore HTTP Transport Rolling Prev Period ratio: Rolling Prev Period ratio 1`] = `
+Array [
+  Object {
+    "visitors.createdAt": "2017-02-02T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-02T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.createdAt": "2017-02-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-03T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.createdAt": "2017-02-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-04T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.createdAt": "2017-02-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-05T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.createdAt": "2017-02-02T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-02T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": "google",
+  },
+  Object {
+    "visitors.createdAt": "2017-02-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-03T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": "google",
+  },
+  Object {
+    "visitors.createdAt": "2017-02-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-04T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": "google",
+  },
+  Object {
+    "visitors.createdAt": "2017-02-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-05T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": "google",
+  },
+  Object {
+    "visitors.createdAt": "2017-02-02T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-02T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": "0.6666666666666666",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.createdAt": "2017-02-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-03T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": "0.6666666666666666",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.createdAt": "2017-02-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-04T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.createdAt": "2017-02-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-05T00:00:00.000",
+    "visitors.currentMonthToPrevRatio": null,
+    "visitors.source": "some",
+  },
+]
+`;
+
+exports[`postgresql-cubestore HTTP Transport Rolling Prev Period: Rolling Prev Period 1`] = `
+Array [
+  Object {
+    "visitors.checkinsPrevMonth": "1",
+    "visitors.createdAt": "2017-02-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-05T00:00:00.000",
+    "visitors.source": "google",
+  },
+  Object {
+    "visitors.checkinsPrevMonth": "3",
+    "visitors.createdAt": "2017-02-02T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-02T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsPrevMonth": "3",
+    "visitors.createdAt": "2017-02-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-03T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsPrevMonth": "5",
+    "visitors.createdAt": "2017-02-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-04T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsPrevMonth": "5",
+    "visitors.createdAt": "2017-02-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-05T00:00:00.000",
+    "visitors.source": "some",
   },
 ]
 `;

@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/actions/smoke.sh'
+      - '.github/actions/integration/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -18,11 +19,14 @@ on:
       - 'package.json'
       - 'lerna.json'
       - 'rollup.config.js'
+      - 'jest.base.config.js'
       - 'yarn.lock'
     branches:
       - 'master'
   pull_request:
     paths:
+      - '.github/actions/smoke.sh'
+      - '.github/actions/integration/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -37,6 +41,7 @@ on:
       - 'package.json'
       - 'lerna.json'
       - 'rollup.config.js'
+      - 'jest.base.config.js'
       - 'yarn.lock'
 
 env:
@@ -54,7 +59,8 @@ jobs:
     strategy:
       matrix:
         # Current docker version + next LTS
-        node-version: [20.x, 22.x]
+        # TODO: Add 24 after it's been released
+        node-version: [22.x]
         # Don't forget to update build-native-release
         python-version: [3.11]
         transpile-worker-threads: [false, true]
@@ -114,12 +120,21 @@ jobs:
         run: yarn build
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
-#      - uses: codecov/codecov-action@v1
-#        if: (matrix.node-version == '20.x')
-#        with:
-#          files: ./packages/*/coverage/clover.xml
-#          flags: cube-backend
-#          verbose: true # optional (default = false)
+      - name: Fix lcov paths
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
+        run: |
+          ./.github/actions/codecov-fix.sh
+      - name: Combine all fixed LCOV files
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
+        run: |
+          echo "" > ./combined-unit.lcov
+          find ./packages -type f -name lcov.fixed.info -exec cat {} + >> ./combined-unit.lcov || true
+      - name: Upload coverage artifact
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: ./combined-unit.lcov
 
   lint:
     runs-on: ubuntu-24.04
@@ -137,10 +152,10 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-      - name: Install Node.js 20.x
+      - name: Install Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -272,10 +287,10 @@ jobs:
           workspaces: ./packages/cubejs-backend-native
           key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
           shared-key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
-      - name: Install Node.js 20
+      - name: Install Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
@@ -304,7 +319,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
       fail-fast: false
 
     steps:
@@ -385,6 +400,9 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     env:
       CLOUD_DATABASES: >
+        athena
+        bigquery
+        snowflake
         firebolt
         dremio
       # Athena (just to check for secrets availability)
@@ -392,11 +410,17 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
         db: [
+            'athena', 'bigquery', 'snowflake', 'trino',
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
             'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio', 'vertica'
         ]
+        use_tesseract_sql_planner: [ false ]
+        include:
+          - db: postgres
+            node-version: 22.x
+            use_tesseract_sql_planner: true
       fail-fast: false
 
     steps:
@@ -445,6 +469,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Build Core Client libraries
+        run: yarn build
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Integration tests for ${{ matrix.db }} matrix
@@ -460,6 +486,8 @@ jobs:
           (contains(env.CLOUD_DATABASES, matrix.db) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
           (!contains(env.CLOUD_DATABASES, matrix.db))
         env:
+          CUBEJS_TESSERACT_SQL_PLANNER: ${{ matrix.use_tesseract_sql_planner }}
+
           # Firebolt Integration
           DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ENGINE_NAME: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ENGINE_NAME }}
           DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_NAME: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_NAME }}
@@ -471,6 +499,29 @@ jobs:
           DRIVERS_TESTS_DREMIO_CUBEJS_DB_NAME: ${{ secrets.DRIVERS_TESTS_DREMIO_CUBEJS_DB_NAME }}
           DRIVERS_TESTS_DREMIO_CUBEJS_DB_DREMIO_AUTH_TOKEN: ${{ secrets.DRIVERS_TESTS_DREMIO_CUBEJS_DB_DREMIO_AUTH_TOKEN }}
 
+          # BigQuery
+          DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.CUBEJS_DB_BQ_CREDENTIALS }}
+
+          # AWS Athena
+          DRIVERS_TESTS_SNOWFLAKE_CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
+          DRIVERS_TESTS_SNOWFLAKE_CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
+
+          # Snowflake
+          DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
+          DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
+      - name: Fix lcov paths
+        run: |
+          ./.github/actions/codecov-fix.sh
+      - name: Combine all fixed LCOV files
+        run: |
+          echo "" > ./combined-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}.lcov
+          find ./packages -type f -name lcov.fixed.info -exec cat {} + >> ./combined-integration-${{ matrix.db }}.lcov || true
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}
+          path: ./combined-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}.lcov
+
   integration-smoke:
     needs: [latest-tag-sha, build-cubestore, build-native-linux]
     runs-on: ubuntu-24.04
@@ -479,7 +530,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [ 20.x ]
+        node-version: [ 22.x ]
         python-version: [ 3.11 ]
       fail-fast: false
 
@@ -607,7 +658,7 @@ jobs:
           - 5000:5000
     strategy:
       matrix:
-        node-version: [ 20 ]
+        node-version: [ 22 ]
         target: [ "x86_64-unknown-linux-gnu" ]
         dockerfile:
           - dev.Dockerfile
@@ -752,3 +803,29 @@ jobs:
         with:
           name: cypress-screenshots-docker-dev-${{ matrix.name }}
           path: packages/cubejs-testing/cypress/screenshots
+
+  upload-coverage:
+    name: Upload merged coverage to Codecov
+    needs: [unit, integration]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Install Codecov CLI
+        run: |
+          curl -Os https://uploader.codecov.io/latest/linux/codecov
+          chmod +x codecov
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-coverage
+      - name: Merge all coverage files
+        run: |
+          find all-coverage -name '*.lcov' -exec cat {} + > merged-coverage.info
+      - name: Upload merged coverage to Codecov
+        run: |
+          ./codecov --token "${{ secrets.CODECOV_TOKEN }}" \
+              --file ./merged-coverage.info \
+              --flags cube-backend \
+              --name "cube backend coverage"

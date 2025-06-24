@@ -1,7 +1,7 @@
 /* eslint-disable global-require,no-return-assign */
 import crypto from 'crypto';
 import fs from 'fs-extra';
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 import isDocker from 'is-docker';
 import pLimit from 'p-limit';
 
@@ -14,7 +14,6 @@ import {
   CancelableInterval,
   createCancelableInterval,
   formatDuration,
-  getAnonymousId,
   getEnv,
   assertDataSource,
   getRealType,
@@ -36,7 +35,7 @@ import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
 import { DevServer } from './DevServer';
-import agentCollect from './agentCollect';
+import { agentCollect } from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
 import { prodLogger, devLogger } from './logger';
 import { OptsHandler } from './OptsHandler';
@@ -65,6 +64,7 @@ import type {
   DriverConfig,
   ScheduledRefreshTimeZonesFn,
   ContextToCubeStoreRouterIdFn,
+  LoggerFnParams,
 } from './types';
 import {
   ContextToOrchestratorIdFn,
@@ -178,8 +178,6 @@ export class CubejsServerCore {
 
   public projectFingerprint: string | null = null;
 
-  public anonymousId: string | null = null;
-
   public coreServerVersion: string | null = null;
 
   protected contextAcceptor: ContextAcceptor;
@@ -219,8 +217,10 @@ export class CubejsServerCore {
 
     this.compilerCache = new LRUCache<string, CompilerApi>({
       max: this.options.compilerCacheSize || 250,
-      maxAge: this.options.maxCompilerCacheKeepAlive,
-      updateAgeOnGet: this.options.updateCompilerCacheKeepAlive
+      ttl: this.options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: this.options.updateCompilerCacheKeepAlive,
+      // needed to clear the setInterval timer for proactive cache internal cleanups
+      dispose: (v) => v.dispose(),
     });
 
     if (this.options.contextToAppId) {
@@ -240,14 +240,14 @@ export class CubejsServerCore {
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
       this.maxCompilerCacheKeep = setInterval(
-        () => this.compilerCache.prune(),
+        () => this.compilerCache.purgeStale(),
         this.options.maxCompilerCacheKeepAlive
       );
     }
 
     this.startScheduledRefreshTimer();
 
-    this.event = async (name, props) => {
+    this.event = async (event, props: LoggerFnParams) => {
       if (!this.options.telemetry) {
         return;
       }
@@ -262,15 +262,12 @@ export class CubejsServerCore {
         }
       }
 
-      if (!this.anonymousId) {
-        this.anonymousId = getAnonymousId();
-      }
-
       const internalExceptionsEnv = getEnv('internalExceptions');
 
       try {
         await track({
-          event: name,
+          timestamp: new Date().toJSON(),
+          event,
           projectFingerprint: this.projectFingerprint,
           coreServerVersion: this.coreServerVersion,
           dockerVersion: getEnv('dockerImageVersion'),
@@ -424,7 +421,12 @@ export class CubejsServerCore {
     if (agentEndpointUrl) {
       const oldLogger = this.logger;
       this.preAgentLogger = oldLogger;
+
       this.logger = (msg, params) => {
+        // Filling timestamp as much as earlier as we can, otherwise it can be incorrect. Because next code is async
+        // with await points which can be delayed with Node.js micro-tasking.
+        params.timestamp = params.timestamp || new Date().toJSON();
+
         oldLogger(msg, params);
         agentCollect(
           {
@@ -570,7 +572,7 @@ export class CubejsServerCore {
     await this.orchestratorStorage.releaseConnections();
 
     this.orchestratorStorage.clear();
-    this.compilerCache.reset();
+    this.compilerCache.clear();
 
     this.reloadEnvVariables();
 
@@ -730,6 +732,9 @@ export class CubejsServerCore {
         standalone: this.standalone,
         allowNodeRequire: options.allowNodeRequire,
         fastReload: options.fastReload || getEnv('fastReload'),
+        compilerCacheSize: this.options.compilerCacheSize || 250,
+        maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
+        updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive
       },
     );
   }
@@ -888,6 +893,8 @@ export class CubejsServerCore {
       clearInterval(this.maxCompilerCacheKeep);
     }
 
+    this.compilerCache.clear();
+
     if (this.scheduledRefreshTimerInterval) {
       await this.scheduledRefreshTimerInterval.cancel();
     }
@@ -931,6 +938,8 @@ export class CubejsServerCore {
   };
 
   public async shutdown() {
+    this.compilerCache.clear();
+
     if (this.devServer) {
       if (!process.env.CI) {
         process.removeListener('uncaughtException', this.onUncaughtException);

@@ -13,7 +13,7 @@ import { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluato
 import { Granularity } from './Granularity';
 
 export class BaseTimeDimension extends BaseFilter {
-  public readonly dateRange: any;
+  public readonly dateRange: [string, string];
 
   public readonly granularityObj: Granularity | undefined;
 
@@ -44,8 +44,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public selectColumns() {
-    const context = this.query.safeEvaluateSymbolContext();
-    if (!context.granularityOverride && !this.granularityObj) {
+    if (!this.granularityObj) {
       return null;
     }
 
@@ -53,8 +52,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public hasNoRemapping() {
-    const context = this.query.safeEvaluateSymbolContext();
-    if (!context.granularityOverride && !this.granularityObj) {
+    if (!this.granularityObj) {
       return false;
     }
 
@@ -62,8 +60,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public aliasName() {
-    const context = this.query.safeEvaluateSymbolContext();
-    if (!context.granularityOverride && !this.granularityObj) {
+    if (!this.granularityObj) {
       return null;
     }
 
@@ -74,7 +71,7 @@ export class BaseTimeDimension extends BaseFilter {
     const actualGranularity = granularity || this.granularityObj?.granularity || 'day';
 
     const fullName = `${this.dimension}.${actualGranularity}`;
-    if (this.query.options.memberToAlias && this.query.options.memberToAlias[fullName]) {
+    if (this.query.options.memberToAlias?.[fullName]) {
       return this.query.options.memberToAlias[fullName];
     }
 
@@ -110,7 +107,7 @@ export class BaseTimeDimension extends BaseFilter {
         granularity: granularityName
       }) : this.granularityObj;
 
-    if ((context.renderedReference || {})[path]) {
+    if (context.renderedReference?.[path]) {
       return context.renderedReference[path];
     }
 
@@ -158,7 +155,7 @@ export class BaseTimeDimension extends BaseFilter {
     return super.filterParams();
   }
 
-  protected dateFromFormattedValue: any | null = null;
+  protected dateFromFormattedValue: string | null = null;
 
   public dateFromFormatted() {
     if (!this.dateFromFormattedValue) {
@@ -192,7 +189,7 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateRange ? this.dateFromFormatted() : BUILD_RANGE_START_LOCAL));
   }
 
-  protected dateToFormattedValue: any | null = null;
+  protected dateToFormattedValue: string | null = null;
 
   public dateToFormatted() {
     if (!this.dateToFormattedValue) {
@@ -249,17 +246,15 @@ export class BaseTimeDimension extends BaseFilter {
               return this.dateRangeGranularity();
             }
 
-            if (!this.dateRange) {
-              return this.granularityObj.minGranularity();
-            }
-
             // If we have granularity and date range, we need to check
             // that the interval and the granularity offset are stacked/fits with date range
-            if (this.granularityObj.isPredefined() ||
-              !this.granularityObj.isAlignedWithDateRange([this.dateFromFormatted(), this.dateToFormatted()])) {
+            if (this.dateRange && (this.granularityObj.isPredefined() ||
+              !this.granularityObj.isAlignedWithDateRange([this.dateFromFormatted(), this.dateToFormatted()]))) {
               return this.query.minGranularity(this.granularityObj.minGranularity(), this.dateRangeGranularity());
             }
 
+            // We return the granularity as-is, including custom ones,
+            // because baseQuery.granularityHierarchies correctly expands all custom granularities into hierarchies.
             return this.granularityObj.granularity;
           }
         );

@@ -1,0 +1,79 @@
+# Using SSL connections to a data source
+
+## Use case
+
+Cube supports SSL-encrypted connections to various data sources. Please check
+the documentation for a particular [data source][ref-config-db] for specific
+instructions.
+
+## Configuration
+
+Generally, you can enable SSL via the `CUBEJS_DB_SSL` environment variable.
+
+### Cube Core
+
+To enable SSL, set the `CUBEJS_DB_SSL` environment variable to `true`. Cube can
+also be configured to use custom connection settings. For example, to use a
+custom certificate authority and certificates, you could do the following:
+
+```dotenv
+CUBEJS_DB_SSL_CA=/path/to/ssl/ca.pem
+CUBEJS_DB_SSL_CERT=/path/to/ssl/cert.pem
+CUBEJS_DB_SSL_KEY=/path/to/ssl/key.pem
+```
+
+You can also set the above environment variables to the contents of the PEM
+files; for example:
+
+```dotenv
+CUBEJS_DB_SSL_CA="-----BEGIN CERTIFICATE-----
+MIIDDjCCAfYCCQCN/HhSZ3ofTDANBgkqhkiG9w0BAQsFADBJMQswCQYDVQQGEwJV
+SzEMMAoGA1UECgwDSUJNMQ0wCwYDVQQLDARBSU9TMR0wGwYDVQQDDBRhaW9zLW9y
+Y2gtZGV2LWVudi1DQTAeFw0yMTAyMTUyMzIyMTZaFw0yMzEyMDYyMzIyMTZaMEkx
+CzAJBgNVBAYTAlVLMQwwCgYDVQQKDANJQk0xDTALBgNVBAsMBEFJT1MxHTAbBgNV
+BAMMFGFpb3Mtb3JjaC1kZXYtZW52LUNBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEAyhYY9+4TduTsNRh/6MaRtE59j8HkAkoQYvNYZN7D1j1oV6yhzitn
+oN4bD+HiQWe4J3mwAaJOAAJRCkIVyUXxwZUCPxGN/KVha/pcB8hN6LHfI6vInixp
+U9kHNYWWBn428nMeMqts7yqly/HwG1/qO+j4178c8lZNS7Uwh76y+lAEaIkeBipq
+i4WuCOiChFc/sIV7g4DcLKKbqzDWtRDjbsg7JRfsALO5gM360GrNYkhV4C5lm8Eh
+ozNuaPhS65zO93PMj/3UTyuctXKa7WpaHJHoKZRXAuOwSamvqvFgIQ0SSnW+qcud
+fL3GAPJn7d065gh7JvgcT86v7WWBiUNs0QIDAQABMA0GCSqGSIb3DQEBCwUAA4IB
+AQCzw00d8e0e5AYZtzIk9hjczta7JHy2/cwTMv0opzBk6C26G6YZww+9brHW2w5U
+mY/HKBnGnMadjMWOZmm9Vu0B0kalYY0lJdE8alO1aiv5B9Ms/XIt7FzzGtfv9gYJ
+cw5/nzGBBMJNICC1kVLnzzlllLferhCIrczDyPcu16o1Flc7q1p8AbwQpC+A2I/L
+8nWlFeHZ+watLtQ1lF3qDzzCumPHrJqAGmlp0265owCM8Q5zv8AL5DStIZvtexrI
+JqbwLdbA8smyOFRwCckOWcWjnrEDjO2e3NLWINbB7Z4ZRviZSEH5UZlDLVu+ahGV
+KmZIuh7+XpXzJ1MN0SBZXgXH
+-----END CERTIFICATE-----"
+```
+
+### Cube Cloud
+
+When setting up a new deployment, select the SSL checkbox when entering database
+credentials:
+
+<Screenshot
+  alt="Cube Cloud Database Connection Screen for Postgres"
+  src="https://ucarecdn.com/a3edc952-41e2-4320-8c32-4524c85af5a6/"
+/>
+
+To use custom SSL certificates between Cube Cloud and your database server, go
+to the <Btn>Configuration</Btn> tab in the <Btn>Settings</Btn> screen:
+
+<Screenshot
+  alt="Cube Cloud Database Connection Screen"
+  src="https://ucarecdn.com/1fd4354c-deec-4fc1-bfdb-e05636021efd/"
+/>
+
+Add the following environment variables:
+
+| Environment Variable | Description                                                                                                                                                                                                 | Example                                  |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                                                                                                                                        | `true`, `false`                          |
+| `CUBEJS_DB_SSL_CA`   | The contents of a CA bundle in PEM format, or a path to one. For more information, check the `options.ca` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]          | A valid CA bundle or a path to one       |
+| `CUBEJS_DB_SSL_CERT` | The contents of an SSL certificate in PEM format, or a path to one. For more information, check the `options.cert` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options] | A valid SSL certificate or a path to one |
+| `CUBEJS_DB_SSL_KEY`  | The contents of a private key in PEM format, or a path to one. For more information, check the `options.key` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]       | A valid SSL private key or a path to one |
+
+[nodejs-docs-tls-options]:
+  https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
+[ref-config-db]: /product/configuration/data-sources

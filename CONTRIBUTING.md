@@ -126,7 +126,7 @@ To enhance the adoption of community-contributed drivers, we decided to split th
 4. Posting a backlink to an open-source repository would be a good idea here so people can provide feedback on it by posting issues.
 5. Before creating PR for the main repository, please make sure it's tested with the standard Cube E2E testing suite. An example of an E2E testing suite can be found here: https://github.com/cube-js/cube/blob/master/packages/cubejs-testing/test/driver-postgres.test.ts
 6. If you're creating PR for the main repo, please be prepared to become a maintainer for this driver and dedicate some time to it. There're no specific time requirements. As a rule of thumb, you should expect to spend time on a weekly basis.
-7. Due to limited resources Core team will review and merge driver PRs based on popularity and development activity.
+7. Due to limited resources Core team will review and merge driver PRs based on popularity and development activity. Preference is given to drivers that are used by a significant number of users.
 
 ### Implementing a Driver
 
@@ -134,7 +134,7 @@ To enhance the adoption of community-contributed drivers, we decided to split th
 `@cubejs-backend/mysql-driver` is a very good candidate for copying this structure.
 2. Please do not copy *CHANGELOG.md*.
 3. Name driver class and adjust package.json, README.md accordingly.
-4. As a rule of thumb please use only Pure JS libraries as a dependencies where possible.
+4. As a rule of thumb please use only pure JS libraries as a dependencies where possible.
 It increases driver adoption rate a lot.
 5. Typically, you need to implement only `query()` and `testConnection()` methods of driver.
 The rest will be done by `BaseDriver` class.
@@ -145,10 +145,9 @@ The rest will be done by `BaseDriver` class.
 
 ### Implementing a JDBC Driver
 
-If there's existing JDBC Driver in place for Database of interest you can just create `DbTypes` configuration inside
-[cubejs-jdbc-driver/driver/JDBCDriver.ts](https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/src/JDBCDriver.ts).
-Most of the time no additional adjustments required for base `JDBCDriver` implementation as JDBC is pretty standard.
-In case you need to tweak it a little please follow [Implementing Driver](#implementing-driver) steps but use `JDBCDriver` as your base driver class.
+It is recommended to implement native, non-JDBC drivers for databases. Even though implementing
+a JDBC driver might seem like a quick solution, its reliance on external libraries makes it
+harder to maintain. Also, such drivers often lack support for important features, such as export buckets and various authentication methods.
 
 ### Implementing SQL Dialect
 

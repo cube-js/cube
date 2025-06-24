@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 import { pipeline } from 'stream';
 import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import { getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
@@ -10,7 +10,7 @@ import {
   InlineTables,
   CacheDriverInterface,
   TableStructure,
-  DriverInterface, QueryKey,
+  DriverInterface,
 } from '@cubejs-backend/base-driver';
 
 import { QueryQueue } from './QueryQueue';
@@ -216,9 +216,7 @@ export class QueryCache {
       .cacheKeyQueriesFrom(queryBody)
       .map(replacePreAggregationTableNames);
 
-    const renewalThreshold =
-      queryBody.cacheKeyQueries &&
-      queryBody.cacheKeyQueries.renewalThreshold;
+    const renewalThreshold = queryBody.cacheKeyQueries?.renewalThreshold;
 
     const expireSecs = this.getExpireSecs(queryBody);
 
@@ -358,7 +356,7 @@ export class QueryCache {
   }
 
   private cacheKeyQueriesFrom(queryBody: QueryBody): QueryWithParams[] {
-    return queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.queries ||
+    return queryBody.cacheKeyQueries?.queries ||
       queryBody.cacheKeyQueries ||
       [];
   }
@@ -924,7 +922,7 @@ export class QueryCache {
             inMemoryValue.renewalKey !== renewalKey
           ) || renewedAgo > expiration * 1000 || renewedAgo > inMemoryCacheDisablePeriod
         ) {
-          this.memoryCache.del(redisKey);
+          this.memoryCache.delete(redisKey);
         } else {
           this.logger('Found in memory cache entry', {
             cacheKey,

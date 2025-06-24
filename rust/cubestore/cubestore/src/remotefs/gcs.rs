@@ -1,5 +1,6 @@
 use crate::app_metrics;
 use crate::di_service;
+use crate::remotefs::ExtendedRemoteFs;
 use crate::remotefs::{CommonRemoteFsUtils, LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
@@ -115,7 +116,7 @@ impl GCSRemoteFs {
     }
 }
 
-di_service!(GCSRemoteFs, [RemoteFs]);
+di_service!(GCSRemoteFs, [RemoteFs, ExtendedRemoteFs]);
 
 #[async_trait]
 impl RemoteFs for GCSRemoteFs {
@@ -261,31 +262,68 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
-        Ok(self
-            .list_with_metadata(remote_prefix)
-            .await?
-            .into_iter()
-            .map(|f| f.remote_path)
-            .collect::<Vec<_>>())
+        let leading_subpath = self.leading_subpath_regex();
+        self.list_with_metadata_and_map(remote_prefix, |obj: Object| {
+            Self::object_key_to_remote_path(&leading_subpath, &obj.name)
+        })
+        .await
     }
 
     async fn list_with_metadata(
         &self,
         remote_prefix: String,
     ) -> Result<Vec<RemoteFile>, CubeError> {
+        let leading_subpath = self.leading_subpath_regex();
+        self.list_with_metadata_and_map(remote_prefix, |obj: Object| RemoteFile {
+            remote_path: Self::object_key_to_remote_path(&leading_subpath, &obj.name),
+            updated: obj.updated,
+            file_size: obj.size,
+        })
+        .await
+    }
+
+    async fn local_path(&self) -> Result<String, CubeError> {
+        Ok(self.dir.to_str().unwrap().to_owned())
+    }
+
+    async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
+        let buf = self.dir.join(remote_path);
+        fs::create_dir_all(buf.parent().unwrap()).await?;
+        Ok(buf.to_str().unwrap().to_string())
+    }
+}
+
+// TODO: Make a faster implementation
+#[async_trait]
+impl ExtendedRemoteFs for GCSRemoteFs {}
+
+struct LeadingSubpath(Regex);
+
+impl GCSRemoteFs {
+    fn leading_subpath_regex(&self) -> LeadingSubpath {
+        LeadingSubpath(Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap())
+    }
+
+    fn object_key_to_remote_path(leading_subpath: &LeadingSubpath, obj_name: &String) -> String {
+        leading_subpath
+            .0
+            .replace(&obj_name, NoExpand(""))
+            .to_string()
+    }
+
+    async fn list_with_metadata_and_map<T, F>(
+        &self,
+        remote_prefix: String,
+        f: F,
+    ) -> Result<Vec<T>, CubeError>
+    where
+        F: FnMut(Object) -> T + Copy,
+    {
         let prefix = self.gcs_path(&remote_prefix);
         let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
-        let leading_slash = Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap();
         let result = list
-            .map(|objects| -> Result<Vec<RemoteFile>, CubeError> {
-                Ok(objects?
-                    .into_iter()
-                    .map(|obj| RemoteFile {
-                        remote_path: leading_slash.replace(&obj.name, NoExpand("")).to_string(),
-                        updated: obj.updated.clone(),
-                        file_size: obj.size,
-                    })
-                    .collect())
+            .map(|objects| -> Result<Vec<T>, CubeError> {
+                Ok(objects?.into_iter().map(f).collect())
             })
             .collect::<Vec<_>>()
             .await
@@ -310,18 +348,6 @@ impl RemoteFs for GCSRemoteFs {
         Ok(result)
     }
 
-    async fn local_path(&self) -> Result<String, CubeError> {
-        Ok(self.dir.to_str().unwrap().to_owned())
-    }
-
-    async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
-        let buf = self.dir.join(remote_path);
-        fs::create_dir_all(buf.parent().unwrap()).await?;
-        Ok(buf.to_str().unwrap().to_string())
-    }
-}
-
-impl GCSRemoteFs {
     fn gcs_path(&self, remote_path: &str) -> String {
         format!(
             "{}/{}",

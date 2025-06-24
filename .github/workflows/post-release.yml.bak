@@ -16,6 +16,9 @@ on:
     branches:
       - 'master'
 
+env:
+  VERSION: ${{ github.event.inputs.version || 'latest' }}
+
 # touch to trigger
 jobs:
   cli:
@@ -25,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -78,8 +81,8 @@ jobs:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         run: |
           cd packages/cubejs-testing/
-          npx cubejs-cli@${{ github.event.inputs.version }} create birdbox-test-project -d postgres
-          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}
+          npx cubejs-cli@"$VERSION" create birdbox-test-project -d postgres
+          export BIRDBOX_CUBEJS_VERSION="$VERSION"
           yarn run dataset:minimal
           yarn run birdbox:cli:postgresql
       - name: Slack Failure
@@ -103,10 +106,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Node.js 20.x
+      - name: Install Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
       - name: Restore lerna
         uses: actions/cache@v4
         with:
@@ -139,7 +142,7 @@ jobs:
         run: |
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
-          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}
+          export BIRDBOX_CUBEJS_VERSION="$VERSION"
           yarn run dataset:minimal
           yarn run birdbox:${{ matrix.target }}
       - name: Slack Failure
@@ -167,10 +170,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Node.js 20.x
+      - name: Install Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
       - name: Restore lerna
         uses: actions/cache@v4
         with:
@@ -204,7 +207,7 @@ jobs:
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
           export BIRDBOX_CYPRESS_BROWSER=${{ matrix.browser }}
-          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}
+          export BIRDBOX_CUBEJS_VERSION="$VERSION"
           yarn run cypress:install
           yarn run dataset:minimal
           yarn run cypress:birdbox

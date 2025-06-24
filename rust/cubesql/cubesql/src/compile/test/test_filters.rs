@@ -97,7 +97,7 @@ async fn test_filter_dim_in_null() {
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${MultiTypeCube.dim_str1} IN (NULL)\""#));
+        .contains(r#"\"sql\":\"${MultiTypeCube.dim_str1} IN (NULL)\""#));
 }
 
 #[tokio::test]
@@ -131,5 +131,61 @@ SELECT dim_str0 FROM MultiTypeCube WHERE (dim_str1 IS NULL OR dim_str1 IN (NULL)
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"((${MultiTypeCube.dim_str1} IS NULL) OR (${MultiTypeCube.dim_str1} IN (NULL) AND FALSE))\""#));
+        .contains(r#"\"sql\":\"((${MultiTypeCube.dim_str1} IS NULL) OR (${MultiTypeCube.dim_str1} IN (NULL) AND FALSE))\""#));
+}
+
+/// Single filter in CubeScan does not support both measuser in dimensions, so it should not get pushed to CubeScan
+#[tokio::test]
+async fn test_mixed_filters() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    dim_str0,
+    avgPrice
+FROM (
+    SELECT
+        dim_str0,
+        AVG(avgPrice) AS avgPrice
+    FROM
+        MultiTypeCube
+    GROUP BY 1
+) t
+WHERE
+    avgPrice > 1
+    OR (
+        avgPrice = 1
+        AND
+        dim_str0 = 'completed'
+    )
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["MultiTypeCube.avgPrice".to_string()]),
+            dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            filters: None,
+            ..Default::default()
+        }
+    );
 }

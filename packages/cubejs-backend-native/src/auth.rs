@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use cubesql::{
     di_service,
-    sql::{AuthContext, AuthenticateResponse, SqlAuthService},
+    sql::{AuthContext, AuthenticateResponse, SqlAuthService, SqlAuthServiceAuthenticateRequest},
     transport::LoadRequestMeta,
     CubeError,
 };
@@ -51,8 +51,27 @@ pub struct TransportRequest {
 }
 
 #[derive(Debug, Serialize)]
+pub struct TransportAuthRequest {
+    pub id: String,
+    pub meta: Option<LoadRequestMeta>,
+    pub protocol: String,
+    pub method: String,
+}
+
+impl From<(TransportRequest, SqlAuthServiceAuthenticateRequest)> for TransportAuthRequest {
+    fn from((t, a): (TransportRequest, SqlAuthServiceAuthenticateRequest)) -> Self {
+        Self {
+            id: t.id,
+            meta: t.meta,
+            protocol: a.protocol,
+            method: a.method,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
 struct CheckSQLAuthTransportRequest {
-    request: TransportRequest,
+    request: TransportAuthRequest,
     user: Option<String>,
     password: Option<String>,
 }
@@ -92,6 +111,7 @@ impl AuthContext for NativeSQLAuthContext {
 impl SqlAuthService for NodeBridgeAuthService {
     async fn authenticate(
         &self,
+        request: SqlAuthServiceAuthenticateRequest,
         user: Option<String>,
         password: Option<String>,
     ) -> Result<AuthenticateResponse, CubeError> {
@@ -100,9 +120,11 @@ impl SqlAuthService for NodeBridgeAuthService {
         let request_id = Uuid::new_v4().to_string();
 
         let extra = serde_json::to_string(&CheckSQLAuthTransportRequest {
-            request: TransportRequest {
+            request: TransportAuthRequest {
                 id: format!("{}-span-1", request_id),
                 meta: None,
+                protocol: request.protocol,
+                method: request.method,
             },
             user: user.clone(),
             password: password.clone(),

@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /config/databases/postgres
----
-
 # Postgres
 
 ## Prerequisites
@@ -108,15 +103,15 @@ As a workaround, you can set `rejectUnauthorized` option to `false` in the Cube
 Postgres driver:
 
 ```javascript
-const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const PostgresDriver = require("@cubejs-backend/postgres-driver")
 module.exports = {
   driverFactory: () =>
     new PostgresDriver({
       ssl: {
-        rejectUnauthorized: false,
-      },
-    }),
-};
+        rejectUnauthorized: false
+      }
+    })
+}
 ```
 
 [aws-docs-rds-ssl]:
@@ -130,7 +125,7 @@ module.exports = {
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]:
-  /guides/recipes/data-sources/using-ssl-connections-to-data-source
-[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+  /product/configuration/recipes/using-ssl-connections-to-data-source
+[ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx
 [self-preaggs-batching]: #batching
 [self-ssl]: #ssl

@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /config/multitenancy
----
-
 # Multitenancy
 
 Cube supports multitenancy out of the box, both on database and data model
@@ -33,6 +28,14 @@ Token][ref-security].
 
 There are several multitenancy setup scenarios that can be achieved by using
 combinations of these configuration options.
+
+<ReferenceBox>
+
+See the following recipes:
+- If you'd like to provide a [custom data source][ref-per-tenant-data-source-recipe] for each tenant.
+- If you'd like to provide a [custom data model][ref-per-tenant-data-model-recipe] for each tenant.
+
+</ReferenceBox>
 
 ### Multitenancy vs Multiple Data Sources
 
@@ -68,8 +71,8 @@ module.exports = {
         host: process.env.DB1_HOST,
         user: process.env.DB1_USER,
         password: process.env.DB1_PASS,
-        port: process.env.DB1_PORT,
-      };
+        port: process.env.DB1_PORT
+      }
     } else {
       return {
         type: "postgres",
@@ -77,11 +80,11 @@ module.exports = {
         host: process.env.DB2_HOST,
         user: process.env.DB2_USER,
         password: process.env.DB2_PASS,
-        port: process.env.DB2_PORT,
-      };
+        port: process.env.DB2_PORT
+      }
     }
-  },
-};
+  }
+}
 ```
 
 A more advanced example that uses multiple [data sources][ref-config-db] could
@@ -98,30 +101,30 @@ module.exports = {
         database: dataSource,
 
         // ...
-      };
+      }
     } else if (dataSource === "googleAnalytics") {
       return {
         type: "bigquery",
 
         // ...
-      };
+      }
     } else if (dataSource === "financials") {
       return {
         type: "postgres",
         database: "financials",
         host: "financials-db.acme.com",
         user: process.env.FINANCIALS_DB_USER,
-        password: process.env.FINANCIALS_DB_PASS,
-      };
+        password: process.env.FINANCIALS_DB_PASS
+      }
     } else {
       return {
         type: "postgres",
 
         // ...
-      };
+      }
     }
-  },
-};
+  }
+}
 ```
 
 More information can be found on the [Multiple Data Sources
@@ -144,12 +147,12 @@ module.exports = {
       query.filters.push({
         member: "products.category_id",
         operator: "equals",
-        values: [securityContext.categoryId],
-      });
+        values: [securityContext.categoryId]
+      })
     }
-    return query;
-  },
-};
+    return query
+  }
+}
 ```
 
 Also, you can use a data model like this:
@@ -164,8 +167,8 @@ cubes:
 
 ```javascript
 cube(`products`, {
-  sql_table: `products`,
-});
+  sql_table: `products`
+})
 ```
 
 </CodeTabs>
@@ -185,8 +188,8 @@ cubes:
 
 ```javascript
 cube(`products`, {
-  sql_table: `${COMPILE_CONTEXT.security_context.userId}.products`,
-});
+  sql_table: `${COMPILE_CONTEXT.security_context.userId}.products`
+})
 ```
 
 </CodeTabs>
@@ -231,17 +234,17 @@ tenants.
 ```javascript
 module.exports = {
   queryRewrite: (query, { securityContext }) => {
-    const user = securityContext;
+    const user = securityContext
     if (user.id) {
       query.filters.push({
         member: "users.id",
         operator: "equals",
-        values: [user.id],
-      });
+        values: [user.id]
+      })
     }
-    return query;
-  },
-};
+    return query
+  }
+}
 ```
 
 ## Multiple DB Instances with Same Data Model
@@ -255,12 +258,12 @@ context to every query. We should first ensure our JWTs contain those properties
 so we can access them through the [security context][ref-config-security-ctx].
 
 ```javascript
-const jwt = require("jsonwebtoken");
-const CUBE_API_SECRET = "secret";
+const jwt = require("jsonwebtoken")
+const CUBE_API_SECRET = "secret"
 
 const cubeToken = jwt.sign({ appId: "1", userId: "2" }, CUBE_API_SECRET, {
-  expiresIn: "30d",
-});
+  expiresIn: "30d"
+})
 ```
 
 Now, we can access them through the [`securityContext`][ref-config-security-ctx]
@@ -293,9 +296,9 @@ module.exports = {
     `CUBE_APP_${securityContext.appId}_${securityContext.userId}`,
   driverFactory: ({ securityContext }) => ({
     type: "postgres",
-    database: `my_app_${securityContext.appId}_${securityContext.userId}`,
-  }),
-};
+    database: `my_app_${securityContext.appId}_${securityContext.userId}`
+  })
+}
 ```
 
 ## Same DB Instance with per Tenant Pre-Aggregations
@@ -313,8 +316,8 @@ module.exports = {
   contextToAppId: ({ securityContext }) =>
     `CUBE_APP_${securityContext.userId}`,
   preAggregationsSchema: ({ securityContext }) =>
-    `pre_aggregations_${securityContext.userId}`,
-};
+    `pre_aggregations_${securityContext.userId}`
+}
 ```
 
 ## Multiple Data Models and Drivers
@@ -333,7 +336,7 @@ to dynamically set a repository with data model files depending on the `appId`:
 **cube.js:**
 
 ```javascript
-const { FileRepository } = require("@cubejs-backend/server-core");
+const { FileRepository } = require("@cubejs-backend/server-core")
 
 module.exports = {
   contextToAppId: ({ securityContext }) =>
@@ -345,18 +348,18 @@ module.exports = {
       return {
         type: "mongobi",
         database: `my_app_${securityContext.appId}_${securityContext.userId}`,
-        port: 3307,
-      };
+        port: 3307
+      }
     } else {
       return {
         type: "postgres",
-        database: `my_app_${securityContext.appId}_${securityContext.userId}`,
-      };
+        database: `my_app_${securityContext.appId}_${securityContext.userId}`
+      }
     }
   },
   repositoryFactory: ({ securityContext }) =>
-    new FileRepository(`model/${securityContext.appId}`),
-};
+    new FileRepository(`model/${securityContext.appId}`)
+}
 ```
 
 ## Scheduled Refreshes for Pre-Aggregations
@@ -376,23 +379,25 @@ input.
 </WarningBox>
 
 [ref-config]: /product/configuration#configuration-options
-[ref-config-opts]: /reference/configuration/config
+[ref-config-opts]: /product/configuration/reference/config
 [ref-config-db]: /product/configuration/data-sources
-[ref-config-driverfactory]: /reference/configuration/config#driver_factory
-[ref-config-repofactory]: /reference/configuration/config#repository_factory
+[ref-config-driverfactory]: /product/configuration/reference/config#driver_factory
+[ref-config-repofactory]: /product/configuration/reference/config#repository_factory
 [ref-config-preagg-schema]:
-  /reference/configuration/config#pre_aggregations_schema
-[ref-config-ctx-to-appid]: /reference/configuration/config#context_to_app_id
+  /product/configuration/reference/config#pre_aggregations_schema
+[ref-config-ctx-to-appid]: /product/configuration/reference/config#context_to_app_id
 [ref-config-ctx-to-orch-id]:
-  /reference/configuration/config#context_to_orchestrator_id
+  /product/configuration/reference/config#context_to_orchestrator_id
 [ref-config-multi-data-src]:
   /product/configuration/advanced/multiple-data-sources
-[ref-config-query-rewrite]: /reference/configuration/config#query_rewrite
+[ref-config-query-rewrite]: /product/configuration/reference/config#query_rewrite
 [ref-config-refresh-ctx]:
-  /reference/configuration/config#scheduled_refresh_contexts
+  /product/configuration/reference/config#scheduled_refresh_contexts
 [ref-config-refresh-tz]:
-  /reference/configuration/config#scheduled_refresh_timezones
+  /product/configuration/reference/config#scheduled_refresh_timezones
 [ref-config-security-ctx]: /product/auth/context
 [ref-security]: /product/auth
-[ref-cube-datasource]: /reference/data-model/cube#data_source
-[ref-cube-security-ctx]: /reference/data-model/context-variables#compile_context
+[ref-cube-datasource]: /product/data-modeling/reference/cube#data_source
+[ref-cube-security-ctx]: /product/data-modeling/reference/context-variables#compile_context
+[ref-per-tenant-data-source-recipe]: /product/configuration/recipes/multiple-sources-same-schema
+[ref-per-tenant-data-model-recipe]: /product/configuration/recipes/custom-data-model-per-tenant

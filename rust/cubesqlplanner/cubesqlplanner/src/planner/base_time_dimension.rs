@@ -57,12 +57,42 @@ impl BaseMember for BaseTimeDimension {
         &self.dimension.name()
     }
 
-    fn alias_suffix(&self) -> Option<String> {
+    /*     fn alias_suffix(&self) -> Option<String> {
         Some(self.alias_suffix.clone())
-    }
+    } */
 }
 
 impl BaseTimeDimension {
+    pub fn try_new_from_td_symbol(
+        query_tools: Rc<QueryTools>,
+        td_symbol: Rc<TimeDimensionSymbol>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let dimension =
+            BaseDimension::try_new_required(td_symbol.base_symbol().clone(), query_tools.clone())?;
+        let granularity = td_symbol.granularity().clone();
+        let granularity_obj = td_symbol.granularity_obj().clone();
+        let date_range = td_symbol.date_range_vec();
+        let alias_suffix = td_symbol.alias_suffix();
+        let default_alias = BaseMemberHelper::default_alias(
+            &dimension.cube_name(),
+            &dimension.name(),
+            &Some(alias_suffix.clone()),
+            query_tools.clone(),
+        )?;
+        let member_evaluator = MemberSymbol::new_time_dimension(td_symbol.clone());
+
+        Ok(Rc::new(Self {
+            dimension,
+            query_tools,
+            granularity,
+            granularity_obj,
+            date_range,
+            alias_suffix,
+            default_alias,
+            member_evaluator,
+        }))
+    }
+
     pub fn try_new_required(
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<MemberSymbol>,
@@ -92,11 +122,18 @@ impl BaseTimeDimension {
             granularity.clone(),
         )?;
 
-        let member_evaluator = Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
+        let date_range_tuple = if let Some(date_range) = &date_range {
+            assert!(date_range.len() == 2);
+            Some((date_range[0].clone(), date_range[1].clone()))
+        } else {
+            None
+        };
+        let member_evaluator = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
             member_evaluator.clone(),
             granularity.clone(),
             granularity_obj.clone(),
-        )));
+            date_range_tuple,
+        ));
         Ok(Rc::new(Self {
             dimension,
             query_tools,
@@ -120,11 +157,18 @@ impl BaseTimeDimension {
             &self.dimension.cube_name(),
             new_granularity.clone(),
         )?;
-        let member_evaluator = Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
+        let date_range_tuple = if let Some(date_range) = &self.date_range {
+            assert!(date_range.len() == 2);
+            Some((date_range[0].clone(), date_range[1].clone()))
+        } else {
+            None
+        };
+        let member_evaluator = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
             self.dimension.member_evaluator(),
             new_granularity.clone(),
             new_granularity_obj.clone(),
-        )));
+            date_range_tuple,
+        ));
         Ok(Rc::new(Self {
             dimension: self.dimension.clone(),
             granularity_obj: new_granularity_obj,
@@ -145,9 +189,9 @@ impl BaseTimeDimension {
         &self.granularity_obj
     }
 
-    pub fn resolve_granularity(&self) -> Result<Option<String>, CubeError> {
+    pub fn resolved_granularity(&self) -> Result<Option<String>, CubeError> {
         let res = if let Some(granularity_obj) = &self.granularity_obj {
-            Some(granularity_obj.resolve_granularity()?)
+            Some(granularity_obj.resolved_granularity()?)
         } else {
             None
         };
@@ -162,7 +206,7 @@ impl BaseTimeDimension {
         self.date_range.clone()
     }
 
-    pub fn get_range_for_time_series(&self) -> Result<Option<(String, String)>, CubeError> {
+    pub fn get_range_for_time_series(&self) -> Result<Option<Vec<String>>, CubeError> {
         let res = if let Some(date_range) = &self.date_range {
             if date_range.len() != 2 {
                 return Err(CubeError::user(format!(
@@ -177,12 +221,12 @@ impl BaseTimeDimension {
                         let start = granularity_obj.align_date_to_origin(start)?;
                         let end = QueryDateTime::from_date_str(tz, &date_range[1])?;
 
-                        Some((start.to_string(), end.to_string()))
+                        Some(vec![start.to_string(), end.to_string()])
                     } else {
-                        Some((date_range[0].clone(), date_range[1].clone()))
+                        Some(vec![date_range[0].clone(), date_range[1].clone()])
                     }
                 } else {
-                    Some((date_range[0].clone(), date_range[1].clone()))
+                    Some(vec![date_range[0].clone(), date_range[1].clone()])
                 }
             }
         } else {

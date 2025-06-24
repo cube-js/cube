@@ -1,0 +1,22 @@
+---
+source: cubesql/src/compile/engine/df/wrapper.rs
+expression: "UngroupedMemberDef\n{\n    cube_name: \"cube\".to_string(), alias: \"alias\".to_string(), expr:\n    UngroupedMemberExpr::PatchMeasure(PatchMeasureDef\n    {\n        source_measure: \"cube.measure\".to_string(), replace_aggregation_type:\n        None, add_filters:\n        vec![SqlFunctionExpr\n        {\n            cube_params: vec![\"cube\".to_string()], sql:\n            \"1 + 2 = 3\".to_string(),\n        }],\n    }), grouping_set: None,\n}"
+---
+{
+  "cubeName": "cube",
+  "alias": "alias",
+  "expr": {
+    "type": "PatchMeasure",
+    "sourceMeasure": "cube.measure",
+    "replaceAggregationType": null,
+    "addFilters": [
+      {
+        "cubeParams": [
+          "cube"
+        ],
+        "sql": "1 + 2 = 3"
+      }
+    ]
+  },
+  "groupingSet": null
+}

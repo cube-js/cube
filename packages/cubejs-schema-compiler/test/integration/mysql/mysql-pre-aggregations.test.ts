@@ -1,6 +1,6 @@
 import R from 'ramda';
 import { MysqlQuery } from '../../../src/adapter/MysqlQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { MySqlDbRunner } from './MySqlDbRunner';
 
 describe('MySqlPreAggregations', () => {
@@ -12,7 +12,7 @@ describe('MySqlPreAggregations', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -22,12 +22,12 @@ describe('MySqlPreAggregations', () => {
         count: {
           type: 'count'
         },
-        
+
         uniqueSourceCount: {
           sql: 'source',
           type: 'countDistinct'
         },
-        
+
         countDistinctApprox: {
           sql: 'id',
           type: 'countDistinctApprox'
@@ -49,13 +49,13 @@ describe('MySqlPreAggregations', () => {
           sql: 'created_at'
         }
       },
-      
+
       segments: {
         google: {
           sql: \`source = 'google'\`
         }
       },
-      
+
       preAggregations: {
         partitioned: {
           type: 'rollup',

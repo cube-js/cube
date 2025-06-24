@@ -13,6 +13,15 @@ module.exports = {
     return query;
   },
   checkSqlAuth: async (req, user, password) => {
+    if (!req) {
+      throw new Error('Request is not defined');
+    }
+
+    const missing = ['protocol', 'method'].filter(key => !(key in req));
+    if (missing.length) {
+      throw new Error(`Request object is missing required field(s): ${missing.join(', ')}`);
+    }
+
     if (user === 'admin') {
       if (password && password !== 'admin_password') {
         throw new Error(`Password doesn't match for ${user}`);

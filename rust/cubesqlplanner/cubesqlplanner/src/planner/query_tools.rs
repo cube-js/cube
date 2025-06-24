@@ -13,8 +13,6 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -132,6 +130,7 @@ impl QueryTools {
         base_tools: Rc<dyn BaseTools>,
         join_graph: Rc<dyn JoinGraph>,
         timezone_name: Option<String>,
+        export_annotated_sql: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
         let timezone = if let Some(timezone) = timezone_name {
@@ -143,15 +142,15 @@ impl QueryTools {
         };
         let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
             cube_evaluator.clone(),
+            base_tools.clone(),
             timezone.clone(),
         )));
-        let sql_templates = PlanSqlTemplates::new(templates_render.clone());
         Ok(Rc::new(Self {
             cube_evaluator,
             base_tools,
             join_graph,
             templates_render,
-            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(sql_templates))),
+            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
             evaluator_compiler,
             cached_data: RefCell::new(QueryToolsCachedData::new()),
             timezone,
@@ -160,6 +159,11 @@ impl QueryTools {
 
     pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {
         &self.cube_evaluator
+    }
+
+    pub fn plan_sql_templates(&self, external: bool) -> Result<PlanSqlTemplates, CubeError> {
+        let driver_tools = self.base_tools.driver_tools(external)?;
+        PlanSqlTemplates::try_new(driver_tools)
     }
 
     pub fn base_tools(&self) -> &Rc<dyn BaseTools> {
@@ -190,10 +194,6 @@ impl QueryTools {
         PlanSqlTemplates::alias_name(name)
     }
 
-    pub fn escaped_alias_name(&self, name: &str) -> String {
-        self.escape_column_name(&self.alias_name(name))
-    }
-
     pub fn cube_alias_name(&self, name: &str, prefix: &Option<String>) -> String {
         if let Some(prefix) = prefix {
             self.alias_name(&format!("{}__{}", prefix, self.alias_name(name)))
@@ -214,21 +214,6 @@ impl QueryTools {
         }
     }
 
-    pub fn auto_prefix_with_cube_name(&self, cube_name: &str, sql: &str) -> String {
-        lazy_static! {
-            static ref SINGLE_MEMBER_RE: Regex = Regex::new(r"^[_a-zA-Z][_a-zA-Z0-9]*$").unwrap();
-        }
-        if SINGLE_MEMBER_RE.is_match(sql) {
-            format!(
-                "{}.{}",
-                self.escape_column_name(&self.cube_alias_name(&cube_name, &None)),
-                sql
-            )
-        } else {
-            sql.to_string()
-        }
-    }
-
     pub fn alias_for_cube(&self, cube_name: &String) -> Result<String, CubeError> {
         let cube_definition = self.cube_evaluator().cube_from_path(cube_name.clone())?;
         let res = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
@@ -237,10 +222,6 @@ impl QueryTools {
             cube_name.clone()
         };
         Ok(res)
-    }
-
-    pub fn escape_column_name(&self, column_name: &str) -> String {
-        format!("\"{}\"", column_name)
     }
 
     pub fn templates_render(&self) -> Rc<dyn SqlTemplatesRender> {
@@ -257,12 +238,14 @@ impl QueryTools {
         &self,
         sql: &str,
         should_reuse_params: bool,
+        templates: &PlanSqlTemplates,
     ) -> Result<(String, Vec<String>), CubeError> {
         let native_allocated_params = self.base_tools.get_allocated_params()?;
         self.params_allocator.borrow().build_sql_and_params(
             sql,
             native_allocated_params,
             should_reuse_params,
+            templates,
         )
     }
 }

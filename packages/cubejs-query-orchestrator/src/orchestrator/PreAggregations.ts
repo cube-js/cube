@@ -4,7 +4,7 @@ import { getEnv, } from '@cubejs-backend/shared';
 
 import { BaseDriver, InlineTable, } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 
 import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryWithParams } from './QueryCache';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
@@ -282,8 +282,8 @@ export class PreAggregations {
     this.getQueueEventsBus = options.getQueueEventsBus;
     this.touchCache = new LRUCache({
       max: getEnv('touchPreAggregationCacheMaxCount'),
-      maxAge: getEnv('touchPreAggregationCacheMaxAge') * 1000,
-      stale: false,
+      ttl: getEnv('touchPreAggregationCacheMaxAge') * 1000,
+      allowStale: false,
       updateAgeOnGet: false
     });
   }
@@ -330,7 +330,7 @@ export class PreAggregations {
         this.touchTablePersistTime
       );
     } catch (e: unknown) {
-      this.touchCache.del(tableName);
+      this.touchCache.delete(tableName);
 
       throw e;
     }
@@ -350,7 +350,7 @@ export class PreAggregations {
   }
 
   /**
-   * Determines whether the partition table is already exists or not.
+   * Determines whether the partition table already exists or not.
    */
   public async isPartitionExist(
     request: string,
@@ -512,7 +512,7 @@ export class PreAggregations {
    */
   public async checkPartitionsBuildRangeCache(queryBody) {
     const preAggregations = queryBody.preAggregations || [];
-    const result = await Promise.all(
+    return Promise.all(
       preAggregations.map(async (preAggregation) => {
         const { preAggregationStartEndQueries } = preAggregation;
         const invalidate =
@@ -538,7 +538,6 @@ export class PreAggregations {
         };
       })
     );
-    return result;
   }
 
   public async expandPartitionsInPreAggregations(queryBody: Query): Promise<Query> {
@@ -591,7 +590,7 @@ export class PreAggregations {
 
     return {
       ...queryBody,
-      preAggregations: expandedPreAggregations.reduce((a, b) => a.concat(b), []),
+      preAggregations: expandedPreAggregations.flat(),
       groupedPartitionPreAggregations: expandedPreAggregations
     };
   }
@@ -719,7 +718,7 @@ export class PreAggregations {
   public async getVersionEntries(preAggregations: PreAggregationDescription[], requestId): Promise<VersionEntry[][]> {
     const loadCacheByDataSource = {};
 
-    const getLoadCacheByDataSource = (dataSource = 'default', preAggregationSchema) => {
+    const getLoadCacheByDataSource = (preAggregationSchema, dataSource = 'default') => {
       if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
@@ -741,9 +740,9 @@ export class PreAggregations {
       preAggregations.map(
         async preAggregation => {
           const { dataSource, preAggregationsSchema } = preAggregation;
-          const cacheKey = getLoadCacheByDataSource(dataSource, preAggregationsSchema).tablesCachePrefixKey(preAggregation);
+          const cacheKey = getLoadCacheByDataSource(preAggregationsSchema, dataSource).tablesCachePrefixKey(preAggregation);
           if (!firstByCacheKey[cacheKey]) {
-            firstByCacheKey[cacheKey] = getLoadCacheByDataSource(dataSource, preAggregationsSchema).getVersionEntries(preAggregation);
+            firstByCacheKey[cacheKey] = getLoadCacheByDataSource(preAggregationsSchema, dataSource).getVersionEntries(preAggregation);
             const res = await firstByCacheKey[cacheKey];
             return res.versionEntries;
           }

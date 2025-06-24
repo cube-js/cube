@@ -16,7 +16,8 @@ pub use sql_visitor::SqlEvaluatorVisitor;
 pub use symbols::{
     CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
     DimensionCaseDefinition, DimensionCaseWhenItem, DimensionSymbol, DimensionSymbolFactory,
-    DimenstionCaseLabel, MeasureSymbol, MeasureSymbolFactory, MemberExpressionSymbol, MemberSymbol,
+    DimensionTimeShift, DimenstionCaseLabel, MeasureSymbol, MeasureSymbolFactory,
+    MeasureTimeShifts, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
     SymbolFactory, TimeDimensionSymbol,
 };
 pub use visitor::TraversalVisitor;

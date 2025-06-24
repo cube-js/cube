@@ -40,7 +40,7 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
   ],
   [
     {
-      name: '#3 Events.count with Events.type order by Events.count DESC',
+      name: '#3 Events.count with Events.type order by Events.type DESC, Events.count',
       ws: true,
     },
     {
@@ -49,7 +49,8 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
       ],
       timeDimensions: [],
       order: {
-        'Events.count': 'desc'
+        'Events.type': 'desc',
+        'Events.count': 'asc'
       },
       dimensions: [
         'Events.type'

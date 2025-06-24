@@ -90,7 +90,7 @@ describe('duckdb', () => {
       ]
     });
     
-    // There are 2 'processed' orders 
+    // There are 2 'processed' orders
     expect(response.rawData()[0]['Orders.count']).toBe('2');
   });
   

@@ -171,8 +171,6 @@ export class BaseDbRunner {
 
   public async evaluateQueryWithPreAggregations(query, seed = this.nextSeed++) {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
-    // console.log(preAggregationsDescription);
-
     await Promise.all(preAggregationsDescription.map(
       async desc => {
         if (desc.partitionGranularity) {

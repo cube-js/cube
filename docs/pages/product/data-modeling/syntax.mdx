@@ -1,10 +1,3 @@
----
-redirect_from:
-  - /schema/fundamentals/working-with-yaml
-  - /schema/getting-started/yaml
-  - /data-modeling/syntax
----
-
 # Syntax
 
 Entities within the data model (e.g., cubes, views, etc.) should be placed under
@@ -38,7 +31,7 @@ model
 Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
 JavaScript syntax. YAML data model files should have the `.yml` extension,
 whereas JavaScript data model files should end with `.js`. You can mix YAML and
-JavaScript files within a single data model. 
+JavaScript files within a single data model.
 
 <CodeTabs>
 
@@ -48,8 +41,8 @@ cube(`orders`, {
     SELECT *
     FROM orders, line_items
     WHERE orders.id = line_items.order_id
-  `,
-});
+  `
+})
 ```
 
 ```yaml
@@ -69,16 +62,24 @@ models][ref-dynamic-data-models] programmatically. YAML data models use
 [Jinja and Python][ref-dynamic-data-models-jinja] whereas JavaScript data
 models use [JavaScript][ref-dynamic-data-models-js].
 
-It is [recommended][ref-style-guide] to default to YAML syntax because of its
+It is recommended to default to YAML syntax because of its
 simplicity and readability. However, JavaScript might provide more flexibility
 for dynamic data modeling.
+
+<ReferenceBox>
+
+See [Cube style guide][ref-style-guide] for more recommendations on syntax and structure.
+
+</ReferenceBox>
 
 ## Naming
 
 Common rules apply to names of entities within the data model. All names must:
 
-- start with a letter
-- consist of letters, numbers, and underscore (`_`) symbols only
+- Start with a letter.
+- Consist of letters, numbers, and underscore (`_`) symbols only.
+- Not be a [reserved keyword in Python][link-python-reserved-words], e.g., `from`, `return`, or `yield`.
+- When using the DAX API, not clash with the names of columns in [date hierarchies][ref-dax-api-date-hierarchies].
 
 It is also recommended that names use [snake case][wiki-snake-case].
 
@@ -125,17 +126,17 @@ cube(`orders`, {
   measures: {
     statuses: {
       sql: `STRING_AGG(status)`,
-      type: `string`,
-    },
+      type: `string`
+    }
   },
 
   dimensions: {
     status: {
       sql: `UPPER(status)`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 <ReferenceBox>
@@ -169,8 +170,8 @@ cubes:
 
 ```javascript
 cube(`orders`, {
-  sql_table: `public."Orders"`,
-});
+  sql_table: `public."Orders"`
+})
 ```
 
 </CodeTabs>
@@ -207,10 +208,10 @@ cube(`users`, {
   dimensions: {
     name: {
       sql: `name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -254,20 +255,20 @@ cube(`users`, {
   dimensions: {
     name: {
       sql: `name`,
-      type: `string`,
+      type: `string`
     },
 
     surname: {
       sql: `UPPER(surname)`,
-      type: `string`,
+      type: `string`
     },
 
     full_name: {
       sql: `CONCAT(${name}, ' ', ${surname})`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -389,23 +390,23 @@ cube(`users`, {
   joins: {
     contacts: {
       sql: `${users}.contact_id = ${contacts.id}`,
-      relationship: `one_to_one`,
-    },
+      relationship: `one_to_one`
+    }
   },
 
   dimensions: {
     id: {
       sql: `${users}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `COALESCE(${users}.name, ${contacts.name})`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 
 cube(`contacts`, {
   sql_table: `contacts`,
@@ -414,15 +415,15 @@ cube(`contacts`, {
     id: {
       sql: `${contacts}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `${contacts}.name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -448,23 +449,23 @@ cube(`users`, {
   joins: {
     contacts: {
       sql: `${CUBE}.contact_id = ${contacts.id}`,
-      relationship: `one_to_one`,
-    },
+      relationship: `one_to_one`
+    }
   },
 
   dimensions: {
     id: {
       sql: `${CUBE}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `COALESCE(${CUBE}.name, ${contacts.name})`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 
 cube(`contacts`, {
   sql_table: `contacts`,
@@ -473,15 +474,15 @@ cube(`contacts`, {
     id: {
       sql: `${CUBE}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `${CUBE}.name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -547,6 +548,8 @@ when defining [polymorphic cubes][ref-polymorphism] or using [data blending][ref
 
 Consider the following data model:
 
+<CodeTabs>
+
 ```javascript
 cube(`organisms`, {
   sql_table: `organisms`
@@ -564,7 +567,7 @@ cube(`dogs`, {
   sql: `
     SELECT *
     FROM ${animals.sql()}
-    WHERE species = 'dogs' 
+    WHERE species = 'dogs'
   `,
 
   measures: {
@@ -574,6 +577,30 @@ cube(`dogs`, {
   }
 })
 ```
+
+```yaml
+cubes:
+  - name: organisms
+    sql_table: organisms
+
+  - name: animals
+    sql: >
+      SELECT *
+      FROM {organisms.sql()}
+      WHERE kingdom = 'animals'
+
+  - name: dogs
+    sql: >
+      SELECT *
+      FROM {animals.sql()}
+      WHERE species = 'dogs'
+
+    measures:
+      - name: count
+        type: count
+```
+
+</CodeTabs>
 
 If you query for `dogs.count`, Cube will generate the following SQL:
 
@@ -590,17 +617,72 @@ FROM (
 ) AS "dogs"
 ```
 
-<ReferenceBox>
+### Curly braces and escaping
 
-Currently, `{cube.sql()}` function is only supported in JavaScript data models.
-It is not supported in YAML data models.
-Please [track this issue](https://github.com/cube-js/cube/issues/7484).
+As you can see in the examples above, within [SQL expressions][self-sql-expressions],
+curly braces are used to reference cubes and members.
 
-As a workaround, you can use JavaScript data models, put a SQL query in a
-[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
-the [template context](/reference/python/cube#templatecontext-class).
+In YAML data models, use `{reference}`:
 
-</ReferenceBox>
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT id, created_at
+      FROM {other_cube.sql()}
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: status_x2
+        sql: "{status} || ' ' || {status}"
+        type: string
+```
+
+In JavaScript data models, use `${reference}` in [JavaScript template
+literals][link-js-template-literals] (mind the dollar sign):
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT id, created_at
+    FROM ${other_cube.sql()}
+  `,
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+
+    status_x2: {
+      sql: `${status} || ' ' || ${status}`,
+      type: `string`
+    }
+  }
+})
+```
+
+If you need to use literal, non-referential curly braces in YAML, e.g.,
+to define a JSON object, you can escape them with a backslash:
+
+```yaml
+cubes:
+  - name: json_object_in_postgres
+    sql: SELECT CAST('\{"key":"value"\}'::JSON AS TEXT) AS json_column
+
+  - name: csv_from_s3_in_duckdb
+    sql: >
+      SELECT *
+      FROM read_csv(
+        's3://bbb/aaa.csv',
+        delim = ',',
+        header = true,
+        columns=\{'time':'DATE','count':'NUMERIC'\}
+      )
+```
 
 ### Non-SQL references
 
@@ -658,7 +740,7 @@ cube(`orders`, {
       measures: [CUBE.count]
     }
   }
-});
+})
 ```
 
 </CodeTabs>
@@ -670,6 +752,25 @@ variables][ref-context-variables] within your data model. They are
 generally useful for two purposes: optimizing generated SQL queries and
 defining dynamic data models.
 
+## Troubleshooting
+
+### `Can't parse timestamp`
+
+Sometimes, you might come across the following error message: `Can't parse timestamp:
+2023-11-07T14:33:23.16.000`.
+
+It indicates that the data source was unable to recognize the value of a [time
+dimension][ref-time-dimension] as a timestamp. Please check that the [SQL
+expression](#sql-expressions) of this time dimension evaluates to a `TIMESTAMP` type.
+
+<ReferenceBox>
+
+Check [this recipe][ref-recipe-string-time-dimensions] to see how you can work around
+string values in time dimensions.
+
+</ReferenceBox>
+
+
 [self-folder-structure]: #folder-structure
 [self-naming]: #naming
 [self-syntax]: #code-syntax
@@ -678,19 +779,24 @@ defining dynamic data models.
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-dynamic-data-models-jinja]: /product/data-modeling/dynamic/jinja
 [ref-dynamic-data-models-js]: /product/data-modeling/dynamic/javascript
-[ref-context-variables]: /reference/data-model/context-variables
-[ref-config-model-path]: /reference/configuration/config#schemapath
+[ref-context-variables]: /product/data-modeling/reference/context-variables
+[ref-config-model-path]: /product/configuration/reference/config#schemapath
 [ref-config-repository-factory]:
-  /reference/configuration/config#repositoryfactory
+  /product/configuration/reference/config#repositoryfactory
 [ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [wiki-yaml]: https://en.wikipedia.org/wiki/YAML
 [link-snowflake-listagg]: https://docs.snowflake.com/en/sql-reference/functions/listagg
 [link-bigquery-stringagg]: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#string_agg
 [link-sql-udf]: https://en.wikipedia.org/wiki/User-defined_function#Databases
-[ref-time-dimension]: /reference/data-model/types-and-formats#time-1
+[ref-time-dimension]: /product/data-modeling/reference/types-and-formats#time-1
 [ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
-[ref-custom-granularities]: /reference/data-model/dimensions#granularities
-[ref-style-guide]: /guides/style-guide
+[ref-custom-granularities]: /product/data-modeling/reference/dimensions#granularities
+[ref-style-guide]: /product/data-modeling/recipes/style-guide
 [ref-polymorphism]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
+[link-js-template-literals]: https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Strings#embedding_javascript
+[link-python-reserved-words]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
+[ref-dax-api-date-hierarchies]: /product/apis-integrations/dax-api#date-hierarchies
+[ref-time-dimension]: /product/data-modeling/concepts#time-dimensions
+[ref-recipe-string-time-dimensions]: /product/data-modeling/recipes/string-time-dimensions

@@ -1,11 +1,13 @@
 use crate::app_metrics;
 use crate::di_service;
+use crate::remotefs::ExtendedRemoteFs;
 use crate::remotefs::{CommonRemoteFsUtils, LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::cube_ext;
+use futures::stream::BoxStream;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
@@ -147,7 +149,7 @@ fn refresh_interval_from_env() -> Duration {
     Duration::from_secs(60 * mins)
 }
 
-di_service!(S3RemoteFs, [RemoteFs]);
+di_service!(S3RemoteFs, [RemoteFs, ExtendedRemoteFs]);
 
 #[async_trait]
 impl RemoteFs for S3RemoteFs {
@@ -306,46 +308,26 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
-        Ok(self
-            .list_with_metadata(remote_prefix)
-            .await?
-            .into_iter()
-            .map(|f| f.remote_path)
-            .collect::<Vec<_>>())
+        let leading_subpath = self.leading_subpath_regex();
+        self.list_objects_and_map(remote_prefix, |o: s3::serde_types::Object| {
+            Ok(Self::object_key_to_remote_path(&leading_subpath, &o.key))
+        })
+        .await
     }
 
     async fn list_with_metadata(
         &self,
         remote_prefix: String,
     ) -> Result<Vec<RemoteFile>, CubeError> {
-        let path = self.s3_path(&remote_prefix);
-        let bucket = self.bucket.load();
-        let list = bucket.list(path, None).await?;
-        let pages_count = list.len();
-        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
-            pages_count as i64,
-            Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
-        );
-        if pages_count > 100 {
-            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
-        }
-        let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
-        let result = list
-            .iter()
-            .flat_map(|res| {
-                res.contents
-                    .iter()
-                    .map(|o| -> Result<RemoteFile, CubeError> {
-                        Ok(RemoteFile {
-                            remote_path: leading_slash.replace(&o.key, NoExpand("")).to_string(),
-                            updated: DateTime::parse_from_rfc3339(&o.last_modified)?
-                                .with_timezone(&Utc),
-                            file_size: o.size,
-                        })
-                    })
+        let leading_subpath = self.leading_subpath_regex();
+        self.list_objects_and_map(remote_prefix, |o: s3::serde_types::Object| {
+            Ok(RemoteFile {
+                remote_path: Self::object_key_to_remote_path(&leading_subpath, &o.key),
+                updated: DateTime::parse_from_rfc3339(&o.last_modified)?.with_timezone(&Utc),
+                file_size: o.size,
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(result)
+        })
+        .await
     }
 
     async fn local_path(&self) -> Result<String, CubeError> {
@@ -359,7 +341,106 @@ impl RemoteFs for S3RemoteFs {
     }
 }
 
+#[async_trait]
+impl ExtendedRemoteFs for S3RemoteFs {
+    async fn list_by_page(
+        &self,
+        remote_prefix: String,
+    ) -> Result<BoxStream<Result<Vec<String>, CubeError>>, CubeError> {
+        let path = self.s3_path(&remote_prefix);
+        let bucket = self.bucket.load();
+        let leading_subpath = self.leading_subpath_regex();
+
+        let stream = async_stream::stream! {
+            let mut continuation_token = None;
+            let mut pages_count: i64 = 0;
+
+            loop {
+                let (result, _) = bucket
+                    .list_page(path.clone(), None, continuation_token, None, None)
+                    .await?;
+
+                pages_count += 1;
+
+                let page: Vec<String> = result.contents.into_iter().map(|obj| Self::object_key_to_remote_path(&leading_subpath, &obj.key)).collect();
+                continuation_token = result.next_continuation_token;
+
+                yield Ok(page);
+
+                if continuation_token.is_none() {
+                    break;
+                }
+            }
+
+            Self::pages_count_app_metrics_and_logging(pages_count, "streaming");
+        };
+
+        Ok(Box::pin(stream))
+    }
+}
+
+struct LeadingSubpath(Regex);
+
 impl S3RemoteFs {
+    fn leading_subpath_regex(&self) -> LeadingSubpath {
+        LeadingSubpath(Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap())
+    }
+
+    fn object_key_to_remote_path(leading_subpath: &LeadingSubpath, o_key: &String) -> String {
+        leading_subpath.0.replace(o_key, NoExpand("")).to_string()
+    }
+
+    async fn list_objects_and_map<T, F>(
+        &self,
+        remote_prefix: String,
+        mut f: F,
+    ) -> Result<Vec<T>, CubeError>
+    where
+        F: FnMut(s3::serde_types::Object) -> Result<T, CubeError> + Copy,
+    {
+        let path = self.s3_path(&remote_prefix);
+        let bucket = self.bucket.load();
+        let mut mapped_results = Vec::new();
+        let mut continuation_token = None;
+        let mut pages_count: i64 = 0;
+
+        loop {
+            let (result, _) = bucket
+                .list_page(path.clone(), None, continuation_token, None, None)
+                .await?;
+
+            pages_count += 1;
+
+            for obj in result.contents.into_iter() {
+                mapped_results.push(f(obj)?);
+            }
+
+            continuation_token = result.next_continuation_token;
+            if continuation_token.is_none() {
+                break;
+            }
+        }
+
+        Self::pages_count_app_metrics_and_logging(pages_count, "non-streaming");
+
+        Ok(mapped_results)
+    }
+
+    fn pages_count_app_metrics_and_logging(pages_count: i64, log_op: &str) {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages_count as i64,
+            Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
+        );
+        if pages_count > 100 {
+            // Probably only "S3 list (non-streaming)" messages are of concern, not "S3 list (streaming)".
+            log::warn!(
+                "S3 list ({}) returned more than 100 pages: {}",
+                log_op,
+                pages_count
+            );
+        }
+    }
+
     fn s3_path(&self, remote_path: &str) -> String {
         format!(
             "{}{}",

@@ -52,11 +52,12 @@ impl RegularRollingWindowJoinCondition {
             };
 
             let trailing_start = if let Some(trailing_interval) = &self.trailing_interval {
-                format!("{start_date} - interval '{trailing_interval}'")
+                templates.subtract_interval(start_date, trailing_interval.clone())?
             } else {
                 start_date
             };
 
+            let trailing_start = templates.rolling_window_expr_timestamp_cast(&trailing_start)?;
             let sign = if self.offset == "start" { ">=" } else { ">" };
 
             conditions.push(format!("{date_column} {sign} {trailing_start}"));
@@ -70,11 +71,12 @@ impl RegularRollingWindowJoinCondition {
             };
 
             let leading_end = if let Some(leading_interval) = &self.leading_interval {
-                format!("{end_date} + interval '{leading_interval}'")
+                templates.add_interval(end_date, leading_interval.clone())?
             } else {
                 end_date
             };
 
+            let leading_end = templates.rolling_window_expr_timestamp_cast(&leading_end)?;
             let sign = if self.offset == "end" { "<=" } else { "<" };
 
             conditions.push(format!("{date_column} {sign} {leading_end}"));
@@ -109,6 +111,7 @@ impl RollingTotalJoinCondition {
         let date_column = self.time_dimension.to_sql(templates, context)?;
         let date_to =
             templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
+        let date_to = templates.rolling_window_expr_timestamp_cast(&date_to)?;
         let result = format!("{date_column} <= {date_to}");
         Ok(result)
     }
@@ -117,7 +120,7 @@ pub struct ToDateRollingWindowJoinCondition {
     time_series_source: String,
     granularity: String,
     time_dimension: Expr,
-    query_tools: Rc<QueryTools>,
+    _query_tools: Rc<QueryTools>,
 }
 
 impl ToDateRollingWindowJoinCondition {
@@ -131,7 +134,7 @@ impl ToDateRollingWindowJoinCondition {
             time_series_source,
             granularity,
             time_dimension,
-            query_tools,
+            _query_tools: query_tools,
         }
     }
 
@@ -146,10 +149,9 @@ impl ToDateRollingWindowJoinCondition {
             templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
         let date_to =
             templates.column_reference(&Some(self.time_series_source.clone()), "date_from")?;
-        let grouped_from = self
-            .query_tools
-            .base_tools()
-            .time_grouped_column(self.granularity.clone(), date_from)?;
+        let date_from = templates.rolling_window_expr_timestamp_cast(&date_from)?;
+        let date_to = templates.rolling_window_expr_timestamp_cast(&date_to)?;
+        let grouped_from = templates.time_grouped_column(self.granularity.clone(), date_from)?;
         let result = format!("{date_column} >= {grouped_from} and {date_column} <= {date_to}");
         Ok(result)
     }

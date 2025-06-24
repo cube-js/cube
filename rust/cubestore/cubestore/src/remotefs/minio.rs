@@ -1,5 +1,7 @@
 use crate::di_service;
-use crate::remotefs::{CommonRemoteFsUtils, LocalDirRemoteFs, RemoteFile, RemoteFs};
+use crate::remotefs::{
+    CommonRemoteFsUtils, ExtendedRemoteFs, LocalDirRemoteFs, RemoteFile, RemoteFs,
+};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -153,7 +155,7 @@ fn refresh_interval_from_env() -> Duration {
     Duration::from_secs(60 * mins)
 }
 
-di_service!(MINIORemoteFs, [RemoteFs]);
+di_service!(MINIORemoteFs, [RemoteFs, ExtendedRemoteFs]);
 
 #[async_trait]
 impl RemoteFs for MINIORemoteFs {
@@ -337,6 +339,10 @@ impl RemoteFs for MINIORemoteFs {
         Ok(buf.to_str().unwrap().to_string())
     }
 }
+
+#[async_trait]
+impl ExtendedRemoteFs for MINIORemoteFs {}
+
 //TODO
 impl MINIORemoteFs {
     fn s3_path(&self, remote_path: &str) -> String {

@@ -1,8 +1,17 @@
 use chrono::{DateTime, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
+use regex::Regex;
 pub struct QueryDateTimeHelper {}
 
+use lazy_static::lazy_static;
+lazy_static! {
+    static ref DATE_TIME_LOCAL_MS_RE: Regex =
+        Regex::new(r"^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$").unwrap();
+    static ref DATE_TIME_LOCAL_U_RE: Regex =
+        Regex::new(r"^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d\d\d\d$").unwrap();
+    static ref DATE_RE: Regex = Regex::new(r"^\d\d\d\d-\d\d-\d\d$").unwrap();
+}
 impl QueryDateTimeHelper {
     pub fn parse_native_date_time(date: &str) -> Result<NaiveDateTime, CubeError> {
         let formats = &[
@@ -51,7 +60,7 @@ impl QueryDateTimeHelper {
 
         // Ensure `high` is a valid local time (expand if needed)
         while let LocalResult::None = tz.from_local_datetime(&high) {
-            high = high + max_offset;
+            high += max_offset;
         }
 
         // Binary search for the first valid local time >= `naive`
@@ -78,6 +87,66 @@ impl QueryDateTimeHelper {
                 tz
             ))),
         }
+    }
+
+    pub fn format_from_date(date: &str, precision: u32) -> Result<String, CubeError> {
+        if precision == 3 {
+            if DATE_TIME_LOCAL_MS_RE.is_match(date) {
+                return Ok(date.to_string());
+            }
+        } else if precision == 6 {
+            if date.len() == 23 && DATE_TIME_LOCAL_MS_RE.is_match(date) {
+                return Ok(format!("{}000", date));
+            } else if date.len() == 26 && DATE_TIME_LOCAL_U_RE.is_match(date) {
+                return Ok(date.to_string());
+            }
+        } else {
+            return Err(CubeError::user(format!(
+                "Unsupported timestamp precision: {}",
+                precision
+            )));
+        }
+
+        if DATE_RE.is_match(date) {
+            return Ok(format!(
+                "{}T00:00:00.{}",
+                date,
+                "0".repeat(precision as usize)
+            ));
+        }
+        Ok(date.to_string())
+    }
+
+    pub fn format_to_date(date: &str, precision: u32) -> Result<String, CubeError> {
+        if precision == 3 {
+            if DATE_TIME_LOCAL_MS_RE.is_match(date) {
+                return Ok(date.to_string());
+            }
+        } else if precision == 6 {
+            if date.len() == 23 && DATE_TIME_LOCAL_MS_RE.is_match(date) {
+                if date.ends_with(".999") {
+                    return Ok(format!("{}999", date));
+                }
+                return Ok(format!("{}000", date));
+            } else if date.len() == 26 && DATE_TIME_LOCAL_U_RE.is_match(date) {
+                return Ok(date.to_string());
+            }
+        } else {
+            return Err(CubeError::user(format!(
+                "Unsupported timestamp precision: {}",
+                precision
+            )));
+        }
+
+        if DATE_RE.is_match(date) {
+            return Ok(format!(
+                "{}T23:59:59.{}",
+                date,
+                "9".repeat(precision as usize)
+            ));
+        }
+
+        Ok(date.to_string())
     }
 }
 

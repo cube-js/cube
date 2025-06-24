@@ -6362,7 +6362,6 @@ mod tests {
             let list = LocalDirRemoteFs::list_recursive(
                 config.remote_dir().clone(),
                 "metastore-".to_string(),
-                config.remote_dir().clone(),
             )
             .await
             .unwrap();
@@ -6543,6 +6542,110 @@ mod tests {
         assert!(true);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[tokio::test]
+    async fn delete_old_snapshots() {
+        let metastore_snapshots_lifetime_secs = 1;
+        let config = Config::test("delete_old_snapshots").update_config(|mut obj| {
+            obj.metastore_snapshots_lifetime = metastore_snapshots_lifetime_secs;
+            obj.minimum_metastore_snapshots_count = 2;
+            obj
+        });
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("delete_old_snapshots-local");
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join("delete_old_snapshots-remote");
+        let _ = fs::remove_dir_all(&store_path);
+        let _ = fs::remove_dir_all(&remote_store_path);
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+
+            // let list = remote_fs.list("metastore-".to_owned()).await.unwrap();
+            // assert_eq!(0, list.len(), "remote fs list: {:?}", list);
+
+            let uploaded =
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
+                    .await
+                    .unwrap();
+            assert_eq!(uploaded.len(), 0);
+
+            meta_store
+                .create_schema("foo1".to_string(), false)
+                .await
+                .unwrap();
+
+            meta_store.upload_check_point().await.unwrap();
+            let uploaded1 =
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
+                    .await
+                    .unwrap();
+
+            assert_eq!(uploaded1.len(), 1);
+
+            meta_store
+                .create_schema("foo2".to_string(), false)
+                .await
+                .unwrap();
+
+            meta_store.upload_check_point().await.unwrap();
+
+            let uploaded2 =
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
+                    .await
+                    .unwrap();
+
+            assert_eq!(uploaded2.len(), 2);
+
+            meta_store
+                .create_schema("foo3".to_string(), false)
+                .await
+                .unwrap();
+
+            meta_store.upload_check_point().await.unwrap();
+
+            let uploaded3 =
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
+                    .await
+                    .unwrap();
+
+            assert_eq!(
+                uploaded3.len(),
+                3,
+                "uploaded3 keys: {}",
+                uploaded3.keys().join(", ")
+            );
+
+            meta_store
+                .create_schema("foo4".to_string(), false)
+                .await
+                .unwrap();
+
+            tokio::time::sleep(Duration::from_millis(
+                metastore_snapshots_lifetime_secs * 1000 + 100,
+            ))
+            .await;
+            meta_store.upload_check_point().await.unwrap();
+
+            let uploaded4 =
+                BaseRocksStoreFs::list_files_by_snapshot(remote_fs.as_ref(), "metastore")
+                    .await
+                    .unwrap();
+
+            // Should have 2 remaining snapshots because 2 is the minimum.
+            assert_eq!(uploaded4.len(), 2);
+        }
+
+        let _ = fs::remove_dir_all(&store_path);
+        let _ = fs::remove_dir_all(&remote_store_path);
     }
 
     #[tokio::test]

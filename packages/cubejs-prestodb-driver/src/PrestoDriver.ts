@@ -42,6 +42,8 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   schema?: string;
   user?: string;
   // eslint-disable-next-line camelcase
+  custom_auth?: string;
+  // eslint-disable-next-line camelcase
   basic_auth?: { user: string, password: string };
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
@@ -60,11 +62,13 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return 2;
   }
 
-  private config: PrestoDriverConfiguration;
+  protected readonly config: PrestoDriverConfiguration;
 
-  private catalog: string | undefined;
+  protected readonly catalog: string | undefined;
 
-  private client: any;
+  protected client: any;
+
+  protected useSelectTestConnection: boolean;
 
   /**
    * Class constructor.
@@ -76,6 +80,16 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
+    const dbUser = getEnv('dbUser', { dataSource });
+    const dbPassword = getEnv('dbPass', { dataSource });
+    const authToken = getEnv('prestoAuthToken', { dataSource });
+
+    if (authToken && dbPassword) {
+      throw new Error('Both user/password and auth token are set. Please remove password or token.');
+    }
+
+    this.useSelectTestConnection = getEnv('dbUseSelectTestConnection', { dataSource });
+
     this.config = {
       host: getEnv('dbHost', { dataSource }),
       port: getEnv('dbPort', { dataSource }),
@@ -85,13 +99,9 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       schema:
         getEnv('dbName', { dataSource }) ||
         getEnv('dbSchema', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      basic_auth: getEnv('dbPass', { dataSource })
-        ? {
-          user: getEnv('dbUser', { dataSource }),
-          password: getEnv('dbPass', { dataSource }),
-        }
-        : undefined,
+      user: dbUser,
+      ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
+      ...(dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
       ssl: this.getSslOptions(dataSource),
       bucketType: getEnv('dbExportBucketType', { supported: ['gcs'], dataSource }),
       exportBucket: getEnv('dbExportBucket', { dataSource }),
@@ -103,6 +113,10 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection(): Promise<void> {
+    if (this.useSelectTestConnection) {
+      return this.testConnectionViaSelect();
+    }
+
     return new Promise((resolve, reject) => {
       // Get node list of presto cluster and return it.
       // @see https://prestodb.io/docs/current/rest/node.html
@@ -114,6 +128,11 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         }
       });
     });
+  }
+
+  protected async testConnectionViaSelect() {
+    const query = SqlString.format('SELECT 1', []);
+    await this.queryPromised(query, false);
   }
 
   public query(query: string, values: unknown[]): Promise<any[]> {

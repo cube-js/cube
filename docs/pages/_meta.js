@@ -31,14 +31,4 @@ module.exports = {
     type: "page",
     title: "Documentation",
   },
-
-  reference: {
-    type: "page",
-    title: "Reference",
-  },
-
-  guides: {
-    type: "page",
-    title: "Guides",
-  },
 };

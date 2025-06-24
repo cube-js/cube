@@ -66,6 +66,13 @@ describe('Gateway Api Scopes', () => {
       .toStrictEqual('API scope is missing: data');
 
     res = await request(app)
+      .get('/cubejs-api/v1/sql')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('API scope is missing: sql');
+
+    res = await request(app)
       .post('/cubejs-api/v1/pre-aggregations/jobs')
       .set('Authorization', AUTH_TOKEN)
       .expect(403);
@@ -178,23 +185,6 @@ describe('Gateway Api Scopes', () => {
     expect(res3.body && res3.body.error)
       .toStrictEqual('API scope is missing: data');
 
-    const res4 = await request(app)
-      .get('/cubejs-api/v1/sql')
-      .set('Authorization', AUTH_TOKEN)
-      .expect(403);
-
-    expect(res4.body && res4.body.error)
-      .toStrictEqual('API scope is missing: data');
-
-    const res5 = await request(app)
-      .post('/cubejs-api/v1/sql')
-      .set('Content-type', 'application/json')
-      .set('Authorization', AUTH_TOKEN)
-      .expect(403);
-
-    expect(res5.body && res5.body.error)
-      .toStrictEqual('API scope is missing: data');
-
     const res6 = await request(app)
       .get('/cubejs-api/v1/dry-run')
       .set('Authorization', AUTH_TOKEN)
@@ -211,6 +201,31 @@ describe('Gateway Api Scopes', () => {
 
     expect(res7.body && res7.body.error)
       .toStrictEqual('API scope is missing: data');
+
+    apiGateway.release();
+  });
+
+  test('Sql declined', async () => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => ['graphql', 'meta', 'jobs', 'data'],
+    });
+
+    const res1 = await request(app)
+      .get('/cubejs-api/v1/sql')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+
+    expect(res1.body && res1.body.error)
+      .toStrictEqual('API scope is missing: sql');
+
+    const res2 = await request(app)
+      .post('/cubejs-api/v1/sql')
+      .set('Content-type', 'application/json')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+
+    expect(res2.body && res2.body.error)
+      .toStrictEqual('API scope is missing: sql');
 
     apiGateway.release();
   });
