@@ -528,7 +528,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 );
             }
             if o.show_filters && t.filter.is_some() {
-                *out += &format!(", predicate: {:?}", t.filter.as_ref().unwrap())
+                *out += &format!(", predicate: {}", t.filter.as_ref().unwrap())
             }
         } else if let Some(_) = a.downcast_ref::<EmptyExec>() {
             *out += "Empty";
