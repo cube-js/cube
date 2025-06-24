@@ -25,6 +25,7 @@ pub struct BaseFilter {
     filter_type: FilterType,
     filter_operator: FilterOperator,
     values: Vec<Option<String>>,
+    is_over_date_range: bool,
     use_raw_values: bool,
 }
 
@@ -49,11 +50,27 @@ impl BaseFilter {
         } else {
             vec![]
         };
+
+        //Check if we have proxy time dimension as input
+        let symbol_to_check = if let Ok(time_dimension) = member_evaluator.as_time_dimension() {
+            time_dimension.base_symbol().clone()
+        } else {
+            member_evaluator.clone()
+        };
+
+        let resolved_ref = symbol_to_check.resolve_reference_chain();
+        let is_over_date_range = if resolved_ref.as_time_dimension().is_ok() {
+            true
+        } else {
+            false
+        };
+
         Ok(Rc::new(Self {
             query_tools,
             member_evaluator,
             filter_type,
             filter_operator,
+            is_over_date_range,
             values,
             use_raw_values: false,
         }))
@@ -69,6 +86,7 @@ impl BaseFilter {
             query_tools: self.query_tools.clone(),
             member_evaluator: self.member_evaluator.clone(),
             filter_type: self.filter_type.clone(),
+            is_over_date_range: self.is_over_date_range,
             filter_operator,
             values,
             use_raw_values,
@@ -127,6 +145,13 @@ impl BaseFilter {
                 context.clone(),
                 plan_templates,
             )?;
+            let member_sql = if self.is_over_date_range {
+                plan_templates
+                    .base_tools()
+                    .time_stamp_cast(member_sql.clone())?
+            } else {
+                member_sql
+            };
             let filters_context = context.filters_context();
 
             let res = match self.filter_operator {
@@ -267,7 +292,7 @@ impl BaseFilter {
         if self.is_array_value() {
             plan_templates.in_where(
                 member_sql.to_string(),
-                self.filter_and_allocate_values(),
+                self.filter_and_allocate_values()?,
                 need_null_check,
             )
         } else if self.is_values_contains_null() {
@@ -287,7 +312,7 @@ impl BaseFilter {
         if self.is_array_value() {
             plan_templates.not_in_where(
                 member_sql.to_string(),
-                self.filter_and_allocate_values(),
+                self.filter_and_allocate_values()?,
                 need_null_check,
             )
         } else if self.is_values_contains_null() {
@@ -507,7 +532,7 @@ impl BaseFilter {
         let need_null_check = self.is_need_null_chek(false);
         plan_templates.in_where(
             member_sql.to_string(),
-            self.filter_and_allocate_values(),
+            self.filter_and_allocate_values()?,
             need_null_check,
         )
     }
@@ -521,7 +546,7 @@ impl BaseFilter {
         let need_null_check = self.is_need_null_chek(true);
         plan_templates.not_in_where(
             member_sql.to_string(),
-            self.filter_and_allocate_values(),
+            self.filter_and_allocate_values()?,
             need_null_check,
         )
     }
@@ -642,7 +667,7 @@ impl BaseFilter {
         end_wild: bool,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let values = self.filter_and_allocate_values();
+        let values = self.filter_and_allocate_values()?;
         let like_parts = values
             .into_iter()
             .map(|v| plan_templates.ilike(member_sql, &v, start_wild, end_wild, not))
@@ -747,8 +772,12 @@ impl BaseFilter {
         QueryDateTimeHelper::format_to_date(date, plan_templates.timestamp_precision()?)
     }
 
-    fn allocate_param(&self, param: &str) -> String {
-        self.query_tools.allocate_param(param)
+    fn allocate_param(&self, param: &str) -> Result<String, CubeError> {
+        if self.is_over_date_range {
+            self.allocate_timestamp_param(param, false)
+        } else {
+            Ok(self.query_tools.allocate_param(param))
+        }
     }
 
     fn allocate_timestamp_param(
@@ -775,7 +804,7 @@ impl BaseFilter {
             )))
         } else {
             if let Some(value) = &self.values[0] {
-                Ok(self.allocate_param(value))
+                self.allocate_param(value)
             } else {
                 Ok("NULL".to_string())
             }
@@ -825,10 +854,10 @@ impl BaseFilter {
         self.values.len() > 1
     }
 
-    fn filter_and_allocate_values(&self) -> Vec<String> {
+    fn filter_and_allocate_values(&self) -> Result<Vec<String>, CubeError> {
         self.values
             .iter()
             .filter_map(|v| v.as_ref().map(|v| self.allocate_param(&v)))
-            .collect::<Vec<_>>()
+            .collect::<Result<Vec<_>, _>>()
     }
 }
