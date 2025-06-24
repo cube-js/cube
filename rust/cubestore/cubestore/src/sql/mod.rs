@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use chrono::format::Fixed::Nanosecond3;
@@ -1140,6 +1140,7 @@ impl SqlService for SqlServiceImpl {
                     .await
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
+                let logical_plan_time_start = SystemTime::now();
                 let logical_plan = self
                     .query_planner
                     .logical_plan(
@@ -1148,6 +1149,9 @@ impl SqlService for SqlServiceImpl {
                         context.trace_obj.clone(),
                     )
                     .await?;
+
+                app_metrics::DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_MS
+                    .report(logical_plan_time_start.elapsed()?.as_millis() as i64);
 
                 // TODO distribute and combine
                 let res = match logical_plan {
@@ -1163,40 +1167,35 @@ impl SqlService for SqlServiceImpl {
 
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
+                        let serialized_plan_time_start = SystemTime::now();
+                        let serialized_plan = serialized.to_serialized_plan()?;
+                        app_metrics::DATA_QUERY_TO_SERIALIZED_PLAN_TIME_MS
+                            .report(serialized_plan_time_start.elapsed()?.as_millis() as i64);
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(
-                                    query,
-                                    context,
-                                    serialized.to_serialized_plan()?,
-                                    async move |plan| {
-                                        let records;
-                                        if workers.len() == 0 {
-                                            records = executor
-                                                .execute_router_plan(plan, cluster)
-                                                .await?
-                                                .1;
-                                        } else {
-                                            // Pick one of the workers to run as main for the request.
-                                            let i =
-                                                thread_rng().sample(Uniform::new(0, workers.len()));
-                                            let rs =
-                                                cluster.route_select(&workers[i], plan).await?.1;
-                                            records = rs
-                                                .into_iter()
-                                                .map(|r| r.read())
-                                                .collect::<Result<Vec<_>, _>>()?;
-                                        }
-                                        Ok(cube_ext::spawn_blocking(
-                                            move || -> Result<DataFrame, CubeError> {
-                                                let df = batches_to_dataframe(records)?;
-                                                Ok(df)
-                                            },
-                                        )
-                                        .await??)
-                                    },
-                                )
+                                .get(query, context, serialized_plan, async move |plan| {
+                                    let records;
+                                    if workers.len() == 0 {
+                                        records =
+                                            executor.execute_router_plan(plan, cluster).await?.1;
+                                    } else {
+                                        // Pick one of the workers to run as main for the request.
+                                        let i = thread_rng().sample(Uniform::new(0, workers.len()));
+                                        let rs = cluster.route_select(&workers[i], plan).await?.1;
+                                        records = rs
+                                            .into_iter()
+                                            .map(|r| r.read())
+                                            .collect::<Result<Vec<_>, _>>()?;
+                                    }
+                                    Ok(cube_ext::spawn_blocking(
+                                        move || -> Result<DataFrame, CubeError> {
+                                            let df = batches_to_dataframe(records)?;
+                                            Ok(df)
+                                        },
+                                    )
+                                    .await??)
+                                })
                                 .with_current_subscriber(),
                         )
                         .await??
