@@ -174,5 +174,41 @@
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
     "SQL API: Extended nested Rollup over asterisk"
+  ],
+  "tesseractSkip": [
+    "for the ECommerce.TimeAnalysisExternal",
+    "for the ECommerce.TimeAnalysisInternal",
+
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying BigECommerce: partitioned pre-agg",
+    "querying BigECommerce: null sum",
+    "querying BigECommerce: null boolean",
+    "--------------------",
+
+
+    "querying BigECommerce: rolling window by 2 week",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading",
+    "pre-aggregations Customers: running total without time dimension",
+    "querying BigECommerce: totalProfitYearAgo",
+    "SQL API: post-aggregate percentage of total",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Nested Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: Timeshift measure from cube",
+    "SQL API: SQL push down push to cube quoted alias"
   ]
 }
