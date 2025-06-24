@@ -325,7 +325,7 @@ jobs:
       matrix:
         # We do not need to test under all versions, we do it under linux
         node-version: [22.x]
-        os-version: [windows-2019]
+        os-version: [windows-2022]
         python-version: ["fallback"]
       fail-fast: false
 
