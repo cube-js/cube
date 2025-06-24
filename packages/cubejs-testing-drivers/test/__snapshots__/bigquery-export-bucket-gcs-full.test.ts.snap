@@ -30,7 +30,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup with aliases: nested_rollup_with_aliases 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup with aliases 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
@@ -833,7 +833,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup: nested_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
@@ -1636,7 +1636,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Rollup over exprs: rollup_over_exprs 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Rollup over exprs 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2447,7 +2447,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Simple Rollup: simple_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Simple Rollup 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3303,7 +3303,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: post-aggregate percentage of total: post_aggregate_percentage_of_total 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: post-aggregate percentage of total 1`] = `
 Array [
   Object {
     "SUM(BigECommerce.percentageOfTotalForStatus)": 100,

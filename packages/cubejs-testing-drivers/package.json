@@ -90,6 +90,7 @@
     "fs-extra": "^11.1.1",
     "jest": "^29",
     "jsonwebtoken": "^9.0.2",
+    "env-var": "^6.3.0",
     "pg": "^8.7.3",
     "ramda": "^0.28.0",
     "testcontainers": "^10.13.0",

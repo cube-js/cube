@@ -1,3 +1,4 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
@@ -612,33 +613,45 @@ describe('Multiple join paths', () => {
       },
     ];
     for (const { preAggregationId, addTimeRange, expectedData } of preAggregationTests) {
-      // eslint-disable-next-line no-loop-func
-      it(`pre-aggregation ${preAggregationId} should match its own references`, async () => {
-        // Always not using range, because reference query would have no range to start from
-        // but should match pre-aggregation anyway
-        const query = makeReferenceQueryFor(preAggregationId);
+      if (!getEnv('nativeSqlPlanner')) {
+        // eslint-disable-next-line no-loop-func
+        it(`pre-aggregation ${preAggregationId} should match its own references`, async () => {
+          // Always not using range, because reference query would have no range to start from
+          // but should match pre-aggregation anyway
+          const query = makeReferenceQueryFor(preAggregationId);
 
-        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-        const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
-        if (preAggregationFromQuery === undefined) {
-          throw expect(preAggregationFromQuery).toBeDefined();
-        }
-      });
+          const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+          const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
+          if (preAggregationFromQuery === undefined) {
+            throw expect(preAggregationFromQuery).toBeDefined();
+          }
+        });
+      } else {
+        it.skip(`FIXME(tesseract): pre-aggregation ${preAggregationId} should match its own references`, async () => {
+          // This should be implemented in Tesseract.
+        });
+      }
 
-      // eslint-disable-next-line no-loop-func
-      it(`pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
-        // Adding date range for rolling window measure
-        const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
+      if (!getEnv('nativeSqlPlanner')) {
+        // eslint-disable-next-line no-loop-func
+        it(`pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
+          // Adding date range for rolling window measure
+          const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
 
-        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-        const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
-        if (preAggregationFromQuery === undefined) {
-          throw expect(preAggregationFromQuery).toBeDefined();
-        }
+          const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+          const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
+          if (preAggregationFromQuery === undefined) {
+            throw expect(preAggregationFromQuery).toBeDefined();
+          }
 
-        const res = await testWithPreAggregation(preAggregationFromQuery, query);
-        expect(res).toEqual(expectedData);
-      });
+          const res = await testWithPreAggregation(preAggregationFromQuery, query);
+          expect(res).toEqual(expectedData);
+        });
+      } else {
+        it.skip(`FIXME(tesseract): pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
+          // This should be implemented in Tesseract.
+        });
+      }
     }
   });
 

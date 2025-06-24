@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Complex Rollup: complex_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Complex Rollup 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1797,7 +1797,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Extended nested Rollup over asterisk: extended_nested_rollup_over_asterisk 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Extended nested Rollup over asterisk 1`] = `
 Array [
   Object {
     "SUM(a.count)": "1",
@@ -2261,7 +2261,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Nested Rollup over asterisk: nested_rollup_over_asterisk 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Nested Rollup over asterisk 1`] = `
 Array [
   Object {
     "SUM(a.count)": "1",
@@ -3064,7 +3064,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Nested Rollup with aliases: nested_rollup_with_aliases 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Nested Rollup with aliases 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
@@ -3867,7 +3867,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Nested Rollup: nested_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Nested Rollup 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
@@ -4670,7 +4670,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Rollup over exprs: rollup_over_exprs 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Rollup over exprs 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -5473,7 +5473,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Rollup with aliases: rollup_with_aliases 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Rollup with aliases 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -7278,7 +7278,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Simple Rollup: simple_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Simple Rollup 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -8134,7 +8134,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: post-aggregate percentage of total: post_aggregate_percentage_of_total 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: post-aggregate percentage of total 1`] = `
 Array [
   Object {
     "SUM(BigECommerce.percentageOfTotalForStatus)": 100,

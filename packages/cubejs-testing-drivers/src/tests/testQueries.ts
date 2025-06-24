@@ -1,5 +1,6 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import { randomBytes } from 'crypto';
+import { get } from 'env-var';
 import { Client as PgClient } from 'pg';
 import { BaseDriver } from '@cubejs-backend/base-driver';
 import cubejs, { CubeApi } from '@cubejs-client/core';
@@ -25,6 +26,8 @@ type TestQueriesOptions = {
 export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
+
+    const isTesseractEnv = get('DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool();
 
     const fixtures = getFixtures(type, extendedEnv);
     let client: CubeApi;
@@ -65,7 +68,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
 
     function execute(name: string, test: () => Promise<void>) {
-      if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+      if (!isTesseractEnv && fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+        it.skip(name, test);
+      } else if (isTesseractEnv && fixtures.tesseractSkip && fixtures.tesseractSkip.indexOf(name) >= 0) {
         it.skip(name, test);
       } else {
         it(name, test);
@@ -73,7 +78,11 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
 
     function executePg(name: string, test: (connection: PgClient) => Promise<void>) {
-      if (!fixtures.cube.ports[1] || fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+      if (!isTesseractEnv && fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+        it.skip(name, () => {
+          // nothing to do
+        });
+      } else if (isTesseractEnv && fixtures.tesseractSkip && fixtures.tesseractSkip.indexOf(name) >= 0) {
         it.skip(name, () => {
           // nothing to do
         });
@@ -1907,7 +1916,7 @@ from
     from
       "public"."BigECommerce" "BigECommerce"
   `);
-      expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: reuse params', async (connection) => {
@@ -1942,7 +1951,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('simple_rollup');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Complex Rollup', async (connection) => {
@@ -1956,7 +1965,7 @@ from
     order by 1, 2, 3, 4
 
   `);
-      expect(res.rows).toMatchSnapshot('complex_rollup');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Rollup with aliases', async (connection) => {
@@ -1970,7 +1979,7 @@ from
     order by 1, 2, 3, 4
 
   `);
-      expect(res.rows).toMatchSnapshot('rollup_with_aliases');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Rollup over exprs', async (connection) => {
@@ -1984,7 +1993,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('rollup_over_exprs');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Nested Rollup', async (connection) => {
@@ -2003,7 +2012,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Nested Rollup with aliases', async (connection) => {
@@ -2022,7 +2031,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup_with_aliases');
+      expect(res.rows).toMatchSnapshot();
     });
     executePg('SQL API: Nested Rollup over asterisk', async (connection) => {
       const res = await connection.query(`
@@ -2037,7 +2046,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup_over_asterisk');
+      expect(res.rows).toMatchSnapshot();
     });
     executePg('SQL API: Extended nested Rollup over asterisk', async (connection) => {
       const res = await connection.query(`
@@ -2056,7 +2065,7 @@ from
     ) q2 ORDER BY q2.order, q2.row DESC limit 100
 
   `);
-      expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asterisk');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: metabase count cast to float32 from push down', async (connection) => {
