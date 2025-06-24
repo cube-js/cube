@@ -86,6 +86,10 @@ impl PlanSqlTemplates {
         self.driver_tools.add_interval(date, interval)
     }
 
+    pub fn interval_string(&self, interval: String) -> Result<String, CubeError> {
+        self.driver_tools.interval_string(interval)
+    }
+
     pub fn add_timestamp_interval(
         &self,
         date: String,
@@ -667,6 +671,11 @@ impl PlanSqlTemplates {
                 param => param
             },
         )
+    }
+
+    pub fn series_bounds_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template(&"tesseract/series_bounds_cast", context! { expr => expr })
     }
 
     pub fn additional_null_check(&self, need: bool, column: &String) -> Result<String, CubeError> {

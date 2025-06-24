@@ -1078,7 +1078,8 @@ export class BaseQuery {
    * @returns {string}
    */
   subtractInterval(date, interval) {
-    return `${date} - interval '${interval}'`;
+    const intervalStr = this.intervalString(interval);
+    return `${date} - interval ${intervalStr}`;
   }
 
   /**
@@ -1087,7 +1088,17 @@ export class BaseQuery {
    * @returns {string}
    */
   addInterval(date, interval) {
-    return `${date} + interval '${interval}'`;
+    const intervalStr = this.intervalString(interval);
+    return `${date} + interval ${intervalStr}`;
+  }
+
+  /**
+   * @param {string} interval
+   * @returns {string}
+   */
+  intervalString(interval) {
+    return `'${interval}'`;
+
   }
 
   /**
@@ -4111,6 +4122,7 @@ export class BaseQuery {
       },
       tesseract: {
         ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}', // May require different overloads in Tesseract than the ilike from expressions used in SQLAPI.
+        series_bounds_cast: '{{ expr }}'
       },
       filters: {
         equals: '{{ column }} = {{ value }}{{ is_null_check }}',

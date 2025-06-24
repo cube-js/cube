@@ -203,6 +203,10 @@ export class BigqueryQuery extends BaseQuery {
     return this.subtractInterval(timestamp, interval);
   }
 
+  public intervalString(interval: string): string {
+    return `${interval}`;
+  }
+
   public addTimestampInterval(timestamp, interval) {
     return this.addInterval(timestamp, interval);
   }
@@ -353,6 +357,7 @@ export class BigqueryQuery extends BaseQuery {
     delete templates.expressions.like_escape;
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
+    templates.tesseract.series_bounds_cast = 'TIMESTAMP({{ expr }})';
     templates.types.boolean = 'BOOL';
     templates.types.float = 'FLOAT64';
     templates.types.double = 'FLOAT64';
