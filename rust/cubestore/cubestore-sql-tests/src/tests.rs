@@ -4081,7 +4081,7 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
             \n            MergeJoin, on: [customer_id@1 = customer_id@0]\
             \n              CoalesceBatches\
             \n                Filter, predicate: product_id@2 = 125\
-            \n                  Scan, index: by_product_customer:3:[3]:sort_on[product_id, customer_id], fields: [order_id, customer_id, product_id], predicate: BinaryExpr(BinaryExpr { left: Column(Column { relation: None, name: \"product_id\" }), op: Eq, right: Literal(Int64(125)) })\
+            \n                  Scan, index: by_product_customer:3:[3]:sort_on[product_id, customer_id], fields: [order_id, customer_id, product_id], predicate: product_id = Int64(125)\
             \n                    Sort\
             \n                      Empty\
             \n              Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
@@ -4089,7 +4089,7 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
             \n                  Empty\
             \n          CoalesceBatches\
             \n            Filter, predicate: product_id@0 = 125\
-            \n              Scan, index: default:5:[5]:sort_on[product_id], fields: *, predicate: BinaryExpr(BinaryExpr { left: Column(Column { relation: None, name: \"product_id\" }), op: Eq, right: Literal(Int64(125)) })\
+            \n              Scan, index: default:5:[5]:sort_on[product_id], fields: *, predicate: product_id = Int64(125)\
             \n                Sort\
             \n                  Empty",
         );
