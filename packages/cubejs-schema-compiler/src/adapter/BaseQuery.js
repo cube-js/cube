@@ -1098,7 +1098,6 @@ export class BaseQuery {
    */
   intervalString(interval) {
     return `'${interval}'`;
-
   }
 
   /**
