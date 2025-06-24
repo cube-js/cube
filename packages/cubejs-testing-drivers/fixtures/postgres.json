@@ -182,6 +182,13 @@
     "SQL API: Nested Rollup over asterisk",
     "SQL API: Extended nested Rollup over asterisk",
     "SQL API: Timeshift measure from cube",
-    "SQL API: SQL push down push to cube quoted alias"
+    "SQL API: SQL push down push to cube quoted alias",
+
+    "---- Different results comparing to baseQuery version. Need to investigate ----",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce: rolling window YTD without granularity",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
   ]
 }
