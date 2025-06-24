@@ -1,0 +1,204 @@
+# Analyzing data from Query History export
+
+You can use [Query History export][ref-query-history-export] to bring [Query
+History][ref-query-history] data to an external monitoring solution for further
+analysis.
+
+In this recipe, we will show you how to export Query History data to Amazon S3, and then
+analyze it using Cube by reading the data from S3 using DuckDB.
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/6Xf2ayeQZC8"
+  aspectRatio={4/3}
+/>
+
+## Configuration
+
+[Vector configuration][ref-vector-configuration] for exporting Query History to Amazon S3
+and also outputting it to the console of the Vector agent in your Cube Cloud deployment.
+
+In the example below, we are using the `aws_s3` sink to export the `cube-query-history-export-demo`
+bucket in Amazon S3, but you can use any other storage solution that Vector supports.
+
+```toml
+[sinks.aws_s3]
+type = "aws_s3"
+inputs = [
+  "query-history"
+]
+bucket = "cube-query-history-export-demo"
+region = "us-east-2"
+compression = "gzip"
+ 
+[sinks.aws_s3.auth]
+access_key_id = "$CUBE_CLOUD_MONITORING_AWS_ACCESS_KEY_ID"
+secret_access_key = "$CUBE_CLOUD_MONITORING_AWS_SECRET_ACCESS_KEY"
+ 
+[sinks.aws_s3.encoding]
+codec = "json"
+ 
+[sinks.aws_s3.healthcheck]
+enabled = false
+
+
+[sinks.my_console]
+type = "console"
+inputs = [
+  "query-history"
+]
+target = "stdout"
+encoding = { codec = "json" }
+```
+
+You'd also need to set the following environment variables in the <Btn>Settings → Environment
+variables</Btn> page of your Cube Cloud deployment:
+
+```bash
+CUBE_CLOUD_MONITORING_AWS_ACCESS_KEY_ID=your-access-key-id
+CUBE_CLOUD_MONITORING_AWS_SECRET_ACCESS_KEY=your-secret-access-key
+
+CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID=your-access-key-id
+CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY=your-secret-access-key
+CUBEJS_DB_DUCKDB_S3_REGION=us-east-2
+```
+
+## Data modeling
+
+Example data model for analyzing data from Query History export that is brought to a
+bucket in Amazon S3. The data is accessed directly from S3 using DuckDB.
+
+With this data model, you can run queries that aggregate data by dimensions such as
+`status`, `environment_name`, `api_type`, etc. and also calculate metrics like
+`count`, `total_duration`, or `avg_duration`:
+
+```yaml
+cubes:
+  - name: requests
+    sql: >
+      SELECT
+        *,
+        api_response_duration_ms / 1000 AS api_response_duration,
+        EPOCH_MS(start_time_unix_ms) AS start_time,
+        EPOCH_MS(end_time_unix_ms) AS end_time
+      FROM read_json_auto('s3://cube-query-history-export-demo/**/*.log.gz')
+    
+    dimensions:
+      - name: trace_id
+        sql: trace_id
+        type: string
+        primary_key: true
+
+      - name: deployment_id
+        sql: deployment_id
+        type: number
+
+      - name: environment_name
+        sql: environment_name
+        type: string
+
+      - name: api_type
+        sql: api_type
+        type: string
+
+      - name: api_query
+        sql: api_query
+        type: string
+
+      - name: security_context
+        sql: security_context
+        type: string
+
+      - name: cache_type
+        sql: cache_type
+        type: string
+
+      - name: start_time
+        sql: start_time
+        type: time
+
+      - name: end_time
+        sql: end_time
+        type: time
+
+      - name: duration
+        sql: api_response_duration
+        type: number
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: error_message
+        sql: error_message
+        type: string
+
+      - name: user_name
+        sql: "SUBSTRING(security_context::JSON ->> 'user', 3, LENGTH(security_context::JSON ->> 'user') - 4)"
+        type: string
+
+    segments:
+      - name: production_environment
+        sql: "{environment_name} IS NULL"
+
+      - name: errors
+        sql: "{status} <> 'success'"
+
+    measures:
+      - name: count
+        type: count
+
+      - name: count_non_production
+        description: >
+          Counts all non-production environments.
+          See for details: https://cube.dev/docs/product/workspace/environments
+        type: count
+        filters:
+          - sql: "{environment_name} IS NOT NULL"
+
+      - name: total_duration
+        type: sum
+        sql: "{duration}"
+        
+      - name: avg_duration
+        type: number
+        sql: "{total_duration} / {count}"
+
+      - name: median_duration
+        type: number
+        sql: "MEDIAN({duration})"
+
+      - name: min_duration
+        type: min
+        sql: "{duration}"
+
+      - name: max_duration
+        type: max
+        sql: "{duration}"
+        
+    pre_aggregations:
+      - name: count_and_durations_by_status_and_start_date
+        measures:
+          - count
+          - min_duration
+          - max_duration
+          - total_duration
+        dimensions:
+          - status
+        time_dimension: start_time
+        granularity: hour
+        refresh_key:
+          sql: SELECT MAX(end_time) FROM {requests.sql()}
+          every: 10 minutes
+
+```
+
+## Result
+
+Example query in Playground:
+
+<Screenshot src="https://ucarecdn.com/327373f0-217b-4a91-8ac7-fd2d97c79513/" />
+
+
+[ref-query-history-export]: /product/workspace/monitoring#query-history-export
+[ref-query-history]: /product/workspace/query-history
+[ref-vector-configuration]: /product/workspace/monitoring#configuration

@@ -1,5 +1,21 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Date/time comparison with SQL push down 1`] = `
+Array [
+  Object {
+    "measure(BigECommerce.rollingCountBy2Day)": "12",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Date/time comparison with date_trunc with SQL push down 1`] = `
+Array [
+  Object {
+    "measure(BigECommerce.rollingCountBy2Week)": "12",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: NULLS FIRST/LAST SQL push down: nulls_first_last_sql_push_down 1`] = `
 Array [
   Object {
@@ -14,7 +30,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup with aliases: nested_rollup_with_aliases 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup with aliases 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
@@ -817,7 +833,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup: nested_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
@@ -1620,7 +1636,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Rollup over exprs: rollup_over_exprs 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Rollup over exprs 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2423,7 +2439,15 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Simple Rollup: simple_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: SQL push down push to cube quoted alias 1`] = `
+Array [
+  Object {
+    "result": true,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Simple Rollup 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3226,6 +3250,51 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Timeshift measure from cube 1`] = `
+Array [
+  Object {
+    "orderDate": 2020-02-01T00:00:00.000Z,
+    "totalQuantity": 2,
+    "totalQuantityPriorMonth": 6,
+  },
+  Object {
+    "orderDate": 2020-03-01T00:00:00.000Z,
+    "totalQuantity": 13,
+    "totalQuantityPriorMonth": 2,
+  },
+  Object {
+    "orderDate": 2020-04-01T00:00:00.000Z,
+    "totalQuantity": 3,
+    "totalQuantityPriorMonth": 13,
+  },
+  Object {
+    "orderDate": 2020-05-01T00:00:00.000Z,
+    "totalQuantity": 15,
+    "totalQuantityPriorMonth": 3,
+  },
+  Object {
+    "orderDate": 2020-06-01T00:00:00.000Z,
+    "totalQuantity": 18,
+    "totalQuantityPriorMonth": 15,
+  },
+  Object {
+    "orderDate": 2020-10-01T00:00:00.000Z,
+    "totalQuantity": 11,
+    "totalQuantityPriorMonth": 27,
+  },
+  Object {
+    "orderDate": 2020-11-01T00:00:00.000Z,
+    "totalQuantity": 43,
+    "totalQuantityPriorMonth": 11,
+  },
+  Object {
+    "orderDate": 2020-12-01T00:00:00.000Z,
+    "totalQuantity": 22,
+    "totalQuantityPriorMonth": 43,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: metabase count cast to float32 from push down: metabase_count_cast_to_float32_from_push_down 1`] = `
 Array [
   Object {
@@ -3234,7 +3303,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: post-aggregate percentage of total: post_aggregate_percentage_of_total 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: post-aggregate percentage of total 1`] = `
 Array [
   Object {
     "SUM(BigECommerce.percentageOfTotalForStatus)": 100,
@@ -6448,6 +6517,136 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce: rolling window YTD 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 2,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 3,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 5,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 6,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 11,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 18,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 18,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 18,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 24,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 28,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 37,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 44,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce: rolling window YTD without date range 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 2,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 3,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 5,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 6,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 11,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 18,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 18,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 18,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 24,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 28,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 37,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": 44,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce: rolling window by 2 day 1`] = `
 Array [
   Object {
@@ -6513,7 +6712,137 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce: rolling window by 2 day without date range 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": 1,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce: rolling window by 2 month 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 2,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 3,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 3,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 3,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 6,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 12,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 7,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 6,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 10,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 13,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 16,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce: rolling window by 2 month without date range 1`] = `
 Array [
   Object {
     "BigECommerce.orderDate": "2020-01-01T00:00:00.000",

@@ -1105,31 +1105,31 @@ describe('Multiple datasources', () => {
     process.env.CUBEJS_DB_DATABRICKS_URL = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_URL = 'postgres1';
     process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_URL = 'wrong1';
-    expect(getEnv('databrickUrl', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('databrickUrl', { dataSource: 'postgres' })).toEqual('postgres1');
-    expect(() => getEnv('databrickUrl', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksUrl', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('databricksUrl', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('databricksUrl', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     process.env.CUBEJS_DB_DATABRICKS_URL = 'default2';
     process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_URL = 'postgres2';
     process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_URL = 'wrong2';
-    expect(getEnv('databrickUrl', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('databrickUrl', { dataSource: 'postgres' })).toEqual('postgres2');
-    expect(() => getEnv('databrickUrl', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksUrl', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('databricksUrl', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('databricksUrl', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     delete process.env.CUBEJS_DB_DATABRICKS_URL;
     delete process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_URL;
     delete process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_URL;
-    expect(() => getEnv('databrickUrl', { dataSource: 'default' })).toThrow(
+    expect(() => getEnv('databricksUrl', { dataSource: 'default' })).toThrow(
       'The CUBEJS_DB_DATABRICKS_URL is required and missing.'
     );
-    expect(() => getEnv('databrickUrl', { dataSource: 'postgres' })).toThrow(
+    expect(() => getEnv('databricksUrl', { dataSource: 'postgres' })).toThrow(
       'The CUBEJS_DS_POSTGRES_DB_DATABRICKS_URL is required and missing.'
     );
-    expect(() => getEnv('databrickUrl', { dataSource: 'wrong' })).toThrow(
+    expect(() => getEnv('databricksUrl', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
   });
@@ -1138,27 +1138,27 @@ describe('Multiple datasources', () => {
     process.env.CUBEJS_DB_DATABRICKS_TOKEN = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_TOKEN = 'postgres1';
     process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_TOKEN = 'wrong1';
-    expect(getEnv('databrickToken', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('databrickToken', { dataSource: 'postgres' })).toEqual('postgres1');
-    expect(() => getEnv('databrickToken', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksToken', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('databricksToken', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('databricksToken', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     process.env.CUBEJS_DB_DATABRICKS_TOKEN = 'default2';
     process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_TOKEN = 'postgres2';
     process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_TOKEN = 'wrong2';
-    expect(getEnv('databrickToken', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('databrickToken', { dataSource: 'postgres' })).toEqual('postgres2');
-    expect(() => getEnv('databrickToken', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksToken', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('databricksToken', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('databricksToken', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     delete process.env.CUBEJS_DB_DATABRICKS_TOKEN;
     delete process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_TOKEN;
     delete process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_TOKEN;
-    expect(getEnv('databrickToken', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('databrickToken', { dataSource: 'postgres' })).toBeUndefined();
-    expect(() => getEnv('databrickToken', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksToken', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('databricksToken', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('databricksToken', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
   });

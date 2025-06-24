@@ -2,6 +2,12 @@
   "extends": "./tsconfig.base.json",
   "references": [
     {
+      "path": "packages/cubejs-client-core"
+    },
+    {
+      "path": "packages/cubejs-client-ws-transport"
+    },
+    {
       "path": "packages/cubejs-backend-shared"
     },
     {
@@ -45,6 +51,9 @@
     },
     {
       "path": "packages/cubejs-firebolt-driver"
+    },
+    {
+      "path": "packages/cubejs-mssql-driver"
     },
     {
       "path": "packages/cubejs-mysql-driver"

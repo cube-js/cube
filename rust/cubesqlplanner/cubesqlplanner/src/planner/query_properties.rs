@@ -1,6 +1,9 @@
 use super::filter::compiler::FilterCompiler;
 use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
+use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
+use crate::planner::sql_evaluator::MemberExpressionExpression;
 
 use super::sql_evaluator::MemberSymbol;
 use super::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
@@ -18,17 +21,24 @@ use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub struct OrderByItem {
-    name: String,
+    member_evaluator: Rc<MemberSymbol>,
     desc: bool,
 }
 
 impl OrderByItem {
-    pub fn new(name: String, desc: bool) -> Self {
-        Self { name, desc }
+    pub fn new(member_evaluator: Rc<MemberSymbol>, desc: bool) -> Self {
+        Self {
+            member_evaluator,
+            desc,
+        }
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> String {
+        self.member_evaluator.full_name()
+    }
+
+    pub fn member_symbol(&self) -> Rc<MemberSymbol> {
+        self.member_evaluator.clone()
     }
 
     pub fn desc(&self) -> bool {
@@ -36,9 +46,29 @@ impl OrderByItem {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct MultipliedMeasure {
+    measure: Rc<BaseMeasure>,
+    cube_name: String, //May differ from cube_name of the measure for a member_expression that refers to a dimension.
+}
+
+impl MultipliedMeasure {
+    pub fn new(measure: Rc<BaseMeasure>, cube_name: String) -> Rc<Self> {
+        Rc::new(Self { measure, cube_name })
+    }
+
+    pub fn measure(&self) -> &Rc<BaseMeasure> {
+        &self.measure
+    }
+
+    pub fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+}
+
 #[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
-    pub multiplied_measures: Vec<Rc<BaseMeasure>>,
+    pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
     pub regular_measures: Vec<Rc<BaseMeasure>>,
     pub multi_stage_measures: Vec<Rc<BaseMeasure>>,
     pub rendered_as_multiplied_measures: HashSet<String>,
@@ -70,6 +100,9 @@ pub struct QueryProperties {
     ignore_cumulative: bool,
     ungrouped: bool,
     multi_fact_join_groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>,
+    pre_aggregation_query: bool,
+    total_query: bool,
+    query_join_hints: Rc<Vec<JoinHintItem>>,
 }
 
 impl QueryProperties {
@@ -102,8 +135,16 @@ impl QueryProperties {
                             } else {
                                 "".to_string()
                             };
-                        let expression_evaluator = evaluator_compiler
-                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        let expression_evaluator = match member_expression.expression()? {
+                            MemberExpressionExpressionDef::Sql(sql) => {
+                                evaluator_compiler.compile_sql_call(&cube_name, sql)?
+                            }
+                            MemberExpressionExpressionDef::Struct(_) => {
+                                return Err(CubeError::user(format!(
+                                    "Expression struct not supported for dimension"
+                                )));
+                            }
+                        };
                         BaseDimension::try_new_from_expression(
                             expression_evaluator,
                             cube_name,
@@ -156,13 +197,45 @@ impl QueryProperties {
                         let name =
                             if let Some(name) = &member_expression.static_data().expression_name {
                                 name.clone()
+                            } else if let Some(name) = &member_expression.static_data().name {
+                                format!("{}.{}", cube_name, name)
                             } else {
                                 "".to_string()
                             };
-                        let expression_evaluator = evaluator_compiler
-                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        let expression = match member_expression.expression()? {
+                            MemberExpressionExpressionDef::Sql(sql) => {
+                                MemberExpressionExpression::SqlCall(
+                                    evaluator_compiler.compile_sql_call(&cube_name, sql)?,
+                                )
+                            }
+                            MemberExpressionExpressionDef::Struct(expr) => {
+                                if expr.static_data().expression_type != "PatchMeasure" {
+                                    return Err(CubeError::user(format!("Only `PatchMeasure` type of memeber expression is supported")));
+                                }
+
+                                if let Some(source_measure) = &expr.static_data().source_measure {
+
+                                    let new_measure_type = expr.static_data().replace_aggregation_type.clone();
+                                    let mut filters_to_add = vec![];
+                                    if let Some(add_filters) = expr.add_filters()? {
+                                        for filter in add_filters.iter() {
+                                            let node = evaluator_compiler.compile_sql_call(&cube_name, filter.sql()?)?;
+                                            filters_to_add.push(node);
+                                        }
+                                    }
+                                    let source_measure_compiled = evaluator_compiler.add_measure_evaluator(source_measure.clone())?;
+                                    let patched_measure = source_measure_compiled.as_measure()?.new_patched(new_measure_type, filters_to_add)?;
+                                    let patched_symbol = MemberSymbol::new_measure(patched_measure);
+                                    MemberExpressionExpression::PatchedSymbol(patched_symbol)
+
+                                } else {
+                                    return Err(CubeError::user(format!("Source measure is required for `PatchMeasure` type of memeber expression")));
+                                }
+
+                            }
+                        };
                         BaseMeasure::try_new_from_expression(
-                            expression_evaluator,
+                            expression,
                             cube_name,
                             name,
                             member_expression.static_data().definition.clone(),
@@ -221,8 +294,16 @@ impl QueryProperties {
                             } else {
                                 "".to_string()
                             };
-                            let expression_evaluator = evaluator_compiler
-                                .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                            let expression_evaluator = match member_expression.expression()? {
+                                MemberExpressionExpressionDef::Sql(sql) => {
+                                    evaluator_compiler.compile_sql_call(&cube_name, sql)?
+                                }
+                                MemberExpressionExpressionDef::Struct(_) => {
+                                    return Err(CubeError::user(format!(
+                                        "Expression struct not supported for dimension"
+                                    )));
+                                }
+                            };
                             BaseSegment::try_new(
                                 expression_evaluator,
                                 cube_name,
@@ -260,8 +341,21 @@ impl QueryProperties {
         let order_by = if let Some(order) = &options.static_data().order {
             order
                 .iter()
-                .map(|o| OrderByItem::new(o.id.clone(), o.is_desc()))
-                .collect_vec()
+                .map(|o| -> Result<_, CubeError> {
+                    let evaluator = if let Some(found) =
+                        dimensions.iter().find(|d| d.name() == &o.id)
+                    {
+                        found.member_evaluator().clone()
+                    } else if let Some(found) = time_dimensions.iter().find(|d| d.name() == &o.id) {
+                        found.member_evaluator().clone()
+                    } else if let Some(found) = measures.iter().find(|d| d.name() == &o.id) {
+                        found.member_evaluator().clone()
+                    } else {
+                        evaluator_compiler.add_auto_resolved_member_evaluator(o.id.clone())?
+                    };
+                    Ok(OrderByItem::new(evaluator, o.is_desc()))
+                })
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             Self::default_order(&dimensions, &time_dimensions, &measures)
         };
@@ -278,7 +372,10 @@ impl QueryProperties {
         };
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
 
+        let query_join_hints = Rc::new(options.join_hints()?.unwrap_or_default());
+
         let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
+            query_join_hints.clone(),
             query_tools.clone(),
             &measures,
             &dimensions,
@@ -288,6 +385,9 @@ impl QueryProperties {
             &measures_filters,
             &segments,
         )?;
+
+        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        let total_query = options.static_data().total_query.unwrap_or(false);
 
         Ok(Rc::new(Self {
             measures,
@@ -304,6 +404,9 @@ impl QueryProperties {
             ignore_cumulative: false,
             ungrouped,
             multi_fact_join_groups,
+            pre_aggregation_query,
+            total_query,
+            query_join_hints,
         }))
     }
 
@@ -321,6 +424,9 @@ impl QueryProperties {
         offset: Option<usize>,
         ignore_cumulative: bool,
         ungrouped: bool,
+        pre_aggregation_query: bool,
+        total_query: bool,
+        query_join_hints: Rc<Vec<JoinHintItem>>,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -329,6 +435,7 @@ impl QueryProperties {
         };
 
         let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
+            query_join_hints.clone(),
             query_tools.clone(),
             &measures,
             &dimensions,
@@ -354,6 +461,9 @@ impl QueryProperties {
             ignore_cumulative,
             ungrouped,
             multi_fact_join_groups,
+            pre_aggregation_query,
+            total_query,
+            query_join_hints,
         }))
     }
 
@@ -362,6 +472,7 @@ impl QueryProperties {
         measures: &Vec<Rc<BaseMeasure>>,
     ) -> Result<Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>, CubeError> {
         Self::compute_join_multi_fact_groups(
+            self.query_join_hints.clone(),
             self.query_tools.clone(),
             measures,
             &self.dimensions,
@@ -373,7 +484,12 @@ impl QueryProperties {
         )
     }
 
+    pub fn is_total_query(&self) -> bool {
+        self.total_query
+    }
+
     pub fn compute_join_multi_fact_groups(
+        query_join_hints: Rc<Vec<JoinHintItem>>,
         query_tools: Rc<QueryTools>,
         measures: &Vec<Rc<BaseMeasure>>,
         dimensions: &Vec<Rc<BaseDimension>>,
@@ -402,7 +518,7 @@ impl QueryProperties {
             .cached_data_mut()
             .join_hints_for_filter_item_vec(&measures_filters)?;
 
-        let mut dimension_and_filter_join_hints_concat = Vec::new();
+        let mut dimension_and_filter_join_hints_concat = vec![query_join_hints];
 
         dimension_and_filter_join_hints_concat.extend(dimensions_join_hints.into_iter());
         dimension_and_filter_join_hints_concat.extend(time_dimensions_join_hints.into_iter());
@@ -444,7 +560,7 @@ impl QueryProperties {
             .into_values()
             .map(|measures_and_join| {
                 (
-                    measures_and_join.iter().next().unwrap().1 .1.clone(),
+                    measures_and_join.first().unwrap().1 .1.clone(),
                     measures_and_join
                         .into_iter()
                         .flat_map(|m| m.0)
@@ -471,7 +587,7 @@ impl QueryProperties {
                     .join(", ")
             )));
         }
-        Ok(self.multi_fact_join_groups.iter().next().unwrap().0.clone())
+        Ok(self.multi_fact_join_groups.first().unwrap().0.clone())
     }
 
     pub fn measures(&self) -> &Vec<Rc<BaseMeasure>> {
@@ -480,6 +596,27 @@ impl QueryProperties {
 
     pub fn dimensions(&self) -> &Vec<Rc<BaseDimension>> {
         &self.dimensions
+    }
+
+    pub fn dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn time_dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.time_dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn measure_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.measures
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
     }
 
     pub fn time_dimensions(&self) -> &Vec<Rc<BaseTimeDimension>> {
@@ -502,6 +639,10 @@ impl QueryProperties {
         self.row_limit
     }
 
+    pub fn query_join_hints(&self) -> &Rc<Vec<JoinHintItem>> {
+        &self.query_join_hints
+    }
+
     pub fn offset(&self) -> Option<usize> {
         self.offset
     }
@@ -519,6 +660,10 @@ impl QueryProperties {
         self.ungrouped
     }
 
+    pub fn is_pre_aggregation_query(&self) -> bool {
+        self.pre_aggregation_query
+    }
+
     pub fn all_filters(&self) -> Option<Filter> {
         let items = self
             .time_dimensions_filters
@@ -532,6 +677,10 @@ impl QueryProperties {
         } else {
             Some(Filter { items })
         }
+    }
+
+    pub fn segments(&self) -> &Vec<FilterItem> {
+        &self.segments
     }
 
     pub fn all_dimensions_and_measures(
@@ -593,19 +742,42 @@ impl QueryProperties {
         }
     }
     pub fn all_member_symbols(&self, exclude_time_dimensions: bool) -> Vec<Rc<MemberSymbol>> {
-        let mut members = BaseMemberHelper::extract_symbols_from_members(
-            &self.all_members(exclude_time_dimensions),
-        );
-        for filter_item in self.dimensions_filters.iter() {
-            filter_item.find_all_member_evaluators(&mut members);
+        self.get_member_symbols(!exclude_time_dimensions, true, true, true, &vec![])
+    }
+
+    pub fn get_member_symbols(
+        &self,
+        include_time_dimensions: bool,
+        include_dimensions: bool,
+        include_measures: bool,
+        include_filters: bool,
+        additional_symbols: &Vec<Rc<MemberSymbol>>,
+    ) -> Vec<Rc<MemberSymbol>> {
+        let mut members = additional_symbols.clone();
+        if include_time_dimensions {
+            members.append(&mut self.time_dimension_symbols());
         }
-        for filter_item in self.measures_filters.iter() {
-            filter_item.find_all_member_evaluators(&mut members);
+        if include_dimensions {
+            members.append(&mut self.dimension_symbols());
+        }
+        if include_measures {
+            members.append(&mut self.measure_symbols());
+        }
+        if include_filters {
+            self.fill_all_filter_symbols(&mut members);
         }
         members
             .into_iter()
             .unique_by(|m| m.full_name())
             .collect_vec()
+    }
+
+    pub fn fill_all_filter_symbols(&self, members: &mut Vec<Rc<MemberSymbol>>) {
+        if let Some(all_filters) = self.all_filters() {
+            for filter_item in all_filters.items.iter() {
+                filter_item.find_all_member_evaluators(members);
+            }
+        }
     }
 
     pub fn group_by(&self) -> Vec<Expr> {
@@ -631,11 +803,20 @@ impl QueryProperties {
     ) -> Vec<OrderByItem> {
         let mut result = Vec::new();
         if let Some(granularity_dim) = time_dimensions.iter().find(|d| d.has_granularity()) {
-            result.push(OrderByItem::new(granularity_dim.full_name(), false));
+            result.push(OrderByItem::new(
+                granularity_dim.member_evaluator().clone(),
+                false,
+            ));
         } else if !measures.is_empty() && !dimensions.is_empty() {
-            result.push(OrderByItem::new(measures[0].full_name(), true));
+            result.push(OrderByItem::new(
+                measures[0].member_evaluator().clone(),
+                true,
+            ));
         } else if !dimensions.is_empty() {
-            result.push(OrderByItem::new(dimensions[0].full_name(), false));
+            result.push(OrderByItem::new(
+                dimensions[0].member_evaluator().clone(),
+                false,
+            ));
         }
         result
     }
@@ -693,13 +874,15 @@ impl QueryProperties {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.all_used_measures()?;
         for m in measures.iter() {
-            if has_multi_stage_members(m.member_evaluator(), self.ignore_cumulative)? {
+            if has_multi_stage_members(
+                m.member_evaluator(),
+                self.ignore_cumulative || self.pre_aggregation_query,
+            )? {
                 result.multi_stage_measures.push(m.clone())
             } else {
                 let join = self
                     .compute_join_multi_fact_groups_with_measures(&vec![m.clone()])?
-                    .iter()
-                    .next()
+                    .first()
                     .expect("No join groups returned for single measure multi-fact join group")
                     .0
                     .clone();
@@ -713,8 +896,10 @@ impl QueryProperties {
                             .rendered_as_multiplied_measures
                             .insert(item.measure.full_name());
                     }
-                    if item.multiplied && !item.measure.can_used_as_addictive_in_multplied()? {
-                        result.multiplied_measures.push(item.measure.clone());
+                    if item.multiplied && !item.measure.can_be_used_as_additive_in_multplied() {
+                        result
+                            .multiplied_measures
+                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_name));
                     } else {
                         result.regular_measures.push(item.measure.clone());
                     }
@@ -746,11 +931,7 @@ impl QueryProperties {
             }
             FilterItem::Item(item) => {
                 let item_member_name = item.member_name();
-                if measures
-                    .iter()
-                    .find(|m| m.full_name() == item_member_name)
-                    .is_none()
-                {
+                if !measures.iter().any(|m| m.full_name() == item_member_name) {
                     measures.push(BaseMeasure::try_new_required(
                         item.member_evaluator().clone(),
                         self.query_tools.clone(),

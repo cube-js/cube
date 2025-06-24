@@ -1,8 +1,9 @@
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::ops::{Add, AddAssign, Neg, Sub};
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone, Hash, Eq)]
 pub struct SqlInterval {
     pub year: i32,
     pub month: i32,
@@ -57,6 +58,32 @@ impl SqlInterval {
         Ok(res.to_string())
     }
 
+    pub fn to_sql(&self) -> String {
+        let mut res = vec![];
+        if self.year != 0 {
+            res.push(format!("{} year", self.year));
+        }
+        if self.month != 0 {
+            res.push(format!("{} month", self.month));
+        }
+        if self.week != 0 {
+            res.push(format!("{} week", self.week));
+        }
+        if self.day != 0 {
+            res.push(format!("{} day", self.day));
+        }
+        if self.hour != 0 {
+            res.push(format!("{} hour", self.hour));
+        }
+        if self.minute != 0 {
+            res.push(format!("{} minute", self.minute));
+        }
+        if self.second != 0 {
+            res.push(format!("{} second", self.second));
+        }
+        res.join(" ")
+    }
+
     pub fn inverse(&self) -> Self {
         Self::new(
             -self.year,
@@ -70,17 +97,66 @@ impl SqlInterval {
     }
 }
 
-impl Default for SqlInterval {
-    fn default() -> Self {
-        Self {
-            second: 0,
-            minute: 0,
-            hour: 0,
-            day: 0,
-            week: 0,
-            month: 0,
-            year: 0,
-        }
+impl Add for SqlInterval {
+    type Output = SqlInterval;
+    fn add(self, other: SqlInterval) -> SqlInterval {
+        SqlInterval::new(
+            self.year + other.year,
+            self.month + other.month,
+            self.week + other.week,
+            self.day + other.day,
+            self.hour + other.hour,
+            self.minute + other.minute,
+            self.second + other.second,
+        )
+    }
+}
+
+impl AddAssign<&SqlInterval> for SqlInterval {
+    fn add_assign(&mut self, other: &SqlInterval) {
+        self.year += other.year;
+        self.month += other.month;
+        self.week += other.week;
+        self.day += other.day;
+        self.hour += other.hour;
+        self.minute += other.minute;
+        self.second += other.second;
+    }
+}
+
+impl AddAssign<SqlInterval> for SqlInterval {
+    fn add_assign(&mut self, other: SqlInterval) {
+        *self += &other;
+    }
+}
+
+impl Sub for SqlInterval {
+    type Output = SqlInterval;
+    fn sub(self, other: SqlInterval) -> SqlInterval {
+        SqlInterval::new(
+            self.year - other.year,
+            self.month - other.month,
+            self.week - other.week,
+            self.day - other.day,
+            self.hour - other.hour,
+            self.minute - other.minute,
+            self.second - other.second,
+        )
+    }
+}
+
+impl Neg for SqlInterval {
+    type Output = SqlInterval;
+    fn neg(self) -> SqlInterval {
+        SqlInterval::new(
+            -self.year,
+            -self.month,
+            -self.week,
+            -self.day,
+            -self.hour,
+            -self.minute,
+            -self.second,
+        )
     }
 }
 
@@ -122,6 +198,21 @@ mod tests {
             SqlInterval::from_str("1 year 3 months 4 weeks 2 day 4 hours 2 minutes 1 second")
                 .unwrap(),
             SqlInterval::new(1, 3, 4, 2, 4, 2, 1)
+        );
+    }
+    #[test]
+    fn test_arithmetic() {
+        assert_eq!(
+            SqlInterval::new(1, 3, 4, 2, 4, 2, 1) + SqlInterval::new(1, 3, 4, 2, 4, 2, 1),
+            SqlInterval::new(2, 6, 8, 4, 8, 4, 2)
+        );
+        assert_eq!(
+            SqlInterval::new(1, 3, 4, 2, 4, 2, 1) - SqlInterval::new(1, 4, 4, 2, 2, 2, 1),
+            SqlInterval::new(0, -1, 0, 0, 2, 0, 0)
+        );
+        assert_eq!(
+            -SqlInterval::new(1, 3, -4, 2, 4, 2, 1),
+            SqlInterval::new(-1, -3, 4, -2, -4, -2, -1)
         );
     }
 }

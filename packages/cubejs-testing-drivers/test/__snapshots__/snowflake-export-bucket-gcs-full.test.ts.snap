@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Complex Rollup: complex_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Complex Rollup 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1797,7 +1797,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Extended nested Rollup over asterisk: extended_nested_rollup_over_asterisk 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Extended nested Rollup over asterisk 1`] = `
 Array [
   Object {
     "SUM(a.count)": "1",
@@ -2261,7 +2261,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup over asterisk: nested_rollup_over_asterisk 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup over asterisk 1`] = `
 Array [
   Object {
     "SUM(a.count)": "1",
@@ -3064,7 +3064,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup with aliases: nested_rollup_with_aliases 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup with aliases 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
@@ -3867,7 +3867,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup: nested_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Nested Rollup 1`] = `
 Array [
   Object {
     "SUM(a.cnt)": "1",
@@ -4670,7 +4670,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Rollup over exprs: rollup_over_exprs 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Rollup over exprs 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -5473,7 +5473,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Rollup with aliases: rollup_with_aliases 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Rollup with aliases 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -7270,7 +7270,15 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Simple Rollup: simple_rollup 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: SQL push down push to cube quoted alias 1`] = `
+Array [
+  Object {
+    "result": true,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Simple Rollup 1`] = `
 Array [
   Object {
     "SUM(ECommerce.count)": "1",
@@ -8073,6 +8081,51 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Timeshift measure from cube 1`] = `
+Array [
+  Object {
+    "orderDate": 2020-02-01T00:00:00.000Z,
+    "totalQuantity": 2,
+    "totalQuantityPriorMonth": 6,
+  },
+  Object {
+    "orderDate": 2020-03-01T00:00:00.000Z,
+    "totalQuantity": 13,
+    "totalQuantityPriorMonth": 2,
+  },
+  Object {
+    "orderDate": 2020-04-01T00:00:00.000Z,
+    "totalQuantity": 3,
+    "totalQuantityPriorMonth": 13,
+  },
+  Object {
+    "orderDate": 2020-05-01T00:00:00.000Z,
+    "totalQuantity": 15,
+    "totalQuantityPriorMonth": 3,
+  },
+  Object {
+    "orderDate": 2020-06-01T00:00:00.000Z,
+    "totalQuantity": 18,
+    "totalQuantityPriorMonth": 15,
+  },
+  Object {
+    "orderDate": 2020-10-01T00:00:00.000Z,
+    "totalQuantity": 11,
+    "totalQuantityPriorMonth": 27,
+  },
+  Object {
+    "orderDate": 2020-11-01T00:00:00.000Z,
+    "totalQuantity": 43,
+    "totalQuantityPriorMonth": 11,
+  },
+  Object {
+    "orderDate": 2020-12-01T00:00:00.000Z,
+    "totalQuantity": 22,
+    "totalQuantityPriorMonth": 43,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: metabase count cast to float32 from push down: metabase_count_cast_to_float32_from_push_down 1`] = `
 Array [
   Object {
@@ -8081,7 +8134,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: post-aggregate percentage of total: post_aggregate_percentage_of_total 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: post-aggregate percentage of total 1`] = `
 Array [
   Object {
     "SUM(BigECommerce.percentageOfTotalForStatus)": 100,
@@ -16554,6 +16607,22 @@ Array [
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
     "ECommerce.rollingCountByUnbounded": "44",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Date/time comparison with SQL push down 1`] = `
+Array [
+  Object {
+    "measure(BigECommerce.rollingCountBy2Day)": "12",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-gcs SQL API: Date/time comparison with date_trunc with SQL push down 1`] = `
+Array [
+  Object {
+    "measure(BigECommerce.rollingCountBy2Week)": "12",
   },
 ]
 `;

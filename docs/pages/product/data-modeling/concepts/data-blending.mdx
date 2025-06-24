@@ -1,10 +1,3 @@
----
-redirect_from:
-  - /data-blending
-  - /recipes/data-blending
-  - /schema/advanced/data-blending
----
-
 # Data blending
 
 In case you want to plot two measures from different cubes on a single chart, or
@@ -55,22 +48,22 @@ cube(`retail_orders`, {
   measures: {
     customer_count: {
       sql: `customer_id`,
-      type: `count_distinct`,
+      type: `count_distinct`
     },
 
     revenue: {
       sql: `amount`,
-      type: `sum`,
-    },
+      type: `sum`
+    }
   },
 
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -106,27 +99,29 @@ cube(`online_orders`, {
   measures: {
     customer_count: {
       sql: `user_id`,
-      type: `count_distinct`,
+      type: `count_distinct`
     },
 
     revenue: {
       sql: `amount`,
-      type: `sum`,
-    },
+      type: `sum`
+    }
   },
 
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
 
 Given the above cubes, a data blending cube can be introduced as follows:
+
+<CodeTabs>
 
 ```javascript
 cube(`all_sales`, {
@@ -136,37 +131,37 @@ cube(`all_sales`, {
       user_id AS customer_id,
       created_at,
       'online' AS row_type
-    FROM (${online_orders.sql()}) AS online
+    FROM ${online_orders.sql()} AS online
     UNION ALL
     SELECT
       amount,
       customer_id,
       created_at,
       'retail' AS row_type
-    FROM (${retail_orders.sql()}) AS retail
+    FROM ${retail_orders.sql()} AS retail
  `,
 
   measures: {
     customer_count: {
       sql: `customer_id`,
-      type: `count_distinct`,
+      type: `count_distinct`
     },
 
     revenue: {
       sql: `amount`,
-      type: `sum`,
+      type: `sum`
     },
 
     online_revenue: {
       sql: `amount`,
       type: `sum`,
-      filters: [{ sql: `${CUBE}.row_type = 'online'` }],
+      filters: [{ sql: `${CUBE}.row_type = 'online'` }]
     },
 
     offline_revenue: {
       sql: `amount`,
       type: `sum`,
-      filters: [{ sql: `${CUBE}.row_type = 'retail'` }],
+      filters: [{ sql: `${CUBE}.row_type = 'retail'` }]
     },
 
     online_revenue_percentage: {
@@ -175,34 +170,81 @@ cube(`all_sales`, {
         NULLIF(${online_revenue} + ${offline_revenue}, 0)
       `,
       type: `number`,
-      format: `percent`,
-    },
+      format: `percent`
+    }
   },
 
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
+      type: `time`
     },
 
     revenue_type: {
       sql: `row_type`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
-<ReferenceBox>
+```yaml
+cubes:
+  - name: all_sales
+    sql: >
+      SELECT
+        amount,
+        user_id AS customer_id,
+        created_at,
+        'online' AS row_type
+      FROM {online_orders.sql()} AS online
+      UNION ALL
+      SELECT
+        amount,
+        customer_id,
+        created_at,
+        'retail' AS row_type
+      FROM {retail_orders.sql()} AS retail
 
-Currently, [`{cube.sql()}` function][ref-cube-sql-func] is not supported in YAML data models.
-Please [track this issue](https://github.com/cube-js/cube/issues/7484).
+    measures:
+      - name: customer_count
+        sql: customer_id
+        type: count_distinct
 
-As a workaround, you can use JavaScript data models, put a SQL query in a
-[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
-the [template context](/reference/python/cube#templatecontext-class).
+      - name: revenue
+        sql: amount
+        type: sum
 
-</ReferenceBox>
+      - name: online_revenue
+        sql: amount
+        type: sum
+        filters:
+          - sql: "{CUBE}.row_type = 'online'"
+
+      - name: offline_revenue
+        sql: amount
+        type: sum
+        filters:
+          - sql: "{CUBE}.row_type = 'retail'"
+
+      - name: online_revenue_percentage
+        sql: >
+          {online_revenue} /
+          NULLIF({online_revenue} + {offline_revenue}, 0)
+        type: number
+        format: percent
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: revenue_type
+        sql: row_type
+        type: string
+```
+
+</CodeTabs>
 
 Another use case of the Data Blending approach would be when you want to chart
 some measures (business related) together and see how they correlate.
@@ -213,14 +255,14 @@ correlate. You can simply pass the queries to the Cube client, and it will merge
 the results which will let you easily display it on the chart.
 
 ```javascript
-import cube from "@cubejs-client/core";
+import cube from "@cubejs-client/core"
 
-const API_URL = "http://localhost:4000";
-const CUBE_TOKEN = "YOUR_TOKEN";
+const API_URL = "http://localhost:4000"
+const CUBE_TOKEN = "YOUR_TOKEN"
 
 const cubeApi = cube(CUBE_TOKEN, {
-  apiUrl: `${API_URL}/cubejs-api/v1`,
-});
+  apiUrl: `${API_URL}/cubejs-api/v1`
+})
 
 const queries = [
   {
@@ -229,9 +271,9 @@ const queries = [
       {
         dimension: "online_orders.created_at",
         granularity: "day",
-        dateRange: ["2020-08-01", "2020-08-07"],
-      },
-    ],
+        dateRange: ["2020-08-01", "2020-08-07"]
+      }
+    ]
   },
   {
     measures: ["retail_orders.revenue"],
@@ -239,13 +281,13 @@ const queries = [
       {
         dimension: "retail_orders.created_at",
         granularity: "day",
-        dateRange: ["2020-08-01", "2020-08-07"],
-      },
-    ],
-  },
-];
+        dateRange: ["2020-08-01", "2020-08-07"]
+      }
+    ]
+  }
+]
 
-const resultSet = await cubeApi.load(queries);
+const resultSet = await cubeApi.load(queries)
 ```
 
 [ref-cube-sql-func]: /product/data-modeling/syntax#cubesql-function

@@ -1,13 +1,24 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
-use crate::planner::planners::multi_stage::MultiStageTimeShift;
-use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
-use cubenativeutils::CubeError;
+use crate::planner::sql_evaluator::{DimensionTimeShift, MeasureTimeShifts, MemberSymbol};
+use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension, SqlInterval};
 use itertools::Itertools;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
+
+#[derive(Clone, Default, Debug)]
+pub struct TimeShiftState {
+    pub dimensions_shifts: HashMap<String, DimensionTimeShift>,
+    pub common_time_shift: Option<SqlInterval>,
+}
+
+impl TimeShiftState {
+    pub fn is_empty(&self) -> bool {
+        self.dimensions_shifts.is_empty() && self.common_time_shift.is_none()
+    }
+}
 
 #[derive(Clone)]
 pub struct MultiStageAppliedState {
@@ -16,7 +27,8 @@ pub struct MultiStageAppliedState {
     time_dimensions_filters: Vec<FilterItem>,
     dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
-    time_shifts: HashMap<String, String>,
+    segments: Vec<FilterItem>,
+    time_shifts: TimeShiftState,
 }
 
 impl MultiStageAppliedState {
@@ -26,6 +38,7 @@ impl MultiStageAppliedState {
         time_dimensions_filters: Vec<FilterItem>,
         dimensions_filters: Vec<FilterItem>,
         measures_filters: Vec<FilterItem>,
+        segments: Vec<FilterItem>,
     ) -> Rc<Self> {
         Rc::new(Self {
             time_dimensions,
@@ -33,7 +46,8 @@ impl MultiStageAppliedState {
             time_dimensions_filters,
             dimensions_filters,
             measures_filters,
-            time_shifts: HashMap::new(),
+            segments,
+            time_shifts: TimeShiftState::default(),
         })
     }
 
@@ -44,6 +58,7 @@ impl MultiStageAppliedState {
             time_dimensions_filters: self.time_dimensions_filters.clone(),
             dimensions_filters: self.dimensions_filters.clone(),
             measures_filters: self.measures_filters.clone(),
+            segments: self.segments.clone(),
             time_shifts: self.time_shifts.clone(),
         }
     }
@@ -58,14 +73,34 @@ impl MultiStageAppliedState {
             .collect_vec();
     }
 
-    pub fn add_time_shifts(&mut self, time_shifts: Vec<MultiStageTimeShift>) {
-        for ts in time_shifts.into_iter() {
-            self.time_shifts
-                .insert(ts.time_dimension.clone(), ts.interval.clone());
+    pub fn add_time_shifts(&mut self, time_shifts: MeasureTimeShifts) {
+        match time_shifts {
+            MeasureTimeShifts::Dimensions(dimensions) => {
+                for ts in dimensions.into_iter() {
+                    if let Some(exists) = self
+                        .time_shifts
+                        .dimensions_shifts
+                        .get_mut(&ts.dimension.full_name())
+                    {
+                        exists.interval += ts.interval;
+                    } else {
+                        self.time_shifts
+                            .dimensions_shifts
+                            .insert(ts.dimension.full_name(), ts);
+                    }
+                }
+            }
+            MeasureTimeShifts::Common(interval) => {
+                if let Some(common) = self.time_shifts.common_time_shift.as_mut() {
+                    *common += interval;
+                } else {
+                    self.time_shifts.common_time_shift = Some(interval);
+                }
+            }
         }
     }
 
-    pub fn time_shifts(&self) -> &HashMap<String, String> {
+    pub fn time_shifts(&self) -> &TimeShiftState {
         &self.time_shifts
     }
 
@@ -73,8 +108,26 @@ impl MultiStageAppliedState {
         &self.time_dimensions_filters
     }
 
+    pub fn time_dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.time_dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
     pub fn dimensions_filters(&self) -> &Vec<FilterItem> {
         &self.dimensions_filters
+    }
+
+    pub fn segments(&self) -> &Vec<FilterItem> {
+        &self.segments
     }
 
     pub fn measures_filters(&self) -> &Vec<FilterItem> {
@@ -93,19 +146,8 @@ impl MultiStageAppliedState {
         self.time_dimensions = time_dimensions;
     }
 
-    pub fn change_time_dimension_granularity(
-        &mut self,
-        time_dimension: &Rc<BaseTimeDimension>,
-        new_granularity: Option<String>,
-    ) -> Result<(), CubeError> {
-        if let Some(time_dimension) = self
-            .time_dimensions
-            .iter_mut()
-            .find(|dim| dim.full_name() == time_dimension.full_name())
-        {
-            *time_dimension = time_dimension.change_granularity(new_granularity)?;
-        }
-        Ok(())
+    pub fn set_dimensions(&mut self, dimensions: Vec<Rc<BaseDimension>>) {
+        self.dimensions = dimensions;
     }
 
     pub fn remove_filter_for_member(&mut self, member_name: &String) {
@@ -301,7 +343,8 @@ impl PartialEq for MultiStageAppliedState {
             && self.time_dimensions_filters == other.time_dimensions_filters
             && self.dimensions_filters == other.dimensions_filters
             && self.measures_filters == other.measures_filters
-            && self.time_shifts == other.time_shifts
+            && self.time_shifts.common_time_shift == other.time_shifts.common_time_shift
+            && self.time_shifts.dimensions_shifts == other.time_shifts.dimensions_shifts
     }
 }
 

@@ -5,6 +5,7 @@ use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, MeasureSymbolFactory,
     SqlCall, SymbolFactory, TraversalVisitor,
 };
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
@@ -14,18 +15,45 @@ use std::collections::HashMap;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    base_tools: Rc<dyn BaseTools>,
     timezone: Tz,
     /* (type, name) */
     members: HashMap<(String, String), Rc<MemberSymbol>>,
 }
 
 impl Compiler {
-    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>, timezone: Tz) -> Self {
+    pub fn new(
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        base_tools: Rc<dyn BaseTools>,
+        timezone: Tz,
+    ) -> Self {
         Self {
             cube_evaluator,
+            base_tools,
             timezone,
             members: HashMap::new(),
         }
+    }
+
+    pub fn add_auto_resolved_member_evaluator(
+        &mut self,
+        name: String,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let path = name.split(".").map(|s| s.to_string()).collect::<Vec<_>>();
+        if self.cube_evaluator.is_measure(path.clone())? {
+            Ok(self.add_measure_evaluator(name)?)
+        } else if self.cube_evaluator.is_dimension(path.clone())? {
+            Ok(self.add_dimension_evaluator(name)?)
+        } else {
+            Err(CubeError::internal(format!(
+                "Cannot resolve evaluator of member {}. Only dimensions and measures can be autoresolved",
+                name
+            )))
+        }
+    }
+
+    pub fn base_tools(&self) -> Rc<dyn BaseTools> {
+        self.base_tools.clone()
     }
 
     pub fn add_measure_evaluator(

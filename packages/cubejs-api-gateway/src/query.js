@@ -6,7 +6,6 @@ import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
 import { QueryType } from './types/enums';
-import { PreAggsJobsRequest } from "./types/request";
 
 const getQueryGranularity = (queries) => R.pipe(
   R.map(({ timeDimensions }) => timeDimensions[0]?.granularity),
@@ -39,11 +38,32 @@ const getPivotQuery = (queryType, queries) => {
   return pivotQuery;
 };
 
+const parsedPatchMeasureFilterExpression = Joi.array().items(Joi.string());
+
+const evaluatedPatchMeasureFilterExpression = Joi.object().keys({
+  sql: Joi.func().required(),
+});
+
+const parsedPatchMeasureExpression = Joi.object().keys({
+  type: Joi.valid('PatchMeasure').required(),
+  sourceMeasure: Joi.string().required(),
+  replaceAggregationType: Joi.string().allow(null).required(),
+  addFilters: Joi.array().items(parsedPatchMeasureFilterExpression).required(),
+});
+
+const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
+  addFilters: Joi.array().items(evaluatedPatchMeasureFilterExpression).required(),
+});
+
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
+// It might be member name, td+granularity or member expression
+const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/);
 const parsedMemberExpression = Joi.object().keys({
-  expression: Joi.array().items(Joi.string()).min(1).required(),
+  expression: Joi.alternatives(
+    Joi.array().items(Joi.string()).min(1),
+    parsedPatchMeasureExpression,
+  ).required(),
   cubeName: Joi.string().required(),
   name: Joi.string().required(),
   expressionName: Joi.string(),
@@ -55,7 +75,43 @@ const parsedMemberExpression = Joi.object().keys({
   })
 });
 const memberExpression = parsedMemberExpression.keys({
-  expression: Joi.func().required(),
+  expression: Joi.alternatives(
+    Joi.func().required(),
+    evaluatedPatchMeasureExpression,
+  ).required(),
+});
+
+const inputSqlFunction = Joi.object().keys({
+  cubeParams: Joi.array().items(Joi.string()).required(),
+  sql: Joi.string().required(),
+});
+
+// This should be aligned with cubesql side
+const inputMemberExpressionSqlFunction = inputSqlFunction.keys({
+  type: Joi.valid('SqlFunction').required(),
+});
+
+// This should be aligned with cubesql side
+const inputMemberExpressionPatchMeasure = Joi.object().keys({
+  type: Joi.valid('PatchMeasure').required(),
+  sourceMeasure: Joi.string().required(),
+  replaceAggregationType: Joi.string().allow(null).required(),
+  addFilters: Joi.array().items(inputSqlFunction).required(),
+});
+
+// This should be aligned with cubesql side
+const inputMemberExpression = Joi.object().keys({
+  cubeName: Joi.string().required(),
+  alias: Joi.string().required(),
+  expr: Joi.alternatives(
+    inputMemberExpressionSqlFunction,
+    inputMemberExpressionPatchMeasure,
+  ),
+  groupingSet: Joi.object().keys({
+    groupType: Joi.valid('Rollup', 'Cube').required(),
+    id: Joi.number().required(),
+    subId: Joi.number().allow(null),
+  }).allow(null)
 });
 
 const operators = [
@@ -106,6 +162,8 @@ const subqueryJoin = Joi.object().keys({
   alias: Joi.string(),
 });
 
+const joinHint = Joi.array().items(Joi.string());
+
 const querySchema = Joi.object().keys({
   // TODO add member expression alternatives only for SQL API queries?
   measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
@@ -126,13 +184,14 @@ const querySchema = Joi.object().keys({
   ),
   segments: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
   timezone: Joi.string(),
-  limit: Joi.number().integer().min(0),
-  offset: Joi.number().integer().min(0),
+  limit: Joi.number().integer().strict().min(0),
+  offset: Joi.number().integer().strict().min(0),
   total: Joi.boolean(),
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
   subqueryJoins: Joi.array().items(subqueryJoin),
+  joinHints: Joi.array().items(joinHint),
 });
 
 const normalizeQueryOrder = order => {
@@ -214,6 +273,20 @@ const normalizeQueryFilters = (filter) => (
     return res;
   })
 );
+
+/**
+ * Parse incoming member expression
+ * @param {unknown} expression
+ * @throws {import('./UserError').UserError}
+ * @returns {import('./types/query').InputMemberExpression}
+ */
+function parseInputMemberExpression(expression) {
+  const { error } = inputMemberExpression.validate(expression);
+  if (error) {
+    throw new UserError(`Invalid member expression format: ${error.message || error.toString()}`);
+  }
+  return expression;
+}
 
 /**
  * Normalize incoming network query.
@@ -384,5 +457,6 @@ export {
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryCancelPreAggregations,
+  parseInputMemberExpression,
   remapToQueryAdapterFormat,
 };

@@ -4,6 +4,7 @@ use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::Compiler;
+use crate::planner::BaseMember;
 use crate::planner::BaseTimeDimension;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -43,7 +44,7 @@ impl<'a> FilterCompiler<'a> {
         if let Some(date_range) = item.get_date_range() {
             let filter = BaseFilter::try_new(
                 self.query_tools.clone(),
-                item.base_member_evaluator(),
+                item.member_evaluator(),
                 FilterType::Dimension,
                 FilterOperator::InDateRange,
                 Some(date_range.into_iter().map(|v| Some(v)).collect()),

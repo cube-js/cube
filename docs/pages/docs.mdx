@@ -25,15 +25,15 @@ cube(`monthly_retention`, {
   dimensions: {
     months_since_signup: {
       sql: `DATEDIFF('month', ${CUBE}.signup_month, ${CUBE}.activity_month)`,
-      type: `number`,
+      type: `number`
     },
 
     signup_date: {
       sql: `(signup_month AT TIME ZONE 'America/Los_Angeles')`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 #### With tabs
@@ -61,15 +61,15 @@ cube(`monthly_retention`, {
   dimensions: {
     months_since_signup: {
       sql: `DATEDIFF('month', ${CUBE}.signup_month, ${CUBE}.activity_month)`,
-      type: `number`,
+      type: `number`
     },
 
     signup_date: {
       sql: `(signup_month AT TIME ZONE 'America/Los_Angeles')`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>

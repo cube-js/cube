@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /config/downstream/observable
----
-
 # Observable
 
 Observable is a collaborative data notebook.
@@ -130,14 +125,14 @@ jsonQuery = {
     timeDimensions: [
       {
         dimension: "orders.created_at",
-        granularity: "month",
-      },
+        granularity: "month"
+      }
     ],
     order: {
-      "orders.created_at": "asc",
-    },
-  },
-};
+      "orders.created_at": "asc"
+    }
+  }
+}
 ```
 
 Next, create another JavaScript cell with a POST request. Paste this POST

@@ -1,7 +1,7 @@
 # Connecting to multiple data sources
 
 Cube supports connecting to multiple data sources, so that different
-[cubes](/reference/data-model/cube) reference data from different
+[cubes](/product/data-modeling/reference/cube) reference data from different
 databases.
 
 Usually, data sources are configured **statically** (see below). However, Cube
@@ -56,7 +56,7 @@ pages][ref-config-db].
 
 ## Data model
 
-Use the [`data_source`](/reference/data-model/cube#data_source)
+Use the [`data_source`](/product/data-modeling/reference/cube#data_source)
 property to set a data source for each cube:
 
 <CodeTabs>
@@ -78,20 +78,20 @@ cubes:
 cube(`orders`, {
   // ...
 
-  data_source: `default`,
-});
+  data_source: `default`
+})
 
 cube(`orders_from_other_data_source`, {
   // ...
 
-  data_source: `other_data_source`,
-});
+  data_source: `other_data_source`
+})
 ```
 
 </CodeTabs>
 
-[ref-config-ref-env]: /reference/configuration/environment-variables
-[ref-config-ref-driverfactory]: /reference/configuration/config#driverfactory
+[ref-config-ref-env]: /product/configuration/reference/environment-variables
+[ref-config-ref-driverfactory]: /product/configuration/reference/config#driverfactory
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-multitenancy]:
   /product/configuration/advanced/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources

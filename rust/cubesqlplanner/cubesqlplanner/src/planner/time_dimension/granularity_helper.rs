@@ -58,8 +58,10 @@ impl GranularityHelper {
         let first = Ok(dimensions[0].clone());
         dimensions.iter().skip(1).fold(first, |acc, d| match acc {
             Ok(min_dim) => {
-                let min_granularity =
-                    Self::min_granularity(&min_dim.get_granularity(), &d.get_granularity())?;
+                let min_granularity = Self::min_granularity(
+                    &min_dim.resolved_granularity()?,
+                    &d.resolved_granularity()?,
+                )?;
                 if min_granularity == min_dim.get_granularity() {
                     Ok(min_dim)
                 } else {
@@ -72,15 +74,15 @@ impl GranularityHelper {
 
     pub fn granularity_from_interval(interval: &Option<String>) -> Option<String> {
         if let Some(interval) = interval {
-            if interval.find("day").is_some() {
+            if interval.contains("day") {
                 Some("day".to_string())
-            } else if interval.find("month").is_some() {
+            } else if interval.contains("month") {
                 Some("month".to_string())
-            } else if interval.find("year").is_some() {
+            } else if interval.contains("year") {
                 Some("year".to_string())
-            } else if interval.find("week").is_some() {
+            } else if interval.contains("week") {
                 Some("week".to_string())
-            } else if interval.find("hour").is_some() {
+            } else if interval.contains("hour") {
                 Some("hour".to_string())
             } else {
                 None

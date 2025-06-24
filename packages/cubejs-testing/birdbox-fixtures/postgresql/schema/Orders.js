@@ -1,14 +1,14 @@
 cube(`Orders`, {
   sql: `
-  select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at
+  select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at, '2025-01-01'::timestamptz updated_at
   UNION ALL
-  select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at
+  select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at, '2025-01-02'::timestamptz updated_at
   UNION ALL
-  select 3 as id, 300 as amount, 'processed' status, '2024-01-03'::timestamptz created_at
+  select 3 as id, 300 as amount, 'processed' status, '2024-01-03'::timestamptz created_at, '2025-01-03'::timestamptz updated_at
   UNION ALL
-  select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at
+  select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at, '2025-01-04'::timestamptz updated_at
   UNION ALL
-  select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at
+  select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at, '2025-01-05'::timestamptz updated_at
   `,
   joins: {
     OrderItems: {
@@ -121,6 +121,11 @@ cube(`Orders`, {
 
     createdAt: {
       sql: `created_at`,
+      type: `time`
+    },
+
+    updatedAt: {
+      sql: `updated_at`,
       type: `time`
     }
   },

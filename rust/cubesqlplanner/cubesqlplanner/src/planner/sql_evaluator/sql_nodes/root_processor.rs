@@ -12,6 +12,7 @@ pub struct RootSqlNode {
     time_dimesions_processor: Rc<dyn SqlNode>,
     measure_processor: Rc<dyn SqlNode>,
     cube_name_processor: Rc<dyn SqlNode>,
+    cube_table_processor: Rc<dyn SqlNode>,
     default_processor: Rc<dyn SqlNode>,
 }
 
@@ -21,6 +22,7 @@ impl RootSqlNode {
         time_dimesions_processor: Rc<dyn SqlNode>,
         measure_processor: Rc<dyn SqlNode>,
         cube_name_processor: Rc<dyn SqlNode>,
+        cube_table_processor: Rc<dyn SqlNode>,
         default_processor: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
         Rc::new(Self {
@@ -28,6 +30,7 @@ impl RootSqlNode {
             time_dimesions_processor,
             measure_processor,
             cube_name_processor,
+            cube_table_processor,
             default_processor,
         })
     }
@@ -81,6 +84,13 @@ impl SqlNode for RootSqlNode {
                 templates,
             )?,
             MemberSymbol::CubeName(_) => self.cube_name_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?,
+            MemberSymbol::CubeTable(_) => self.cube_table_processor.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),

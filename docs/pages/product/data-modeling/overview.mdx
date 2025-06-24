@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /schema/getting-started
----
-
 # Getting started with data modeling
 
 The data model is used to transform raw data into meaningful business
@@ -50,8 +45,8 @@ our `users` table.
 
 ```javascript
 cube(`users`, {
-  sql_table: `users`,
-});
+  sql_table: `users`
+})
 ```
 
 ```yaml
@@ -89,22 +84,22 @@ cube(`users`, {
   measures: {
     count: {
       sql: `id`,
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     city: {
       sql: `city`,
-      type: `string`,
+      type: `string`
     },
 
     company_name: {
       sql: `company_name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -164,18 +159,18 @@ cube(`users`, {
   measures: {
     count: {
       sql: `id`,
-      type: `count`,
+      type: `count`
     },
 
     paying_count: {
       sql: `id`,
       type: `count`,
-      filters: [{ sql: `${CUBE}.paying = 'true'` }],
-    },
+      filters: [{ sql: `${CUBE}.paying = 'true'` }]
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -236,24 +231,24 @@ cube(`users`, {
   measures: {
     count: {
       sql: `id`,
-      type: `count`,
+      type: `count`
     },
 
     paying_count: {
       sql: `id`,
       type: `count`,
-      filters: [{ sql: `${CUBE}.paying = 'true'` }],
+      filters: [{ sql: `${CUBE}.paying = 'true'` }]
     },
 
     paying_percentage: {
       sql: `100.0 * ${paying_count} / ${count}`,
       type: `number`,
-      format: `percent`,
-    },
+      format: `percent`
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -303,10 +298,10 @@ As with other measures, `paying_percentage` can be used with dimensions.
 3.  [Data model reference documentation][ref-schema-cube]
 
 [ref-backend-restapi]: /product/apis-integrations/rest-api/reference
-[ref-schema-cube]: /reference/data-model/cube
-[ref-schema-measures]: /reference/data-model/measures
-[ref-schema-dimensions]: /reference/data-model/dimensions
-[ref-schema-types-formats]: /reference/data-model/types-and-formats
+[ref-schema-cube]: /product/data-modeling/reference/cube
+[ref-schema-measures]: /product/data-modeling/reference/measures
+[ref-schema-dimensions]: /product/data-modeling/reference/dimensions
+[ref-schema-types-formats]: /product/data-modeling/reference/types-and-formats
 [ref-backend-query-format]: /product/apis-integrations/rest-api/query-format
 [ref-demo-deployment]: /product/deployment/cloud/deployments#demo-deployments
 [ref-apis]: /product/apis-integrations

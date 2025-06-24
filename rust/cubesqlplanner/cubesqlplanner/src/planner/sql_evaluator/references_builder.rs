@@ -36,10 +36,10 @@ impl ReferencesBuilder {
             }
         } else {
             if !self.has_source_for_leaf_memeber(&member, strict_source) {
-                return Err(CubeError::internal(format!(
+                /*                 return Err(CubeError::internal(format!(
                     "Planning error: member {} has no source",
                     member_name
-                )));
+                ))); */
             }
         }
         Ok(())
@@ -52,6 +52,9 @@ impl ReferencesBuilder {
         references: &mut HashMap<String, QualifiedColumnName>,
     ) -> Result<(), CubeError> {
         let member_name = member.full_name();
+        if references.contains_key(&member_name) {
+            return Ok(());
+        }
         if let Some(reference) = self.find_reference_for_member(&member_name, strict_source) {
             references.insert(member_name.clone(), reference);
             return Ok(());
@@ -63,12 +66,12 @@ impl ReferencesBuilder {
                 self.resolve_references_for_member(dep.clone(), strict_source, references)?
             }
         } else {
-            if !self.has_source_for_leaf_memeber(&member, strict_source) {
+            /*             if !self.has_source_for_leaf_memeber(&member, strict_source) {
                 return Err(CubeError::internal(format!(
                     "Planning error: member {} has no source",
                     member_name
                 )));
-            }
+            } */
         }
 
         Ok(())
@@ -85,12 +88,12 @@ impl ReferencesBuilder {
                 self.validete_member_for_leaf_query(dep.clone(), strict_source)?
             }
         } else {
-            if !self.has_source_for_leaf_memeber(&member, strict_source) {
+            /*             if !self.has_source_for_leaf_memeber(&member, strict_source) {
                 return Err(CubeError::internal(format!(
                     "Planning error: member {} has no source",
                     member.full_name()
                 )));
-            }
+            } */
         }
         Ok(())
     }

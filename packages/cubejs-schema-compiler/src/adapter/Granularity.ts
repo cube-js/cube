@@ -31,7 +31,7 @@ export class Granularity {
   ) {
     this.granularity = timeDimension.granularity;
     this.predefinedGranularity = isPredefinedGranularity(this.granularity);
-    this.queryTimezone = query.timezone;
+    this.queryTimezone = query.timezone || 'UTC';
     this.origin = moment.tz(query.timezone).startOf('year'); // Defaults to current year start
 
     if (this.predefinedGranularity) {

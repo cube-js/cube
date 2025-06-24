@@ -29,7 +29,7 @@ impl TraversalVisitor for JoinHintsCollector {
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
-                if e.owned_by_cube() {
+                if !e.is_view() {
                     if !path.is_empty() {
                         if path.len() == 1 {
                             self.hints.push(JoinHintItem::Single(path[0].clone()))
@@ -48,7 +48,7 @@ impl TraversalVisitor for JoinHintsCollector {
                 return self.on_node_traverse(e.base_symbol(), path, &())
             }
             MemberSymbol::Measure(e) => {
-                if e.owned_by_cube() {
+                if !e.is_view() {
                     if !path.is_empty() {
                         if path.len() == 1 {
                             self.hints.push(JoinHintItem::Single(path[0].clone()))

@@ -93,17 +93,17 @@ sometimes known as `trustedConnection`), instantiate the driver with
 `trustedConnection: true` in your `cube.js` configuration file:
 
 ```javascript
-const MssqlDriver = require("@cubejs-backend/mssql-driver");
+const MssqlDriver = require("@cubejs-backend/mssql-driver")
 module.exports = {
   driverFactory: ({ dataSource }) =>
-    new MssqlDriver({ database: dataSource, trustedConnection: true }),
-};
+    new MssqlDriver({ database: dataSource, trustedConnection: true })
+}
 ```
 
 [mssql]: https://www.microsoft.com/en-gb/sql-server/sql-server-2019
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]:
-  /guides/recipes/data-sources/using-ssl-connections-to-data-source
-[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+  /product/configuration/recipes/using-ssl-connections-to-data-source
+[ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx
 [self-preaggs-simple]: #simple

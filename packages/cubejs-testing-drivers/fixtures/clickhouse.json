@@ -10,6 +10,17 @@
           "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
         }
       }
+    },
+    "export-bucket-s3-prefix": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+          "CUBEJS_DB_EXPORT_BUCKET": "clickhouse-drivers-tests-preaggs/testing_prefix/for_export_buckets/",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
+        }
+      }
     }
   },
   "cube": {
@@ -25,7 +36,8 @@
       "CUBEJS_PG_SQL_PORT": "5656",
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
-      "CUBESQL_SQL_PUSH_DOWN": "true"
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}"
     },
     "depends_on": ["data"],
     "links": ["data"],
@@ -174,6 +186,15 @@
     "querying BigECommerce: rolling window by 2 month",
 
     "---------------------------------------",
+    "Requires Tesseract.                    ",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD",
+    "querying BigECommerce: rolling window YTD without date range",
+    "--------------------",
+
+    "---------------------------------------",
     "Custom Granularities                   ",
     "---------------------------------------",
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
@@ -188,6 +209,7 @@
     "SQL API: Nested Rollup over asterisk",
     "SQL API: Rollup over exprs",
     "SQL API: Rollup with aliases",
-    "SQL API: Simple Rollup"
+    "SQL API: Simple Rollup",
+    "SQL API: SQL push down push to cube quoted alias"
   ]
 }

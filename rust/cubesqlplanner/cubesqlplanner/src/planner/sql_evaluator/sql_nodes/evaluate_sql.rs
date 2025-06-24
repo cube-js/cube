@@ -24,13 +24,16 @@ impl SqlNode for EvaluateSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        match node.as_ref() {
-            MemberSymbol::Dimension(ev) => ev.evaluate_sql(
-                visitor,
-                node_processor.clone(),
-                query_tools.clone(),
-                templates,
-            ),
+        let res = match node.as_ref() {
+            MemberSymbol::Dimension(ev) => {
+                let res = ev.evaluate_sql(
+                    visitor,
+                    node_processor.clone(),
+                    query_tools.clone(),
+                    templates,
+                )?;
+                Ok(res)
+            }
             MemberSymbol::TimeDimension(ev) => {
                 let res = visitor.apply(&ev.base_symbol(), node_processor.clone(), templates)?;
                 Ok(res)
@@ -78,13 +81,17 @@ impl SqlNode for EvaluateSqlNode {
                 templates,
             ),
             MemberSymbol::CubeName(ev) => ev.evaluate_sql(),
-            MemberSymbol::MemberExpression(e) => e.evaluate_sql(
-                visitor,
-                node_processor.clone(),
-                query_tools.clone(),
-                templates,
-            ),
-        }
+            MemberSymbol::MemberExpression(e) => {
+                let res = e.evaluate_sql(
+                    visitor,
+                    node_processor.clone(),
+                    query_tools.clone(),
+                    templates,
+                )?;
+                Ok(res)
+            }
+        }?;
+        Ok(res)
     }
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {

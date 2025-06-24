@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /cloud/pricing
----
-
 # Pricing in Cube Cloud
 
 Cube Cloud pricing is based on resource consumption which we measure
@@ -114,14 +109,6 @@ of deployments within a Cube Cloud account. The consumption is measured in 5-min
 | [Query History][ref-query-history] | <nobr>0..20</nobr> | Depends on a [chosen tier](#query-history-tiers) |
 | [Monitoring Integrations][ref-monitoring-integrations] | <nobr>1..4</nobr> | Depends on a [chosen tier](#monitoring-integrations-tiers) |
 
-The following resource types incur CCU consumption and apply to _individual requests_
-to deployments within a Cube Cloud account:
-
-| Resource type | CCUs per request | Notes |
-| --- | :---: | --- |
-| [AI API][ref-ai-api] | <nobr>0..1</nobr> | Depends on [configuration](#ai-requests-consumption) |
-| [AI Assistant][ref-ai-assistant] | <nobr>0..1</nobr> | Depends on [configuration](#ai-requests-consumption) |
-
 The following resource types incur CCU consumption and apply to the _whole Cube Cloud
 account_:
 
@@ -191,24 +178,14 @@ You can upgrade to a chosen tier in the
 
 [Monitoring Integrations][ref-monitoring-integrations] feature has the following tiers:
 
-| Tier | CCUs per hour | Exported data  |
-| ---- | :-----------: | -------------- |
-| XS   | 1             | Up to 10 GB/mo |
-| S    | 2             | Up to 25 GB/mo |
-| M    | 4             | Up to 50 GB/mo |
+| Tier | CCUs per hour | Exported data  | Dependent features |
+| ---- | :-----------: | -------------- | --- |
+| XS   | 1             | Up to 10 GB/mo | — |
+| S    | 2             | Up to 25 GB/mo | — |
+| M    | 4             | Up to 50 GB/mo | [Query History export][ref-query-history-export] |
 
 You can [upgrade][ref-monitoring-integrations-config] to a chosen tier in the
 <Btn>Settings</Btn> of your deployment.
-
-### AI requests consumption
-
-[AI API][ref-ai-api] and [AI Assistant][ref-ai-assistant] consume CCUs per request apart from
-[Enterprise and above][cube-pricing] product tiers where customers can provide their own suitable
-LLM if wanted and then will be exempt from this charge:
-
-| <nobr>CCUs per request</nobr> |
-| :------------------------: |
-| 1                          |
 
 ### Audit Log tiers
 
@@ -365,5 +342,4 @@ product tier level. Payments are non-refundable.
 [ref-data-at-rest-encryption]: /product/caching/running-in-production#data-at-rest-encryption
 [ref-customer-managed-keys]: /product/workspace/encryption-keys
 [ref-semantic-catalog]: /product/workspace/semantic-catalog
-[ref-ai-api]: /product/apis-integrations/ai-api
-[ref-ai-assistant]: /product/workspace/ai-assistant
+[ref-query-history-export]: /product/workspace/monitoring#query-history-export

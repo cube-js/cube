@@ -198,6 +198,16 @@
           "type": "sum"
         },
         {
+          "name": "totalQuantityPriorMonth",
+          "multiStage": true,
+          "sql": "{totalQuantity}",
+          "type": "number",
+          "timeShift": [{
+            "interval": "1 month",
+            "type": "prior"
+          }]
+        },
+        {
           "name": "avgDiscount",
           "sql": "discount",
           "type": "avg"
@@ -409,6 +419,14 @@
           "type": "count",
           "rolling_window": {
             "trailing": "2 month"
+          }
+        },
+        {
+          "name": "rollingCountYTD",
+          "type": "count",
+          "rollingWindow": {
+            "type": "to_date",
+            "granularity": "year"
           }
         },
         {

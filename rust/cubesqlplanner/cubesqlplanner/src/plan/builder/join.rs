@@ -1,5 +1,7 @@
 use crate::plan::join::JoinType;
-use crate::plan::{Join, JoinCondition, JoinItem, QueryPlan, Schema, Select, SingleAliasedSource};
+use crate::plan::{
+    Join, JoinCondition, JoinItem, QueryPlan, Schema, Select, SingleAliasedSource, SingleSource,
+};
 use crate::planner::BaseCube;
 use std::rc::Rc;
 
@@ -34,6 +36,10 @@ impl JoinBuilder {
         Self::new(SingleAliasedSource::new_from_subquery(plan, alias))
     }
 
+    pub fn new_from_source(source: SingleSource, alias: String) -> Self {
+        Self::new(SingleAliasedSource::new_from_source(source, alias))
+    }
+
     pub fn new_from_subselect(plan: Rc<Select>, alias: String) -> Self {
         Self::new(SingleAliasedSource::new_from_subquery(
             Rc::new(QueryPlan::Select(plan)),
@@ -55,6 +61,18 @@ impl JoinBuilder {
 
     pub fn left_join_cube(&mut self, cube: Rc<BaseCube>, alias: Option<String>, on: JoinCondition) {
         self.join_cube(cube, alias, on, JoinType::Left)
+    }
+
+    pub fn left_join_source(&mut self, source: SingleSource, alias: String, on: JoinCondition) {
+        self.join_source(source, alias, on, JoinType::Left)
+    }
+
+    pub fn inner_join_source(&mut self, source: SingleSource, alias: String, on: JoinCondition) {
+        self.join_source(source, alias, on, JoinType::Inner)
+    }
+
+    pub fn full_join_source(&mut self, source: SingleSource, alias: String, on: JoinCondition) {
+        self.join_source(source, alias, on, JoinType::Full)
     }
 
     pub fn inner_join_cube(
@@ -117,6 +135,21 @@ impl JoinBuilder {
         join_type: JoinType,
     ) {
         let from = SingleAliasedSource::new_from_cube(cube, alias);
+        self.joins.push(JoinItem {
+            from,
+            on,
+            join_type,
+        })
+    }
+
+    fn join_source(
+        &mut self,
+        source: SingleSource,
+        alias: String,
+        on: JoinCondition,
+        join_type: JoinType,
+    ) {
+        let from = SingleAliasedSource::new_from_source(source, alias);
         self.joins.push(JoinItem {
             from,
             on,

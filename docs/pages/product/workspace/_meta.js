@@ -3,6 +3,7 @@ module.exports = {
   "vizard": "Chart Prototyping",
   "data-model": "Data Model",
   "visual-model": "Visual Model",
+  "saved-reports": "Saved Reports",
   "rollup-designer": "Rollup Designer",
   "dev-mode": "Development mode",
   "environments": "Environments",
@@ -19,6 +20,6 @@ module.exports = {
   "budgets": "Budgets",
   "preferences": "Preferences",
   "cli": "CLI",
-  "ai-assistant": "AI Assistant",
   "semantic-catalog": "Semantic Catalog",
+  "recipes": "Recipes",
 }

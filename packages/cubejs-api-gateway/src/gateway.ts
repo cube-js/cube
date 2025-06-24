@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import * as stream from 'stream';
+import { assertNever } from 'assert-never';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
@@ -8,7 +9,7 @@ import structuredClone from '@ungap/structured-clone';
 import {
   getEnv,
   getRealType,
-  parseLocalDate,
+  parseUtcIntoLocalDate,
   QueryAlias,
 } from '@cubejs-backend/shared';
 import {
@@ -83,6 +84,7 @@ import {
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryPreAggregations,
+  parseInputMemberExpression,
   preAggsJobsRequestSchema,
   remapToQueryAdapterFormat,
 } from './query';
@@ -153,7 +155,7 @@ class ApiGateway {
   public readonly contextToApiScopesFn: ContextToApiScopesFn;
 
   public readonly contextToApiScopesDefFn: ContextToApiScopesFn =
-    async () => ['graphql', 'meta', 'data'];
+    async () => ['graphql', 'meta', 'data', 'sql'];
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
@@ -919,8 +921,8 @@ class ApiGateway {
     // It's expected that selector.dateRange is provided in local time (without timezone)
     // At the same time it is ok to get timestamps with `Z` (in UTC).
     if (selector.dateRange) {
-      const start = parseLocalDate([{ val: selector.dateRange[0] }], 'UTC');
-      const end = parseLocalDate([{ val: selector.dateRange[1] }], 'UTC');
+      const start = parseUtcIntoLocalDate([{ val: selector.dateRange[0] }], 'UTC');
+      const end = parseUtcIntoLocalDate([{ val: selector.dateRange[1] }], 'UTC');
       if (!start || !end) {
         throw new UserError(`Cannot parse selector date range ${selector.dateRange}`);
       }
@@ -1309,7 +1311,7 @@ class ApiGateway {
     res,
   }: {query: string, disablePostProcessing: boolean} & BaseRequest) {
     try {
-      await this.assertApiScope('data', context.securityContext);
+      await this.assertApiScope('sql', context.securityContext);
 
       const result = await this.sqlServer.sql4sql(query, disablePostProcessing, context.securityContext);
       res({ sql: result });
@@ -1337,7 +1339,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
-      await this.assertApiScope('data', context.securityContext);
+      await this.assertApiScope('sql', context.securityContext);
 
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context, disableLimitEnforcing, memberExpressions);
@@ -1392,30 +1394,46 @@ class ApiGateway {
   }
 
   private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
-    try {
-      if (memberExpression.startsWith('{')) {
-        const obj = JSON.parse(memberExpression);
-        const args = obj.cube_params;
-        args.push(`return \`${obj.expr}\``);
-
-        const groupingSet = obj.grouping_set ? {
-          groupType: obj.grouping_set.group_type,
-          id: obj.grouping_set.id,
-          subId: obj.grouping_set.sub_id ? obj.grouping_set.sub_id : undefined
-        } : undefined;
-
-        return {
-          cubeName: obj.cube_name,
-          name: obj.alias,
-          expressionName: obj.alias,
-          expression: args,
-          definition: memberExpression,
-          groupingSet,
-        };
-      } else {
-        return memberExpression;
+    if (memberExpression.startsWith('{')) {
+      const obj = parseInputMemberExpression(JSON.parse(memberExpression));
+      let expression: ParsedMemberExpression['expression'];
+      switch (obj.expr.type) {
+        case 'SqlFunction':
+          expression = [
+            ...obj.expr.cubeParams,
+            `return \`${obj.expr.sql}\``,
+          ];
+          break;
+        case 'PatchMeasure':
+          expression = {
+            type: 'PatchMeasure',
+            sourceMeasure: obj.expr.sourceMeasure,
+            replaceAggregationType: obj.expr.replaceAggregationType,
+            addFilters: obj.expr.addFilters.map(filter => [
+              ...filter.cubeParams,
+              `return \`${filter.sql}\``,
+            ]),
+          };
+          break;
+        default:
+          assertNever(obj.expr);
       }
-    } catch {
+
+      const groupingSet = obj.groupingSet ? {
+        groupType: obj.groupingSet.groupType,
+        id: obj.groupingSet.id,
+        subId: obj.groupingSet.subId ? obj.groupingSet.subId : undefined
+      } : undefined;
+
+      return {
+        cubeName: obj.cubeName,
+        name: obj.alias,
+        expressionName: obj.alias,
+        expression,
+        definition: memberExpression,
+        groupingSet,
+      };
+    } else {
       return memberExpression;
     }
   }
@@ -1433,14 +1451,31 @@ class ApiGateway {
     };
   }
 
-  private evalMemberExpression(memberExpression: MemberExpression | ParsedMemberExpression): string | MemberExpression {
-    const expression = Array.isArray(memberExpression.expression) ?
-      Function.constructor.apply(null, memberExpression.expression) : memberExpression.expression;
+  private evalMemberExpression(memberExpression: MemberExpression | ParsedMemberExpression): MemberExpression | ParsedMemberExpression {
+    if (typeof memberExpression.expression === 'function') {
+      return memberExpression;
+    }
 
-    return {
-      ...memberExpression,
-      expression,
-    };
+    if (Array.isArray(memberExpression.expression)) {
+      return {
+        ...memberExpression,
+        expression: Function.constructor.apply(null, memberExpression.expression),
+      };
+    }
+
+    if (memberExpression.expression.type === 'PatchMeasure') {
+      return {
+        ...memberExpression,
+        expression: {
+          ...memberExpression.expression,
+          addFilters: memberExpression.expression.addFilters.map(filter => ({
+            sql: Function.constructor.apply(null, filter),
+          })),
+        }
+      };
+    }
+
+    throw new Error(`Unexpected member expression to evaluate: ${memberExpression}`);
   }
 
   public async sqlGenerators({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
@@ -1451,15 +1486,14 @@ class ApiGateway {
       const query = {
         requestId: context.requestId,
       };
-      const cubeNameToDataSource = await compilerApi.cubeNameToDataSource(query);
+      const memberToDataSource: Record<string, string> = await compilerApi.memberToDataSource(query);
 
-      let dataSources = Object.keys(cubeNameToDataSource).map(c => cubeNameToDataSource[c]);
-      dataSources = [...new Set(dataSources)];
+      const dataSources = new Set(Object.values(memberToDataSource));
       const dataSourceToSqlGenerator = (await Promise.all(
-        dataSources.map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
+        [...dataSources].map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
-      res({ cubeNameToDataSource, dataSourceToSqlGenerator });
+      res({ memberToDataSource, dataSourceToSqlGenerator });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -1803,6 +1837,7 @@ class ApiGateway {
 
       this.log({
         type: 'Load Request',
+        apiType,
         query
       }, context);
 
@@ -2413,7 +2448,7 @@ class ApiGateway {
           );
         } else {
           scopes.forEach((p) => {
-            if (['graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
+            if (['graphql', 'meta', 'data', 'sql', 'jobs'].indexOf(p) === -1) {
               throw new Error(
                 `A user-defined contextToApiScopes function returns a wrong scope: ${p}`
               );

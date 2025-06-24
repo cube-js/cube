@@ -261,8 +261,12 @@ macro_rules! variant_field_struct {
 
             impl FromStr for [<$variant $var_field:camel>] {
                 type Err = $crate::compile::rewrite::language::LanguageParseError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(Self::Err::NotSupported)
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) =  s.strip_prefix(PREFIX) {
+                        return Ok([<$variant $var_field:camel>](suffix.to_string()));
+                    }
+                    Err(Self::Err::ShouldStartWith(PREFIX))
                 }
             }
 
@@ -340,6 +344,7 @@ macro_rules! variant_field_struct {
                 AggregateFunction::ApproxMedian => "ApproxMedian",
                 AggregateFunction::BoolAnd => "BoolAnd",
                 AggregateFunction::BoolOr => "BoolOr",
+                AggregateFunction::PercentileCont => "PercentileCont",
             }
         );
     };
@@ -360,6 +365,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::Log => "Log",
                 BuiltinScalarFunction::Log10 => "Log10",
                 BuiltinScalarFunction::Log2 => "Log2",
+                BuiltinScalarFunction::Power => "Power",
                 BuiltinScalarFunction::Round => "Round",
                 BuiltinScalarFunction::Signum => "Signum",
                 BuiltinScalarFunction::Sin => "Sin",
@@ -640,6 +646,8 @@ macro_rules! variant_field_struct {
                     } else if let Some(value) = typed_str.strip_prefix("f:") {
                         let n: f64 = value.parse().map_err(|err| Self::Err::InvalidFloatValue(err))?;
                         Ok([<$variant $var_field:camel>](ScalarValue::Float64(Some(n))))
+                    } else if typed_str == "null" {
+                        Ok([<$variant $var_field:camel>](ScalarValue::Null))
                     } else {
                         Err(Self::Err::InvalidScalarType)
                     }

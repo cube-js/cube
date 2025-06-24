@@ -1,0 +1,148 @@
+# `cube` package
+
+`cube` package contains tools for setting [configuration
+options][ref-config-options] and providing the Jinja template context for
+the data model in [YAML][ref-model-syntax].
+
+* `cube` package is available out of the box, it doesn't need to be installed explicitly
+* Submit issues to [`cube`][link-cube-repo-issues] on GitHub
+
+## Reference
+
+### `config` object
+
+This object is used to set configuration options in the `cube.py` file.
+
+You can set properties of this object, named after supported [configuration
+options][ref-ref-config-options], to values or functions that would be used
+as these configuration options.
+
+```python
+from cube import config
+
+config.base_path = '/cube-api'
+
+config.context_to_app_id = lambda ctx: ctx['securityContext']['tenant_id']
+
+def rewrite(query, ctx):
+  query['measures'].append('orders.count')
+  return query
+
+config.query_rewrite = rewrite
+```
+
+Alternatively, this object can be used as a decorator with a single
+`name` argument. In that case, the decorated function will be set as the
+configuration option under that `name`.
+
+```python
+from cube import config
+
+@config('context_to_app_id')
+def app_id(ctx):
+  return ctx['securityContext']['tenant_id']
+
+@config('query_rewrite')
+def rewrite(query, ctx):
+  query['measures'].append('orders.count')
+  return query
+```
+
+### `TemplateContext` class
+
+Instances of this class are used for registering variables, functions, and
+filters so that they are accessible from Jinja templates when defining the
+data model in YAML.
+
+```python
+from cube import TemplateContext
+
+template = TemplateContext()
+```
+
+#### `add_variable`
+
+The `add_variable` method registers a variable so that it's available in
+a Jinja template. Should be called with two arguments, a `name` and a `value`
+of the variable.
+
+```python
+from cube import TemplateContext
+
+template = TemplateContext()
+
+# Accessible from Jinja as 'my_var'
+template.add_variable('my_var', 123)
+```
+
+#### `add_function` and `function`
+
+The `add_function` method registers a function so that it's callable from
+a Jinja template as a Python function. Should be called with two arguments,
+a `name` and a function that will be registered under that `name`:
+
+```python
+from cube import TemplateContext
+
+template = TemplateContext()
+
+# Accessible from Jinja as 'get_data()'
+def get_data_1():
+  return 1
+template.add_function('get_data', get_data_1)
+```
+
+Also, you can use the `template.function` decorator with a single `name`
+argument; the decorated function will be registered under that `name`:
+
+```python
+from cube import TemplateContext
+
+template = TemplateContext()
+
+# Accessible from Jinja as 'get_more_data()'
+@template.function('get_more_data')
+def get_data_2():
+  return 2
+```
+
+#### `add_filter` and `filter`
+
+The `add_filter` method registers a function so that it's callable from
+a Jinja template as a [Jinja filter][link-jinja-filters]. Should be called
+with two arguments, a `name` and a function that will be registered as a filter
+under that `name`:
+
+```python
+from cube import TemplateContext
+
+template = TemplateContext()
+
+# Accessible from Jinja as 'data | wrap'
+def wrap_1(data):
+  return f"< {data} >"
+template.add_filter('wrap', wrap_1)
+```
+
+Also, you can use the `template.filter` decorator with a single `name`
+argument; the decorated function will be registered as a filter under that
+`name`:
+
+```python
+from cube import TemplateContext
+
+template = TemplateContext()
+
+# Accessible from Jinja as 'data | wrap_more'
+@template.filter('wrap_more')
+def wrap_2(data):
+  return f"<<< {data} >>>"
+```
+
+
+[link-cube-repo-issues]: https://github.com/cube-js/cube/issues
+[link-jinja-filters]: https://jinja.palletsprojects.com/en/3.1.x/templates/#filters
+
+[ref-config-options]: /product/configuration#configuration-options
+[ref-ref-config-options]: /product/configuration/reference/config
+[ref-model-syntax]: /product/data-modeling/syntax#model-syntax

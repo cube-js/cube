@@ -15,8 +15,8 @@ pub struct CubeNameSymbol {
 }
 
 impl CubeNameSymbol {
-    pub fn new(cube_name: String) -> Self {
-        Self { cube_name }
+    pub fn new(cube_name: String) -> Rc<Self> {
+        Rc::new(Self { cube_name })
     }
 
     pub fn evaluate_sql(&self) -> Result<String, CubeError> {
@@ -80,13 +80,13 @@ impl CubeTableSymbol {
         member_sql: Option<Rc<SqlCall>>,
         definition: Rc<dyn CubeDefinition>,
         is_table_sql: bool,
-    ) -> Self {
-        Self {
+    ) -> Rc<Self> {
+        Rc::new(Self {
             cube_name,
             member_sql,
             definition,
             is_table_sql,
-        }
+        })
     }
 
     pub fn evaluate_sql(

@@ -1,0 +1,36 @@
+cubes:
+  - name: line_items
+    sql_table: public.line_items
+    public: false
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        public: true
+
+      - name: product_id
+        sql: product_id
+        type: number
+
+      - name: order_id
+        sql: order_id
+        type: number
+
+      # - name: quantity
+      #   sql: quantity
+      #   type: number
+
+      - name: price
+        sql: price
+        type: number
+
+    measures:
+      - name: count
+        type: count
+
+      - name: sum_price
+        sql: "{price}"
+        type: sum
+        public: false

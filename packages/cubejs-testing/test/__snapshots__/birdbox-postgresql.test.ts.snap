@@ -16,35 +16,39 @@ Array [
 ]
 `;
 
-exports[`postgresql HTTP Transport #3 Events.count with Events.type order by Events.count DESC: #3 Events.count with Events.type order by Events.count DESC 1`] = `
+exports[`postgresql HTTP Transport #3 Events.count with Events.type order by Events.type DESC, Events.count: #3 Events.count with Events.type order by Events.type DESC, Events.count 1`] = `
 Array [
-  Object {
-    "Events.count": "513",
-    "Events.type": "PushEvent",
-  },
-  Object {
-    "Events.count": "120",
-    "Events.type": "CreateEvent",
-  },
-  Object {
-    "Events.count": "104",
-    "Events.type": "IssueCommentEvent",
-  },
   Object {
     "Events.count": "92",
     "Events.type": "WatchEvent",
   },
   Object {
-    "Events.count": "57",
-    "Events.type": "IssuesEvent",
+    "Events.count": "2",
+    "Events.type": "ReleaseEvent",
+  },
+  Object {
+    "Events.count": "513",
+    "Events.type": "PushEvent",
+  },
+  Object {
+    "Events.count": "21",
+    "Events.type": "PullRequestReviewCommentEvent",
   },
   Object {
     "Events.count": "32",
     "Events.type": "PullRequestEvent",
   },
   Object {
-    "Events.count": "21",
-    "Events.type": "ForkEvent",
+    "Events.count": "1",
+    "Events.type": "MemberEvent",
+  },
+  Object {
+    "Events.count": "57",
+    "Events.type": "IssuesEvent",
+  },
+  Object {
+    "Events.count": "104",
+    "Events.type": "IssueCommentEvent",
   },
   Object {
     "Events.count": "21",
@@ -52,19 +56,15 @@ Array [
   },
   Object {
     "Events.count": "21",
-    "Events.type": "PullRequestReviewCommentEvent",
+    "Events.type": "ForkEvent",
   },
   Object {
     "Events.count": "14",
     "Events.type": "DeleteEvent",
   },
   Object {
-    "Events.count": "2",
-    "Events.type": "ReleaseEvent",
-  },
-  Object {
-    "Events.count": "1",
-    "Events.type": "MemberEvent",
+    "Events.count": "120",
+    "Events.type": "CreateEvent",
   },
   Object {
     "Events.count": "1",
@@ -77,6 +77,95 @@ exports[`postgresql HTTP Transport Dbt orders count: Dbt orders count 1`] = `
 Array [
   Object {
     "OrdersFiltered.ordersCount": "999",
+  },
+]
+`;
+
+exports[`postgresql HTTP Transport Different column data types: Different column data types 1`] = `
+Array [
+  Object {
+    "unusualDataTypes.array": Array [
+      1,
+      2,
+      3,
+    ],
+    "unusualDataTypes.bit_column": "11111111",
+    "unusualDataTypes.boolean_column": true,
+    "unusualDataTypes.cidr_column": "192.168.0.0/24",
+    "unusualDataTypes.id": 1,
+    "unusualDataTypes.inet_column": "192.168.0.1",
+    "unusualDataTypes.json": Object {
+      "key": "value1",
+      "number": 42,
+    },
+    "unusualDataTypes.jsonb": Object {
+      "key": "value1",
+      "number": 42,
+    },
+    "unusualDataTypes.mac_address": "11:22:33:44:55:66",
+    "unusualDataTypes.point_column": Object {
+      "x": 1,
+      "y": 1,
+    },
+    "unusualDataTypes.status": "new",
+    "unusualDataTypes.text_column": "Hello, world!",
+    "unusualDataTypes.xml_column": "<root><child>data</child></root>",
+  },
+  Object {
+    "unusualDataTypes.array": Array [
+      4,
+      5,
+      6,
+    ],
+    "unusualDataTypes.bit_column": "00000001",
+    "unusualDataTypes.boolean_column": false,
+    "unusualDataTypes.cidr_column": "192.168.0.0/24",
+    "unusualDataTypes.id": 2,
+    "unusualDataTypes.inet_column": "192.168.0.2",
+    "unusualDataTypes.json": Object {
+      "key": "value2",
+      "number": 84,
+    },
+    "unusualDataTypes.jsonb": Object {
+      "key": "value2",
+      "number": 84,
+    },
+    "unusualDataTypes.mac_address": "00:11:22:33:44:55",
+    "unusualDataTypes.point_column": Object {
+      "x": 2,
+      "y": 2,
+    },
+    "unusualDataTypes.status": "new",
+    "unusualDataTypes.text_column": "Goodbye, world!",
+    "unusualDataTypes.xml_column": "<root><child>more data</child></root>",
+  },
+  Object {
+    "unusualDataTypes.array": Array [
+      7,
+      8,
+      9,
+    ],
+    "unusualDataTypes.bit_column": "11110000",
+    "unusualDataTypes.boolean_column": true,
+    "unusualDataTypes.cidr_column": "192.168.0.0/24",
+    "unusualDataTypes.id": 3,
+    "unusualDataTypes.inet_column": "192.168.0.3",
+    "unusualDataTypes.json": Object {
+      "key": "value3",
+      "number": 168,
+    },
+    "unusualDataTypes.jsonb": Object {
+      "key": "value3",
+      "number": 168,
+    },
+    "unusualDataTypes.mac_address": "22:33:44:55:66:77",
+    "unusualDataTypes.point_column": Object {
+      "x": 3,
+      "y": 3,
+    },
+    "unusualDataTypes.status": "processed",
+    "unusualDataTypes.text_column": "PostgreSQL is awesome!",
+    "unusualDataTypes.xml_column": "<root><child>even more data</child></root>",
   },
 ]
 `;
@@ -97,35 +186,39 @@ Array [
 ]
 `;
 
-exports[`postgresql WS Transport #3 Events.count with Events.type order by Events.count DESC: #3 Events.count with Events.type order by Events.count DESC 1`] = `
+exports[`postgresql WS Transport #3 Events.count with Events.type order by Events.type DESC, Events.count: #3 Events.count with Events.type order by Events.type DESC, Events.count 1`] = `
 Array [
-  Object {
-    "Events.count": "513",
-    "Events.type": "PushEvent",
-  },
-  Object {
-    "Events.count": "120",
-    "Events.type": "CreateEvent",
-  },
-  Object {
-    "Events.count": "104",
-    "Events.type": "IssueCommentEvent",
-  },
   Object {
     "Events.count": "92",
     "Events.type": "WatchEvent",
   },
   Object {
-    "Events.count": "57",
-    "Events.type": "IssuesEvent",
+    "Events.count": "2",
+    "Events.type": "ReleaseEvent",
+  },
+  Object {
+    "Events.count": "513",
+    "Events.type": "PushEvent",
+  },
+  Object {
+    "Events.count": "21",
+    "Events.type": "PullRequestReviewCommentEvent",
   },
   Object {
     "Events.count": "32",
     "Events.type": "PullRequestEvent",
   },
   Object {
-    "Events.count": "21",
-    "Events.type": "ForkEvent",
+    "Events.count": "1",
+    "Events.type": "MemberEvent",
+  },
+  Object {
+    "Events.count": "57",
+    "Events.type": "IssuesEvent",
+  },
+  Object {
+    "Events.count": "104",
+    "Events.type": "IssueCommentEvent",
   },
   Object {
     "Events.count": "21",
@@ -133,19 +226,15 @@ Array [
   },
   Object {
     "Events.count": "21",
-    "Events.type": "PullRequestReviewCommentEvent",
+    "Events.type": "ForkEvent",
   },
   Object {
     "Events.count": "14",
     "Events.type": "DeleteEvent",
   },
   Object {
-    "Events.count": "2",
-    "Events.type": "ReleaseEvent",
-  },
-  Object {
-    "Events.count": "1",
-    "Events.type": "MemberEvent",
+    "Events.count": "120",
+    "Events.type": "CreateEvent",
   },
   Object {
     "Events.count": "1",

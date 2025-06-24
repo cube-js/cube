@@ -1,22 +1,27 @@
----
-redirect_from:
-  - /config/databases/snowflake
----
-
 # Snowflake
+
+[Snowflake][snowflake] is a popular cloud-based data platform.
 
 ## Prerequisites
 
-- [The account ID][snowflake-docs-account-id] for [Snowflake][snowflake]
-- The warehouse name in the [Snowflake][snowflake] account
-- [The region][snowflake-docs-regions] for the [Snowflake][snowflake] warehouse
-- The username/password for the [Snowflake][snowflake] account
+<InfoBox>
 
-## Snowflake quoted identifiers
+In order to connect Cube to Snowflake, you need to grant certain permissions to the Snowflake role
+used by Cube. Cube requires the role to have `USAGE` on databases and schemas
+and `SELECT` on tables. An example configuration:
+```
+GRANT USAGE ON DATABASE ABC TO ROLE XYZ;
+GRANT USAGE ON ALL SCHEMAS IN DATABASE ABC TO ROLE XYZ;
+GRANT USAGE ON FUTURE SCHEMAS IN DATABASE ABC TO ROLE XYZ;
+GRANT SELECT ON ALL TABLES IN DATABASE ABC TO ROLE XYZ;
+GRANT SELECT ON FUTURE TABLES IN DATABASE ABC TO ROLE XYZ;
+```
 
-Due to an issue in snowflakes opinion about quoted identifers we set a session value to override
-snowflake defaults for users that have set an account value for: QUOTED_IDENTIFIERS_IGNORE_CASE
-you can learn more about this here: https://docs.snowflake.com/en/sql-reference/identifiers-syntax#double-quoted-identifiers
+</InfoBox>
+
+- [Account/Server URL][snowflake-docs-account-id] for Snowflake.
+- User name and password or an RSA private key for the Snowflake account.
+- Optionally, the warehouse name, the user role, and the database name.
 
 ## Setup
 
@@ -53,7 +58,7 @@ The following fields are required when creating a Snowflake connection:
 
 <Screenshot
   alt="Cube Cloud Snowflake Configuration Screen"
-  src="https://ucarecdn.com/304d6222-3b82-4edc-b35d-63f70375642c/"
+  src="https://ucarecdn.com/2a113d20-33ca-4634-b6fa-8886df4d215c/"
 />
 
 Cube Cloud also supports connecting to data sources within private VPCs
@@ -81,7 +86,7 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`               | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key                     |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`               | The path to the valid oauth toket file                                                                                                              | A valid path for the oauth token file                                  |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_HOST`                           | Host address to which the driver should connect                                                                                                     | A valid hostname                                                       |    ❌    |
-| `CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE` | Whether or not quoted identifiers should be case insensitive. Default is `false`                                                                    | `true`, `false`                                                        |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE` | Whether or not [quoted identifiers should be case insensitive][link-snowflake-quoted-identifiers]. Default is `false`                               | `true`, `false`                                                        |    ❌    |
 | `CUBEJS_DB_MAX_POOL`                                 | The maximum number of concurrent database connections to pool. Default is `20`                                                                      | A valid number                                                         |    ❌    |
 | `CUBEJS_CONCURRENCY`                                 | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                                                  | A valid number                                                         |    ❌    |
 
@@ -157,7 +162,7 @@ Once the Snowflake integration is set up, configure Cube using the following:
 
 ```dotenv
 CUBEJS_DB_EXPORT_BUCKET=snowflake-export-bucket
-CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
+CUBEJS_DB_EXPORT_BUCKET_TYPE=gcs
 CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
 CUBEJS_DB_EXPORT_INTEGRATION=gcs_int
 ```
@@ -191,7 +196,7 @@ connections are made over HTTPS.
 [google-cloud-storage]: https://cloud.google.com/storage
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/
 [snowflake-docs-account-id]:
@@ -210,3 +215,4 @@ connections are made over HTTPS.
 [snowflake-format-2]: https://docs.snowflake.com/en/user-guide/admin-account-identifier#format-2-account-locator-in-a-region
 [snowflake-docs-azure]: https://docs.snowflake.com/en/user-guide/data-load-azure-config#option-1-configuring-a-snowflake-storage-integration
 [azure-bs-docs-get-key]: https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?toc=%2Fazure%2Fstorage%2Fblobs%2Ftoc.json&tabs=azure-portal#view-account-access-keys
+[link-snowflake-quoted-identifiers]: https://docs.snowflake.com/en/sql-reference/identifiers-syntax#double-quoted-identifiers

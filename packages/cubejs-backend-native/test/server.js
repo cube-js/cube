@@ -98,6 +98,7 @@ const meta_fixture = require('./meta');
 
     return {
       cubeNameToDataSource: {},
+      memberToDataSource: {},
       dataSourceToSqlGenerator: {},
     };
   };

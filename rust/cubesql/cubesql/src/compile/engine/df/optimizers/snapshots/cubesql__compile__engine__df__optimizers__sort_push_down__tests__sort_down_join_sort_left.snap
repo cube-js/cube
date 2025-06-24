@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/engine/df/optimizers/sort_push_down.rs
+expression: optimize(&plan)
+---
+Projection: #j1.c1, #j2.c2
+  Sort: #j1.c1 ASC NULLS LAST
+    Inner Join: #j1.key = #j2.key
+      Projection: #j1.key, #j1.c1
+        TableScan: j1 projection=None
+      Projection: #j2.key, #j2.c2
+        TableScan: j2 projection=None
