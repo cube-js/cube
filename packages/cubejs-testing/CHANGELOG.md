@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.24](https://github.com/cube-js/cube/compare/v1.3.23...v1.3.24) (2025-06-24)
+
+### Bug Fixes
+
+- **schema-compiler:** Correct join hints collection for transitive joins ([#9671](https://github.com/cube-js/cube/issues/9671)) ([f60b4aa](https://github.com/cube-js/cube/commit/f60b4aa99285fb5e0c8a80f28837cbbdb5d634dd))
+
 ## [1.3.23](https://github.com/cube-js/cube/compare/v1.3.22...v1.3.23) (2025-06-19)
 
 **Note:** Version bump only for package @cubejs-backend/testing

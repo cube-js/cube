@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.24](https://github.com/cube-js/cube/compare/v1.3.23...v1.3.24) (2025-06-24)
+
+### Features
+
+- **schema-compiler:** Allow to specify td with granularity in REST API query order section ([#9630](https://github.com/cube-js/cube/issues/9630)) ([ba13bd3](https://github.com/cube-js/cube/commit/ba13bd369607f4672802933c015e82169e3f6876))
+
 ## [1.3.23](https://github.com/cube-js/cube/compare/v1.3.22...v1.3.23) (2025-06-19)
 
 **Note:** Version bump only for package @cubejs-backend/questdb-driver

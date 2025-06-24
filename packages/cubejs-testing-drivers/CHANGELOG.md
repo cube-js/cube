@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.24](https://github.com/cube-js/cube/compare/v1.3.23...v1.3.24) (2025-06-24)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix BigQuery queries datetime/timestamp comparisons ([#9683](https://github.com/cube-js/cube/issues/9683)) ([525932c](https://github.com/cube-js/cube/commit/525932cb9d28d333a94c678f389334832f3a3ba8))
+
 ## [1.3.23](https://github.com/cube-js/cube/compare/v1.3.22...v1.3.23) (2025-06-19)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers
