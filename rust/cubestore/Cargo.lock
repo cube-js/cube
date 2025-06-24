@@ -213,7 +213,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 [[package]]
 name = "arrow"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-arith",
  "arrow-array",
@@ -233,7 +233,7 @@ dependencies = [
 [[package]]
 name = "arrow-arith"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -246,7 +246,7 @@ dependencies = [
 [[package]]
 name = "arrow-array"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "ahash 0.8.11",
  "arrow-buffer",
@@ -262,7 +262,7 @@ dependencies = [
 [[package]]
 name = "arrow-buffer"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "bytes 1.10.1",
  "half 2.4.1",
@@ -272,7 +272,7 @@ dependencies = [
 [[package]]
 name = "arrow-cast"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -292,7 +292,7 @@ dependencies = [
 [[package]]
 name = "arrow-csv"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-array",
  "arrow-cast",
@@ -307,7 +307,7 @@ dependencies = [
 [[package]]
 name = "arrow-data"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-buffer",
  "arrow-schema",
@@ -318,7 +318,7 @@ dependencies = [
 [[package]]
 name = "arrow-ipc"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -331,7 +331,7 @@ dependencies = [
 [[package]]
 name = "arrow-json"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -350,7 +350,7 @@ dependencies = [
 [[package]]
 name = "arrow-ord"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -362,7 +362,7 @@ dependencies = [
 [[package]]
 name = "arrow-row"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -374,7 +374,7 @@ dependencies = [
 [[package]]
 name = "arrow-schema"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "serde",
 ]
@@ -382,7 +382,7 @@ dependencies = [
 [[package]]
 name = "arrow-select"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "ahash 0.8.11",
  "arrow-array",
@@ -395,7 +395,7 @@ dependencies = [
 [[package]]
 name = "arrow-string"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -1713,7 +1713,7 @@ checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 [[package]]
 name = "datafusion"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "arrow-ipc",
@@ -1766,7 +1766,7 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "async-trait",
@@ -1785,7 +1785,7 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog-listing"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "async-trait",
@@ -1806,7 +1806,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1829,7 +1829,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common-runtime"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "log",
  "tokio",
@@ -1838,7 +1838,7 @@ dependencies = [
 [[package]]
 name = "datafusion-datasource"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "async-compression 0.4.17",
@@ -1871,12 +1871,12 @@ dependencies = [
 [[package]]
 name = "datafusion-doc"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 
 [[package]]
 name = "datafusion-execution"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "dashmap",
@@ -1896,7 +1896,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "chrono",
@@ -1916,7 +1916,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr-common"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -1928,7 +1928,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "arrow-buffer",
@@ -1956,7 +1956,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1976,7 +1976,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate-common"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1988,7 +1988,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-nested"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "arrow-ord",
@@ -2008,7 +2008,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-table"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "async-trait",
@@ -2023,7 +2023,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "datafusion-common",
  "datafusion-doc",
@@ -2039,7 +2039,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window-common"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "datafusion-common",
  "datafusion-physical-expr-common",
@@ -2048,7 +2048,7 @@ dependencies = [
 [[package]]
 name = "datafusion-macros"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "datafusion-expr",
  "quote",
@@ -2058,7 +2058,7 @@ dependencies = [
 [[package]]
 name = "datafusion-optimizer"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "chrono",
@@ -2071,12 +2071,13 @@ dependencies = [
  "recursive",
  "regex",
  "regex-syntax",
+ "tracing",
 ]
 
 [[package]]
 name = "datafusion-physical-expr"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2097,7 +2098,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-common"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2110,7 +2111,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-optimizer"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -2128,7 +2129,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-plan"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2160,7 +2161,7 @@ dependencies = [
 [[package]]
 name = "datafusion-proto"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "chrono",
@@ -2175,7 +2176,7 @@ dependencies = [
 [[package]]
 name = "datafusion-proto-common"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -2185,7 +2186,7 @@ dependencies = [
 [[package]]
 name = "datafusion-sql"
 version = "46.0.1"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ae86f95ba934de08a0f05116c9653dc35a596e40"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-46.0.1#ec41171fc0020f5d9f41e7317a0980d77c716a36"
 dependencies = [
  "arrow",
  "bigdecimal 0.4.8",
@@ -4555,7 +4556,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "54.2.1"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#d48db48b121bd47b8ddbb98b7aebf5f856d43f13"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-46.0.1#108bf7edf5a3661b86e9cd7fca6ace2073fb61a5"
 dependencies = [
  "aes-gcm",
  "ahash 0.8.11",
@@ -4909,7 +4910,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.10.1",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.87",
@@ -6782,8 +6783,8 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 0.1.10",
- "rand 0.6.5",
+ "cfg-if 1.0.0",
+ "rand 0.7.3",
  "static_assertions",
 ]
 
