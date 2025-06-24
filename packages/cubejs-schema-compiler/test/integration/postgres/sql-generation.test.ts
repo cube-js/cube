@@ -4335,7 +4335,7 @@ cubes:
         ]);
       });
     } else {
-      it.skip('querying cube dimension that require transitive joins', async () => {
+      it.skip('FIXME(tesseract): querying cube dimension that require transitive joins', async () => {
         // FIXME should be implemented in Tesseract
       });
     }
@@ -4365,7 +4365,7 @@ cubes:
         }
       });
     } else {
-      it.skip('querying cube dimension that require transitive joins', async () => {
+      it.skip('FIXME(tesseract): querying cube dimension that require transitive joins', async () => {
         // FIXME should be implemented in Tesseract
       });
     }
