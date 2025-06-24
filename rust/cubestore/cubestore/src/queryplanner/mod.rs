@@ -195,11 +195,17 @@ impl QueryPlanner for QueryPlannerImpl {
                 self.config.enable_topk(),
             )
             .await?;
+            let choose_index_ext_end = SystemTime::now();
             let workers = compute_workers(
                 self.config.as_ref(),
                 &logical_plan,
                 &meta.multi_part_subtree,
             )?;
+            app_metrics::DATA_QUERY_CHOOSE_INDEX_TIME_MS.report(
+                choose_index_ext_end
+                    .duration_since(choose_index_ext_start)?
+                    .as_millis() as i64,
+            );
             app_metrics::DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_MS
                 .report(choose_index_ext_start.elapsed()?.as_millis() as i64);
             QueryPlan::Select(
