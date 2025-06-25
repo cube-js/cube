@@ -464,7 +464,7 @@ impl SchedulerImpl {
 
         for (table_id, handles) in &without_failed
             .into_iter()
-            .group_by(|(h, _)| h.get_row().table_id())
+            .chunk_by(|(h, _)| h.get_row().table_id())
         {
             let mut seq_pointer_by_location = None;
             let mut ids = Vec::new();
