@@ -174,8 +174,6 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
         toProcess.push(row.id as string);
       } else if (row.status === 'active') {
         active.push(row.id as string);
-        // TODO: getQueryStage is broken for Executing query stage...
-        toProcess.push(row.id as string);
       }
     }
 
