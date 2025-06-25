@@ -242,9 +242,9 @@ jobs:
       matrix:
         node-version: [22.x]
         python-version: ["fallback"]
-        os-version: [windows-2019]
+        os-version: [windows-2022]
         include:
-          - os-version: windows-2019
+          - os-version: windows-2022
             package_target_arch: x64
             package_target_platform: win32
             package_target_libc: unknown
@@ -670,7 +670,7 @@ jobs:
           - aarch64-apple-darwin
         include:
           - target: x86_64-pc-windows-msvc
-            os: windows-2019
+            os: windows-2022
             executable_name: cubestored.exe
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
