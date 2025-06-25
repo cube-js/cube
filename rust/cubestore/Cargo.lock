@@ -1568,7 +1568,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "ipc-channel",
- "itertools 0.11.0",
+ "itertools 0.14.0",
  "json",
  "lazy_static",
  "libc",
@@ -1634,7 +1634,7 @@ dependencies = [
  "flate2",
  "indoc",
  "ipc-channel",
- "itertools 0.9.0",
+ "itertools 0.14.0",
  "lazy_static",
  "log",
  "pretty_assertions",
@@ -3395,15 +3395,6 @@ dependencies = [
  "hermit-abi 0.5.2",
  "libc",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "itertools"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
-dependencies = [
- "either",
 ]
 
 [[package]]
