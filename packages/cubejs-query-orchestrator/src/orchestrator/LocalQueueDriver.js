@@ -152,12 +152,14 @@ export class LocalQueueDriverConnection {
     }
 
     let added = 0;
-    if (!this.toProcess[key]) {
+
+    if (!this.toProcess[key] && !this.active[key]) {
       this.toProcess[key] = {
         order: keyScore,
         queueId: options.queueId,
         key
       };
+
       added = 1;
     }
 
