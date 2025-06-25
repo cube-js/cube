@@ -271,6 +271,18 @@ describe('SQL Generation', () => {
           type: 'sum',
           group_by: []
         },
+        visitors_revenue_per_source: {
+          multi_stage: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          group_by: [visitors.source]
+        },
+        visitors_revenue_without_date: {
+          multi_stage: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          reduce_by: [visitors.created_at]
+        },
         percentage_of_total: {
           multi_stage: true,
           sql: \`(100 * \${revenue} / NULLIF(\${visitors_revenue_total}, 0))::int\`,
@@ -887,7 +899,6 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   async function runQueryTest(q, expectedResult) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
-
     const res = await dbRunner.testQuery(query.buildSqlAndParams());
     console.log(JSON.stringify(res));
 
@@ -3758,6 +3769,186 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       vc__source: null
     }]
   ));
+
+  it('multi stage sum with group by', async () => runQueryTest(
+    {
+      measures: ['visitors.visitors_revenue_per_source', 'visitors.revenue'],
+      dimensions: ['visitors.source', 'visitors.created_at'],
+      order: [{
+        id: 'visitors.source'
+      }, {
+        id: 'visitors.created_at'
+      }],
+    },
+    [{
+      visitors__source: 'google',
+      visitors__created_at: '2017-01-06T00:00:00.000Z',
+      visitors__visitors_revenue_per_source: '300',
+      visitors__revenue: '300'
+    },
+    {
+      visitors__source: 'some',
+      visitors__created_at: '2017-01-03T00:00:00.000Z',
+      visitors__visitors_revenue_per_source: '300',
+      visitors__revenue: '100'
+    },
+    {
+      visitors__source: 'some',
+      visitors__created_at: '2017-01-05T00:00:00.000Z',
+      visitors__visitors_revenue_per_source: '300',
+      visitors__revenue: '200'
+    },
+    {
+      visitors__source: null,
+      visitors__created_at: '2016-09-07T00:00:00.000Z',
+      visitors__visitors_revenue_per_source: '1400',
+      visitors__revenue: '500'
+    },
+    {
+      visitors__source: null,
+      visitors__created_at: '2017-01-07T00:00:00.000Z',
+      visitors__visitors_revenue_per_source: '1400',
+      visitors__revenue: '900'
+    }]
+  ));
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('multi stage sum with group by over view', async () => runQueryTest(
+      {
+        measures: ['visitors_multi_stage.visitors_revenue_per_source', 'visitors_multi_stage.revenue'],
+        dimensions: ['visitors_multi_stage.source', 'visitors_multi_stage.created_at'],
+        order: [{
+          id: 'visitors_multi_stage.source'
+        }, {
+          id: 'visitors_multi_stage.created_at'
+        }],
+      },
+      [{
+        visitors_multi_stage__source: 'google',
+        visitors_multi_stage__created_at: '2017-01-06T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_per_source: '300',
+        visitors_multi_stage__revenue: '300'
+      },
+      {
+        visitors_multi_stage__source: 'some',
+        visitors_multi_stage__created_at: '2017-01-03T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_per_source: '300',
+        visitors_multi_stage__revenue: '100'
+      },
+      {
+        visitors_multi_stage__source: 'some',
+        visitors_multi_stage__created_at: '2017-01-05T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_per_source: '300',
+        visitors_multi_stage__revenue: '200'
+      },
+      {
+        visitors_multi_stage__source: null,
+        visitors_multi_stage__created_at: '2016-09-07T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_per_source: '1400',
+        visitors_multi_stage__revenue: '500'
+      },
+      {
+        visitors_multi_stage__source: null,
+        visitors_multi_stage__created_at: '2017-01-07T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_per_source: '1400',
+        visitors_multi_stage__revenue: '900'
+      }]
+    ));
+  } else {
+    it.skip('multi stage sum with reduce by over view', async () => {
+    // Works only in Tesseract
+    });
+  }
+
+  it('multi stage sum with reduce by', async () => runQueryTest(
+    {
+      measures: ['visitors.visitors_revenue_without_date', 'visitors.revenue'],
+      dimensions: ['visitors.source', 'visitors.created_at'],
+      order: [{
+        id: 'visitors.source'
+      }, {
+        id: 'visitors.created_at'
+      }],
+    },
+    [{
+      visitors__source: 'google',
+      visitors__created_at: '2017-01-06T00:00:00.000Z',
+      visitors__visitors_revenue_without_date: '300',
+      visitors__revenue: '300'
+    },
+    {
+      visitors__source: 'some',
+      visitors__created_at: '2017-01-03T00:00:00.000Z',
+      visitors__visitors_revenue_without_date: '300',
+      visitors__revenue: '100'
+    },
+    {
+      visitors__source: 'some',
+      visitors__created_at: '2017-01-05T00:00:00.000Z',
+      visitors__visitors_revenue_without_date: '300',
+      visitors__revenue: '200'
+    },
+    {
+      visitors__source: null,
+      visitors__created_at: '2016-09-07T00:00:00.000Z',
+      visitors__visitors_revenue_without_date: '1400',
+      visitors__revenue: '500'
+    },
+    {
+      visitors__source: null,
+      visitors__created_at: '2017-01-07T00:00:00.000Z',
+      visitors__visitors_revenue_without_date: '1400',
+      visitors__revenue: '900'
+    }]
+  ));
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('multi stage sum with reduce by over view', async () => runQueryTest(
+      {
+        measures: ['visitors_multi_stage.visitors_revenue_without_date', 'visitors_multi_stage.revenue'],
+        dimensions: ['visitors_multi_stage.source', 'visitors_multi_stage.created_at'],
+        order: [{
+          id: 'visitors_multi_stage.source'
+        }, {
+          id: 'visitors_multi_stage.created_at'
+        }],
+      },
+      [{
+        visitors_multi_stage__source: 'google',
+        visitors_multi_stage__created_at: '2017-01-06T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_without_date: '300',
+        visitors_multi_stage__revenue: '300'
+      },
+      {
+        visitors_multi_stage__source: 'some',
+        visitors_multi_stage__created_at: '2017-01-03T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_without_date: '300',
+        visitors_multi_stage__revenue: '100'
+      },
+      {
+        visitors_multi_stage__source: 'some',
+        visitors_multi_stage__created_at: '2017-01-05T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_without_date: '300',
+        visitors_multi_stage__revenue: '200'
+      },
+      {
+        visitors_multi_stage__source: null,
+        visitors_multi_stage__created_at: '2016-09-07T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_without_date: '1400',
+        visitors_multi_stage__revenue: '500'
+      },
+      {
+        visitors_multi_stage__source: null,
+        visitors_multi_stage__created_at: '2017-01-07T00:00:00.000Z',
+        visitors_multi_stage__visitors_revenue_without_date: '1400',
+        visitors_multi_stage__revenue: '900'
+      }]
+    ));
+  } else {
+    it.skip('multi stage sum with reduce by over view', async () => {
+    // Works only in Tesseract
+    });
+  }
 
   it('multiplied sum and count no dimensions through view', async () => runQueryTest(
     {
