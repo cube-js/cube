@@ -280,7 +280,8 @@ GROUP BY 1
     assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
 }
 
-/// This should test that query with CubeScanWrapper uses proper change_user for both SQL generation and execution calls
+/// This should test that query with CubeScanWrapper uses proper change_user
+/// for both SQL generation and execution calls
 #[tokio::test]
 async fn test_user_change_sql_generation_cast() {
     if !Rewriter::sql_push_down_enabled() {
@@ -316,6 +317,61 @@ GROUP BY 1
     // This should be placed from load meta to query by TestConnectionTransport::sql
     // It would mean that SQL generation used changed user
     assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
+    assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
+}
+
+/// This should test that query with CubeScanWrapper and joins with multiple WHERE clauses
+/// uses proper change_user for both SQL generation and execution calls
+#[tokio::test]
+async fn test_user_change_sql_push_down_with_joins() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+    context
+        .execute_query(
+            // language=PostgreSQL
+            r#"
+SELECT
+    COALESCE(customer_gender, 'N/A') AS customer_gender,
+    AVG(avgPrice)
+FROM
+    KibanaSampleDataEcommerce
+    INNER JOIN (
+        SELECT
+            COALESCE(customer_gender, 'N/A') AS customer_gender
+        FROM
+            KibanaSampleDataEcommerce
+        WHERE
+            CAST(__user AS TEXT) = 'gopher'
+            AND LOWER(customer_gender) = 'test'
+        GROUP BY 1
+    ) t0 ON (
+        CAST(KibanaSampleDataEcommerce.customer_gender AS TEXT)
+        IS NOT DISTINCT FROM
+        CAST(t0.customer_gender AS TEXT)
+    )
+WHERE
+    CAST(KibanaSampleDataEcommerce.__user AS TEXT) = 'gopher'
+    AND LOWER(KibanaSampleDataEcommerce.customer_gender) = 'test'
+GROUP BY 1
+;
+        "#
+            .to_string(),
+        )
+        .await
+        .expect_err("Test transport does not support load with SQL");
+
+    let load_calls = context.load_calls().await;
+    assert_eq!(load_calls.len(), 1);
+    let sql_query = load_calls[0].sql_query.as_ref().unwrap();
+    // This should be placed from load meta to query by TestConnectionTransport::sql
+    // It would mean that SQL generation used changed user
+    assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
+    assert!(!sql_query.sql.contains("= 'gopher'"));
     assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
 }
 
