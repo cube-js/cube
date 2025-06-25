@@ -810,6 +810,7 @@ impl BaseFilter {
 
     fn is_need_null_chek(&self, is_not: bool) -> bool {
         let contains_null = self.is_values_contains_null();
+
         if is_not {
             !contains_null
         } else {
