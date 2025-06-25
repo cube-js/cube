@@ -442,11 +442,22 @@ mod tests {
     #[test]
     fn test_queue_item_sort() -> Result<(), CubeError> {
         let priority0_1 = QueueItem::new("1".to_string(), QueueItemStatus::Active, 0, None);
-        let priority0_2 = QueueItem::new("2".to_string(), QueueItemStatus::Active, 0, None);
-        let priority0_3 = QueueItem::new("3".to_string(), QueueItemStatus::Active, 0, None);
-        let priority10_4 = QueueItem::new("4".to_string(), QueueItemStatus::Active, 10, None);
-        let priority0_5 = QueueItem::new("5".to_string(), QueueItemStatus::Active, 0, None);
-        let priority_n5_6 = QueueItem::new("6".to_string(), QueueItemStatus::Active, -5, None);
+        let mut priority0_2 = QueueItem::new("2".to_string(), QueueItemStatus::Active, 0, None);
+        let mut priority0_3 = QueueItem::new("3".to_string(), QueueItemStatus::Active, 0, None);
+        let mut priority10_4 = QueueItem::new("4".to_string(), QueueItemStatus::Active, 10, None);
+        let mut priority0_5 = QueueItem::new("5".to_string(), QueueItemStatus::Active, 0, None);
+        let mut priority_n5_6 = QueueItem::new("6".to_string(), QueueItemStatus::Active, -5, None);
+
+        // Force timestamps to be distinct (on systems that are too fast or have low clock resolution)
+        for (i, item) in (1..).zip([
+            &mut priority0_2,
+            &mut priority0_3,
+            &mut priority10_4,
+            &mut priority0_5,
+            &mut priority_n5_6,
+        ]) {
+            item.created = priority0_1.created + Duration::milliseconds(i);
+        }
 
         assert_eq!(
             vec![
@@ -491,7 +502,7 @@ mod tests {
                 "3".to_string(),
                 "5".to_string(),
                 "6".to_string()
-            ]
+            ],
         );
 
         Ok(())
