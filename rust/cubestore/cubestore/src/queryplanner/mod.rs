@@ -137,7 +137,15 @@ impl QueryPlanner for QueryPlannerImpl {
         inline_tables: &InlineTables,
         trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError> {
+        let pre_execution_context_time = SystemTime::now();
         let ctx = self.execution_context()?;
+
+        let post_execution_context_time = SystemTime::now();
+        app_metrics::DATA_QUERY_LOGICAL_PLAN_EXECUTION_CONTEXT_TIME_US.report(
+            post_execution_context_time
+                .duration_since(pre_execution_context_time)?
+                .as_micros() as i64,
+        );
 
         let state = Arc::new(ctx.state());
         let schema_provider = MetaStoreSchemaProvider::new(
@@ -150,7 +158,20 @@ impl QueryPlanner for QueryPlannerImpl {
         );
 
         let query_planner = SqlToRel::new_with_options(&schema_provider, sql_to_rel_options());
+
+        let pre_statement_to_plan_time = SystemTime::now();
         let mut logical_plan = query_planner.statement_to_plan(statement)?;
+        let post_statement_to_plan_time = SystemTime::now();
+        app_metrics::DATA_QUERY_LOGICAL_PLAN_QUERY_PLANNER_SETUP_TIME_US.report(
+            pre_statement_to_plan_time
+                .duration_since(post_execution_context_time)?
+                .as_micros() as i64,
+        );
+        app_metrics::DATA_QUERY_LOGICAL_PLAN_STATEMENT_TO_PLAN_TIME_US.report(
+            post_statement_to_plan_time
+                .duration_since(pre_statement_to_plan_time)?
+                .as_micros() as i64,
+        );
 
         // TODO upgrade DF remove
         trace!(
@@ -170,8 +191,12 @@ impl QueryPlanner for QueryPlannerImpl {
 
         let logical_plan_optimize_time = SystemTime::now();
         logical_plan = state.optimize(&logical_plan)?;
-        app_metrics::DATA_QUERY_LOGICAL_PLAN_OPTIMIZE_TIME_MS
-            .report(logical_plan_optimize_time.elapsed()?.as_millis() as i64);
+        let post_optimize_time = SystemTime::now();
+        app_metrics::DATA_QUERY_LOGICAL_PLAN_OPTIMIZE_TIME_US.report(
+            post_optimize_time
+                .duration_since(logical_plan_optimize_time)?
+                .as_micros() as i64,
+        );
         trace!(
             "Logical Plan: {}",
             pp_plan_ext(
@@ -187,34 +212,36 @@ impl QueryPlanner for QueryPlannerImpl {
             )
         );
 
+        let post_is_data_select_query_time: SystemTime;
         let plan = if SerializedPlan::is_data_select_query(&logical_plan) {
             let choose_index_ext_start = SystemTime::now();
+            post_is_data_select_query_time = choose_index_ext_start;
             let (logical_plan, meta) = choose_index_ext(
                 logical_plan,
                 &self.meta_store.as_ref(),
                 self.config.enable_topk(),
             )
             .await?;
-            let choose_index_ext_end = SystemTime::now();
             let workers = compute_workers(
                 self.config.as_ref(),
                 &logical_plan,
                 &meta.multi_part_subtree,
             )?;
-            app_metrics::DATA_QUERY_CHOOSE_INDEX_TIME_MS.report(
-                choose_index_ext_end
-                    .duration_since(choose_index_ext_start)?
-                    .as_millis() as i64,
-            );
-            app_metrics::DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_MS
-                .report(choose_index_ext_start.elapsed()?.as_millis() as i64);
+            app_metrics::DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_US
+                .report(choose_index_ext_start.elapsed()?.as_micros() as i64);
             QueryPlan::Select(
                 PreSerializedPlan::try_new(logical_plan, meta, trace_obj)?,
                 workers,
             )
         } else {
+            post_is_data_select_query_time = SystemTime::now();
             QueryPlan::Meta(logical_plan)
         };
+        app_metrics::DATA_QUERY_LOGICAL_PLAN_IS_DATA_SELECT_QUERY_US.report(
+            post_is_data_select_query_time
+                .duration_since(post_optimize_time)?
+                .as_micros() as i64,
+        );
 
         Ok(plan)
     }
