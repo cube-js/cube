@@ -18,20 +18,28 @@ pub static DATA_QUERIES_CACHE_SIZE: Gauge = metrics::gauge("cs.sql.query.data.ca
 // Approximate total weighted size of entries in this cache.
 pub static DATA_QUERIES_CACHE_WEIGHT: Gauge = metrics::gauge("cs.sql.query.data.cache.weight");
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
-pub static DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_MS: Histogram =
-    metrics::histogram("cs.sql.query.data.planning.logical_plan_total_creation.ms");
-pub static DATA_QUERY_LOGICAL_PLAN_OPTIMIZE_TIME_MS: Histogram =
-    metrics::histogram("cs.sql.query.data.planning.logical_plan_optimize.ms");
-pub static DATA_QUERY_CHOOSE_INDEX_TIME_MS: Histogram =
-    metrics::histogram("cs.sql.query.data.planning.choose_index.ms");
-pub static DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_MS: Histogram =
-    metrics::histogram("cs.sql.query.data.planning.choose_index_and_workers.ms");
-pub static DATA_QUERY_TO_SERIALIZED_PLAN_TIME_MS: Histogram =
-    metrics::histogram("cs.sql.query.data.planning.to_serialized_plan.ms");
-pub static DATA_QUERY_CREATE_ROUTER_PHYSICAL_PLAN_MS: Histogram =
-    metrics::histogram("cs.sql.query.data.planning.router_plan.ms");
-pub static DATA_QUERY_CREATE_WORKER_PHYSICAL_PLAN_MS: Histogram =
-    metrics::histogram("cs.sql.query.data.planning.worker_plan.ms");
+pub static DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.logical_plan.total_creation.us");
+pub static DATA_QUERY_LOGICAL_PLAN_EXECUTION_CONTEXT_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.logical_plan.execution_context.us");
+pub static DATA_QUERY_LOGICAL_PLAN_QUERY_PLANNER_SETUP_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.logical_plan.query_planner_setup.us");
+pub static DATA_QUERY_LOGICAL_PLAN_STATEMENT_TO_PLAN_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.logical_plan.statement_to_plan.us");
+
+pub static DATA_QUERY_LOGICAL_PLAN_OPTIMIZE_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.logical_plan.optimize.us");
+pub static DATA_QUERY_LOGICAL_PLAN_IS_DATA_SELECT_QUERY_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.logical_plan.is_data_select_query.us");
+
+pub static DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.choose_index_and_workers.us");
+pub static DATA_QUERY_TO_SERIALIZED_PLAN_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.to_serialized_plan.us");
+pub static DATA_QUERY_CREATE_ROUTER_PHYSICAL_PLAN_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.router_plan.us");
+pub static DATA_QUERY_CREATE_WORKER_PHYSICAL_PLAN_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.worker_plan.us");
 
 /// Incoming SQL queries that only read metadata or do trivial computations.
 pub static META_QUERIES: Counter = metrics::counter("cs.sql.query.meta");

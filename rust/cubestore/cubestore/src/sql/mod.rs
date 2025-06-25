@@ -1150,8 +1150,8 @@ impl SqlService for SqlServiceImpl {
                     )
                     .await?;
 
-                app_metrics::DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_MS
-                    .report(logical_plan_time_start.elapsed()?.as_millis() as i64);
+                app_metrics::DATA_QUERY_LOGICAL_PLAN_TOTAL_CREATION_TIME_US
+                    .report(logical_plan_time_start.elapsed()?.as_micros() as i64);
 
                 // TODO distribute and combine
                 let res = match logical_plan {
@@ -1169,8 +1169,8 @@ impl SqlService for SqlServiceImpl {
                         let executor = self.query_executor.clone();
                         let serialized_plan_time_start = SystemTime::now();
                         let serialized_plan = serialized.to_serialized_plan()?;
-                        app_metrics::DATA_QUERY_TO_SERIALIZED_PLAN_TIME_MS
-                            .report(serialized_plan_time_start.elapsed()?.as_millis() as i64);
+                        app_metrics::DATA_QUERY_TO_SERIALIZED_PLAN_TIME_US
+                            .report(serialized_plan_time_start.elapsed()?.as_micros() as i64);
                         timeout(
                             self.query_timeout,
                             self.cache

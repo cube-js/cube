@@ -173,8 +173,8 @@ impl QueryExecutor for QueryExecutorImpl {
         let trace_obj = plan.trace_obj();
         let create_router_physical_plan_time = SystemTime::now();
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
-        app_metrics::DATA_QUERY_CREATE_ROUTER_PHYSICAL_PLAN_MS
-            .report(create_router_physical_plan_time.elapsed()?.as_millis() as i64);
+        app_metrics::DATA_QUERY_CREATE_ROUTER_PHYSICAL_PLAN_US
+            .report(create_router_physical_plan_time.elapsed()?.as_micros() as i64);
         let split_plan = physical_plan;
 
         trace!(
@@ -250,8 +250,8 @@ impl QueryExecutor for QueryExecutorImpl {
                 Some(data_loaded_size.clone()),
             )
             .await?;
-        app_metrics::DATA_QUERY_CREATE_WORKER_PHYSICAL_PLAN_MS
-            .report(create_worker_physical_plan_time.elapsed()?.as_millis() as i64);
+        app_metrics::DATA_QUERY_CREATE_WORKER_PHYSICAL_PLAN_US
+            .report(create_worker_physical_plan_time.elapsed()?.as_micros() as i64);
 
         let worker_plan;
         let max_batch_rows;
