@@ -1557,7 +1557,7 @@ dependencies = [
  "humansize",
  "indoc",
  "ipc-channel",
- "itertools 0.11.0",
+ "itertools 0.14.0",
  "json",
  "lazy_static",
  "libc",
@@ -1625,7 +1625,7 @@ dependencies = [
  "futures-timer 3.0.2",
  "indoc",
  "ipc-channel",
- "itertools 0.9.0",
+ "itertools 0.14.0",
  "lazy_static",
  "log",
  "pretty_assertions",
@@ -3380,15 +3380,6 @@ name = "ipnet"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68f2d64f2edebec4ce84ad108148e67e1064789bee435edc5b60ad398714a3a9"
-
-[[package]]
-name = "itertools"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"

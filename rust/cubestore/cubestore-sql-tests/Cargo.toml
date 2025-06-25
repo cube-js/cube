@@ -43,7 +43,7 @@ async-trait = "0.1.36"
 cubestore = { path = "../cubestore" }
 flate2 = "1.0.22"
 futures = "0.3.5"
-itertools = "0.9.0"
+itertools = "0.14.0"
 lazy_static = "1.4.0"
 log = "0.4.11"
 pretty_assertions = "0.7.1"
