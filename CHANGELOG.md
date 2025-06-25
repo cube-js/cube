@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.26](https://github.com/cube-js/cube/compare/v1.3.25...v1.3.26) (2025-06-25)
+
+### Bug Fixes
+
+- **cubesql:** Push down `__user` meta filter further ([#9711](https://github.com/cube-js/cube/issues/9711)) ([5dd626a](https://github.com/cube-js/cube/commit/5dd626a2471a8282dd51a9d6d03654dcf44e2f80))
+- **schema-compiler:** Fix incorrect truncated time dimensions over time series queries for BigQuery ([#9615](https://github.com/cube-js/cube/issues/9615)) ([b075966](https://github.com/cube-js/cube/commit/b075966a6882c70a8f21652fca83cca74611e632))
+
 ## [1.3.25](https://github.com/cube-js/cube/compare/v1.3.24...v1.3.25) (2025-06-24)
 
 ### Features
