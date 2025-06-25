@@ -658,7 +658,9 @@ export class QueryQueue {
         };
       }
 
-      const index = toProcess.indexOf(this.redisHash(queryInQueue.queryKey));
+      const index = toProcess
+        .filter((queryKey) => (priorityFilter != null ? allQueryDefs[queryKey]?.priority === priorityFilter : true))
+        .indexOf(this.redisHash(queryInQueue.queryKey));
       if (index !== -1) {
         return index !== -1 ? { stage: `#${index + 1} in queue` } : undefined;
       }
