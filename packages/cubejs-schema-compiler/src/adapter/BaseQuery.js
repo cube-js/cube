@@ -3693,6 +3693,10 @@ export class BaseQuery {
     }
     // TODO: https://github.com/cube-js/cube.js/issues/4019
     // use single underscore for pre-aggregations to avoid fail of pre-aggregation name replace
+    const lowercaseName = name.toLowerCase();
+    if (lowercaseName === '__user' || lowercaseName === '__cubejoinfield') {
+      return name;
+    }
     return inflection.underscore(name).replace(/\./g, isPreAggregationName ? '_' : '__');
   }
 
