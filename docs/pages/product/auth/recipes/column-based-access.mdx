@@ -10,7 +10,7 @@ products. A supplier can't see other supplier's products.
 
 To implement column-based access, we will use supplier's email from a
 [JSON Web Token](/product/auth), and the
-[`queryRewrite`](/product/auth/context#using-queryrewrite) extension point to
+[`queryRewrite`](/product/auth/context#using-query_rewrite) extension point to
 manage data access.
 
 We have `products` and `suppliers` cubes with a `many_to_one` relationship from

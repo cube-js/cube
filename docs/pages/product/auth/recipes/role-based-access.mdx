@@ -10,7 +10,7 @@ from a shop and a `manager` can only view shipped and completed orders.
 
 To implement role-based access, we will use a [JSON Web Token](/product/auth)
 with role information in the payload, and the
-[`queryRewrite`](/product/auth/context#using-queryrewrite) extension point to
+[`queryRewrite`](/product/auth/context#using-query_rewrite) extension point to
 manage data access.
 
 Let's add the role verification in the `cube.js` file.
