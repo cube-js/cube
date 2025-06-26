@@ -1963,6 +1963,8 @@ export class BaseQuery {
   }
 
   /**
+   * BigQuery has strict date type and can not automatically convert between date
+   * and timestamp, so we override seriesSql() in BigQuery Dialect
    * @param {import('./BaseTimeDimension').BaseTimeDimension} timeDimension
    * @return {string}
    */
