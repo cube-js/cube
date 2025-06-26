@@ -191,6 +191,7 @@
     "querying BigECommerce: rolling window YTD (month + week + no gran)",
     "querying BigECommerce: rolling window YTD (month + week + day)",
     "querying BigECommerce: rolling window YTD (month + week + day + no gran)",
+    "querying BigECommerce: time series in rolling window",
 
     "---------------------------------------",
     "Requires Tesseract.                    ",
