@@ -76,6 +76,24 @@ user-specific state of the deployment:
 * <Btn>Enter Development Mode</Btn> button indicates whether a user has
   entered the [development mode][ref-dev-mode].
 
+## Deployment settings
+
+You can manage various settings of a deployment, such as [environment
+variables](#environment-variables), by navigating to the <Btn>Settings</Btn> page of the
+deployment.
+
+### Environment variables
+
+You can configure environment variables by navigating to <Btn>Settings → Environment
+variables</Btn> where you can add, edit, or remove environment variables for your
+deployment.
+
+For convenience, environment variables are split into two lists: ones that relate to
+the [data source][ref-data-sources] configuration and all other variables.
+Browsing environment variables is reflected in the [Audit Log][ref-audit-log].
+
+<Screenshot src="https://ucarecdn.com/e7d6cbc3-ed83-492c-9376-dee501ae747a/" />
+
 ## Cube version
 
 Each [environment][ref-environments] within a Cube Cloud deployment runs a specific
@@ -152,3 +170,5 @@ resource consumption in different scenarios.
 [ref-environments-prod]: /product/workspace/environments#production-environment
 [ref-lts]: /product/distribution#long-term-support
 [link-semver]: https://semver.org
+[ref-data-sources]: /product/configuration/data-sources
+[ref-audit-log]: /product/workspace/audit-log
