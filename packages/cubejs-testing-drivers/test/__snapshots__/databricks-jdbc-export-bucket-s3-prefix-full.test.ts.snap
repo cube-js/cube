@@ -10890,6 +10890,71 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-s3-prefix querying BigECommerce: time series in rolling window 1`] = `
+Array [
+  Object {
+    "BigECommerce.customersCountPrev1Month": null,
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "2",
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "1",
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "2",
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "1",
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "5",
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "7",
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": null,
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": null,
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "6",
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "4",
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.customersCountPrev1Month": "9",
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-s3-prefix querying BigECommerce: totalProfitYearAgo 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-s3-prefix querying Customers: dimensions + limit 1`] = `
@@ -15717,22 +15782,6 @@ Array [
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
     "ECommerce.rollingCountByUnbounded": "44",
-  },
-]
-`;
-
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-s3-prefix SQL API: Date/time comparison with SQL push down 1`] = `
-Array [
-  Object {
-    "measure(BigECommerce.rollingCountBy2Day)": "12",
-  },
-]
-`;
-
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-s3-prefix SQL API: Date/time comparison with date_trunc with SQL push down 1`] = `
-Array [
-  Object {
-    "measure(BigECommerce.rollingCountBy2Week)": "12",
   },
 ]
 `;
