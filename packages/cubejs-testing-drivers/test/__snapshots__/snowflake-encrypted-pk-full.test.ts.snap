@@ -18214,7 +18214,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying BigECommerce: time series in rolling window 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver encrypted-pk querying BigECommerce: time series in rolling window 1`] = `
 Array [
   Object {
     "BigECommerce.customersCountPrev1Month": null,
