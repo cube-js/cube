@@ -1,0 +1,141 @@
+cubes:
+  - name: custom_calendar
+    sql_table: public.custom_calendar
+    calendar: true
+
+    dimensions:
+      # Plain date value
+      - name: date_val
+        sql: "{CUBE}.date_val"
+        type: time
+        primary_key: true
+
+      ##### Retail Dates ####
+      - name: retail_date
+        sql: retail_date
+        type: time
+
+        # This follows the syntax for custom granularities and
+        # extends it with the new `sql` parameter (that we wanted to introduce later anyway)
+        granularities:
+          - name: year
+            sql: "{CUBE.retail_year_begin_date}"
+
+          - name: quarter
+            sql: "{CUBE.retail_quarter_year}"
+
+          - name: month
+            sql: "{CUBE.retail_month_begin_date}"
+
+          - name: week
+            sql: "{CUBE.retail_week_begin_date}"
+
+            # Casually defining custom granularities should also work.
+            # While maybe not very sound from a business standpoint,
+            # such definition should be allowed in this data model
+          - name: fortnight
+            interval: 2 week
+            origin: "2025-01-01"
+
+      - name: retail_year
+        sql: "{CUBE}.retail_year_name"
+        type: string
+
+      - name: retail_month_long_name
+        sql: "{CUBE}.retail_month_long_name"
+        type: string
+
+      - name: retail_week_name
+        sql: "{CUBE}.retail_week_name"
+        type: string
+
+      - name: retail_year_begin_date
+        sql: "{CUBE}.retail_year_begin_date"
+        type: time
+
+      - name: retail_year_end_date
+        sql: "{CUBE}.retail_year_end_date"
+        type: time
+
+      - name: retail_quarter_year
+        sql: "{CUBE}.retail_quarter_year"
+        type: string
+
+      - name: retail_month_begin_date
+        sql: "{CUBE}.retail_month_begin_date"
+        type: string
+
+      - name: retail_week_begin_date
+        sql: "{CUBE}.retail_week_begin_date"
+        type: string
+
+      - name: retail_year_week
+        sql: "{CUBE}.retail_year_week"
+        type: string
+
+      - name: retail_week_in_month
+        sql: "{CUBE}.retail_week_in_month"
+        type: string
+
+    ##### Fiscal Dates ####
+
+      - name: fiscal_year
+        sql: "{CUBE}.fiscal_year"
+        type: string
+
+      - name: fiscal_quarter_year
+        sql: "{CUBE}.fiscal_quarter_year"
+        type: string
+
+      - name: fiscal_year_month_number
+        sql: "{CUBE}.fiscal_year_month_number"
+        type: number
+
+      - name: fiscal_year_month_name
+        sql: "{CUBE}.fiscal_year_month_name"
+        type: string
+
+      - name: fiscal_year_period_name
+        sql: "{CUBE}.fiscal_year_period_name"
+        type: number
+
+      - name: fiscal_month_number
+        sql: "{CUBE}.fiscal_month_number"
+        type: string
+
+      - name: fiscal_month_short_name
+        sql: "{CUBE}.fiscal_month_short_name"
+        type: string
+
+      - name: fiscal_week_name
+        sql: "{CUBE}.fiscal_week_name"
+        type: string
+
+      - name: fiscal_week_begin_date
+        sql: "{CUBE}.fiscal_week_begin_date"
+        type: time
+
+      - name: fiscal_week_end_date
+        sql: "{CUBE}.fiscal_week_end_date"
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+    hierarchies:
+      - name: Fiscal_Calendar_Hierarchy
+        title: Fiscal Calendar Hierarchy
+        levels:
+          - fiscal_year
+          - fiscal_quarter_year
+          - fiscal_month_number
+          # - date
+
+      - name: Retail_Calendar_Hierarchy
+        title: Retail Calendar Hierarchy
+        levels:
+          - retail_year
+          - retail_month_long_name
+          - retail_week_name
+          # - date

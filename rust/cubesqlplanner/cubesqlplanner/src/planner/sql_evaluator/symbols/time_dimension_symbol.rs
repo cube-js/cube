@@ -60,10 +60,6 @@ impl TimeDimensionSymbol {
         self.alias_suffix.clone()
     }
 
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        self.base_symbol.get_dependencies()
-    }
-
     pub fn owned_by_cube(&self) -> bool {
         self.base_symbol.owned_by_cube()
     }
@@ -94,8 +90,28 @@ impl TimeDimensionSymbol {
             .collect()
     }
 
+    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut deps = vec![];
+        if let Some(granularity_obj) = &self.granularity_obj {
+            if let Some(calendar_sql) = granularity_obj.calendar_sql() {
+                calendar_sql.extract_symbol_deps(&mut deps);
+            }
+        }
+
+        deps.append(&mut self.base_symbol.get_dependencies());
+        deps
+    }
+
     pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        self.base_symbol.get_dependencies_with_path()
+        let mut deps = vec![];
+        if let Some(granularity_obj) = &self.granularity_obj {
+            if let Some(calendar_sql) = granularity_obj.calendar_sql() {
+                calendar_sql.extract_symbol_deps_with_path(&mut deps);
+            }
+        }
+
+        deps.append(&mut self.base_symbol.get_dependencies_with_path());
+        deps
     }
 
     pub fn cube_name(&self) -> String {
@@ -107,6 +123,12 @@ impl TimeDimensionSymbol {
     }
 
     pub fn is_reference(&self) -> bool {
+        if let Some(granularity_obj) = &self.granularity_obj {
+            if granularity_obj.calendar_sql().is_some() {
+                return false;
+            }
+        }
+
         self.base_symbol.is_reference()
     }
 

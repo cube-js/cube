@@ -31,6 +31,7 @@ interface CubeDefinition {
   excludes?: any;
   cubes?: any;
   isView?: boolean;
+  calendar?: boolean;
   isSplitView?: boolean;
   includedMembers?: any[];
 }
@@ -982,8 +983,17 @@ export class CubeSymbols {
     const [cubeName, dimName, gr, granName] = Array.isArray(path) ? path : path.split('.');
     const cube = refCube || this.symbols[cubeName];
 
-    // Predefined granularity
+    // Calendar cubes time dimensions may define custom sql for predefined granularities,
+    // so we need to check if such granularity exists in cube definition.
     if (typeof granName === 'string' && /^(second|minute|hour|day|week|month|quarter|year)$/i.test(granName)) {
+      const customGranularity = cube?.[dimName]?.[gr]?.[granName];
+      if (customGranularity) {
+        return {
+          ...customGranularity,
+          interval: `1 ${granName}`, // It's still important to have interval for granularity math
+        };
+      }
+
       return { interval: `1 ${granName}` };
     }
 

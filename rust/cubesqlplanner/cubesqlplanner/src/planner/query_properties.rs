@@ -169,6 +169,7 @@ impl QueryProperties {
                     BaseTimeDimension::try_new_required(
                         query_tools.clone(),
                         evaluator,
+                        &mut evaluator_compiler,
                         d.granularity.clone(),
                         d.date_range.clone(),
                     )

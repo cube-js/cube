@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{MemberSymbol, TimeDimensionSymbol};
+use super::sql_evaluator::{Compiler, MemberSymbol, TimeDimensionSymbol};
 use super::BaseDimension;
 use super::Granularity;
 use super::GranularityHelper;
@@ -96,6 +96,7 @@ impl BaseTimeDimension {
     pub fn try_new_required(
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<MemberSymbol>,
+        compiler: &mut Compiler,
         granularity: Option<String>,
         date_range: Option<Vec<String>>,
     ) -> Result<Rc<Self>, CubeError> {
@@ -116,6 +117,7 @@ impl BaseTimeDimension {
 
         let granularity_obj = GranularityHelper::make_granularity_obj(
             query_tools.cube_evaluator().clone(),
+            compiler,
             query_tools.timezone().clone(),
             &dimension.cube_name(),
             &dimension.name(),
@@ -123,7 +125,7 @@ impl BaseTimeDimension {
         )?;
 
         let date_range_tuple = if let Some(date_range) = &date_range {
-            assert!(date_range.len() == 2);
+            assert_eq!(date_range.len(), 2);
             Some((date_range[0].clone(), date_range[1].clone()))
         } else {
             None
@@ -150,15 +152,19 @@ impl BaseTimeDimension {
         &self,
         new_granularity: Option<String>,
     ) -> Result<Rc<Self>, CubeError> {
+        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
         let new_granularity_obj = GranularityHelper::make_granularity_obj(
             self.query_tools.cube_evaluator().clone(),
+            &mut evaluator_compiler,
             self.query_tools.timezone(),
             &self.dimension.name(),
             &self.dimension.cube_name(),
             new_granularity.clone(),
         )?;
         let date_range_tuple = if let Some(date_range) = &self.date_range {
-            assert!(date_range.len() == 2);
+            assert_eq!(date_range.len(), 2);
             Some((date_range[0].clone(), date_range[1].clone()))
         } else {
             None

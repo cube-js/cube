@@ -172,6 +172,7 @@ impl<'a> DependenciesBuilder<'a> {
             let granularity = &call_deps[*child_ind].name;
             if let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
                 self.cube_evaluator.clone(),
+                self.compiler,
                 self.timezone.clone(),
                 cube_name,
                 &dep.name,
