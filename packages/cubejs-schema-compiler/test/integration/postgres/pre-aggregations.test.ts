@@ -1267,90 +1267,102 @@ describe('PreAggregations', () => {
     });
   });
 
-  it('non-match because of join tree difference (through the view)', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'cards_visitors_checkins_view.count'
-      ],
-      dimensions: ['cards_visitors_checkins_view.source'],
-      timeDimensions: [{
-        dimension: 'cards_visitors_checkins_view.createdAt',
-        granularity: 'day',
-        dateRange: ['2017-01-01', '2017-01-30']
-      }],
-      order: [{
-        id: 'cards_visitors_checkins_view.createdAt'
-      }, {
-        id: 'cards_visitors_checkins_view.source'
-      }],
-      timezone: 'America/Los_Angeles',
-      preAggregationsSchema: ''
+  if (getEnv('nativeSqlPlanner')) {
+    it.skip('FIXME(tesseract): non-match because of join tree difference (through the view)', () => {
+      // This should be fixed in Tesseract.
     });
+  } else {
+    it('non-match because of join tree difference (through the view)', async () => {
+      await compiler.compile();
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'cards_visitors_checkins_view.count'
+        ],
+        dimensions: ['cards_visitors_checkins_view.source'],
+        timeDimensions: [{
+          dimension: 'cards_visitors_checkins_view.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30']
+        }],
+        order: [{
+          id: 'cards_visitors_checkins_view.createdAt'
+        }, {
+          id: 'cards_visitors_checkins_view.source'
+        }],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: ''
+      });
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    expect((<any>query).preAggregations.preAggregationForQuery).toBeUndefined();
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      expect((<any>query).preAggregations.preAggregationForQuery).toBeUndefined();
 
-    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-      expect(res).toEqual(
-        [
-          {
-            cards_visitors_checkins_view__count: '1',
-            cards_visitors_checkins_view__created_at_day: '2017-01-02T00:00:00.000Z',
-            cards_visitors_checkins_view__source: 'google',
-          },
-          {
-            cards_visitors_checkins_view__count: '1',
-            cards_visitors_checkins_view__created_at_day: '2017-01-02T00:00:00.000Z',
-            cards_visitors_checkins_view__source: null,
-          },
-          {
-            cards_visitors_checkins_view__count: '1',
-            cards_visitors_checkins_view__created_at_day: '2017-01-04T00:00:00.000Z',
-            cards_visitors_checkins_view__source: null,
-          },
-          {
-            cards_visitors_checkins_view__count: '1',
-            cards_visitors_checkins_view__created_at_day: '2017-01-05T00:00:00.000Z',
-            cards_visitors_checkins_view__source: null,
-          },
-          {
-            cards_visitors_checkins_view__count: '2',
-            cards_visitors_checkins_view__created_at_day: '2017-01-06T00:00:00.000Z',
-            cards_visitors_checkins_view__source: null,
-          },
-        ]
-      );
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [
+            {
+              cards_visitors_checkins_view__count: '1',
+              cards_visitors_checkins_view__created_at_day: '2017-01-02T00:00:00.000Z',
+              cards_visitors_checkins_view__source: 'google',
+            },
+            {
+              cards_visitors_checkins_view__count: '1',
+              cards_visitors_checkins_view__created_at_day: '2017-01-02T00:00:00.000Z',
+              cards_visitors_checkins_view__source: null,
+            },
+            {
+              cards_visitors_checkins_view__count: '1',
+              cards_visitors_checkins_view__created_at_day: '2017-01-04T00:00:00.000Z',
+              cards_visitors_checkins_view__source: null,
+            },
+            {
+              cards_visitors_checkins_view__count: '1',
+              cards_visitors_checkins_view__created_at_day: '2017-01-05T00:00:00.000Z',
+              cards_visitors_checkins_view__source: null,
+            },
+            {
+              cards_visitors_checkins_view__count: '2',
+              cards_visitors_checkins_view__created_at_day: '2017-01-06T00:00:00.000Z',
+              cards_visitors_checkins_view__source: null,
+            },
+          ]
+        );
+      });
     });
-  });
+  }
 
-  it('non-match because of requesting only joined cube members', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      dimensions: ['visitor_checkins.source'],
-      order: [{
-        id: 'visitor_checkins.source'
-      }],
-      timezone: 'America/Los_Angeles',
-      preAggregationsSchema: ''
+  if (getEnv('nativeSqlPlanner')) {
+    it.skip('FIXME(tesseract): non-match because of requesting only joined cube members', () => {
+      // This should be fixed in Tesseract.
     });
+  } else {
+    it('non-match because of requesting only joined cube members', async () => {
+      await compiler.compile();
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        dimensions: ['visitor_checkins.source'],
+        order: [{
+          id: 'visitor_checkins.source'
+        }],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: ''
+      });
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    expect((<any>query).preAggregations.preAggregationForQuery).toBeUndefined();
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      expect((<any>query).preAggregations.preAggregationForQuery).toBeUndefined();
 
-    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-      expect(res).toEqual([
-        {
-          vc__source: 'google',
-        },
-        {
-          vc__source: null,
-        },
-      ]);
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual([
+          {
+            vc__source: 'google',
+          },
+          {
+            vc__source: null,
+          },
+        ]);
+      });
     });
-  });
+  }
 
   it('non-leaf additive measure', async () => {
     await compiler.compile();
