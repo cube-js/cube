@@ -127,6 +127,12 @@ export class BigqueryQuery extends BaseQuery {
       return [`'${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' HOUR TO SECOND`, 'SECOND'];
     } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
       return [`'${intervalParsed.minute}:${intervalParsed.second}' MINUTE TO SECOND`, 'SECOND'];
+    } else if (intervalParsed.hour && intKeys === 1) {
+      return [`${intervalParsed.hour} HOUR`, 'HOUR'];
+    } else if (intervalParsed.minute && intKeys === 1) {
+      return [`${intervalParsed.minute} MINUTE`, 'MINUTE'];
+    } else if (intervalParsed.second && intKeys === 1) {
+      return [`${intervalParsed.second} SECOND`, 'SECOND'];
     }
 
     // No need to support microseconds.
