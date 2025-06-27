@@ -88,6 +88,30 @@ pub static CACHESTORE_ROCKSDB_CF_DEFAULT_SIZE: Gauge =
 pub static CACHESTORE_SCHEDULER_GC_QUEUE: Gauge =
     metrics::gauge("cs.cachestore.scheduler.gc_queue");
 
+// TODO: Maybe these should be a single metric that uses tags.
+pub static JOBS_PARTITION_COMPACTION: Counter =
+    metrics::counter("cs.jobs.partition_compaction.count");
+pub static JOBS_PARTITION_COMPACTION_COMPLETED: Counter =
+    metrics::counter("cs.jobs.partition_compaction.completed");
+pub static JOBS_PARTITION_COMPACTION_FAILURES: Counter =
+    metrics::counter("cs.jobs.partition_compaction.failures");
+pub static JOBS_MULTI_PARTITION_SPLIT: Counter =
+    metrics::counter("cs.jobs.multi_partition_split.count");
+pub static JOBS_MULTI_PARTITION_SPLIT_COMPLETED: Counter =
+    metrics::counter("cs.jobs.multi_partition_split.completed");
+pub static JOBS_MULTI_PARTITION_SPLIT_FAILURES: Counter =
+    metrics::counter("cs.jobs.multi_partition_split.failures");
+pub static JOBS_FINISH_MULTI_SPLIT: Counter = metrics::counter("cs.jobs.finish_multi_split.count");
+pub static JOBS_FINISH_MULTI_SPLIT_COMPLETED: Counter =
+    metrics::counter("cs.jobs.finish_multi_split.completed");
+pub static JOBS_FINISH_MULTI_SPLIT_FAILURES: Counter =
+    metrics::counter("cs.jobs.finish_multi_split.failures");
+pub static JOBS_REPARTITION_CHUNK: Counter = metrics::counter("cs.jobs.repartition_chunk.count");
+pub static JOBS_REPARTITION_CHUNK_COMPLETED: Counter =
+    metrics::counter("cs.jobs.repartition_chunk.completed");
+pub static JOBS_REPARTITION_CHUNK_FAILURES: Counter =
+    metrics::counter("cs.jobs.repartition_chunk.failures");
+
 /// RemoteFs metrics
 pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");
 pub static REMOTE_FS_FILES_TO_REMOVE: Gauge = metrics::gauge("cs.remote_fs.files_to_remove.count");
