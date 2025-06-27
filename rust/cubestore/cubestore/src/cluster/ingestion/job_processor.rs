@@ -7,7 +7,7 @@ use crate::metastore::{MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -117,10 +117,16 @@ impl JobIsolatedProcessor {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
                     let data_loaded_size = DataLoadedSize::new();
+                    app_metrics::JOBS_PARTITION_COMPACTION.add(1);
                     let r = compaction_service
                         .compact(partition_id, data_loaded_size.clone())
                         .await;
-                    r?;
+                    if let Err(e) = r {
+                        app_metrics::JOBS_PARTITION_COMPACTION_FAILURES.add(1);
+                        return Err(e);
+                    }
+                    app_metrics::JOBS_PARTITION_COMPACTION_COMPLETED.add(1);
+
                     Ok(JobProcessResult::new(data_loaded_size.get()))
                 } else {
                     Self::fail_job_row_key(job)
@@ -130,7 +136,13 @@ impl JobIsolatedProcessor {
                 if let RowKey::Table(TableId::MultiPartitions, id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let id = *id;
-                    compaction_service.split_multi_partition(id).await?;
+                    app_metrics::JOBS_MULTI_PARTITION_SPLIT.add(1);
+                    let r = compaction_service.split_multi_partition(id).await;
+                    if let Err(e) = r {
+                        app_metrics::JOBS_MULTI_PARTITION_SPLIT_FAILURES.add(1);
+                        return Err(e);
+                    }
+                    app_metrics::JOBS_MULTI_PARTITION_SPLIT_COMPLETED.add(1);
                     Ok(JobProcessResult::default())
                 } else {
                     Self::fail_job_row_key(job)
@@ -143,9 +155,15 @@ impl JobIsolatedProcessor {
                     let compaction_service = self.compaction_service.clone();
                     let multi_part_id = *multi_part_id;
                     for p in meta_store.find_unsplit_partitions(multi_part_id).await? {
-                        compaction_service
+                        app_metrics::JOBS_FINISH_MULTI_SPLIT.add(1);
+                        let r = compaction_service
                             .finish_multi_split(multi_part_id, p)
-                            .await?
+                            .await;
+                        if let Err(e) = r {
+                            app_metrics::JOBS_FINISH_MULTI_SPLIT_FAILURES.add(1);
+                            return Err(e);
+                        }
+                        app_metrics::JOBS_FINISH_MULTI_SPLIT_COMPLETED.add(1);
                     }
 
                     Ok(JobProcessResult::default())
@@ -196,9 +214,16 @@ impl JobIsolatedProcessor {
                         ));
                     }
                     let data_loaded_size = DataLoadedSize::new();
-                    self.chunk_store
+                    app_metrics::JOBS_REPARTITION_CHUNK.add(1);
+                    let r = self
+                        .chunk_store
                         .repartition_chunk(chunk_id, data_loaded_size.clone())
-                        .await?;
+                        .await;
+                    if let Err(e) = r {
+                        app_metrics::JOBS_REPARTITION_CHUNK_FAILURES.add(1);
+                        return Err(e);
+                    }
+                    app_metrics::JOBS_REPARTITION_CHUNK_COMPLETED.add(1);
                     Ok(JobProcessResult::new(data_loaded_size.get()))
                 } else {
                     Self::fail_job_row_key(job)
