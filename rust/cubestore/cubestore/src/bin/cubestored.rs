@@ -77,6 +77,9 @@ fn main() {
     if let Ok(var) = std::env::var("CUBESTORE_EVENT_LOOP_WORKER_THREADS") {
         tokio_builder.worker_threads(var.parse().unwrap());
     }
+    if let Ok(var) = std::env::var("CUBESTORE_EVENT_LOOP_MAX_BLOCKING_THREADS") {
+        tokio_builder.max_blocking_threads(var.parse().unwrap());
+    }
     let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
         init_agent_sender().await;
