@@ -4133,11 +4133,14 @@ export class BaseQuery {
         like_escape: '{{ like_expr }} ESCAPE {{ escape_char }}',
         within_group: '{{ fun_sql }} WITHIN GROUP (ORDER BY {{ within_group_concat }})',
         concat_strings: '{{ strings | join(\' || \' ) }}',
-        rolling_window_expr_timestamp_cast: '{{ value }}'
+        rolling_window_expr_timestamp_cast: '{{ value }}',
+        timestamp_literal: '{{ value }}'
       },
       tesseract: {
         ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}', // May require different overloads in Tesseract than the ilike from expressions used in SQLAPI.
-        series_bounds_cast: '{{ expr }}'
+        series_bounds_cast: '{{ expr }}',
+        bool_param_cast: '{{ expr }}',
+        number_param_cast: '{{ expr }}',
       },
       filters: {
         equals: '{{ column }} = {{ value }}{{ is_null_check }}',

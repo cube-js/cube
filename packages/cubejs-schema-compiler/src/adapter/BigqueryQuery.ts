@@ -335,6 +335,8 @@ export class BigqueryQuery extends BaseQuery {
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
     templates.tesseract.series_bounds_cast = 'TIMESTAMP({{ expr }})';
+    templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOL)';
+    templates.tesseract.number_param_cast = 'CAST({{ expr }} AS FLOAT64)';
     templates.types.boolean = 'BOOL';
     templates.types.float = 'FLOAT64';
     templates.types.double = 'FLOAT64';
