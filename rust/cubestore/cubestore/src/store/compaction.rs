@@ -448,10 +448,6 @@ impl CompactionServiceImpl {
     }
 }
 
-/// The batch size used by CompactionServiceImpl::compact.  Based on MAX_BATCH_ROWS=4096 of the
-/// pre-DF-upgrade's MergeSortExec, but even smaller to be farther from potential i32 overflow.
-const COMPACT_BATCH_SIZE: usize = 2048;
-
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(
@@ -605,12 +601,9 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
 
-        // We use COMPACT_BATCH_SIZE instead of ROW_GROUP_SIZE for this write, to avoid i32 Utf8 arrow
-        // array offset overflow in some (unusual) cases.
-        // TODO: Simply lowering the size is not great.
         let store = ParquetTableStore::new(
             index.get_row().clone(),
-            COMPACT_BATCH_SIZE,
+            ROW_GROUP_SIZE,
             self.metadata_cache_factory.clone(),
         );
         let old_partition_remote = match &new_chunk {
@@ -686,12 +679,6 @@ impl CompactionService for CompactionServiceImpl {
             .metadata_cache_factory
             .cache_factory()
             .make_session_config();
-        // Set batch size to 2048 to avoid overflow in case where, perhaps, we might get repeated
-        // large string values, such that the default value, 8192, could produce an array too big
-        // for i32 string array offsets in a SortPreservingMergeExecStream that is constructed in
-        // `merge_chunks`.  In pre-DF-upgrade Cubestore, MergeSortExec used a local variable,
-        // MAX_BATCH_ROWS = 4096, which might be small enough.
-        let session_config = session_config.with_batch_size(COMPACT_BATCH_SIZE);
 
         // Merge and write rows.
         let schema = Arc::new(arrow_schema(index.get_row()));
@@ -1358,9 +1345,9 @@ async fn write_to_files_impl(
             }
         };
     let err = redistribute(records, store.row_group_size(), move |b| {
-        // See if we get an array using more than 512 MB and log it.  With COMPACT_BATCH_SIZE=2048,
-        // this means a default batch size of 8192 might, or our row group size of 16384 really might,
-        // get i32 offset overflow when used in an Arrow array.
+        // See if we get an array using more than 512 MB and log it.  This means a default batch
+        // size of 8192 might, or our row group size of 16384 really might, get i32 offset overflow
+        // when used in an Arrow array with a Utf8 column.
 
         // First figure out what to log.  (Normally we don't allocate or log anything.)
         let mut loggable_overlongs = Vec::new();
