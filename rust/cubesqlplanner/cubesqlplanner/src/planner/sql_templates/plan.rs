@@ -678,6 +678,16 @@ impl PlanSqlTemplates {
             .render_template(&"tesseract/series_bounds_cast", context! { expr => expr })
     }
 
+    pub fn bool_param_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template(&"tesseract/bool_param_cast", context! { expr => expr })
+    }
+
+    pub fn number_param_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template(&"tesseract/number_param_cast", context! { expr => expr })
+    }
+
     pub fn additional_null_check(&self, need: bool, column: &String) -> Result<String, CubeError> {
         if need {
             self.or_is_null_check(column.clone())

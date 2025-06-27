@@ -1804,6 +1804,35 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying BigECommerce: filtering with possible casts', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalSales',
+        ],
+        filters: [
+          {
+            values: ['10'],
+            member: 'BigECommerce.sales',
+            operator: 'gte'
+          },
+          {
+            values: ['true'],
+            member: 'BigECommerce.returning',
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: {
+          'BigECommerce.orderDate': 'asc',
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('querying custom granularities ECommerce: count by half_year + no dimension', async () => {
       const response = await client.load({
         measures: [

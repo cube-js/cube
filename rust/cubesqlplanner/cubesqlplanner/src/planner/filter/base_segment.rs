@@ -50,13 +50,13 @@ impl BaseSegment {
     pub fn to_sql(
         &self,
         context: Rc<VisitorContext>,
-        templates: &PlanSqlTemplates,
+        plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         evaluate_with_context(
             &self.member_evaluator,
             self.query_tools.clone(),
             context,
-            templates,
+            plan_templates,
         )
     }
 

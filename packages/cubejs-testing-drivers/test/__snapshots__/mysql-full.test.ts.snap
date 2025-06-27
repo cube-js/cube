@@ -2566,6 +2566,61 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/mysql-driver querying BigECommerce: filtering with possible casts 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalSales": 210.98,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.totalSales": 18.368,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.totalSales": 2471.56,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalSales": 36.672,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.totalSales": 1284.45,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.totalSales": 724.974,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.totalSales": 2451.472,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalSales": 2209.828,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.totalSales": 5573.922,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.totalSales": 2073.63,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/mysql-driver querying BigECommerce: partitioned pre-agg with multi time dimension 1`] = `
 Array [
   Object {

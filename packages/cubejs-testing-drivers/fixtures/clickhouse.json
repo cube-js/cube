@@ -179,6 +179,7 @@
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
+    "querying BigECommerce: filtering with possible casts",
 
     "---------------------------------------",
     "Unsupported JOIN ON conditions. Unexpected 'big_e_commerce__order_date_month > subtractWeeks(date_to, 2)'",

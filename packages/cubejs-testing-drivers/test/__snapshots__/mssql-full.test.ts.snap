@@ -2336,6 +2336,21 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/mssql-driver querying BigECommerce: filtering with possible casts 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalSales": "488960",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.totalSales": "2328800",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/mssql-driver querying BigECommerce: partitioned pre-agg 1`] = `
 Array [
   Object {
