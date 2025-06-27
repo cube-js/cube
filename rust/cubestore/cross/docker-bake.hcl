@@ -26,6 +26,10 @@ target "aarch64-unknown-linux-gnu-python" {
   matrix = {
     item = [
       {
+        python_version = "3.13.5"
+        python_release = "3.13"
+      },
+      {
         python_version = "3.12.4"
         python_release = "3.12"
       },
@@ -81,6 +85,10 @@ target "x86_64-unknown-linux-gnu-python" {
   name = "x86_64-unknown-linux-gnu-python-${replace(item.python_release, ".", "-")}"
   matrix = {
     item = [
+      {
+        python_version = "3.13.5"
+        python_release = "3.13"
+      },
       {
         python_version = "3.12.4"
         python_release = "3.12"
