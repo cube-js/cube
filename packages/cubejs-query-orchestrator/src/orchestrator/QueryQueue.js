@@ -564,7 +564,16 @@ export class QueryQueue {
         }
       }));
 
-      const [_active, toProcess] = await queueConnection.getActiveAndToProcess();
+      const [active, toProcess] = await queueConnection.getActiveAndToProcess();
+
+      /**
+       * Important notice: Concurrency configuration works per a specific queue, not per node.
+       *
+       * In production clusters where it contains N nodes, it shares the same concurrency. It leads to a point
+       * where every node tries to pick up jobs as much as concurrency is defined for the whole cluster. To minimize
+       * the effect of competition between nodes, it's important to reduce the number of tries to process by active jobs.
+       */
+      const toProcessLimit = active.length >= this.concurrency ? 1 : this.concurrency - active.length;
 
       await Promise.all(
         R.pipe(
@@ -581,7 +590,7 @@ export class QueryQueue {
               return false;
             }
           }),
-          R.take(this.concurrency),
+          R.take(toProcessLimit),
           R.map((([queryKey, queueId]) => this.sendProcessMessageFn(queryKey, queueId)))
         )(toProcess)
       );
@@ -740,8 +749,8 @@ export class QueryQueue {
   }
 
   /**
-   * Processing query specified by the `queryKey`. This method encapsulate most
-   * of the logic related with the queues updates, heartbeat, etc.
+   * Processing query specified by the `queryKey`. This method encapsulates most
+   * of the logic related to the queue updates, heartbeat, etc.
    *
    * @param {QueryKeyHash} queryKeyHashed
    * @param {QueueId | null} queueId Supported by new Cube Store and Memory
