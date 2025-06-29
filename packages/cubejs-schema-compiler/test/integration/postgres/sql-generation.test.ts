@@ -2267,6 +2267,10 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day'
+      }],
       segments: [
         {
           // eslint-disable-next-line no-new-func
@@ -2290,8 +2294,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
 
     const res = await testWithPreAggregation(preAggregationsDescription, query);
     expect(res).toEqual(
-      // Empty result set, only segments in query
-      [{}]
+      [{
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+      }]
     );
   });
 
