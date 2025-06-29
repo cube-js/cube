@@ -341,13 +341,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if !reduce_by.is_empty() {
             dimensions
                 .into_iter()
-                .filter(|d| {
-                    if reduce_by.iter().any(|m| d.full_name() == m.full_name()) {
-                        false
-                    } else {
-                        true
-                    }
-                })
+                .filter(|d| !reduce_by.iter().any(|m| d.has_member_in_reference_chain(m)))
                 .collect_vec()
         } else {
             dimensions
@@ -355,13 +349,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if let Some(group_by) = group_by {
             dimensions
                 .into_iter()
-                .filter(|d| {
-                    if group_by.iter().any(|m| d.full_name() == m.full_name()) {
-                        true
-                    } else {
-                        false
-                    }
-                })
+                .filter(|d| group_by.iter().any(|m| d.has_member_in_reference_chain(m)))
                 .collect_vec()
         } else {
             dimensions

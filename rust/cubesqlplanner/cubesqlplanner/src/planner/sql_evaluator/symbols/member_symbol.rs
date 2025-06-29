@@ -163,6 +163,21 @@ impl MemberSymbol {
         current
     }
 
+    pub fn has_member_in_reference_chain(&self, member: &Rc<MemberSymbol>) -> bool {
+        if self.full_name() == member.full_name() {
+            return true;
+        }
+
+        let mut current = self.reference_member();
+        while let Some(reference) = current {
+            if reference.full_name() == member.full_name() {
+                return true;
+            }
+            current = reference.reference_member();
+        }
+        false
+    }
+
     pub fn owned_by_cube(&self) -> bool {
         match self {
             Self::Dimension(d) => d.owned_by_cube(),
