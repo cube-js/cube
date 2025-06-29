@@ -42,7 +42,6 @@
     "decompress": "^4.2.1",
     "env-var": "^6.3.0",
     "fs-extra": "^9.1.0",
-    "https-proxy-agent": "^7.0.6",
     "moment-range": "^4.0.2",
     "moment-timezone": "^0.5.47",
     "node-fetch": "^2.6.1",
