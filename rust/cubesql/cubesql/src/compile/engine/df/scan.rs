@@ -918,13 +918,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = parse_date_str(s.as_ref())
-                                .map_err(|e| {
-                                    DataFusionError::Execution(format!(
-                                        "Can't parse timestamp: '{}': {}",
-                                        s, e
-                                    ))
-                                })?;
+                            let timestamp = parse_date_str(s.as_ref())?;
                             // TODO switch parsing to microseconds
                             if timestamp.and_utc().timestamp_millis() > (((1i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
@@ -952,13 +946,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = parse_date_str(s.as_ref())
-                                .map_err(|e| {
-                                    DataFusionError::Execution(format!(
-                                        "Can't parse timestamp: '{}': {}",
-                                        s, e
-                                    ))
-                                })?;
+                            let timestamp = parse_date_str(s.as_ref())?;
                             // TODO switch parsing to microseconds
                             if timestamp.and_utc().timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
