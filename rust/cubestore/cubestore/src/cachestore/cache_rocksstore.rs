@@ -1071,14 +1071,10 @@ impl CacheStore for RocksCacheStore {
                     &QueueItemRocksIndex::ByPrefixAndStatus,
                 )?;
 
-                let index_key = QueueItemIndexKey::ByPath(payload.path.clone());
-                let id_row_opt = queue_schema
-                    .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
-
-                let (id, added) = if let Some(row) = id_row_opt {
-                    (row.id, false)
-                } else {
-                    let queue_item_row = queue_schema.insert(
+                let (id, added) = {
+                    let (queue_item_row, added) = queue_schema.insert_if_not_exists(
+                        &QueueItemIndexKey::ByPath(payload.path.clone()),
+                        &QueueItemRocksIndex::ByPath,
                         QueueItem::new(
                             payload.path,
                             QueueItem::status_default(),
@@ -1087,19 +1083,20 @@ impl CacheStore for RocksCacheStore {
                         ),
                         batch_pipe,
                     )?;
+                    if added {
+                        let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+                        queue_payload_schema.insert_with_pk(
+                            queue_item_row.id,
+                            QueueItemPayload::new(
+                                payload.value,
+                                queue_item_row.row.get_created().clone(),
+                                queue_item_row.row.get_expire().clone(),
+                            ),
+                            batch_pipe,
+                        )?;
+                    }
 
-                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
-                    queue_payload_schema.insert_with_pk(
-                        queue_item_row.id,
-                        QueueItemPayload::new(
-                            payload.value,
-                            queue_item_row.row.get_created().clone(),
-                            queue_item_row.row.get_expire().clone(),
-                        ),
-                        batch_pipe,
-                    )?;
-
-                    (queue_item_row.id, true)
+                    (queue_item_row.id, added)
                 };
 
                 Ok(QueueAddResponse {

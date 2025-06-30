@@ -487,12 +487,19 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         row_id: Option<u64>,
         row: Self::T,
         batch_pipe: &mut BatchPipe,
+        secondary_index_id_to_ignore: Option<u32>,
     ) -> Result<IdRow<Self::T>, CubeError> {
         let mut ser = flexbuffers::FlexbufferSerializer::new();
         row.serialize(&mut ser).unwrap();
         let serialized_row = ser.take_buffer();
 
         for index in Self::indexes().iter() {
+            if let Some(index_id_to_ignore) = secondary_index_id_to_ignore {
+                if index.get_id() == index_id_to_ignore {
+                    continue;
+                }
+            }
+
             if index.is_unique() {
                 let hash = index.key_hash(&row);
                 let index_val = index.index_key_by(&row);
@@ -540,7 +547,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         row: Self::T,
         batch_pipe: &mut BatchPipe,
     ) -> Result<IdRow<Self::T>, CubeError> {
-        self.do_insert(Some(row_id), row, batch_pipe)
+        self.do_insert(Some(row_id), row, batch_pipe, None)
     }
 
     fn insert(
@@ -548,7 +555,34 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         row: Self::T,
         batch_pipe: &mut BatchPipe,
     ) -> Result<IdRow<Self::T>, CubeError> {
-        self.do_insert(None, row, batch_pipe)
+        self.do_insert(None, row, batch_pipe, None)
+    }
+
+    /// Special optimized insert method that checks if the row already exists in the secondary index.
+    /// If it exists, it returns the existing row without inserting a new one.
+    ///
+    /// The idea is to skip check if the row already exists in the secondary index while inserting.
+    fn insert_if_not_exists<K: Debug + Hash>(
+        &self,
+        row_key: &K,
+        secondary_index: &impl RocksSecondaryIndex<Self::T, K>,
+        row: Self::T,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<(IdRow<Self::T>, bool), CubeError> {
+        let id_row_opt = self.get_single_opt_row_by_index(row_key, secondary_index)?;
+
+        if let Some(row) = id_row_opt {
+            Ok((row, false))
+        } else {
+            let row = self.do_insert(
+                None,
+                row,
+                batch_pipe,
+                Some(RocksSecondaryIndex::get_id(secondary_index)),
+            )?;
+
+            Ok((row, true))
+        }
     }
 
     fn migrate(&self) -> Result<(), CubeError> {

@@ -55,20 +55,39 @@ async fn do_insert(
     }
 }
 
-fn do_insert_bench(c: &mut Criterion, runtime: &Runtime, total: usize, size_kb: usize) {
+fn do_insert_bench(
+    c: &mut Criterion,
+    runtime: &Runtime,
+    total: usize,
+    size_kb: usize,
+    do_duplicates: bool,
+) {
     let cachestore = runtime.block_on(async {
-        prepare_cachestore(&format!("cachestore_queue_add_{}", size_kb)).unwrap()
+        prepare_cachestore(&format!(
+            "cachestore_queue_add_{}_{}",
+            size_kb, do_duplicates
+        ))
+        .unwrap()
     });
 
     c.bench_with_input(
-        BenchmarkId::new(format!("queue_add queues:1, size:{} kb", size_kb), total),
+        BenchmarkId::new(
+            format!(
+                "queue_add duplicates_check: {} queues:1, size:{} kb",
+                do_duplicates, size_kb
+            ),
+            total,
+        ),
         &(total, size_kb),
         |b, (total, size_kb)| {
             let mut insert_id_padding = 0;
 
             b.to_async(runtime).iter(|| {
                 let prev_value = insert_id_padding.clone();
-                insert_id_padding += total;
+
+                if !do_duplicates {
+                    insert_id_padding += total;
+                }
 
                 do_insert(
                     &cachestore,
@@ -190,9 +209,11 @@ fn do_get_bench(
 fn do_benches(c: &mut Criterion) {
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
-    do_insert_bench(c, &runtime, 512, 64);
-    do_insert_bench(c, &runtime, 512, 256);
-    do_insert_bench(c, &runtime, 512, 512);
+    do_insert_bench(c, &runtime, 512, 64, false);
+    do_insert_bench(c, &runtime, 512, 256, false);
+    do_insert_bench(c, &runtime, 512, 512, false);
+
+    do_insert_bench(c, &runtime, 1_000, 64, true);
 
     do_list_bench(c, &runtime, Some(QueueItemStatus::Pending), 1_000, 128, 128);
     do_list_bench(c, &runtime, Some(QueueItemStatus::Active), 1_000, 128, 128);
