@@ -40,10 +40,11 @@ async fn do_insert(
     total: usize,
     size_kb: usize,
     queue_path: &str,
+    insert_id_padding: usize,
 ) {
     for i in 0..total {
         let fut = cachestore.queue_add(QueueAddPayload {
-            path: generate_queue_path(queue_path, i),
+            path: generate_queue_path(queue_path, i + insert_id_padding),
             value: "a".repeat(size_kb * 1024), // size in bytes
             priority: 0,
             orphaned: None,
@@ -63,8 +64,20 @@ fn do_insert_bench(c: &mut Criterion, runtime: &Runtime, total: usize, size_kb: 
         BenchmarkId::new(format!("queue_add queues:1, size:{} kb", size_kb), total),
         &(total, size_kb),
         |b, (total, size_kb)| {
-            b.to_async(runtime)
-                .iter(|| do_insert(&cachestore, *total, *size_kb, "STANDALONE#queue"));
+            let mut insert_id_padding = 0;
+
+            b.to_async(runtime).iter(|| {
+                let prev_value = insert_id_padding.clone();
+                insert_id_padding += total;
+
+                do_insert(
+                    &cachestore,
+                    *total,
+                    *size_kb,
+                    &"STANDALONE#queue",
+                    prev_value,
+                )
+            });
         },
     );
 }
@@ -103,11 +116,11 @@ fn do_list_bench(
         ))
         .unwrap();
 
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
 
         cachestore
     });
@@ -150,11 +163,11 @@ fn do_get_bench(
     let cachestore = runtime.block_on(async {
         let cachestore = prepare_cachestore(&format!("cachestore_queue_get_{}", size_kb)).unwrap();
 
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
-        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue").await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
+        do_insert(&cachestore, per_queue, size_kb, "STANDALONE#queue", 0).await;
 
         cachestore
     });
@@ -177,9 +190,9 @@ fn do_get_bench(
 fn do_benches(c: &mut Criterion) {
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
-    do_insert_bench(c, &runtime, 1_000, 64);
-    do_insert_bench(c, &runtime, 1_000, 256);
-    do_insert_bench(c, &runtime, 1_000, 512);
+    do_insert_bench(c, &runtime, 512, 64);
+    do_insert_bench(c, &runtime, 512, 256);
+    do_insert_bench(c, &runtime, 512, 512);
 
     do_list_bench(c, &runtime, Some(QueueItemStatus::Pending), 1_000, 128, 128);
     do_list_bench(c, &runtime, Some(QueueItemStatus::Active), 1_000, 128, 128);
