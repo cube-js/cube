@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.28](https://github.com/cube-js/cube/compare/v1.3.27...v1.3.28) (2025-06-30)
+
+### Bug Fixes
+
+- **tesseract:** MultiStage group_by and reduce_by now work with views ([#9710](https://github.com/cube-js/cube/issues/9710)) ([f17f49a](https://github.com/cube-js/cube/commit/f17f49aba5a0e84361147514e6e45d708569dba3))
+
 ## [1.3.27](https://github.com/cube-js/cube/compare/v1.3.26...v1.3.27) (2025-06-30)
 
 ### Bug Fixes
