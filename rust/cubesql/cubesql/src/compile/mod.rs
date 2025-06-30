@@ -14,6 +14,7 @@ pub mod service;
 pub mod session;
 
 // Internal API
+mod date_parser;
 pub mod test;
 
 // Re-export for Public API
