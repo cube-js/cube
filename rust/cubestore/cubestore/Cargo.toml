@@ -120,6 +120,7 @@ sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 [dev-dependencies]
 pretty_assertions = "0.7.1"
 criterion = { version = "0.5.1", features = ["async_tokio", "html_reports"] }
+md5 = "0.8.0"
 
 [[bench]]
 name = "cachestore_queue"
