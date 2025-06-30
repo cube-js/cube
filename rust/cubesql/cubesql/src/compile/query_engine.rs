@@ -512,6 +512,7 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udf(create_to_regtype_udf());
         ctx.register_udf(create_pg_get_indexdef_udf());
         ctx.register_udf(create_inet_server_addr_udf());
+        ctx.register_udf(create_age_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());

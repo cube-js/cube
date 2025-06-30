@@ -1310,3 +1310,20 @@ async fn test_extension_udf_xirr() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_age() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "age",
+        execute_query(
+            r#"SELECT AGE('2025-06-09T10:09:45'::timestamp, DATE '2023-08-10') AS age;"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
