@@ -19,6 +19,7 @@
 use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::Field;
@@ -54,7 +55,7 @@ use crate::queryplanner::topk::{plan_topk, DummyTopKLowerExec};
 use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper};
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::{cmp_same_types, Row};
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use datafusion::common;
 use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
 use datafusion::common::DFSchemaRef;
@@ -105,6 +106,10 @@ fn de_vec_as_map<'de, D: Deserializer<'de>>(
     Vec::<(u64, MultiPartition)>::deserialize(d).map(HashMap::from_iter)
 }
 
+fn system_time_to_df_error(e: std::time::SystemTimeError) -> DataFusionError {
+    DataFusionError::Execution(e.to_string())
+}
+
 pub async fn choose_index_ext(
     p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
@@ -117,6 +122,7 @@ pub async fn choose_index_ext(
 
     // Consult metastore to choose the index.
     // TODO should be single snapshot read to ensure read consistency here
+    let get_tables_with_indices_start = SystemTime::now();
     let tables = metastore
         .get_tables_with_indexes(
             collector
@@ -131,11 +137,25 @@ pub async fn choose_index_ext(
                 .collect_vec(),
         )
         .await?;
+    let time_2 = SystemTime::now();
+    let get_tables_with_indices_micros = time_2
+        .duration_since(get_tables_with_indices_start)
+        .map_err(system_time_to_df_error)?
+        .as_micros() as i64;
+    let mut cumulative_await_micros = get_tables_with_indices_micros;
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_GET_TABLES_WITH_INDICES_TIME_US
+        .report(get_tables_with_indices_micros);
     assert_eq!(tables.len(), collector.constraints.len());
     let mut candidates = Vec::new();
     for (c, inputs) in collector.constraints.iter().zip(tables) {
-        candidates.push(pick_index(c, inputs.0, inputs.1, inputs.2).await?)
+        candidates.push(pick_index(c, inputs.0, inputs.1, inputs.2)?)
     }
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_PICK_INDEX_TIME_US.report(
+        time_2
+            .elapsed()
+            .map_err(system_time_to_df_error)?
+            .as_micros() as i64,
+    );
 
     // We pick partitioned index only when all tables request the same one.
     let mut indices: Vec<_> = match all_have_same_partitioned_index(&candidates) {
@@ -150,12 +170,20 @@ pub async fn choose_index_ext(
             .collect::<Result<_, DataFusionError>>()?,
     };
 
+    let get_active_partitions_and_chunks_start = SystemTime::now();
     // TODO should be single snapshot read to ensure read consistency here
     let partitions = metastore
         .get_active_partitions_and_chunks_by_index_id_for_select(
             indices.iter().map(|i| i.index.get_id()).collect_vec(),
         )
         .await?;
+    let get_active_partitions_and_chunks_micros = get_active_partitions_and_chunks_start
+        .elapsed()
+        .map_err(system_time_to_df_error)?
+        .as_micros() as i64;
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_GET_ACTIVE_PARTITIONS_AND_CHUNKS_BY_INDEX_ID_TIME_US
+        .report(get_active_partitions_and_chunks_micros);
+    cumulative_await_micros += get_active_partitions_and_chunks_micros;
 
     assert_eq!(partitions.len(), indices.len());
     for ((i, c), ps) in indices
@@ -187,8 +215,17 @@ pub async fn choose_index_ext(
         }
     }
 
+    let get_multi_partition_subtree_start_time = SystemTime::now();
     // TODO should be single snapshot read to ensure read consistency here
     let multi_part_subtree = metastore.get_multi_partition_subtree(multi_parts).await?;
+    let get_multi_partition_subtree_micros = get_multi_partition_subtree_start_time
+        .elapsed()
+        .map_err(system_time_to_df_error)?
+        .as_micros() as i64;
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_GET_MULTI_PARTITION_SUBTREE_TIME_US
+        .report(get_multi_partition_subtree_micros);
+    cumulative_await_micros += get_multi_partition_subtree_micros;
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_TOTAL_AWAITING_TIME_US.report(cumulative_await_micros);
     Ok((
         plan,
         PlanningMeta {
@@ -1070,7 +1107,7 @@ fn check_aggregates_expr(table: &IdRow<Table>, aggregates: &Vec<Expr>) -> bool {
 }
 
 // Picks the index, but not partitions snapshots.
-async fn pick_index(
+fn pick_index(
     c: &IndexConstraints,
     schema: IdRow<Schema>,
     table: IdRow<Table>,
