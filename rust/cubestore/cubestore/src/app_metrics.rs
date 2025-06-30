@@ -34,6 +34,21 @@ pub static DATA_QUERY_LOGICAL_PLAN_IS_DATA_SELECT_QUERY_US: Histogram =
 
 pub static DATA_QUERY_CHOOSE_INDEX_AND_WORKERS_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.choose_index_and_workers.us");
+pub static DATA_QUERY_CHOOSE_INDEX_EXT_GET_TABLES_WITH_INDICES_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.choose_index_ext.get_tables_with_indices.us");
+pub static DATA_QUERY_CHOOSE_INDEX_EXT_PICK_INDEX_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.choose_index_ext.pick_index.us");
+pub static DATA_QUERY_CHOOSE_INDEX_EXT_GET_ACTIVE_PARTITIONS_AND_CHUNKS_BY_INDEX_ID_TIME_US:
+    Histogram = metrics::histogram(
+    "cs.sql.query.data.planning.choose_index_ext.get_active_partitions_and_chunks_by_index_id.us",
+);
+pub static DATA_QUERY_CHOOSE_INDEX_EXT_GET_MULTI_PARTITION_SUBTREE_TIME_US: Histogram =
+    metrics::histogram(
+        "cs.sql.query.data.planning.choose_index_ext.get_multi_partition_subtree.us",
+    );
+pub static DATA_QUERY_CHOOSE_INDEX_EXT_TOTAL_AWAITING_TIME_US: Histogram =
+    metrics::histogram("cs.sql.query.data.planning.choose_index_ext.total_awaiting.us");
+
 pub static DATA_QUERY_TO_SERIALIZED_PLAN_TIME_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.to_serialized_plan.us");
 pub static DATA_QUERY_CREATE_ROUTER_PHYSICAL_PLAN_US: Histogram =
