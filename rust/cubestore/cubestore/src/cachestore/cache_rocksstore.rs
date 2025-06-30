@@ -1312,7 +1312,7 @@ impl CacheStore for RocksCacheStore {
                     .map(|item| item.into_row().key)
                     .collect();
                 if active.len() >= (allow_concurrency as usize) {
-                    return Ok(QueueRetrieveResponse::NotFound { pending, active });
+                    return Ok(QueueRetrieveResponse::NotEnoughConcurrency { pending, active });
                 }
 
                 let id_row = queue_schema.get_single_opt_row_by_index(
@@ -1328,7 +1328,7 @@ impl CacheStore for RocksCacheStore {
                 if id_row.get_row().get_status() == &QueueItemStatus::Pending {
                     let mut new = id_row.get_row().clone();
                     new.status = QueueItemStatus::Active;
-                    // It's an important to insert heartbeat, because
+                    // It's important to insert heartbeat, because
                     // without that created datetime will be used for orphaned filtering
                     new.update_heartbeat();
 
@@ -1425,8 +1425,8 @@ impl CacheStore for RocksCacheStore {
         key: QueueKey,
         timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        // It's an important to open listener at the beginning to protect race condition
-        // it will fix position (subscribe) of broadcast channel
+        // It's important to open listener at the beginning to protect race condition
+        // it will fix the position (subscribe) of a broadcast channel
         let listener = self.get_listener().await;
 
         let store_in_result = self.lookup_queue_result_by_key(key.clone()).await?;
