@@ -105,13 +105,14 @@ components:
       required:
         - name
         - title
-        - interval
       properties:
         name:
           type: "string"
         title:
           type: "string"
         interval:
+          type: "string"
+        sql:
           type: "string"
         offset:
           type: "string"

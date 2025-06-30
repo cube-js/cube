@@ -14,8 +14,10 @@ pub struct V1CubeMetaDimensionGranularity {
     pub name: String,
     #[serde(rename = "title")]
     pub title: String,
-    #[serde(rename = "interval")]
-    pub interval: String,
+    #[serde(rename = "interval", skip_serializing_if = "Option::is_none")]
+    pub interval: Option<String>,
+    #[serde(rename = "sql", skip_serializing_if = "Option::is_none")]
+    pub sql: Option<String>,
     #[serde(rename = "offset", skip_serializing_if = "Option::is_none")]
     pub offset: Option<String>,
     #[serde(rename = "origin", skip_serializing_if = "Option::is_none")]
@@ -23,11 +25,12 @@ pub struct V1CubeMetaDimensionGranularity {
 }
 
 impl V1CubeMetaDimensionGranularity {
-    pub fn new(name: String, title: String, interval: String) -> V1CubeMetaDimensionGranularity {
+    pub fn new(name: String, title: String) -> V1CubeMetaDimensionGranularity {
         V1CubeMetaDimensionGranularity {
             name,
             title,
-            interval,
+            interval: None,
+            sql: None,
             offset: None,
             origin: None,
         }
