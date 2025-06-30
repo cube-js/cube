@@ -4631,18 +4631,14 @@ impl FilterRules {
                             }
 
                             let mut result = Vec::new();
-                            let resolved_start_date = if let Some(rtd) =
+                            let Some(resolved_start_date) =
                                 resolve_time_delta(&date_range_start[0], date_range_start_op)
-                            {
-                                rtd
-                            } else {
+                            else {
                                 return false;
                             };
-                            let resolved_end_date = if let Some(rtd) =
+                            let Some(resolved_end_date) =
                                 resolve_time_delta(&date_range_end[0], date_range_end_op)
-                            {
-                                rtd
-                            } else {
+                            else {
                                 return false;
                             };
 
