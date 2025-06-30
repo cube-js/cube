@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.27](https://github.com/cube-js/cube/compare/v1.3.26...v1.3.27) (2025-06-30)
+
+### Bug Fixes
+
+- **cubejs-schema-compiler:** Stay unchanged `__user` / `__cubejoinfield` names in aliasing ([#8303](https://github.com/cube-js/cube/issues/8303)) ([7bb4bdc](https://github.com/cube-js/cube/commit/7bb4bdc3f6b2d67a6f8263730f84fc3289b08347))
+- **cubesql:** Fix incorrect underscore truncation for aliases ([#9716](https://github.com/cube-js/cube/issues/9716)) ([c16175b](https://github.com/cube-js/cube/commit/c16175bf964fbb351bede1bfe0fd13adf793e51a))
+- **cubestore:** Cache - minimize possible bad effect of pro active eviction ([#9692](https://github.com/cube-js/cube/issues/9692)) ([22407d7](https://github.com/cube-js/cube/commit/22407d7c2043b90e0c55bb51fdb97de01153c300))
+- **schema-compiler:** Fix BigQuery rolling window time series queries ([#9718](https://github.com/cube-js/cube/issues/9718)) ([1f6cf8f](https://github.com/cube-js/cube/commit/1f6cf8fe44c7cd802ef47785a34e06c23fb18829))
+- **schema-compiler:** Use member expression definition as measure key ([#9154](https://github.com/cube-js/cube/issues/9154)) ([e478d0e](https://github.com/cube-js/cube/commit/e478d0ea20e33f383b624a4dbf4cff14359336f8))
+- **tesseracrt:** Fix filter params casting for BigQuery dialect ([#9720](https://github.com/cube-js/cube/issues/9720)) ([7b48c27](https://github.com/cube-js/cube/commit/7b48c275ecb4b18ed6262f23866760f46420e099))
+
+### Features
+
+- **tesseract:** Support calendar cubes and custom sql granularities ([#9698](https://github.com/cube-js/cube/issues/9698)) ([40b3708](https://github.com/cube-js/cube/commit/40b3708ce053fd5ea1664bea70cdc613cf343810))
+
 ## [1.3.26](https://github.com/cube-js/cube/compare/v1.3.25...v1.3.26) (2025-06-25)
 
 ### Bug Fixes

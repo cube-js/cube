@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.27](https://github.com/cube-js/cube/compare/v1.3.26...v1.3.27) (2025-06-30)
+
+### Bug Fixes
+
+- **cubestore:** Cache - minimize possible bad effect of pro active eviction ([#9692](https://github.com/cube-js/cube/issues/9692)) ([22407d7](https://github.com/cube-js/cube/commit/22407d7c2043b90e0c55bb51fdb97de01153c300))
+
 ## [1.3.26](https://github.com/cube-js/cube/compare/v1.3.25...v1.3.26) (2025-06-25)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
