@@ -15,7 +15,6 @@ libc = { version = "0.2.97", optional = true }
 
 [dependencies]
 base64 = "0.13.0"
-bumpalo = "3.6.1"
 tokio = { version = "1", features = ["full", "rt"] }
 warp = { version = "0.3.6" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "4388f6712dae5073c2d71d74f64cae2edd418066" }
@@ -120,6 +119,12 @@ sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"
+criterion = { version = "0.5.1", features = ["async_tokio", "html_reports"] }
+md5 = "0.8.0"
+
+[[bench]]
+name = "cachestore_queue"
+harness = false
 
 [features]
 # When enabled, child processes will die whenever parent process exits.
