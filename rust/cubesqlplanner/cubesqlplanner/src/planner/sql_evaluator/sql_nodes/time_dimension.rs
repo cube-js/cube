@@ -62,30 +62,7 @@ impl SqlNode for TimeDimensionNode {
                         templates.convert_tz(input_sql)?
                     };
 
-                    let res = if granularity_obj.is_natural_aligned() {
-                        if let Some(granularity_offset) = granularity_obj.granularity_offset() {
-                            let dt = templates
-                                .subtract_interval(converted_tz, granularity_offset.clone())?;
-                            let dt = templates.time_grouped_column(
-                                granularity_obj.granularity_from_interval()?,
-                                dt,
-                            )?;
-                            templates.add_interval(dt, granularity_offset.clone())?
-                        } else {
-                            templates.time_grouped_column(
-                                granularity_obj.granularity().clone(),
-                                converted_tz,
-                            )?
-                        }
-                    } else {
-                        templates.date_bin(
-                            granularity_obj.granularity_interval().clone(),
-                            converted_tz,
-                            granularity_obj.origin_local_formatted(),
-                        )?
-                    };
-
-                    res
+                    granularity_obj.apply_to_input_sql(templates, converted_tz)?
                 } else {
                     input_sql
                 };
