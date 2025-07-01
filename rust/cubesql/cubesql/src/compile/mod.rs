@@ -14,6 +14,7 @@ pub mod service;
 pub mod session;
 
 // Internal API
+mod date_parser;
 pub mod test;
 
 // Re-export for Public API
@@ -15542,6 +15543,47 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_daterange_filter_literals() -> Result<(), CubeError> {
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            r#"SELECT
+                    DATE_TRUNC('month', order_date) AS order_date,
+                    COUNT(*) AS month_count
+            FROM "KibanaSampleDataEcommerce" ecom
+            WHERE ecom.order_date >= '2025-01-01' and ecom.order_date < '2025-02-01'
+            GROUP BY 1"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_string()),
+                    date_range: Some(json!(vec![
+                        // WHY NOT "2025-01-01T00:00:00.000Z".to_string(), ?
+                        "2025-01-01".to_string(),
+                        "2025-01-31T23:59:59.999Z".to_string()
+                    ])),
+                }]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_time_dimension_range_filter_chain_or() {
         init_testing_logger();
 
@@ -15584,7 +15626,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
                                 "2019-01-01 00:00:00.0".to_string(),
-                                "2020-01-01 00:00:00.0".to_string(),
+                                "2019-12-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -15594,7 +15636,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
                                 "2021-01-01 00:00:00.0".to_string(),
-                                "2022-01-01 00:00:00.0".to_string(),
+                                "2021-12-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
                             and: None,

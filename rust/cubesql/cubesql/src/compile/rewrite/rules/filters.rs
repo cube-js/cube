@@ -1,4 +1,5 @@
 use super::utils;
+use crate::compile::date_parser::parse_date_str;
 use crate::{
     compile::rewrite::{
         alias_expr,
@@ -36,7 +37,7 @@ use chrono::{
         Numeric::{Day, Hour, Minute, Month, Second, Year},
         Pad::Zero,
     },
-    DateTime, Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, Timelike, Weekday,
+    DateTime, Datelike, Days, Duration, Months, NaiveDateTime, Timelike, Weekday,
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -4568,36 +4569,36 @@ impl FilterRules {
         let date_range_start_op_var = date_range_start_op_var.parse().unwrap();
         let date_range_end_op_var = date_range_end_op_var.parse().unwrap();
         move |egraph, subst| {
-            fn resolve_time_delta(date_var: &String, op: &String) -> String {
+            fn resolve_time_delta(date_var: &String, op: &String) -> Option<String> {
                 if op == "afterDate" {
                     return increment_iso_timestamp_time(date_var);
                 } else if op == "beforeDate" {
                     return decrement_iso_timestamp_time(date_var);
                 } else {
-                    return date_var.clone();
+                    return Some(date_var.clone());
                 }
             }
 
-            fn increment_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
+            fn increment_iso_timestamp_time(date_var: &String) -> Option<String> {
+                let timestamp = parse_date_str(date_var);
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_add_signed(Duration::milliseconds(1)).unwrap(),
                     ),
-                    Err(_) => date_var.clone(),
+                    Err(_) => return None,
                 };
-                return value;
+                return Some(value);
             }
 
-            fn decrement_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
+            fn decrement_iso_timestamp_time(date_var: &String) -> Option<String> {
+                let timestamp = parse_date_str(date_var);
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
                     ),
-                    Err(_) => date_var.clone(),
+                    Err(_) => return None,
                 };
-                return value;
+                return Some(value);
             }
 
             for date_range_start in
@@ -4630,10 +4631,16 @@ impl FilterRules {
                             }
 
                             let mut result = Vec::new();
-                            let resolved_start_date =
-                                resolve_time_delta(&date_range_start[0], date_range_start_op);
-                            let resolved_end_date =
-                                resolve_time_delta(&date_range_end[0], date_range_end_op);
+                            let Some(resolved_start_date) =
+                                resolve_time_delta(&date_range_start[0], date_range_start_op)
+                            else {
+                                return false;
+                            };
+                            let Some(resolved_end_date) =
+                                resolve_time_delta(&date_range_end[0], date_range_end_op)
+                            else {
+                                return false;
+                            };
 
                             if swap_left_and_right {
                                 result.extend(vec![resolved_end_date]);
@@ -5222,12 +5229,7 @@ impl FilterRules {
         let Some(str) = str else {
             return Some(None);
         };
-        let dt = NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S%.f")
-            .or_else(|_| NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S"))
-            .or_else(|_| {
-                NaiveDate::parse_from_str(str, "%Y-%m-%d")
-                    .map(|date| date.and_hms_opt(0, 0, 0).unwrap())
-            });
+        let dt = parse_date_str(str.as_str());
         let Ok(dt) = dt else {
             return None;
         };
