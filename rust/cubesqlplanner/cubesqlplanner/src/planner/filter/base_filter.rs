@@ -3,8 +3,8 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::sql_templates::TemplateProjectionColumn;
-use crate::planner::{Granularity, GranularityHelper, QueryDateTimeHelper};
 use crate::planner::{evaluate_with_context, FiltersContext, VisitorContext};
+use crate::planner::{Granularity, GranularityHelper, QueryDateTimeHelper};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -220,16 +220,15 @@ impl BaseFilter {
                             symbol.name()
                         )));
                     };
-                    
-                    self
-                        .to_date_rolling_window_date_range(
-                            &member_sql,
-                            plan_templates,
-                            filters_context,
-                            &member_type,
-                            granularity_obj,
-                        )?
-                },
+
+                    self.to_date_rolling_window_date_range(
+                        &member_sql,
+                        plan_templates,
+                        filters_context,
+                        &member_type,
+                        granularity_obj,
+                    )?
+                }
                 FilterOperator::In => {
                     self.in_where(&member_sql, plan_templates, filters_context, &member_type)?
                 }
@@ -578,10 +577,7 @@ impl BaseFilter {
     ) -> Result<String, CubeError> {
         let (from, to) = self.date_range_from_time_series(plan_templates)?;
 
-        let from = granularity_obj.apply_to_input_sql(
-            plan_templates,
-            from.clone(),
-        )?;
+        let from = granularity_obj.apply_to_input_sql(plan_templates, from.clone())?;
 
         let date_field = plan_templates.convert_tz(member_sql.to_string())?;
         plan_templates.time_range_filter(date_field, from, to)
