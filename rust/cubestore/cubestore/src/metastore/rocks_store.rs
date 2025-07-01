@@ -998,6 +998,7 @@ impl RocksStore {
         self.listeners.write().await.push(listener);
     }
 
+    #[inline(always)]
     pub async fn write_operation<F, R>(&self, op_name: &'static str, f: F) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
@@ -1340,6 +1341,7 @@ impl RocksStore {
         Ok((remote_path, checkpoint_path))
     }
 
+    #[inline(always)]
     pub async fn read_operation<F, R>(&self, op_name: &'static str, f: F) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,

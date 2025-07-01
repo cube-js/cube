@@ -534,28 +534,26 @@ impl RocksCacheStore {
     }
 
     async fn queue_result_delete_by_id(&self, id: u64) -> Result<(), CubeError> {
-        self.store
-            .write_operation("queue_result_delete_by_id", move |db_ref, batch_pipe| {
-                let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                result_schema.try_delete(id, batch_pipe)?;
+        self.write_operation_queue("queue_result_delete_by_id", move |db_ref, batch_pipe| {
+            let result_schema = QueueResultRocksTable::new(db_ref.clone());
+            result_schema.try_delete(id, batch_pipe)?;
 
-                Ok(())
-            })
-            .await
+            Ok(())
+        })
+        .await
     }
 
     /// This method should be called when we are sure that we return data to the consumer
     async fn queue_result_ready_to_delete(&self, id: u64) -> Result<(), CubeError> {
-        self.store
-            .write_operation("queue_result_ready_to_delete", move |db_ref, batch_pipe| {
-                let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                if let Some(row) = result_schema.get_row(id)? {
-                    Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, row)?;
-                }
+        self.write_operation_queue("queue_result_ready_to_delete", move |db_ref, batch_pipe| {
+            let result_schema = QueueResultRocksTable::new(db_ref.clone());
+            if let Some(row) = result_schema.get_row(id)? {
+                Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, row)?;
+            }
 
-                Ok(())
-            })
-            .await
+            Ok(())
+        })
+        .await
     }
 
     /// This method should be called when we are sure that we return data to the consumer
@@ -587,33 +585,32 @@ impl RocksCacheStore {
         &self,
         key: QueueKey,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.store
-            .write_operation("lookup_queue_result_by_key", move |db_ref, batch_pipe| {
-                let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                let query_key_is_path = key.is_path();
-                let queue_result = result_schema.get_row_by_key(key.clone())?;
+        self.write_operation_queue("lookup_queue_result_by_key", move |db_ref, batch_pipe| {
+            let result_schema = QueueResultRocksTable::new(db_ref.clone());
+            let query_key_is_path = key.is_path();
+            let queue_result = result_schema.get_row_by_key(key.clone())?;
 
-                if let Some(queue_result) = queue_result {
-                    if query_key_is_path {
-                        if queue_result.get_row().is_deleted() {
-                            Ok(None)
-                        } else {
-                            Self::queue_result_ready_to_delete_impl(
-                                &result_schema,
-                                batch_pipe,
-                                queue_result,
-                            )
-                        }
+            if let Some(queue_result) = queue_result {
+                if query_key_is_path {
+                    if queue_result.get_row().is_deleted() {
+                        Ok(None)
                     } else {
-                        Ok(Some(QueueResultResponse::Success {
-                            value: Some(queue_result.into_row().value),
-                        }))
+                        Self::queue_result_ready_to_delete_impl(
+                            &result_schema,
+                            batch_pipe,
+                            queue_result,
+                        )
                     }
                 } else {
-                    Ok(None)
+                    Ok(Some(QueueResultResponse::Success {
+                        value: Some(queue_result.into_row().value),
+                    }))
                 }
-            })
-            .await
+            } else {
+                Ok(None)
+            }
+        })
+        .await
     }
 
     fn filter_to_cancel(
@@ -1080,17 +1077,16 @@ impl CacheStore for RocksCacheStore {
     }
 
     async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError> {
-        self.store
-            .write_operation("queue_results_multi_delete", move |db_ref, batch_pipe| {
-                let queue_result_schema = QueueResultRocksTable::new(db_ref);
+        self.write_operation_queue("queue_results_multi_delete", move |db_ref, batch_pipe| {
+            let queue_result_schema = QueueResultRocksTable::new(db_ref);
 
-                for id in ids {
-                    queue_result_schema.try_delete(id, batch_pipe)?;
-                }
+            for id in ids {
+                queue_result_schema.try_delete(id, batch_pipe)?;
+            }
 
-                Ok(())
-            })
-            .await
+            Ok(())
+        })
+        .await
     }
 
     async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError> {
@@ -1238,31 +1234,30 @@ impl CacheStore for RocksCacheStore {
     }
 
     async fn queue_get(&self, key: QueueKey) -> Result<Option<QueueGetResponse>, CubeError> {
-        self.store
-            .read_operation("queue_get", move |db_ref| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+        self.read_operation_queue("queue_get", move |db_ref| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
 
-                if let Some(item_row) = queue_schema.get_row_by_key(key)? {
-                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+            if let Some(item_row) = queue_schema.get_row_by_key(key)? {
+                let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
 
-                    if let Some(payload_row) = queue_payload_schema.get_row(item_row.get_id())? {
-                        Ok(Some(QueueGetResponse {
-                            extra: item_row.into_row().extra,
-                            payload: payload_row.into_row().value,
-                        }))
-                    } else {
-                        error!(
-                            "Unable to find payload for queue item, id = {}",
-                            item_row.get_id()
-                        );
-
-                        Ok(None)
-                    }
+                if let Some(payload_row) = queue_payload_schema.get_row(item_row.get_id())? {
+                    Ok(Some(QueueGetResponse {
+                        extra: item_row.into_row().extra,
+                        payload: payload_row.into_row().value,
+                    }))
                 } else {
+                    error!(
+                        "Unable to find payload for queue item, id = {}",
+                        item_row.get_id()
+                    );
+
                     Ok(None)
                 }
-            })
-            .await
+            } else {
+                Ok(None)
+            }
+        })
+        .await
     }
 
     async fn queue_cancel(&self, key: QueueKey) -> Result<Option<QueueCancelResponse>, CubeError> {
