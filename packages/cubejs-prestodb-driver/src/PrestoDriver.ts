@@ -35,6 +35,7 @@ export type PrestoDriverExportBucket = {
   accessKeyId?: string,
   secretAccessKey?: string,
   exportBucketRegion?: string,
+  exportBucketS3AdvancedFS?: boolean,
   exportBucketCsvEscapeSymbol?: string,
 };
 
@@ -318,10 +319,11 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
     const { schema, tableName } = this.splitTableFullName(params.tableFullName);
     const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
-    let protocol = bucketType === 'gcs' ? 'gs' : bucketType;
-    if (bucketType === 's3') {
-      protocol = 's3a';
-    }
+    
+    const protocol = {
+      gcs: 'gc',
+      s3: this.config.exportBucketS3AdvancedFS ? 's3a' : 's3'
+    }[bucketType || 'gcs'];
 
     const externalLocation = `${protocol}://${exportBucket}/${schema}/${tableName}`;
     const withParams = `( external_location = '${externalLocation}', format = 'CSV')`;
