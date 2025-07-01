@@ -481,10 +481,12 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
       },
-      QueryExecutionContext: {
-        Catalog: this.config.catalog,
-        Database: this.config.database
-      }
+      ...(this.config.catalog || this.config.database ? {
+        QueryExecutionContext: {
+          Catalog: this.config.catalog,
+          Database: this.config.database
+        }
+      } : {})
     };
     const { QueryExecutionId } = await this.athena.startQueryExecution(request);
     return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
