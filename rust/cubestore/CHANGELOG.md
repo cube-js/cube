@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.29](https://github.com/cube-js/cube/compare/v1.3.28...v1.3.29) (2025-07-01)
+
+### Features
+
+- **cubestore:** Rockstore - optimize index scanning ([#9728](https://github.com/cube-js/cube/issues/9728)) ([7987b75](https://github.com/cube-js/cube/commit/7987b757f9bc674fc3973493b3707865093fcf0a))
+
 ## [1.3.28](https://github.com/cube-js/cube/compare/v1.3.27...v1.3.28) (2025-06-30)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

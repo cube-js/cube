@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.29](https://github.com/cube-js/cube/compare/v1.3.28...v1.3.29) (2025-07-01)
+
+### Features
+
+- **prestodb-driver:** Support s3 export bucket ([#9736](https://github.com/cube-js/cube/issues/9736)) ([31c6629](https://github.com/cube-js/cube/commit/31c6629c50eb487879254b1f31b55489a7fe82fb))
+
 ## [1.3.28](https://github.com/cube-js/cube/compare/v1.3.27...v1.3.28) (2025-06-30)
 
 **Note:** Version bump only for package @cubejs-backend/prestodb-driver

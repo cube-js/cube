@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.29](https://github.com/cube-js/cube/compare/v1.3.28...v1.3.29) (2025-07-01)
+
+### Bug Fixes
+
+- **cubesql:** Fix incorrect datetime parsing in filters rewrite rules ([#9732](https://github.com/cube-js/cube/issues/9732)) ([6e73860](https://github.com/cube-js/cube/commit/6e73860aa92aa9b2733a771ded59b2febf9853dd))
+
 ## [1.3.28](https://github.com/cube-js/cube/compare/v1.3.27...v1.3.28) (2025-06-30)
 
 ### Bug Fixes
