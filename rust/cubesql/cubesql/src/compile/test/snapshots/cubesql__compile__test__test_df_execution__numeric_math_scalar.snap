@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/test/test_df_execution.rs
+expression: "execute_query(query.to_string(), DatabaseProtocol::PostgreSQL).await.unwrap()"
+---
++--------------+
+| m            |
++--------------+
+| 1.0000000000 |
+| 1.5000000000 |
++--------------+
