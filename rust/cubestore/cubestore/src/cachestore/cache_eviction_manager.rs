@@ -391,7 +391,7 @@ impl CacheEvictionManager {
         store: &Arc<RocksStore>,
     ) -> Result<DeleteBatchResult, CubeError> {
         let (deleted_count, deleted_size, skipped) = store
-            .write_operation(move |db_ref, pipe| {
+            .write_operation("delete_batch", move |db_ref, pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 let mut deleted_count: u32 = 0;
@@ -951,7 +951,7 @@ impl CacheEvictionManager {
         app_metrics::CACHESTORE_TTL_BUFFER.report(buffer_len as i64);
 
         store
-            .write_operation(move |db_ref, pipe| {
+            .write_operation("persist_ttl", move |db_ref, pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 for (row_id, item) in to_persist.into_iter() {

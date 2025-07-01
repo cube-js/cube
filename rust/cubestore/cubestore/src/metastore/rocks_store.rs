@@ -706,15 +706,17 @@ macro_rules! meta_store_table_impl {
 
             async fn row_by_id_or_not_found(&self, id: u64) -> Result<IdRow<Self::T>, CubeError> {
                 self.rocks_meta_store
-                    .read_operation(move |db_ref| Ok(Self::table(db_ref).get_row_or_not_found(id)?))
+                    .read_operation("row_by_id_or_not_found", move |db_ref| {
+                        Ok(Self::table(db_ref).get_row_or_not_found(id)?)
+                    })
                     .await
             }
 
             async fn delete(&self, id: u64) -> Result<IdRow<Self::T>, CubeError> {
                 self.rocks_meta_store
-                    .write_operation(
-                        move |db_ref, batch| Ok(Self::table(db_ref).delete(id, batch)?),
-                    )
+                    .write_operation("delete", move |db_ref, batch| {
+                        Ok(Self::table(db_ref).delete(id, batch)?)
+                    })
                     .await
             }
         }
@@ -977,7 +979,7 @@ impl RocksStore {
         self.listeners.write().await.push(listener);
     }
 
-    pub async fn write_operation<F, R>(&self, f: F) -> Result<R, CubeError>
+    pub async fn write_operation<F, R>(&self, op_name: &'static str, f: F) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
             + Send
@@ -990,12 +992,13 @@ impl RocksStore {
         let db_to_send = db.clone();
         let cached_tables = self.cached_tables.clone();
         let store_name = self.details.get_name();
+        let span_name = format!("{} write operation {}", store_name, op_name);
 
         let rw_loop_sender = self.rw_loop_tx.clone();
         let (tx, rx) = oneshot::channel::<Result<(R, Vec<MetaStoreEvent>), CubeError>>();
 
         let res = rw_loop_sender.send(Box::new(move || {
-            let db_span = warn_long("store write operation", Duration::from_millis(100));
+            let db_span = warn_long(&span_name, Duration::from_millis(100));
 
             let mut batch = BatchPipe::new(db_to_send.as_ref());
             let snapshot = db_to_send.snapshot();
@@ -1183,7 +1186,7 @@ impl RocksStore {
     }
 
     pub async fn healthcheck(&self) -> Result<(), CubeError> {
-        self.read_operation(move |_| {
+        self.read_operation("healthcheck", move |_| {
             // read_operation will call getSnapshot, which is enough to test that RocksDB works
             Ok(())
         })
@@ -1297,7 +1300,7 @@ impl RocksStore {
         Ok((remote_path, checkpoint_path))
     }
 
-    pub async fn read_operation<F, R>(&self, f: F) -> Result<R, CubeError>
+    pub async fn read_operation<F, R>(&self, op_name: &'static str, f: F) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
         R: Send + Sync + 'static,
@@ -1309,8 +1312,10 @@ impl RocksStore {
         let rw_loop_sender = self.rw_loop_tx.clone();
         let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
 
+        let span_name = format!("{} read operation {}", store_name, op_name);
+
         let res = rw_loop_sender.send(Box::new(move || {
-            let db_span = warn_long("store read operation", Duration::from_millis(100));
+            let db_span = warn_long(&span_name, Duration::from_millis(100));
 
             let snapshot = db_to_send.snapshot();
             let res = f(DbTableRef {
