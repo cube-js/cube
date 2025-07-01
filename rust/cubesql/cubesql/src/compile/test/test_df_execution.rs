@@ -129,3 +129,27 @@ async fn test_date_part_interval() {
             .unwrap()
     );
 }
+
+#[tokio::test]
+async fn test_numeric_math_scalar() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+        SELECT
+            a % 2::numeric AS m
+        FROM (
+            SELECT
+                5::numeric AS a
+            UNION ALL
+            SELECT
+                3.5::numeric AS a
+        ) AS t
+        "#;
+
+    insta::assert_snapshot!(
+        execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .unwrap()
+    );
+}
