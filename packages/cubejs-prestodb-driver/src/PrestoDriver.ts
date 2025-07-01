@@ -365,10 +365,12 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         return this.extractFilesFromGCS({ credentials: this.config.credentials }, exportBucket, `${schema}/${tableName}`);
       case 's3':
         return this.extractUnloadedFilesFromS3({
-          credentials: {
-            accessKeyId: this.config.accessKeyId || '',
-            secretAccessKey: this.config.secretAccessKey || '',
-          },
+          credentials: this.config.accessKeyId && this.config.secretAccessKey
+            ? {
+              accessKeyId: this.config.accessKeyId,
+              secretAccessKey: this.config.secretAccessKey,
+            }
+            : undefined,
           region: this.config.exportBucketRegion,
         },
         exportBucket, `${schema}/${tableName}`);
