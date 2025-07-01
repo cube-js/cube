@@ -20,6 +20,7 @@ CUBEJS_AWS_SECRET=****************************************
 CUBEJS_AWS_REGION=us-east-1
 CUBEJS_AWS_S3_OUTPUT_LOCATION=s3://my-athena-output-bucket
 CUBEJS_AWS_ATHENA_WORKGROUP=primary
+CUBEJS_DB_NAME=my_non_default_athena_database
 CUBEJS_AWS_ATHENA_CATALOG=AwsDataCatalog
 ```
 
@@ -59,8 +60,9 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 | `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube deployment                                                         | A valid S3 path                                  |    ❌    |
 | `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                                                          | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
 | `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                                                              | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |
+| `CUBEJS_DB_NAME`                | The name of the database to use by default                                                                             | A valid Athena Database name                     |    ❌    |
 | `CUBEJS_DB_SCHEMA`              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |
-| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| `CUBEJS_CONCURRENCY`            | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                     | A valid number                                   |    ❌    |
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
