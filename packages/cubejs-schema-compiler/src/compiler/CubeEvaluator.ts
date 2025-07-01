@@ -565,6 +565,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public preAggregationsForCubeAsArray(path: string) {
+  console.log("!!!! pre aggrs", this.cubeFromPath(path).preAggregations);
     return Object.entries(this.cubeFromPath(path).preAggregations || {}).map(([name, preAggregation]) => ({
       name,
       ...(preAggregation as Record<string, any>)
@@ -783,6 +784,14 @@ export class CubeEvaluator extends CubeSymbols {
       cubeReferencesUsed,
     });
     return { cubeReferencesUsed, pathReferencesUsed, evaluatedSql };
+  }
+
+  /**
+   * Evaluates rollup references for retrieving rollupReference used in Tesseract.
+   * This is a temporary solution until Tesseract takes ownership of all pre-aggregations.
+   */
+  public evaluateRollupReferences<T extends ToString | Array<ToString>>(cube: string, rollupReferences: (...args: Array<unknown>) => T) {
+    return this.evaluateReferences(cube, rollupReferences, { originalSorting: true });
   }
 
   public evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinition): PreAggregationReferences {

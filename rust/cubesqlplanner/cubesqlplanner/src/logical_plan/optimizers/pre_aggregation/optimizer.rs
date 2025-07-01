@@ -1,3 +1,4 @@
+use super::PreAggregationsCompiler;
 use super::*;
 use crate::logical_plan::*;
 use crate::plan::FilterItem;
@@ -43,22 +44,9 @@ impl PreAggregationOptimizer {
         let mut cube_names_collector = CubeNamesCollector::new();
         cube_names_collector.collect(&plan)?;
         let cube_names = cube_names_collector.result();
+        let mut compiler = PreAggregationsCompiler::try_new(self.query_tools.clone(), &cube_names)?;
 
-        let mut compiled_pre_aggregations = Vec::new();
-        for cube_name in cube_names.iter() {
-            let pre_aggregations = self
-                .query_tools
-                .cube_evaluator()
-                .pre_aggregations_for_cube_as_array(cube_name.clone())?;
-            for pre_aggregation in pre_aggregations.iter() {
-                let compiled = CompiledPreAggregation::try_new(
-                    self.query_tools.clone(),
-                    cube_name,
-                    pre_aggregation.clone(),
-                )?;
-                compiled_pre_aggregations.push(compiled);
-            }
-        }
+        let compiled_pre_aggregations = compiler.compile_all_pre_aggregations()?;
 
         for pre_aggregation in compiled_pre_aggregations.iter() {
             let new_query = self.try_rewrite_query(plan.clone(), pre_aggregation)?;
@@ -413,51 +401,44 @@ impl PreAggregationOptimizer {
         &mut self,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<Rc<PreAggregation>, CubeError> {
-        let pre_aggregation_obj = self.query_tools.base_tools().get_pre_aggregation_by_name(
+        /* let pre_aggregation_obj = self.query_tools.base_tools().get_pre_aggregation_by_name(
             pre_aggregation.cube_name.clone(),
             pre_aggregation.name.clone(),
-        )?;
-        if let Some(table_name) = &pre_aggregation_obj.static_data().table_name {
-            let schema = LogicalSchema {
-                time_dimensions: vec![],
-                dimensions: pre_aggregation
-                    .dimensions
-                    .iter()
-                    .cloned()
-                    .chain(
-                        pre_aggregation
-                            .time_dimensions
-                            .iter()
-                            .map(|(d, _)| d.clone()),
-                    )
-                    .collect(),
-                measures: pre_aggregation.measures.to_vec(),
-                multiplied_measures: HashSet::new(),
-            };
-            let pre_aggregation = PreAggregation {
-                name: pre_aggregation.name.clone(),
-                time_dimensions: pre_aggregation.time_dimensions.clone(),
-                dimensions: pre_aggregation.dimensions.clone(),
-                measures: pre_aggregation.measures.clone(),
-                schema: Rc::new(schema),
-                external: pre_aggregation.external.unwrap_or_default(),
-                granularity: pre_aggregation.granularity.clone(),
-                table_name: table_name.clone(),
-                cube_name: pre_aggregation.cube_name.clone(),
-                pre_aggregation_obj,
-            };
-            let result = Rc::new(pre_aggregation);
-            self.used_pre_aggregations.insert(
-                (result.cube_name.clone(), result.name.clone()),
-                result.clone(),
-            );
-            Ok(result)
-        } else {
-            Err(CubeError::internal(format!(
-                "Cannot find pre aggregation object for cube {} and name {}",
-                pre_aggregation.cube_name, pre_aggregation.name
-            )))
-        }
+        )?; */
+        //if let Some(table_name) = &pre_aggregation_obj.static_data().table_name {
+        let schema = LogicalSchema {
+            time_dimensions: vec![],
+            dimensions: pre_aggregation
+                .dimensions
+                .iter()
+                .cloned()
+                .chain(
+                    pre_aggregation
+                        .time_dimensions
+                        .iter()
+                        .map(|(d, _)| d.clone()),
+                )
+                .collect(),
+            measures: pre_aggregation.measures.to_vec(),
+            multiplied_measures: HashSet::new(),
+        };
+        let pre_aggregation = PreAggregation {
+            name: pre_aggregation.name.clone(),
+            time_dimensions: pre_aggregation.time_dimensions.clone(),
+            dimensions: pre_aggregation.dimensions.clone(),
+            measures: pre_aggregation.measures.clone(),
+            schema: Rc::new(schema),
+            external: pre_aggregation.external.unwrap_or_default(),
+            granularity: pre_aggregation.granularity.clone(),
+            source: pre_aggregation.source.clone(),
+            cube_name: pre_aggregation.cube_name.clone(),
+        };
+        let result = Rc::new(pre_aggregation);
+        self.used_pre_aggregations.insert(
+            (result.cube_name.clone(), result.name.clone()),
+            result.clone(),
+        );
+        Ok(result)
     }
 
     fn is_schema_and_filters_match(

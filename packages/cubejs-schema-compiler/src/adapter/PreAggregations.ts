@@ -981,12 +981,14 @@ export class PreAggregations {
           // TODO join hints?
           p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p)))
         ));
+        console.log("!!!! exixtingJoins", existingJoins);
         const nonExistingJoins = targetJoins.filter(target => !existingJoins.find(
           existing => existing.originalFrom === target.originalFrom &&
             existing.originalTo === target.originalTo &&
             R.equals(existing.fromMembers, target.fromMembers) &&
             R.equals(existing.toMembers, target.toMembers)
         ));
+        console.log("!!!! nonexixtingJoins", nonExistingJoins);
         if (!nonExistingJoins.length) {
           throw new UserError(`Nothing to join in rollup join. Target joins ${JSON.stringify(targetJoins)} are included in existing rollup joins ${JSON.stringify(existingJoins)}`);
         }
@@ -1020,6 +1022,7 @@ export class PreAggregations {
   private resolveJoinMembers(join) {
     return join.joins.map(j => {
       const memberPaths = this.query.collectMemberNamesFor(() => this.query.evaluateSql(j.originalFrom, j.join.sql)).map(m => m.split('.'));
+      console.log("!!!! memb paths ", memberPaths);
       const invalidMembers = memberPaths.filter(m => m[0] !== j.originalFrom && m[0] !== j.originalTo);
       if (invalidMembers.length) {
         throw new UserError(`Members ${invalidMembers.join(', ')} in join from '${j.originalFrom}' to '${j.originalTo}' doesn't reference join cubes`);
@@ -1344,6 +1347,7 @@ export class PreAggregations {
   }
 
   private rollupLambdaUnion(preAggregationForQuery: PreAggregationForQuery, rollupGranularity: string): string {
+    console.log("!!!!! EEEEEE");
     if (!preAggregationForQuery.referencedPreAggregations) {
       return this.preAggregationTableName(
         preAggregationForQuery.cube,
@@ -1376,6 +1380,8 @@ export class PreAggregations {
       }
     );
 
+    console.log("!!!! ref pre aggr", preAggregationForQuery.referencedPreAggregations);
+
     const tables = preAggregationForQuery.referencedPreAggregations.map(preAggregation => {
       const dimensionsReferences = this.dimensionsRenderedReference(preAggregation);
       const timeDimensionsReferences = this.timeDimensionsRenderedReference(rollupGranularity, preAggregation);
@@ -1403,6 +1409,7 @@ export class PreAggregations {
     let toJoin;
     // TODO granularity shouldn't be null?
     const rollupGranularity = preAggregationForQuery.references.timeDimensions[0]?.granularity || 'day';
+    console.log("!!!! IIIIIII");
 
     const sqlAndAlias = (preAgg) => ({
       preAggregation: preAgg,
@@ -1412,6 +1419,7 @@ export class PreAggregations {
 
     if (preAggregationForQuery.preAggregation.type === 'rollupJoin') {
       const join = preAggregationForQuery.rollupJoin;
+      console.log("!!!!! cccc ", join);
 
       toJoin = [
         sqlAndAlias(join[0].fromPreAggObj),

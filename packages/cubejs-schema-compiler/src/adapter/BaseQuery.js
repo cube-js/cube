@@ -331,12 +331,12 @@ export class BaseQuery {
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
-    this.canUseNativeSqlPlannerPreAggregation = false;
-    if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
+    this.canUseNativeSqlPlannerPreAggregation = true;
+    /* if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
       const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
 
       this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0 || fullAggregateMeasures.cumulativeMeasures.length > 0;
-    }
+    } */
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -710,6 +710,7 @@ export class BaseQuery {
         preAggForQuery = undefined;
       }
     }
+    console.log("!!!! =========");
     if (preAggForQuery) {
       const {
         multipliedMeasures,
@@ -718,6 +719,7 @@ export class BaseQuery {
         withQueries,
         multiStageMembers,
       } = this.fullKeyQueryAggregateMeasures();
+      console.log("!!!! OOOO ", preAggForQuery);
 
       if (cumulativeMeasures.length === 0) {
         sql = this.preAggregations.rollupPreAggregation(
@@ -736,6 +738,8 @@ export class BaseQuery {
     } else {
       sql = this.fullKeyQueryAggregate();
     }
+    console.log("!!! sql", sql);
+    console.log("!!!! --------");
     return this.options.totalQuery
       ? this.countAllQuery(sql)
       : sql;
@@ -967,6 +971,7 @@ export class BaseQuery {
   }
 
   getPreAggregationByName(cube, preAggregationName) {
+    console.log("!!!!! paaaaa", this.preAggregations.getRollupPreAggregationByName(cube, preAggregationName));
     return this.preAggregations.getRollupPreAggregationByName(cube, preAggregationName);
   }
 

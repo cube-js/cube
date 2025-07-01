@@ -234,8 +234,11 @@ impl PhysicalPlanBuilder {
             );
             pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(meas.full_name())));
         }
+        let table_name = match &pre_aggregation.source {
+            PreAggregationSource::Table(name) => name.clone()
+        };
         let from = From::new_from_table_reference(
-            pre_aggregation.table_name.clone(),
+            table_name,
             Rc::new(pre_aggregation_schema),
             Some(pre_aggregation_alias),
         );

@@ -2136,7 +2136,7 @@ describe('PreAggregations', () => {
     });
   });
 
-  it('rollup join', async () => {
+  it('rollup join 11', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
