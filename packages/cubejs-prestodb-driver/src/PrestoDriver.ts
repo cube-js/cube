@@ -32,6 +32,9 @@ export type PrestoDriverExportBucket = {
   exportBucket?: string,
   bucketType?: 'gcs' | 's3',
   credentials?: any,
+  accessKeyId?: string,
+  secretAccessKey?: string,
+  exportBucketRegion?: string,
   exportBucketCsvEscapeSymbol?: string,
 };
 
@@ -105,6 +108,9 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       ssl: this.getSslOptions(dataSource),
       bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
       exportBucket: getEnv('dbExportBucket', { dataSource }),
+      accessKeyId: getEnv('dbExportBucketAwsKey', { dataSource }),
+      secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
+      exportBucketRegion: getEnv('dbExportBucketAwsRegion', { dataSource }),
       credentials: getEnv('dbExportGCSCredentials', { dataSource }),
       ...config
     };
@@ -312,7 +318,11 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
     const { schema, tableName } = this.splitTableFullName(params.tableFullName);
     const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
-    const protocol = bucketType === 'gcs' ? 'gs' : bucketType;
+    let protocol = bucketType === 'gcs' ? 'gs' : bucketType;
+    if (bucketType === 's3') {
+      protocol = 's3a';
+    }
+
     const externalLocation = `${protocol}://${exportBucket}/${schema}/${tableName}`;
     const withParams = `( external_location = '${externalLocation}', format = 'CSV')`;
     const select = `SELECT ${this.generateTableColumnsForExport(types)} FROM (${params.fromSql})`;
@@ -345,14 +355,21 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
-    const { bucketType, exportBucket, credentials } = this.config;
+    const { bucketType, exportBucket } = this.config;
     const { schema, tableName } = this.splitTableFullName(tableFullName);
 
     switch (bucketType) {
       case 'gcs':
-        return this.extractFilesFromGCS({ credentials }, exportBucket, `${schema}/${tableName}`);
+        return this.extractFilesFromGCS({ credentials: this.config.credentials }, exportBucket, `${schema}/${tableName}`);
       case 's3':
-        return this.extractUnloadedFilesFromS3({ credentials }, exportBucket, `${schema}/${tableName}`);
+        return this.extractUnloadedFilesFromS3({
+          credentials: {
+            accessKeyId: this.config.accessKeyId || '',
+            secretAccessKey: this.config.secretAccessKey || '',
+          },
+          region: this.config.exportBucketRegion,
+        },
+        exportBucket, `${schema}/${tableName}`);
       default:
         throw new Error(`Unsupported export bucket type: ${bucketType}`);
     }
