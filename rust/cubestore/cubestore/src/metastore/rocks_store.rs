@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::{Cursor, Write};
+use std::io::{Cursor, Read, Write};
 
 use crate::metastore::snapshot_info::SnapshotInfo;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
@@ -122,7 +122,7 @@ pub fn get_fixed_prefix() -> usize {
     13
 }
 
-pub type SecondaryKey = Vec<u8>;
+pub type SecondaryKeyHash = [u8; 8];
 pub type IndexId = u32;
 
 #[derive(Clone)]
@@ -378,7 +378,7 @@ impl<'a> RocksSecondaryIndexValue<'a> {
 pub enum RowKey {
     Table(TableId, /** row_id */ u64),
     Sequence(TableId),
-    SecondaryIndex(IndexId, SecondaryKey, /** row_id */ u64),
+    SecondaryIndex(IndexId, SecondaryKeyHash, /** row_id */ u64),
     SecondaryIndexInfo { index_id: IndexId },
     TableInfo { table_id: TableId },
 }
@@ -421,11 +421,10 @@ impl RowKey {
             )?)),
             3 => {
                 let table_id = IndexId::from(reader.read_u32::<BigEndian>()?);
-                let mut secondary_key: SecondaryKey = SecondaryKey::new();
-                let sc_length = bytes.len() - 13;
-                for _i in 0..sc_length {
-                    secondary_key.push(reader.read_u8()?);
-                }
+
+                let mut secondary_key: SecondaryKeyHash = [0_u8; 8];
+                reader.read_exact(&mut secondary_key)?;
+
                 let row_id = reader.read_u64::<BigEndian>()?;
 
                 Ok(RowKey::SecondaryIndex(table_id, secondary_key, row_id))

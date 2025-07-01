@@ -958,7 +958,7 @@ impl CacheEvictionManager {
                     cache_schema.update_extended_ttl_secondary_index(
                         row_id,
                         &CacheItemRocksIndex::ByPath,
-                        item.key_hash.to_vec(),
+                        item.key_hash,
                         RocksSecondaryIndexValueTTLExtended {
                             lfu: item.lfu,
                             lru: item.lru.decode_value_as_opt_datetime()?,
