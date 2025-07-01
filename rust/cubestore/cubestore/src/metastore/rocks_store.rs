@@ -1540,7 +1540,7 @@ mod tests {
         // read operation
         {
             let r = rocks_store
-                .read_operation(|_| -> Result<(), CubeError> {
+                .read_operation("unnamed", |_| -> Result<(), CubeError> {
                     panic!("panic - task 1");
                 })
                 .await;
@@ -1550,7 +1550,7 @@ mod tests {
             );
 
             let r = rocks_store
-                .read_operation(|_| -> Result<(), CubeError> {
+                .read_operation("unnamed", |_| -> Result<(), CubeError> {
                     Err(CubeError::user("error - task 3".to_string()))
                 })
                 .await;
@@ -1563,7 +1563,7 @@ mod tests {
         // write operation
         {
             let r = rocks_store
-                .write_operation(|_, _| -> Result<(), CubeError> {
+                .write_operation("unnamed", |_, _| -> Result<(), CubeError> {
                     panic!("panic - task 1");
                 })
                 .await;
@@ -1573,7 +1573,7 @@ mod tests {
             );
 
             let r = rocks_store
-                .write_operation(|_, _| -> Result<(), CubeError> {
+                .write_operation("unnamed", |_, _| -> Result<(), CubeError> {
                     panic!("panic - task 2");
                 })
                 .await;
@@ -1583,7 +1583,7 @@ mod tests {
             );
 
             let r = rocks_store
-                .write_operation(|_, _| -> Result<(), CubeError> {
+                .write_operation("unnamed", |_, _| -> Result<(), CubeError> {
                     Err(CubeError::user("error - task 3".to_string()))
                 })
                 .await;
@@ -1601,7 +1601,7 @@ mod tests {
 
     async fn write_test_data(rocks_store: &Arc<RocksStore>, name: String) {
         rocks_store
-            .write_operation(move |db_ref, batch_pipe| {
+            .write_operation("write_test_data", move |db_ref, batch_pipe| {
                 let table = SchemaRocksTable::new(db_ref.clone());
                 let schema = Schema { name };
                 Ok(table.insert(schema, batch_pipe)?)
