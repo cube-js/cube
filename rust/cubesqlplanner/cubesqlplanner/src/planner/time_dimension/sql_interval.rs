@@ -56,7 +56,9 @@ impl SqlInterval {
         } else if self.year != 0 {
             "year"
         } else {
-            return Err(CubeError::internal("Attempt to get granularity from empty SqlInterval".to_string()));
+            return Err(CubeError::internal(
+                "Attempt to get granularity from empty SqlInterval".to_string(),
+            ));
         };
         Ok(res.to_string())
     }
