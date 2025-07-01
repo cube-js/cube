@@ -805,6 +805,51 @@ pub trait RocksStoreDetails: Send + Sync {
     fn log_enabled(&self) -> bool;
 }
 
+#[derive(Debug, Clone)]
+pub struct RocksStoreRWLoop {
+    name: &'static str,
+    tx: tokio::sync::mpsc::Sender<
+        Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
+    >,
+    _join_handle: Arc<AbortingJoinHandle<()>>,
+}
+
+impl RocksStoreRWLoop {
+    pub fn new(name: &'static str) -> Self {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<
+            Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
+        >(32_768);
+
+        let join_handle = cube_ext::spawn_blocking(move || loop {
+            if let Some(fun) = rx.blocking_recv() {
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(fun)) {
+                    Err(panic_payload) => {
+                        let restore_error = CubeError::from_panic_payload(panic_payload);
+                        log::error!("Panic during read write loop execution: {}", restore_error);
+                    }
+                    Ok(res) => {
+                        if let Err(e) = res {
+                            log::error!("Error during read write loop execution: {}", e);
+                        }
+                    }
+                }
+            } else {
+                return;
+            }
+        });
+
+        Self {
+            name,
+            tx,
+            _join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
+        }
+    }
+
+    pub fn get_name(&self) -> &'static str {
+        self.name
+    }
+}
+
 #[derive(Clone)]
 pub struct RocksStore {
     pub db: Arc<DB>,
@@ -820,10 +865,7 @@ pub struct RocksStore {
     snapshot_uploaded: Arc<RwLock<bool>>,
     snapshots_upload_stopped: Arc<AsyncMutex<bool>>,
     pub(crate) cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
-    rw_loop_tx: tokio::sync::mpsc::Sender<
-        Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
-    >,
-    _rw_loop_join_handle: Arc<AbortingJoinHandle<()>>,
+    rw_loop_default_cf: RocksStoreRWLoop,
     details: Arc<dyn RocksStoreDetails>,
 }
 
@@ -863,28 +905,6 @@ impl RocksStore {
         let db = details.open_db(path, &config)?;
         let db_arc = Arc::new(db);
 
-        let (rw_loop_tx, mut rw_loop_rx) = tokio::sync::mpsc::channel::<
-            Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
-        >(32_768);
-
-        let join_handle = cube_ext::spawn_blocking(move || loop {
-            if let Some(fun) = rw_loop_rx.blocking_recv() {
-                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(fun)) {
-                    Err(panic_payload) => {
-                        let restore_error = CubeError::from_panic_payload(panic_payload);
-                        log::error!("Panic during read write loop execution: {}", restore_error);
-                    }
-                    Ok(res) => {
-                        if let Err(e) = res {
-                            log::error!("Error during read write loop execution: {}", e);
-                        }
-                    }
-                }
-            } else {
-                return;
-            }
-        });
-
         let meta_store = RocksStore {
             db: db_arc.clone(),
             seq_store: Arc::new(Mutex::new(HashMap::new())),
@@ -899,8 +919,7 @@ impl RocksStore {
             snapshots_upload_stopped: Arc::new(AsyncMutex::new(false)),
             config,
             cached_tables: Arc::new(Mutex::new(None)),
-            rw_loop_tx,
-            _rw_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
+            rw_loop_default_cf: RocksStoreRWLoop::new("default"),
             details,
         };
 
@@ -987,58 +1006,79 @@ impl RocksStore {
             + 'static,
         R: Send + Sync + 'static,
     {
+        self.write_operation_impl::<F, R>(&self.rw_loop_default_cf, op_name, f)
+            .await
+    }
+
+    pub async fn write_operation_impl<F, R>(
+        &self,
+        rw_loop: &RocksStoreRWLoop,
+        op_name: &'static str,
+        f: F,
+    ) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
+            + Send
+            + Sync
+            + 'static,
+        R: Send + Sync + 'static,
+    {
         let db = self.db.clone();
         let mem_seq = MemorySequence::new(self.seq_store.clone());
         let db_to_send = db.clone();
         let cached_tables = self.cached_tables.clone();
-        let store_name = self.details.get_name();
-        let span_name = format!("{} write operation {}", store_name, op_name);
 
-        let rw_loop_sender = self.rw_loop_tx.clone();
+        let loop_name = rw_loop.get_name();
+        let store_name = self.details.get_name();
+        let span_name = format!("{}({}) write operation: {}", store_name, loop_name, op_name);
+
         let (tx, rx) = oneshot::channel::<Result<(R, Vec<MetaStoreEvent>), CubeError>>();
 
-        let res = rw_loop_sender.send(Box::new(move || {
-            let db_span = warn_long(&span_name, Duration::from_millis(100));
+        let res = rw_loop
+            .tx
+            .send(Box::new(move || {
+                let db_span = warn_long(&span_name, Duration::from_millis(100));
 
-            let mut batch = BatchPipe::new(db_to_send.as_ref());
-            let snapshot = db_to_send.snapshot();
-            let res = f(
-                DbTableRef {
-                    db: db_to_send.as_ref(),
-                    snapshot: &snapshot,
-                    mem_seq,
-                    start_time: Utc::now(),
-                },
-                &mut batch,
-            );
-            match res {
-                Ok(res) => {
-                    if batch.invalidate_tables_cache {
-                        *cached_tables.lock().unwrap() = None;
+                let mut batch = BatchPipe::new(db_to_send.as_ref());
+                let snapshot = db_to_send.snapshot();
+                let res = f(
+                    DbTableRef {
+                        db: db_to_send.as_ref(),
+                        snapshot: &snapshot,
+                        mem_seq,
+                        start_time: Utc::now(),
+                    },
+                    &mut batch,
+                );
+                match res {
+                    Ok(res) => {
+                        if batch.invalidate_tables_cache {
+                            *cached_tables.lock().unwrap() = None;
+                        }
+                        let write_result = batch.batch_write_rows()?;
+                        tx.send(Ok((res, write_result))).map_err(|_| {
+                            CubeError::internal(format!(
+                                "[{}-{}] Write operation result receiver has been dropped",
+                                store_name, loop_name
+                            ))
+                        })?;
                     }
-                    let write_result = batch.batch_write_rows()?;
-                    tx.send(Ok((res, write_result))).map_err(|_| {
-                        CubeError::internal(format!(
-                            "[{}] Write operation result receiver has been dropped",
-                            store_name
-                        ))
-                    })?;
+                    Err(e) => {
+                        tx.send(Err(e)).map_err(|_| {
+                            CubeError::internal(format!(
+                                "[{}-{}] Write operation result receiver has been dropped",
+                                store_name, loop_name
+                            ))
+                        })?;
+                    }
                 }
-                Err(e) => {
-                    tx.send(Err(e)).map_err(|_| {
-                        CubeError::internal(format!(
-                            "[{}] Write operation result receiver has been dropped",
-                            store_name
-                        ))
-                    })?;
-                }
-            }
 
-            mem::drop(db_span);
+                mem::drop(db_span);
 
-            Ok(())
-        }));
-        if let Err(e) = res.await {
+                Ok(())
+            }))
+            .await;
+        if let Err(e) = res {
             log::error!(
                 "[{}] Error during scheduling write task in loop: {}",
                 store_name,
@@ -1305,16 +1345,29 @@ impl RocksStore {
         F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
         R: Send + Sync + 'static,
     {
+        self.read_operation_impl::<F, R>(&self.rw_loop_default_cf, op_name, f)
+            .await
+    }
+
+    pub async fn read_operation_impl<F, R>(
+        &self,
+        rw_loop: &RocksStoreRWLoop,
+        op_name: &'static str,
+        f: F,
+    ) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
+    {
         let mem_seq = MemorySequence::new(self.seq_store.clone());
         let db_to_send = self.db.clone();
-        let store_name = self.details.get_name();
-
-        let rw_loop_sender = self.rw_loop_tx.clone();
         let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
 
-        let span_name = format!("{} read operation {}", store_name, op_name);
+        let loop_name = rw_loop.get_name();
+        let store_name = self.details.get_name();
+        let span_name = format!("{}({}) read operation: {}", store_name, loop_name, op_name);
 
-        let res = rw_loop_sender.send(Box::new(move || {
+        let res = rw_loop.tx.send(Box::new(move || {
             let db_span = warn_long(&span_name, Duration::from_millis(100));
 
             let snapshot = db_to_send.snapshot();
@@ -1327,8 +1380,8 @@ impl RocksStore {
 
             tx.send(res).map_err(|_| {
                 CubeError::internal(format!(
-                    "[{}] Read operation result receiver has been dropped",
-                    store_name
+                    "[{}-{}] Read operation result receiver has been dropped",
+                    store_name, loop_name
                 ))
             })?;
 
