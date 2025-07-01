@@ -30,7 +30,7 @@ const presto = require('presto-client');
 
 export type PrestoDriverExportBucket = {
   exportBucket?: string,
-  bucketType?: 'gcs',
+  bucketType?: 'gcs' | 's3',
   credentials?: any,
   exportBucketCsvEscapeSymbol?: string,
 };
@@ -50,7 +50,7 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   queryTimeout?: number;
 };
 
-const SUPPORTED_BUCKET_TYPES = ['gcs'];
+const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
 /**
  * Presto driver class.
  */
@@ -103,7 +103,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
       ...(dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
       ssl: this.getSslOptions(dataSource),
-      bucketType: getEnv('dbExportBucketType', { supported: ['gcs'], dataSource }),
+      bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
       exportBucket: getEnv('dbExportBucket', { dataSource }),
       credentials: getEnv('dbExportGCSCredentials', { dataSource }),
       ...config
@@ -351,6 +351,8 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     switch (bucketType) {
       case 'gcs':
         return this.extractFilesFromGCS({ credentials }, exportBucket, `${schema}/${tableName}`);
+      case 's3':
+        return this.extractUnloadedFilesFromS3({ credentials }, exportBucket, `${schema}/${tableName}`);
       default:
         throw new Error(`Unsupported export bucket type: ${bucketType}`);
     }
