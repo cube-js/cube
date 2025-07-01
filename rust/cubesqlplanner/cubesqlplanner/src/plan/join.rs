@@ -146,9 +146,9 @@ impl ToDateRollingWindowJoinCondition {
         let date_column = self.time_dimension.to_sql(templates, context)?;
 
         let date_from =
-            templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
-        let date_to =
             templates.column_reference(&Some(self.time_series_source.clone()), "date_from")?;
+        let date_to =
+            templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
         let date_from = templates.rolling_window_expr_timestamp_cast(&date_from)?;
         let date_to = templates.rolling_window_expr_timestamp_cast(&date_to)?;
         let grouped_from = templates.time_grouped_column(self.granularity.clone(), date_from)?;
