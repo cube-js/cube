@@ -321,7 +321,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
     
     const protocol = {
-      gcs: 'gc',
+      gcs: 'gs',
       s3: this.config.exportBucketS3AdvancedFS ? 's3a' : 's3'
     }[bucketType || 'gcs'];
 
