@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT i\n                FROM (\n                    SELECT 1 i\n                    UNION ALL\n                    SELECT 2 i\n                    UNION ALL\n                    SELECT 3 i\n                ) t\n                ORDER BY i ASC\n                FETCH NEXT 2 ROWS ONLY\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---+
+| i |
++---+
+| 1 |
+| 2 |
++---+

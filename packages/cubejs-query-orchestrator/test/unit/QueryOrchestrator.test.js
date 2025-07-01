@@ -1,14 +1,17 @@
 /* globals jest, describe, beforeEach, afterEach, test, expect */
+import { Readable } from 'stream';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
-  constructor({ csvImport } = {}) {
+  constructor({ csvImport, schemaData } = {}) {
     this.tablesObj = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
+    this.droppedTables = [];
     this.csvImport = csvImport;
     this.now = new Date().getTime();
+    this.schemaData = schemaData;
   }
 
   get tables() {
@@ -93,8 +96,22 @@ class MockDriver {
   }
 
   async dropTable(tableName) {
+    if (this.droppedTables.indexOf(tableName) !== -1) {
+      throw new Error(`Can't drop table twice: ${tableName}`);
+    }
+    this.droppedTables.push(tableName);
+    console.log(`Driver drops ${tableName}`);
+    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+      throw new Error(`Can't drop missing table: ${tableName}`);
+    }
+    await this.query(`DROP TABLE ${tableName}`);
+    if (this.tablesDropDelay) {
+      await this.delay(this.tablesDropDelay);
+    }
+    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+      throw new Error(`Can't drop missing table: ${tableName}`);
+    }
     this.tablesObj = this.tablesObj.filter(t => (t.tableName || t) !== tableName);
-    return this.query(`DROP TABLE ${tableName}`);
   }
 
   async downloadTable(table, { csvImport } = {}) {
@@ -115,6 +132,12 @@ class MockDriver {
   capabilities() {
     return {};
   }
+
+  async stream(sql) {
+    return {
+      rowStream: Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)))
+    };
+  }
 }
 
 class ExternalMockDriver extends MockDriver {
@@ -130,7 +153,11 @@ class ExternalMockDriver extends MockDriver {
   }
 
   async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns, queryTracingObj, externalOptions) {
-    this.tablesObj.push({ tableName: table.substring(0, 100), buildRangeEnd: queryTracingObj?.buildRangeEnd });
+    this.tablesObj.push({
+      tableName: table.substring(0, 100),
+      buildRangeEnd: queryTracingObj?.buildRangeEnd,
+      sealAt: externalOptions?.sealAt
+    });
     if (tableData.csvFile) {
       this.csvFiles.push(tableData.csvFile);
     }
@@ -150,7 +177,7 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
   capabilities() {
     return { unloadWithoutTempTable: true };
   }
-  
+
   queryColumnTypes() {
     return [];
   }
@@ -186,13 +213,25 @@ describe('QueryOrchestrator', () => {
   let streamingSourceMockDriver = null;
   let externalMockDriver = null;
   let queryOrchestrator = null;
+  let queryOrchestrator2 = null;
   let queryOrchestratorExternalRefresh = null;
   let queryOrchestratorDropWithoutTouch = null;
   let testCount = 1;
+  const schemaData = {
+    public: {
+      orders: [
+        {
+          name: 'id',
+          type: 'integer',
+          attributes: [],
+        },
+      ],
+    },
+  };
 
   beforeEach(() => {
     const mockDriverLocal = new MockDriver();
-    const fooMockDriverLocal = new MockDriver();
+    const fooMockDriverLocal = new MockDriver({ schemaData });
     const barMockDriverLocal = new MockDriver();
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
     const mockDriverUnloadWithoutTempTableSupportLocal = new MockDriverUnloadWithoutTempTableSupport();
@@ -217,11 +256,12 @@ describe('QueryOrchestrator', () => {
     };
     const logger =
       (msg, params) => console.log(new Date().toJSON(), msg, params);
-    const options = {
+    const options = (processUid) => ({
       externalDriverFactory: () => externalMockDriverLocal,
       queryCacheOptions: {
         queueOptions: () => ({
           concurrency: 2,
+          processUid,
         }),
       },
       preAggregationsOptions: {
@@ -229,27 +269,31 @@ describe('QueryOrchestrator', () => {
         queueOptions: () => ({
           executionTimeout: 2,
           concurrency: 2,
+          processUid,
         }),
         usedTablePersistTime: 1
       },
-    };
+    });
 
     queryOrchestrator =
-      new QueryOrchestrator(redisPrefix, driverFactory, logger, options);
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, options('p1'));
+    queryOrchestrator2 =
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, options('p2'));
     queryOrchestratorExternalRefresh =
       new QueryOrchestrator(redisPrefix, driverFactory, logger, {
-        ...options,
+        ...options('p1'),
         preAggregationsOptions: {
-          ...options.preAggregationsOptions,
+          ...options('p1').preAggregationsOptions,
           externalRefresh: true,
         },
       });
     queryOrchestratorDropWithoutTouch =
       new QueryOrchestrator(redisPrefix, driverFactory, logger, {
-        ...options,
+        ...options('p1'),
         preAggregationsOptions: {
-          ...options.preAggregationsOptions,
+          ...options('p1').preAggregationsOptions,
           dropPreAggregationsWithoutTouch: true,
+          touchTablePersistTime: 1,
         },
       });
     mockDriver = mockDriverLocal;
@@ -778,6 +822,40 @@ describe('QueryOrchestrator', () => {
     ).toBe(true);
   });
 
+  test('in memory expire', async () => {
+    const query = (id) => ({
+      query: 'SELECT * FROM orders',
+      values: [],
+      cacheKeyQueries: {
+        queries: [
+          ['SELECT NOW()', [], {
+            renewalThreshold: 21600,
+          }],
+          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', [], {
+            renewalThreshold: 21600,
+          }]
+        ]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d20201103',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20201103 AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT NOW() as now', [], {
+          renewalThreshold: 86400,
+        }]]
+      }],
+      expireSecs: 2,
+      requestId: `in memory expire ${id}`,
+    });
+    await queryOrchestrator.fetchQuery(query(0));
+    await queryOrchestrator.fetchQuery(query(1));
+    await mockDriver.delay(2000);
+    await queryOrchestrator.fetchQuery(query(2));
+    expect(
+      mockDriver.executedQueries.filter(q => q.match(/timestamptz/)).length
+    ).toBe(2);
+  });
+
   test('load cache should respect external flag', async () => {
     const preAggregationsLoadCacheByDataSource = {};
     const externalPreAggregation = {
@@ -984,6 +1062,7 @@ describe('QueryOrchestrator', () => {
           ['SELECT MAX(timestamp) FROM orders', []],
         ],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'range partitions',
@@ -1026,6 +1105,7 @@ describe('QueryOrchestrator', () => {
           ['SELECT MAX(timestamp) FROM orders', []],
         ],
         partitionGranularity: 'hour',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'range partitions',
@@ -1066,6 +1146,7 @@ describe('QueryOrchestrator', () => {
           ['SELECT MAX(created_at) FROM orders', []],
         ],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'empty partitions',
@@ -1076,8 +1157,8 @@ describe('QueryOrchestrator', () => {
   });
 
   test('empty partitions with externalRefresh', async () => {
-    const query = {
-      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+    const query = ({ startQuery, endQuery, matchedTimeDimensionDateRange }) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_empty',
       values: [],
       cacheKeyQueries: {
         queries: []
@@ -1100,19 +1181,29 @@ describe('QueryOrchestrator', () => {
           indexName: 'orders_d_main'
         }],
         preAggregationStartEndQueries: [
-          ['SELECT MIN(created_at) FROM orders', []],
-          ['SELECT MAX(created_at) FROM orders', []],
+          [startQuery || 'SELECT MIN(created_at) FROM orders', []],
+          [endQuery || 'SELECT MAX(created_at) FROM orders', []],
         ],
         partitionGranularity: 'day',
-        timezone: 'UTC'
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        matchedTimeDimensionDateRange
       }],
-      requestId: 'empty partitions',
-    };
+      requestId: 'empty partitions with externalRefresh',
+    });
     await expect(async () => {
-      await queryOrchestratorExternalRefresh.fetchQuery(query);
+      await queryOrchestratorExternalRefresh.fetchQuery(query({}));
     }).rejects.toThrow(
       /refresh worker/
     );
+    await queryOrchestrator.fetchQuery(query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
+    const result = await queryOrchestratorExternalRefresh.fetchQuery(query({
+      startQuery: 'SELECT \'2021-05-01\'',
+      endQuery: 'SELECT \'2021-05-15\'',
+      matchedTimeDimensionDateRange: ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']
+    }));
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_empty20210515/);
   });
 
   test('empty intersection', async () => {
@@ -1145,6 +1236,7 @@ describe('QueryOrchestrator', () => {
         ],
         matchedTimeDimensionDateRange: ['2021-08-01T00:00:00.000', '2021-08-30T00:00:00.000'],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'empty intersection',
@@ -1179,6 +1271,7 @@ describe('QueryOrchestrator', () => {
         ],
         external: true,
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC',
         rollupLambdaId: 'orders.d_lambda',
         matchedTimeDimensionDateRange
@@ -1201,6 +1294,7 @@ describe('QueryOrchestrator', () => {
         ],
         external: true,
         partitionGranularity: 'hour',
+        timestampPrecision: 3,
         timezone: 'UTC',
         rollupLambdaId: 'orders.d_lambda',
         lastRollupLambda: true,
@@ -1214,10 +1308,145 @@ describe('QueryOrchestrator', () => {
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
 
     result = await queryOrchestrator.fetchQuery(query(['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_h2021053100/);
+
+    result = await queryOrchestratorExternalRefresh.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_d20210501/);
+    expect(result.data[0]).not.toMatch(/orders_h2021053000/);
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
+  });
+
+  test('lambda partitions week', async () => {
+    const query = (matchedTimeDimensionDateRange) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_w UNION ALL SELECT * FROM stb_pre_aggregations.orders_d UNION ALL SELECT * FROM stb_pre_aggregations.orders_h',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_w',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_w AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'week',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        matchedTimeDimensionDateRange
+      }, {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'day',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        matchedTimeDimensionDateRange
+      }, {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_h',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_h AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT \'2021-05-30\'', []],
+          ['SELECT MAX(timestamp) FROM orders', []],
+        ],
+        external: true,
+        partitionGranularity: 'hour',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        lastRollupLambda: true,
+        matchedTimeDimensionDateRange
+      }],
+      requestId: 'lambda partitions',
+      external: true,
+    });
+    const result = await queryOrchestrator.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).not.toMatch(/orders_h2021053000/);
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
+  });
+
+  test('real-time sealing partitions', async () => {
+    const query = (matchedTimeDimensionDateRange) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        partitionInvalidateKeyQueries: [],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'day',
+        timestampPrecision: 3,
+        timezone: 'UTC',
+        matchedTimeDimensionDateRange
+      }],
+      requestId: 'real-time sealing partitions',
+      external: true,
+    });
+    const result = await queryOrchestrator.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(externalMockDriver.tablesObj.find(t => t.tableName.indexOf('stb_pre_aggregations.orders_d20210531') !== -1).sealAt).toBe('2021-05-31T23:59:59.999Z');
   });
 
   test('loadRefreshKeys', async () => {
@@ -1302,7 +1531,7 @@ describe('QueryOrchestrator', () => {
         external: true,
       }],
       renewQuery: true,
-      
+
       requestId: 'basic'
     };
     const promise = queryOrchestrator.fetchQuery(query);
@@ -1430,5 +1659,114 @@ describe('QueryOrchestrator', () => {
     }
     await Promise.all(promises);
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
+  });
+
+  test('streaming simple', async () => {
+    const query = (id) => ({
+      query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [],
+      requestId: 'streaming simple',
+      persistent: true,
+      aliasNameToMember: {
+        query: 'Foo.query'
+      }
+    });
+    await Promise.all([
+      queryOrchestrator.fetchQuery(query(1)),
+      queryOrchestrator.fetchQuery(query(2)),
+      queryOrchestrator.fetchQuery(query(3)),
+      queryOrchestrator.fetchQuery(query(4)),
+    ].map(async streamPromise => {
+      const stream = await streamPromise;
+      const data = await new Promise((resolve, reject) => {
+        stream.on('data', (row) => {
+          resolve(row);
+        });
+        stream.on('error', (err) => {
+          reject(err);
+        });
+      });
+      expect(data['Foo.query']).toMatch(/orders_d/);
+    }));
+  });
+
+  test('streaming two nodes', async () => {
+    const query = (id) => ({
+      query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [],
+      requestId: 'streaming simple',
+      persistent: true,
+      aliasNameToMember: {
+        query: 'Foo.query'
+      }
+    });
+    const fetchLongPolling = (orchestrator, q) => orchestrator.fetchQuery(q).catch(e => {
+      console.log(e.toString());
+      if (e.toString().match(/Continue wait/)) {
+        return fetchLongPolling(orchestrator, q);
+      }
+      throw e;
+    });
+    await Promise.all([
+      fetchLongPolling(queryOrchestrator, query(1)),
+      fetchLongPolling(queryOrchestrator, query(2)),
+      fetchLongPolling(queryOrchestrator2, query(3)),
+      fetchLongPolling(queryOrchestrator2, query(4)),
+    ].map(async streamPromise => {
+      const stream = await streamPromise;
+      const data = await new Promise((resolve, reject) => {
+        stream.on('data', (row) => {
+          resolve(row);
+        });
+        stream.on('error', (err) => {
+          reject(err);
+        });
+      });
+      expect(data['Foo.query']).toMatch(/orders_d/);
+    }));
+  });
+
+  test('drop lock', async () => {
+    mockDriver.tablesDropDelay = 300;
+    for (let i = 0; i < 10; i++) {
+      const promises = [];
+      for (let j = 0; j < 10; j++) {
+        // eslint-disable-next-line no-loop-func
+        promises.push((async () => {
+          await mockDriver.delay(100 * j);
+          await queryOrchestratorDropWithoutTouch.fetchQuery({
+            query: `SELECT * FROM stb_pre_aggregations.orders_d2018110${j}`,
+            values: [],
+            cacheKeyQueries: {
+              renewalThreshold: 21600,
+              queries: []
+            },
+            preAggregations: [{
+              preAggregationsSchema: 'stb_pre_aggregations',
+              tableName: `stb_pre_aggregations.orders_d2018110${j}`,
+              loadSql: [`CREATE TABLE stb_pre_aggregations.orders_d2018110${j} AS SELECT * FROM public.orders_d`, []],
+              invalidateKeyQueries: [['SELECT NOW()', [], {
+                renewalThreshold: 0.001
+              }]],
+              external: true,
+            }],
+            requestId: `drop lock ${i}-${j}`
+          });
+        })());
+      }
+
+      await Promise.all(promises);
+
+      await mockDriver.delay(200);
+    }
+    // expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
   });
 });

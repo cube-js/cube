@@ -1,0 +1,104 @@
+# Apache Pinot
+
+[Apache Pinot][link-pinot] is a real-time distributed OLAP datastore purpose-built
+for low-latency, high-throughput analytics, and perfect for user-facing analytical
+workloads. [StarTree][link-startree] is a fully-managed platform for Pinot.
+
+## Prerequisites
+
+- The hostname for the [Pinot][pinot] broker
+- The port for the [Pinot][pinot] broker
+
+Note that the following features should be enabled in your Pinot cluster:
+- [Multi-stage query engine][link-pinot-msqe].
+- [Advanced null value support][link-pinot-nvs].
+
+## Setup
+
+<ReferenceBox>
+
+Currently, Apache Pinot is not shown in the list of available data sources in the UI.
+However, you can still [configure](https://github.com/cube-js/cube/issues/8579#issuecomment-2453545048)
+it using environment variables.
+
+</ReferenceBox>
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=pinot
+CUBEJS_DB_HOST=http[s]://pinot.broker.host
+CUBEJS_DB_PORT=8099
+CUBEJS_DB_USER=pinot_user
+CUBEJS_DB_PASS=**********
+```
+
+## Environment Variables
+
+| Environment Variable            | Description                                           | Possible Values     | Required |
+|---------------------------------|-------------------------------------------------------|---------------------|:--------:|
+| `CUBEJS_DB_HOST`                | The host URL for your Pinot broker                    | A valid host URL    |    ✅    |
+| `CUBEJS_DB_PORT`                | The port for the database connection                  | A valid port number |    ✅    |
+| `CUBEJS_DB_USER`                | The username used to connect to the broker            | A valid username    |    ❌    |
+| `CUBEJS_DB_PASS`                | The password used to connect to the broker            | A valid password    |    ❌    |
+| `CUBEJS_DB_NAME`                | The database name for StarTree                        | A valid name        |    ❌    |
+| `CUBEJS_DB_PINOT_NULL_HANDLING` | If `true`, enables null handling. Default is `false`  | `true`, `false`     |    ❌    |
+| `CUBEJS_DB_PINOT_AUTH_TOKEN`    | The authentication token for StarTree                 | A valid token       |    ❌    |
+| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+be used in pre-aggregations when using Pinot as a source database. To learn more
+about Pinot support for approximate aggregate functions, [click
+here][pinot-docs-approx-agg-fns].
+
+## Pre-aggregation build strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+|---------------|:--------------------------:|:-----------:|
+| Simple        |             ✅             |      ✅     |
+| Batching      |             -              |      -      |
+| Export bucket |             -              |      -      |
+
+By default, Pinot uses a simple strategy to build pre-aggregations.
+
+### Simple
+
+No extra configuration is required to configure simple pre-aggregation builds
+for Pinot.
+
+### Batching
+
+Pinot does not support batching.
+
+### Export bucket
+
+Pinot does not support export buckets.
+
+## SSL
+
+Cube does not require any additional configuration to enable SSL as Pinot connections are made over HTTPS.
+
+[link-pinot]: https://pinot.apache.org/
+[pinot]: https://docs.pinot.apache.org/
+[link-pinot-msqe]: https://docs.pinot.apache.org/reference/multi-stage-engine
+[link-pinot-nvs]: https://docs.pinot.apache.org/developers/advanced/null-value-support#advanced-null-handling-support
+[pinot-docs-approx-agg-fns]:
+  https://docs.pinot.apache.org/users/user-guide-query/query-syntax/how-to-handle-unique-counting
+[ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx
+[link-startree]: https://startree.ai

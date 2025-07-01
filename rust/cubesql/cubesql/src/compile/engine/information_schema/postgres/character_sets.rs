@@ -69,15 +69,16 @@ impl InfoSchemaCharacterSetsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.character_set_catalog.finish()));
-        columns.push(Arc::new(self.character_set_schema.finish()));
-        columns.push(Arc::new(self.character_set_name.finish()));
-        columns.push(Arc::new(self.character_repertoire.finish()));
-        columns.push(Arc::new(self.form_of_use.finish()));
-        columns.push(Arc::new(self.default_collate_catalog.finish()));
-        columns.push(Arc::new(self.default_collate_schema.finish()));
-        columns.push(Arc::new(self.default_collate_name.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.character_set_catalog.finish()),
+            Arc::new(self.character_set_schema.finish()),
+            Arc::new(self.character_set_name.finish()),
+            Arc::new(self.character_repertoire.finish()),
+            Arc::new(self.form_of_use.finish()),
+            Arc::new(self.default_collate_catalog.finish()),
+            Arc::new(self.default_collate_schema.finish()),
+            Arc::new(self.default_collate_name.finish()),
+        ];
 
         columns
     }

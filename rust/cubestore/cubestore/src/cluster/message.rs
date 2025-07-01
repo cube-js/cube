@@ -2,7 +2,7 @@ use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::CubeError;
-use arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -33,15 +33,18 @@ pub enum NetworkMessage {
     WarmupDownloadResult(Result<(), CubeError>),
 
     AddMemoryChunk {
-        chunk_id: u64,
+        chunk_name: String,
         data: SerializedRecordBatchStream,
     },
     AddMemoryChunkResult(Result<(), CubeError>),
 
     FreeMemoryChunk {
-        chunk_id: u64,
+        chunk_name: String,
     },
     FreeMemoryChunkResult(Result<(), CubeError>),
+
+    FreeDeletedMemoryChunks(Vec<String>),
+    FreeDeletedMemoryChunksResult(Result<(), CubeError>),
 
     MetaStoreCall(MetaStoreRpcMethodCall),
     MetaStoreCallResult(MetaStoreRpcMethodResult),

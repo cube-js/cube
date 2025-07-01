@@ -113,7 +113,7 @@ pub trait MultiProcTest {
 
     /// This timeout will be applied both on worker and for the drive() function.
     fn timeout(&self) -> Duration {
-        Duration::from_secs(20)
+        Duration::from_secs(30)
     }
 
     fn worker_init_timeout(&self) -> Duration {
@@ -171,6 +171,7 @@ impl Runtime {
         Self::wrap(
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
+                .thread_stack_size(4 * 1024 * 1024)
                 .build()
                 .unwrap(),
         )

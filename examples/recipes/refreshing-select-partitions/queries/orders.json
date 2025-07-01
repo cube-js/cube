@@ -1,0 +1,8 @@
+{
+  "dimensions": [
+    "Orders.number",
+    "Orders.status",
+    "Orders.createdAt",
+    "Orders.updatedAt"
+  ]
+}

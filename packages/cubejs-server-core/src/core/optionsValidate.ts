@@ -1,9 +1,9 @@
-import Joi from '@hapi/joi';
+import Joi from 'joi';
 import DriverDependencies from './DriverDependencies';
 
-const schemaQueueOptions = Joi.object().keys({
+const schemaQueueOptions = Joi.object().strict(true).keys({
   concurrency: Joi.number().min(1).integer(),
-  continueWaitTimeout: Joi.number().min(0).integer(),
+  continueWaitTimeout: Joi.number().min(0).max(90).integer(),
   executionTimeout: Joi.number().min(0).integer(),
   orphanedTimeout: Joi.number().min(0).integer(),
   heartBeatInterval: Joi.number().min(0).integer(),
@@ -11,7 +11,7 @@ const schemaQueueOptions = Joi.object().keys({
   sendCancelMessageFn: Joi.func(),
 });
 
-const jwtOptions = Joi.object().keys({
+const jwtOptions = Joi.object().strict(true).keys({
   // JWK options
   jwkRetry: Joi.number().min(1).max(5).integer(),
   jwkDefaultExpire: Joi.number().min(0),
@@ -29,6 +29,17 @@ const jwtOptions = Joi.object().keys({
   claimsNamespace: Joi.string(),
 });
 
+const corsOptions = Joi.object().strict(true).keys({
+  origin: Joi.any(),
+  methods: Joi.any(),
+  allowedHeaders: Joi.any(),
+  exposedHeaders: Joi.any(),
+  credentials: Joi.bool(),
+  maxAge: Joi.number(),
+  preflightContinue: Joi.bool(),
+  optionsSuccessStatus: Joi.number(),
+});
+
 const dbTypes = Joi.alternatives().try(
   Joi.string().valid(...Object.keys(DriverDependencies)),
   Joi.func()
@@ -36,12 +47,13 @@ const dbTypes = Joi.alternatives().try(
 
 const schemaOptions = Joi.object().keys({
   // server CreateOptions
-  initApp: Joi.func(),
   webSockets: Joi.boolean(),
-  http: Joi.object().keys({
-    cors: Joi.object(),
+  http: Joi.object().strict(true).keys({
+    cors: corsOptions,
   }),
   gracefulShutdown: Joi.number().min(0).integer(),
+  serverHeadersTimeout: Joi.number(),
+  serverKeepAliveTimeout: Joi.number(),
   // Additional from WebSocketServerOptions
   processSubscriptionsInterval: Joi.number(),
   webSocketsBasePath: Joi.string(),
@@ -60,13 +72,15 @@ const schemaOptions = Joi.object().keys({
   externalDialectFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
   //
-  cacheAndQueueDriver: Joi.string().valid('redis', 'memory'),
+  cacheAndQueueDriver: Joi.string().valid('cubestore', 'memory'),
   contextToAppId: Joi.func(),
+  contextToRoles: Joi.func(),
   contextToOrchestratorId: Joi.func(),
+  contextToCubeStoreRouterId: Joi.func(),
   contextToDataSourceId: Joi.func(),
+  contextToApiScopes: Joi.func(),
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
-  checkAuthMiddleware: Joi.func(),
   jwt: jwtOptions,
   queryTransformer: Joi.func(),
   queryRewrite: Joi.func(),
@@ -81,7 +95,10 @@ const schemaOptions = Joi.object().keys({
     Joi.boolean(),
     Joi.number().min(0).integer()
   ),
-  scheduledRefreshTimeZones: Joi.array().items(Joi.string()),
+  scheduledRefreshTimeZones: Joi.alternatives().try(
+    Joi.array().items(Joi.string()),
+    Joi.func()
+  ),
   scheduledRefreshContexts: Joi.func(),
   scheduledRefreshConcurrency: Joi.number().min(1).integer(),
   scheduledRefreshBatchSize: Joi.number().min(1).integer(),
@@ -93,30 +110,9 @@ const schemaOptions = Joi.object().keys({
   allowUngroupedWithoutPrimaryKey: Joi.boolean(),
   orchestratorOptions: Joi.alternatives().try(
     Joi.func(),
-    Joi.object().keys({
+    Joi.object().strict(true).keys({
       redisPrefix: Joi.string().allow(''),
-      redisPoolOptions: Joi.object().keys({
-        poolMin: Joi.number().min(0),
-        poolMax: Joi.number().min(0),
-        idleTimeoutSeconds: Joi.number().min(0),
-        softIdleTimeoutSeconds: Joi.number().min(0),
-        createClient: Joi.func(),
-        destroyClient: Joi.func(),
-        poolOptions: Joi.object().keys({
-          maxWaitingClients: Joi.number(),
-          testOnBorrow: Joi.bool(),
-          testOnReturn: Joi.bool(),
-          acquireTimeoutMillis: Joi.number(),
-          fifo: Joi.bool(),
-          priorityRange: Joi.number(),
-          autostart: Joi.bool(),
-          evictionRunIntervalMillis: Joi.number().min(0),
-          numTestsPerEvictionRun: Joi.number().min(1),
-          softIdleTimeoutMillis: Joi.number().min(0),
-          idleTimeoutMillis: Joi.number().min(0),
-        })
-      }),
-      continueWaitTimeout: Joi.number().min(0).integer(),
+      continueWaitTimeout: Joi.number().min(0).max(90).integer(),
       skipExternalCacheAndQueue: Joi.boolean(),
       queryCacheOptions: Joi.object().keys({
         refreshKeyRenewalThreshold: Joi.number().min(0).integer(),
@@ -129,7 +125,8 @@ const schemaOptions = Joi.object().keys({
         externalRefresh: Joi.boolean(),
         maxPartitions: Joi.number(),
       },
-      rollupOnlyMode: Joi.boolean()
+      rollupOnlyMode: Joi.boolean(),
+      testConnectionTimeout: Joi.number().min(0).integer(),
     })
   ),
   allowJsDuplicatePropsInSchema: Joi.boolean(),
@@ -140,18 +137,21 @@ const schemaOptions = Joi.object().keys({
   // SQL API
   sqlPort: Joi.number(),
   pgSqlPort: Joi.number(),
+  gatewayPort: Joi.number(),
   sqlSuperUser: Joi.string(),
   checkSqlAuth: Joi.func(),
   canSwitchSqlUser: Joi.func(),
   sqlUser: Joi.string(),
   sqlPassword: Joi.string(),
+  semanticLayerSync: Joi.func(),
   // Additional system flags
   serverless: Joi.boolean(),
   allowNodeRequire: Joi.boolean(),
+  fastReload: Joi.boolean(),
 });
 
 export default (options: any) => {
-  const { error } = Joi.validate(options, schemaOptions, { abortEarly: false, });
+  const { error } = schemaOptions.validate(options, { abortEarly: false });
   if (error) {
     throw new Error(`Invalid cube-server-core options: ${error.message || error.toString()}`);
   }

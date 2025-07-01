@@ -1,6 +1,6 @@
 import R from 'ramda';
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { MSSqlDbRunner } from './MSSqlDbRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
 
@@ -13,12 +13,12 @@ describe('MSSqlPreAggregations', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from ##visitors
       \`,
-      
+
       joins: {
         visitor_checkins: {
           relationship: 'hasMany',
@@ -30,22 +30,22 @@ describe('MSSqlPreAggregations', () => {
         count: {
           type: 'count'
         },
-        
+
         checkinsTotal: {
           sql: \`\${checkinsCount}\`,
           type: 'sum'
         },
-        
+
         uniqueSourceCount: {
           sql: 'source',
           type: 'countDistinct'
         },
-        
+
         countDistinctApprox: {
           sql: 'id',
           type: 'countDistinctApprox'
         },
-        
+
         ratio: {
           sql: \`1.0 * \${uniqueSourceCount} / nullif(\${checkinsTotal}, 0)\`,
           type: 'number'
@@ -72,13 +72,13 @@ describe('MSSqlPreAggregations', () => {
           subQuery: true
         }
       },
-      
+
       segments: {
         google: {
           sql: \`source = 'google'\`
         }
       },
-      
+
       preAggregations: {
         default: {
           type: 'originalSql'
@@ -89,12 +89,6 @@ describe('MSSqlPreAggregations', () => {
           segmentReferences: [google],
           timeDimensionReference: createdAt,
           granularity: 'day',
-        },
-        approx: {
-          type: 'rollup',
-          measureReferences: [countDistinctApprox],
-          timeDimensionReference: createdAt,
-          granularity: 'day'
         },
         ratioRollup: {
           type: 'rollup',
@@ -125,8 +119,8 @@ describe('MSSqlPreAggregations', () => {
         }
       }
     })
-    
-    
+
+
     cube('visitor_checkins', {
       sql: \`
       select * from ##visitor_checkins
@@ -157,7 +151,7 @@ describe('MSSqlPreAggregations', () => {
           sql: 'created_at'
         }
       },
-      
+
       preAggregations: {
         main: {
           type: 'originalSql'
@@ -168,14 +162,14 @@ describe('MSSqlPreAggregations', () => {
         }
       }
     })
-    
+
     cube('GoogleVisitors', {
       extends: visitors,
       sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`
     })
     `);
 
-  const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+  const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
   function replaceTableName(query, preAggregation, suffix) {
     const [toReplace, params] = query;
@@ -276,7 +270,7 @@ describe('MSSqlPreAggregations', () => {
 
       expect(preAggregationsDescription[0].invalidateKeyQueries[0][0].replace(/(\r\n|\n|\r)/gm, '')
         .replace(/\s+/g, ' '))
-        .toMatch('SELECT CASE WHEN CURRENT_TIMESTAMP < DATEADD(day, 7, CAST(@_1 AS DATETIME2)) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END');
+        .toMatch('SELECT CASE WHEN CURRENT_TIMESTAMP < DATEADD(day, 7, CAST(@_1 AS DATETIMEOFFSET)) THEN FLOOR((-25200 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END');
 
       return dbRunner
         .evaluateQueryWithPreAggregations(query)

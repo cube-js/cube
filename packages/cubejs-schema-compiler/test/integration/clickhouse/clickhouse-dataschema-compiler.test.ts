@@ -2,9 +2,11 @@ import { CompileError } from '../../../src/compiler/CompileError';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
 
-import { prepareCompiler as testPrepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
 import { logSqlAndParams } from '../../unit/TestUtil';
+
+const itif = (condition, description, fn) => (condition ? it(description, fn) : it.skip(description, fn));
 
 describe('ClickHouse DataSchemaCompiler', () => {
   jest.setTimeout(200000);
@@ -16,7 +18,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('gutter', () => {
-    const { compiler } = testPrepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -51,7 +53,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('error', () => {
-    const { compiler } = testPrepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube({}, {
       measures: {}
     })
@@ -67,7 +69,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('duplicate member', () => {
-    const { compiler } = testPrepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -102,7 +104,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('calculated metrics', () => {
-    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -176,7 +178,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('static dimension case', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -234,7 +236,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('dynamic dimension case', () => {
-    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -308,7 +310,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   {
-    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
       cube('visitors', {
         sql: \`
         select * from visitors
@@ -378,6 +380,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
 
   it('export import', () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareCompiler({
+      localPath: () => '',
       dataSchemaFiles: () => Promise.resolve([
         {
           fileName: 'main.js',
@@ -415,7 +418,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('contexts', () => {
-    const { compiler, contextEvaluator } = testPrepareCompiler(`
+    const { compiler, contextEvaluator } = prepareJsCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors
@@ -446,4 +449,61 @@ describe('ClickHouse DataSchemaCompiler', () => {
       );
     });
   });
+
+  itif(
+    dbRunner.supportsExtendedDateTimeResults,
+    'handles dates before 1970 correctly for time dimensions',
+    async () => {
+      const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
+      cube('Events', {
+        sql: \`
+        select * from events
+        \`,
+        measures: {
+          count: {
+            type: 'count',
+            sql: 'id'
+          }
+        },
+        dimensions: {
+          type: {
+            type: 'string',
+            sql: 'type'
+          },
+          started_at: {
+            type: 'time',
+            sql: 'started_at'
+          }
+        }
+      })
+      `);
+      await compiler.compile();
+
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['Events.count'],
+        dimensions: ['Events.type'],
+        timeDimensions: [{
+          dimension: 'Events.started_at',
+          granularity: 'year',
+        }],
+        filters: [{
+          operator: 'before_date',
+          dimension: 'Events.started_at',
+          values: ['1970-01-01']
+        }],
+        order: [],
+        timezone: 'America/Los_Angeles'
+      });
+      logSqlAndParams(query);
+      const res = await dbRunner.testQuery(query.buildSqlAndParams());
+
+      expect(res).toEqual([
+        {
+          events__count: '2',
+          events__started_at_year: '1969-01-01T00:00:00.000',
+          events__type: 'moon_missions',
+        }
+      ]);
+    }
+  );
 });

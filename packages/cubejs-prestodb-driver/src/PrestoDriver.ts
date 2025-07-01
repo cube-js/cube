@@ -10,13 +10,17 @@ import {
   StreamOptions,
   StreamTableData,
   TableStructure,
-  BaseDriver
+  BaseDriver,
+  UnloadOptions
 } from '@cubejs-backend/base-driver';
 import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
+
 import { Transform, TransformCallback } from 'stream';
+import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
+
 import {
   map, zipObj, prop, concat
 } from 'ramda';
@@ -24,18 +28,29 @@ import SqlString from 'sqlstring';
 
 const presto = require('presto-client');
 
-export type PrestoDriverConfiguration = {
+export type PrestoDriverExportBucket = {
+  exportBucket?: string,
+  bucketType?: 'gcs',
+  credentials?: any,
+  exportBucketCsvEscapeSymbol?: string,
+};
+
+export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   host?: string;
   port?: string;
   catalog?: string;
   schema?: string;
   user?: string;
   // eslint-disable-next-line camelcase
+  custom_auth?: string;
+  // eslint-disable-next-line camelcase
   basic_auth?: { user: string, password: string };
-  ssl?: string;
+  ssl?: string | TLSConnectionOptions;
   dataSource?: string;
+  queryTimeout?: number;
 };
 
+const SUPPORTED_BUCKET_TYPES = ['gcs'];
 /**
  * Presto driver class.
  */
@@ -47,11 +62,13 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return 2;
   }
 
-  private config: PrestoDriverConfiguration;
+  protected readonly config: PrestoDriverConfiguration;
 
-  private catalog: string | undefined;
+  protected readonly catalog: string | undefined;
 
-  private client: any;
+  protected client: any;
+
+  protected useSelectTestConnection: boolean;
 
   /**
    * Class constructor.
@@ -63,6 +80,16 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
+    const dbUser = getEnv('dbUser', { dataSource });
+    const dbPassword = getEnv('dbPass', { dataSource });
+    const authToken = getEnv('prestoAuthToken', { dataSource });
+
+    if (authToken && dbPassword) {
+      throw new Error('Both user/password and auth token are set. Please remove password or token.');
+    }
+
+    this.useSelectTestConnection = getEnv('dbUseSelectTestConnection', { dataSource });
+
     this.config = {
       host: getEnv('dbHost', { dataSource }),
       port: getEnv('dbPort', { dataSource }),
@@ -72,29 +99,40 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       schema:
         getEnv('dbName', { dataSource }) ||
         getEnv('dbSchema', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      basic_auth: getEnv('dbPass', { dataSource })
-        ? {
-          user: getEnv('dbUser', { dataSource }),
-          password: getEnv('dbPass', { dataSource }),
-        }
-        : undefined,
+      user: dbUser,
+      ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
+      ...(dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
       ssl: this.getSslOptions(dataSource),
+      bucketType: getEnv('dbExportBucketType', { supported: ['gcs'], dataSource }),
+      exportBucket: getEnv('dbExportBucket', { dataSource }),
+      credentials: getEnv('dbExportGCSCredentials', { dataSource }),
       ...config
     };
     this.catalog = this.config.catalog;
     this.client = new presto.Client(this.config);
   }
 
-  public testConnection() {
-    const query = SqlString.format('show catalogs like ?', [`%${this.catalog}%`]);
+  public async testConnection(): Promise<void> {
+    if (this.useSelectTestConnection) {
+      return this.testConnectionViaSelect();
+    }
 
-    return (<Promise<any[]>> this.queryPromised(query, false))
-      .then(catalogs => {
-        if (catalogs.length === 0) {
-          throw new Error(`Catalog not found '${this.catalog}'`);
+    return new Promise((resolve, reject) => {
+      // Get node list of presto cluster and return it.
+      // @see https://prestodb.io/docs/current/rest/node.html
+      this.client.nodes(null, (error: any, _result: any[]) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
         }
       });
+    });
+  }
+
+  protected async testConnectionViaSelect() {
+    const query = SqlString.format('SELECT 1', []);
+    await this.queryPromised(query, false);
   }
 
   public query(query: string, values: unknown[]): Promise<any[]> {
@@ -123,6 +161,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
             resolve({
               rowStream,
@@ -172,6 +211,13 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return super.downloadQueryResults(query, values, options);
   }
 
+  public informationSchemaQuery() {
+    if (this.config.schema) {
+      return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.schema}'`;
+    }
+    return super.informationSchemaQuery();
+  }
+
   public normalizeResultOverColumns(data: any[], columns: TableStructure) {
     const columnNames = map(prop('name'), columns || []);
     const arrayToObject = zipObj(columnNames);
@@ -188,5 +234,125 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return {
       unloadWithoutTempTable: true
     };
+  }
+
+  public async createSchemaIfNotExists(schemaName: string) {
+    await this.query(
+      `CREATE SCHEMA IF NOT EXISTS ${this.config.catalog}.${schemaName}`,
+      [],
+    );
+  }
+
+  // Export bucket methods
+  public async isUnloadSupported() {
+    return this.config.exportBucket !== undefined;
+  }
+
+  public async unload(tableName: string, options: UnloadOptions) {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+
+    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
+      throw new Error(`Unsupported export bucket type: ${
+        this.config.bucketType
+      }`);
+    }
+
+    const types = options.query
+      ? await this.unloadWithSql(tableName, options.query.sql, options.query.params)
+      : await this.unloadWithTable(tableName);
+
+    const csvFile = await this.getCsvFiles(tableName);
+
+    return {
+      exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
+      csvFile,
+      types,
+      csvNoHeader: true,
+    };
+  }
+
+  private splitTableFullName(tableFullName: string) {
+    const [schema, tableName] = tableFullName.split('.');
+    return { schema, tableName };
+  }
+
+  private generateTableColumnsForExport(types: {name: string, type: string}[]) {
+    return types.map((c) => `CAST(${c.name} AS varchar) ${c.name}`).join(', ');
+  }
+
+  private async unloadWithSql(tableFullName: string, sql: string, params: any[]) {
+    return this.unloadGeneric({
+      tableFullName,
+      typeSql: sql,
+      typeParams: params,
+      fromSql: sql,
+      fromParams: params
+    });
+  }
+
+  private async unloadWithTable(tableFullName: string) {
+    return this.unloadGeneric({
+      tableFullName,
+      typeSql: `SELECT * FROM ${tableFullName}`,
+      typeParams: [],
+      fromSql: tableFullName,
+      fromParams: []
+    });
+  }
+
+  private async unloadGeneric(params: {tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[]}) {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+
+    const { bucketType, exportBucket } = this.config;
+    const types = await this.queryColumnTypes(params.typeSql, params.typeParams);
+
+    const { schema, tableName } = this.splitTableFullName(params.tableFullName);
+    const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
+    const protocol = bucketType === 'gcs' ? 'gs' : bucketType;
+    const externalLocation = `${protocol}://${exportBucket}/${schema}/${tableName}`;
+    const withParams = `( external_location = '${externalLocation}', format = 'CSV')`;
+    const select = `SELECT ${this.generateTableColumnsForExport(types)} FROM (${params.fromSql})`;
+    const createTableQuery = `CREATE TABLE ${tableWithCatalogAndSchema} WITH ${withParams} AS (${select})`;
+
+    try {
+      await this.query(
+        createTableQuery,
+        params.fromParams,
+      );
+    } finally {
+      await this.query(`DROP TABLE IF EXISTS ${tableWithCatalogAndSchema}`, []);
+    }
+
+    return types;
+  }
+
+  public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: string; type: string; }[]> {
+    const response = await this.stream(`${sql} LIMIT 0`, params || [], { highWaterMark: 1 });
+    const result = [];
+    for (const column of response.types || []) {
+      result.push({ name: column.name, type: this.toGenericType(column.type) });
+    }
+    return result;
+  }
+
+  private async getCsvFiles(
+    tableFullName: string,
+  ): Promise<string[]> {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+    const { bucketType, exportBucket, credentials } = this.config;
+    const { schema, tableName } = this.splitTableFullName(tableFullName);
+
+    switch (bucketType) {
+      case 'gcs':
+        return this.extractFilesFromGCS({ credentials }, exportBucket, `${schema}/${tableName}`);
+      default:
+        throw new Error(`Unsupported export bucket type: ${bucketType}`);
+    }
   }
 }

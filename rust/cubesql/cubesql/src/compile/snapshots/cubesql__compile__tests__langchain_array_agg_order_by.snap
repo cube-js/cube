@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT\n                    pg_catalog.pg_type.typname AS name,\n                    pg_catalog.pg_type_is_visible(pg_catalog.pg_type.oid) AS visible,\n                    pg_catalog.pg_namespace.nspname AS schema, lbl_agg.labels AS labels \n                FROM pg_catalog.pg_type\n                JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_type.typnamespace\n                LEFT OUTER JOIN (\n                    SELECT\n                        pg_catalog.pg_enum.enumtypid AS enumtypid,\n                        array_agg(pg_catalog.pg_enum.enumlabel ORDER BY pg_catalog.pg_enum.enumsortorder) AS labels \n                    FROM pg_catalog.pg_enum\n                    GROUP BY pg_catalog.pg_enum.enumtypid\n                ) AS lbl_agg ON pg_catalog.pg_type.oid = lbl_agg.enumtypid \n                WHERE pg_catalog.pg_type.typtype = 'e'\n                ORDER BY\n                    pg_catalog.pg_namespace.nspname,\n                    pg_catalog.pg_type.typname\n                ;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------+---------+--------+--------+
+| name | visible | schema | labels |
++------+---------+--------+--------+
++------+---------+--------+--------+

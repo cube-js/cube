@@ -8,7 +8,10 @@
 
 ```bash
 cd packages/cubejs-backend-native
-yarn run native:build
+# default one, fallback build
+yarn run native:build-debug
+# or with python
+yarn native:build-debug-python
 yarn link
 ```
 

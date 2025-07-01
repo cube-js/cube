@@ -1,0 +1,89 @@
+# Streamlit
+
+Streamlit turns data scripts into shareable web apps in minutes.
+
+Here's a short video guide on how to connect Streamlit to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/716b753ea8344e288160a6d8804d7bd6" />
+
+## Connect from Cube Cloud
+
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Streamlit</Btn> to get
+detailed instructions.
+
+## Connect from Cube Core
+
+You can connect a Cube deployment to Streamlit using the [SQL API][ref-sql-api].
+
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Streamlit.
+
+## Connecting from Streamlit
+
+Streamlit connects to Cube as to a Postgres database.
+
+### Creating a connection
+
+Make sure to install the `streamlit`, `sqlalchemy` and `pandas` modules.
+
+```bash
+pip install streamlit
+pip install sqlalchemy
+pip install pandas
+```
+
+Then you can use `sqlalchemy.create_engine` to connect to Cube's SQL API.
+
+```python
+import streamlit
+import sqlalchemy
+import pandas
+
+engine = sqlalchemy.create_engine(
+  sqlalchemy.engine.url.URL(
+    drivername="postgresql",
+    username="cube",
+    password="9943f670fd019692f58d66b64e375213",
+    host="thirsty-raccoon.sql.aws-eu-central-1.cubecloudapp.dev",
+    port="5432",
+    database="db@thirsty-raccoon",
+  ),
+  echo_pool=True,
+)
+print("connecting with engine " + str(engine))
+connection = engine.connect()
+
+# ...
+```
+
+### Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+You can write SQL in Streamlit that will be executed in Cube. Learn more about
+Cube SQL syntax on the [reference page][ref-sql-api].
+
+```python
+# ...
+
+with streamlit.echo():
+  query = "SELECT sum(count) AS orders_count, status FROM orders GROUP BY status;"
+df = pandas.read_sql_query(query, connection)
+streamlit.dataframe(df)
+```
+
+In your Streamlit notebook it'll look like this. You can create a visualization
+of the executed SQL query by using `streamlit.dataframe(df)`.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/298ee212-b4eb-4f13-afaf-7313d040456b/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+[ref-sql-api]: /product/apis-integrations/sql-api

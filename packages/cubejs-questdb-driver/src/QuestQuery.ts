@@ -1,4 +1,8 @@
-import { BaseFilter, BaseQuery, ParamAllocator } from '@cubejs-backend/schema-compiler';
+import {
+  BaseFilter,
+  BaseQuery,
+  ParamAllocator
+} from '@cubejs-backend/schema-compiler';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   second: 's',
@@ -6,7 +10,7 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   hour: 'h',
   day: 'd',
   month: 'M',
-  year: 'Y'
+  year: 'y'
 };
 
 class QuestParamAllocator extends ParamAllocator {
@@ -30,7 +34,7 @@ class QuestFilter extends BaseFilter {
 }
 
 export class QuestQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: any): BaseFilter {
     return new QuestFilter(this, filter);
   }
 
@@ -87,14 +91,14 @@ export class QuestQuery extends BaseQuery {
       .join(' AND ');
   }
 
-  public renderSqlMeasure(name: string, evaluateSql: string, symbol: any, cubeName: string, parentMeasure: string): string {
+  public renderSqlMeasure(name: string, evaluateSql: string, symbol: any, cubeName: string, parentMeasure: string, orderBySql: string[]): string {
     // QuestDB doesn't support COUNT(column_name) syntax.
     // COUNT() or COUNT(*) should be used instead.
 
     if (symbol.type === 'count') {
       return 'count(*)';
     }
-    return super.renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure);
+    return super.renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure, orderBySql);
   }
 
   public primaryKeyCount(cubeName: string, distinct: boolean): string {
@@ -109,7 +113,7 @@ export class QuestQuery extends BaseQuery {
     }
   }
 
-  public orderHashToString(hash: any): string | null {
+  public orderHashToString(hash: { id: string, desc: boolean }): string | null {
     // QuestDB has partial support for order by index column, so map these to the alias names.
     // So, instead of:
     // SELECT col_a as "a", col_b as "b" FROM tab ORDER BY 2 ASC
@@ -129,32 +133,6 @@ export class QuestQuery extends BaseQuery {
 
     const direction = hash.desc ? 'DESC' : 'ASC';
     return `${fieldAlias} ${direction}`;
-  }
-
-  private getFieldAlias(id: string): string | null {
-    const equalIgnoreCase = (a: any, b: any) => (
-      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
-    );
-
-    let field;
-
-    field = this.dimensionsForSelect().find(
-      (d: any) => equalIgnoreCase(d.dimension, id),
-    );
-
-    if (field) {
-      return field.aliasName();
-    }
-
-    field = this.measures.find(
-      (d: any) => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
-    );
-
-    if (field) {
-      return field.aliasName();
-    }
-
-    return null;
   }
 
   public groupByClause(): string {

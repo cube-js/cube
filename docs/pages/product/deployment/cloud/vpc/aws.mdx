@@ -1,0 +1,15 @@
+# Connecting with a VPC on AWS
+
+[Dedicated infrastructure][dedicated-infrastructure] in Cube Cloud comes with
+an option of setting up a direct network connection between
+an AWS VPC on the Cube Cloud side and your own VPC(s). Such a connection allows you to
+access internal datasources without the need to expose any ports publicly.
+
+On AWS, Cube Cloud supports two main ways of establishing a private network connection:
+
+- [AWS PrivateLink][aws-private-link]
+- [VPC Peering][aws-vpc-peering]
+
+[dedicated-infrastructure]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
+[aws-private-link]: /product/deployment/cloud/vpc/aws/private-link
+[aws-vpc-peering]: /product/deployment/cloud/vpc/aws/vpc-peering

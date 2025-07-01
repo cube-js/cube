@@ -1,9 +1,7 @@
-import { useMemo } from 'react';
 import { useHistory } from 'react-router-dom';
 import { validateQuery } from '@cubejs-client/core';
 
 import { QueryBuilderContainer } from '../../components/PlaygroundQueryBuilder/QueryBuilderContainer';
-import DashboardSource from '../../DashboardSource';
 import {
   useAppContext,
   useDeepEffect,
@@ -20,11 +18,9 @@ export function buildApiUrl(
 
 export function ExplorePage() {
   const { push } = useHistory();
-  const dashboardSource = useMemo(() => new DashboardSource(), []);
   const livePreviewContext = useLivePreviewContext();
 
-  const { schemaVersion, setContext, playgroundContext } =
-    useAppContext();
+  const { schemaVersion, setContext, playgroundContext } = useAppContext();
   const { token: securityContextToken } = useSecurityContext();
 
   const { basePath, cubejsToken } = playgroundContext;
@@ -63,8 +59,7 @@ export function ExplorePage() {
   return (
     <QueryBuilderContainer
       schemaVersion={schemaVersion}
-      dashboardSource={dashboardSource}
-      onVizStateChanged={setQueryParam}
+      onQueryChange={setQueryParam}
       onTabChange={setQueryParam}
     />
   );

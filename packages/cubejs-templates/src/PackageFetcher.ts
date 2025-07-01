@@ -16,7 +16,7 @@ export class PackageFetcher {
 
   protected repoArchivePath: string;
 
-  public constructor(private repo: Repository) {
+  public constructor(private readonly repo: Repository) {
     this.tmpFolderPath = path.resolve('.', 'node_modules', '.tmp');
 
     this.init();
@@ -28,7 +28,7 @@ export class PackageFetcher {
     try {
       // Folder node_modules does not exist by default inside docker in /cube/conf without sharing volume for it
       fs.mkdirpSync(this.tmpFolderPath);
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'EEXIST') {
         this.cleanup();
         fs.mkdirSync(this.tmpFolderPath);
@@ -53,7 +53,7 @@ export class PackageFetcher {
     (await proxyFetch(url)).body.pipe(writer);
 
     return new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
+      writer.on('finish', resolve as () => void);
       writer.on('error', reject);
     });
   }

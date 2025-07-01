@@ -1,13 +1,32 @@
-use std::{backtrace::Backtrace, collections::HashMap};
+use std::{backtrace::Backtrace, collections::HashMap, fmt::Formatter};
 
-#[derive(thiserror::Error, Debug)]
+/// TODO: Migrate back to thiserror crate, when Rust will stabilize feature(error_generic_member_access)
+#[derive(Debug)]
 pub enum CompilationError {
-    #[error("SQLCompilationError: Internal: {0}")]
     Internal(String, Backtrace, Option<HashMap<String, String>>),
-    #[error("SQLCompilationError: User: {0}")]
     User(String, Option<HashMap<String, String>>),
-    #[error("SQLCompilationError: Unsupported: {0}")]
     Unsupported(String, Option<HashMap<String, String>>),
+    Fatal(String, Option<HashMap<String, String>>),
+}
+
+impl std::fmt::Display for CompilationError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompilationError::Internal(message, _, _) => {
+                f.write_fmt(format_args!("SQLCompilationError: Internal: {}", message))
+            }
+            CompilationError::User(message, _) => {
+                f.write_fmt(format_args!("SQLCompilationError: User: {}", message))
+            }
+            CompilationError::Unsupported(message, _) => f.write_fmt(format_args!(
+                "SQLCompilationError: Unsupported: {}",
+                message
+            )),
+            CompilationError::Fatal(message, _) => {
+                f.write_fmt(format_args!("SQLCompilationError: Fatal: {}", message))
+            }
+        }
+    }
 }
 
 impl PartialEq for CompilationError {
@@ -25,6 +44,10 @@ impl PartialEq for CompilationError {
                 CompilationError::Unsupported(right, _) => left == right,
                 _ => false,
             },
+            CompilationError::Fatal(left, _) => match other {
+                CompilationError::Fatal(right, _) => left == right,
+                _ => false,
+            },
         }
     }
 
@@ -39,6 +62,7 @@ impl CompilationError {
             CompilationError::Internal(_, bt, _) => Some(bt),
             CompilationError::User(_, _) => None,
             CompilationError::Unsupported(_, _) => None,
+            CompilationError::Fatal(_, _) => None,
         }
     }
 
@@ -47,6 +71,7 @@ impl CompilationError {
             CompilationError::Internal(_, bt, _) => Some(bt),
             CompilationError::User(_, _) => None,
             CompilationError::Unsupported(_, _) => None,
+            CompilationError::Fatal(_, _) => None,
         }
     }
 }
@@ -67,6 +92,10 @@ impl CompilationError {
     pub fn unsupported(message: String) -> Self {
         Self::Unsupported(message, None)
     }
+
+    pub fn fatal(message: String) -> Self {
+        Self::Fatal(message, None)
+    }
 }
 
 impl CompilationError {
@@ -75,6 +104,7 @@ impl CompilationError {
             CompilationError::Internal(msg, _, _)
             | CompilationError::User(msg, _)
             | CompilationError::Unsupported(msg, _) => msg.clone(),
+            CompilationError::Fatal(msg, _) => msg.clone(),
         }
     }
 
@@ -83,6 +113,7 @@ impl CompilationError {
             CompilationError::Internal(_, bts, meta) => CompilationError::Internal(msg, bts, meta),
             CompilationError::User(_, meta) => CompilationError::User(msg, meta),
             CompilationError::Unsupported(_, meta) => CompilationError::Unsupported(msg, meta),
+            CompilationError::Fatal(_, meta) => CompilationError::Fatal(msg, meta),
         }
     }
 }
@@ -93,6 +124,7 @@ impl CompilationError {
             CompilationError::Internal(msg, bts, _) => CompilationError::Internal(msg, bts, meta),
             CompilationError::User(msg, _) => CompilationError::User(msg, meta),
             CompilationError::Unsupported(msg, _) => CompilationError::Unsupported(msg, meta),
+            CompilationError::Fatal(msg, _) => CompilationError::Fatal(msg, meta),
         }
     }
 }

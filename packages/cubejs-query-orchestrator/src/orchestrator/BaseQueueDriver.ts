@@ -1,12 +1,20 @@
-import { QueueDriverConnectionInterface, QueueDriverInterface } from '@cubejs-backend/base-driver';
+import {
+  QueryKey,
+  QueryKeyHash,
+  QueueDriverConnectionInterface,
+  QueueDriverInterface,
+} from '@cubejs-backend/base-driver';
 import { getCacheHash } from './utils';
 
 export abstract class BaseQueueDriver implements QueueDriverInterface {
-  public redisHash(queryKey) {
-    return getCacheHash(queryKey);
+  public constructor(protected processUid: string) {
   }
 
-  abstract createConnection(): Promise<QueueDriverConnectionInterface>;
+  public redisHash(queryKey: QueryKey): QueryKeyHash {
+    return getCacheHash(queryKey, this.processUid);
+  }
 
-  abstract release(connection: QueueDriverConnectionInterface): Promise<void>;
+  public abstract createConnection(): Promise<QueueDriverConnectionInterface>;
+
+  public abstract release(connection: QueueDriverConnectionInterface): void;
 }

@@ -1,0 +1,110 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Sequence with the @cubejs-backend/mysql-driver for the Customers.RollingExternal 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+    "stream",
+  ],
+  Array [
+    "createSchemaIfNotExists",
+    "uploadTableWithIndexes",
+  ],
+]
+`;
+
+exports[`Sequence with the @cubejs-backend/mysql-driver for the Customers.RollingInternal 1`] = `
+Array [
+  Array [
+    "createSchemaIfNotExists",
+    "loadPreAggregationIntoTable",
+  ],
+  Array [],
+]
+`;
+
+exports[`Sequence with the @cubejs-backend/mysql-driver for the ECommerce.SimpleAnalysisExternal 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+    "stream",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+  ],
+]
+`;
+
+exports[`Sequence with the @cubejs-backend/mysql-driver for the ECommerce.SimpleAnalysisInternal 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+  ],
+  Array [],
+]
+`;
+
+exports[`Sequence with the @cubejs-backend/mysql-driver for the ECommerce.TimeAnalysisExternal 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+    "downloadQueryResults",
+    "stream",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+    "uploadTableWithIndexes",
+  ],
+]
+`;
+
+exports[`Sequence with the @cubejs-backend/mysql-driver for the ECommerce.TimeAnalysisInternal 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+    "loadPreAggregationIntoTable",
+  ],
+  Array [],
+]
+`;

@@ -1,0 +1,14 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT LEFT(ACOS(\n                    CASE i\n                        WHEN 0 THEN NULL\n                        ELSE (i::float / 10.0)\n                    END\n                )::text, 10) AS acos\n                FROM (\n                    SELECT generate_series(0, 5) AS i\n                ) AS t\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------------+
+| acos       |
++------------+
+| NULL       |
+| 1.47062890 |
+| 1.36943840 |
+| 1.26610367 |
+| 1.15927948 |
+| 1.04719755 |
++------------+

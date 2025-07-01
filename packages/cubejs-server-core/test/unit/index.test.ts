@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
-import { withTimeout } from '@cubejs-backend/shared';
+import { SchemaFileRepository, withTimeout } from '@cubejs-backend/shared';
 
 import {
   CreateOptions,
   CubejsServerCore,
-  SchemaFileRepository,
   ServerCoreInitializedOptions
 } from '../../src';
 import { OptsHandler } from '../../src/core/OptsHandler';
@@ -15,15 +14,19 @@ import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 // It's just a mock to open protected methods
 class CubejsServerCoreOpen extends CubejsServerCore {
-  public readonly optsHandler: OptsHandler;
+  public declare optsHandler: OptsHandler;
 
-  public readonly options: ServerCoreInitializedOptions;
+  public declare options: ServerCoreInitializedOptions;
 
   public getRefreshScheduler = super.getRefreshScheduler;
 
   public isReadyForQueryProcessing = super.isReadyForQueryProcessing;
 
   public createOrchestratorApi = super.createOrchestratorApi;
+
+  public pubScheduledRefreshTimeZones(ctx: any) {
+    return this.scheduledRefreshTimeZones(ctx);
+  }
 }
 
 const repositoryWithoutPreAggregations: SchemaFileRepository = {
@@ -33,13 +36,13 @@ const repositoryWithoutPreAggregations: SchemaFileRepository = {
       fileName: 'main.js', content: `
 cube('Bar', {
   sql: 'select * from bar',
-  
+
   measures: {
     count: {
       type: 'count'
     }
   },
-  
+
   dimensions: {
     time: {
       sql: 'timestamp',
@@ -55,6 +58,28 @@ cube('Bar', {
 const repositoryWithoutContent: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: '' }]),
+};
+
+const repositoryWithDataSource: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: `
+cube('Bar', {
+  sql: 'select * from bar',
+
+  measures: {
+    count: {
+      type: 'count'
+    }
+  },
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  },
+  dataSource: 'main'
+});
+` }]),
 };
 
 describe('index.test', () => {
@@ -103,7 +128,7 @@ describe('index.test', () => {
     };
 
     expect(() => new CubejsServerCore(options))
-      .toThrowError(/"compilerCacheSize" must be larger than or equal to 0/);
+      .toThrowError(/"compilerCacheSize" must be greater than or equal to 0/);
   });
 
   test('Should create instance of CubejsServerCore, orchestratorOptions as func', () => {
@@ -113,12 +138,12 @@ describe('index.test', () => {
       .toBeInstanceOf(CubejsServerCore);
   });
 
-  const getCreateOrchestratorOptionsFromServer = (options: CreateOptions) => {
+  const getCreateOrchestratorOptionsFromServer = async (options: CreateOptions) => {
     const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
     const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
-    cubejsServerCore.getOrchestratorApi({
+    await cubejsServerCore.getOrchestratorApi({
       requestId: 'XXX',
       authInfo: null,
       securityContext: null,
@@ -132,7 +157,7 @@ describe('index.test', () => {
     const options: CreateOptions = { dbType: () => <any>null };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await driverFactory('mongo');
@@ -146,8 +171,7 @@ describe('index.test', () => {
   test('driverFactory should return driver, failure', async () => {
     const options: CreateOptions = { dbType: () => <any>'mongo', driverFactory: () => <any>null, };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [driverFactory, _orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await driverFactory('default');
@@ -161,8 +185,7 @@ describe('index.test', () => {
   test('externalDriverFactory should return driver, failure', async () => {
     const options: CreateOptions = { dbType: () => <any>'mongo', externalDriverFactory: () => <any>null, };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [_driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await orchestratorOptions.externalDriverFactory();
@@ -190,7 +213,6 @@ describe('index.test', () => {
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
       webSocketsBasePath: '/webSocketsBasePath',
-      initApp: () => {},
       processSubscriptionsInterval: 5000,
       devServer: false,
       apiSecret: 'randomstring',
@@ -207,12 +229,11 @@ describe('index.test', () => {
         release: () => {}
       },
       externalDialectFactory: () => {},
-      cacheAndQueueDriver: 'redis',
+      cacheAndQueueDriver: 'cubestore',
       contextToAppId: () => 'STANDALONE',
       contextToOrchestratorId: () => 'EMPTY',
       repositoryFactory: () => {},
       checkAuth: () => {},
-      checkAuthMiddleware: () => {},
       queryTransformer: () => {},
       preAggregationsSchema: () => {},
       schemaVersion: () => {},
@@ -265,6 +286,16 @@ describe('index.test', () => {
         subject: 'http://localhost:4000',
         claimsNamespace: 'http://localhost:4000',
       },
+      http: {
+        cors: {
+          origin: '*',
+          methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+          preflightContinue: false,
+          optionsSuccessStatus: 204,
+          maxAge: 86400,
+          credentials: true,
+        }
+      },
       dashboardAppPath: 'string',
       dashboardAppPort: 4444,
       livePreview: true,
@@ -273,10 +304,11 @@ describe('index.test', () => {
 
     const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+    expect(cubejsServerCore.pubScheduledRefreshTimeZones({} as any)).toEqual(['Europe/Moscow']);
 
     const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
 
-    cubejsServerCore.getOrchestratorApi({
+    await cubejsServerCore.getOrchestratorApi({
       requestId: 'XXX',
       authInfo: null,
       securityContext: null,
@@ -285,7 +317,7 @@ describe('index.test', () => {
     expect(createOrchestratorApiSpy.mock.calls[0]).toEqual([
       expect.any(Function),
       {
-        cacheAndQueueDriver: 'redis',
+        cacheAndQueueDriver: 'cubestore',
         contextToDbType: expect.any(Function),
         contextToExternalDbType: expect.any(Function),
         continueWaitTimeout: 10,
@@ -301,7 +333,7 @@ describe('index.test', () => {
     ]);
     createOrchestratorApiSpy.mockRestore();
 
-    const compilerApi = cubejsServerCore.getCompilerApi({
+    const compilerApi = await cubejsServerCore.getCompilerApi({
       authInfo: null,
       securityContext: null,
       requestId: 'XXX'
@@ -322,8 +354,8 @@ describe('index.test', () => {
     const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
 
     test('CompilerApi metaConfig', async () => {
-      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
-      expect(metaConfig?.length).toBeGreaterThan(0);
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX' });
+      expect((<any[]>metaConfig)?.length).toBeGreaterThan(0);
       expect(metaConfig[0]).toHaveProperty('config');
       expect(metaConfig[0].config.hasOwnProperty('sql')).toBe(false);
       expect(metaConfigSpy).toHaveBeenCalled();
@@ -331,7 +363,7 @@ describe('index.test', () => {
     });
 
     test('CompilerApi metaConfigExtended', async () => {
-      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
       expect(metaConfigExtended.metaConfig.length).toBeGreaterThan(0);
       expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
@@ -351,20 +383,67 @@ describe('index.test', () => {
     const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
 
     test('CompilerApi metaConfig', async () => {
-      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfig).toEqual([]);
       expect(metaConfigSpy).toHaveBeenCalled();
       metaConfigSpy.mockClear();
     });
 
     test('CompilerApi metaConfigExtended', async () => {
-      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
       expect(metaConfigExtended.metaConfig).toEqual([]);
       expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
       expect(metaConfigExtended.cubeDefinitions).toEqual({});
       expect(metaConfigExtendedSpy).toHaveBeenCalled();
       metaConfigExtendedSpy.mockClear();
+    });
+
+    test('CompilerApi dataSources default', async () => {
+      const dataSources = await compilerApi.dataSources({
+        driverFactory: jest.fn(async () => true)
+      });
+
+      expect(dataSources).toHaveProperty('dataSources');
+      expect(dataSources.dataSources).toEqual([]);
+    });
+  });
+
+  describe('CompilerApi dataSources method', () => {
+    const logger = jest.fn(() => {});
+    const compilerApi = new CompilerApi(
+      repositoryWithDataSource,
+      async () => 'mysql',
+      { logger }
+    );
+
+    const dataSourcesSpy = jest.spyOn(compilerApi, 'dataSources');
+    test('CompilerApi dataSources', async () => {
+      const dataSources = await compilerApi.dataSources({
+        driverFactory: jest.fn(async () => true)
+      });
+
+      expect(dataSources).toHaveProperty('dataSources');
+      expect(dataSources.dataSources).toEqual([{
+        dataSource: 'main',
+        dbType: 'mysql',
+      }]);
+
+      expect(dataSourcesSpy).toHaveBeenCalled();
+      dataSourcesSpy.mockClear();
+    });
+
+    test('CompilerApi dataSources with driverFactory error', async () => {
+      const dataSources = await compilerApi.dataSources({
+        driverFactory: jest.fn(async () => {
+          throw new Error('Some driverFactory error');
+        })
+      });
+
+      expect(dataSources).toHaveProperty('dataSources');
+      expect(dataSources.dataSources).toEqual([]);
+      expect(dataSourcesSpy).toHaveBeenCalled();
+      dataSourcesSpy.mockClear();
     });
   });
 
@@ -405,7 +484,7 @@ describe('index.test', () => {
       [
         'Cube Store is not supported on your system',
         {
-          warning: 'You are using MockOS platform with x64 architecture, which is not supported by Cube Store.'
+          warning: `You are using MockOS platform with ${process.arch} architecture, which is not supported by Cube Store.`
         }
       ]
     ]);
@@ -567,7 +646,7 @@ describe('index.test', () => {
 
       const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
 
-      cubejsServerCore.getOrchestratorApi({
+      await cubejsServerCore.getOrchestratorApi({
         requestId: 'XXX',
         authInfo: null,
         securityContext: null,
@@ -758,5 +837,80 @@ describe('index.test', () => {
     await cubejsServerCore.shutdown();
 
     jest.restoreAllMocks();
+  });
+
+  test('scheduledRefreshTimeZones option', async () => {
+    jest.spyOn(
+      CubejsServerCoreOpen.prototype,
+      'isReadyForQueryProcessing',
+    ).mockImplementation(
+      () => true,
+    );
+
+    const timeoutKiller = withTimeout(
+      () => {
+        throw new Error('scheduledRefreshTimeZones was not called');
+      },
+      3 * 1000,
+    );
+
+    let counter = 0;
+
+    const cubejsServerCore = new CubejsServerCoreOpen({
+      dbType: 'mysql',
+      apiSecret: 'secret',
+      // 250ms
+      scheduledRefreshTimer: 1,
+      scheduledRefreshConcurrency: 1,
+      scheduledRefreshContexts: async () => [
+        {
+          securityContext: {
+            appid: 'test1',
+            u: {
+              prop1: 'value1'
+            }
+          }
+        },
+        // securityContext is required in typings, but can be empty in user-space
+        <any>{
+          // Renamed to securityContext, let's test that it migrate automatically
+          authInfo: {
+            appid: 'test2',
+            u: {
+              prop2: 'value2'
+            }
+          },
+        },
+        // Null is a default placeholder
+        null
+      ],
+      scheduledRefreshTimeZones: async (ctx) => {
+        counter++;
+        if (counter === 1) {
+          expect(ctx.securityContext).toEqual({ appid: 'test1', u: { prop1: 'value1' } });
+          return ['Europe/Kyiv'];
+        } else if (counter === 2) {
+          expect(ctx.securityContext).toEqual({ appid: 'test2', u: { prop2: 'value2' } });
+          return ['Europe/London'];
+        } else if (counter === 3) {
+          expect(ctx.securityContext).toEqual(undefined);
+
+          // Kill the timer after processing all 3 test contexts
+          await timeoutKiller.cancel();
+
+          return ['America/Los_Angeles'];
+        }
+
+        return ['Europe/Kyiv', 'Europe/London', 'America/Los_Angeles'];
+      }
+    });
+
+    await timeoutKiller;
+
+    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCoreOpen);
+    expect(counter).toBe(3);
+
+    await cubejsServerCore.beforeShutdown();
+    await cubejsServerCore.shutdown();
   });
 });

@@ -2,26 +2,26 @@
 import * as stream from 'stream';
 import pt from 'promise-timeout';
 import {
-  QueryOrchestrator,
   ContinueWaitError,
   DriverFactoryByDataSource,
   DriverType,
-  QueryOrchestratorOptions,
   QueryBody,
+  QueryOrchestrator,
+  QueryOrchestratorOptions,
 } from '@cubejs-backend/query-orchestrator';
 
-import { DbTypeAsyncFn, ExternalDbTypeFn, RequestContext } from './types';
+import { DatabaseType, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
-  contextToDbType: DbTypeAsyncFn;
-  contextToExternalDbType: ExternalDbTypeFn;
+  contextToDbType: (dataSource: string) => Promise<DatabaseType>;
+  contextToExternalDbType: () => DatabaseType;
   redisPrefix?: string;
 }
 
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
-  protected readonly orchestrator: QueryOrchestrator;
+  protected orchestrator: QueryOrchestrator;
 
   protected readonly continueWaitTimeout: number;
 
@@ -61,6 +61,7 @@ export class OrchestratorApi {
    * @throw Error
    */
   public async streamQuery(query: QueryBody): Promise<stream.Writable> {
+    // TODO merge with fetchQuery
     return this.orchestrator.streamQuery(query);
   }
 
@@ -70,7 +71,7 @@ export class OrchestratorApi {
    * error otherwise.
    */
   public async executeQuery(query: QueryBody) {
-    const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
+    const queryForLog = query.query?.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 
     try {
@@ -85,13 +86,13 @@ export class OrchestratorApi {
         : this.orchestrator.fetchQuery(query);
 
       if (query.isJob) {
-        // We want to immediately resolve and return a jobed build query result
+        // We want to immediately resolve and return a jobbed build query result
         // (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint)
         // because the following stack was optimized for such behavior.
         const job = await fetchQueryPromise;
         return job;
       }
-      
+
       fetchQueryPromise = pt.timeout(fetchQueryPromise, this.continueWaitTimeout * 1000);
 
       const data = await fetchQueryPromise;
@@ -103,34 +104,19 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      const extractDbType = async (response) => {
-        const dbType = await this.options.contextToDbType({
-          ...query.context,
-          dataSource: response.dataSource,
-        });
-        return dbType;
-      };
-
-      const extractExternalDbType = (response) => (
-        this.options.contextToExternalDbType({
-          ...query.context,
-          dataSource: response.dataSource,
-        })
-      );
-
       if (Array.isArray(data)) {
         const res = await Promise.all(
           data.map(async (item) => ({
             ...item,
-            dbType: await extractDbType(item),
-            extDbType: extractExternalDbType(item),
+            dbType: await this.options.contextToDbType(item.dataSource),
+            extDbType: this.options.contextToExternalDbType(),
           }))
         );
         return res;
       }
 
-      data.dbType = await extractDbType(data);
-      data.extDbType = extractExternalDbType(data);
+      data.dbType = await this.options.contextToDbType(data.dataSource);
+      data.extDbType = this.options.contextToExternalDbType();
 
       return data;
     } catch (err) {
@@ -188,7 +174,7 @@ export class OrchestratorApi {
   }
 
   /**
-   * Tests worker's connections to the Cubstore and, if not in the rollup only
+   * Tests worker's connections to the Cubestore and, if not in the rollup only
    * mode, to the datasources.
    */
   public async testConnection() {
@@ -239,7 +225,7 @@ export class OrchestratorApi {
     dataSource = 'default',
     schema: string,
     table: string,
-    key: any[],
+    key: any,
     token: string,
   ): Promise<[boolean, string]> {
     return this.orchestrator.isPartitionExist(
@@ -311,11 +297,11 @@ export class OrchestratorApi {
     return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
   }
 
-  public async subscribeQueueEvents(id, callback) {
+  public async subscribeQueueEvents(id: string, callback) {
     return this.orchestrator.subscribeQueueEvents(id, callback);
   }
 
-  public async unSubscribeQueueEvents(id) {
+  public async unSubscribeQueueEvents(id: string) {
     return this.orchestrator.unSubscribeQueueEvents(id);
   }
 

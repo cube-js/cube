@@ -1,0 +1,79 @@
+# `lkml2cube` package
+
+`lkml2cube` package facilitates the migration from [Looker][link-looker]
+to Cube. It provides a convenient command-line tool for converting
+[LookML][link-lookml] models into the Cube data model.
+
+* Install [`lkml2cube`][link-lkml2cube-pypi] package from PyPI
+* Check the source code in [`lkml2cube`][link-lkml2cube-repo] on GitHub
+* Submit issues to [`cube`][link-cube-repo-issues] on GitHub
+
+## Installation
+
+Run the following command:
+
+```bash
+pip install lkml2cube
+```
+
+## Usage
+
+There are two commands: `cubes` and `views`. Both commands read all the
+files in the provided input parameter, including those referenced by the
+LookML keyword `include`.
+
+### `cubes`
+
+The `cubes` command would inspect LookML [views][link-lookml-views] and
+generate [cubes][ref-cubes].
+
+Since join relationships are defined at the `explore` level in LookML
+syntax, generated cubes would not have [join][ref-joins] definitions.
+
+#### Debugging
+
+Run the following command to display a representation of a LookML object
+as a Python dictionary:
+
+```bash
+lkml2cube cubes --parseonly path/to/file.view.lkml
+```
+
+#### Converting
+
+Run the following command to convert LookML [views][link-lookml-views]
+into [cubes][ref-cubes]:
+
+```bash
+lkml2cube cubes path/to/file.view.lkml --outputdir ./
+```
+
+### `views`
+
+The `views` command would inspect LookML [explores][link-lookml-explores]
+and generate [cubes][ref-cubes] and [views][ref-views].
+
+Since join relationships are defined at the `explore` level in LookML
+syntax, generated cubes and views would have [join][ref-joins] definitions.
+
+#### Converting
+
+Run the following command to convert LookML [explores][link-lookml-explores]
+into [cubes][ref-cubes] and [views][ref-views]:
+
+```bash
+lkml2cube views path/to/file.explore.lkml --outputdir ./
+```
+
+
+[link-looker]: https://cloud.google.com/looker/
+[link-lookml]: https://cloud.google.com/looker/docs/reference/lookml-quick-reference
+[link-lookml-views]: https://cloud.google.com/looker/docs/reference/param-view
+[link-lookml-explores]: https://cloud.google.com/looker/docs/reference/param-explore
+[link-lkml2cube-repo]: https://github.com/cube-js/lkml2cube
+[link-lkml2cube-pypi]: https://pypi.org/project/lkml2cube/
+[link-cube-repo-issues]: https://github.com/cube-js/cube/issues
+
+[ref-cubes]: /product/data-modeling/reference/cube
+[ref-views]: /product/data-modeling/reference/view
+[ref-joins]: /product/data-modeling/reference/joins

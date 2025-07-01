@@ -1,0 +1,36 @@
+{# https://cube.dev/docs/schema/advanced/extending-cubes#usage-with-filter-params #}
+
+{%- set tables = [
+  "base_events",
+  "product_purchases",
+  "page_views"
+] %}
+
+cubes:
+  {%- for table in tables[0:1] %}
+  - name: cube_04_{{ table }}
+    sql: >
+      SELECT *
+      FROM public.events
+      WHERE
+      {%- for inner_table in tables %}
+        {FILTER_PARAMS.cube_04_{{ inner_table | safe }}.timestamp.filter('timestamp')}
+        {%- if not loop.last %} AND {% endif %}
+      {%- endfor %}
+
+    dimensions:
+      - name: timestamp
+        sql: timestamp
+        type: time
+  {% endfor %}
+
+  {%- for table in tables[1:] %}
+  - name: cube_04_{{ table | safe }}
+    extends: {{ tables[0] }}
+    sql_table: public.events
+
+    dimensions:
+      - name: timestamp
+        sql: timestamp
+        type: time
+  {% endfor %}

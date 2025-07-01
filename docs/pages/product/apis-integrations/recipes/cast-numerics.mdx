@@ -1,0 +1,156 @@
+# Retrieving numeric values on the front-end
+
+## Use case
+
+The REST API returns numeric measure and dimension values as strings.
+However, we'd like to receive them as JavaScript `Number` type.
+In the recipe below, we explore a way to have numeric values automatically
+converted to `Number`. This is a potentially unsafe operation, so we also
+explore when it's safe to do so.
+
+## Data modeling
+
+Let's assume we have the following cube with a numeric dimension and a
+numeric measure:
+
+```yaml
+cubes:
+  - name: cube_with_big_numbers
+    sql: >
+      SELECT              123::BIGINT AS number UNION ALL
+      SELECT 9007199254740991::BIGINT AS number UNION ALL
+      SELECT 9999999999999999::BIGINT AS number
+
+    dimensions:
+      - name: number
+        sql: number
+        type: number
+
+    measures:
+      - name: sum
+        sql: number
+        type: sum
+```
+
+## Query via the REST API
+
+Let's send the following query via the REST API:
+
+```json
+{
+  "dimensions": [
+    "cube_with_big_numbers.number"
+  ],
+  "measures": [
+    "cube_with_big_numbers.sum"
+  ]
+}
+```
+
+Unsurprisingly, we'll get the following result set in respose:
+
+```json
+[
+  {
+    "cube_with_big_numbers.number": "9999999999999999",
+    "cube_with_big_numbers.sum": "9999999999999999"
+  },
+  {
+    "cube_with_big_numbers.number": "9007199254740991",
+    "cube_with_big_numbers.sum": "9007199254740991"
+  },
+  {
+    "cube_with_big_numbers.number": "123",
+    "cube_with_big_numbers.sum": "123"
+  }
+]
+```
+
+You can see that the REST API returns numeric measure and dimension values
+as strings. While it might counter-intuitive, this is actually by design.
+
+[JavaScript numbers][link-js-numbers] are always stored as double precision
+floating point numbers, following the international IEEE 754 standard.
+They can only safely represent integers between `–9007199254740991`
+and `9007199254740991`, also known as `Number.MIN_SAFE_INTEGER` and
+[`Number.MAX_SAFE_INTEGER`][link-mdn-max-safe-integer]. It's also true with
+regards to JSON numbers since they are handled by the JavaScript runtime. 
+
+That is why the REST API returns numeric measure and dimension values as
+strings by default. Depending on the nature of your data and domain, you
+can decide that numbers are "safe integers" and parse them as instances of
+the `Number` type; alternatively, you can parse them as instances of the
+`BigInt` type. 
+
+JavaScript SDK provides convenient facilities for the case when all numbers
+are considered "safe integers". See how to use them below.
+
+## Query via the JavaScript SDK
+
+Let's use [JavaScript SDK][ref-cube-core] to send the same query and print
+the result set to the browser console:
+
+```js
+import cube from "@cubejs-client/core";
+
+const apiUrl = "...";
+const apiToken = "...";
+const cubeApi = cube(apiToken, { apiUrl });
+
+const query = {
+  dimensions: ["cube_with_big_numbers.number"],
+  measures: ["cube_with_big_numbers.sum"]
+};
+
+// 1. Default format
+cubeApi.load(query).then((resultSet) => {
+  console.log(resultSet.tablePivot());
+});
+
+// 2. Format with castNumerics
+cubeApi.load(query, { castNumerics: true }).then((resultSet) => {
+  console.log(resultSet.tablePivot());
+});
+```
+
+In the first case, numeric measure and dimension values will be rendered
+as strings:
+
+```js
+(3) [Object, Object, Object]
+  0: Object
+    cube_with_big_numbers.number: "9999999999999999"
+    cube_with_big_numbers.sum: "9999999999999999"
+  1: Object
+    cube_with_big_numbers.number: "9007199254740991"
+    cube_with_big_numbers.sum: "9007199254740991"
+  2: Object
+    cube_with_big_numbers.number: "123"
+    cube_with_big_numbers.sum: "123"
+```
+
+In the second case, when the [`castNumerics`][ref-cube-core-cast-numerics]
+flag is set to `true`, numeric values are automatically cast to `number`.
+As the result, some numbers consequently loose precision:
+
+```js
+(3) [Object, Object, Object]
+  0: Object
+    cube_with_big_numbers.number: 10000000000000000
+    cube_with_big_numbers.sum: 10000000000000000
+  1: Object
+    cube_with_big_numbers.number: 9007199254740991
+    cube_with_big_numbers.sum: 9007199254740991
+  2: Object
+    cube_with_big_numbers.number: 123
+    cube_with_big_numbers.sum: 123
+```
+
+It is advised to use `castNumerics` only in cases when you're sure that
+you work with "safe integers".
+
+[link-js-numbers]: https://www.w3schools.com/js/js_numbers.asp
+[link-mdn-max-safe-integer]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER
+
+[ref-cube-core]: http://localhost:3000/product/apis-integrations/javascript-sdk/reference/cubejs-client-core
+[ref-cube-core-cast-numerics]: http://localhost:3000/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#loadmethodoptions

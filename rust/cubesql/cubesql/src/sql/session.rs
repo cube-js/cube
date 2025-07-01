@@ -3,43 +3,25 @@ use log::trace;
 use rand::Rng;
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock as RwLockSync},
+    sync::{Arc, LazyLock, RwLock as RwLockSync, Weak},
+    time::{Duration, SystemTime},
 };
 use tokio_util::sync::CancellationToken;
 
+use super::{server_manager::ServerManager, session_manager::SessionManager, AuthContextRef};
 use crate::{
+    compile::{
+        DatabaseProtocol, DatabaseProtocolDetails, DatabaseVariable, DatabaseVariables,
+        DatabaseVariablesToUpdate,
+    },
     sql::{
-        database_variables::{
-            mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
-            DatabaseVariablesToUpdate,
-        },
+        database_variables::{mysql_default_session_variables, postgres_default_session_variables},
         extended::PreparedStatement,
+        temp_tables::TempTableManager,
     },
     transport::LoadRequestMeta,
     RWLockAsync,
 };
-
-use super::{
-    database_variables::DatabaseVariables, server_manager::ServerManager,
-    session_manager::SessionManager, AuthContextRef,
-};
-
-extern crate lazy_static;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DatabaseProtocol {
-    MySQL,
-    PostgreSQL,
-}
-
-impl DatabaseProtocol {
-    pub fn to_string(&self) -> String {
-        match &self {
-            DatabaseProtocol::PostgreSQL => "postgres".to_string(),
-            DatabaseProtocol::MySQL => "mysql".to_string(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct SessionProperties {
@@ -53,10 +35,10 @@ impl SessionProperties {
     }
 }
 
-lazy_static! {
-    static ref POSTGRES_DEFAULT_VARIABLES: DatabaseVariables = postgres_default_session_variables();
-    static ref MYSQL_DEFAULT_VARIABLES: DatabaseVariables = mysql_default_session_variables();
-}
+static POSTGRES_DEFAULT_VARIABLES: LazyLock<DatabaseVariables> =
+    LazyLock::new(postgres_default_session_variables);
+static MYSQL_DEFAULT_VARIABLES: LazyLock<DatabaseVariables> =
+    LazyLock::new(mysql_default_session_variables);
 
 #[derive(Debug)]
 pub enum TransactionState {
@@ -78,49 +60,66 @@ pub enum QueryState {
 pub struct SessionState {
     // connection id, immutable
     pub connection_id: u32,
+    // Can be UUID or anything else. MDX uses UUID
+    pub extra_id: Option<SessionExtraId>,
     // secret for this session
     pub secret: u32,
-    // client address, immutable
-    pub host: String,
+    // client ip, immutable
+    pub client_ip: String,
+    // client port, immutable
+    pub client_port: u16,
     // client protocol, mysql/postgresql, immutable
     pub protocol: DatabaseProtocol,
 
     // session db variables
     variables: RwLockSync<Option<DatabaseVariables>>,
 
+    // session temporary tables
+    temp_tables: Arc<TempTableManager>,
+
     properties: RwLockSync<SessionProperties>,
 
     // @todo Remove RWLock after split of Connection & SQLWorker
     // Context for Transport
-    auth_context: RwLockSync<Option<AuthContextRef>>,
+    auth_context: RwLockSync<(Option<AuthContextRef>, SystemTime)>,
 
     transaction: RwLockSync<TransactionState>,
     query: RwLockSync<QueryState>,
 
     // Extended Query
     pub statements: RWLockAsync<HashMap<String, PreparedStatement>>,
+
+    auth_context_expiration: Duration,
 }
 
 impl SessionState {
     pub fn new(
         connection_id: u32,
-        host: String,
+        extra_id: Option<SessionExtraId>,
+        client_ip: String,
+        client_port: u16,
         protocol: DatabaseProtocol,
         auth_context: Option<AuthContextRef>,
+        auth_context_expiration: Duration,
+        session_manager: Weak<SessionManager>,
     ) -> Self {
         let mut rng = rand::thread_rng();
 
         Self {
             connection_id,
+            extra_id,
             secret: rng.gen(),
-            host,
+            client_ip,
+            client_port,
             protocol,
             variables: RwLockSync::new(None),
+            temp_tables: Arc::new(TempTableManager::new(session_manager)),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
-            auth_context: RwLockSync::new(auth_context),
+            auth_context: RwLockSync::new((auth_context, SystemTime::now())),
             transaction: RwLockSync::new(TransactionState::None),
             query: RwLockSync::new(QueryState::None),
             statements: RWLockAsync::new(HashMap::new()),
+            auth_context_expiration,
         }
     }
 
@@ -181,6 +180,18 @@ impl SessionState {
         match &*guard {
             QueryState::Active { query, .. } => Some(query.clone()),
             QueryState::None => None,
+        }
+    }
+
+    pub fn has_current_query(&self) -> bool {
+        let guard = self
+            .query
+            .read()
+            .expect("failed to unlock query for has_current_query");
+
+        match &*guard {
+            QueryState::None => false,
+            QueryState::Active { .. } => true,
         }
     }
 
@@ -276,12 +287,23 @@ impl SessionState {
         guard.database = database;
     }
 
+    pub fn is_auth_context_expired(&self) -> bool {
+        let guard = self
+            .auth_context
+            .read()
+            .expect("failed to unlock auth_context for reading");
+        let (_, created_at) = &*guard;
+        let now = SystemTime::now();
+        let duration = now.duration_since(*created_at).unwrap_or_default();
+        duration > self.auth_context_expiration
+    }
+
     pub fn auth_context(&self) -> Option<AuthContextRef> {
         let guard = self
             .auth_context
             .read()
             .expect("failed to unlock auth_context for reading");
-        guard.clone()
+        guard.0.clone()
     }
 
     pub fn set_auth_context(&self, auth_context: Option<AuthContextRef>) {
@@ -289,7 +311,7 @@ impl SessionState {
             .auth_context
             .write()
             .expect("failed to auth_context properties for writting");
-        *guard = auth_context;
+        *guard = (auth_context, SystemTime::now());
     }
 
     // TODO: Read without copy by holding acquired lock
@@ -302,9 +324,10 @@ impl SessionState {
 
         match guard {
             Some(vars) => vars,
-            _ => match self.protocol {
+            _ => match &self.protocol {
                 DatabaseProtocol::MySQL => return MYSQL_DEFAULT_VARIABLES.clone(),
                 DatabaseProtocol::PostgreSQL => return POSTGRES_DEFAULT_VARIABLES.clone(),
+                DatabaseProtocol::Extension(ext) => ext.get_session_default_variables(),
             },
         }
     }
@@ -316,12 +339,11 @@ impl SessionState {
             .expect("failed to unlock variables for reading");
 
         match &*guard {
-            Some(vars) => vars.get(name).map(|v| v.clone()),
-            _ => match self.protocol {
-                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).map(|v| v.clone()),
-                DatabaseProtocol::PostgreSQL => {
-                    POSTGRES_DEFAULT_VARIABLES.get(name).map(|v| v.clone())
-                }
+            Some(vars) => vars.get(name).cloned(),
+            _ => match &self.protocol {
+                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).cloned(),
+                DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.get(name).cloned(),
+                DatabaseProtocol::Extension(ext) => ext.get_session_variable_default(name),
             },
         }
     }
@@ -349,7 +371,11 @@ impl SessionState {
         }
     }
 
-    pub fn get_load_request_meta(&self) -> LoadRequestMeta {
+    pub fn temp_tables(&self) -> Arc<TempTableManager> {
+        Arc::clone(&self.temp_tables)
+    }
+
+    pub fn get_load_request_meta(&self, api_type: &str) -> LoadRequestMeta {
         let application_name = if let Some(var) = self.get_variable("application_name") {
             Some(var.value.to_string())
         } else {
@@ -357,12 +383,14 @@ impl SessionState {
         };
 
         LoadRequestMeta::new(
-            self.protocol.to_string(),
-            "sql".to_string(),
+            self.protocol.get_name().to_string(),
+            api_type.to_string(),
             application_name,
         )
     }
 }
+
+pub type SessionExtraId = [u8; 16];
 
 #[derive(Debug)]
 pub struct Session {
@@ -373,46 +401,7 @@ pub struct Session {
     pub state: Arc<SessionState>,
 }
 
-impl Session {
-    // For PostgreSQL
-    pub fn to_stat_activity(self: &Arc<Self>) -> SessionStatActivity {
-        let query = self.state.current_query();
-
-        let application_name = if let Some(v) = self.state.get_variable("application_name") {
-            match v.value {
-                ScalarValue::Utf8(r) => r,
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        SessionStatActivity {
-            oid: self.state.connection_id,
-            datname: self.state.database(),
-            pid: self.state.connection_id,
-            leader_pid: None,
-            usesysid: 0,
-            usename: self.state.user(),
-            application_name,
-            client_addr: None,
-            client_hostname: None,
-            client_port: None,
-            query,
-        }
-    }
-
-    // For MySQL
-    pub fn to_process_list(self: &Arc<Self>) -> SessionProcessList {
-        SessionProcessList {
-            id: self.state.connection_id,
-            host: self.state.host.clone(),
-            user: self.state.user(),
-            database: self.state.database(),
-        }
-    }
-}
-
+/// Specific representation of session for MySQL
 #[derive(Debug)]
 pub struct SessionProcessList {
     pub id: u32,
@@ -421,17 +410,58 @@ pub struct SessionProcessList {
     pub database: Option<String>,
 }
 
+impl From<&Session> for SessionProcessList {
+    fn from(session: &Session) -> Self {
+        Self {
+            id: session.state.connection_id,
+            host: session.state.client_ip.clone(),
+            user: session.state.user(),
+            database: session.state.database(),
+        }
+    }
+}
+
+/// Specific representation of session for PostgreSQL
 #[derive(Debug)]
 pub struct SessionStatActivity {
     pub oid: u32,
     pub datname: Option<String>,
     pub pid: u32,
     pub leader_pid: Option<u32>,
-    pub usesysid: u32,
+    pub usesysid: Option<u32>,
     pub usename: Option<String>,
     pub application_name: Option<String>,
-    pub client_addr: Option<String>,
+    pub client_addr: String,
     pub client_hostname: Option<String>,
-    pub client_port: Option<String>,
+    pub client_port: u16,
     pub query: Option<String>,
+}
+
+impl From<&Session> for SessionStatActivity {
+    fn from(session: &Session) -> Self {
+        let query = session.state.current_query();
+
+        let application_name = if let Some(v) = session.state.get_variable("application_name") {
+            match v.value {
+                ScalarValue::Utf8(r) => r,
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        Self {
+            oid: session.state.connection_id,
+            datname: session.state.database(),
+            pid: session.state.connection_id,
+            leader_pid: None,
+            usesysid: None,
+            usename: session.state.user(),
+            application_name,
+            client_addr: session.state.client_ip.clone(),
+            client_hostname: None,
+            client_port: session.state.client_port,
+            query,
+        }
+    }
 }

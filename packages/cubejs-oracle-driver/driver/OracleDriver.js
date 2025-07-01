@@ -8,7 +8,7 @@ const {
   getEnv,
   assertDataSource,
 } = require('@cubejs-backend/shared');
-const { BaseDriver } = require('@cubejs-backend/base-driver');
+const { BaseDriver, TableColumn } = require('@cubejs-backend/base-driver');
 const oracledb = require('oracledb');
 const { reduce } = require('ramda');
 
@@ -58,7 +58,9 @@ class OracleDriver extends BaseDriver {
    * Class constructor.
    */
   constructor(config = {}) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -69,7 +71,7 @@ class OracleDriver extends BaseDriver {
     this.db.partRows = 100000;
     this.db.maxRows = 100000;
     this.db.prefetchRows = 500;
-    this.config = config || {
+    this.config = {
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       db: getEnv('dbName', { dataSource }),
@@ -80,11 +82,9 @@ class OracleDriver extends BaseDriver {
         config.maxPoolSize ||
         getEnv('dbMaxPoolSize', { dataSource }) ||
         50,
+      ...config
     };
-
-    if (!this.config.connectionString) {
-      this.config.connectionString = `${this.config.host}/${this.config.db}`
-    }
+    this.config.connectionString = this.config.connectionString || `${this.config.host}:${this.config.port}/${this.config.db}`;
   }
 
   async tablesSchema() {
@@ -95,13 +95,13 @@ class OracleDriver extends BaseDriver {
           , tc.data_type      "data_type"
           , c.constraint_type "key_type"
       from all_tab_columns tc
-      left join all_cons_columns cc 
-        on (tc.owner, tc.table_name, tc.column_name) 
+      left join all_cons_columns cc
+        on (tc.owner, tc.table_name, tc.column_name)
         in ((cc.owner, cc.table_name, cc.column_name))
-      left join all_constraints c 
-        on (tc.owner, tc.table_name, cc.constraint_name) 
-        in ((c.owner, c.table_name, c.constraint_name)) 
-        and c.constraint_type 
+      left join all_constraints c
+        on (tc.owner, tc.table_name, cc.constraint_name)
+        in ((c.owner, c.table_name, c.constraint_name))
+        and c.constraint_type
         in ('P','U')
       where tc.owner = user
     `);
@@ -113,22 +113,36 @@ class OracleDriver extends BaseDriver {
     if (!this.pool) {
       this.pool = await this.db.createPool(this.config);
     }
+
     return this.pool.getConnection()
   }
 
   async testConnection() {
-    return (
-      await this.getConnectionFromPool()
-    ).execute('SELECT 1 FROM DUAL');
+    await this.query('SELECT 1 FROM DUAL', {});
+  }
+
+  async createTable(quotedTableName, columns) {
+    if (quotedTableName.length > 128) {
+      throw new Error('Oracle can not work with table names longer than 128 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
+    }
+    return super.createTable(quotedTableName, columns);
   }
 
   async query(query, values) {
     const conn = await this.getConnectionFromPool();
+
     try {
       const res = await conn.execute(query, values || {});
       return res && res.rows;
     } catch (e) {
       throw (e);
+    } finally {
+      try {
+        await conn.close();
+      } catch (e) {
+        throw e;
+      }
     }
   }
 
@@ -138,6 +152,10 @@ class OracleDriver extends BaseDriver {
 
   readOnly() {
     return true;
+  }
+
+  wrapQueryWithLimit(query) {
+    query.query = `SELECT * FROM (${query.query}) AS t WHERE ROWNUM <= ${query.limit}`;
   }
 }
 

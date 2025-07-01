@@ -2,6 +2,7 @@ import { CopyOutlined } from '@ant-design/icons';
 import { Button, Form, Input } from 'antd';
 import { InputProps } from 'antd/lib/input/Input';
 import styled from 'styled-components';
+import { copyToClipboard } from '../utils';
 
 const IconButton: typeof Button = styled(Button)`
   border: none;
@@ -10,20 +11,30 @@ const IconButton: typeof Button = styled(Button)`
 
 type CopiableInputProps = {
   label?: string;
-  onCopyClick: (value: string) => void;
+  wrapperStyle?: object;
+  onCopyClick?: (value: string) => void;
 } & InputProps;
 
 export function CopiableInput({
   label,
   value,
   onCopyClick,
+  wrapperStyle,
   ...props
 }: CopiableInputProps) {
   const suffix = (
     <IconButton
       data-testid={`localhost-tipbox-${label?.toLowerCase()}-copy-btn`}
       icon={<CopyOutlined />}
-      onClick={() => value && onCopyClick(value.toString())}
+      onClick={async () => {
+        if (value) {
+          if (onCopyClick != null) {
+            onCopyClick(value.toString());
+          } else {
+            await copyToClipboard(value.toString());
+          }
+        }
+      }}
     />
   );
 
@@ -32,6 +43,7 @@ export function CopiableInput({
       label={label ? <b>{label}</b> : null}
       labelCol={{ span: 24 }}
       wrapperCol={{ span: 24 }}
+      style={wrapperStyle}
     >
       <Input
         data-testid={`localhost-tipbox-${label?.toLowerCase()}-input`}

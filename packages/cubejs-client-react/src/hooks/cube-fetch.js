@@ -19,12 +19,12 @@ export function useCubeFetch(method, options = {}) {
   const { skip = false } = options;
 
   async function load(loadOptions = {}, ignoreSkip = false) {
-    const cubejsApi = options.cubejsApi || context?.cubejsApi;
+    const cubeApi = options.cubeApi || context?.cubeApi;
     const query = loadOptions.query || options.query;
 
     const queryCondition = method === 'meta' ? true : query && isQueryPresent(query);
 
-    if (cubejsApi && (ignoreSkip || !skip) && queryCondition) {
+    if (cubeApi && (ignoreSkip || !skip) && queryCondition) {
       setError(null);
       setResponse({
         isLoading: true,
@@ -38,7 +38,7 @@ export function useCubeFetch(method, options = {}) {
       const args = method === 'meta' ? [coreOptions] : [query, coreOptions];
 
       try {
-        const response = await cubejsApi[method](...args);
+        const response = await cubeApi[method](...args);
 
         if (isMounted()) {
           setResponse({

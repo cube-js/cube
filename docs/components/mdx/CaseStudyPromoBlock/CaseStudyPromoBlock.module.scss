@@ -1,0 +1,17 @@
+.CaseStudyPromoBlock__Wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.75rem 1rem;
+  margin: 1.5rem 0;
+  gap: 0.25rem;
+
+  /* web/dark_bg */
+
+  background: var(--dark_bg);
+  border-radius: 0.5rem;
+}
+
+.CaseStudyPromoBlock__Title {}
+
+.CaseStudyPromoBlock__Text {}

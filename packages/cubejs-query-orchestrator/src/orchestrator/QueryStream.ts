@@ -2,51 +2,61 @@ import * as stream from 'stream';
 import { getEnv } from '@cubejs-backend/shared';
 
 export class QueryStream extends stream.Transform {
+  private timeout = 5 * 60 * 1000;
+
+  private timer = null;
+
   public queryKey: string;
 
-  public maps: {
-    queued: Map<string, QueryStream>;
-    processing: Map<string, QueryStream>;
-  };
+  public streams: Map<string, stream.Stream>;
 
   public aliasNameToMember: { [alias: string]: string };
+
+  public counter = 0;
 
   /**
    * @constructor
    */
   public constructor({
     key,
-    maps,
+    streams,
     aliasNameToMember,
   }: {
     key: string;
-    maps: {
-      queued: Map<string, QueryStream>;
-      processing: Map<string, QueryStream>;
-    };
-    aliasNameToMember: { [alias: string]: string };
+    streams: Map<string, stream.Stream>;
+    aliasNameToMember: { [alias: string]: string } | null;
   }) {
     super({
       objectMode: true,
       highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
     });
     this.queryKey = key;
-    this.maps = maps;
+    this.streams = streams;
     this.aliasNameToMember = aliasNameToMember;
+    this.debounce();
   }
 
   /**
    * @override
    */
   public _transform(chunk, encoding, callback) {
-    if (this.maps.queued.has(this.queryKey)) {
-      this.maps.queued.delete(this.queryKey);
-      this.maps.processing.set(this.queryKey, this);
+    if (this.streams.has(this.queryKey)) {
+      this.streams.delete(this.queryKey);
     }
-    const row = {};
-    Object.keys(chunk).forEach((alias) => {
-      row[this.aliasNameToMember[alias]] = chunk[alias];
-    });
+    let row = {};
+    if (this.aliasNameToMember) {
+      Object.keys(chunk).forEach((alias) => {
+        row[this.aliasNameToMember[alias]] = chunk[alias];
+      });
+    } else {
+      row = chunk;
+    }
+    if (this.counter < this.readableHighWaterMark) {
+      this.counter++;
+    } else {
+      this.counter = 0;
+      this.debounce();
+    }
     callback(null, row);
   }
 
@@ -54,12 +64,22 @@ export class QueryStream extends stream.Transform {
    * @override
    */
   public _destroy(error, callback) {
-    if (this.maps.queued.has(this.queryKey)) {
-      this.maps.queued.delete(this.queryKey);
-    }
-    if (this.maps.processing.has(this.queryKey)) {
-      this.maps.processing.delete(this.queryKey);
+    clearTimeout(this.timer);
+    if (this.streams.has(this.queryKey)) {
+      this.streams.delete(this.queryKey);
     }
     callback(error);
+  }
+
+  /**
+   * Reset destroyer timeout.
+   */
+  public debounce() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+    }
+    this.timer = setTimeout(() => {
+      this.destroy();
+    }, this.timeout);
   }
 }

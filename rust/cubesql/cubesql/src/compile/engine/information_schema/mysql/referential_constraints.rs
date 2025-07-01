@@ -14,7 +14,7 @@ use datafusion::{
 };
 
 use super::utils::new_string_array_with_placeholder;
-use crate::compile::engine::provider::TableName;
+use crate::compile::engine::context::TableName;
 
 pub struct InfoSchemaReferentialConstraintsProvider {}
 
@@ -62,51 +62,19 @@ impl TableProvider for InfoSchemaReferentialConstraintsProvider {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        let mut data: Vec<Arc<dyn Array>> = vec![];
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
+        let data: Vec<Arc<dyn Array>> = vec![
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+            Arc::new(new_string_array_with_placeholder(0, Some("".to_string()))),
+        ];
 
         let batch = RecordBatch::try_new(self.schema(), data)?;
 

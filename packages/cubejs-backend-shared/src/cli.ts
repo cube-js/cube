@@ -22,3 +22,13 @@ export const displayCLIError = async (text: string, pkg: string) => {
 export const displayCLIWarning = (message: string) => {
   console.log(`${color.yellow('Warning.')} ${message}`);
 };
+
+const warningOnce = new Map();
+
+export const displayCLIWarningOnce = (key: string, message: string) => {
+  if (!warningOnce.has(key)) {
+    warningOnce.set(key, 1);
+
+    displayCLIWarning(message);
+  }
+};

@@ -72,6 +72,17 @@ describe('dateParser', () => {
     );
   });
 
+  test('from 1 quarter ago to now', () => {
+    const now = new Date(2021, 4, 3, 12, 0, 0, 0);
+    Date.now = jest.fn().mockReturnValue(now);
+
+    expect(dateParser('from 1 quarter ago to now', 'UTC', now)).toStrictEqual(
+      ['2021-02-03T00:00:00.000', '2021-05-03T23:59:59.999']
+    );
+
+    Date.now.mockRestore();
+  });
+
   test('from 7 days ago to now', () => {
     expect(dateParser('from 7 days ago to now', 'UTC')).toStrictEqual(
       [dateParser('last 7 days', 'UTC')[0], dateParser('today', 'UTC')[1]]
@@ -88,6 +99,18 @@ describe('dateParser', () => {
     expect(() => dateParser('unexpected date', 'UTC')).toThrowError(
       'Can\'t parse date: \'unexpected date\'',
     );
+  });
+
+  test('last 2 quarters', () => {
+    const now = new Date(2021, 1, 15, 13, 0, 0, 0);
+    Date.now = jest.fn().mockReturnValue(now);
+
+    expect(dateParser('last 2 quarters', 'UTC', now)).toStrictEqual([
+      '2020-07-01T00:00:00.000',
+      '2020-12-31T23:59:59.999',
+    ]);
+
+    Date.now.mockRestore();
   });
 
   test('last 6 months from month with less days than previous month', () => {
@@ -140,6 +163,30 @@ describe('dateParser', () => {
       [
         '2021-03-06T00:00:00.000',
         '2021-03-10T23:59:59.999'
+      ]
+    );
+
+    Date.now.mockRestore();
+  });
+
+  test('throws error on from invalid date to date', () => {
+    expect(() => dateParser('from invalid to 2020-02-02', 'UTC')).toThrow(
+      'Can\'t parse date: \'invalid\''
+    );
+  });
+
+  test('throws error on from date to invalid date', () => {
+    expect(() => dateParser('from 2020-02-02 to invalid', 'UTC')).toThrow(
+      'Can\'t parse date: \'invalid\''
+    );
+  });
+
+  test('from 12AM till now by hour', () => {
+    Date.now = jest.fn().mockReturnValue(new Date(2021, 2, 5, 13, 0, 0, 0));
+    expect(dateParser('2 weeks ago by hour', 'UTC', new Date(Date.UTC(2021, 2, 5, 13, 0, 0, 0)))).toStrictEqual(
+      [
+        '2021-02-19T13:00:00.000',
+        '2021-02-19T13:59:59.999'
       ]
     );
 

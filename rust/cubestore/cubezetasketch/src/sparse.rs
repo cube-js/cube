@@ -341,7 +341,7 @@ impl SparseRepresentation {
     ///    - If the sparse representation has become too large, converts to a `NormalRepresentation`.
     ///
     /// Returns a new normal representation if this sparse representation has outgrown itself or
-    /// `None` if the sparse representation can continue to be be used.
+    /// `None` if the sparse representation can continue to be used.
     #[must_use]
     fn update_representation(&mut self, state: &mut State) -> Result<Option<NormalRepresentation>> {
         if (self.max_buffer_elements as usize) < self.buffer.len() {

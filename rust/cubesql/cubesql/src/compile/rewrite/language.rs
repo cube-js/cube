@@ -1,3 +1,34 @@
+use std::{
+    num::{ParseFloatError, ParseIntError},
+    str::ParseBoolError,
+};
+
+// `from_op` is generated as if-else chain from op.parse()
+// Because of this a lot of instances of FromStr::Err will be constructed just as a "take other branch" marker
+// This type should be very cheap to construct, at least while we use FromStr chains
+// Don't store any input in here, FromStr is not designed for this, and it requires allocation
+// Instead rely on egg::FromOpError for now, it will return allocated `op`, but only once in the end
+// TODO make parser dispatch stricter, and return both input and LanguageParseError from `from_op`
+#[derive(thiserror::Error, Debug)]
+pub enum LanguageParseError {
+    #[error("Should start with '{0}'")]
+    ShouldStartWith(&'static str),
+    #[error("Can't be matched against {0}")]
+    ShouldMatch(&'static str),
+    #[error("Should contain a valid type")]
+    InvalidType,
+    #[error("Should contains a valid scalar type")]
+    InvalidScalarType,
+    #[error("Can't parse boolean scalar value with error: {0}")]
+    InvalidBoolValue(#[source] ParseBoolError),
+    #[error("Can't parse i64 scalar value with error: {0}")]
+    InvalidIntValue(#[source] ParseIntError),
+    #[error("Can't parse f64 scalar value with error: {0}")]
+    InvalidFloatValue(#[source] ParseFloatError),
+    #[error("Conversion from string is not supported")]
+    NotSupported,
+}
+
 #[macro_export]
 macro_rules! plan_to_language {
     ($(#[$meta:meta])* $vis:vis enum $name:ident $variants:tt) => {
@@ -13,13 +44,13 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](String);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        return Ok([<$variant $var_field:camel>](s.replace(&prefix, "")));
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) =  s.strip_prefix(PREFIX) {
+                        return Ok([<$variant $var_field:camel>](suffix.to_string()));
                     }
-                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
+                    Err(Self::Err::ShouldStartWith(PREFIX))
                 }
             }
 
@@ -37,13 +68,13 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](usize);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        return Ok([<$variant $var_field:camel>](s.replace(&prefix, "").parse().unwrap()));
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) =  s.strip_prefix(PREFIX) {
+                        return Ok([<$variant $var_field:camel>](suffix.parse().unwrap()));
                     }
-                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
+                    Err(Self::Err::ShouldStartWith(PREFIX))
                 }
             }
 
@@ -61,13 +92,13 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](bool);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        return Ok([<$variant $var_field:camel>](s.replace(&prefix, "").parse().unwrap()));
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) = s.strip_prefix(PREFIX) {
+                        return Ok([<$variant $var_field:camel>](suffix.parse().unwrap()));
                     }
-                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
+                    Err(Self::Err::ShouldStartWith(PREFIX))
                 }
             }
 
@@ -85,18 +116,17 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](Option<usize>);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        let replaced = s.replace(&prefix, "");
-                        if &replaced == "None" {
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) = s.strip_prefix(PREFIX) {
+                        if suffix == "None" {
                             return Ok([<$variant $var_field:camel>](None));
                         } else {
-                            return Ok([<$variant $var_field:camel>](Some(s.replace(&prefix, "").parse().unwrap())));
+                            return Ok([<$variant $var_field:camel>](Some(suffix.parse().unwrap())));
                         }
                     }
-                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
+                    Err(Self::Err::ShouldStartWith(PREFIX))
                 }
             }
 
@@ -114,18 +144,17 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](Option<Vec<String>>);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        let replaced = s.replace(&prefix, "");
-                        if &replaced == "None" {
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) = s.strip_prefix(PREFIX) {
+                        if suffix == "None" {
                             return Ok([<$variant $var_field:camel>](None));
                         } else {
-                            return Ok([<$variant $var_field:camel>](Some(s.split(',').map(|s| s.to_string()).collect::<Vec<_>>())));
+                            return Ok([<$variant $var_field:camel>](Some(suffix.split(',').map(|s| s.to_string()).collect::<Vec<_>>())));
                         }
                     }
-                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
+                    Err(Self::Err::ShouldStartWith(PREFIX))
                 }
             }
 
@@ -143,18 +172,17 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](Option<String>);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        let replaced = s.replace(&prefix, "");
-                        if &replaced == "None" {
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) = s.strip_prefix(PREFIX) {
+                        if suffix == "None" {
                             return Ok([<$variant $var_field:camel>](None));
                         } else {
-                            return Ok([<$variant $var_field:camel>](Some(s.to_string())));
+                            return Ok([<$variant $var_field:camel>](Some(suffix.to_string())));
                         }
                     }
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                    Err(Self::Err::NotSupported)
                 }
             }
 
@@ -172,9 +200,9 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](Column);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                    Err(Self::Err::NotSupported)
                 }
             }
 
@@ -192,9 +220,29 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](Vec<Column>);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                    Err(Self::Err::NotSupported)
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{:?}", self.0)
+                }
+            }
+        }
+    };
+
+    ($variant:ident, $var_field:ident, Vec<JoinType>) => {
+        paste::item! {
+            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+            pub struct [<$variant $var_field:camel>](Vec<Column>);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
+                fn from_str(_s: &str) -> Result<Self, Self::Err> {
+                    Err(Self::Err::NotSupported)
                 }
             }
 
@@ -212,9 +260,13 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](String);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) =  s.strip_prefix(PREFIX) {
+                        return Ok([<$variant $var_field:camel>](suffix.to_string()));
+                    }
+                    Err(Self::Err::ShouldStartWith(PREFIX))
                 }
             }
 
@@ -232,9 +284,9 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](String);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                    Err(Self::Err::NotSupported)
                 }
             }
 
@@ -252,13 +304,13 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](String);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        return Ok([<$variant $var_field:camel>](s.replace(&prefix, "")));
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) = s.strip_prefix(PREFIX) {
+                        return Ok([<$variant $var_field:camel>](suffix.to_string()));
                     }
-                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
+                    Err(Self::Err::ShouldStartWith(PREFIX))
                 }
             }
 
@@ -292,6 +344,7 @@ macro_rules! variant_field_struct {
                 AggregateFunction::ApproxMedian => "ApproxMedian",
                 AggregateFunction::BoolAnd => "BoolAnd",
                 AggregateFunction::BoolOr => "BoolOr",
+                AggregateFunction::PercentileCont => "PercentileCont",
             }
         );
     };
@@ -312,6 +365,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::Log => "Log",
                 BuiltinScalarFunction::Log10 => "Log10",
                 BuiltinScalarFunction::Log2 => "Log2",
+                BuiltinScalarFunction::Power => "Power",
                 BuiltinScalarFunction::Round => "Round",
                 BuiltinScalarFunction::Signum => "Signum",
                 BuiltinScalarFunction::Sin => "Sin",
@@ -336,6 +390,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::MD5 => "MD5",
                 BuiltinScalarFunction::NullIf => "NullIf",
                 BuiltinScalarFunction::OctetLength => "OctetLength",
+                BuiltinScalarFunction::Pi => "Pi",
                 BuiltinScalarFunction::Random => "Random",
                 BuiltinScalarFunction::RegexpReplace => "RegexpReplace",
                 BuiltinScalarFunction::Repeat => "Repeat",
@@ -361,6 +416,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::ToDayInterval => "ToDayInterval",
                 BuiltinScalarFunction::Now => "Now",
                 BuiltinScalarFunction::UtcTimestamp => "UtcTimestamp",
+                BuiltinScalarFunction::CurrentDate => "CurrentDate",
                 BuiltinScalarFunction::Translate => "Translate",
                 BuiltinScalarFunction::Trim => "Trim",
                 BuiltinScalarFunction::Upper => "Upper",
@@ -384,6 +440,7 @@ macro_rules! variant_field_struct {
                 Operator::Multiply => "*",
                 Operator::Divide => "/",
                 Operator::Modulo => "%",
+                Operator::Exponentiate => "^",
                 Operator::And => "AND",
                 Operator::Or => "OR",
                 Operator::Like => "LIKE",
@@ -437,20 +494,40 @@ macro_rules! variant_field_struct {
         );
     };
 
+    ($variant:ident, $var_field:ident, WrappedSelectType) => {
+        $crate::variant_field_struct!(
+            @enum_struct $variant, $var_field, { WrappedSelectType } -> {
+                WrappedSelectType::Projection => "Projection",
+                WrappedSelectType::Aggregate => "Aggregate",
+            }
+        );
+    };
+
+    ($variant:ident, $var_field:ident, GroupingSetType) => {
+        $crate::variant_field_struct!(
+            @enum_struct $variant, $var_field, { GroupingSetType } -> {
+                GroupingSetType::Rollup => "Rollup",
+                GroupingSetType::Cube => "Cube",
+            }
+        );
+    };
+
     (@enum_struct $variant:ident, $var_field:ident, { $var_field_type:ty } -> {$($variant_type:ty => $name:literal,)*}) => {
         paste::item! {
             #[derive(Debug, Clone)]
             pub struct [<$variant $var_field:camel>]($var_field_type);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    let name = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    let name = s
+                        .strip_prefix(PREFIX)
+                        .ok_or(Self::Err::ShouldStartWith(PREFIX))?;
 
                     match name {
                         $($name => Ok([<$variant $var_field:camel>]($variant_type)),)*
-                        x => Err(CubeError::internal(format!("{} can't be matched against {}", x, std::stringify!($var_field_type))))
+                        _ => Err(Self::Err::ShouldMatch(std::stringify!($var_field_type)))
                     }
                 }
             }
@@ -516,10 +593,12 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](DataType);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    let typed_str = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    let typed_str = s
+                        .strip_prefix(PREFIX)
+                        .ok_or(Self::Err::ShouldStartWith(PREFIX))?;
 
                     match typed_str {
                         "Float32" => Ok([<$variant $var_field:camel>](DataType::Float32)),
@@ -530,7 +609,7 @@ macro_rules! variant_field_struct {
                         "Utf8" => Ok([<$variant $var_field:camel>](DataType::Utf8)),
                         "Date32" => Ok([<$variant $var_field:camel>](DataType::Date32)),
                         "Date64" => Ok([<$variant $var_field:camel>](DataType::Date64)),
-                        _ => Err(CubeError::internal(format!("Can't convert {}. Should contain a valid type, actual: {}", s, typed_str))),
+                        _ => Err(Self::Err::InvalidType),
                     }
                 }
             }
@@ -549,24 +628,28 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>](ScalarValue);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    let typed_str = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    let typed_str = s
+                        .strip_prefix(PREFIX)
+                        .ok_or(Self::Err::ShouldStartWith(PREFIX))?;
 
                     if let Some(value) = typed_str.strip_prefix("s:") {
                         Ok([<$variant $var_field:camel>](ScalarValue::Utf8(Some(value.to_string()))))
                     } else if let Some(value) = typed_str.strip_prefix("b:") {
-                        let n: bool = value.parse().map_err(|err| CubeError::internal(format!("Can't parse boolean scalar value from '{}' with error: {}", typed_str, err)))?;
+                        let n: bool = value.parse().map_err(|err| Self::Err::InvalidBoolValue(err))?;
                         Ok([<$variant $var_field:camel>](ScalarValue::Boolean(Some(n))))
                     } else if let Some(value) = typed_str.strip_prefix("i:") {
-                        let n: i64 = value.parse().map_err(|err| CubeError::internal(format!("Can't parse i64 scalar value from '{}' with error: {}", typed_str, err)))?;
+                        let n: i64 = value.parse().map_err(|err| Self::Err::InvalidIntValue(err))?;
                         Ok([<$variant $var_field:camel>](ScalarValue::Int64(Some(n))))
                     } else if let Some(value) = typed_str.strip_prefix("f:") {
-                        let n: f64 = value.parse().map_err(|err| CubeError::internal(format!("Can't parse f64 scalar value from '{}' with error: {}", typed_str, err)))?;
+                        let n: f64 = value.parse().map_err(|err| Self::Err::InvalidFloatValue(err))?;
                         Ok([<$variant $var_field:camel>](ScalarValue::Float64(Some(n))))
+                    } else if typed_str == "null" {
+                        Ok([<$variant $var_field:camel>](ScalarValue::Null))
                     } else {
-                        Err(CubeError::internal(format!("Can't convert {}. Should contains type type, actual: {}", s, typed_str)))
+                        Err(Self::Err::InvalidScalarType)
                     }
                 }
             }
@@ -616,9 +699,9 @@ macro_rules! variant_field_struct {
             pub struct [<$variant $var_field:camel>]($var_field_type);
 
             impl FromStr for [<$variant $var_field:camel>] {
-                type Err = CubeError;
+                type Err = $crate::compile::rewrite::language::LanguageParseError;
                 fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                    Err(Self::Err::NotSupported)
                 }
             }
 
@@ -636,9 +719,7 @@ macro_rules! variant_field_struct {
 
             impl core::hash::Hash for [<$variant $var_field:camel>] {
                 fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-                    // @todo Care about enums
-                    #[allow(enum_intrinsics_non_enums)]
-                    std::mem::discriminant(&self.0).hash(state);
+                    self.0.hash(state);
                 }
             }
 
@@ -666,6 +747,8 @@ macro_rules! __plan_to_language {
         $($type_decl)*
 
         impl egg::Language for $name {
+            type Discriminant = std::mem::Discriminant<Self>;
+
             #[inline(always)]
             fn matches(&self, other: &Self) -> bool {
                 ::std::mem::discriminant(self) == ::std::mem::discriminant(other) &&
@@ -674,6 +757,7 @@ macro_rules! __plan_to_language {
 
             fn children(&self) -> &[egg::Id] { match self $children }
             fn children_mut(&mut self) -> &mut [egg::Id] { match self $children_mut }
+            fn discriminant(&self) -> Self::Discriminant { std::mem::discriminant(self) }
         }
 
         impl ::std::fmt::Display for $name {
@@ -750,7 +834,7 @@ macro_rules! __plan_to_language {
 
     (@define_language $(#[$meta:meta])* $vis:vis enum $name:ident
      {
-         @data $variant:ident $var_field:ident ($data:ty),
+         @data $variant:ident $var_field:ident ($($data:tt)*),
          $($variants:tt)*
      } ->
      { $($decl:tt)* } { $($matches:tt)* } { $($children:tt)* } { $($children_mut:tt)* }
@@ -767,7 +851,7 @@ macro_rules! __plan_to_language {
             { $($from_op)*       (op, children) if op.parse::<[<$variant $var_field:camel>]>().is_ok() && children.is_empty() => Ok($name::[<$variant $var_field:camel>](op.parse().unwrap())), }
             {
                 $($type_decl)*
-                $crate::variant_field_struct!($variant, $var_field, $data);
+                $crate::variant_field_struct!($variant, $var_field, $($data)*);
             }
         );
     };
@@ -1030,7 +1114,7 @@ macro_rules! __plan_to_language {
      {
          $variant:ident {
             @variant_size $variant_size:expr,
-            $var_field:ident : $var_field_type:ty,
+            $var_field:ident : @collect_var_field_type ($($var_field_type:tt)*),
             $($var_fields:tt)*
          },
          $($variants:tt)*
@@ -1046,7 +1130,53 @@ macro_rules! __plan_to_language {
                 },
                 $($variants)*
             } ->
-            { $($decl)* @data $variant $var_field ($var_field_type), }
+            { $($decl)* @data $variant $var_field ($($var_field_type)*), }
+        );
+    };
+
+    ($(#[$meta:meta])* $vis:vis enum $name:ident
+     {
+         $variant:ident {
+            @variant_size $variant_size:expr,
+            $var_field:ident : @collect_var_field_type ($($var_field_type:tt)*) $token:tt $($var_fields:tt)*
+         },
+         $($variants:tt)*
+     } ->
+     { $($decl:tt)* }
+    ) => {
+        $crate::__plan_to_language!(
+            $(#[$meta])* $vis enum $name
+            {
+                $variant {
+                    @variant_size $variant_size,
+                    $var_field : @collect_var_field_type ($($var_field_type)* $token) $($var_fields)*
+                },
+                $($variants)*
+            } ->
+            { $($decl)* }
+        );
+    };
+
+    ($(#[$meta:meta])* $vis:vis enum $name:ident
+     {
+         $variant:ident {
+            @variant_size $variant_size:expr,
+            $var_field:ident : $($var_fields:tt)*
+         },
+         $($variants:tt)*
+     } ->
+     { $($decl:tt)* }
+    ) => {
+        $crate::__plan_to_language!(
+            $(#[$meta])* $vis enum $name
+            {
+                $variant {
+                    @variant_size $variant_size,
+                    $var_field : @collect_var_field_type () $($var_fields)*
+                },
+                $($variants)*
+            } ->
+            { $($decl)* }
         );
     };
 

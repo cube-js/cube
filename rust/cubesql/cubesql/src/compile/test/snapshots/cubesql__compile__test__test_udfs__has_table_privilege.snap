@@ -1,0 +1,14 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"SELECT\n                    relname,\n                    has_table_privilege('ovr', relname, 'SELECT') \\\"select\\\",\n                    has_table_privilege('ovr', relname, 'INSERT') \\\"insert\\\"\n                FROM pg_class\n                ORDER BY relname ASC\n                \".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------+--------+--------+
+| relname                   | select | insert |
++---------------------------+--------+--------+
+| KibanaSampleDataEcommerce | true   | false  |
+| Logs                      | true   | false  |
+| MultiTypeCube             | true   | false  |
+| NumberCube                | true   | false  |
+| WideCube                  | true   | false  |
+| pg_class                  | true   | false  |
++---------------------------+--------+--------+

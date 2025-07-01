@@ -1,17 +1,16 @@
-import { Required } from '@cubejs-backend/shared';
+import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
-  CheckAuthMiddlewareFn,
   ExtendContextFn,
   JWTOptions,
   UserBackgroundContext,
   QueryRewriteFn,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  ContextToApiScopesFn,
 } from '@cubejs-backend/api-gateway';
-import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
-import type { SchemaFileRepository } from './FileRepository';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -45,10 +44,10 @@ export interface PreAggregationsOptions {
 
 export interface OrchestratorOptions {
   redisPrefix?: string;
-  redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
   rollupOnlyMode?: boolean;
+  testConnectionTimeout?: number;
 }
 
 export interface QueueInitedOptions {
@@ -75,13 +74,13 @@ export interface OrchestratorInitedOptions {
   queryCacheOptions: QueryInitedOptions;
   preAggregationsOptions: AggsInitedOptions;
   redisPrefix?: string;
-  redisPoolOptions?: RedisPoolOptions;
   rollupOnlyMode?: boolean;
+  testConnectionTimeout?: number;
 }
 
 export interface RequestContext {
   // @deprecated Renamed to securityContext, please use securityContext.
-  authInfo: any;
+  authInfo?: any;
   securityContext: any;
   requestId: string;
 }
@@ -118,19 +117,33 @@ export type DatabaseType =
   | 'snowflake'
   | 'sqlite'
   | 'questdb'
-  | 'materialize';
+  | 'materialize'
+  | 'pinot';
 
-export type ContextToAppIdFn = (context: RequestContext) => string;
-export type ContextToOrchestratorIdFn = (context: RequestContext) => string;
+export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;
+export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
 
-export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions;
+export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
-export type PreAggregationsSchemaFn = (context: RequestContext) => string;
+export type PreAggregationsSchemaFn = (context: RequestContext) => string | Promise<string>;
+
+export type ScheduledRefreshTimeZonesFn = (context: RequestContext) => string[] | Promise<string[]>;
+
+/**
+ * Function that should provide a logic of scheduled returning of
+ * the user background context. Used as a part of a main
+ * configuration object of the Gateway to provide extendability to
+ * this logic.
+ */
+export type ScheduledRefreshContextsFn = () => Promise<UserBackgroundContext[]>;
 
 // internal
 export type DriverOptions = {
   dataSource?: string,
   maxPoolSize?: number,
+  testConnectionTimeout?: number,
 };
 
 export type DriverConfig = {
@@ -154,7 +167,18 @@ export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export type LoggerFn = (msg: string, params: Record<string, any>) => void;
+export type LoggerFnParams = {
+  // It's possible to fill timestamp at the place of logging, otherwise, it will be filled in automatically
+  timestamp?: string,
+  [key: string]: any,
+};
+export type LoggerFn = (msg: string, params: LoggerFnParams) => void;
+
+export type BiToolSyncConfig = {
+  type: string;
+  active?: boolean;
+  config: Record<string, any>;
+};
 
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
@@ -170,13 +194,16 @@ export interface CreateOptions {
   externalDialectFactory?: ExternalDialectFactoryFn;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
+  contextToRoles?: ContextToRolesFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
+  contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
+  contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   checkSqlAuth?: CheckSQLAuthFn;
   canSwitchSqlUser?: CanSwitchSQLUserFn;
   jwt?: JWTOptions;
+  gatewayPort?: number;
   // @deprecated Please use queryRewrite
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;
@@ -184,7 +211,7 @@ export interface CreateOptions {
   schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
-  scheduledRefreshTimeZones?: string[];
+  scheduledRefreshTimeZones?: string[] | ScheduledRefreshTimeZonesFn;
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
   scheduledRefreshConcurrency?: number;
   scheduledRefreshBatchSize?: number;
@@ -204,6 +231,8 @@ export interface CreateOptions {
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
   allowNodeRequire?: boolean;
+  semanticLayerSync?: (context: RequestContext) => Promise<BiToolSyncConfig[]> | BiToolSyncConfig[];
+  fastReload?: boolean;
 }
 
 export interface DriverDecoratedOptions extends CreateOptions {
@@ -219,6 +248,7 @@ export type ServerCoreInitializedOptions = Required<
   'telemetry' |
   'dashboardAppPath' |
   'dashboardAppPort' |
+  'schemaPath' |
   'driverFactory' |
   'dialectFactory' |
   'externalDriverFactory' |
@@ -245,7 +275,7 @@ export type ContextAcceptanceResultWs = ContextAcceptanceResult & {
 };
 
 export interface ContextAcceptor {
-  shouldAccept(context: RequestContext | null): ContextAcceptanceResult;
-  shouldAcceptHttp(context: RequestContext | null): ContextAcceptanceResultHttp;
-  shouldAcceptWs(context: RequestContext | null): ContextAcceptanceResultWs;
+  shouldAccept(context: RequestContext | null): Promise<ContextAcceptanceResult> | ContextAcceptanceResult;
+  shouldAcceptHttp(context: RequestContext | null): Promise<ContextAcceptanceResultHttp> | ContextAcceptanceResultHttp;
+  shouldAcceptWs(context: RequestContext | null): Promise<ContextAcceptanceResultWs> | ContextAcceptanceResultWs;
 }

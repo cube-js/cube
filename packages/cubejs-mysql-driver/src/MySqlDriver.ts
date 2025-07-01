@@ -21,6 +21,8 @@ import {
   DownloadTableData,
   IndexesSQL,
   DownloadTableMemoryData,
+  DriverCapabilities,
+  TableColumn,
 } from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
@@ -97,11 +99,26 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: MySqlDriverConfiguration & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -162,6 +179,41 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     });
   }
 
+  protected primaryKeysQuery(conditionString?: string): string | null {
+    return `SELECT
+      TABLE_SCHEMA as ${this.quoteIdentifier('table_schema')},
+      TABLE_NAME as ${this.quoteIdentifier('table_name')},
+      COLUMN_NAME as ${this.quoteIdentifier('column_name')}
+  FROM
+      information_schema.KEY_COLUMN_USAGE
+  WHERE
+      CONSTRAINT_NAME = 'PRIMARY'
+      AND TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+      ${conditionString ? ` AND (${conditionString})` : ''}
+  ORDER BY
+      TABLE_SCHEMA,
+      TABLE_NAME,
+      ORDINAL_POSITION;`;
+  }
+
+  protected foreignKeysQuery(conditionString?: string): string | null {
+    return `SELECT
+        tc.table_schema as ${this.quoteIdentifier('table_schema')},
+        tc.table_name as ${this.quoteIdentifier('table_name')},
+        kcu.column_name as ${this.quoteIdentifier('column_name')},
+        columns.table_name as ${this.quoteIdentifier('target_table')},
+        columns.column_name as ${this.quoteIdentifier('target_column')}
+    FROM
+        information_schema.table_constraints AS tc
+    JOIN information_schema.key_column_usage AS kcu
+        ON tc.constraint_name = kcu.constraint_name
+    JOIN information_schema.key_column_usage AS columns
+        ON columns.constraint_name = tc.constraint_name
+    WHERE
+        columns.table_name NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+        AND tc.constraint_type = 'FOREIGN KEY'${conditionString ? ` AND (${conditionString})` : ''};`;
+  }
+
   public readOnly() {
     return !!this.config.readOnly;
   }
@@ -209,6 +261,14 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       // eslint-disable-next-line no-underscore-dangle
       await (<any> this.pool)._factory.destroy(conn);
     }
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
+    if (quotedTableName.length > 64) {
+      throw new Error('MySQL can not work with table names longer than 64 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
+    }
+    return super.createTable(quotedTableName, columns);
   }
 
   public async query(query: string, values: unknown[]) {
@@ -391,5 +451,11 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     return MySqlToGenericType[columnType.toLowerCase()] ||
       MySqlToGenericType[columnType.toLowerCase().split('(')[0]] ||
       super.toGenericType(columnType);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }

@@ -1,4 +1,5 @@
 {
+  "_version": "18.2.0",
   "exclude": [
     "node_modules",
     "dist",
@@ -6,8 +7,8 @@
   "files": [],
   "compilerOptions": {
     "incremental": true,
-    "lib": ["es2017", "es2018", "es2019", "es2020"],
-    "target": "es2018",
+    "lib": ["es2023"],
+    "target": "es2022",
     "module": "commonjs",
     "baseUrl": ".",
     "paths": {
@@ -19,14 +20,13 @@
         "packages/cubejs-query-orchestrator/src",
         "packages/cubejs-schema-compiler/src",
         "packages/cubejs-server/src",
-        "packages/cubejs-server-core/src",
+        "packages/cubejs-server-core/src"
       ]
     },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    //
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,

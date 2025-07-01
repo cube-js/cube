@@ -10,7 +10,7 @@ import {
 import { BehaviorSubject, combineLatest, of, Subject } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
 
-import { CubejsClient } from '../client';
+import { CubeClient } from '../client';
 import { Query } from './query';
 import { BuilderMeta } from './builder-meta';
 import { PivotConfig } from './pivot-config';
@@ -25,7 +25,7 @@ export type TQueryBuilderState = {
 
 @Injectable()
 export class QueryBuilderService {
-  private _cubejs: CubejsClient;
+  private _cube: CubeClient;
   private _meta: Meta;
   private _query: Query;
   private _disableHeuristics: boolean = false;
@@ -48,7 +48,7 @@ export class QueryBuilderService {
     this.pivotConfig = new PivotConfig(null);
     this.chartType = new ChartType('line');
 
-    this._cubejs.meta().subscribe((meta) => {
+    this._cube.meta().subscribe((meta) => {
       this._meta = meta;
 
       this._query = new Query(
@@ -66,7 +66,7 @@ export class QueryBuilderService {
         .pipe(
           switchMap((data) => {
             return combineLatest([
-              this._cubejs.dryRun(data.query).pipe(catchError((error) => {
+              this._cube.dryRun(data.query).pipe(catchError((error) => {
                 console.error(error);
                 return of(null);
               })),
@@ -126,8 +126,8 @@ export class QueryBuilderService {
     return query;
   }
 
-  setCubejsClient(cubejsClient: CubejsClient) {
-    this._cubejs = cubejsClient;
+  setCubeClient(cubeClient: CubeClient) {
+    this._cube = cubeClient;
     this.init();
   }
 

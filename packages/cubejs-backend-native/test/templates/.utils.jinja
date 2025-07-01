@@ -1,0 +1,7 @@
+{%- macro markup(column1, column2) -%}
+  (({{column1}} - {{column2}}) / {{column2}})
+{%- endmacro -%}
+
+{% macro escape_single_quotes(expression) -%}
+{{ expression | replace("'", "''") | safe }}
+{%- endmacro %}

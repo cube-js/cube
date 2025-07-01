@@ -6,7 +6,6 @@
 
 /* globals describe,test,expect */
 /* eslint-disable import/no-duplicates */
-/* eslint-disable @typescript-eslint/no-duplicate-imports */
 
 import { MemberType } from '../../src/types/enums';
 import prepareAnnotationDef
@@ -164,7 +163,7 @@ describe('prepareAnnotation helpers', () => {
         type: undefined,
       }
     });
-    
+
     // query timeDimensions
     expect(
       prepareAnnotation([{
@@ -197,6 +196,11 @@ describe('prepareAnnotation helpers', () => {
         shortTitle: undefined,
         title: undefined,
         type: undefined,
+        granularity: {
+          name: 'day',
+          title: 'day',
+          interval: '1 day',
+        }
       },
     });
 

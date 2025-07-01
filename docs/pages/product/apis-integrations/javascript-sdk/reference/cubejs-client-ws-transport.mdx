@@ -1,0 +1,96 @@
+# `@cubejs-client/ws-transport`
+
+WebSocket transport for Cube client
+
+## `WebSocketTransport`
+
+### constructor
+
+>  **new WebSocketTransport**(**__namedParameters**: object): *[WebSocketTransport](#web-socket-transport)*
+
+### `apiUrl`
+
+> **apiUrl**: *string*
+
+### `hearBeatInterval`
+
+> **hearBeatInterval**: *number*
+
+### `messageCounter`
+
+> **messageCounter**: *number*
+
+### `messageIdToSubscription`
+
+> **messageIdToSubscription**: *Record‹number, [Subscription](#types-subscription)›*
+
+### `messageQueue`
+
+> **messageQueue**: *[Message](#types-message)[]*
+
+### `token`
+
+> **token**: *string*
+
+### `ws`
+
+> **ws**: *any*
+
+### `authorization`
+
+### `initSocket`
+
+>  **initSocket**(): *any*
+
+### `request`
+
+>  **request**(**method**: string, **__namedParameters**: object): *object*
+
+### `sendMessage`
+
+> `protected` **sendMessage**(**message**: any): *void*
+
+## `WebSocketTransportResult`
+
+### constructor
+
+>  **new WebSocketTransportResult**(**__namedParameters**: object): *[WebSocketTransportResult](#result)*
+
+### `result`
+
+> **result**: *unknown*
+
+### `status`
+
+> **status**: *unknown*
+
+### `json`
+
+>  **json**(): *Promise‹unknown›*
+
+## Types
+
+### `Message`
+
+Name | Type |
+------ | ------ |
+messageId | number |
+method | string |
+params | string |
+requestId | any |
+
+### `Subscription`
+
+Name | Type |
+------ | ------ |
+callback |  (**result**: [WebSocketTransportResult](#result)) => *void* |
+message | [Message](#types-message) |
+
+### `WebSocketTransportOptions`
+
+Name | Type |
+------ | ------ |
+apiUrl | string |
+authorization | string |
+hearBeatInterval? | number |
+heartBeatInterval? | number |

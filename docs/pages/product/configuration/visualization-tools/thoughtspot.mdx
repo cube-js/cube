@@ -1,0 +1,49 @@
+# ThoughtSpot
+
+[ThoughtSpot][thoughtspot] is an analytics platform that allows users to search and
+analyze data using a search interface.
+
+## Connect from Cube Cloud
+
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>ThoughtSpot</Btn> to get
+detailed instructions.
+
+## Connect from Cube Core
+
+You can connect a Cube deployment to ThoughtSpot using the [SQL API][ref-sql-api].
+
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to ThoughtSpot.
+
+## Connecting from ThoughtSpot
+
+ThoughtSpot connects to Cube as an Amazon Redshift database.
+
+### Creating a connection
+
+In Thoughtspot, go to the Setup tab, then click <Btn>Connect now</Btn> to add a new
+data source:
+
+<Screenshot src="https://ucarecdn.com/85bd8325-efd9-4cae-a463-e9b025a667cc/" />
+
+Enter a name for the data source, choose <Btn>Amazon Redshift</Btn> as the data
+warehouse and click <Btn>Continue</Btn> in the header.
+
+Enter credentials from the previous step and click <Btn>Continue</Btn>:
+
+<Screenshot src="https://ucarecdn.com/bddba9ac-1e24-4651-9086-75f1d0c3c811/" />
+
+Select columns from the desired cubes and click <Btn>Create Connection</Btn> on the
+next screen:
+
+<Screenshot src="https://ucarecdn.com/95692c63-e620-42a5-9355-b4df27d6b3c4/" />
+
+### Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+[ref-sql-api]: /product/apis-integrations/sql-api
+[thoughtspot]: https://www.thoughtspot.com/

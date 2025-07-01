@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { CommanderStatic } from 'commander';
-import { isDockerImage, requireFromPackage, packageExists } from '@cubejs-backend/shared';
+import { isDockerImage, requireFromPackage, packageExists, getEnv } from '@cubejs-backend/shared';
 import type { ServerContainer as ServerContainerType } from '@cubejs-backend/server';
 
 import { displayError, event } from '../utils';
@@ -79,8 +79,9 @@ const generate = async (options) => {
   );
   const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema, driver);
   const { tables, dataSource } = options;
+
   const files = scaffoldingTemplate.generateFilesByTableNames(tables, { dataSource });
-  await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
+  await Promise.all(files.map(file => fs.writeFile(path.join(getEnv('schemaPath'), 'cubes', file.fileName), file.content)));
 
   await event({
     event: 'Generate Schema Success',
@@ -97,7 +98,7 @@ export function configureGenerateCommand(program: CommanderStatic) {
     .command('generate')
     .option('-t, --tables <tables>', 'Comma delimited list of tables to generate schema from', list)
     .option('-d, --dataSource <dataSource>', '', 'default')
-    .description('Generate Cube.js schema from DB tables schema')
+    .description('Generate Cube schema from DB tables schema')
     .action(
       (options) => generate(options)
         .catch(e => displayError(e.stack || e, { dbType: options.dbType }))

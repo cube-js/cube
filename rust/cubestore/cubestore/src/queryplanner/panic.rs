@@ -1,6 +1,6 @@
 use crate::queryplanner::planning::WorkerExec;
-use arrow::datatypes::{Schema, SchemaRef};
 use async_trait::async_trait;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
 use datafusion::physical_plan::{
@@ -111,5 +111,6 @@ pub fn plan_panic_worker() -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         input: Arc::new(PanicWorkerExec::new()),
         schema: Arc::new(Schema::empty()),
         max_batch_rows: 1,
+        limit_and_reverse: None,
     }))
 }

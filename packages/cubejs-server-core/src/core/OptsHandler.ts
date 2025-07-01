@@ -1,6 +1,4 @@
 import crypto from 'crypto';
-import fs from 'fs-extra';
-import path from 'path';
 import cloneDeep from 'lodash.clonedeep';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import {
@@ -221,7 +219,7 @@ export class OptsHandler {
           );
         }
         // TODO (buntarb): wrapping this call with assertDriverFactoryResult
-        // change assertions sequince and cause a fail of few tests. Review it.
+        // change assertions sequence and cause a fail of few tests. Review it.
         return this.defaultDriverFactory(ctx);
       } else {
         return this.assertDriverFactoryResult(
@@ -289,6 +287,7 @@ export class OptsHandler {
   private queueOptionsWrapper(
     context: RequestContext,
     queueOptions: unknown | ((dataSource?: string) => QueueOptions),
+    queueType: 'query' | 'pre-aggs',
   ): (dataSource?: string) => Promise<QueueOptions> {
     return async (dataSource = 'default') => {
       const options = (
@@ -300,7 +299,15 @@ export class OptsHandler {
         // concurrency specified in cube.js
         return options;
       } else {
-        const envConcurrency: number = getEnv('concurrency');
+        const workerConcurrency = getEnv('refreshWorkerConcurrency');
+        if (queueType === 'pre-aggs' && workerConcurrency) {
+          return {
+            ...options,
+            concurrency: workerConcurrency,
+          };
+        }
+
+        const envConcurrency: number = getEnv('concurrency', { dataSource });
         if (envConcurrency) {
           // concurrency specified in CUBEJS_CONCURRENCY
           return {
@@ -322,7 +329,7 @@ export class OptsHandler {
           // no specified concurrency
           return {
             ...options,
-            concurrency: 2,
+            concurrency: 5,
           };
         }
       }
@@ -455,22 +462,19 @@ export class OptsHandler {
       externalDialectFactory,
       apiSecret: process.env.CUBEJS_API_SECRET,
       telemetry: getEnv('telemetry'),
-      scheduledRefreshTimeZones:
-        process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
-        process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
+      scheduledRefreshTimeZones: getEnv('scheduledRefreshTimezones'),
       scheduledRefreshContexts: async () => [null],
       basePath: '/cubejs-api',
       dashboardAppPath: 'dashboard-app',
       dashboardAppPort: 3000,
-      scheduledRefreshConcurrency:
-        parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
+      scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
         (this.isDevMode()
           ? 'dev_pre_aggregations'
           : 'prod_pre_aggregations'),
-      schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
+      schemaPath: getEnv('schemaPath'),
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,
       livePreview: getEnv('livePreview'),
@@ -484,7 +488,8 @@ export class OptsHandler {
         jwkUrl: getEnv('jwkUrl'),
         claimsNamespace: getEnv('jwtClaimsNamespace'),
         ...opts.jwt,
-      }
+      },
+      fastReload: getEnv('fastReload'),
     };
 
     if (opts.contextToAppId && !opts.scheduledRefreshContexts) {
@@ -501,19 +506,10 @@ export class OptsHandler {
     if (options.devServer && !options.apiSecret) {
       options.apiSecret = crypto.randomBytes(16).toString('hex');
       displayCLIWarning(
-        `Option apiSecret is required in dev mode. Cube.js has generated it as ${
+        `Option apiSecret is required in dev mode. Cube has generated it as ${
           options.apiSecret
         }`
       );
-    }
-
-    // Create schema directory to protect error on new project with dev mode
-    // (docker flow)
-    if (options.devServer) {
-      const repositoryPath = path.join(process.cwd(), options.schemaPath);
-      if (!fs.existsSync(repositoryPath)) {
-        fs.mkdirSync(repositoryPath);
-      }
     }
 
     if (!options.devServer || this.configuredForQueryProcessing()) {
@@ -673,6 +669,7 @@ export class OptsHandler {
     clone.queryCacheOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.queryCacheOptions.queueOptions,
+      'query'
     );
 
     // pre-aggs queue options
@@ -680,6 +677,7 @@ export class OptsHandler {
     clone.preAggregationsOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.preAggregationsOptions.queueOptions,
+      'pre-aggs'
     );
 
     // pre-aggs external refresh flag (force to run pre-aggs build flow first if

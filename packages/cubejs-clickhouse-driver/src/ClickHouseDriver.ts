@@ -12,16 +12,28 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
+  DownloadTableCSVData,
+  DriverCapabilities,
   DriverInterface,
+  QueryOptions,
+  QuerySchemasResult,
   StreamOptions,
   StreamTableDataWithTypes,
+  TableColumn,
+  TableQueryResult,
+  TableStructure,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
-import genericPool, { Pool } from 'generic-pool';
+
+import { Readable } from 'node:stream';
+import { ClickHouseClient, createClient } from '@clickhouse/client';
+import type { ClickHouseSettings, ResponseJSON } from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
 import sqlstring from 'sqlstring';
-import { HydrationStream } from './HydrationStream';
 
-const ClickHouse = require('@apla/clickhouse');
+import { transformRow, transformStreamRow } from './HydrationStream';
+
+const SUPPORTED_BUCKET_TYPES = ['s3'];
 
 const ClickhouseTypeToGeneric: Record<string, string> = {
   enum: 'text',
@@ -43,135 +55,187 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   // floats
   float32: 'float',
   float64: 'double',
+  // We don't support enums
+  enum8: 'text',
+  enum16: 'text',
 };
 
-interface ClickHouseDriverOptions {
+export interface ClickHouseDriverOptions {
   host?: string,
   port?: string,
-  auth?: string,
+  username?: string,
+  password?: string,
   protocol?: string,
   database?: string,
   readOnly?: boolean,
-  queryOptions?: object,
+  /**
+   * Timeout in milliseconds for requests to ClickHouse.
+   * Default is 10 minutes
+   */
+  requestTimeout?: number,
+
+  /**
+   * Data source name.
+   */
+  dataSource?: string,
+
+  /**
+   * Max pool size value for the [cube]<-->[db] pool.
+   */
+  maxPoolSize?: number,
+
+  /**
+   * Time to wait for a response from a connection after validation
+   * request before determining it as not valid. Default - 10000 ms.
+   */
+  testConnectionTimeout?: number,
 }
 
-/**
- * ClickHouse driver class.
- */
+interface ClickhouseDriverExportRequiredAWS {
+  bucketType: 's3',
+  bucketName: string,
+  region: string,
+}
+
+interface ClickhouseDriverExportKeySecretAWS extends ClickhouseDriverExportRequiredAWS {
+  keyId: string,
+  secretKey: string,
+}
+
+interface ClickhouseDriverExportAWS extends ClickhouseDriverExportKeySecretAWS {
+}
+
+type ClickHouseDriverConfig = {
+  url: string,
+  username: string,
+  password: string,
+  readOnly: boolean,
+  database: string,
+  requestTimeout: number,
+  exportBucket: ClickhouseDriverExportAWS | null,
+  compression: { response?: boolean; request?: boolean },
+  clickhouseSettings: ClickHouseSettings,
+};
+
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 5;
+    return 10;
   }
 
-  protected readonly pool: Pool<any>;
+  // ClickHouseClient has internal pool of several sockets, no need for generic-pool
+  protected readonly client: ClickHouseClient;
 
   protected readonly readOnlyMode: boolean;
 
-  protected readonly config: any;
+  protected readonly config: ClickHouseDriverConfig;
 
   /**
    * Class constructor.
    */
   public constructor(
-    config: ClickHouseDriverOptions & {
-      dataSource?: string,
-      maxPoolSize?: number,
-    } = {},
+    config: ClickHouseDriverOptions = {},
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
-    const dataSource =
-      config.dataSource ||
-      assertDataSource('default');
+    const dataSource = config.dataSource ?? assertDataSource('default');
+    const host = config.host ?? getEnv('dbHost', { dataSource });
+    const port = config.port ?? getEnv('dbPort', { dataSource }) ?? 8123;
+    const protocol = config.protocol ?? (getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:');
+    const url = `${protocol}//${host}:${port}`;
+
+    const username = config.username ?? getEnv('dbUser', { dataSource });
+    const password = config.password ?? getEnv('dbPass', { dataSource });
+    const database = config.database ?? (getEnv('dbName', { dataSource }) as string) ?? 'default';
+
+    // TODO this is a bit inconsistent with readOnly
+    this.readOnlyMode = getEnv('clickhouseReadOnly', { dataSource });
+
+    // Expect that getEnv('dbQueryTimeout') will always return a value
+    const requestTimeoutEnv: number = getEnv('dbQueryTimeout', { dataSource }) * 1000;
+    const requestTimeout = config.requestTimeout ?? requestTimeoutEnv;
 
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      auth:
-        getEnv('dbUser', { dataSource }) ||
-        getEnv('dbPass', { dataSource })
-          ? `${
-            getEnv('dbUser', { dataSource })
-          }:${
-            getEnv('dbPass', { dataSource })
-          }`
-          : '',
-      protocol: getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:',
-      queryOptions: {
-        database:
-          getEnv('dbName', { dataSource }) ||
-          config && config.database ||
-          'default'
+      url,
+      username,
+      password,
+      database,
+      exportBucket: this.getExportBucket(dataSource),
+      readOnly: !!config.readOnly,
+      requestTimeout,
+      compression: {
+        // Response compression can't be enabled for a user with readonly=1, as ClickHouse will not allow settings modifications for such user.
+        response: this.readOnlyMode ? false : getEnv('clickhouseCompression', { dataSource }),
+        request: getEnv('clickhouseCompression', { dataSource }),
       },
-      ...config
+      clickhouseSettings: {
+        // If ClickHouse user's permissions are restricted with "readonly = 1",
+        // change settings queries are not allowed. Thus, "join_use_nulls" setting
+        // can not be changed
+        ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+      },
     };
-    this.readOnlyMode =
-      getEnv('clickhouseReadOnly', { dataSource }) === 'true';
-    this.pool = genericPool.createPool({
-      create: async () => new ClickHouse({
-        ...this.config,
-        queryOptions: {
-          //
-          //
-          // If ClickHouse user's permissions are restricted with "readonly = 1",
-          // change settings queries are not allowed. Thus, "join_use_nulls" setting
-          // can not be changed
-          //
-          //
-          ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
-          session_id: uuidv4(),
-          ...this.config.queryOptions,
-        }
-      }),
-      destroy: () => Promise.resolve()
-    }, {
-      min: 0,
-      max:
-        config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
-        8,
-      evictionRunIntervalMillis: 10000,
-      softIdleTimeoutMillis: 30000,
-      idleTimeoutMillis: 30000,
-      acquireTimeoutMillis: 20000
-    });
+
+    const maxPoolSize = config.maxPoolSize ?? getEnv('dbMaxPoolSize', { dataSource }) ?? 8;
+
+    this.client = this.createClient(maxPoolSize);
   }
 
-  protected withConnection(fn: (con: any, queryId: string) => Promise<any>) {
-    const self = this;
-    const connectionPromise = this.pool.acquire();
+  protected withCancel<T>(fn: (con: ClickHouseClient, queryId: string, signal: AbortSignal) => Promise<T>): Promise<T> {
     const queryId = uuidv4();
 
-    let cancelled = false;
-    const cancelObj: any = {};
+    const abortController = new AbortController();
+    const { signal } = abortController;
 
-    const promise: any = connectionPromise.then((connection: any) => {
-      cancelObj.cancel = async () => {
-        cancelled = true;
-        await self.withConnection(async conn => {
-          await conn.querying(`KILL QUERY WHERE query_id = '${queryId}'`);
+    const promise = (async () => {
+      const pingResult = await this.client.ping();
+      if (!pingResult.success) {
+        // TODO replace string formatting with proper cause
+        // pingResult.error can be AggregateError when ClickHouse hostname resolves to multiple addresses
+        let errorMessage = pingResult.error.toString();
+        if (pingResult.error instanceof AggregateError) {
+          errorMessage = `Aggregate error: ${pingResult.error.message}; errors: ${pingResult.error.errors.join('; ')}`;
+        }
+        throw new Error(`Connection check failed: ${errorMessage}`);
+      }
+      signal.throwIfAborted();
+      // Queries sent by `fn` can hit a timeout error, would _not_ get killed, and continue running in ClickHouse
+      // TODO should we kill those as well?
+      const result = await fn(this.client, queryId, signal);
+      signal.throwIfAborted();
+      return result;
+    })();
+    (promise as any).cancel = async () => {
+      abortController.abort();
+      // Use separate client for kill query, usual pool may be busy
+      const killClient = this.createClient(1);
+      try {
+        await killClient.command({
+          query: `KILL QUERY WHERE query_id = '${queryId}'`,
         });
-      };
-      return fn(connection, queryId)
-        .then(res => this.pool.release(connection).then(() => {
-          if (cancelled) {
-            throw new Error('Query cancelled');
-          }
-          return res;
-        }))
-        .catch((err) => this.pool.release(connection).then(() => {
-          if (cancelled) {
-            throw new Error('Query cancelled');
-          }
-          throw err;
-        }));
-    });
-    promise.cancel = () => cancelObj.cancel();
+      } finally {
+        await killClient.close();
+      }
+    };
 
     return promise;
+  }
+
+  protected createClient(maxPoolSize: number): ClickHouseClient {
+    return createClient({
+      url: this.config.url,
+      username: this.config.username,
+      password: this.config.password,
+      database: this.config.database,
+      compression: this.config.compression,
+      clickhouse_settings: this.config.clickhouseSettings,
+      request_timeout: this.config.requestTimeout,
+      max_open_connections: maxPoolSize,
+    });
   }
 
   public async testConnection() {
@@ -184,62 +248,57 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       true;
   }
 
-  public async query(query: string, values: unknown[]) {
-    return this.queryResponse(query, values).then((res: any) => this.normaliseResponse(res));
+  public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
+    const response = await this.queryResponse(query, values);
+    return this.normaliseResponse(response);
   }
 
-  protected queryResponse(query: string, values: unknown[]) {
+  protected queryResponse(query: string, values: unknown[]): Promise<ResponseJSON<Record<string, unknown>>> {
     const formattedQuery = sqlstring.format(query, values);
 
-    return this.withConnection((connection, queryId) => connection.querying(formattedQuery, {
-      dataObjects: true,
-      queryOptions: {
-        query_id: queryId,
-        //
-        //
-        // If ClickHouse user's permissions are restricted with "readonly = 1",
-        // change settings queries are not allowed. Thus, "join_use_nulls" setting
-        // can not be changed
-        //
-        //
-        ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+    return this.withCancel(async (connection, queryId, signal) => {
+      try {
+        const format = 'JSON';
+
+        const resultSet = await connection.query({
+          query: formattedQuery,
+          query_id: queryId,
+          format,
+          clickhouse_settings: this.config.clickhouseSettings,
+          abort_signal: signal,
+        });
+
+        if (resultSet.response_headers['x-clickhouse-format'] !== format) {
+          throw new Error(`Unexpected x-clickhouse-format in response: expected ${format}, received ${resultSet.response_headers['x-clickhouse-format']}`);
+        }
+
+        // We used format JSON, so we expect each row to be Record with column names as keys
+        const results = await resultSet.json<Record<string, unknown>>();
+        return results;
+      } catch (e) {
+        // TODO replace string formatting with proper cause
+        throw new Error(`Query failed: ${e}; query id: ${queryId}`);
       }
-    }));
+    });
   }
 
-  protected normaliseResponse(res: any) {
-    //
-    //
-    //  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS"
-    //  cube.js expects them in format "YYYY-DD-MMTHH:MM:SS.000", so translate them based on the metadata returned
-    //
-    //  ClickHouse returns some number types as js numbers, others as js string, normalise them all to strings
-    //
-    //
+  protected normaliseResponse<R = unknown>(res: ResponseJSON<Record<string, unknown>>): Array<R> {
     if (res.data) {
-      res.data.forEach((row: any) => {
-        Object.keys(row).forEach(field => {
-          const value = row[field];
-          if (value !== null) {
-            const meta = res.meta.find((m: any) => m.name === field);
-            if (meta.type.includes('DateTime')) {
-              row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
-            } else if (meta.type.includes('Date')) {
-              row[field] = `${value}T00:00:00.000`;
-            } else if (meta.type.includes('Int') || meta.type.includes('Float') || meta.type.includes('Decimal')) {
-              // convert all numbers into strings
-              row[field] = `${value}`;
-            }
-          }
-        });
+      const meta = (res.meta ?? []).reduce<Record<string, { name: string; type: string; }>>(
+        (state, element) => ({ [element.name]: element, ...state }),
+        {}
+      );
+
+      // TODO maybe use row-based format here as well?
+      res.data.forEach((row) => {
+        transformRow(row, meta);
       });
     }
-    return res.data;
+    return res.data as Array<R>;
   }
 
   public async release() {
-    await this.pool.drain();
-    await this.pool.clear();
+    await this.client.close();
   }
 
   public informationSchemaQuery() {
@@ -249,8 +308,42 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
              database as table_schema,
              type as data_type
         FROM system.columns
-       WHERE database = '${this.config.queryOptions.database}'
+       WHERE database = '${this.config.database}'
     `;
+  }
+
+  protected override getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+    const query = `
+      SELECT database as schema_name,
+            name as table_name
+      FROM system.tables
+      WHERE database IN (${schemasPlaceholders})
+    `;
+    return query;
+  }
+
+  protected override getColumnsForSpecificTablesQuery(conditionString: string) {
+    const query = `
+      SELECT name as ${this.quoteIdentifier('column_name')},
+             table as ${this.quoteIdentifier('table_name')},
+             database as ${this.quoteIdentifier('schema_name')},
+             type as ${this.quoteIdentifier('data_type')}
+      FROM system.columns
+      WHERE ${conditionString}
+    `;
+    return query;
+  }
+
+  protected override getColumnNameForSchemaName() {
+    return 'database';
+  }
+
+  protected override getColumnNameForTableName() {
+    return 'table';
+  }
+
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    return [{ schema_name: this.config.database }];
   }
 
   public async stream(
@@ -259,53 +352,81 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
-    // eslint-disable-next-line no-underscore-dangle
-    const conn = await (<any> this.pool)._factory.create();
+    // Use separate client for this long-living query
+    const client = this.createClient(1);
+    const queryId = uuidv4();
 
     try {
       const formattedQuery = sqlstring.format(query, values);
 
-      return await new Promise((resolve, reject) => {
-        const options = {
-          queryOptions: {
-            query_id: uuidv4(),
-            //
-            //
-            // If ClickHouse user's permissions are restricted with "readonly = 1",
-            // change settings queries are not allowed. Thus, "join_use_nulls" setting
-            // can not be changed
-            //
-            //
-            ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
-          }
-        };
+      const format = 'JSONCompactEachRowWithNamesAndTypes';
 
-        const originalStream = conn.query(formattedQuery, options, (err: Error | null, result: any) => {
-          if (err) {
-            reject(err);
-          } else {
-            const rowStream = new HydrationStream(result.meta);
-            originalStream.pipe(rowStream);
-
-            resolve({
-              rowStream,
-              types: result.meta.map((field: any) => ({
-                name: field.name,
-                type: this.toGenericType(field.type),
-              })),
-              release: async () => {
-                // eslint-disable-next-line no-underscore-dangle
-                await (<any> this.pool)._factory.destroy(conn);
-              }
-            });
-          }
-        });
+      const resultSet = await client.query({
+        query: formattedQuery,
+        query_id: queryId,
+        format,
+        clickhouse_settings: this.config.clickhouseSettings,
       });
-    } catch (e) {
-      // eslint-disable-next-line no-underscore-dangle
-      await (<any> this.pool)._factory.destroy(conn);
 
-      throw e;
+      if (resultSet.response_headers['x-clickhouse-format'] !== format) {
+        throw new Error(`Unexpected x-clickhouse-format in response: expected ${format}, received ${resultSet.response_headers['x-clickhouse-format']}`);
+      }
+
+      // Array<unknown> is okay, because we use fixed JSONCompactEachRowWithNamesAndTypes format
+      // And each row after first two will look like this: [42, "hello", [0,1]]
+      // https://clickhouse.com/docs/en/interfaces/formats#jsoncompacteachrowwithnamesandtypes
+      const resultSetStream = resultSet.stream<Array<unknown>>();
+
+      const allRowsIter = (async function* allRowsIter() {
+        for await (const rowsBatch of resultSetStream) {
+          for (const row of rowsBatch) {
+            yield row.json();
+          }
+        }
+      }());
+
+      const first = await allRowsIter.next();
+      if (first.done) {
+        throw new Error('Unexpected stream end before row with names');
+      }
+      // JSONCompactEachRowWithNamesAndTypes: expect first row to be column names as string
+      const names = first.value as Array<string>;
+
+      const second = await allRowsIter.next();
+      if (second.done) {
+        throw new Error('Unexpected stream end before row with types');
+      }
+      // JSONCompactEachRowWithNamesAndTypes: expect first row to be column names as string
+      const types = second.value as Array<string>;
+
+      if (names.length !== types.length) {
+        throw new Error(`Unexpected names and types length mismatch; names ${names.length} vs types ${types.length}`);
+      }
+
+      const dataRowsIter = (async function* () {
+        for await (const row of allRowsIter) {
+          yield transformStreamRow(row, names, types);
+        }
+      }());
+      const rowStream = Readable.from(dataRowsIter);
+
+      return {
+        rowStream,
+        types: names.map((name, idx) => {
+          const type = types[idx];
+          return {
+            name,
+            type: this.toGenericType(type),
+          };
+        }),
+        release: async () => {
+          await client.close();
+        }
+      };
+    } catch (e) {
+      await client.close();
+      // TODO replace string formatting with proper cause
+      throw new Error(`Stream query failed: ${e}; query id: ${queryId}`);
     }
   }
 
@@ -314,7 +435,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     options: DownloadQueryResultsOptions
   ): Promise<DownloadQueryResultsResult> {
-    if ((options || {}).streamImport) {
+    if ((options ?? {}).streamImport) {
       return this.stream(query, values, options);
     }
 
@@ -322,7 +443,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
     return {
       rows: this.normaliseResponse(response),
-      types: response.meta.map((field: any) => ({
+      types: (response.meta ?? []).map((field) => ({
         name: field.name,
         type: this.toGenericType(field.type),
       })),
@@ -355,11 +476,185 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return super.toGenericType(columnType);
   }
 
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
-    return this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`, []);
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    await this.command(`CREATE DATABASE IF NOT EXISTS ${schemaName}`);
   }
 
-  public getTablesQuery(schemaName: string) {
+  public getTablesQuery(schemaName: string): Promise<TableQueryResult[]> {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
+  }
+
+  public override async dropTable(tableName: string, _options?: QueryOptions): Promise<void> {
+    await this.command(`DROP TABLE ${tableName}`);
+  }
+
+  protected getExportBucket(
+    dataSource: string,
+  ): ClickhouseDriverExportAWS | null {
+    const requiredExportBucket: ClickhouseDriverExportRequiredAWS = {
+      bucketType: getEnv('dbExportBucketType', {
+        supported: SUPPORTED_BUCKET_TYPES,
+        dataSource,
+      }),
+      bucketName: getEnv('dbExportBucket', { dataSource }),
+      region: getEnv('dbExportBucketAwsRegion', { dataSource }),
+    };
+
+    const exportBucket: ClickhouseDriverExportAWS = {
+      ...requiredExportBucket,
+      keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
+      secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
+    };
+
+    if (exportBucket.bucketType) {
+      if (!SUPPORTED_BUCKET_TYPES.includes(exportBucket.bucketType)) {
+        throw new Error(
+          `Unsupported EXPORT_BUCKET_TYPE, supported: ${SUPPORTED_BUCKET_TYPES.join(',')}`
+        );
+      }
+
+      // Make sure the required keys are set
+      const emptyRequiredKeys = Object.keys(requiredExportBucket)
+        .filter((key: string) => requiredExportBucket[<keyof ClickhouseDriverExportRequiredAWS>key] === undefined);
+      if (emptyRequiredKeys.length) {
+        throw new Error(
+          `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyRequiredKeys.join(',')}`
+        );
+      }
+
+      return exportBucket;
+    }
+
+    return null;
+  }
+
+  public async isUnloadSupported() {
+    return !!this.config.exportBucket;
+  }
+
+  /**
+   * Returns an array of queried fields meta info.
+   */
+  public async queryColumnTypes(sql: string, params: unknown[]): Promise<TableStructure> {
+    // For DESCRIBE we expect that each row would have special structure
+    // See https://clickhouse.com/docs/en/sql-reference/statements/describe-table
+    // TODO complete this type
+    type DescribeRow = {
+      name: string,
+      type: string
+    };
+    const columns = await this.query<DescribeRow>(`DESCRIBE ${sql}`, params);
+    if (!columns) {
+      throw new Error('Unable to describe table');
+    }
+
+    return columns.map((column) => ({
+      name: column.name,
+      type: this.toGenericType(column.type),
+    }));
+  }
+
+  // This is only for use in tests
+  public override async createTableRaw(query: string): Promise<void> {
+    await this.command(query);
+  }
+
+  public override async createTable(quotedTableName: string, columns: TableColumn[]) {
+    const createTableSql = this.createTableSql(quotedTableName, columns);
+    try {
+      await this.command(createTableSql);
+    } catch (e) {
+      // TODO replace string formatting with proper cause
+      throw new Error(`Create table failed: ${e}`);
+    }
+  }
+
+  /**
+   * We use unloadWithoutTempTable strategy
+   */
+  public async unload(_tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+    if (!options.query?.sql) {
+      throw new Error('Query must be defined in options');
+    }
+
+    return this.unloadFromQuery(
+      options.query?.sql,
+      options.query?.params,
+      options
+    );
+  }
+
+  public async unloadFromQuery(sql: string, params: unknown[], _options: UnloadOptions): Promise<DownloadTableCSVData> {
+    if (!this.config.exportBucket) {
+      throw new Error('Unload is not configured');
+    }
+
+    const types = await this.queryColumnTypes(`(${sql})`, params);
+    const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
+    const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
+
+    const formattedQuery = sqlstring.format(`
+      INSERT INTO FUNCTION
+         s3(
+             'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
+             '${this.config.exportBucket.keyId}',
+             '${this.config.exportBucket.secretKey}',
+             'CSV'
+          )
+      ${sql}
+    `, params);
+
+    await this.command(formattedQuery);
+
+    const csvFile = await this.extractUnloadedFilesFromS3(
+      {
+        credentials: {
+          accessKeyId: this.config.exportBucket.keyId,
+          secretAccessKey: this.config.exportBucket.secretKey,
+        },
+        region: this.config.exportBucket.region,
+      },
+      bucketName,
+      exportPrefix,
+    );
+
+    return {
+      csvFile,
+      types,
+      csvNoHeader: true,
+      // Can be controlled via SET format_csv_delimiter
+      csvDelimiter: ','
+    };
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      unloadWithoutTempTable: true,
+      incrementalSchemaLoading: true,
+    };
+  }
+
+  // This is not part of a driver interface, and marked public only for testing
+  public async command(query: string): Promise<void> {
+    await this.withCancel(async (connection, queryId, signal) => {
+      await connection.command({
+        query,
+        query_id: queryId,
+        abort_signal: signal,
+      });
+    });
+  }
+
+  // This is not part of a driver interface, and marked public only for testing
+  public async insert(table: string, values: Array<Array<unknown>>): Promise<void> {
+    await this.withCancel(async (connection, queryId, signal) => {
+      await connection.insert({
+        table,
+        values,
+        format: 'JSONCompactEachRow',
+        query_id: queryId,
+        abort_signal: signal,
+      });
+    });
   }
 }

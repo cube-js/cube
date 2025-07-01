@@ -4,76 +4,58 @@ use datafusion::{
     logical_plan::LogicalPlan,
     sql::{parser::Statement, planner::SqlToRel},
 };
-use egg::Rewrite;
 
-use super::{get_test_session, get_test_tenant_ctx};
+use super::get_test_session;
 use crate::{
     compile::{
-        engine::provider::CubeContext,
         parser::parse_sql_to_statement,
         rewrite::{
-            analysis::LogicalPlanAnalysis,
             converter::{CubeRunner, LogicalPlanToLanguageConverter},
-            rewriter::RewriteRules,
-            rules::{
-                dates::DateRules, filters::FilterRules, members::MemberRules, order::OrderRules,
-                split::SplitRules,
-            },
-            LogicalPlanLanguage,
+            rewriter::{CubeRewrite, Rewriter},
         },
-        rewrite_statement, QueryPlanner,
+        rewrite_statement, CompilationError, CubeContext, DatabaseProtocol, QueryEngine,
+        SqlQueryEngine,
     },
-    sql::session::DatabaseProtocol,
+    config::{ConfigObj, ConfigObjImpl},
+    transport::MetaContext,
 };
 
-pub async fn cube_context() -> CubeContext {
-    let session = get_test_session(DatabaseProtocol::PostgreSQL).await;
-    let planner = QueryPlanner::new(
-        session.state.clone(),
-        get_test_tenant_ctx(),
-        session.session_manager.clone(),
-    );
-    let ctx = planner.create_execution_ctx();
-    let df_state = Arc::new(ctx.state.write().clone());
+pub async fn create_test_postgresql_cube_context(
+    meta: Arc<MetaContext>,
+) -> Result<CubeContext, CompilationError> {
+    let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
+    let query_engine = SqlQueryEngine::new(session.session_manager.clone());
 
-    CubeContext::new(
-        df_state,
-        planner.meta.clone(),
-        planner.session_manager.clone(),
-        planner.state.clone(),
+    query_engine.create_cube_ctx(
+        session.state.clone(),
+        meta,
+        query_engine.create_session_ctx(session.state.clone())?,
     )
 }
 
 pub fn query_to_logical_plan(query: String, context: &CubeContext) -> LogicalPlan {
     let stmt = parse_sql_to_statement(&query, DatabaseProtocol::PostgreSQL, &mut None).unwrap();
-    let stmt = rewrite_statement(&stmt);
+    let stmt = rewrite_statement(stmt);
     let df_query_planner = SqlToRel::new_with_options(context, true);
 
-    return df_query_planner
-        .statement_to_plan(Statement::Statement(Box::new(stmt.clone())))
-        .unwrap();
+    df_query_planner
+        .statement_to_plan(Statement::Statement(Box::new(stmt)))
+        .unwrap()
 }
 
 pub fn rewrite_runner(plan: LogicalPlan, context: Arc<CubeContext>) -> CubeRunner {
-    let mut converter = LogicalPlanToLanguageConverter::new(context);
+    let config_obj = ConfigObjImpl::default();
+    let flat_list = config_obj.push_down_pull_up_split();
+    let mut converter = LogicalPlanToLanguageConverter::new(context, flat_list);
     converter.add_logical_plan(&plan).unwrap();
 
     converter.take_runner()
 }
 
-pub fn rewrite_rules(
-    cube_context: Arc<CubeContext>,
-) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-    let rules: Vec<Box<dyn RewriteRules>> = vec![
-        Box::new(MemberRules::new(cube_context.clone())),
-        Box::new(FilterRules::new(cube_context.clone())),
-        Box::new(DateRules::new(cube_context.clone())),
-        Box::new(OrderRules::new(cube_context.clone())),
-        Box::new(SplitRules::new(cube_context.clone())),
-    ];
-    let mut rewrites = Vec::new();
-    for r in rules {
-        rewrites.extend(r.rewrite_rules());
-    }
-    rewrites
+pub fn rewrite_rules(cube_context: Arc<CubeContext>) -> Vec<CubeRewrite> {
+    Rewriter::rewrite_rules(
+        cube_context.meta.clone(),
+        cube_context.sessions.server.config_obj.clone(),
+        true,
+    )
 }

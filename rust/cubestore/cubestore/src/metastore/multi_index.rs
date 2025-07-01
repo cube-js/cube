@@ -6,7 +6,7 @@
 //! Multi-partitioned are compacted and repartitioned by applying the same operation to ordinary
 //! partitions they own.
 use crate::data_frame_from;
-use crate::metastore::{Column, IdRow, IndexId, RocksSecondaryIndex, TableId};
+use crate::metastore::{Column, IdRow, IndexId, RocksEntity, RocksSecondaryIndex, TableId};
 use crate::rocks_table_impl;
 use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
@@ -23,6 +23,8 @@ pub struct MultiIndex {
     key_columns: Vec<Column>
 }
 }
+
+impl RocksEntity for MultiIndex {}
 
 impl MultiIndex {
     pub fn new(schema_id: u64, name: String, key_columns: Vec<Column>) -> MultiIndex {
@@ -113,6 +115,8 @@ pub struct MultiPartition {
    total_row_count: u64
 }
 }
+
+impl RocksEntity for MultiPartition {}
 
 impl MultiPartition {
     // Note that roots are active by default.

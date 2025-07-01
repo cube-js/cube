@@ -8,11 +8,6 @@
     "outDir": "dist",
     "rootDir": ".",
     "baseUrl": ".",
-    "allowJs": true,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "strictFunctionTypes": false,
-    "strictBindCallApply": false,
-    "strictPropertyInitialization": false,
+    "allowJs": true
   },
 }

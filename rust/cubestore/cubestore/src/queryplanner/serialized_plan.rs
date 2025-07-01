@@ -2,6 +2,7 @@ use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta, Snapshots};
+use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
@@ -9,10 +10,11 @@ use crate::queryplanner::udfs::{
     aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
     CubeScalarUDFKind,
 };
+use crate::queryplanner::InfoSchemaTableProvider;
 use crate::table::Row;
 use crate::CubeError;
-use arrow::datatypes::DataType;
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext::alias::LogicalAlias;
 use datafusion::cube_ext::join::SkewedLeftCrossJoin;
 use datafusion::cube_ext::joinagg::CrossJoinAgg;
@@ -74,6 +76,7 @@ pub struct SerializedPlan {
     schema_snapshot: Arc<SchemaSnapshot>,
     partition_ids_to_execute: Vec<(u64, RowFilter)>,
     inline_table_ids_to_execute: Vec<InlineTableId>,
+    trace_obj: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -199,6 +202,8 @@ pub enum SerializedLogicalPlan {
     ClusterSend {
         input: Arc<SerializedLogicalPlan>,
         snapshots: Vec<Snapshots>,
+        #[serde(default)]
+        limit_and_reverse: Option<(usize, bool)>,
     },
     ClusterAggregateTopK {
         limit: usize,
@@ -383,9 +388,14 @@ impl SerializedLogicalPlan {
                     schema: schema.clone(),
                 }),
             },
-            SerializedLogicalPlan::ClusterSend { input, snapshots } => ClusterSendNode {
+            SerializedLogicalPlan::ClusterSend {
+                input,
+                snapshots,
+                limit_and_reverse,
+            } => ClusterSendNode {
                 input: Arc::new(input.logical_plan(worker_context)?),
                 snapshots: snapshots.clone(),
+                limit_and_reverse: limit_and_reverse.clone(),
             }
             .into_plan(),
             SerializedLogicalPlan::ClusterAggregateTopK {
@@ -584,10 +594,17 @@ impl SerializedLogicalPlan {
                     })
                     .collect::<Vec<_>>();
 
-                SerializedLogicalPlan::Union {
-                    inputs,
-                    schema: schema.clone(),
-                    alias: alias.clone(),
+                if inputs.is_empty() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Union {
+                        inputs,
+                        schema: schema.clone(),
+                        alias: alias.clone(),
+                    }
                 }
             }
             SerializedLogicalPlan::TableScan {
@@ -725,12 +742,17 @@ impl SerializedLogicalPlan {
                     }
                 }
             }
-            SerializedLogicalPlan::ClusterSend { input, snapshots } => {
+            SerializedLogicalPlan::ClusterSend {
+                input,
+                snapshots,
+                limit_and_reverse,
+            } => {
                 let input =
                     input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
                 SerializedLogicalPlan::ClusterSend {
                     input: Arc::new(input),
                     snapshots: snapshots.clone(),
+                    limit_and_reverse: limit_and_reverse.clone(),
                 }
             }
             SerializedLogicalPlan::ClusterAggregateTopK {
@@ -1021,6 +1043,7 @@ impl SerializedPlan {
     pub async fn try_new(
         plan: LogicalPlan,
         index_snapshots: PlanningMeta,
+        trace_obj: Option<String>,
     ) -> Result<Self, CubeError> {
         let serialized_logical_plan = Self::serialized_logical_plan(&plan);
         Ok(SerializedPlan {
@@ -1028,6 +1051,7 @@ impl SerializedPlan {
             schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
             partition_ids_to_execute: Vec::new(),
             inline_table_ids_to_execute: Vec::new(),
+            trace_obj,
         })
     }
 
@@ -1044,6 +1068,7 @@ impl SerializedPlan {
             schema_snapshot: self.schema_snapshot.clone(),
             partition_ids_to_execute,
             inline_table_ids_to_execute,
+            trace_obj: self.trace_obj.clone(),
         }
     }
 
@@ -1062,6 +1087,10 @@ impl SerializedPlan {
         })
     }
 
+    pub fn trace_obj(&self) -> Option<String> {
+        self.trace_obj.clone()
+    }
+
     pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {
         &self.schema_snapshot.index_snapshots.indices
     }
@@ -1070,7 +1099,7 @@ impl SerializedPlan {
         &self.schema_snapshot.index_snapshots
     }
 
-    pub fn files_to_download(&self) -> Vec<(IdRow<Partition>, String, Option<u64>)> {
+    pub fn files_to_download(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
         self.list_files_to_download(|id| {
             self.partition_ids_to_execute
                 .binary_search_by_key(&id, |(id, _)| *id)
@@ -1079,7 +1108,7 @@ impl SerializedPlan {
     }
 
     /// Note: avoid during normal execution, workers must filter the partitions they execute.
-    pub fn all_required_files(&self) -> Vec<(IdRow<Partition>, String, Option<u64>)> {
+    pub fn all_required_files(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
         self.list_files_to_download(|_| true)
     }
 
@@ -1090,6 +1119,7 @@ impl SerializedPlan {
         IdRow<Partition>,
         /* file_name */ String,
         /* size */ Option<u64>,
+        /* chunk_id */ Option<u64>,
     )> {
         let indexes = self.index_snapshots();
 
@@ -1109,6 +1139,7 @@ impl SerializedPlan {
                         partition.partition.clone(),
                         file,
                         partition.partition.get_row().file_size(),
+                        None,
                     ));
                 }
 
@@ -1118,6 +1149,7 @@ impl SerializedPlan {
                             partition.partition.clone(),
                             chunk.get_row().get_full_name(chunk.get_id()),
                             chunk.get_row().file_size(),
+                            Some(chunk.get_id()),
                         ))
                     }
                 }
@@ -1172,9 +1204,16 @@ impl SerializedPlan {
             type Error = ();
 
             fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
-                if let LogicalPlan::TableScan { table_name, .. } = plan {
-                    let name_split = table_name.split(".").collect::<Vec<_>>();
-                    if name_split[0] != "information_schema" && name_split[0] != "system" {
+                if let LogicalPlan::TableScan { source, .. } = plan {
+                    if source
+                        .as_any()
+                        .downcast_ref::<InfoSchemaTableProvider>()
+                        .is_none()
+                        && source
+                            .as_any()
+                            .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
+                            .is_none()
+                    {
                         self.seen_data_scans = true;
                         return Ok(false);
                     }
@@ -1269,6 +1308,7 @@ impl SerializedPlan {
                     SerializedLogicalPlan::ClusterSend {
                         input: Arc::new(Self::serialized_logical_plan(&cs.input)),
                         snapshots: cs.snapshots.clone(),
+                        limit_and_reverse: cs.limit_and_reverse.clone(),
                     }
                 } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
                     SerializedLogicalPlan::ClusterAggregateTopK {

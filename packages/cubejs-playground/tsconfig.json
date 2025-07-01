@@ -6,6 +6,7 @@
       "dom",
       "esnext"
     ],
+    "types": ["vitest/globals"],
     "declaration": true,
     "rootDir": "src",
     "outDir": "./lib",

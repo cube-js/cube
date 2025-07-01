@@ -79,21 +79,22 @@ impl PgCatalogDatabaseBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.datname.finish()));
-        columns.push(Arc::new(self.datdba.finish()));
-        columns.push(Arc::new(self.encoding.finish()));
-        columns.push(Arc::new(self.datcollate.finish()));
-        columns.push(Arc::new(self.datctype.finish()));
-        columns.push(Arc::new(self.datistemplate.finish()));
-        columns.push(Arc::new(self.datallowconn.finish()));
-        columns.push(Arc::new(self.datconnlimit.finish()));
-        columns.push(Arc::new(self.datlastsysoid.finish()));
-        columns.push(Arc::new(self.datfrozenxid.finish()));
-        columns.push(Arc::new(self.datminmxid.finish()));
-        columns.push(Arc::new(self.dattablespace.finish()));
-        columns.push(Arc::new(self.datacl.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.datname.finish()),
+            Arc::new(self.datdba.finish()),
+            Arc::new(self.encoding.finish()),
+            Arc::new(self.datcollate.finish()),
+            Arc::new(self.datctype.finish()),
+            Arc::new(self.datistemplate.finish()),
+            Arc::new(self.datallowconn.finish()),
+            Arc::new(self.datconnlimit.finish()),
+            Arc::new(self.datlastsysoid.finish()),
+            Arc::new(self.datfrozenxid.finish()),
+            Arc::new(self.datminmxid.finish()),
+            Arc::new(self.dattablespace.finish()),
+            Arc::new(self.datacl.finish()),
+        ];
 
         columns
     }

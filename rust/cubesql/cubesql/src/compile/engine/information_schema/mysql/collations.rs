@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use crate::compile::engine::provider::TableName;
+use crate::compile::engine::context::TableName;
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
@@ -68,15 +68,15 @@ impl InformationSchemaCollationsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.collation_names.finish()));
-        columns.push(Arc::new(self.character_set_names.finish()));
-        columns.push(Arc::new(self.ids.finish()));
-        columns.push(Arc::new(self.is_defaults.finish()));
-        columns.push(Arc::new(self.is_compiled_values.finish()));
-        columns.push(Arc::new(self.sortlens.finish()));
-        columns.push(Arc::new(self.pad_attributes.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.collation_names.finish()),
+            Arc::new(self.character_set_names.finish()),
+            Arc::new(self.ids.finish()),
+            Arc::new(self.is_defaults.finish()),
+            Arc::new(self.is_compiled_values.finish()),
+            Arc::new(self.sortlens.finish()),
+            Arc::new(self.pad_attributes.finish()),
+        ];
 
         columns
     }

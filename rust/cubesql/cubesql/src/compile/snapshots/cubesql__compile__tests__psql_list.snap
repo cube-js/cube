@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT\n                    d.datname as \"Name\",\n                    pg_catalog.pg_get_userbyid(d.datdba) as \"Owner\",\n                    pg_catalog.pg_encoding_to_char(d.encoding) as \"Encoding\",\n                    d.datcollate as \"Collate\",\n                    d.datctype as \"Ctype\",\n                    NULL as \"ICU Locale\",\n                    'libc' AS \"Locale Provider\",\n                    pg_catalog.array_to_string(d.datacl, E'\\n') AS \"Access privileges\"\n                FROM pg_catalog.pg_database d\n                ORDER BY 1\n                ;\"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------+-------+----------+------------+------------+------------+-----------------+-------------------+
+| Name   | Owner | Encoding | Collate    | Ctype      | ICU Locale | Locale Provider | Access privileges |
++--------+-------+----------+------------+------------+------------+-----------------+-------------------+
+| cubedb | ovr   | UTF8     | en_US.utf8 | en_US.utf8 | NULL       | libc            | NULL              |
++--------+-------+----------+------------+------------+------------+-----------------+-------------------+

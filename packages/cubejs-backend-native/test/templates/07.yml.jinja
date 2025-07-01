@@ -1,0 +1,14 @@
+{%- import ".utils.jinja" as utils -%}
+
+{%- macro cents_to_dollars(column_name, precision=2) -%}
+  ({{ column_name }} / 100)::NUMERIC(16, {{ precision }})
+{%- endmacro -%}
+
+cubes:
+  - name: cube_07
+    sql: >
+      SELECT
+        id AS payment_id,
+        {{ cents_to_dollars('amount') }} AS amount_usd,
+        {{ utils.markup('order_selling_price', 'order_cost_price') }} AS markup
+      FROM app_data.payments

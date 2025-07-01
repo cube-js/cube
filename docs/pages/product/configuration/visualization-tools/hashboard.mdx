@@ -1,0 +1,53 @@
+# Hashboard
+
+[Hashboard](https://hashboard.com) is an interactive data exploration tool.
+
+<Screenshot src="https://ucarecdn.com/73a9205f-02a4-4b60-b001-5ae50b5ccc87/"/>
+
+<InfoBox>
+
+Watch how Cube and Hashboard work together in this webinar recording:
+[Build an explorable and accessible semantic layer with Cube and
+Hashboard](https://cube.dev/events/build-an-explorable-and-accessible-semantic-layer-with-cube-and-hashboard).
+
+</InfoBox>
+
+## Connect from Cube Cloud
+
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Hashboard</Btn> to get
+detailed instructions.
+
+## Connect from Cube Core
+
+You can connect a Cube deployment to Hashboard using the [SQL API][ref-sql-api].
+
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Hashboard.
+
+## Connecting from Hashboard
+
+### Connecting a data source
+
+To connect to Cube, click on &nbsp;<Btn>More → Data Sources</Btn> and
+then click&nbsp;<Btn>+ Add Connection</Btn>:
+
+<Screenshot src="https://ucarecdn.com/1063b9bd-6133-4504-a576-008c383acadd/"/>
+
+Choose&nbsp;<Btn>PostgreSQL</Btn> and enter the connection credentials for Cube's SQL API:
+
+<Screenshot src="https://ucarecdn.com/2373ad16-9d3b-4353-8d5f-956cdddef3d6/" />
+
+Next, choose your newly added data source and build the data model:
+
+<Screenshot src="https://ucarecdn.com/5851f4f8-feb4-4de0-88bc-f99ddb6b5365/" />
+
+### Querying data
+
+To query your data, go to the&nbsp;<Btn>Data models</Btn> page, choose your newly created
+data model, and click&nbsp;<Btn>Explore</Btn>:
+
+<Screenshot src="https://ucarecdn.com/3eb1bc17-5ee7-4715-8be6-6fc17950c5e3/" />
+
+[ref-sql-api]: /product/apis-integrations/sql-api

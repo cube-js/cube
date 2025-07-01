@@ -1,0 +1,87 @@
+# Metabase
+
+[Metabase][metabase-oss] is an open-source way to help everyone in your company
+to ask questions and learn from data. There's also a fully-managed [cloud
+service][metabase] for Metabase.
+
+<InfoBox>
+
+Webinar recording: [Instant Insights Unlocked with Cube & Metabase](https://cube.dev/events/cube-metabase-webinar)
+
+</InfoBox>
+
+<LoomVideo url="https://www.loom.com/embed/38752bb23e5244d1a43675795c470a53" />
+
+## Connect from Cube Cloud
+
+It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube Cloud to
+Metabase. It automatically synchronizes the [data model][ref-data-model] with Metabase.
+
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Metabase</Btn> to get
+detailed instructions.
+
+## Connect from Cube Core
+
+You can connect a Cube deployment to Metabase using the [SQL API][ref-sql-api].
+
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Metabase.
+
+## Connecting from Metabase
+
+Metabase connects to Cube as to a Postgres database.
+
+### Creating a connection
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/15722cdb-901e-4f21-aab2-b8c468997e4d/"
+    style={{ border: "none" }}
+    width="80%"
+  />
+</div>
+
+### Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/e25bff7f-c3d2-4b33-a8a4-72681e71f60c/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+You can write SQL in Metabase that will be executed in Cube. Learn more about
+Cube SQL syntax on the [reference page][ref-sql-api]. You can also create a
+visualization of the executed SQL query.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/c2740434-69ae-4e0b-ab3c-755205963892/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+If you prefer using the UI interface to "Ask a question", you can do that as
+well.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/aac8591f-47ae-47a3-b4f0-51a7164d6305/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+[ref-sql-api]: /product/apis-integrations/sql-api
+[metabase-oss]: https://github.com/metabase/metabase
+[metabase]: https://www.metabase.com
+[ref-sls]: /product/apis-integrations/semantic-layer-sync
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-data-model]: /product/data-modeling/overview

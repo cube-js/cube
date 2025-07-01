@@ -17,6 +17,7 @@ import {
   BaseDriver, DownloadQueryResultsOptions,
   DownloadTableMemoryData, DriverInterface,
   IndexesSQL, TableStructure, QueryOptions,
+  DatabaseStructure,
 } from '@cubejs-backend/base-driver';
 import { QuestQuery } from './QuestQuery';
 
@@ -58,11 +59,26 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
    */
   public constructor(
     config: QuestDriverConfiguration & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -79,6 +95,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
       port: getEnv('dbPort', { dataSource }),
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
+      ssl: this.getSslOptions(dataSource),
       ...config
     });
     this.pool.on('error', (err) => {
@@ -163,14 +180,14 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     // no-op as there are no schemas in QuestDB
   }
 
-  public async tablesSchema() {
+  public async tablesSchema(): Promise<DatabaseStructure> {
     const tables = await this.getTablesQuery('');
 
     // QuestDB doesn't have a notion of schema/logical database while the driver
     // has to return a `{ 'schema_name': { 'table1': {...} } }` object. So, we use
     // empty schema name ('') as a workaround to avoid the schema prefix
     // ('schema_name.') being used for table names in the generated queries.
-    const metadata: Record<string, Record<string, object>> = { '': {} };
+    const metadata: DatabaseStructure = { '': {} };
 
     // eslint-disable-next-line camelcase
     await Promise.all(tables.map(async ({ table_name: tableName }) => {
@@ -190,14 +207,10 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
 
   // eslint-disable-next-line camelcase
   public async getTablesQuery(_schemaName: string): Promise<({ table_name?: string, TABLE_NAME?: string })[]> {
-    const response = await this.query('SHOW TABLES', []);
-
-    return response.map((row: any) => ({
-      table_name: row.table,
-    }));
+    return this.query('SHOW TABLES', []);
   }
 
-  public async tableColumnTypes(table: string) {
+  public async tableColumnTypes(table: string): Promise<TableStructure> {
     const response: any[] = await this.query(`SHOW COLUMNS FROM '${table}'`, []);
 
     return response.map((row) => ({ name: row.column, type: this.toGenericType(row.type) }));

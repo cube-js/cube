@@ -26,6 +26,12 @@ pub struct V1LoadRequestQuery {
     pub offset: Option<i32>,
     #[serde(rename = "filters", skip_serializing_if = "Option::is_none")]
     pub filters: Option<Vec<crate::models::V1LoadRequestQueryFilterItem>>,
+    #[serde(rename = "ungrouped", skip_serializing_if = "Option::is_none")]
+    pub ungrouped: Option<bool>,
+    #[serde(rename = "subqueryJoins", skip_serializing_if = "Option::is_none")]
+    pub subquery_joins: Option<Vec<crate::models::V1LoadRequestQueryJoinSubquery>>,
+    #[serde(rename = "joinHints", skip_serializing_if = "Option::is_none")]
+    pub join_hints: Option<Vec<Vec<String>>>,
 }
 
 impl V1LoadRequestQuery {
@@ -39,6 +45,9 @@ impl V1LoadRequestQuery {
             limit: None,
             offset: None,
             filters: None,
+            ungrouped: None,
+            subquery_joins: None,
+            join_hints: None,
         }
     }
 }

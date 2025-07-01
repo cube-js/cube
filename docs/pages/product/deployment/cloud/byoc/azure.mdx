@@ -1,0 +1,88 @@
+# Deploying Cube Cloud BYOC on Azure
+
+With Bring Your Own Cloud (BYOC) on Azure, all the components interacting with private data are deployed on
+the customer infrastructure on Azure and managed by the Cube Cloud Control Plane via the Cube Cloud Operator.
+This document provides step-by-step instructions for deploying Cube Cloud BYOC on Azure.
+
+## Overall Design
+Cube Cloud will gain access to your Azure account via the Cube Cloud Provisioner Enterprise App.
+
+It will leverage a dedicated subscription where it will create a new Resource
+Group and bootstrap all the necessary infrastructure. At the center of the BYOC
+infrastructure are two AKS clusters that provide compute resources for the Cube
+Store and all Cube deployments you configure in the Cube Cloud UI. These AKS
+clusters will have a Cube Cloud operator installed in them that is connected to
+the Cube Cloud Control Plane. The Cube Cloud Operator receives instructions
+from the Control Plane and dynamically creates or destroys all the necessary
+Kubernetes resources required to support your Cube deployments.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="High-level diagram of Cube Cloud resources deployed on Azure"
+    src="https://ucarecdn.com/6d0f12db-086c-4274-b165-da68ccc381a9/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+## Prerequisites
+
+The bulk of provisioning work will be done remotely by Cube Cloud automation.
+However, to get started, you'll need to provide Cube with the necessary access
+along with some additional information that includes:
+
+- **Azure Tenant ID** - the Entra ID of your Azure account
+- **Azure Subscription ID** - The target subscription where Cube Cloud will be granted admin permissions to provision the BYOC infrastructure
+- **Region** - The target Azure region where Cube Cloud BYOC will be installed
+
+## Provisioning access
+
+### Add Cube tenant to your organization
+
+First you should add the Cube Cloud tenant to your organization. To do this,
+open the [Azure Portal][azure-console] and go to&nbsp;<Btn>Azure Active
+Directory</Btn> →&nbsp;<Btn>External Identities</Btn> →&nbsp;<Btn>Cross-tenant
+access settings</Btn> →&nbsp;<Btn>Organizational Settings</Btn>
+→&nbsp;<Btn>Add Organization</Btn>.
+
+For Tenant ID, enter `197e5263-87f4-4ce1-96c4-351b0c0c714a`.
+
+Make sure that&nbsp;<Btn>B2B Collaboration</Btn> →&nbsp;<Btn>Inbound Access</Btn>
+→&nbsp;<Btn>Applications</Btn> is set to&nbsp;<Btn>Allows access</Btn>.
+
+### Register Cube Cloud service principal at your organization
+
+To register the Cube Cloud service principal for your organization, follow these
+steps:
+
+1.  Log in with an account that has permissions to register Enterprise
+    applications.
+2.  Open a browser tab and go to the following URL, replacing `<TENANT_ID>` with
+    your tenant ID:
+    `https://login.microsoftonline.com/<TENANT_ID>/oauth2/authorize?client_id=0c5d0d4b-6cee-402e-9a08-e5b79f199481&response_type=code&redirect_uri=https%3A%2F%2Fwww.microsoft.com%2F`
+3.  The Cube Cloud service principal has specific credentials. Check that the
+    following details match exactly what you see on the dialog box that pops up:
+
+- Client ID: `d1c59948-4d4a-43dc-8d04-c0df8795ae19`
+- Name: `cube-cloud-byoc-provisioner`
+
+Once you have confirmed that all the information is correct,
+select&nbsp;<Btn>Consent on behalf of your organization</Btn> and
+click&nbsp;<Btn>Accept</Btn>.
+
+### Grant admin permissions on your BYOC Azure Subscription to the cube-cloud-byoc-provisioner
+
+On the [Azure Portal][azure-console], go to&nbsp;<Btn>Subscriptions</Btn>
+→ _Your BYOC Subscription_ →&nbsp;<Btn>IAM</Btn>→&nbsp;<Btn>Role Assignment</Btn>
+ and assing `Contributor` and `Role Based Access Control Administrator` to the `cube-cloud-byoc-provisioner`
+ Service Principal.
+
+<Screenshot src="https://ucarecdn.com/e1e917cd-6992-4864-b20e-0fbf7688a7e5/"/>
+
+## Deployment
+
+The actual deployment will be done by Cube Cloud automation. All that's left to
+do is notify your Cube contact point that access has been granted, and pass
+along your Azure Tenant/Subscription/Region information.
+
+[azure-console]: https://portal.azure.com

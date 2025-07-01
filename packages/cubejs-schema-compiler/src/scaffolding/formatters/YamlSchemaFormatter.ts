@@ -14,9 +14,9 @@ function isPlainObject(value) {
 
 export class YamlSchemaFormatter extends BaseSchemaFormatter {
   public fileExtension(): string {
-    return 'yaml';
+    return 'yml';
   }
-  
+
   protected cubeReference(cube: string): string {
     return `{${cube}}`;
   }
@@ -26,11 +26,7 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
 
     return `cubes:\n  - name: ${cube}${this.render(
       {
-        sql: new ValueWithComments(sql, [
-          'preAggregations:',
-          'Pre-Aggregations definitions go here',
-          'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started',
-        ]),
+        ...(sql ? { sql } : null),
         ...descriptor,
       },
       2
@@ -51,7 +47,7 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
     } else if (value instanceof ValueWithComments) {
       const comments = `\n${value.comments
         .map((comment) => `${indent}# ${comment}`)
-        .join('\n')}`;
+        .join('\n')}\n`;
 
       return value.value ? `${this.render(value.value)}${comments}` : comments;
     } else if (Array.isArray(value)) {
@@ -60,7 +56,7 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
           (v) => typeof v !== 'object' || v instanceof MemberReference
         )
       ) {
-        return ` [${value.map(this.render).join(', ')}]`;
+        return ` [${value.map(this.render).join(', ')}]\n`;
       }
 
       return `\n${value
@@ -74,17 +70,19 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
               Array.isArray(parent) && index === 0 ? '' : `${indent}`
             }${k}:${this.render(v, level + 1, value)}`
           )
-          .join('\n')}`;
+          .join('\n')}\n`;
       }
 
+      const newLineKeys = Object.keys(value).includes('data_source') ? ['data_source'] : ['sql_table'];
       const content = Object.keys(value)
         .map((key) => {
           if (!isPlainObject(value[key])) {
+            const newLine = newLineKeys.includes(key) ? '\n' : '';
             return `${indent}${key}:${this.render(
               value[key],
               level + 1,
               value
-            )}`;
+            )}${newLine}`;
           }
 
           return `${indent}${key}:${this.render(
@@ -106,12 +104,12 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
 
     return `${Array.isArray(parent) ? '' : ' '}${this.escapedValue(value)}`;
   }
-  
+
   private escapedValue(value: string | number | boolean): string | number | boolean {
     if (typeof value !== 'string') {
       return value;
     }
-    
-    return value.match(/[{}]/) ? `"${value.replace(/"/g, '\\"')}"` : value;
+
+    return value.match(/[{}"]/) ? `"${value.replace(/"/g, '\\"')}"` : value;
   }
 }

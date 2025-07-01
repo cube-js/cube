@@ -17,7 +17,6 @@
 use crate::CubeError;
 use std::net::ToSocketAddrs;
 use std::net::UdpSocket;
-use std::sync::Once;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Compatibility {
@@ -31,9 +30,10 @@ pub enum Compatibility {
 pub fn init_metrics(
     bind_addr: impl ToSocketAddrs,
     server_addr: impl ToSocketAddrs,
-    c: Compatibility,
+    mode: Compatibility,
+    constant_tags: Vec<String>,
 ) {
-    global_sink::init(bind_addr, server_addr, c).unwrap()
+    global_sink::init(bind_addr, server_addr, mode, constant_tags).unwrap()
 }
 
 pub const fn counter(name: &'static str) -> Counter {
@@ -60,14 +60,22 @@ pub const fn distribution(name: &'static str) -> IntMetric {
     }
 }
 
+pub fn format_tag(name: &'static str, value: &str) -> String {
+    format!("{}:{}", name, value)
+}
+
 pub struct Counter {
     metric: Metric,
 }
 
 impl Counter {
     pub fn add(&self, v: i64) {
+        self.add_with_tags(v, None)
+    }
+
+    pub fn add_with_tags(&self, v: i64, tags: Option<&Vec<String>>) {
         if let Some(s) = sink() {
-            s.send(&self.metric, v)
+            s.send(&self.metric, v, tags)
         }
     }
 
@@ -82,8 +90,12 @@ pub struct IntMetric {
 
 impl IntMetric {
     pub fn report(&self, v: i64) {
+        self.report_with_tags(v, None)
+    }
+
+    pub fn report_with_tags(&self, v: i64, tags: Option<&Vec<String>>) {
         if let Some(s) = sink() {
-            s.send(&self.metric, v)
+            s.send(&self.metric, v, tags)
         }
     }
 }
@@ -113,6 +125,7 @@ impl Metric {
 struct Sink {
     socket: UdpSocket,
     mode: Compatibility,
+    constant_tags: Option<String>,
 }
 
 impl Sink {
@@ -120,14 +133,26 @@ impl Sink {
         bind_addr: impl ToSocketAddrs,
         addr: impl ToSocketAddrs,
         mode: Compatibility,
+        tags: Vec<String>,
     ) -> Result<Sink, CubeError> {
         let socket = UdpSocket::bind(bind_addr)?;
         socket.connect(addr)?;
         socket.set_nonblocking(true)?;
-        Ok(Sink { socket, mode })
+
+        let constant_tags = if tags.len() > 0 {
+            Some(tags.join(","))
+        } else {
+            None
+        };
+
+        Ok(Sink {
+            socket,
+            mode,
+            constant_tags,
+        })
     }
 
-    fn send(&self, m: &Metric, value: i64) {
+    fn send(&self, m: &Metric, value: i64, tags: Option<&Vec<String>>) {
         let kind = match m.kind {
             MetricType::Counter => "c",
             MetricType::Gauge => "g",
@@ -136,32 +161,49 @@ impl Sink {
             MetricType::Distribution if self.mode == Compatibility::StatsD => "ms",
             MetricType::Distribution => "d",
         };
+        let data = format!("{}:{}|{}", m.name, value, kind);
+
+        let msg = match (&self.constant_tags, tags) {
+            (Some(constant_tags), tags) => {
+                if let Some(t) = tags {
+                    format!("{}|#{},{}", data, constant_tags, &t.join(","))
+                } else {
+                    format!("{}|#{}", data, constant_tags)
+                }
+            }
+            (None, tags) => {
+                if let Some(t) = tags {
+                    format!("{}|#{}", data, t.join(","))
+                } else {
+                    data
+                }
+            }
+        };
+
         // We deliberately choose to loose metric submissions on failures.
         // TODO: handle EWOULDBLOCK with background sends or at least internal failure counters.
-        let _ = self
-            .socket
-            .send(format!("{}:{}|{}", m.name, value, kind).as_bytes());
+        let _ = self.socket.send(msg.as_bytes());
     }
 }
 
 mod global_sink {
     use super::*;
-    static mut GLOBAL_SINK: Option<Sink> = None;
-    static ONCE: Once = Once::new();
+    use std::sync::OnceLock;
+
+    static GLOBAL_SINK: OnceLock<Option<Sink>> = OnceLock::new();
 
     pub fn init(
         bind_addr: impl ToSocketAddrs,
         server_addr: impl ToSocketAddrs,
-        c: Compatibility,
+        mode: Compatibility,
+        constant_tags: Vec<String>,
     ) -> Result<(), CubeError> {
-        let s = Sink::connect(bind_addr, server_addr, c)?;
+        let s = Sink::connect(bind_addr, server_addr, mode, constant_tags)?;
 
         let mut called = false;
-        ONCE.call_once(|| {
-            unsafe {
-                GLOBAL_SINK = Some(s);
-            }
+        GLOBAL_SINK.get_or_init(|| {
             called = true;
+            Some(s)
         });
         if !called {
             panic!("Metrics initialized twice or used before initialization");
@@ -170,9 +212,7 @@ mod global_sink {
     }
 
     pub(super) fn sink() -> &'static Option<Sink> {
-        // Ensure we synchronize access to GLOBAL_SINK.
-        ONCE.call_once(|| {});
-        unsafe { &GLOBAL_SINK }
+        GLOBAL_SINK.get_or_init(|| None)
     }
 }
 

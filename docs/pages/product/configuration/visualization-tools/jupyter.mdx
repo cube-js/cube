@@ -1,0 +1,95 @@
+# Jupyter
+
+Jupyter Notebook is a web application for creating and sharing computational
+documents.
+
+Here's a short video guide on how to connect Jupyter to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/bdb42d1c9e5a4bb8991d11e1ecab8324" />
+
+## Connect from Cube Cloud
+
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Jupyter</Btn> to get
+detailed instructions.
+
+## Connect from Cube Core
+
+You can connect a Cube deployment to Jupyter using the [SQL API][ref-sql-api].
+
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Jupyter.
+
+## Connecting from Jupyter
+
+Jupyter connects to Cube as to a Postgres database.
+
+### Creating a connection
+
+Make sure to install the `sqlalchemy` and `pandas` modules.
+
+```bash
+pip install sqlalchemy
+pip install pandas
+```
+
+Then you can use `sqlalchemy.create_engine` to connect to Cube's SQL API.
+
+```python
+import sqlalchemy
+import pandas
+
+engine = sqlalchemy.create_engine(
+    sqlalchemy.engine.url.URL(
+        drivername="postgresql",
+        username="cube",
+        password="9943f670fd019692f58d66b64e375213",
+        host="thirsty-raccoon.sql.aws-eu-central-1.cubecloudapp.dev",
+        port="5432",
+        database="db@thirsty-raccoon",
+    ),
+    echo_pool=True,
+)
+print("connecting with engine " + str(engine))
+connection = engine.connect()
+
+# ...
+```
+
+### Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+You can write SQL in Jupyter that will be executed in Cube. Learn more about
+Cube SQL syntax on the [reference page][ref-sql-api].
+
+```python
+# ...
+
+query = "SELECT SUM(count), status FROM orders GROUP BY status;"
+df = pandas.read_sql_query(query, connection)
+```
+
+In your Jupyter notebook it'll look like this.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/616046d9-729f-426e-8000-d15c6ca90347/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+You can also create a visualization of the executed SQL query.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/91f558c2-f65c-43cf-9747-3423c3894330/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+[ref-sql-api]: /product/apis-integrations/sql-api

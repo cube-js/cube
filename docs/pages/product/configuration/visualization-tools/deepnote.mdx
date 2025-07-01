@@ -1,0 +1,57 @@
+# Deepnote
+
+Deepnote is a data notebook that is built for collaboration and is Jupyter compatible.
+
+Here's a short video guide on how to connect Deepnote to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/d00eed9dd37b476e8928126d010b3dfc" />
+
+## Connect from Cube Cloud
+
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Deepnote</Btn> to get
+detailed instructions.
+
+## Connect from Cube Core
+
+You can connect a Cube deployment to Deepnote using the [SQL API][ref-sql-api].
+
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Deepnote.
+
+## Connecting from Deepnote
+
+Deepnote connects to Cube as to a Postgres database.
+
+### Creating a connection
+
+<Screenshot src="https://ucarecdn.com/7e11daae-f956-47ed-8183-7805a6e7757c/" />
+
+### Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+You can write SQL in Deepnote that will be executed in Cube. Learn more about
+Cube SQL syntax on the [reference page][ref-sql-api].
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/0d8b4090-ae23-4c3e-939d-c8080be9191c/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+You can also create a visualization of the executed SQL query.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/9267b047-4631-442a-b968-a3b7a3d94cb7/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+[ref-sql-api]: /product/apis-integrations/sql-api

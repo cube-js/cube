@@ -15,7 +15,7 @@ export default {
     loadSql: {
       required: false,
     },
-    cubejsApi: {
+    cubeApi: {
       type: Object,
       required: true,
     },
@@ -95,21 +95,21 @@ export default {
         this.resultSet = null;
 
         if (this.loadSql === 'only') {
-          this.sqlQuery = await this.cubejsApi.sql(query, {
+          this.sqlQuery = await this.cubeApi.sql(query, {
             mutexObj: this.mutexObj,
             mutexKey: 'sql',
           });
         } else if (this.loadSql) {
-          this.sqlQuery = await this.cubejsApi.sql(query, {
+          this.sqlQuery = await this.cubeApi.sql(query, {
             mutexObj: this.mutexObj,
             mutexKey: 'sql',
           });
-          this.resultSet = await this.cubejsApi.load(query, {
+          this.resultSet = await this.cubeApi.load(query, {
             mutexObj: this.mutexObj,
             mutexKey: 'query',
           });
         } else {
-          this.resultSet = await this.cubejsApi.load(query, {
+          this.resultSet = await this.cubeApi.load(query, {
             mutexObj: this.mutexObj,
             mutexKey: 'query',
           });
@@ -130,7 +130,7 @@ export default {
 
         const resultPromises = Promise.all(
           toPairs(queries).map(([name, query]) =>
-            this.cubejsApi
+            this.cubeApi
               .load(query, {
                 mutexObj: this.mutexObj,
                 mutexKey: name,
@@ -159,7 +159,7 @@ export default {
         this.$emit('queryStatus', { isLoading: true });
       }
     },
-    cubejsApi() {
+    cubeApi() {
       this.load();
     },
     chartType() {

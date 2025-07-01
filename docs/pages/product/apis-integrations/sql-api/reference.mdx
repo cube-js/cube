@@ -1,0 +1,431 @@
+# SQL API reference
+
+[SQL API][ref-sql-api] supports the following [commands](#sql-commands) as well
+as [functions and operators](#sql-functions-and-operators).
+
+<InfoBox>
+
+If you'd like to propose a function or an operator to be supported in the SQL API,
+check the existing [issues on GitHub][link-github-sql-api]. If there are no relevant
+issues, please [file a new one][link-github-new-sql-api-issue].
+
+</InfoBox>
+
+## SQL commands
+
+### `SELECT`
+
+Synopsis:
+
+```sql
+SELECT select_expr [, ...]
+  FROM from_item
+    CROSS JOIN join_item
+    ON join_criteria]*
+  [ WHERE where_condition ]
+  [ GROUP BY grouping_expression ]
+  [ HAVING having_expression ]
+  [ LIMIT number ] [ OFFSET number ];
+```
+
+`SELECT` retrieves rows from a cube.
+
+The `FROM` clause specifies one or more source **cube tables** for the `SELECT`.
+Qualification conditions can be added (via `WHERE`) to restrict the returned
+rows to a small subset of the original dataset.
+
+Example:
+
+```sql
+SELECT COUNT(*), orders.status, users.city
+FROM orders
+  CROSS JOIN users
+WHERE city IN ('San Francisco', 'Los Angeles')
+GROUP BY orders.status, users.city
+HAVING status = 'shipped'
+LIMIT 1 OFFSET 1;
+```
+
+### `EXPLAIN`
+
+Synopsis:
+
+```sql
+EXPLAIN [ ANALYZE ] statement
+```
+
+The `EXPLAIN` command displays the query execution plan that the Cube planner
+will generate for the supplied `statement`.
+
+The `ANALYZE` will execute `statement` and display actual runtime statistics,
+including the total elapsed time expended within each plan node and the total
+number of rows it actually returned.
+
+Example:
+
+```sql
+EXPLAIN WITH cte AS (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o
+    CROSS JOIN products p
+)
+SELECT COUNT(*) FROM cte;
+   plan_type   |                                plan
+---------------+---------------------------------------------------------------------
+ logical_plan  | Projection: #COUNT(UInt8(1))                                       +
+               |   Aggregate: groupBy=[[]], aggr=[[COUNT(UInt8(1))]]                +
+               |     CubeScan: request={                                            +
+               |   "measures": [                                                    +
+               |     "orders.count"                                                 +
+               |   ],                                                               +
+               |   "dimensions": [                                                  +
+               |     "products.name",                                               +
+               |     "products.description"                                         +
+               |   ],                                                               +
+               |   "segments": []                                                   +
+               | }
+ physical_plan | ProjectionExec: expr=[COUNT(UInt8(1))@0 as COUNT(UInt8(1))]        +
+               |   HashAggregateExec: mode=Final, gby=[], aggr=[COUNT(UInt8(1))]    +
+               |     HashAggregateExec: mode=Partial, gby=[], aggr=[COUNT(UInt8(1))]+
+               |       CubeScanExecutionPlan                                        +
+               |
+(2 rows)
+```
+
+With `ANALYZE`:
+
+```sql
+EXPLAIN ANALYZE WITH cte AS (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o
+    CROSS JOIN products p
+)
+SELECT COUNT(*) FROM cte;
+     plan_type     |                                                                                plan
+-------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Plan with Metrics | ProjectionExec: expr=[COUNT(UInt8(1))@0 as COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=541ns, spill_count=0, spilled_bytes=0, mem_used=0]           +
+                   |   HashAggregateExec: mode=Final, gby=[], aggr=[COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=6.583µs, spill_count=0, spilled_bytes=0, mem_used=0]     +
+                   |     HashAggregateExec: mode=Partial, gby=[], aggr=[COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=13.958µs, spill_count=0, spilled_bytes=0, mem_used=0]+
+                   |       CubeScanExecutionPlan, metrics=[]                                                                                                                           +
+                   |
+(1 row)
+```
+
+### `SHOW`
+
+Synopsis:
+
+```sql
+SHOW name
+SHOW ALL
+```
+
+Returns the value of a runtime parameter using `name`, or all runtime parameters
+if `ALL` is specified.
+
+Example:
+
+```sql
+SHOW timezone;
+ setting
+---------
+ GMT
+(1 row)
+
+SHOW ALL;
+            name             |    setting     | description
+-----------------------------+----------------+-------------
+ max_index_keys              | 32             |
+ max_allowed_packet          | 67108864       |
+ timezone                    | GMT            |
+ client_min_messages         | NOTICE         |
+ standard_conforming_strings | on             |
+ extra_float_digits          | 1              |
+ transaction_isolation       | read committed |
+ application_name            | NULL           |
+ lc_collate                  | en_US.utf8     |
+(9 rows)
+```
+
+## SQL functions and operators
+
+SQL API currently implements a subset of functions and operators [supported by
+PostgreSQL][link-postgres-funcs]. Additionally, it supports a few [custom
+functions](#custom-functions).
+
+### Comparison operators
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-comparison.html#FUNCTIONS-COMPARISON-OP-TABLE)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `<` | Returns `TRUE` if the first value is **less** than the second | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `>` | Returns `TRUE` if the first value is **greater** than the second | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `<=` | Returns `TRUE` if the first value is **less** than or **equal** to the second | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `>=` | Returns `TRUE` if the first value is **greater** than or **equal** to the second | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `=` | Returns `TRUE` if the first value is **equal** to the second | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `<>` or `!=` | Returns `TRUE` if the first value is **not equal** to the second | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### Comparison predicates
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-comparison.html#FUNCTIONS-COMPARISON-PRED-TABLE)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `BETWEEN` | Returns `TRUE` if the first value is between the second and the third | ❌ No | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `IS NULL` | Test whether value is `NULL` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `IS NOT NULL` | Test whether value is not `NULL` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### Mathematical functions
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-math.html#FUNCTIONS-MATH-FUNC-TABLE)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `ABS` | Absolute value | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `CEIL` | Nearest integer greater than or equal to argument | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `DEGREES` | Converts radians to degrees | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `EXP` | Exponential (`e` raised to the given power) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `FLOOR` | Nearest integer less than or equal to argument | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `LN` | Natural logarithm | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `LOG` | Base 10 logarithm | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `LOG10` | Base 10 logarithm (same as `LOG`) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `PI` | Approximate value of `π` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `POWER` | `a` raised to the power of `b` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `RADIANS` | Converts degrees to radians | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `ROUND` | Rounds `v` to `s` decimal places | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `SIGN` | Sign of the argument (`-1`, `0`, or `+1`) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `SQRT` | Square root | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `TRUNC` | Truncates to integer (towards zero) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+
+### Trigonometric functions
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-math.html#FUNCTIONS-MATH-TRIG-TABLE)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `ACOS` | Inverse cosine, result in radians | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `ASIN` | Inverse sine, result in radians | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `ATAN` | Inverse tangent, result in radians | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `ATAN2` | Inverse tangent of `y/x`, result in radians | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `COS` | Cosine, argument in radians | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `COT` | Cotangent, argument in radians | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `SIN` | Sine, argument in radians | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `TAN` | Tangent, argument in radians | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### String functions and operators
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-string.html#FUNCTIONS-STRING-SQL)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `\|\|` | Concatenates two strings | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `BTRIM` | Removes the longest string containing only characters in `characters` from the start and end of `string` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `BIT_LENGTH` | Returns number of bits in the string (8 times the `OCTET_LENGTH`) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `CHAR_LENGTH` or `CHARACTER_LENGTH` | Returns number of characters in the string | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `LOWER` | Converts the string to all lower case | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `LTRIM` | Removes the longest string containing only characters in `characters` from the start of `string` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `OCTET_LENGTH` | Returns number of bytes in the string | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `POSITION` | Returns first starting index of the specified `substring` within `string`, or zero if it's not present | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `RTRIM` | Removes the longest string containing only characters in `characters` from the end of `string` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `SUBSTRING` | Extracts the substring of `string` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `TRIM` | Removes the longest string containing only characters in `characters` from the start, end, or both ends of string | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `UPPER` | Converts the string to all upper case | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+
+### Other string functions
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-string.html#FUNCTIONS-STRING-OTHER)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `ASCII` | Returns the numeric code of the first character of the argument | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `CONCAT` | Concatenates the text representations of all the arguments | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `LEFT` | Returns first `n` characters in the string, or when `n` is negative, returns all but last `ABS(n)` characters | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `REPEAT` | Repeats string the specified number of times | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `REPLACE` | Replaces all occurrences in `string` of substring `from` with substring `to` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `RIGHT` | Returns last `n` characters in the string, or when `n` is negative, returns all but first `ABS(n)` characters | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `STARTS_WITH` | Returns `TRUE` if string starts with prefix | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+
+### Pattern matching
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-matching.html)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `LIKE` | Returns `TRUE` if the string matches the supplied pattern | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `REGEXP_SUBSTR` | Returns the substring that matches a POSIX regular expression pattern | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### Data type formatting functions
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-formatting.html)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `TO_CHAR` | Converts a timestamp to string according to the given format | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### Date/time functions
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-TABLE)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `DATE_ADD` | Add an interval to a timestamp with time zone | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `DATE_TRUNC` | Truncate a timestamp to specified precision | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `DATEDIFF` | From [Redshift](https://docs.aws.amazon.com/redshift/latest/dg/r_DATEDIFF_function.html). Returns the difference between the date parts of two date or time expressions | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `EXTRACT` | Retrieves subfields such as year or hour from date/time values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `LOCALTIMESTAMP` | Returns the current date and time **without** time zone | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `NOW` | Returns the current date and time **with** time zone | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### Conditional expressions
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-conditional.html)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function, expression | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `CASE` | Generic conditional expression | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `COALESCE` | Returns the first of its arguments that is not `NULL` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `NULLIF` | Returns `NULL` if both arguments are equal, otherwise returns the first argument | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `GREATEST` | Select the largest value from a list of expressions | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `LEAST` | Select the smallest value from a list of expressions | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### General-purpose aggregate functions
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-aggregate.html#FUNCTIONS-AGGREGATE-TABLE)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `AVG` | Computes the average (arithmetic mean) of all the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `COUNT` | Computes the number of input rows in which the input value is not `NULL` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `COUNT(DISTINCT)` | Computes the number of input rows containing unique input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `MAX` | Computes the maximum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `MIN` | Computes the minimum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `SUM` | Computes the sum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `MEASURE` | Works with measures of [any type][ref-sql-api-aggregate-functions] | ✅ Yes | <nobr>❌ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+In projections in inner parts of post-processing queries:
+* `AVG`, `COUNT`, `MAX`, `MIN`, and `SUM` can only be used with measures of
+[compatible types][ref-sql-api-aggregate-functions].
+* If `COUNT(*)` is specified, Cube will query the **first** measure of type `count`
+of the relevant cube.
+
+### Aggregate functions for statistics
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-aggregate.html#FUNCTIONS-AGGREGATE-STATISTICS-TABLE)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `COVAR_POP` | Computes the population covariance | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `COVAR_SAMP` | Computes the sample covariance | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `STDDEV_POP` | Computes the population standard deviation of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `STDDEV_SAMP` | Computes the sample standard deviation of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `VAR_POP` | Computes the population variance of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `VAR_SAMP` | Computes the sample variance of the input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### Row and array comparisons
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-comparisons.html)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `IN` | Returns `TRUE` if a left-side value matches **any** of right-side values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `NOT IN` | Returns `TRUE` if a left-side value matches **none** of right-side values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+### Custom functions
+
+| Function | Description |
+| --- | --- |
+| `XIRR` | Calculates the [internal rate of return][link-xirr] for a series of cash flows |
+
+<ReferenceBox>
+
+See the [XIRR recipe](/product/data-modeling/recipes/xirr) for more details.
+
+</ReferenceBox>
+
+
+[ref-qpd]: /product/apis-integrations/sql-api/query-format#query-pushdown
+[ref-qpp]: /product/apis-integrations/sql-api/query-format#query-post-processing
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-sql-api-aggregate-functions]: /product/apis-integrations/sql-api/query-format#aggregate-functions
+[link-postgres-funcs]: https://www.postgresql.org/docs/current/functions.html
+[link-github-sql-api]: https://github.com/cube-js/cube/issues?q=is%3Aopen+is%3Aissue+label%3Aapi%3Asql
+[link-github-new-sql-api-issue]: https://github.com/cube-js/cube/issues/new?assignees=&labels=&projects=&template=sql_api_query_issue.md&title=
+[link-xirr]: https://support.microsoft.com/en-us/office/xirr-function-de1242ec-6477-445b-b11b-a303ad9adc9d

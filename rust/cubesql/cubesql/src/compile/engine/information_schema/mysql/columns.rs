@@ -16,7 +16,7 @@ use datafusion::{
 use crate::transport::{CubeColumn, MetaContext, V1CubeMetaExt};
 
 use super::{ext::CubeColumnMySqlExt, utils::new_string_array_with_placeholder};
-use crate::compile::engine::provider::TableName;
+use crate::compile::engine::context::TableName;
 
 struct InformationSchemaColumnsBuilder {
     catalog_names: StringBuilder,

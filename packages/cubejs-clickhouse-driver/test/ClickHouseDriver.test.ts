@@ -1,18 +1,24 @@
-import { GenericContainer } from 'testcontainers';
+import { ClickhouseDBRunner } from '@cubejs-backend/testing-shared';
+import { streamToArray } from '@cubejs-backend/shared';
 
-import { ClickHouseDriver } from '../src/ClickHouseDriver';
-
-const streamToArray = require('stream-to-array');
+import { ClickHouseDriver } from '../src';
+import type { ClickHouseDriverOptions } from '../src';
 
 describe('ClickHouseDriver', () => {
+  jest.setTimeout(20 * 1000);
+
   let container: any;
-  let config: any;
+  let config: ClickHouseDriverOptions;
 
   const doWithDriver = async (cb: (driver: ClickHouseDriver) => Promise<any>) => {
     const driver = new ClickHouseDriver(config);
 
     try {
       await cb(driver);
+    } catch (e) {
+      const newError = new Error('doWithDriver failed', { cause: e });
+      console.log(newError);
+      throw newError;
     } finally {
       await driver.release();
     }
@@ -20,13 +26,7 @@ describe('ClickHouseDriver', () => {
 
   // eslint-disable-next-line func-names
   beforeAll(async () => {
-    jest.setTimeout(20 * 1000);
-
-    const version = process.env.TEST_CLICKHOUSE_VERSION || 'latest';
-
-    container = await new GenericContainer(`yandex/clickhouse-server:${version}`)
-      .withExposedPorts(8123)
-      .start();
+    container = await ClickhouseDBRunner.startContainer({});
 
     config = {
       host: 'localhost',
@@ -35,13 +35,14 @@ describe('ClickHouseDriver', () => {
 
     await doWithDriver(async (driver) => {
       await driver.createSchemaIfNotExists('test');
-      // Unsupported in old servers
-      // datetime64 DateTime64,
-      await driver.query(
+      await driver.command(
         `
             CREATE TABLE test.types_test (
               date Date,
               datetime DateTime,
+              datetime64_millis DateTime64(3, 'UTC'),
+              datetime64_micros DateTime64(6, 'UTC'),
+              datetime64_nanos DateTime64(9, 'UTC'),
               int8 Int8,
               int16 Int16,
               int32 Int32,
@@ -54,36 +55,37 @@ describe('ClickHouseDriver', () => {
               float64 Nullable(Float64),
               decimal32 Decimal32(2),
               decimal64 Decimal64(2),
-              decimal128 Decimal128(2)
+              decimal128 Decimal128(2),
+              enum8 Enum('hello' = 1, 'world' = 2),
+              enum16 Enum('hello' = 1, 'world' = 1000)
             ) ENGINE Log
-        `,
-        []
+        `
       );
 
-      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
-        '2020-01-01', '2020-01-01 00:00:00', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.01, 1.01, 1.01
+      await driver.insert('test.types_test', [
+        ['2020-01-01', '2020-01-01 00:00:00', '2020-01-01 00:00:00.000', '2020-01-01 00:00:00.000000', '2020-01-01 00:00:00.000000000', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.01, 1.01, 1.01, 'hello', 'world']
       ]);
-      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
-        '2020-01-02', '2020-01-02 00:00:00', 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2.02, 2.02, 2.02
+      await driver.insert('test.types_test', [
+        ['2020-01-02', '2020-01-02 00:00:00', '2020-01-02 00:00:00.123', '2020-01-02 00:00:00.123456', '2020-01-02 00:00:00.123456789', 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2.02, 2.02, 2.02, 'hello', 'world']
       ]);
-      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
-        '2020-01-03', '2020-01-03 00:00:00', 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.03, 3.03, 3.03
+      await driver.insert('test.types_test', [
+        ['2020-01-03', '2020-01-03 00:00:00', '2020-01-03 00:00:00.234', '2020-01-03 00:00:00.234567', '2020-01-03 00:00:00.234567890', 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.03, 3.03, 3.03, 'hello', 'world']
       ]);
     });
-  });
+  }, 30 * 1000);
 
   // eslint-disable-next-line func-names
   afterAll(async () => {
     jest.setTimeout(10 * 1000);
 
     await doWithDriver(async (driver) => {
-      await driver.query('DROP DATABASE test', []);
+      await driver.command('DROP DATABASE test');
     });
 
     if (container) {
       await container.stop();
     }
-  });
+  }, 30 * 1000);
 
   it('should construct', async () => {
     await doWithDriver(async () => {
@@ -149,7 +151,7 @@ describe('ClickHouseDriver', () => {
       try {
         await driver.createSchemaIfNotExists(name);
       } finally {
-        await driver.query(`DROP DATABASE ${name}`, []);
+        await driver.command(`DROP DATABASE ${name}`);
       }
     });
   });
@@ -160,8 +162,9 @@ describe('ClickHouseDriver', () => {
       expect(values).toEqual([{
         date: '2020-01-01T00:00:00.000',
         datetime: '2020-01-01T00:00:00.000',
-        // Unsupported in old servers
-        // datetime64: '2020-01-01T00:00:00.00.000',
+        datetime64_millis: '2020-01-01T00:00:00.000',
+        datetime64_micros: '2020-01-01T00:00:00.000',
+        datetime64_nanos: '2020-01-01T00:00:00.000',
         int8: '1',
         int16: '1',
         int32: '1',
@@ -174,7 +177,9 @@ describe('ClickHouseDriver', () => {
         float64: '1',
         decimal32: '1.01',
         decimal64: '1.01',
-        decimal128: '1.01'
+        decimal128: '1.01',
+        enum8: 'hello',
+        enum16: 'world',
       }]);
     });
   });
@@ -184,8 +189,8 @@ describe('ClickHouseDriver', () => {
       const name = `temp_${Date.now()}`;
       try {
         await driver.createSchemaIfNotExists(name);
-        await driver.query(`CREATE TABLE ${name}.a (dateTime DateTime, date Date) ENGINE Log`, []);
-        await driver.query(`INSERT INTO ${name}.a VALUES ('2019-04-30 11:55:00', '2019-04-30')`, []);
+        await driver.command(`CREATE TABLE ${name}.a (dateTime DateTime, date Date) ENGINE Log`);
+        await driver.insert(`${name}.a`, [['2019-04-30 11:55:00', '2019-04-30']]);
 
         const values = await driver.query(`SELECT * FROM ${name}.a`, []);
         expect(values).toEqual([{
@@ -193,7 +198,7 @@ describe('ClickHouseDriver', () => {
           date: '2019-04-30T00:00:00.000',
         }]);
       } finally {
-        await driver.query(`DROP DATABASE ${name}`, []);
+        await driver.command(`DROP DATABASE ${name}`);
       }
     });
   });
@@ -203,12 +208,12 @@ describe('ClickHouseDriver', () => {
       const name = `temp_${Date.now()}`;
       try {
         await driver.createSchemaIfNotExists(name);
-        await driver.query(`CREATE TABLE ${name}.test (x Int32, s String) ENGINE Log`, []);
-        await driver.query(`INSERT INTO ${name}.test VALUES (?, ?), (?, ?), (?, ?)`, [1, 'str1', 2, 'str2', 3, 'str3']);
+        await driver.command(`CREATE TABLE ${name}.test (x Int32, s String) ENGINE Log`);
+        await driver.insert(`${name}.test`, [[1, 'str1'], [2, 'str2'], [3, 'str3']]);
         const values = await driver.query(`SELECT * FROM ${name}.test WHERE x = ?`, [2]);
         expect(values).toEqual([{ x: '2', s: 'str2' }]);
       } finally {
-        await driver.query(`DROP DATABASE ${name}`, []);
+        await driver.command(`DROP DATABASE ${name}`);
       }
     });
   });
@@ -218,11 +223,11 @@ describe('ClickHouseDriver', () => {
       const name = `temp_${Date.now()}`;
       try {
         await driver.createSchemaIfNotExists(name);
-        await driver.query(`CREATE TABLE ${name}.a (x Int32, s String) ENGINE Log`, []);
-        await driver.query(`INSERT INTO ${name}.a VALUES (?, ?), (?, ?), (?, ?)`, [1, 'str1', 2, 'str2', 3, 'str3']);
+        await driver.command(`CREATE TABLE ${name}.a (x Int32, s String) ENGINE Log`);
+        await driver.insert(`${name}.a`, [[1, 'str1'], [2, 'str2'], [3, 'str3']]);
 
-        await driver.query(`CREATE TABLE ${name}.b (x Int32, s String) ENGINE Log`, []);
-        await driver.query(`INSERT INTO ${name}.b VALUES (?, ?), (?, ?), (?, ?)`, [2, 'str2', 3, 'str3', 4, 'str4']);
+        await driver.command(`CREATE TABLE ${name}.b (x Int32, s String) ENGINE Log`);
+        await driver.insert(`${name}.b`, [[2, 'str2'], [3, 'str3'], [4, 'str4']]);
 
         const values = await driver.query(`SELECT * FROM ${name}.a LEFT OUTER JOIN ${name}.b ON a.x = b.x`, []);
         expect(values).toEqual([
@@ -237,8 +242,42 @@ describe('ClickHouseDriver', () => {
           }
         ]);
       } finally {
-        await driver.query(`DROP DATABASE ${name}`, []);
+        await driver.command(`DROP DATABASE ${name}`);
       }
+    });
+  });
+
+  it('datetime with specific timezone', async () => {
+    await doWithDriver(async (driver) => {
+      const rows = await driver.query('SELECT toDateTime(?, \'Asia/Istanbul\') as dt', [
+        '2020-01-01 00:00:00'
+      ]);
+      expect(rows).toEqual([{
+        dt: '2020-01-01T00:00:00.000'
+      }]);
+    });
+  });
+
+  it('query types_test', async () => {
+    await doWithDriver(async (driver) => {
+      const tableData = await driver.query('SELECT date, datetime, datetime64_micros FROM test.types_test ORDER BY int8', []);
+      expect(tableData).toEqual([
+        {
+          date: '2020-01-01T00:00:00.000',
+          datetime: '2020-01-01T00:00:00.000',
+          datetime64_micros: '2020-01-01T00:00:00.000',
+        },
+        {
+          date: '2020-01-02T00:00:00.000',
+          datetime: '2020-01-02T00:00:00.000',
+          datetime64_micros: '2020-01-02T00:00:00.123',
+        },
+        {
+          date: '2020-01-03T00:00:00.000',
+          datetime: '2020-01-03T00:00:00.000',
+          datetime64_micros: '2020-01-03T00:00:00.234',
+        }
+      ]);
     });
   });
 
@@ -252,8 +291,9 @@ describe('ClickHouseDriver', () => {
         expect(tableData.types).toEqual([
           { name: 'date', type: 'date' },
           { name: 'datetime', type: 'timestamp' },
-          // Unsupported in old servers
-          // { name: 'datetime64', type: 'timestamp' },
+          { name: 'datetime64_millis', type: 'timestamp' },
+          { name: 'datetime64_micros', type: 'timestamp' },
+          { name: 'datetime64_nanos', type: 'timestamp' },
           { name: 'int8', type: 'int' },
           { name: 'int16', type: 'int' },
           { name: 'int32', type: 'int' },
@@ -267,11 +307,13 @@ describe('ClickHouseDriver', () => {
           { name: 'decimal32', type: 'decimal' },
           { name: 'decimal64', type: 'decimal' },
           { name: 'decimal128', type: 'decimal' },
+          { name: 'enum8', type: 'text' },
+          { name: 'enum16', type: 'text' },
         ]);
-        expect(await streamToArray(tableData.rowStream)).toEqual([
-          ['2020-01-01T00:00:00.000', '2020-01-01T00:00:00.000', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1.01', '1.01', '1.01'],
-          ['2020-01-02T00:00:00.000', '2020-01-02T00:00:00.000', '2', '2', '2', '2', '2', '2', '2', '2', '2', '2', '2.02', '2.02', '2.02'],
-          ['2020-01-03T00:00:00.000', '2020-01-03T00:00:00.000', '3', '3', '3', '3', '3', '3', '3', '3', '3', '3', '3.03', '3.03', '3.03'],
+        expect(await streamToArray(tableData.rowStream as any)).toEqual([
+          { date: '2020-01-01T00:00:00.000', datetime: '2020-01-01T00:00:00.000', datetime64_millis: '2020-01-01T00:00:00.000', datetime64_micros: '2020-01-01T00:00:00.000', datetime64_nanos: '2020-01-01T00:00:00.000', int8: '1', int16: '1', int32: '1', int64: '1', uint8: '1', uint16: '1', uint32: '1', uint64: '1', float32: '1', float64: '1', decimal32: '1.01', decimal64: '1.01', decimal128: '1.01', enum8: 'hello', enum16: 'world' },
+          { date: '2020-01-02T00:00:00.000', datetime: '2020-01-02T00:00:00.000', datetime64_millis: '2020-01-02T00:00:00.123', datetime64_micros: '2020-01-02T00:00:00.123', datetime64_nanos: '2020-01-02T00:00:00.123', int8: '2', int16: '2', int32: '2', int64: '2', uint8: '2', uint16: '2', uint32: '2', uint64: '2', float32: '2', float64: '2', decimal32: '2.02', decimal64: '2.02', decimal128: '2.02', enum8: 'hello', enum16: 'world' },
+          { date: '2020-01-03T00:00:00.000', datetime: '2020-01-03T00:00:00.000', datetime64_millis: '2020-01-03T00:00:00.234', datetime64_micros: '2020-01-03T00:00:00.234', datetime64_nanos: '2020-01-03T00:00:00.234', int8: '3', int16: '3', int32: '3', int64: '3', uint8: '3', uint16: '3', uint32: '3', uint64: '3', float32: '3', float64: '3', decimal32: '3.03', decimal64: '3.03', decimal128: '3.03', enum8: 'hello', enum16: 'world' },
         ]);
       } finally {
         // @ts-ignore

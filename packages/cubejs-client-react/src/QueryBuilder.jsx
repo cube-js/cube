@@ -33,7 +33,7 @@ export default class QueryBuilder extends React.Component {
   static contextType = CubeContext;
 
   static defaultProps = {
-    cubejsApi: null,
+    cubeApi: null,
     stateChangeHeuristics: null,
     disableHeuristics: false,
     render: null,
@@ -136,14 +136,14 @@ export default class QueryBuilder extends React.Component {
     const { schemaVersion, onSchemaChange } = this.props;
     const { meta } = this.state;
 
-    if (this.prevContext?.cubejsApi !== this.context?.cubejsApi) {
+    if (this.prevContext?.cubeApi !== this.context?.cubeApi) {
       this.prevContext = this.context;
       await this.fetchMeta();
     }
 
     if (prevProps.schemaVersion !== schemaVersion) {
       try {
-        const newMeta = await this.cubejsApi().meta();
+        const newMeta = await this.cubeApi().meta();
         if (!equals(newMeta, meta) && typeof onSchemaChange === 'function') {
           onSchemaChange({
             schemaVersion,
@@ -160,7 +160,7 @@ export default class QueryBuilder extends React.Component {
   }
 
   fetchMeta = async () => {
-    if (!this.cubejsApi()) {
+    if (!this.cubeApi()) {
       return;
     }
 
@@ -171,7 +171,7 @@ export default class QueryBuilder extends React.Component {
 
     try {
       this.setState({ isFetchingMeta: true });
-      meta = await this.cubejsApi().meta();
+      meta = await this.cubeApi().meta();
     } catch (error) {
       metaError = error.response?.plainError || error;
       richMetaError = error;
@@ -194,10 +194,10 @@ export default class QueryBuilder extends React.Component {
     );
   };
 
-  cubejsApi() {
-    const { cubejsApi } = this.props;
+  cubeApi() {
+    const { cubeApi } = this.props;
     // eslint-disable-next-line react/destructuring-assignment
-    return cubejsApi || (this.context && this.context.cubejsApi);
+    return cubeApi || (this.context && this.context.cubeApi);
   }
 
   getMissingMembers(query, meta) {
@@ -522,7 +522,7 @@ export default class QueryBuilder extends React.Component {
 
     if (shouldFetchDryRun && isQueryPresent(finalState.query) && finalState.missingMembers.length === 0) {
       try {
-        const response = await this.cubejsApi().dryRun(finalState.query, {
+        const response = await this.cubeApi().dryRun(finalState.query, {
           mutexObj: this.mutexObj,
         });
 
@@ -577,13 +577,13 @@ export default class QueryBuilder extends React.Component {
 
   render() {
     const { query } = this.state;
-    const { cubejsApi, render, wrapWithQueryRenderer } = this.props;
+    const { cubeApi, render, wrapWithQueryRenderer } = this.props;
 
     if (wrapWithQueryRenderer) {
       return (
         <QueryRenderer
           query={query}
-          cubejsApi={cubejsApi}
+          cubeApi={cubeApi}
           resetResultSetOnChange={false}
           render={(queryRendererProps) => {
             if (render) {

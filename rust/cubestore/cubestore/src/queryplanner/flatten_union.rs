@@ -63,20 +63,20 @@ fn try_remove_sub_union(
     parent_inputs: &Vec<LogicalPlan>,
     parent_schema: Arc<DFSchema>,
 ) -> Vec<LogicalPlan> {
-    let mut may_be_result = Vec::new();
+    let mut result = Vec::new();
     for inp in parent_inputs.iter() {
         match inp {
             LogicalPlan::Union { inputs, schema, .. } => {
                 if schema.to_schema_ref() == parent_schema.to_schema_ref() {
-                    may_be_result.extend(inputs.iter().cloned());
+                    result.extend(inputs.iter().cloned());
                 } else {
                     return parent_inputs.clone();
                 }
             }
             _ => {
-                return parent_inputs.clone();
+                result.push(inp.clone());
             }
         }
     }
-    return may_be_result;
+    return result;
 }

@@ -1,6 +1,6 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import dotenv from '@cubejs-backend/dotenv';
-import { CubePreAggregationConverter, CubeSchemaConverter, ScaffoldingTemplate, SchemaFormat, YamlSchemaFormatter } from '@cubejs-backend/schema-compiler';
+import { CubePreAggregationConverter, CubeSchemaConverter, ScaffoldingTemplate, SchemaFormat } from '@cubejs-backend/schema-compiler';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
@@ -11,7 +11,7 @@ import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
 import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
-import { executeCommand, getEnv, keyByDataSource, packageExists } from '@cubejs-backend/shared';
+import { executeCommand, getAnonymousId, getEnv, keyByDataSource, packageExists } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
@@ -77,9 +77,35 @@ export class DevServer {
       try {
         await handler(req, res, next);
       } catch (e) {
-        console.error(((e as Error).stack || e).toString());
-        this.cubejsServer.event('Dev Server Error', { error: ((e as Error).stack || e).toString() });
-        res.status(500).json({ error: ((e as Error).stack || e).toString() });
+        const errorString = ((e as Error).stack || e).toString();
+        console.error(errorString);
+        this.cubejsServer.event('Dev Server Error', { error: errorString });
+
+        // We don't know what state response is left at here:
+        // It could be corked, headers could be sent, body could be sent completely or partially
+
+        // Also, because we pass `next` to handler without any wrapper we don't know if it was called or not
+        // Hence, we shouldn't call it for error handling
+
+        try {
+          while (res.writableCorked > 0) {
+            res.uncork();
+          }
+
+          if (res.writableEnded) {
+            // There's nothing we can do for response, error happened after call to end()
+          } else if (res.headersSent) {
+            // If header is already sent, we can't alter any of it, so best we can do is just terminate body
+            res.end();
+          } else {
+            res.status(500).json({ error: errorString });
+          }
+        } catch (send500Error) {
+          const send500ErrorString = ((send500Error as Error).stack || send500Error).toString();
+          console.error(send500ErrorString);
+          this.cubejsServer.event('Dev Server Error', { error: send500ErrorString });
+          res.destroy(send500Error);
+        }
       }
     };
 
@@ -89,7 +115,7 @@ export class DevServer {
       res.json({
         cubejsToken,
         basePath: options.basePath,
-        anonymousId: this.cubejsServer.anonymousId,
+        anonymousId: getAnonymousId(),
         coreServerVersion: this.cubejsServer.coreServerVersion,
         dockerVersion: this.options.dockerVersion || null,
         projectFingerprint: this.cubejsServer.projectFingerprint,
@@ -113,6 +139,7 @@ export class DevServer {
       });
 
       const tablesSchema = await driver.tablesSchema();
+
       this.cubejsServer.event('Dev Server DB Schema Load Success');
       if (Object.keys(tablesSchema || {}).length === 0) {
         this.cubejsServer.event('Dev Server DB Schema Load Empty');
@@ -154,13 +181,47 @@ export class DevServer {
       if (!Object.values(SchemaFormat).includes(req.body.format)) {
         throw new Error(`Unknown schema format. Must be one of ${Object.values(SchemaFormat)}`);
       }
-      
-      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver, req.body.format);
+
+      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver, {
+        format: req.body.format,
+        snakeCase: true
+      });
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 
-      const schemaPath = options.schemaPath || 'schema';
+      await fs.emptyDir(path.join(options.schemaPath, 'cubes'));
+      await fs.emptyDir(path.join(options.schemaPath, 'views'));
 
-      await Promise.all(files.map(file => fs.writeFile(path.join(schemaPath, file.fileName), file.content)));
+      await fs.writeFile(path.join(options.schemaPath, 'views', 'example_view.yml'), `# In Cube, views are used to expose slices of your data graph and act as data marts.
+# You can control which measures and dimensions are exposed to BIs or data apps,
+# as well as the direction of joins between the exposed cubes.
+# You can learn more about views in documentation here - https://cube.dev/docs/schema/reference/view
+
+
+# The following example shows a view defined on top of orders and customers cubes.
+# Both orders and customers cubes are exposed using the "includes" parameter to
+# control which measures and dimensions are exposed.
+# Prefixes can also be applied when exposing measures or dimensions.
+# In this case, the customers' city dimension is prefixed with the cube name,
+# resulting in "customers_city" when querying the view.
+
+# views:
+#   - name: example_view
+#
+#     cubes:
+#       - join_path: orders
+#         includes:
+#           - status
+#           - created_date
+#
+#           - total_amount
+#           - count
+#
+#       - join_path: orders.customers
+#         prefix: true
+#         includes:
+#           - city`);
+      await Promise.all(files.map(file => fs.writeFile(path.join(options.schemaPath, 'cubes', file.fileName), file.content)));
+
       res.json({ files });
     }));
 
@@ -496,12 +557,21 @@ export class DevServer {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
 
+      let envs: Record<string, string> = {};
+      const envPath = path.join(process.cwd(), '.env');
+      if (fs.existsSync(envPath)) {
+        envs = dotenv.parse(fs.readFileSync(envPath));
+      }
+
+      const schemaPath = envs.CUBEJS_SCHEMA_PATH || process.env.CUBEJS_SCHEMA_PATH || 'model';
+
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
+      variables.CUBEJS_SCHEMA_PATH = schemaPath;
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
-      const repositoryPath = path.join(process.cwd(), options.schemaPath);
+      const repositoryPath = path.join(process.cwd(), schemaPath);
 
       if (!fs.existsSync(repositoryPath)) {
         fs.mkdirSync(repositoryPath);
@@ -541,6 +611,12 @@ export class DevServer {
     app.post('/playground/schema/pre-aggregation', catchErrors(async (req: Request, res: Response) => {
       const { cubeName, preAggregationName, code } = req.body;
 
+      /**
+       * Important note:
+       * JS code for pre-agg includes the content of the pre-aggregation object
+       * without name, which is passed as preAggregationName.
+       * While yaml code for pre-agg includes whole yaml object including name.
+       */
       const schemaConverter = new CubeSchemaConverter(this.cubejsServer.repository, [
         new CubePreAggregationConverter({
           cubeName,
@@ -550,18 +626,21 @@ export class DevServer {
       ]);
 
       try {
-        await schemaConverter.generate();
+        await schemaConverter.generate(cubeName);
       } catch (error) {
-        res.status(400).json({ error: (error as Error).message || error });
+        return res.status(400).json({ error: (error as Error).message || error });
       }
 
-      schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
-        if (currentCubeName === cubeName) {
-          this.cubejsServer.repository.writeDataSchemaFile(fileName, source);
-        }
-      });
+      const file = schemaConverter.getSourceFiles().find(
+        ({ cubeName: currentCubeName }) => currentCubeName === cubeName
+      );
 
-      res.json('ok');
+      if (!file) {
+        return res.status(400).json({ error: `The schema file for "${cubeName}" cube was not found or could not be updated. Only JS and non-templated YAML files are supported.` });
+      }
+
+      this.cubejsServer.repository.writeDataSchemaFile(file.fileName, file.source);
+      return res.json('ok');
     }));
   }
 

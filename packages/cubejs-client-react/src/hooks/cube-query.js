@@ -9,7 +9,7 @@ export function useCubeQuery(query, options = {}) {
   const mutexRef = useRef({});
   const isMounted = useIsMounted();
   const [currentQuery, setCurrentQuery] = useState(null);
-  const [isLoading, setLoading] = useState(false);
+  const [isLoading, setLoading] = useState(!options.skip);
   const [resultSet, setResultSet] = useState(null);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState(null);
@@ -21,10 +21,10 @@ export function useCubeQuery(query, options = {}) {
 
   async function fetch() {
     const { resetResultSetOnChange } = options;
-    const cubejsApi = options.cubejsApi || context?.cubejsApi;
+    const cubeApi = options.cubeApi || context?.cubeApi;
 
-    if (!cubejsApi) {
-      throw new Error('Cube.js API client is not provided');
+    if (!cubeApi) {
+      throw new Error('Cube API client is not provided');
     }
 
     if (resetResultSetOnChange) {
@@ -35,10 +35,11 @@ export function useCubeQuery(query, options = {}) {
     setLoading(true);
 
     try {
-      const response = await cubejsApi.load(query, {
+      const response = await cubeApi.load(query, {
         mutexObj: mutexRef.current,
         mutexKey: 'query',
         progressCallback,
+        castNumerics: Boolean(typeof options.castNumerics === 'boolean' ? options.castNumerics : context?.options?.castNumerics)
       });
 
       if (isMounted()) {
@@ -61,10 +62,10 @@ export function useCubeQuery(query, options = {}) {
   useEffect(() => {
     const { skip = false, resetResultSetOnChange } = options;
 
-    const cubejsApi = options.cubejsApi || context?.cubejsApi;
+    const cubeApi = options.cubeApi || context?.cubeApi;
 
-    if (!cubejsApi) {
-      throw new Error('Cube.js API client is not provided');
+    if (!cubeApi) {
+      throw new Error('Cube API client is not provided');
     }
 
     async function loadQuery() {
@@ -86,7 +87,7 @@ export function useCubeQuery(query, options = {}) {
           }
 
           if (options.subscribe) {
-            subscribeRequest = cubejsApi.subscribe(
+            subscribeRequest = cubeApi.subscribe(
               query,
               {
                 mutexObj: mutexRef.current,

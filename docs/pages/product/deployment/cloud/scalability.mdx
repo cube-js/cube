@@ -1,0 +1,55 @@
+# Scalability
+
+Cube Cloud also allows adding additional infrastructure to your deployment to
+increase scalability and performance beyond what is available with each
+Production Deployment.
+
+## Auto-scaling of API instances
+
+With a Production Cluster, 2 Cube API Instances are included. That said, it
+is very common to use more, and [additional API instances][ref-limits] can be
+added to your deployment to increase the throughput of your queries. A rough
+estimate is that 1 Cube API Instance is needed for every 5-10
+requests-per-second served. Cube API Instances can also auto-scale as needed.
+
+To change how many Cube API instances are available in the Production Cluster,
+go to the deployment’s <Btn>Settings</Btn> screen, and open
+the <Btn>Configuration</Btn> tab. From this screen, you can set the minimum and
+maximum number of Cube API instances for a deployment:
+
+<Screenshot
+  alt="Cube Cloud Deployment Settings page showing auto-scaling configuration options"
+  src="https://ucarecdn.com/3b39c56f-d553-4612-b4f0-07084cc4b742/"
+/>
+
+## Sizing Cube Store workers
+
+Cube Store Workers are used to build and persist pre-aggregations. Each Worker
+has a **maximum of 150GB** of storage; [additional Cube Store
+workers][ref-limits] can be added to your deployment to both increase storage
+space and improve pre-aggregation performance. A **minimum of 2** Cube Store
+Workers is required for pre-aggregations; this can be adjusted. For a rough
+estimate, it will take approximately 2 Cube Store Workers per 4 GB of
+pre-aggregated data per day.
+
+<InfoBox>
+
+Idle workers will automatically hibernate after 10 minutes of inactivity, and
+will not consume CCUs until they are resumed. Workers are resumed automatically
+when Cube receives a query that should be accelerated by a pre-aggregation, or
+when a scheduled refresh is triggered.
+
+</InfoBox>
+
+To change the number of Cube Store Workers in a deployment, go to the
+deployment’s <Btn>Settings</Btn> screen, and open the <Btn>Configuration</Btn>
+tab. From this screen, you can set the number of Cube Store Workers from the
+dropdown:
+
+<Screenshot
+  alt="Cube Cloud Deployment Settings page showing auto-scaling configuration options"
+  src="https://ucarecdn.com/3b39c56f-d553-4612-b4f0-07084cc4b742/"
+/>
+
+
+[ref-limits]: /product/deployment/cloud/limits#resources

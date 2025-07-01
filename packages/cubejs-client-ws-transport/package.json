@@ -1,14 +1,14 @@
 {
   "name": "@cubejs-client/ws-transport",
-  "version": "0.31.35",
+  "version": "1.3.28",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-ws-transport"
   },
   "description": "Cube.js WebSocket transport",
-  "main": "dist/cubejs-client-ws-transport.js",
+  "main": "dist/cubejs-client-ws-transport.cjs.js",
   "typings": "dist/index.d.ts",
   "author": "Cube Dev, Inc.",
   "scripts": {
@@ -20,13 +20,12 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "^0.31.35",
+    "@cubejs-client/core": "1.3.28",
     "core-js": "^3.6.5",
     "isomorphic-ws": "^4.0.1",
     "ws": "^7.3.1"
   },
   "files": [
-    "src",
     "dist"
   ],
   "license": "MIT",
@@ -34,11 +33,9 @@
     "@babel/core": "^7.3.3",
     "@babel/preset-env": "^7.3.1",
     "@babel/preset-typescript": "^7.12.1",
-    "@cubejs-backend/linter": "^0.31.0",
+    "@cubejs-backend/linter": "1.3.28",
     "@types/ws": "^7.2.9",
-    "babel-jest": "^26.6.3",
-    "jest": "^26.6.3",
-    "typescript": "~4.1.5"
+    "typescript": "~5.2.2"
   },
   "publishConfig": {
     "access": "public"

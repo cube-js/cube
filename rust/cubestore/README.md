@@ -2,7 +2,7 @@
 
 [Website](https://cube.dev) • [Docs](https://cube.dev/docs) •
 [Examples](#examples) • [Blog](https://cube.dev/blog) •
-[Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
+[Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Rust/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ARust+branch%3Amaster)
@@ -141,15 +141,31 @@ docker run --rm cubejs/cubestore:latest
 
 ## Development
 
-Check out https://github.com/cube-js/arrow/tree/cubestore-2020-11-06 and put
-**.cargo/config.toml** in the current directory with following contents:
+Debian prerequisites (incomplete): `apt-get install lld libssl-dev pkg-config cmake`
 
-```toml
-paths = ["../../arrow/rust"]
+When changing Datafusion or Arrow:
+
+Check out https://github.com/cube-js/arrow-rs/tree/cube and
+https://github.com/cube-js/arrow-datafusion/tree/cube and add the
+following to the current directory's `Cargo.toml`.  (But remember to
+exclude this from your PR!)
+
 ```
 
-It should point to checked out Apache Arrow fork and it'll allow you to build
-project against locally modified sources.
+[patch.'https://github.com/cube-js/arrow-rs']
+parquet = { path = "../../../arrow-rs/parquet" }
+arrow = { path = "../../../arrow-rs/arrow" }
+
+[patch.'https://github.com/cube-js/arrow-datafusion']
+datafusion = { path = "../../../arrow-datafusion/datafusion" }
+```
+
+Of course, you can use absolute paths or adjust the paths to your
+chosen checkout location.
+
+It is possible that uncommenting the arrow-datafusion
+`.cargo/config.toml` path line works for you too, but it might not, if
+you are making changes in arrow-rs.
 
 ## License
 

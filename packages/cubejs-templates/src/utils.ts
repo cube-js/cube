@@ -12,9 +12,11 @@ export async function fileContentsRecursive(dir: string, rootPath?: string, incl
   if (!rootPath) {
     rootPath = dir;
   }
+
   if (!fs.pathExistsSync(dir)) {
     return [];
   }
+
   if ((dir.includes('node_modules') && !includeNodeModules) || dir.includes('.git')) {
     return [];
   }

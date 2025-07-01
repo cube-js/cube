@@ -1,0 +1,154 @@
+# CLI command reference
+
+With this CLI utility, you can [create](#create) a barebones Cube app,
+[generate](#generate) a data model, [validate](#validate) it, or
+[generate](#token) a JSON web token.
+
+You can also use the CLI utility to [deploy](#deploy) your Cube application to
+Cube Cloud. This is one of supported ways of [continuous deployment][ref-ci].
+
+## `create`
+
+The `create` command generates a barebones Cube app.
+
+### Usage
+
+```bash
+npx cubejs-cli create APP-NAME -d DB-TYPE [-t TEMPLATE]
+```
+
+| Parameter                   | Description                                  | Values                                                                                                                  |
+| --------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `-d, --db-type <db-type>`   | Preconfigure Cube app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift`, `mssql`, `clickhouse`, `snowflake`, `presto`, `druid` |
+| `-t, --template <template>` | Framework running Cube backend.              | `docker` (default)                                                                                                      |
+
+### Example
+
+Create app called `demo-app` using default (`docker`) template and `mysql`
+database:
+
+```bash
+npx cubejs-cli create demo-app -d mysql
+```
+
+Create app called `demo-app` using `express` template and `mysql` database:
+
+```bash
+npx cubejs-cli create demo-app -t express -d mysql
+```
+
+## `generate`
+
+The `generate` command helps to build data models for existing database tables.
+You can only run `generate` from the Cube app directory. This command requires
+an active [database connection](/product/configuration/data-sources).
+
+### Usage
+
+```bash
+npx cubejs-cli generate -t TABLE-NAMES
+```
+
+| Parameter               | Description                                                 | Values                      |
+| ----------------------- | ----------------------------------------------------------- | --------------------------- |
+| `-t, --tables <tables>` | Comma delimited list of tables to generate data models for. | `TABLE-NAME-1,TABLE-NAME-2` |
+
+### Example
+
+Generate data model files for tables `orders` and `customers`:
+
+```bash
+npx cubejs-cli generate -t orders,customers
+```
+
+## `validate`
+
+The `validate` command checks models in a Cube project for validation errors.
+
+### Usage
+
+```bash
+npx cubejs-cli validate
+```
+
+### Example
+
+Example of a Cube project with models that fail validation:
+
+```bash
+npx cubejs-cli validate
+❌ Cube Data Model validation failed
+
+Cube Error ---------------------------------------
+
+Orders cube: "dimensions.id" does not match any of the allowed types
+Possible reasons (one of):
+  * (dimensions.id.case) is required
+  * (dimensions.id.latitude) is required
+  * (dimensions.id.sql) is required
+LineItems cube: Cube Orders doesn't exist
+
+Need some help? -------------------------------------
+
+  Ask this question in Cube Slack: https://slack.cube.dev
+  Post an issue: https://github.com/cube-js/cube/issues
+```
+
+## `token`
+
+The `token` command generates a JWT Cube token. It either uses the value of the
+`CUBEJS_API_SECRET` environment variable or provided value with `-s` flag. You
+can only run `token` command from the Cube app directory.
+
+_Use these manually generated tokens in production with caution._ <br/> _Please
+refer to the [Security Guide](/product/auth) for production security best
+practices._
+
+### Usage
+
+```bash
+npx cubejs-cli token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR
+```
+
+| Parameter              | Description                                                                   | Example                    |
+| ---------------------- | ----------------------------------------------------------------------------- | -------------------------- |
+| -e, --expiry           | Token expiry. Set to 0 for no expiry (default: "30 days")                     | `1 day`, `30 days`         |
+| -s, --secret           | Cube app secret. Also can be set via environment variable `CUBEJS_API_SECRET` | -                          |
+| -p, --payload          | Token Payload                                                                 | `foo=bar`, `userId=2`      |
+
+### Example
+
+Generate token with 1 day expiry and payload `{ 'appId': 1, 'userId': 2 }`:
+
+```bash
+npx cubejs-cli token -e "1 day" -p appId=1 -p userId=2
+```
+
+## `deploy`
+
+The `deploy` command uploads your Cube application to Cube Cloud. You can only
+run this command from the Cube app directory.
+
+### Usage
+
+```bash
+npx cubejs-cli deploy --replace-env --directory PATH --token TOKEN
+```
+
+| Parameter            | Required | Description                                    |
+| -------------------- | -------- | ---------------------------------------------- |
+| `--token <token>`    | ✅ Yes   | Authentication token for Cube Cloud            |
+| `--directory <path>` | ✅ Yes   | Path to the Cube application directory         |
+| `--upload-env`       | ❌ No    | Use `.env` file to populate environment variables in Cube Cloud. Only set them once during the very _first_ upload for this deployment |
+| `--replace-env`      | ❌ No    | Use `.env` file to populate environment variables in Cube Cloud. Replace them with new ones during _every_ upload for this deployment |
+
+### Example
+
+Upload a Cube application from the current directory to Cube Cloud and pass its
+`.env` file as well:
+
+```bash
+npx cubejs-cli deploy --upload-env --directory ./ --token 56e2636272ffc9cd8c19e9d1e9ffb52f
+```
+
+[ref-ci]: /product/deployment/cloud/continuous-deployment#deploy-with-cli

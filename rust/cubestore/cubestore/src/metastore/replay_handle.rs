@@ -1,6 +1,6 @@
 use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::metastore::table::Table;
-use crate::metastore::IdRow;
+use crate::metastore::{IdRow, RocksEntity};
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
@@ -19,6 +19,8 @@ pub struct ReplayHandle {
     has_failed_to_persist_chunks: bool
 }
 }
+
+impl RocksEntity for ReplayHandle {}
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct SeqPointer {

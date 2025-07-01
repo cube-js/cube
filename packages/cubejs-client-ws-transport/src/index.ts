@@ -1,15 +1,6 @@
 import WebSocket from 'isomorphic-ws';
 import type { ITransport, ITransportResponse } from '@cubejs-client/core';
 
-/**
- * @title @cubejs-client/ws-transport
- * @permalink /@cubejs-client-ws-transport
- * @menuCategory Cube.js Frontend
- * @subcategory Reference
- * @menuOrder 4
- * @description WebSocket transport for Cube.js client
- */
-
 class WebSocketTransportResult {
   protected readonly status: unknown;
 
@@ -91,6 +82,9 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
 
   public async close(): Promise<void> {
     if (this.ws) {
+      // Flush send queue before sending close frame
+      this.ws.sendQueue();
+
       this.ws.close();
     }
   }

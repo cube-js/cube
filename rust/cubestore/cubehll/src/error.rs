@@ -8,7 +8,7 @@ pub struct HllError {
 
 impl Display for HllError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.message)
+        write!(f, "HllError: {}", self.message)
     }
 }
 

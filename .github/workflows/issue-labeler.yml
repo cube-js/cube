@@ -6,9 +6,9 @@ on:
 jobs:
   main:
     name: Process Label Action
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Process Label Action
         uses: hramos/label-actions@v1
         with:
