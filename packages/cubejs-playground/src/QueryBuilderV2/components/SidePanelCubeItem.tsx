@@ -147,9 +147,7 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
   const [openHierarchies, setOpenHierarchies] = useState<string[]>([]);
 
   const folderMembers = folders.reduce((acc, folder) => {
-    // FIXME: Temporary marked folder members as strings
-    // It should be aware of recursive folders structure
-    return acc.concat(folder.members as string[]);
+    return acc.concat(folder.members);
   }, [] as string[]);
   const hierarchyMembers = hierarchies.reduce((acc, hierarchy) => {
     return acc.concat(hierarchy.levels);

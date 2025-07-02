@@ -1286,32 +1286,30 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
 
           const folderStats = stats.folders[folderName];
 
-          // FIXME: Temporary marked folder members as strings
-          // It should be aware of recursive folders structure
           folder.members.forEach((memberName) => {
-            if (stats.dimensions.includes(memberName as string)) {
-              if (!folderStats.dimensions.includes(memberName as string)) {
-                folderStats.dimensions.push(memberName as string);
+            if (stats.dimensions.includes(memberName)) {
+              if (!folderStats.dimensions.includes(memberName)) {
+                folderStats.dimensions.push(memberName);
               }
-            } else if (stats.measures.includes(memberName as string)) {
-              if (!folderStats.measures.includes(memberName as string)) {
-                folderStats.measures.push(memberName as string);
+            } else if (stats.measures.includes(memberName)) {
+              if (!folderStats.measures.includes(memberName)) {
+                folderStats.measures.push(memberName);
               }
-            } else if (stats.segments.includes(memberName as string)) {
-              if (!folderStats.segments.includes(memberName as string)) {
-                folderStats.segments.push(memberName as string);
+            } else if (stats.segments.includes(memberName)) {
+              if (!folderStats.segments.includes(memberName)) {
+                folderStats.segments.push(memberName);
               }
-            } else if (stats.hierarchies[memberName as string]) {
+            } else if (stats.hierarchies[memberName]) {
               // add all selected dimensions from the hierarchy
-              stats.hierarchies[memberName as string].forEach((levelMemberName) => {
+              stats.hierarchies[memberName].forEach((levelMemberName) => {
                 if (!folderStats.dimensions.includes(levelMemberName)) {
                   folderStats.dimensions.push(levelMemberName);
                 }
               });
             }
 
-            if (grouping.includes(memberName as string)) {
-              folderStats.grouping.push(memberName as string);
+            if (grouping.includes(memberName)) {
+              folderStats.grouping.push(memberName);
             }
           });
         });
