@@ -33,6 +33,8 @@ pub struct V1CubeMeta {
     pub joins: Option<Vec<models::V1CubeMetaJoin>>,
     #[serde(rename = "folders", skip_serializing_if = "Option::is_none")]
     pub folders: Option<Vec<models::V1CubeMetaFolder>>,
+    #[serde(rename = "nestedFolders", skip_serializing_if = "Option::is_none")]
+    pub nested_folders: Option<Vec<models::V1CubeMetaNestedFolder>>,
     #[serde(rename = "hierarchies", skip_serializing_if = "Option::is_none")]
     pub hierarchies: Option<Vec<models::V1CubeMetaHierarchy>>,
 }
@@ -56,6 +58,7 @@ impl V1CubeMeta {
             segments,
             joins: None,
             folders: None,
+            nested_folders: None,
             hierarchies: None,
         }
     }
