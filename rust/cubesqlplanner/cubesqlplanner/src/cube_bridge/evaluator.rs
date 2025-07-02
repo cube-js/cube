@@ -64,6 +64,12 @@ pub trait CubeEvaluator {
         &self,
         cube_name: String,
     ) -> Result<Vec<Rc<dyn PreAggregationDescription>>, CubeError>;
+    #[nbridge(optional)]
+    fn pre_aggregation_description_by_name(
+        &self,
+        cube_name: String,
+        name: String,
+    ) -> Result<Option<Rc<dyn PreAggregationDescription>>, CubeError>;
     #[nbridge(vec)]
     fn evaluate_rollup_references(
         &self,

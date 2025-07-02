@@ -85,86 +85,94 @@ impl PreAggregationsCompiler {
             return Ok(compiled.clone());
         }
 
-        if let Some((_, description)) = self.descriptions.clone().iter().find(|(n, _)| n == name) {
-            let static_data = description.static_data();
-            let measures = if let Some(refs) = description.measure_references()? {
-                Self::symbols_from_ref(
-                    self.query_tools.clone(),
-                    &name.cube_name,
-                    refs,
-                    Self::check_is_measure,
-                )?
-            } else {
-                Vec::new()
-            };
-            let dimensions = if let Some(refs) = description.dimension_references()? {
-                Self::symbols_from_ref(
-                    self.query_tools.clone(),
-                    &name.cube_name,
-                    refs,
-                    Self::check_is_dimension,
-                )?
-            } else {
-                Vec::new()
-            };
-            let time_dimensions = if let Some(refs) = description.time_dimension_reference()? {
-                let dims = Self::symbols_from_ref(
-                    self.query_tools.clone(),
-                    &name.cube_name,
-                    refs,
-                    Self::check_is_time_dimension,
-                )?;
-                vec![(dims[0].clone(), static_data.granularity.clone())]
-            } else {
-                Vec::new()
-            };
-            let allow_non_strict_date_range_match = description
-                .static_data()
-                .allow_non_strict_date_range_match
-                .unwrap_or(false);
-            let rollups = if let Some(refs) = description.rollup_references()? {
-                let r = self
-                    .query_tools
-                    .cube_evaluator()
-                    .evaluate_rollup_references(name.cube_name.clone(), refs)?;
-                r
-            } else {
-                Vec::new()
-            };
-
-            let source = if static_data.pre_aggregation_type == "rollupJoin" {
-                PreAggregationSource::Join(self.build_join_source(
-                    &measures,
-                    &dimensions,
-                    &rollups,
-                )?)
-            } else {
-                PreAggregationSource::Table(PreAggregationTable {
-                    cube_name: name.cube_name.clone(),
-                    name: name.name.clone(),
-                    alias: static_data.sql_alias.clone(),
-                })
-            };
-
-            let res = Rc::new(CompiledPreAggregation {
-                name: static_data.name.clone(),
-                cube_name: name.cube_name.clone(),
-                source: Rc::new(source),
-                granularity: static_data.granularity.clone(),
-                external: static_data.external,
-                measures,
-                dimensions,
-                time_dimensions,
-                allow_non_strict_date_range_match,
-            });
-            self.compiled_cache.insert(name.clone(), res.clone());
-            Ok(res)
+        let description = if let Some((_, description)) =
+            self.descriptions.clone().iter().find(|(n, _)| n == name)
+        {
+            description.clone()
         } else {
-            Err(CubeError::internal(format!(
-                "Undefined pre-aggregation {}.{}",
-                name.cube_name, name.name
-            )))
-        }
+            if let Some(descr) = self
+                .query_tools
+                .cube_evaluator()
+                .pre_aggregation_description_by_name(name.cube_name.clone(), name.name.clone())?
+            {
+                descr
+            } else {
+                return Err(CubeError::internal(format!(
+                    "Undefined pre-aggregation {}.{}",
+                    name.cube_name, name.name
+                )));
+            }
+        };
+
+        let static_data = description.static_data();
+        let measures = if let Some(refs) = description.measure_references()? {
+            Self::symbols_from_ref(
+                self.query_tools.clone(),
+                &name.cube_name,
+                refs,
+                Self::check_is_measure,
+            )?
+        } else {
+            Vec::new()
+        };
+        let dimensions = if let Some(refs) = description.dimension_references()? {
+            Self::symbols_from_ref(
+                self.query_tools.clone(),
+                &name.cube_name,
+                refs,
+                Self::check_is_dimension,
+            )?
+        } else {
+            Vec::new()
+        };
+        let time_dimensions = if let Some(refs) = description.time_dimension_reference()? {
+            let dims = Self::symbols_from_ref(
+                self.query_tools.clone(),
+                &name.cube_name,
+                refs,
+                Self::check_is_time_dimension,
+            )?;
+            vec![(dims[0].clone(), static_data.granularity.clone())]
+        } else {
+            Vec::new()
+        };
+        let allow_non_strict_date_range_match = description
+            .static_data()
+            .allow_non_strict_date_range_match
+            .unwrap_or(false);
+        let rollups = if let Some(refs) = description.rollup_references()? {
+            let r = self
+                .query_tools
+                .cube_evaluator()
+                .evaluate_rollup_references(name.cube_name.clone(), refs)?;
+            r
+        } else {
+            Vec::new()
+        };
+
+        let source = if static_data.pre_aggregation_type == "rollupJoin" {
+            PreAggregationSource::Join(self.build_join_source(&measures, &dimensions, &rollups)?)
+        } else {
+            PreAggregationSource::Table(PreAggregationTable {
+                cube_name: name.cube_name.clone(),
+                name: name.name.clone(),
+                alias: static_data.sql_alias.clone(),
+            })
+        };
+
+        let res = Rc::new(CompiledPreAggregation {
+            name: static_data.name.clone(),
+            cube_name: name.cube_name.clone(),
+            source: Rc::new(source),
+            granularity: static_data.granularity.clone(),
+            external: static_data.external,
+            measures,
+            dimensions,
+            time_dimensions,
+            allow_non_strict_date_range_match,
+        });
+        self.compiled_cache.insert(name.clone(), res.clone());
+        Ok(res)
     }
 
     fn build_join_source(

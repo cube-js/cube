@@ -571,6 +571,23 @@ export class CubeEvaluator extends CubeSymbols {
     }));
   }
 
+  public preAggregationDescriptionByName(cubeName: string, preAggName: string) {
+    const cube = this.cubeFromPath(cubeName);
+    const preAggregations = cube.preAggregations || {};
+
+    const preAgg = preAggregations[preAggName];
+
+    if (!preAgg) {
+      return undefined;
+    }
+
+    return {
+      name: preAggName,
+      ...(preAgg as Record<string, any>)
+    };
+  }
+
+
   /**
    * Returns pre-aggregations filtered by the specified selector.
    */
