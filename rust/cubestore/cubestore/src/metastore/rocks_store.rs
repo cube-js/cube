@@ -808,16 +808,14 @@ pub trait RocksStoreDetails: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct RocksStoreRWLoop {
     name: &'static str,
-    tx: tokio::sync::mpsc::Sender<
-        Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
-    >,
+    tx: tokio::sync::mpsc::Sender<Box<dyn FnOnce() -> Result<(), CubeError> + Send + 'static>>,
     _join_handle: Arc<AbortingJoinHandle<()>>,
 }
 
 impl RocksStoreRWLoop {
     pub fn new(name: &'static str) -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::channel::<
-            Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
+            Box<dyn FnOnce() -> Result<(), CubeError> + Send + 'static>,
         >(32_768);
 
         let join_handle = cube_ext::spawn_blocking(move || loop {
