@@ -69,7 +69,7 @@ export class CubeToMetaTransformer {
       } else { // We're at the root level
         flatFolders.push({
           name: folder.name,
-          members: flatMembers,
+          members: [...new Set(flatMembers)],
         });
       }
 
