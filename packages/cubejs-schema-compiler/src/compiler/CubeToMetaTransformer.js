@@ -43,16 +43,33 @@ export class CubeToMetaTransformer {
 
     const isCubeVisible = this.isVisible(cube, true);
 
-    const processFolderMember = (member) => {
-      if (member.type === 'folder') {
-        return {
-          name: member.name,
-          members: member.includes.map(processFolderMember),
-        };
-      }
+    const flatFolderSeparator = '/';
+    const flatFolders = [];
 
-      return `${cube.name}.${member.name}`;
+    const processFolder = (folder, path = []) => {
+      const flatMembers = [];
+      const nestedMembers = folder.includes.map(member => {
+        if (member.type === 'folder') {
+          return processFolder(member, [...path, folder.name]);
+        }
+        const memberName = `${cube.name}.${member.name}`;
+        flatMembers.push(memberName);
+
+        return `${cube.name}.${member.name}`;
+      });
+
+      flatFolders.push({
+        name: [...path, folder.name].join(flatFolderSeparator),
+        members: flatMembers,
+      });
+
+      return {
+        name: folder.name,
+        members: nestedMembers,
+      };
     };
+
+    const nestedFolders = (cube.folders || []).map(f => processFolder(f));
 
     return {
       config: {
@@ -124,10 +141,8 @@ export class CubeToMetaTransformer {
           public: it.public ?? true,
           name: `${cube.name}.${it.name}`,
         })),
-        folders: (cube.folders || []).map((it) => ({
-          name: it.name,
-          members: it.includes.map(processFolderMember),
-        })),
+        folders: flatFolders,
+        nestedFolders,
       },
     };
   }
