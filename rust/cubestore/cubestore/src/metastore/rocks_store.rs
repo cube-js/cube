@@ -805,18 +805,18 @@ pub trait RocksStoreDetails: Send + Sync {
     fn log_enabled(&self) -> bool;
 }
 
-pub type RocksStoreRWLoopFun = Box<dyn FnOnce() -> Result<(), CubeError> + Send + 'static>;
+pub type RocksStoreRWLoopFn = Box<dyn FnOnce() -> Result<(), CubeError> + Send + 'static>;
 
 #[derive(Debug, Clone)]
 pub struct RocksStoreRWLoop {
     name: &'static str,
-    tx: tokio::sync::mpsc::Sender<RocksStoreRWLoopFun>,
+    tx: tokio::sync::mpsc::Sender<RocksStoreRWLoopFn>,
     _join_handle: Arc<AbortingJoinHandle<()>>,
 }
 
 impl RocksStoreRWLoop {
     pub fn new(name: &'static str) -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<RocksStoreRWLoopFun>(32_768);
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<RocksStoreRWLoopFn>(32_768);
 
         let join_handle = cube_ext::spawn_blocking(move || loop {
             if let Some(fun) = rx.blocking_recv() {
@@ -843,7 +843,7 @@ impl RocksStoreRWLoop {
         }
     }
 
-    pub async fn schedule(&self, fun: RocksStoreRWLoopFun) -> Result<(), CubeError> {
+    pub async fn schedule(&self, fun: RocksStoreRWLoopFn) -> Result<(), CubeError> {
         self.tx.send(fun).await.map_err(|err| {
             CubeError::user(format!(
                 "Failed to schedule task to RWLoop ({}), error: {}",
