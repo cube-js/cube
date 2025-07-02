@@ -185,16 +185,11 @@ impl PhysicalPlanBuilder {
     fn process_pre_aggregation(
         &self,
         pre_aggregation: &Rc<PreAggregation>,
-        _context: &PhysicalPlanBuilderContext,
+        context: &PhysicalPlanBuilderContext,
         measure_references: &mut HashMap<String, QualifiedColumnName>,
         dimensions_references: &mut HashMap<String, QualifiedColumnName>,
     ) -> Result<Rc<From>, CubeError> {
         let mut pre_aggregation_schema = Schema::empty();
-        let pre_aggregation_alias = PlanSqlTemplates::memeber_alias_name(
-            &pre_aggregation.cube_name,
-            &pre_aggregation.name,
-            &None,
-        );
         for dim in pre_aggregation.dimensions.iter() {
             let alias = BaseMemberHelper::default_alias(
                 &dim.cube_name(),
@@ -204,7 +199,7 @@ impl PhysicalPlanBuilder {
             )?;
             dimensions_references.insert(
                 dim.full_name(),
-                QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
+                QualifiedColumnName::new(None, alias.clone()),
             );
             pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(dim.full_name())));
         }
@@ -217,7 +212,7 @@ impl PhysicalPlanBuilder {
             )?;
             dimensions_references.insert(
                 dim.full_name(),
-                QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
+                QualifiedColumnName::new(None, alias.clone()),
             );
             pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(dim.full_name())));
         }
@@ -230,19 +225,76 @@ impl PhysicalPlanBuilder {
             )?;
             measure_references.insert(
                 meas.full_name(),
-                QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
+                QualifiedColumnName::new(None, alias.clone()),
             );
             pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(meas.full_name())));
         }
-        let table_name = match &pre_aggregation.source {
-            PreAggregationSource::Table(name) => name.clone()
-        };
-        let from = From::new_from_table_reference(
-            table_name,
-            Rc::new(pre_aggregation_schema),
-            Some(pre_aggregation_alias),
-        );
+        let from = self.make_pre_aggregation_source(
+            &pre_aggregation.source,
+            context,
+            measure_references,
+            dimensions_references,
+        )?;
         Ok(from)
+    }
+
+    fn make_pre_aggregation_source(
+        &self,
+        source: &Rc<PreAggregationSource>,
+        _context: &PhysicalPlanBuilderContext,
+        _measure_references: &mut HashMap<String, QualifiedColumnName>,
+        dimensions_references: &mut HashMap<String, QualifiedColumnName>,
+    ) -> Result<Rc<From>, CubeError> {
+        let from = match source.as_ref() {
+            PreAggregationSource::Table(table) => {
+                let table_source = self.make_pre_aggregation_table_source(table)?;
+                From::new(FromSource::Single(table_source))
+            }
+            PreAggregationSource::Join(join) => {
+                let root_table_source = self.make_pre_aggregation_table_source(&join.root)?;
+                let mut join_builder = JoinBuilder::new(root_table_source);
+                for item in join.items.iter() {
+                    let to_table_source = self.make_pre_aggregation_table_source(&item.to)?;
+                    let condition =
+                        SqlJoinCondition::try_new(self.query_tools.clone(), item.on_sql.clone())?;
+                    let on = JoinCondition::new_base_join(condition);
+                    join_builder.left_join_aliased_source(to_table_source, on);
+                    for member in item.from_members.iter().chain(item.to_members.iter()) {
+                        let alias = BaseMemberHelper::default_alias(
+                            &member.cube_name(),
+                            &member.name(),
+                            &None,
+                            self.query_tools.clone(),
+                        )?;
+                        dimensions_references.insert(
+                            member.full_name(),
+                            QualifiedColumnName::new(None, alias.clone()),
+                        );
+                    }
+                }
+                let from = From::new_from_join(join_builder.build());
+                from
+            }
+        };
+        Ok(from)
+    }
+
+    fn make_pre_aggregation_table_source(
+        &self,
+        table: &PreAggregationTable,
+    ) -> Result<SingleAliasedSource, CubeError> {
+        let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
+        let table_name = self
+            .query_tools
+            .base_tools()
+            .pre_aggregation_table_name(table.cube_name.clone(), name.clone())?;
+        let alias = PlanSqlTemplates::memeber_alias_name(&table.cube_name, &name, &None);
+        let res = SingleAliasedSource::new_from_table_reference(
+            table_name,
+            Rc::new(Schema::empty()),
+            Some(alias),
+        );
+        Ok(res)
     }
 
     fn build_full_key_aggregate_query(

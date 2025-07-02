@@ -1,20 +1,40 @@
-use crate::cube_bridge::member_sql::MemberSql;
-use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
-use cubenativeutils::CubeError;
+use crate::planner::sql_evaluator::{MemberSymbol, SqlCall};
 use std::fmt::Debug;
 use std::rc::Rc;
+
+#[derive(Clone)]
+pub struct PreAggregationJoinItem {
+    pub from: PreAggregationTable,
+    pub to: PreAggregationTable,
+    pub from_members: Vec<Rc<MemberSymbol>>,
+    pub to_members: Vec<Rc<MemberSymbol>>,
+    pub on_sql: Rc<SqlCall>,
+}
+
+#[derive(Clone)]
+pub struct PreAggregationJoin {
+    pub root: PreAggregationTable,
+    pub items: Vec<PreAggregationJoinItem>,
+}
+
+#[derive(Clone)]
+pub struct PreAggregationTable {
+    pub cube_name: String,
+    pub name: String,
+    pub alias: Option<String>,
+}
+
 #[derive(Clone)]
 pub enum PreAggregationSource {
-    Table(String),
+    Table(PreAggregationTable),
+    Join(PreAggregationJoin),
 }
 
 #[derive(Clone)]
 pub struct CompiledPreAggregation {
     pub cube_name: String,
     pub name: String,
-    pub source: PreAggregationSource,
+    pub source: Rc<PreAggregationSource>,
     pub granularity: Option<String>,
     pub external: Option<bool>,
     pub measures: Vec<Rc<MemberSymbol>>,

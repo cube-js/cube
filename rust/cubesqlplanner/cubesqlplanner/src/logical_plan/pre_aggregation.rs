@@ -1,6 +1,5 @@
 use super::pre_aggregation::PreAggregationSource;
 use super::*;
-use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::planner::sql_evaluator::MemberSymbol;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -13,7 +12,7 @@ pub struct PreAggregation {
     pub time_dimensions: Vec<(Rc<MemberSymbol>, Option<String>)>,
     pub external: bool,
     pub granularity: Option<String>,
-    pub source: PreAggregationSource,
+    pub source: Rc<PreAggregationSource>,
     pub cube_name: String,
 }
 
@@ -24,10 +23,17 @@ impl PrettyPrint for PreAggregation {
         result.println(&format!("name: {}", self.name), &state);
         result.println(&format!("cube_name: {}", self.cube_name), &state);
         result.println(&format!("source:"), &state);
-        match &self.source {
-            PreAggregationSource::Table(name) => {
+        match self.source.as_ref() {
+            PreAggregationSource::Table(table) => {
                 let state = state.new_level();
-                result.println(&format!("table: {}", name), &state);
+                result.println(
+                    &format!("table: {}.{}", table.cube_name, table.name),
+                    &state,
+                );
+            }
+            PreAggregationSource::Join(_) => {
+                let state = state.new_level();
+                result.println(&format!("rollup join"), &state);
             }
         }
         result.println(&format!("external: {}", self.external), &state);

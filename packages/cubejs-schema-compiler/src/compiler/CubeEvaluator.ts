@@ -565,7 +565,6 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public preAggregationsForCubeAsArray(path: string) {
-  console.log("!!!! pre aggrs", this.cubeFromPath(path).preAggregations);
     return Object.entries(this.cubeFromPath(path).preAggregations || {}).map(([name, preAggregation]) => ({
       name,
       ...(preAggregation as Record<string, any>)
