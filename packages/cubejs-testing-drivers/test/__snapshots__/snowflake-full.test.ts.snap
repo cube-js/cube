@@ -12925,7 +12925,7 @@ Array [
 exports[`Queries with the @cubejs-backend/snowflake-driver querying BigECommerce: rolling window YTD without granularity 1`] = `
 Array [
   Object {
-    "BigECommerce.rollingCountYTD": "44",
+    "BigECommerce.rollingCountYTD": "3",
   },
 ]
 `;

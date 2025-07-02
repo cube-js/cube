@@ -216,14 +216,26 @@ export class BigqueryQuery extends BaseQuery {
    * joining conditions (note timeStampCast)
    */
   public override rollingWindowToDateJoinCondition(granularity) {
-    return this.timeDimensions
-      .filter(td => td.granularity)
-      .map(
-        d => [
-          d,
-          (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, _isFromStartToEnd: boolean) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
-        ]
-      );
+    return Object.values(
+      this.timeDimensions.reduce((acc, td) => {
+        const key = td.dimension;
+
+        if (!acc[key]) {
+          acc[key] = td;
+        }
+
+        if (!acc[key].granularity && td.granularity) {
+          acc[key] = td;
+        }
+
+        return acc;
+      }, {})
+    ).map(
+      d => [
+        d,
+        (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, _isFromStartToEnd: boolean) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
+      ]
+    );
   }
 
   /**
@@ -233,8 +245,21 @@ export class BigqueryQuery extends BaseQuery {
    */
   public override rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
     offset = offset || 'end';
-    return this.timeDimensions
-      .filter(td => td.granularity)
+    return Object.values(
+      this.timeDimensions.reduce((acc, td) => {
+        const key = td.dimension;
+
+        if (!acc[key]) {
+          acc[key] = td;
+        }
+
+        if (!acc[key].granularity && td.granularity) {
+          acc[key] = td;
+        }
+
+        return acc;
+      }, {})
+    )
       .map(
         d => [d, (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, isFromStartToEnd: boolean) => {
         // dateFrom based window

@@ -1037,23 +1037,48 @@ export class BaseQuery {
   }
 
   rollingWindowToDateJoinCondition(granularity) {
-    return this.timeDimensions
-      .filter(td => td.granularity)
-      .map(
-        d => [
-          d,
-          (dateFrom, dateTo, dateField, _dimensionDateFrom, _dimensionDateTo, _isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
-        ]
-      );
+    return Object.values(
+      this.timeDimensions.reduce((acc, td) => {
+        const key = td.dimension;
+
+        if (!acc[key]) {
+          acc[key] = td;
+        }
+
+        if (!acc[key].granularity && td.granularity) {
+          acc[key] = td;
+        }
+
+        return acc;
+      }, {})
+    ).map(
+      d => [
+        d,
+        (dateFrom, dateTo, dateField, _dimensionDateFrom, _dimensionDateTo, _isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
+      ]
+    );
   }
 
   rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
     offset = offset || 'end';
-    return this.timeDimensions
-      .filter(td => td.granularity)
+    return Object.values(
+      this.timeDimensions.reduce((acc, td) => {
+        const key = td.dimension;
+
+        if (!acc[key]) {
+          acc[key] = td;
+        }
+
+        if (!acc[key].granularity && td.granularity) {
+          acc[key] = td;
+        }
+
+        return acc;
+      }, {})
+    )
       .map(
         d => [d, (dateFrom, dateTo, dateField, _dimensionDateFrom, _dimensionDateTo, isFromStartToEnd) => {
-        // dateFrom based window
+          // dateFrom based window
           const conditions = [];
           if (trailingInterval !== 'unbounded') {
             const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
