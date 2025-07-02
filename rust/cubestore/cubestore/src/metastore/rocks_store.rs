@@ -805,18 +805,18 @@ pub trait RocksStoreDetails: Send + Sync {
     fn log_enabled(&self) -> bool;
 }
 
+pub type RocksStoreRWLoopFun = Box<dyn FnOnce() -> Result<(), CubeError> + Send + 'static>;
+
 #[derive(Debug, Clone)]
 pub struct RocksStoreRWLoop {
     name: &'static str,
-    tx: tokio::sync::mpsc::Sender<Box<dyn FnOnce() -> Result<(), CubeError> + Send + 'static>>,
+    tx: tokio::sync::mpsc::Sender<RocksStoreRWLoopFun>,
     _join_handle: Arc<AbortingJoinHandle<()>>,
 }
 
 impl RocksStoreRWLoop {
     pub fn new(name: &'static str) -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<
-            Box<dyn FnOnce() -> Result<(), CubeError> + Send + 'static>,
-        >(32_768);
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<RocksStoreRWLoopFun>(32_768);
 
         let join_handle = cube_ext::spawn_blocking(move || loop {
             if let Some(fun) = rx.blocking_recv() {
@@ -841,6 +841,15 @@ impl RocksStoreRWLoop {
             tx,
             _join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
         }
+    }
+
+    pub async fn schedule(&self, fun: RocksStoreRWLoopFun) -> Result<(), CubeError> {
+        self.tx.send(fun).await.map_err(|err| {
+            CubeError::user(format!(
+                "Failed to schedule task to RWLoop ({}), error: {}",
+                self.name, err
+            ))
+        })
     }
 
     pub fn get_name(&self) -> &'static str {
@@ -1034,8 +1043,7 @@ impl RocksStore {
         let (tx, rx) = oneshot::channel::<Result<(R, Vec<MetaStoreEvent>), CubeError>>();
 
         let res = rw_loop
-            .tx
-            .send(Box::new(move || {
+            .schedule(Box::new(move || {
                 let db_span = warn_long(&span_name, Duration::from_millis(100));
 
                 let mut batch = BatchPipe::new(db_to_send.as_ref());
@@ -1367,7 +1375,7 @@ impl RocksStore {
         let store_name = self.details.get_name();
         let span_name = format!("{}({}) read operation: {}", store_name, loop_name, op_name);
 
-        let res = rw_loop.tx.send(Box::new(move || {
+        let res = rw_loop.schedule(Box::new(move || {
             let db_span = warn_long(&span_name, Duration::from_millis(100));
 
             let snapshot = db_to_send.snapshot();
