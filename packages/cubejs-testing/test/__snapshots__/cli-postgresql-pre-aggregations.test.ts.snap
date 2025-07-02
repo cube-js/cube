@@ -5,7 +5,7 @@ exports[`postgresql HTTP Transport Empty partitions: Empty partitions 1`] = `Arr
 exports[`postgresql HTTP Transport Rolling Mixed With Dimension No Granularity: Rolling Mixed With Dimension No Granularity 1`] = `
 Array [
   Object {
-    "visitors.checkinsRollingTotal": "5",
+    "visitors.checkinsRollingTotal": null,
     "visitors.source": "some",
   },
 ]

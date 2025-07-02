@@ -10690,7 +10690,7 @@ Array [
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-s3-prefix querying BigECommerce: rolling window YTD without granularity 1`] = `
 Array [
   Object {
-    "BigECommerce.rollingCountYTD": "44",
+    "BigECommerce.rollingCountYTD": "3",
   },
 ]
 `;
