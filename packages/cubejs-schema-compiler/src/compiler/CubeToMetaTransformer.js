@@ -2,6 +2,7 @@ import inflection from 'inflection';
 import R from 'ramda';
 import camelCase from 'camelcase';
 
+import { getEnv } from '@cubejs-backend/shared';
 import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseMeasure } from '../adapter';
@@ -43,25 +44,34 @@ export class CubeToMetaTransformer {
 
     const isCubeVisible = this.isVisible(cube, true);
 
-    const flatFolderSeparator = '/';
+    const flatFolderSeparator = getEnv('nestedFoldersDelimiter');
     const flatFolders = [];
 
-    const processFolder = (folder, path = []) => {
+    const processFolder = (folder, path = [], mergedMembers = []) => {
       const flatMembers = [];
       const nestedMembers = folder.includes.map(member => {
         if (member.type === 'folder') {
-          return processFolder(member, [...path, folder.name]);
+          return processFolder(member, [...path, folder.name], flatMembers);
         }
         const memberName = `${cube.name}.${member.name}`;
         flatMembers.push(memberName);
 
-        return `${cube.name}.${member.name}`;
+        return memberName;
       });
 
-      flatFolders.push({
-        name: [...path, folder.name].join(flatFolderSeparator),
-        members: flatMembers,
-      });
+      if (flatFolderSeparator !== '') {
+        flatFolders.push({
+          name: [...path, folder.name].join(flatFolderSeparator),
+          members: flatMembers,
+        });
+      } else if (path.length > 0) {
+        mergedMembers.push(...flatMembers);
+      } else { // We're at the root level
+        flatFolders.push({
+          name: folder.name,
+          members: flatMembers,
+        });
+      }
 
       return {
         name: folder.name,
