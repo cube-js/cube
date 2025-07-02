@@ -3,8 +3,8 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::sql_templates::TemplateProjectionColumn;
-use crate::planner::QueryDateTimeHelper;
 use crate::planner::{evaluate_with_context, FiltersContext, VisitorContext};
+use crate::planner::{Granularity, GranularityHelper, QueryDateTimeHelper};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -188,13 +188,47 @@ impl BaseFilter {
                         filters_context,
                         &member_type,
                     )?,
-                FilterOperator::ToDateRollingWindowDateRange => self
-                    .to_date_rolling_window_date_range(
+                FilterOperator::ToDateRollingWindowDateRange => {
+                    let query_granularity = if self.values.len() >= 3 {
+                        if let Some(granularity) = &self.values[2] {
+                            granularity
+                        } else {
+                            return Err(CubeError::user(
+                                "Granularity required for to_date rolling window".to_string(),
+                            ));
+                        }
+                    } else {
+                        return Err(CubeError::user(
+                            "Granularity required for to_date rolling window".to_string(),
+                        ));
+                    };
+                    let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                    let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
+                    let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
+                        self.query_tools.cube_evaluator().clone(),
+                        &mut evaluator_compiler,
+                        self.query_tools.timezone().clone(),
+                        &symbol.cube_name(),
+                        &symbol.name(),
+                        Some(query_granularity.clone()),
+                    )?
+                    else {
+                        return Err(CubeError::internal(format!(
+                            "Rolling window granularity '{}' is not found in time dimension '{}'",
+                            query_granularity,
+                            symbol.name()
+                        )));
+                    };
+
+                    self.to_date_rolling_window_date_range(
                         &member_sql,
                         plan_templates,
                         filters_context,
                         &member_type,
-                    )?,
+                        granularity_obj,
+                    )?
+                }
                 FilterOperator::In => {
                     self.in_where(&member_sql, plan_templates, filters_context, &member_type)?
                 }
@@ -539,22 +573,11 @@ impl BaseFilter {
         plan_templates: &PlanSqlTemplates,
         _filters_context: &FiltersContext,
         _member_type: &Option<String>,
+        granularity_obj: Granularity,
     ) -> Result<String, CubeError> {
         let (from, to) = self.date_range_from_time_series(plan_templates)?;
 
-        let from = if self.values.len() >= 3 {
-            if let Some(granularity) = &self.values[2] {
-                plan_templates.time_grouped_column(granularity.clone(), from)?
-            } else {
-                return Err(CubeError::user(format!(
-                    "Granularity required for to_date rolling window"
-                )));
-            }
-        } else {
-            return Err(CubeError::user(format!(
-                "Granularity required for to_date rolling window"
-            )));
-        };
+        let from = granularity_obj.apply_to_input_sql(plan_templates, from.clone())?;
 
         let date_field = plan_templates.convert_tz(member_sql.to_string())?;
         plan_templates.time_range_filter(date_field, from, to)

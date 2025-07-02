@@ -6,7 +6,9 @@ use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
+use crate::planner::{
+    BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension, GranularityHelper,
+};
 use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
@@ -126,8 +128,30 @@ impl MultiStageMemberQueryPlanner {
                 })
             }
             RollingWindowType::ToDate(to_date_rolling_window) => {
+                let time_dimension = &rolling_window_desc.time_dimension;
+                let query_granularity = to_date_rolling_window.granularity.clone();
+
+                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
+                let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
+                    self.query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    self.query_tools.timezone().clone(),
+                    time_dimension.cube_name(),
+                    time_dimension.name(),
+                    Some(query_granularity.clone()),
+                )?
+                else {
+                    return Err(CubeError::internal(format!(
+                        "Rolling window granularity '{}' is not found in time dimension '{}'",
+                        query_granularity,
+                        time_dimension.name()
+                    )));
+                };
+
                 MultiStageRollingWindowType::ToDate(MultiStageToDateRollingWindow {
-                    granularity: to_date_rolling_window.granularity.clone(),
+                    granularity_obj: Rc::new(granularity_obj),
                 })
             }
             RollingWindowType::RunningTotal => MultiStageRollingWindowType::RunningTotal,

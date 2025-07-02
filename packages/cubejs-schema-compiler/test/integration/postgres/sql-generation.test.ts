@@ -144,6 +144,13 @@ describe('SQL Generation', () => {
             granularity: 'week'
           }
         },
+        countRollingThreeDaysToDate: {
+          type: 'count',
+          rollingWindow: {
+            type: 'to_date',
+            granularity: 'three_days'
+          }
+        },
         revenue_qtd: {
           type: 'sum',
           sql: 'amount',
@@ -1209,6 +1216,149 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       visitors__created_at_three_days: '2017-01-10T00:00:00.000Z',
     }
   ]));
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('custom granularity rolling window to_date with one time dimension with regular granularity', async () => runQueryTest({
+      measures: [
+        'visitors.countRollingThreeDaysToDate'
+      ],
+      timeDimensions: [
+        {
+          dimension: 'visitors.created_at',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-10']
+        }
+      ],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    }, [
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-01T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '1',
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '1',
+        visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '1',
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '2',
+        visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '4',
+        visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-09T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-10T00:00:00.000Z',
+      },
+    ]));
+  } else {
+    it.skip('NO_BASE_QUERY_SUPPORT: custom granularity rolling window to_date with one time dimension with regular granularity', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('custom granularity rolling window to_date with two time dimension granularities one custom one regular', async () => runQueryTest({
+      measures: [
+        'visitors.countRollingThreeDaysToDate'
+      ],
+      timeDimensions: [
+        {
+          dimension: 'visitors.created_at',
+          granularity: 'three_days',
+          dateRange: ['2017-01-01', '2017-01-10']
+        },
+        {
+          dimension: 'visitors.created_at',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-10']
+        }
+      ],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    }, [
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-01T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '1',
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '1',
+        visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '1',
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '2',
+        visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: '4',
+        visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-09T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      },
+      {
+        visitors__count_rolling_three_days_to_date: null,
+        visitors__created_at_day: '2017-01-10T00:00:00.000Z',
+        visitors__created_at_three_days: '2017-01-10T00:00:00.000Z',
+      },
+    ]));
+  } else {
+    it.skip('NO_BASE_QUERY_SUPPORT: custom granularity rolling window to_date with two time dimension granularities one custom one regular', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
 
   it('rolling window with same td with and without granularity', async () => runQueryTest({
     measures: [

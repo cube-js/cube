@@ -62,6 +62,15 @@ impl PlanSqlTemplates {
             .time_grouped_column(granularity, dimension)
     }
 
+    pub fn date_bin(
+        &self,
+        interval: String,
+        source: String,
+        origin: String,
+    ) -> Result<String, CubeError> {
+        self.driver_tools.date_bin(interval, source, origin)
+    }
+
     pub fn timestamp_precision(&self) -> Result<u32, CubeError> {
         self.driver_tools.timestamp_precision()
     }
@@ -121,14 +130,6 @@ impl PlanSqlTemplates {
         self.driver_tools.count_distinct_approx(sql)
     }
 
-    pub fn date_bin(
-        &self,
-        interval: String,
-        source: String,
-        origin: String,
-    ) -> Result<String, CubeError> {
-        self.driver_tools.date_bin(interval, source, origin)
-    }
     pub fn alias_name(name: &str) -> String {
         let res = name
             .with_boundaries(&[

@@ -1,5 +1,6 @@
 use super::{GranularityHelper, QueryDateTime, SqlInterval};
 use crate::planner::sql_evaluator::SqlCall;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -165,5 +166,30 @@ impl Granularity {
 
     fn default_origin(timezone: Tz) -> Result<QueryDateTime, CubeError> {
         Ok(QueryDateTime::now(timezone)?.start_of_year())
+    }
+
+    pub fn apply_to_input_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        input: String,
+    ) -> Result<String, CubeError> {
+        let res = if self.is_natural_aligned {
+            if let Some(offset) = &self.granularity_offset {
+                let mut res = templates.subtract_interval(input.clone(), offset.clone())?;
+                res = templates.time_grouped_column(self.granularity_from_interval()?, res)?;
+                res = templates.add_interval(res, offset.clone())?;
+                res
+            } else {
+                templates.time_grouped_column(self.granularity_from_interval()?, input)?
+            }
+        } else {
+            templates.date_bin(
+                self.granularity_interval.clone(),
+                input,
+                self.origin_local_formatted(),
+            )?
+        };
+
+        Ok(res)
     }
 }

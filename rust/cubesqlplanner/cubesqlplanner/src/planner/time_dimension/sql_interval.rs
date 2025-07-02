@@ -6,6 +6,7 @@ use std::str::FromStr;
 #[derive(Default, Debug, PartialEq, Clone, Hash, Eq)]
 pub struct SqlInterval {
     pub year: i32,
+    pub quarter: i32,
     pub month: i32,
     pub week: i32,
     pub day: i32,
@@ -17,6 +18,7 @@ pub struct SqlInterval {
 impl SqlInterval {
     pub fn new(
         year: i32,
+        quarter: i32,
         month: i32,
         week: i32,
         day: i32,
@@ -26,6 +28,7 @@ impl SqlInterval {
     ) -> Self {
         Self {
             year,
+            quarter,
             month,
             week,
             day,
@@ -48,12 +51,14 @@ impl SqlInterval {
             "week"
         } else if self.month != 0 {
             "month"
+        } else if self.quarter != 0 {
+            "quarter"
         } else if self.year != 0 {
             "year"
         } else {
-            return Err(CubeError::internal(format!(
-                "Attempt to get granularity from empty SqlInterval"
-            )));
+            return Err(CubeError::internal(
+                "Attempt to get granularity from empty SqlInterval".to_string(),
+            ));
         };
         Ok(res.to_string())
     }
@@ -62,6 +67,9 @@ impl SqlInterval {
         let mut res = vec![];
         if self.year != 0 {
             res.push(format!("{} year", self.year));
+        }
+        if self.quarter != 0 {
+            res.push(format!("{} quarter", self.quarter));
         }
         if self.month != 0 {
             res.push(format!("{} month", self.month));
@@ -87,6 +95,7 @@ impl SqlInterval {
     pub fn inverse(&self) -> Self {
         Self::new(
             -self.year,
+            -self.quarter,
             -self.month,
             -self.week,
             -self.day,
@@ -102,6 +111,7 @@ impl Add for SqlInterval {
     fn add(self, other: SqlInterval) -> SqlInterval {
         SqlInterval::new(
             self.year + other.year,
+            self.quarter + other.quarter,
             self.month + other.month,
             self.week + other.week,
             self.day + other.day,
@@ -115,6 +125,7 @@ impl Add for SqlInterval {
 impl AddAssign<&SqlInterval> for SqlInterval {
     fn add_assign(&mut self, other: &SqlInterval) {
         self.year += other.year;
+        self.quarter += other.quarter;
         self.month += other.month;
         self.week += other.week;
         self.day += other.day;
@@ -135,6 +146,7 @@ impl Sub for SqlInterval {
     fn sub(self, other: SqlInterval) -> SqlInterval {
         SqlInterval::new(
             self.year - other.year,
+            self.quarter - other.quarter,
             self.month - other.month,
             self.week - other.week,
             self.day - other.day,
@@ -150,6 +162,7 @@ impl Neg for SqlInterval {
     fn neg(self) -> SqlInterval {
         SqlInterval::new(
             -self.year,
+            -self.quarter,
             -self.month,
             -self.week,
             -self.day,
@@ -175,6 +188,7 @@ impl FromStr for SqlInterval {
                 "day" | "days" => result.day = value,
                 "week" | "weeks" => result.week = value,
                 "month" | "months" => result.month = value,
+                "quarter" | "quarters" => result.quarter = value,
                 "year" | "years" => result.year = value,
                 other => return Err(CubeError::user(format!("Invalid interval unit: {}", other))),
             }
@@ -191,28 +205,28 @@ mod tests {
     fn test_from_str() {
         assert_eq!(
             SqlInterval::from_str("1 second").unwrap(),
-            SqlInterval::new(0, 0, 0, 0, 0, 0, 1)
+            SqlInterval::new(0, 0, 0, 0, 0, 0, 0, 1)
         );
 
         assert_eq!(
             SqlInterval::from_str("1 year 3 months 4 weeks 2 day 4 hours 2 minutes 1 second")
                 .unwrap(),
-            SqlInterval::new(1, 3, 4, 2, 4, 2, 1)
+            SqlInterval::new(1, 0, 3, 4, 2, 4, 2, 1)
         );
     }
     #[test]
     fn test_arithmetic() {
         assert_eq!(
-            SqlInterval::new(1, 3, 4, 2, 4, 2, 1) + SqlInterval::new(1, 3, 4, 2, 4, 2, 1),
-            SqlInterval::new(2, 6, 8, 4, 8, 4, 2)
+            SqlInterval::new(1, 0, 3, 4, 2, 4, 2, 1) + SqlInterval::new(1, 0, 3, 4, 2, 4, 2, 1),
+            SqlInterval::new(2, 0, 6, 8, 4, 8, 4, 2)
         );
         assert_eq!(
-            SqlInterval::new(1, 3, 4, 2, 4, 2, 1) - SqlInterval::new(1, 4, 4, 2, 2, 2, 1),
-            SqlInterval::new(0, -1, 0, 0, 2, 0, 0)
+            SqlInterval::new(1, 0, 3, 4, 2, 4, 2, 1) - SqlInterval::new(1, 0, 4, 4, 2, 2, 2, 1),
+            SqlInterval::new(0, 0, -1, 0, 0, 2, 0, 0)
         );
         assert_eq!(
-            -SqlInterval::new(1, 3, -4, 2, 4, 2, 1),
-            SqlInterval::new(-1, -3, 4, -2, -4, -2, -1)
+            -SqlInterval::new(1, 0, 3, -4, 2, 4, 2, 1),
+            SqlInterval::new(-1, 0, -3, 4, -2, -4, -2, -1)
         );
     }
 }

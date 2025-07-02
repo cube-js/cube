@@ -3665,7 +3665,6 @@ export class BaseQuery {
    * @param {import('./Granularity').Granularity} granularity
    * @return {string}
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   dimensionTimeGroupedColumn(dimension, granularity) {
     let dtDate;
 
