@@ -502,6 +502,7 @@ impl RocksCacheStore {
 }
 
 impl RocksCacheStore {
+    #[inline(always)]
     pub async fn write_operation_queue<F, R>(
         &self,
         op_name: &'static str,
@@ -519,6 +520,7 @@ impl RocksCacheStore {
             .await
     }
 
+    #[inline(always)]
     pub async fn read_operation_queue<F, R>(
         &self,
         op_name: &'static str,
