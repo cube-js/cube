@@ -268,7 +268,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
           abort_signal: signal,
         });
 
-        if (resultSet.response_headers['x-clickhouse-format'] !== format) {
+        // response_headers['x-clickhouse-format'] is optional, but if it exists,
+        // it should match the requested format.
+        if (resultSet.response_headers['x-clickhouse-format'] && resultSet.response_headers['x-clickhouse-format'] !== format) {
           throw new Error(`Unexpected x-clickhouse-format in response: expected ${format}, received ${resultSet.response_headers['x-clickhouse-format']}`);
         }
 
