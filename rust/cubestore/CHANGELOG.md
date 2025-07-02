@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.31](https://github.com/cube-js/cube/compare/v1.3.30...v1.3.31) (2025-07-02)
+
+### Features
+
+- **cubestore:** Use seperate working loop for queue ([#6243](https://github.com/cube-js/cube/issues/6243)) ([f961f97](https://github.com/cube-js/cube/commit/f961f97328efbd6535cbcaf510c38904984b0970))
+
 ## [1.3.30](https://github.com/cube-js/cube/compare/v1.3.29...v1.3.30) (2025-07-01)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.31](https://github.com/cube-js/cube/compare/v1.3.30...v1.3.31) (2025-07-02)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix date filter truncation for rolling window queries ([#9743](https://github.com/cube-js/cube/issues/9743)) ([f045af9](https://github.com/cube-js/cube/commit/f045af91086dafad80fe363a4ddba6f6411892f7))
+
+### Features
+
+- **tesseract:** Support custom granularities in to_date rolling windows ([#9739](https://github.com/cube-js/cube/issues/9739)) ([a8b611c](https://github.com/cube-js/cube/commit/a8b611c877dfa87edc14652af6d3ebeafc071bd2))
+
 ## [1.3.30](https://github.com/cube-js/cube/compare/v1.3.29...v1.3.30) (2025-07-01)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

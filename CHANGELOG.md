@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.31](https://github.com/cube-js/cube/compare/v1.3.30...v1.3.31) (2025-07-02)
+
+### Bug Fixes
+
+- **clickhouse-driver:** Fix headers check ([#9746](https://github.com/cube-js/cube/issues/9746)) ([b643b0c](https://github.com/cube-js/cube/commit/b643b0cbf85e9090008e63f3fb516bcf302b4967))
+- **schema-compiler:** Fix date filter truncation for rolling window queries ([#9743](https://github.com/cube-js/cube/issues/9743)) ([f045af9](https://github.com/cube-js/cube/commit/f045af91086dafad80fe363a4ddba6f6411892f7))
+
+### Features
+
+- **cubestore:** Use seperate working loop for queue ([#6243](https://github.com/cube-js/cube/issues/6243)) ([f961f97](https://github.com/cube-js/cube/commit/f961f97328efbd6535cbcaf510c38904984b0970))
+- **tesseract:** Support custom granularities in to_date rolling windows ([#9739](https://github.com/cube-js/cube/issues/9739)) ([a8b611c](https://github.com/cube-js/cube/commit/a8b611c877dfa87edc14652af6d3ebeafc071bd2))
+
 ## [1.3.30](https://github.com/cube-js/cube/compare/v1.3.29...v1.3.30) (2025-07-01)
 
 ### Bug Fixes
