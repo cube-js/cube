@@ -18,6 +18,12 @@ pub struct SqlCall {
     deps: Vec<Dependency>,
 }
 
+impl std::fmt::Debug for SqlCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SqlCall").finish()
+    }
+}
+
 impl SqlCall {
     pub fn new(member_sql: Rc<dyn MemberSql>, deps: Vec<Dependency>) -> Self {
         Self { member_sql, deps }
