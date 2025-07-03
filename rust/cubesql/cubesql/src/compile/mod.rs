@@ -9494,11 +9494,11 @@ ORDER BY "source"."str0" ASC
             WHERE date_part('YEAR', "KibanaSampleDataEcommerce"."order_date") = 2019
             GROUP BY 2
             ;"#
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-            .await
-            .as_logical_plan();
+        .await
+        .as_logical_plan();
 
         assert_eq!(
             logical_plan.find_cube_scan().request,
@@ -9533,11 +9533,11 @@ ORDER BY "source"."str0" ASC
             WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019
             GROUP BY 2
             ;"#
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-            .await
-            .as_logical_plan();
+        .await
+        .as_logical_plan();
 
         assert_eq!(
             logical_plan.find_cube_scan().request,

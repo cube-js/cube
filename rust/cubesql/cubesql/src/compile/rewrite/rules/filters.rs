@@ -3612,13 +3612,13 @@ impl FilterRules {
                     let year = match year {
                         ScalarValue::Int64(Some(year)) => year,
                         ScalarValue::Int32(Some(year)) => year as i64,
-                        ScalarValue::Utf8(Some(year_str)) if year_str.len() == 4 => {
+                        ScalarValue::Utf8(Some(ref year_str)) if year_str.len() == 4 => {
                             if let Ok(year) = year_str.parse::<i64>() {
-                                return year;
+                                year
+                            } else {
+                                continue;
                             }
-
-                            continue;
-                        } ,
+                        }
                         _ => continue,
                     };
 
