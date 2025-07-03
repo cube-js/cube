@@ -56,6 +56,11 @@ pub static DATA_QUERY_CREATE_ROUTER_PHYSICAL_PLAN_US: Histogram =
 pub static DATA_QUERY_CREATE_WORKER_PHYSICAL_PLAN_US: Histogram =
     metrics::histogram("cs.sql.query.data.planning.worker_plan.us");
 
+pub static SQL_DATA_FRAME_SERIALIZATION_TIME_US: Histogram =
+    metrics::histogram("cs.sql.data_frame_serialization.us");
+pub static HTTP_MESSAGE_DATA_FRAME_SERIALIZATION_TIME_US: Histogram =
+    metrics::histogram("cs.http.data_frame_serialization.us");
+
 /// Incoming SQL queries that only read metadata or do trivial computations.
 pub static META_QUERIES: Counter = metrics::counter("cs.sql.query.meta");
 pub static META_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.meta.ms");
