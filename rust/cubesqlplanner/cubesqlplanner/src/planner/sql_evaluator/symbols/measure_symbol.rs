@@ -121,6 +121,38 @@ impl MeasureSymbol {
         })
     }
 
+    pub fn new_unrolling(&self) -> Rc<Self> {
+        if self.is_rolling_window() {
+            let measure_type = if self.is_multi_stage {
+                format!("number")
+            } else {
+                self.measure_type.clone()
+            };
+            Rc::new(Self {
+                cube_name: self.cube_name.clone(),
+                name: self.name.clone(),
+                owned_by_cube: self.owned_by_cube,
+                measure_type,
+                rolling_window: None,
+                is_multi_stage: false,
+                is_reference: false,
+                is_view: self.is_view,
+                measure_filters: self.measure_filters.clone(),
+                measure_drill_filters: self.measure_drill_filters.clone(),
+                time_shift: self.time_shift.clone(),
+                measure_order_by: self.measure_order_by.clone(),
+                reduce_by: self.reduce_by.clone(),
+                add_group_by: self.add_group_by.clone(),
+                group_by: self.group_by.clone(),
+                member_sql: self.member_sql.clone(),
+                pk_sqls: self.pk_sqls.clone(),
+                is_splitted_source: self.is_splitted_source,
+            })
+        } else {
+            Rc::new(self.clone())
+        }
+    }
+
     pub fn new_patched(
         &self,
         new_measure_type: Option<String>,

@@ -159,6 +159,15 @@ describe('SQL Generation', () => {
             granularity: 'quarter'
           }
         },
+        revenue_qtd_proxy: {
+          type: 'sum',
+          sql: \`\${revenue}\`,
+          multi_stage: true,
+          rollingWindow: {
+            type: 'to_date',
+            granularity: 'quarter'
+          }
+        },
         revenue_day_ago: {
           multi_stage: true,
           type: 'sum',
@@ -168,6 +177,15 @@ describe('SQL Generation', () => {
             interval: '1 day',
             type: 'prior',
           }]
+        },
+        revenueRollingDayAgo: {
+          type: 'sum',
+          sql: \`\${revenue_day_ago}\`,
+          multi_stage: true,
+          rollingWindow: {
+            trailing: '2 day',
+            offset: 'start'
+          }
         },
         revenue_day_ago_no_td: {
           multi_stage: true,
@@ -1033,6 +1051,38 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_rolling: null }
   ]));
 
+  if (getEnv('nativeSqlPlanner')) {
+    it('rolling day ago', async () => runQueryTest({
+      measures: [
+        'visitors.revenueRollingDayAgo'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-10']
+      }],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    }, [
+      { visitors__created_at_day: '2017-01-01T00:00:00.000Z', visitors__revenue_rolling_day_ago: null },
+      { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__revenue_rolling_day_ago: null },
+      { visitors__created_at_day: '2017-01-03T00:00:00.000Z', visitors__revenue_rolling_day_ago: null },
+      { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__revenue_rolling_day_ago: '100' },
+      { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__revenue_rolling_day_ago: '100' },
+      { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__revenue_rolling_day_ago: '200' },
+      { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__revenue_rolling_day_ago: '500' },
+      { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__revenue_rolling_day_ago: '1200' },
+      { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling_day_ago: '900' },
+      { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_rolling_day_ago: null }
+    ]));
+  } else {
+    it.skip('rolling count without date range', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
+
   it('rolling multiplied', async () => runQueryTest({
     measures: [
       'visitors.revenueRolling',
@@ -1701,6 +1751,34 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__revenue_qtd: '1500' },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_qtd: '1500' }
   ]));
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('rolling qtd proxy', async () => runQueryTest({
+      measures: [
+        'visitors.revenue_qtd_proxy'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-05', '2017-01-10']
+      }],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    }, [
+      { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__revenue_qtd_proxy: '600' },
+      { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__revenue_qtd_proxy: '1500' },
+      { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__revenue_qtd_proxy: '1500' },
+      { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__revenue_qtd_proxy: '1500' },
+      { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__revenue_qtd_proxy: '1500' },
+      { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_qtd_proxy: '1500' }
+    ]));
+  } else {
+    it.skip('rolling qtd proxy', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
 
   it('CAGR', async () => runQueryTest({
     measures: [
