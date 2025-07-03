@@ -10,7 +10,7 @@ use crate::sql::{InlineTable, InlineTables, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use async_std::fs::File;
 use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
@@ -600,6 +600,7 @@ pub enum HttpCommand {
 impl HttpMessage {
     pub fn bytes(&self) -> Vec<u8> {
         let mut builder = FlatBufferBuilder::with_capacity(1024);
+        let mut data_frame_serialization_start = None::<SystemTime>;
         let args = HttpMessageArgs {
             message_id: self.message_id,
             command_type: match self.command {
@@ -645,6 +646,7 @@ impl HttpMessage {
                     )
                 }
                 HttpCommand::ResultSet { data_frame } => {
+                    data_frame_serialization_start = Some(SystemTime::now());
                     let columns_vec =
                         HttpMessage::build_columns(&mut builder, data_frame.get_columns());
                     let rows = HttpMessage::build_rows(&mut builder, data_frame.clone());
@@ -668,7 +670,16 @@ impl HttpMessage {
         };
         let message = cubeshared::codegen::HttpMessage::create(&mut builder, &args);
         builder.finish(message, None);
-        builder.finished_data().to_vec() // TODO copy
+        let result = builder.finished_data().to_vec(); // TODO copy
+        if let Some(data_frame_serialization_start) = data_frame_serialization_start {
+            app_metrics::HTTP_MESSAGE_DATA_FRAME_SERIALIZATION_TIME_US.report(
+                data_frame_serialization_start
+                    .elapsed()
+                    .unwrap_or_else(|_| Duration::ZERO)
+                    .as_micros() as i64,
+            );
+        }
+        result
     }
 
     pub fn should_close_connection(&self) -> bool {
