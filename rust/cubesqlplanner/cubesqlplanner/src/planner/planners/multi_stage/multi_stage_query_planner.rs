@@ -290,7 +290,7 @@ impl MultiStageQueryPlanner {
                         .collect_vec();
                     if !measures.is_empty() {
                         return Err(CubeError::user(
-                            format!("Measure {} and references another measures ({}). In this case, {} must have multi_stage: true defined",
+                            format!("Measure {} references another measures ({}). In this case, {} must have multi_stage: true defined",
                             member.full_name(),
                             measures.into_iter().map(|m| m.full_name()).join(", "),
                             member.full_name(),
