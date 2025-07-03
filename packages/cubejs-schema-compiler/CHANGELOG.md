@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.32](https://github.com/cube-js/cube/compare/v1.3.31...v1.3.32) (2025-07-03)
+
+### Features
+
+- **tesseract:** MultiStage rolling window ([#9747](https://github.com/cube-js/cube/issues/9747)) ([4f5e5dc](https://github.com/cube-js/cube/commit/4f5e5dcd47e93be237e856d672e7df3c3a2f3d6f))
+
 ## [1.3.31](https://github.com/cube-js/cube/compare/v1.3.30...v1.3.31) (2025-07-02)
 
 ### Bug Fixes
