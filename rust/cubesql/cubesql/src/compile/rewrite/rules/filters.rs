@@ -1668,8 +1668,64 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
+            // DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") = 2019
             transforming_rewrite(
                 "extract-year-equals",
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DatePart",
+                            vec![literal_string("YEAR"), column_expr("?column")],
+                        ),
+                        "=",
+                        literal_expr("?year"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                self.transform_filter_extract_year_equals(
+                    "?year",
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?member",
+                    "?values",
+                    "?filter_aliases",
+                ),
+            ),
+            // Same as the rule above, but it uses different case for granularity.
+            // TODO: Remove, whenever we will fix bug with granularity cases. CORE-1761
+            transforming_rewrite(
+                "extract-year-equals-lower-case",
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DatePart",
+                            vec![literal_string("year"), column_expr("?column")],
+                        ),
+                        "=",
+                        literal_expr("?year"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                self.transform_filter_extract_year_equals(
+                    "?year",
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?member",
+                    "?values",
+                    "?filter_aliases",
+                ),
+            ),
+            // TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) = 2019
+            transforming_rewrite(
+                "extract-trunc-year-equals",
                 filter_replacer(
                     binary_expr(
                         self.fun_expr(
@@ -3579,43 +3635,54 @@ impl FilterRules {
                     .collect();
             for year in years {
                 for aliases in aliases_es.iter() {
-                    if let ScalarValue::Int64(Some(year)) = year {
-                        if !(1000..=9999).contains(&year) {
+                    let year = match year {
+                        ScalarValue::Int64(Some(year)) => year,
+                        ScalarValue::Int32(Some(year)) => year as i64,
+                        ScalarValue::Utf8(Some(ref year_str)) if year_str.len() == 4 => {
+                            if let Ok(year) = year_str.parse::<i64>() {
+                                year
+                            } else {
+                                continue;
+                            }
+                        }
+                        _ => continue,
+                    };
+
+                    if !(1000..=9999).contains(&year) {
+                        continue;
+                    }
+
+                    if let Some((member_name, cube)) = Self::filter_member_name(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        column_var,
+                        members_var,
+                        &aliases,
+                    ) {
+                        if !cube.contains_member(&member_name) {
                             continue;
                         }
 
-                        if let Some((member_name, cube)) = Self::filter_member_name(
-                            egraph,
-                            subst,
-                            &meta_context,
-                            alias_to_cube_var,
-                            column_var,
-                            members_var,
-                            &aliases,
-                        ) {
-                            if !cube.contains_member(&member_name) {
-                                continue;
-                            }
+                        subst.insert(
+                            member_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                                FilterMemberMember(member_name.to_string()),
+                            )),
+                        );
 
-                            subst.insert(
-                                member_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberMember(
-                                    FilterMemberMember(member_name.to_string()),
-                                )),
-                            );
+                        subst.insert(
+                            values_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                FilterMemberValues(vec![
+                                    format!("{}-01-01", year),
+                                    format!("{}-12-31", year),
+                                ]),
+                            )),
+                        );
 
-                            subst.insert(
-                                values_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                                    FilterMemberValues(vec![
-                                        format!("{}-01-01", year),
-                                        format!("{}-12-31", year),
-                                    ]),
-                                )),
-                            );
-
-                            return true;
-                        }
+                        return true;
                     }
                 }
             }
