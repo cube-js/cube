@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.33](https://github.com/cube-js/cube/compare/v1.3.32...v1.3.33) (2025-07-03)
+
+### Features
+
+- **cubesql:** Filter push down for date_part('year', ?col) = ?literal ([#9749](https://github.com/cube-js/cube/issues/9749)) ([f952cf7](https://github.com/cube-js/cube/commit/f952cf7e895ca5623d356bed6d104fd26b081ec9))
+
 ## [1.3.32](https://github.com/cube-js/cube/compare/v1.3.31...v1.3.32) (2025-07-03)
 
 ### Features
