@@ -281,6 +281,24 @@ impl MultiStageQueryPlanner {
                         granularity: None,
                     }
                 };
+
+                if !measure.is_multi_stage() {
+                    let childs = member_childs(&member, true)?;
+                    let measures = childs
+                        .iter()
+                        .filter(|s| s.as_measure().is_ok())
+                        .collect_vec();
+                    if !measures.is_empty() {
+                        return Err(CubeError::user(
+                            format!("Measure {} and references another measures ({}). In this case, {} must have multi_stage: true defined",
+                            member.full_name(),
+                            measures.into_iter().map(|m| m.full_name()).join(", "),
+                            member.full_name(),
+                                        ),
+                        ));
+                    }
+                }
+
                 let ungrouped = measure.is_rolling_window() && !measure.is_addictive();
 
                 let mut time_dimensions = self.query_properties.time_dimensions().clone();
@@ -323,14 +341,12 @@ impl MultiStageQueryPlanner {
                     &rolling_window,
                     state.clone(),
                 )?;
-                let base_member = MemberSymbol::new_measure(
-                    measure.new_unrolling(member.get_dependencies().is_empty()),
-                );
+                let base_member = MemberSymbol::new_measure(measure.new_unrolling());
 
                 let time_series =
                     self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?;
 
-                let rolling_base = if base_member.get_dependencies().is_empty() {
+                let rolling_base = if !measure.is_multi_stage() {
                     self.add_rolling_window_base(
                         base_member,
                         base_rolling_state,

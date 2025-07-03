@@ -155,6 +155,7 @@ describe('SQL Generation', () => {
         revenue_qtd_proxy: {
           type: 'sum',
           sql: \`\${revenue}\`,
+          multi_stage: true,
           rollingWindow: {
             type: 'to_date',
             granularity: 'quarter'
@@ -173,6 +174,7 @@ describe('SQL Generation', () => {
         revenueRollingDayAgo: {
           type: 'sum',
           sql: \`\${revenue_day_ago}\`,
+          multi_stage: true,
           rollingWindow: {
             trailing: '2 day',
             offset: 'start'
