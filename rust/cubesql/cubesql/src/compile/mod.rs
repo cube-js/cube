@@ -9485,8 +9485,30 @@ ORDER BY "source"."str0" ASC
     async fn test_filter_date_part_by_year() {
         init_testing_logger();
 
-        let logical_plan = convert_select_to_query_plan(
-            r#"
+        fn assert_expected_result(query_plan: QueryPlan) {
+            assert_eq!(
+                query_plan.as_logical_plan().find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("year".to_string()),
+                        date_range: Some(json!(vec![
+                            "2019-01-01".to_string(),
+                            "2019-12-31".to_string(),
+                        ])),
+                    },]),
+                    order: Some(vec![]),
+                    ..Default::default()
+                }
+            )
+        }
+
+        assert_expected_result(
+            convert_select_to_query_plan(
+                r#"
             SELECT
                 COUNT(*) AS "count",
                 date_part('YEAR', "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
@@ -9494,29 +9516,27 @@ ORDER BY "source"."str0" ASC
             WHERE date_part('YEAR', "KibanaSampleDataEcommerce"."order_date") = 2019
             GROUP BY 2
             ;"#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
+                .to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await,
+        );
 
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec![]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("year".to_string()),
-                    date_range: Some(json!(vec![
-                        "2019-01-01".to_string(),
-                        "2019-12-31".to_string(),
-                    ])),
-                },]),
-                order: Some(vec![]),
-                ..Default::default()
-            }
+        // Same as above, but with string literal.
+        assert_expected_result(
+            convert_select_to_query_plan(
+                r#"
+            SELECT
+                COUNT(*) AS "count",
+                date_part('YEAR', "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE date_part('YEAR', "KibanaSampleDataEcommerce"."order_date") = '2019'
+            GROUP BY 2
+            ;"#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await,
         )
     }
 
