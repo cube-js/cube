@@ -587,7 +587,6 @@ export class CubeEvaluator extends CubeSymbols {
     };
   }
 
-
   /**
    * Returns pre-aggregations filtered by the specified selector.
    */
