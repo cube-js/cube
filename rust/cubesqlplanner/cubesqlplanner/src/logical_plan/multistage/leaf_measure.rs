@@ -1,14 +1,13 @@
 use crate::logical_plan::*;
 use crate::planner::planners::multi_stage::TimeShiftState;
-use crate::planner::sql_evaluator::{DimensionTimeShift, MemberSymbol};
-use std::collections::HashMap;
+use crate::planner::sql_evaluator::MemberSymbol;
 use std::rc::Rc;
 
 pub struct MultiStageLeafMeasure {
     pub measure: Rc<MemberSymbol>,
     pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
     pub render_measure_for_ungrouped: bool,
-    pub time_shifts: HashMap<String, DimensionTimeShift>,
+    pub time_shifts: TimeShiftState,
     pub query: Rc<Query>,
 }
 
@@ -26,7 +25,7 @@ impl PrettyPrint for MultiStageLeafMeasure {
         if !self.time_shifts.is_empty() {
             result.println("time_shifts:", &state);
             let details_state = state.new_level();
-            for (_, time_shift) in self.time_shifts.iter() {
+            for (_, time_shift) in self.time_shifts.dimensions_shifts.iter() {
                 result.println(
                     &format!(
                         "- {}: {}",
