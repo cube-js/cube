@@ -7,12 +7,13 @@ use super::{
 };
 use crate::plan::schema::QualifiedColumnName;
 use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::sql_evaluator::DimensionTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct SqlNodesFactory {
-    time_shifts: TimeShiftState,
+    time_shifts: HashMap<String, DimensionTimeShift>,
     ungrouped: bool,
     ungrouped_measure: bool,
     count_approx_as_state: bool,
@@ -33,7 +34,7 @@ pub struct SqlNodesFactory {
 impl SqlNodesFactory {
     pub fn new() -> Self {
         Self {
-            time_shifts: TimeShiftState::default(),
+            time_shifts: HashMap::new(),
             ungrouped: false,
             ungrouped_measure: false,
             count_approx_as_state: false,
@@ -52,7 +53,7 @@ impl SqlNodesFactory {
         }
     }
 
-    pub fn set_time_shifts(&mut self, time_shifts: TimeShiftState) {
+    pub fn set_time_shifts(&mut self, time_shifts: HashMap<String, DimensionTimeShift>) {
         self.time_shifts = time_shifts;
     }
 

@@ -301,7 +301,7 @@ impl MultiStageMemberQueryPlanner {
             measure: member_node.clone(),
             query,
             render_measure_as_state: self.description.member().has_aggregates_on_top(),
-            time_shifts: self.description.state().time_shifts().clone(),
+            time_shifts: self.description.state().resolved_time_shifts(),
             render_measure_for_ungrouped: self.description.member().is_ungrupped(),
         };
         let result = LogicalMultiStageMember {

@@ -5,6 +5,7 @@ use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::DimensionTimeShift;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -24,7 +25,7 @@ struct PhysicalPlanBuilderContext {
     pub alias_prefix: Option<String>,
     pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
     pub render_measure_for_ungrouped: bool,
-    pub time_shifts: TimeShiftState,
+    pub time_shifts: HashMap<String, DimensionTimeShift>,
     pub original_sql_pre_aggregations: HashMap<String, String>,
 }
 

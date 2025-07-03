@@ -104,6 +104,57 @@ impl MultiStageAppliedState {
         &self.time_shifts
     }
 
+    pub fn resolved_time_shifts(&self) -> HashMap<String, DimensionTimeShift> {
+        let mut resolved_time_shifts = self.time_shifts.dimensions_shifts.clone();
+        if let Some(common) = &self.time_shifts.common_time_shift {
+            for member in self.all_time_members() {
+                if let Some(exists) = resolved_time_shifts.get_mut(&member.full_name()) {
+                    exists.interval += common;
+                } else {
+                    let time_shift = DimensionTimeShift {
+                        interval: common.clone(),
+                        dimension: member.clone(),
+                    };
+                    resolved_time_shifts.insert(member.full_name(), time_shift);
+                }
+            }
+        }
+        resolved_time_shifts
+    }
+
+    fn all_time_members(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut filter_symbols = self.all_dimensions_symbols();
+        for filter_item in self
+            .time_dimensions_filters
+            .iter()
+            .chain(self.dimensions_filters.iter())
+            .chain(self.segments.iter())
+        {
+            filter_item.find_all_member_evaluators(&mut filter_symbols);
+        }
+
+        let time_symbols = filter_symbols
+            .into_iter()
+            .filter_map(|m| {
+                let symbol = if let Ok(time_dim) = m.as_time_dimension() {
+                    time_dim.base_symbol().clone().resolve_reference_chain()
+                } else {
+                    m.resolve_reference_chain()
+                };
+                if let Ok(dim) = symbol.as_dimension() {
+                    if dim.dimension_type() == "time" {
+                        Some(symbol)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+        time_symbols
+    }
+
     pub fn time_dimensions_filters(&self) -> &Vec<FilterItem> {
         &self.time_dimensions_filters
     }
@@ -119,6 +170,14 @@ impl MultiStageAppliedState {
         self.dimensions
             .iter()
             .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn all_dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.time_dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .chain(self.dimensions.iter().map(|d| d.member_evaluator().clone()))
             .collect()
     }
 
