@@ -1698,7 +1698,7 @@ impl RewriteRules for FilterRules {
             // Same as the rule above, but it uses different case for granularity.
             // TODO: Remove, whenever we will fix bug with granularity cases. CORE-1761
             transforming_rewrite(
-                "extract-year-equals",
+                "extract-year-equals-lower-case",
                 filter_replacer(
                     binary_expr(
                         self.fun_expr(
