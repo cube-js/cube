@@ -17988,24 +17988,7 @@ less@^3.13.1:
     native-request "^1.0.5"
     source-map "~0.6.0"
 
-less@^4.1.1:
-  version "4.1.2"
-  resolved "https://registry.yarnpkg.com/less/-/less-4.1.2.tgz#6099ee584999750c2624b65f80145f8674e4b4b0"
-  integrity sha512-EoQp/Et7OSOVu0aJknJOtlXZsnr8XE8KwuzTHOLeVSEx8pVWUICc8Q0VYRHgzyjX78nMEyC/oztWFbgyhtNfDA==
-  dependencies:
-    copy-anything "^2.0.1"
-    parse-node-version "^1.0.1"
-    tslib "^2.3.0"
-  optionalDependencies:
-    errno "^0.1.1"
-    graceful-fs "^4.1.2"
-    image-size "~0.5.0"
-    make-dir "^2.1.0"
-    mime "^1.4.1"
-    needle "^2.5.2"
-    source-map "~0.6.0"
-
-less@^4.2.0:
+less@^4.1.1, less@^4.2.0:
   version "4.3.0"
   resolved "https://registry.yarnpkg.com/less/-/less-4.3.0.tgz#ef0cfc260a9ca8079ed8d0e3512bda8a12c82f2a"
   integrity sha512-X9RyH9fvemArzfdP8Pi3irr7lor2Ok4rOttDXBhlwDg+wKQsXOXgHWduAJE1EsF7JJx0w0bcO6BC6tCKKYnXKA==
