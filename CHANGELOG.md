@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.34](https://github.com/cube-js/cube/compare/v1.3.33...v1.3.34) (2025-07-04)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix pre-agg partitions creation for Ksql ([#9750](https://github.com/cube-js/cube/issues/9750)) ([f08f19b](https://github.com/cube-js/cube/commit/f08f19b2a78105bd5fcc06de3d156767eb483908))
+
 ## [1.3.33](https://github.com/cube-js/cube/compare/v1.3.32...v1.3.33) (2025-07-03)
 
 ### Features
