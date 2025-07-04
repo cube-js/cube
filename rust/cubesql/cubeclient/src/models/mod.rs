@@ -12,6 +12,8 @@ pub mod v1_cube_meta_join;
 pub use self::v1_cube_meta_join::V1CubeMetaJoin;
 pub mod v1_cube_meta_measure;
 pub use self::v1_cube_meta_measure::V1CubeMetaMeasure;
+pub mod v1_cube_meta_nested_folder;
+pub use self::v1_cube_meta_nested_folder::V1CubeMetaNestedFolder;
 pub mod v1_cube_meta_segment;
 pub use self::v1_cube_meta_segment::V1CubeMetaSegment;
 pub mod v1_cube_meta_type;
