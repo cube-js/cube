@@ -4456,6 +4456,10 @@ export class BaseQuery {
     return `SELECT ${sql} as refresh_key`;
   }
 
+  partitionInvalidateKeyQueries(_cube, _preAggregation) {
+    // this is not used across all dialects, atm only in KsqlQuery.
+  }
+
   preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName) {
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
