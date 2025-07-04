@@ -1,7 +1,7 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::sql_evaluator::{DimensionTimeShift, MeasureTimeShifts, MemberSymbol};
-use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension, SqlInterval};
+use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
 use itertools::Itertools;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
@@ -11,12 +11,11 @@ use std::rc::Rc;
 #[derive(Clone, Default, Debug)]
 pub struct TimeShiftState {
     pub dimensions_shifts: HashMap<String, DimensionTimeShift>,
-    pub common_time_shift: Option<SqlInterval>,
 }
 
 impl TimeShiftState {
     pub fn is_empty(&self) -> bool {
-        self.dimensions_shifts.is_empty() && self.common_time_shift.is_none()
+        self.dimensions_shifts.is_empty()
     }
 }
 
@@ -74,34 +73,68 @@ impl MultiStageAppliedState {
     }
 
     pub fn add_time_shifts(&mut self, time_shifts: MeasureTimeShifts) {
-        match time_shifts {
-            MeasureTimeShifts::Dimensions(dimensions) => {
-                for ts in dimensions.into_iter() {
-                    if let Some(exists) = self
-                        .time_shifts
-                        .dimensions_shifts
-                        .get_mut(&ts.dimension.full_name())
-                    {
-                        exists.interval += ts.interval;
-                    } else {
-                        self.time_shifts
-                            .dimensions_shifts
-                            .insert(ts.dimension.full_name(), ts);
-                    }
-                }
-            }
-            MeasureTimeShifts::Common(interval) => {
-                if let Some(common) = self.time_shifts.common_time_shift.as_mut() {
-                    *common += interval;
-                } else {
-                    self.time_shifts.common_time_shift = Some(interval);
-                }
+        let resolved_shifts = match time_shifts {
+            MeasureTimeShifts::Dimensions(dimensions) => dimensions,
+            MeasureTimeShifts::Common(interval) => self
+                .all_time_members()
+                .into_iter()
+                .map(|m| DimensionTimeShift {
+                    interval: interval.clone(),
+                    dimension: m,
+                })
+                .collect_vec(),
+        };
+        for ts in resolved_shifts.into_iter() {
+            if let Some(exists) = self
+                .time_shifts
+                .dimensions_shifts
+                .get_mut(&ts.dimension.full_name())
+            {
+                exists.interval += ts.interval;
+            } else {
+                self.time_shifts
+                    .dimensions_shifts
+                    .insert(ts.dimension.full_name(), ts);
             }
         }
     }
 
     pub fn time_shifts(&self) -> &TimeShiftState {
         &self.time_shifts
+    }
+
+    fn all_time_members(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut filter_symbols = self.all_dimensions_symbols();
+        for filter_item in self
+            .time_dimensions_filters
+            .iter()
+            .chain(self.dimensions_filters.iter())
+            .chain(self.segments.iter())
+        {
+            filter_item.find_all_member_evaluators(&mut filter_symbols);
+        }
+
+        let time_symbols = filter_symbols
+            .into_iter()
+            .filter_map(|m| {
+                let symbol = if let Ok(time_dim) = m.as_time_dimension() {
+                    time_dim.base_symbol().clone().resolve_reference_chain()
+                } else {
+                    m.resolve_reference_chain()
+                };
+                if let Ok(dim) = symbol.as_dimension() {
+                    if dim.dimension_type() == "time" {
+                        Some(symbol)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .unique_by(|s| s.full_name())
+            .collect_vec();
+        time_symbols
     }
 
     pub fn time_dimensions_filters(&self) -> &Vec<FilterItem> {
@@ -119,6 +152,14 @@ impl MultiStageAppliedState {
         self.dimensions
             .iter()
             .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn all_dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.time_dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .chain(self.dimensions.iter().map(|d| d.member_evaluator().clone()))
             .collect()
     }
 
@@ -343,7 +384,6 @@ impl PartialEq for MultiStageAppliedState {
             && self.time_dimensions_filters == other.time_dimensions_filters
             && self.dimensions_filters == other.dimensions_filters
             && self.measures_filters == other.measures_filters
-            && self.time_shifts.common_time_shift == other.time_shifts.common_time_shift
             && self.time_shifts.dimensions_shifts == other.time_shifts.dimensions_shifts
     }
 }

@@ -22,12 +22,9 @@ impl PrettyPrint for MultiStageLeafMeasure {
         if self.render_measure_for_ungrouped {
             result.println("render_measure_for_ungrouped: true", &state);
         }
-        if !self.time_shifts.dimensions_shifts.is_empty() {
+        if !self.time_shifts.is_empty() {
             result.println("time_shifts:", &state);
             let details_state = state.new_level();
-            if let Some(common) = &self.time_shifts.common_time_shift {
-                result.println(&format!("- common: {}", common.to_sql()), &details_state);
-            }
             for (_, time_shift) in self.time_shifts.dimensions_shifts.iter() {
                 result.println(
                     &format!(
