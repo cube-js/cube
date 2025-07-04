@@ -59,22 +59,23 @@ deployment][ref-demo-deployment] in Cube Cloud.
 
 ## Environment Variables
 
-| Environment Variable                    | Description                                                                                                           | Possible Values                                               | Required |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | :------: |
-| `CUBEJS_DB_DUCKDB_MEMORY_LIMIT`         | The maximum memory limit for DuckDB. Equivalent to `SET memory_limit=<MEMORY_LIMIT>`. Default is 75% of available RAM | A valid memory limit                                          |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_SCHEMA`               | The [default search schema][link-duckdb-configuration-ref]                                                            | A valid schema name                                           |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN`     | The service token to use for connections to MotherDuck                                                                | A valid [MotherDuck service token][motherduck-docs-svc-token] |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_DATABASE_PATH`        | The database filepath to use for connection to a local database.                                                      | A valid duckdb database file path                             |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID`     | The Access Key ID to use for database connections                                                                     | A valid Access Key ID                                         |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY` | The Secret Access Key to use for database connections                                                                 | A valid Secret Access Key                                     |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_S3_ENDPOINT`          | The S3 endpoint                                                                                                       | A valid [S3 endpoint][duckdb-docs-s3-import]                  |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_S3_REGION`            | The [region of the bucket][duckdb-docs-s3-import]                                                                     | A valid AWS region                                            |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_S3_USE_SSL`           | Use SSL for connection                                                                                                | A boolean                                                     |    ❌    |                                    ❌                                     |
-| `CUBEJS_DB_DUCKDB_S3_URL_STYLE`         | To choose the S3 URL style(vhost or path)                                                                             | 'vhost' or 'path'                                             |    ❌    |                                    ❌                                     |
-| `CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN`     | The token for the S3 session                                                                                          | A valid Session Token                                         |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_EXTENSIONS`           | A comma-separated list of DuckDB extensions	to install and load                                                       | A comma-separated list of DuckDB extensions                   |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_COMMUNITY_EXTENSIONS` | A comma-separated list of DuckDB community extensions	to install and load                                             | A comma-separated list of DuckDB community extensions         |    ❌    |                                    ✅                                     |
-| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| Environment Variable                       | Description                                                                                                           | Possible Values                                               | Required |
+|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------|:--------:|
+| `CUBEJS_DB_DUCKDB_MEMORY_LIMIT`            | The maximum memory limit for DuckDB. Equivalent to `SET memory_limit=<MEMORY_LIMIT>`. Default is 75% of available RAM | A valid memory limit                                          |    ❌     |
+| `CUBEJS_DB_DUCKDB_SCHEMA`                  | The [default search schema][link-duckdb-configuration-ref]                                                            | A valid schema name                                           |    ❌     |
+| `CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN`        | The service token to use for connections to MotherDuck                                                                | A valid [MotherDuck service token][motherduck-docs-svc-token] |    ❌     |
+| `CUBEJS_DB_DUCKDB_DATABASE_PATH`           | The database filepath to use for connection to a local database.                                                      | A valid duckdb database file path                             |    ❌     |
+| `CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID`        | The Access Key ID to use for database connections                                                                     | A valid Access Key ID                                         |    ❌     |
+| `CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY`    | The Secret Access Key to use for database connections                                                                 | A valid Secret Access Key                                     |    ❌     |
+| `CUBEJS_DB_DUCKDB_S3_ENDPOINT`             | The S3 endpoint                                                                                                       | A valid [S3 endpoint][duckdb-docs-s3-import]                  |    ❌     |
+| `CUBEJS_DB_DUCKDB_S3_REGION`               | The [region of the bucket][duckdb-docs-s3-import]                                                                     | A valid AWS region                                            |    ❌     |
+| `CUBEJS_DB_DUCKDB_S3_USE_SSL`              | Use SSL for connection                                                                                                | A boolean                                                     |    ❌     |
+| `CUBEJS_DB_DUCKDB_S3_URL_STYLE`            | To choose the S3 URL style(vhost or path)                                                                             | `vhost` or `path`                                             |    ❌     |
+| `CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN`        | The token for the S3 session                                                                                          | A valid Session Token                                         |    ❌     |
+| `CUBEJS_DB_DUCKDB_EXTENSIONS`              | A comma-separated list of DuckDB extensions	to install and load                                                       | A comma-separated list of DuckDB extensions                   |    ❌     |
+| `CUBEJS_DB_DUCKDB_COMMUNITY_EXTENSIONS`    | A comma-separated list of DuckDB community extensions	to install and load                                             | A comma-separated list of DuckDB community extensions         |    ❌     |
+| `CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN` | A flag to use credentials chain for secrets for S3 connections                                                        | `true`, `false`. Defaults to `false`                          |    ❌     |
+| `CUBEJS_CONCURRENCY`                       | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                    | A valid number                                                |    ❌     |
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
@@ -128,8 +129,6 @@ connections are made over HTTPS.
   https://motherduck.com/docs/architecture-and-capabilities#hybrid-execution
 [motherduck-docs-svc-token]:
   https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
-[ref-caching-large-preaggs]:
-  /product/caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx

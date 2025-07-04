@@ -75,7 +75,7 @@ would be `HOST/cubejs-api/v1`. Please refer to the
 You will also need to generate a JSON Web Token that would be used to
 authenticate requests to Cube.
 
-Please check the [Security page](/product/auth#generating-json-web-tokens-jwt)
+Please check the [Security page](/product/auth/methods/jwt#generating-json-web-tokens)
 to learn how to generate a token. We suggest generating a long-lived JWT that
 won't expire soon.
 
@@ -125,14 +125,14 @@ jsonQuery = {
     timeDimensions: [
       {
         dimension: "orders.created_at",
-        granularity: "month",
-      },
+        granularity: "month"
+      }
     ],
     order: {
-      "orders.created_at": "asc",
-    },
-  },
-};
+      "orders.created_at": "asc"
+    }
+  }
+}
 ```
 
 Next, create another JavaScript cell with a POST request. Paste this POST
@@ -172,6 +172,5 @@ You can also create a visualization of the executed REST API request.
   />
 </div>
 
-[ref-getting-started]: /product/getting-started/cloud
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-rest-api]: /product/apis-integrations/rest-api

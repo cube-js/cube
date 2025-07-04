@@ -1,10 +1,13 @@
 use super::{GranularityHelper, QueryDateTime, SqlInterval};
+use crate::planner::sql_evaluator::SqlCall;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::rc::Rc;
 use std::str::FromStr;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Granularity {
     granularity: String,
     granularity_interval: String,
@@ -12,6 +15,7 @@ pub struct Granularity {
     origin: QueryDateTime,
     is_predefined_granularity: bool,
     is_natural_aligned: bool,
+    calendar_sql: Option<Rc<SqlCall>>,
 }
 
 impl Granularity {
@@ -26,6 +30,7 @@ impl Granularity {
             origin,
             is_predefined_granularity: true,
             is_natural_aligned: true,
+            calendar_sql: None,
         })
     }
     pub fn try_new_custom(
@@ -34,7 +39,21 @@ impl Granularity {
         origin: Option<String>,
         granularity_interval: String,
         granularity_offset: Option<String>,
+        calendar_sql: Option<Rc<SqlCall>>,
     ) -> Result<Self, CubeError> {
+        // sql() is mutual exclusive with interval and offset/origin
+        if calendar_sql.is_some() {
+            return Ok(Self {
+                granularity,
+                granularity_interval,
+                granularity_offset: None,
+                origin: Self::default_origin(timezone)?,
+                is_predefined_granularity: false,
+                is_natural_aligned: false,
+                calendar_sql,
+            });
+        }
+
         let origin = if let Some(origin) = origin {
             QueryDateTime::from_date_str(timezone, &origin)?
         } else if let Some(offset) = &granularity_offset {
@@ -68,6 +87,7 @@ impl Granularity {
             origin,
             is_predefined_granularity: false,
             is_natural_aligned,
+            calendar_sql,
         })
     }
 
@@ -77,6 +97,10 @@ impl Granularity {
 
     pub fn granularity_offset(&self) -> &Option<String> {
         &self.granularity_offset
+    }
+
+    pub fn calendar_sql(&self) -> &Option<Rc<SqlCall>> {
+        &self.calendar_sql
     }
 
     pub fn granularity(&self) -> &String {
@@ -127,7 +151,7 @@ impl Granularity {
         )
     }
 
-    pub fn resolve_granularity(&self) -> Result<String, CubeError> {
+    pub fn resolved_granularity(&self) -> Result<String, CubeError> {
         if self.is_predefined_granularity {
             Ok(self.granularity.clone())
         } else {
@@ -142,5 +166,30 @@ impl Granularity {
 
     fn default_origin(timezone: Tz) -> Result<QueryDateTime, CubeError> {
         Ok(QueryDateTime::now(timezone)?.start_of_year())
+    }
+
+    pub fn apply_to_input_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        input: String,
+    ) -> Result<String, CubeError> {
+        let res = if self.is_natural_aligned {
+            if let Some(offset) = &self.granularity_offset {
+                let mut res = templates.subtract_interval(input.clone(), offset.clone())?;
+                res = templates.time_grouped_column(self.granularity_from_interval()?, res)?;
+                res = templates.add_interval(res, offset.clone())?;
+                res
+            } else {
+                templates.time_grouped_column(self.granularity_from_interval()?, input)?
+            }
+        } else {
+            templates.date_bin(
+                self.granularity_interval.clone(),
+                input,
+                self.origin_local_formatted(),
+            )?
+        };
+
+        Ok(res)
     }
 }

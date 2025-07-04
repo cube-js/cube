@@ -5,6 +5,7 @@ use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, MeasureSymbolFactory,
     SqlCall, SymbolFactory, TraversalVisitor,
 };
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
@@ -14,15 +15,21 @@ use std::collections::HashMap;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    base_tools: Rc<dyn BaseTools>,
     timezone: Tz,
     /* (type, name) */
     members: HashMap<(String, String), Rc<MemberSymbol>>,
 }
 
 impl Compiler {
-    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>, timezone: Tz) -> Self {
+    pub fn new(
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        base_tools: Rc<dyn BaseTools>,
+        timezone: Tz,
+    ) -> Self {
         Self {
             cube_evaluator,
+            base_tools,
             timezone,
             members: HashMap::new(),
         }
@@ -43,6 +50,10 @@ impl Compiler {
                 name
             )))
         }
+    }
+
+    pub fn base_tools(&self) -> Rc<dyn BaseTools> {
+        self.base_tools.clone()
     }
 
     pub fn add_measure_evaluator(

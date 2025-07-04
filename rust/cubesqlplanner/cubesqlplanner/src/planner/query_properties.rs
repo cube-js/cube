@@ -1,6 +1,9 @@
 use super::filter::compiler::FilterCompiler;
 use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
+use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
+use crate::planner::sql_evaluator::MemberExpressionExpression;
 
 use super::sql_evaluator::MemberSymbol;
 use super::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
@@ -43,9 +46,29 @@ impl OrderByItem {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct MultipliedMeasure {
+    measure: Rc<BaseMeasure>,
+    cube_name: String, //May differ from cube_name of the measure for a member_expression that refers to a dimension.
+}
+
+impl MultipliedMeasure {
+    pub fn new(measure: Rc<BaseMeasure>, cube_name: String) -> Rc<Self> {
+        Rc::new(Self { measure, cube_name })
+    }
+
+    pub fn measure(&self) -> &Rc<BaseMeasure> {
+        &self.measure
+    }
+
+    pub fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+}
+
 #[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
-    pub multiplied_measures: Vec<Rc<BaseMeasure>>,
+    pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
     pub regular_measures: Vec<Rc<BaseMeasure>>,
     pub multi_stage_measures: Vec<Rc<BaseMeasure>>,
     pub rendered_as_multiplied_measures: HashSet<String>,
@@ -79,6 +102,7 @@ pub struct QueryProperties {
     multi_fact_join_groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>,
     pre_aggregation_query: bool,
     total_query: bool,
+    query_join_hints: Rc<Vec<JoinHintItem>>,
 }
 
 impl QueryProperties {
@@ -111,8 +135,16 @@ impl QueryProperties {
                             } else {
                                 "".to_string()
                             };
-                        let expression_evaluator = evaluator_compiler
-                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        let expression_evaluator = match member_expression.expression()? {
+                            MemberExpressionExpressionDef::Sql(sql) => {
+                                evaluator_compiler.compile_sql_call(&cube_name, sql)?
+                            }
+                            MemberExpressionExpressionDef::Struct(_) => {
+                                return Err(CubeError::user(format!(
+                                    "Expression struct not supported for dimension"
+                                )));
+                            }
+                        };
                         BaseDimension::try_new_from_expression(
                             expression_evaluator,
                             cube_name,
@@ -137,6 +169,7 @@ impl QueryProperties {
                     BaseTimeDimension::try_new_required(
                         query_tools.clone(),
                         evaluator,
+                        &mut evaluator_compiler,
                         d.granularity.clone(),
                         d.date_range.clone(),
                     )
@@ -165,13 +198,45 @@ impl QueryProperties {
                         let name =
                             if let Some(name) = &member_expression.static_data().expression_name {
                                 name.clone()
+                            } else if let Some(name) = &member_expression.static_data().name {
+                                format!("{}.{}", cube_name, name)
                             } else {
                                 "".to_string()
                             };
-                        let expression_evaluator = evaluator_compiler
-                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        let expression = match member_expression.expression()? {
+                            MemberExpressionExpressionDef::Sql(sql) => {
+                                MemberExpressionExpression::SqlCall(
+                                    evaluator_compiler.compile_sql_call(&cube_name, sql)?,
+                                )
+                            }
+                            MemberExpressionExpressionDef::Struct(expr) => {
+                                if expr.static_data().expression_type != "PatchMeasure" {
+                                    return Err(CubeError::user(format!("Only `PatchMeasure` type of memeber expression is supported")));
+                                }
+
+                                if let Some(source_measure) = &expr.static_data().source_measure {
+
+                                    let new_measure_type = expr.static_data().replace_aggregation_type.clone();
+                                    let mut filters_to_add = vec![];
+                                    if let Some(add_filters) = expr.add_filters()? {
+                                        for filter in add_filters.iter() {
+                                            let node = evaluator_compiler.compile_sql_call(&cube_name, filter.sql()?)?;
+                                            filters_to_add.push(node);
+                                        }
+                                    }
+                                    let source_measure_compiled = evaluator_compiler.add_measure_evaluator(source_measure.clone())?;
+                                    let patched_measure = source_measure_compiled.as_measure()?.new_patched(new_measure_type, filters_to_add)?;
+                                    let patched_symbol = MemberSymbol::new_measure(patched_measure);
+                                    MemberExpressionExpression::PatchedSymbol(patched_symbol)
+
+                                } else {
+                                    return Err(CubeError::user(format!("Source measure is required for `PatchMeasure` type of memeber expression")));
+                                }
+
+                            }
+                        };
                         BaseMeasure::try_new_from_expression(
-                            expression_evaluator,
+                            expression,
                             cube_name,
                             name,
                             member_expression.static_data().definition.clone(),
@@ -230,8 +295,16 @@ impl QueryProperties {
                             } else {
                                 "".to_string()
                             };
-                            let expression_evaluator = evaluator_compiler
-                                .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                            let expression_evaluator = match member_expression.expression()? {
+                                MemberExpressionExpressionDef::Sql(sql) => {
+                                    evaluator_compiler.compile_sql_call(&cube_name, sql)?
+                                }
+                                MemberExpressionExpressionDef::Struct(_) => {
+                                    return Err(CubeError::user(format!(
+                                        "Expression struct not supported for dimension"
+                                    )));
+                                }
+                            };
                             BaseSegment::try_new(
                                 expression_evaluator,
                                 cube_name,
@@ -300,7 +373,10 @@ impl QueryProperties {
         };
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
 
+        let query_join_hints = Rc::new(options.join_hints()?.unwrap_or_default());
+
         let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
+            query_join_hints.clone(),
             query_tools.clone(),
             &measures,
             &dimensions,
@@ -331,6 +407,7 @@ impl QueryProperties {
             multi_fact_join_groups,
             pre_aggregation_query,
             total_query,
+            query_join_hints,
         }))
     }
 
@@ -350,6 +427,7 @@ impl QueryProperties {
         ungrouped: bool,
         pre_aggregation_query: bool,
         total_query: bool,
+        query_join_hints: Rc<Vec<JoinHintItem>>,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -358,6 +436,7 @@ impl QueryProperties {
         };
 
         let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
+            query_join_hints.clone(),
             query_tools.clone(),
             &measures,
             &dimensions,
@@ -385,6 +464,7 @@ impl QueryProperties {
             multi_fact_join_groups,
             pre_aggregation_query,
             total_query,
+            query_join_hints,
         }))
     }
 
@@ -393,6 +473,7 @@ impl QueryProperties {
         measures: &Vec<Rc<BaseMeasure>>,
     ) -> Result<Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>, CubeError> {
         Self::compute_join_multi_fact_groups(
+            self.query_join_hints.clone(),
             self.query_tools.clone(),
             measures,
             &self.dimensions,
@@ -409,6 +490,7 @@ impl QueryProperties {
     }
 
     pub fn compute_join_multi_fact_groups(
+        query_join_hints: Rc<Vec<JoinHintItem>>,
         query_tools: Rc<QueryTools>,
         measures: &Vec<Rc<BaseMeasure>>,
         dimensions: &Vec<Rc<BaseDimension>>,
@@ -437,7 +519,7 @@ impl QueryProperties {
             .cached_data_mut()
             .join_hints_for_filter_item_vec(&measures_filters)?;
 
-        let mut dimension_and_filter_join_hints_concat = Vec::new();
+        let mut dimension_and_filter_join_hints_concat = vec![query_join_hints];
 
         dimension_and_filter_join_hints_concat.extend(dimensions_join_hints.into_iter());
         dimension_and_filter_join_hints_concat.extend(time_dimensions_join_hints.into_iter());
@@ -556,6 +638,10 @@ impl QueryProperties {
 
     pub fn row_limit(&self) -> Option<usize> {
         self.row_limit
+    }
+
+    pub fn query_join_hints(&self) -> &Rc<Vec<JoinHintItem>> {
+        &self.query_join_hints
     }
 
     pub fn offset(&self) -> Option<usize> {
@@ -811,8 +897,10 @@ impl QueryProperties {
                             .rendered_as_multiplied_measures
                             .insert(item.measure.full_name());
                     }
-                    if item.multiplied && !item.measure.can_used_as_addictive_in_multplied()? {
-                        result.multiplied_measures.push(item.measure.clone());
+                    if item.multiplied && !item.measure.can_be_used_as_additive_in_multplied() {
+                        result
+                            .multiplied_measures
+                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_name));
                     } else {
                         result.regular_measures.push(item.measure.clone());
                     }

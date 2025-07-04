@@ -61,22 +61,22 @@ cube(`users`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     name: {
       sql: `name`,
-      type: `string`,
+      type: `string`
     },
 
     school: {
       sql: `school`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -92,8 +92,8 @@ cube(`teachers`, {
     SELECT *
     FROM ${users.sql()}
     WHERE type = 'teacher'
-  `,
-});
+  `
+})
 
 cube(`students`, {
   extends: users,
@@ -101,8 +101,8 @@ cube(`students`, {
     SELECT *
     FROM ${users.sql()}
     WHERE type = 'student'
-  `,
-});
+  `
+})
 ```
 
 ```yaml
@@ -150,15 +150,15 @@ cube(`lessons`, {
   joins: {
     students: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.student_id = ${students.id}`,
+      sql: `${CUBE}.student_id = ${students.id}`
     },
 
     teachers: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.teacher_id = ${teachers.id}`,
-    },
-  },
-});
+      sql: `${CUBE}.teacher_id = ${teachers.id}`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -167,4 +167,3 @@ cube(`lessons`, {
   /product/data-modeling/concepts/code-reusability-extending-cubes
 [ref-schema-ref-cubes-extends]: /product/data-modeling/reference/cube#extends
 
-[ref-cube-sql-func]: /product/data-modeling/syntax#cubesql-function

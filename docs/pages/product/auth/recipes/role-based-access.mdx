@@ -10,7 +10,7 @@ from a shop and a `manager` can only view shipped and completed orders.
 
 To implement role-based access, we will use a [JSON Web Token](/product/auth)
 with role information in the payload, and the
-[`queryRewrite`](/product/auth/context#using-queryrewrite) extension point to
+[`queryRewrite`](/product/auth/context#using-query_rewrite) extension point to
 manage data access.
 
 Let's add the role verification in the `cube.js` file.
@@ -19,28 +19,28 @@ Let's add the role verification in the `cube.js` file.
 module.exports = {
   queryRewrite: (query, { securityContext }) => {
     if (!securityContext.role) {
-      throw new Error("No role found in Security Context!");
+      throw new Error("No role found in Security Context!")
     }
 
     if (securityContext.role == "manager") {
       query.filters.push({
         member: "orders.status",
         operator: "equals",
-        values: ["shipped", "completed"],
-      });
+        values: ["shipped", "completed"]
+      })
     }
 
     if (securityContext.role == "operator") {
       query.filters.push({
         member: "orders.status",
         operator: "equals",
-        values: ["processing"],
-      });
+        values: ["processing"]
+      })
     }
 
-    return query;
-  },
-};
+    return query
+  }
+}
 ```
 
 ## Query

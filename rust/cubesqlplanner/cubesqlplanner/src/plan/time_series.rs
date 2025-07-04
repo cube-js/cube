@@ -51,6 +51,7 @@ impl TimeSeries {
                 ));
             }
             let interval = interval_description[0].clone();
+            let interval = templates.interval_string(interval)?;
             let minimal_time_unit = interval_description[1].clone();
             match &self.date_range {
                 TimeSeriesDateRange::Filter(from_date, to_date) => {

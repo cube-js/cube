@@ -118,20 +118,20 @@ cube('users_with_organizations', {
       time_dimension: CUBE.created_at,
       refresh_key: {
         every: `1 day`,
-        incremental: true,
+        incremental: true
       },
       granularity: `day`,
       partition_granularity: `month`,
       build_range_start: { sql: `SELECT DATE('2021-01-01')` },
-      build_range_end: { sql: `SELECT NOW()` },
-    },
+      build_range_end: { sql: `SELECT NOW()` }
+    }
   },
 
   dimensions: {
     id: {
       sql: `user_id`,
       type: `number`
-      primary_key: true,
+      primary_key: true
     },
 
     organization_id: {
@@ -144,7 +144,7 @@ cube('users_with_organizations', {
       type: `time`
     }
   }
-});
+})
 ```
 
 </CodeTabs>
@@ -236,7 +236,7 @@ LEFT JOIN organizations
 `,
 
   // ...
-});
+})
 ```
 
 </CodeTabs>

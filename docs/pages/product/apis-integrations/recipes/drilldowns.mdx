@@ -23,13 +23,13 @@ cube(`orders`, {
   joins: {
     users: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.user_id = ${users.id}`,
+      sql: `${CUBE}.user_id = ${users.id}`
     },
 
     products: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.product_id = ${products.id}`,
-    },
+      sql: `${CUBE}.product_id = ${products.id}`
+    }
   },
 
   measures: {
@@ -37,8 +37,8 @@ cube(`orders`, {
       type: `count`,
       // Here we define all possible properties we might want
       // to "drill down" on from our front-end
-      drill_members: [id, status, products.name, users.city],
-    },
+      drill_members: [id, status, products.name, users.city]
+    }
   },
 
   dimensions: {
@@ -46,15 +46,15 @@ cube(`orders`, {
       type: `number`,
       sql: `id`,
       primary_key: true,
-      public: true,
+      public: true
     },
 
     status: {
       type: `string`,
-      sql: `status`,
-    },
-  },
-});
+      sql: `status`
+    }
+  }
+})
 ```
 
 ```yaml

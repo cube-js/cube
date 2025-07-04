@@ -189,7 +189,7 @@ jobs:
           - x86_64-apple-darwin
           - aarch64-apple-darwin
         include:
-          - os: windows-2019
+          - os: windows-2022
             target: x86_64-pc-windows-msvc
             executable_name: cubestored.exe
             strip: true

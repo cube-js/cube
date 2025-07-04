@@ -148,9 +148,10 @@ pub struct CacheEvictionManager {
     persist_batch_size: usize,
     eviction_batch_size: usize,
     eviction_below_threshold: u8,
-    // if ttl of a key is less then this value, key will be evicted
-    // this help to delete upcoming keys for deleting
-    eviction_min_ttl_threshold: u32,
+    /// Proactive deletion of keys with upcoming expiration in the next N seconds. + it checks size, because
+    /// possible it can lead to a drop of refresh keys or touch flags
+    eviction_proactive_size_threshold: u32,
+    eviction_proactive_ttl_threshold: u32,
     compaction_trigger_size: u64,
     // background listener to track events
     _ttl_tl_loop_join_handle: Arc<AbortingJoinHandle<()>>,
@@ -308,7 +309,10 @@ impl CacheEvictionManager {
             persist_batch_size: config.cachestore_cache_persist_batch_size(),
             eviction_batch_size: config.cachestore_cache_eviction_batch_size(),
             eviction_below_threshold: config.cachestore_cache_eviction_below_threshold(),
-            eviction_min_ttl_threshold: config.cachestore_cache_eviction_min_ttl_threshold(),
+            eviction_proactive_size_threshold: config
+                .cachestore_cache_eviction_proactive_size_threshold(),
+            eviction_proactive_ttl_threshold: config
+                .cachestore_cache_eviction_proactive_ttl_threshold(),
             compaction_trigger_size: config.cachestore_cache_compaction_trigger_size(),
             //
             _ttl_tl_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
@@ -387,7 +391,7 @@ impl CacheEvictionManager {
         store: &Arc<RocksStore>,
     ) -> Result<DeleteBatchResult, CubeError> {
         let (deleted_count, deleted_size, skipped) = store
-            .write_operation(move |db_ref, pipe| {
+            .write_operation("delete_batch", move |db_ref, pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 let mut deleted_count: u32 = 0;
@@ -616,7 +620,8 @@ impl CacheEvictionManager {
         criteria: CacheEvictionWeightCriteria,
         store: &Arc<RocksStore>,
     ) -> Result<(KeysVector, KeysVector), CubeError> {
-        let eviction_min_ttl_threshold = self.eviction_min_ttl_threshold as i64;
+        let eviction_proactive_ttl_threshold = self.eviction_proactive_ttl_threshold;
+        let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
 
         let (all_keys, stats_total_keys, stats_total_raw_size, expired_keys) = store
             .read_operation_out_of_queue(move |db_ref| {
@@ -625,8 +630,7 @@ impl CacheEvictionManager {
 
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
-                let now_with_threshold =
-                    Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
+                let now_at_start = Utc::now();
 
                 let mut expired_keys = KeysVector::with_capacity(64);
                 let mut all_keys: Vec<(
@@ -646,7 +650,19 @@ impl CacheEvictionManager {
                     stats_total_raw_size += raw_size as u64;
 
                     if let Some(ttl) = item.ttl {
-                        if ttl < now_with_threshold {
+                        let ready_to_delete = if ttl <= now_at_start {
+                            true
+                        } else if ttl - now_at_start
+                            <= chrono::Duration::seconds(eviction_proactive_ttl_threshold as i64)
+                        {
+                            // Checking the size of the key, because it can be problematic to delete keys with small size, because
+                            // it can be a refresh key.
+                            raw_size > eviction_proactive_size_threshold
+                        } else {
+                            false
+                        };
+
+                        if ready_to_delete {
                             expired_keys.push((item.row_id, raw_size));
                             continue;
                         }
@@ -736,7 +752,7 @@ impl CacheEvictionManager {
         let deletion_result = self.delete_items(pending, &store, false).await?;
         result.add_eviction_result(deletion_result);
 
-        return Ok(EvictionResult::Finished(result));
+        Ok(EvictionResult::Finished(result))
     }
 
     async fn do_eviction_by_sampling(
@@ -748,14 +764,14 @@ impl CacheEvictionManager {
     ) -> Result<EvictionResult, CubeError> {
         // move
         let eviction_batch_size = self.eviction_batch_size;
-        let eviction_min_ttl_threshold = self.eviction_min_ttl_threshold as i64;
+        let eviction_proactive_ttl_threshold = self.eviction_proactive_ttl_threshold;
+        let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
 
         let to_delete: Vec<(u64, u32)> = store
             .read_operation_out_of_queue(move |db_ref| {
                 let mut pending_volume_remove: u64 = 0;
 
-                let now_with_threshold =
-                    Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
+                let now_at_start = Utc::now();
                 let mut to_delete = Vec::with_capacity(eviction_batch_size);
 
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
@@ -774,7 +790,19 @@ impl CacheEvictionManager {
                         Self::get_weight_and_size_by_criteria(&item, &criteria)?;
 
                     if let Some(ttl) = item.ttl {
-                        if ttl < now_with_threshold {
+                        let ready_to_delete = if ttl < now_at_start {
+                            true
+                        } else if ttl - now_at_start
+                            <= chrono::Duration::seconds(eviction_proactive_ttl_threshold as i64)
+                        {
+                            // Checking the size of the key, because it can be problematic to delete keys with small size, because
+                            // it can be a refresh key.
+                            raw_size > eviction_proactive_size_threshold
+                        } else {
+                            false
+                        };
+
+                        if ready_to_delete {
                             if target_is_size {
                                 pending_volume_remove += raw_size as u64;
                             } else {
@@ -782,7 +810,6 @@ impl CacheEvictionManager {
                             }
 
                             to_delete.push((item.row_id, raw_size));
-
                             continue;
                         }
                     }
@@ -924,14 +951,14 @@ impl CacheEvictionManager {
         app_metrics::CACHESTORE_TTL_BUFFER.report(buffer_len as i64);
 
         store
-            .write_operation(move |db_ref, pipe| {
+            .write_operation("persist_ttl", move |db_ref, pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 for (row_id, item) in to_persist.into_iter() {
                     cache_schema.update_extended_ttl_secondary_index(
                         row_id,
                         &CacheItemRocksIndex::ByPath,
-                        item.key_hash.to_vec(),
+                        item.key_hash,
                         RocksSecondaryIndexValueTTLExtended {
                             lfu: item.lfu,
                             lru: item.lru.decode_value_as_opt_datetime()?,

@@ -36,7 +36,7 @@ config.schema_path = 'my-data-model'
 ```javascript
 module.exports = {
   schemaPath: 'my-data-model'
-};
+}
 ```
 
 </CodeTabs>
@@ -70,9 +70,9 @@ def context_to_app_id(ctx: dict) -> str:
 ```javascript
 module.exports = {
   contextToAppId: ({ securityContext }) => {
-    return `CUBE_APP_${securityContext.tenant_id}`;
+    return `CUBE_APP_${securityContext.tenant_id}`
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -101,13 +101,13 @@ def repository_factory(ctx: dict) -> list[dict]:
 ```
 
 ```javascript
-const { FileRepository } = require("@cubejs-backend/server-core");
+const { FileRepository } = require("@cubejs-backend/server-core")
 
 module.exports = {
   repositoryFactory: ({ securityContext }) => {
-    return new FileRepository(`model/${securityContext.tenant_id}`);
+    return new FileRepository(`model/${securityContext.tenant_id}`)
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -144,9 +144,9 @@ module.exports = {
             content: 'contents of file'
           }
         ])
-    };
+    }
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -183,9 +183,9 @@ module.exports = {
   schemaVersion: ({ securityContext }) => {
     // Don't do this!
     // Data model would be recompiled on each request
-    return Math.random();
+    return Math.random()
   }
-};
+}
 
 
 
@@ -210,7 +210,7 @@ config.compiler_cache_size = 100
 ```javascript
 module.exports = {
   compilerCacheSize: 100
-};
+}
 ```
 
 </CodeTabs>
@@ -231,7 +231,7 @@ config.max_compiler_cache_keep_alive = 10000
 ```javascript
 module.exports = {
   maxCompilerCacheKeepAlive: 10000
-};
+}
 ```
 
 </CodeTabs>
@@ -253,7 +253,7 @@ config.update_compiler_cache_keep_alive = True
 ```javascript
 module.exports = {
   updateCompilerCacheKeepAlive: true
-};
+}
 ```
 
 </CodeTabs>
@@ -275,7 +275,7 @@ config.allow_js_duplicate_props_in_schema = True
 ```javascript
 module.exports = {
   allowJsDuplicatePropsInSchema: true
-};
+}
 ```
 
 </CodeTabs>
@@ -298,7 +298,7 @@ config.cache_and_queue_driver = 'cubestore'
 ```javascript
 module.exports = {
   cacheAndQueueDriver: 'cubestore'
-};
+}
 ```
 
 </CodeTabs>
@@ -349,13 +349,13 @@ def context_to_orchestrator_id(ctx: dict) -> str:
 ```javascript
 module.exports = {
   contextToAppId: ({ securityContext }) => {
-    return `CUBE_APP_${securityContext.tenant_id}`;
+    return `CUBE_APP_${securityContext.tenant_id}`
   },
 
   contextToOrchestratorId: ({ securityContext }) => {
-    return `CUBE_APP_${securityContext.tenant_id}`;
+    return `CUBE_APP_${securityContext.tenant_id}`
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -411,7 +411,7 @@ module.exports = {
       database: dataSource
     }
   }
-};
+}
 
 
 
@@ -422,7 +422,7 @@ module.exports = {
 In JavaScript, custom driver implementations can also be loaded:
 
 ```javascript
-const VeryCustomDriver = require('cube-custom-driver');
+const VeryCustomDriver = require('cube-custom-driver')
 
 module.exports = {
   driverFactory: ({ securityContext, dataSource }) => {
@@ -430,7 +430,7 @@ module.exports = {
       /* options */
     })
   }
-};
+}
 ```
 
 ### `orchestrator_options`
@@ -534,7 +534,7 @@ module.exports = {
       }
     }
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -583,9 +583,9 @@ def pre_aggregations_schema(ctx: dict) -> str:
 ```javascript
 module.exports = {
   preAggregationsSchema: ({ securityContext }) => {
-    return `pre_aggregations_${securityContext.tenant_id}`;
+    return `pre_aggregations_${securityContext.tenant_id}`
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -630,7 +630,7 @@ config.scheduled_refresh_timer = 60
 ```javascript
 module.exports = {
   scheduledRefreshTimer: 60
-};
+}
 ```
 
 </CodeTabs>
@@ -696,7 +696,7 @@ module.exports = {
     let tenant_id = securityContext.tenant_id
     return time_zones[tenant_id] || default_time_zones
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -760,7 +760,7 @@ module.exports = {
       }
     }
   ]
-};
+}
 
 
 ```
@@ -864,7 +864,7 @@ config.allow_ungrouped_without_primary_key = True
 ```javascript
 module.exports = {
   allowUngroupedWithoutPrimaryKey: true
-};
+}
 ```
 
 </CodeTabs>
@@ -896,7 +896,7 @@ config.base_path = '/cube-api'
 ```javascript
 module.exports = {
   basePath: '/cube-api'
-};
+}
 ```
 
 </CodeTabs>
@@ -937,7 +937,7 @@ module.exports = {
       credentials: true
     }
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -957,7 +957,7 @@ config.web_sockets_base_path = '/websocket'
 ```javascript
 module.exports = {
   webSocketsBasePath: '/websocket'
-};
+}
 ```
 
 </CodeTabs>
@@ -980,7 +980,7 @@ config.process_subscriptions_interval = 1000
 ```javascript
 module.exports = {
   processSubscriptionsInterval: true
-};
+}
 ```
 
 </CodeTabs>
@@ -1009,9 +1009,9 @@ def context_to_api_scopes(context: dict, default_scopes: list[str]) -> list[str]
 ```javascript
 module.exports = {
   contextToApiScopes: (securityContext, defaultScopes) => {
-    return ['meta', 'data', 'graphql', 'sql'];
-  },
-};
+    return ['meta', 'data', 'graphql', 'sql']
+  }
+}
 ```
 
 </CodeTabs>
@@ -1154,9 +1154,9 @@ module.exports = {
       }
     }
 
-    throw new Error('Access denied');
-  },
-};
+    throw new Error('Access denied')
+  }
+}
 
 ```
 
@@ -1236,19 +1236,19 @@ module.exports = {
   checkSqlAuth: (req, user_name, password) => {
     if (user_name === 'my_user') {
       if (password && password !== 'my_password') {
-        throw new Error('Access denied');
+        throw new Error('Access denied')
       }
       return {
         password,
         securityContext: {
           some: 'data'
-        },
-      };
+        }
+      }
     }
 
-    throw new Error('Access denied');
+    throw new Error('Access denied')
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -1287,16 +1287,16 @@ def can_switch_sql_user(current_user: str, new_user: str) -> dict:
 module.exports = {
   canSwitchSqlUser: (current_user, new_user) => {
     if (current_user === "admin") {
-      return true;
+      return true
     }
 
     if (current_user === "service") {
-      return new_user !== "admin";
+      return new_user !== "admin"
     }
 
-    return false;
+    return false
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -1377,9 +1377,9 @@ def logger(message: str, params: dict) -> None:
 ```javascript
 module.exports = {
   logger: (message, params) => {
-    console.log(`${message}: ${JSON.stringify(params)}`);
-  },
-};
+    console.log(`${message}: ${JSON.stringify(params)}`)
+  }
+}
 ```
 
 </CodeTabs>
@@ -1407,7 +1407,7 @@ config.telemetry = True
 ```javascript
 module.exports = {
   telemetry: false
-};
+}
 ```
 
 </CodeTabs>
@@ -1431,8 +1431,8 @@ module.exports = {
   dbType: 'snowflake',
 
   // function
-  dbType: ({ securityContext }) => 'databricks',
-};
+  dbType: ({ securityContext }) => 'databricks'
+}
 ```
 
 Either `string` or `function` could be passed. Providing a `Function` allows
@@ -1453,7 +1453,7 @@ If not defined, Cube will lookup for environment variable
 [link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
 [ref-development-mode]: /product/configuration#development-mode
-[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-multitenancy]: /product/configuration/multitenancy
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-pre-aggregations-refresh-key]:
@@ -1461,18 +1461,12 @@ If not defined, Cube will lookup for environment variable
 [ref-schema-cube-ref-refresh-key]:
   /product/data-modeling/reference/cube#refresh_key
 [ref-schema-cube-ref-ctx-sec-ctx]: /product/data-modeling/reference/context-variables#security_context
-[ref-schema-ref-preaggs-rollup]:
-  /product/data-modeling/reference/pre-aggregations#rollup
-[ref-sec]: /product/auth
 [ref-sec-ctx]: /product/auth/context
-[self-opts-checkauth]: #checkauth
 [self-pre-aggregations-schema]: #pre_aggregations_schema
 [self-opts-ctx-to-appid]: #context_to_app_id
 [self-driver-factory]: #driver_factory
 [ref-schema-ref-datasource]: /product/data-modeling/reference/cube#data_source
 [self-repofactory]: #repository_factory
-[self-schemafilerepo]: #schema_file_repository
-[self-schemapath]: #schema_path
 [ref-exec-environment-globals]:
   /product/data-modeling/dynamic/schema-execution-environment#nodejs-globals-processenv-consolelog-and-others
 [ref-environment-variables]: /product/configuration/reference/environment-variables

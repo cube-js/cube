@@ -65,10 +65,10 @@ cube(`orders`, {
       partition_granularity: `month`, // this is where we specify the partition
       refresh_key: {
         sql: `SELECT max(updated_at) FROM public.orders`, // check for updates of the updated_at property
-      },
-    },
-  },
-});
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -143,11 +143,11 @@ cube(`orders`, {
         sql: `
           SELECT max(updated_at)
           FROM public.orders
-          WHERE ${FILTER_PARAMS.orders.created_at.filter("created_at")}`,
-      },
-    },
-  },
-});
+          WHERE ${FILTER_PARAMS.orders.created_at.filter("created_at")}`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>

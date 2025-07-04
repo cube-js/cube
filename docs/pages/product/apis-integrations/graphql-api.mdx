@@ -68,22 +68,22 @@ cube(`orders`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     status: {
       sql: `status`,
-      type: `string`,
+      type: `string`
     },
 
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -232,6 +232,6 @@ to our query as follows:
 [ref-websockets]: /product/apis-integrations/rest-api/real-time-data-fetch#web-sockets
 [ref-subscriptions]: /product/apis-integrations/rest-api/real-time-data-fetch#client-subscriptions
 [ref-compare-date-range]: /product/apis-integrations/queries#compare-date-range-query
-[ref-metadata]: /product/apis-integrations/rest-api/reference#v1meta
+[ref-metadata]: /product/apis-integrations/rest-api/reference#base_pathv1meta
 [ref-pivot-config]: /product/apis-integrations/javascript-sdk/reference/cubejs-client-core#pivotconfig
 [ref-segments]: /product/data-modeling/reference/segments

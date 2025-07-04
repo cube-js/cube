@@ -1,4 +1,5 @@
 use super::utils;
+use crate::compile::date_parser::parse_date_str;
 use crate::{
     compile::rewrite::{
         alias_expr,
@@ -36,7 +37,7 @@ use chrono::{
         Numeric::{Day, Hour, Minute, Month, Second, Year},
         Pad::Zero,
     },
-    DateTime, Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, Timelike, Weekday,
+    DateTime, Datelike, Days, Duration, Months, NaiveDateTime, Timelike, Weekday,
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -1667,8 +1668,64 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
+            // DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") = 2019
             transforming_rewrite(
                 "extract-year-equals",
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DatePart",
+                            vec![literal_string("YEAR"), column_expr("?column")],
+                        ),
+                        "=",
+                        literal_expr("?year"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                self.transform_filter_extract_year_equals(
+                    "?year",
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?member",
+                    "?values",
+                    "?filter_aliases",
+                ),
+            ),
+            // Same as the rule above, but it uses different case for granularity.
+            // TODO: Remove, whenever we will fix bug with granularity cases. CORE-1761
+            transforming_rewrite(
+                "extract-year-equals-lower-case",
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DatePart",
+                            vec![literal_string("year"), column_expr("?column")],
+                        ),
+                        "=",
+                        literal_expr("?year"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                self.transform_filter_extract_year_equals(
+                    "?year",
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?member",
+                    "?values",
+                    "?filter_aliases",
+                ),
+            ),
+            // TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) = 2019
+            transforming_rewrite(
+                "extract-trunc-year-equals",
                 filter_replacer(
                     binary_expr(
                         self.fun_expr(
@@ -3578,43 +3635,54 @@ impl FilterRules {
                     .collect();
             for year in years {
                 for aliases in aliases_es.iter() {
-                    if let ScalarValue::Int64(Some(year)) = year {
-                        if !(1000..=9999).contains(&year) {
+                    let year = match year {
+                        ScalarValue::Int64(Some(year)) => year,
+                        ScalarValue::Int32(Some(year)) => year as i64,
+                        ScalarValue::Utf8(Some(ref year_str)) if year_str.len() == 4 => {
+                            if let Ok(year) = year_str.parse::<i64>() {
+                                year
+                            } else {
+                                continue;
+                            }
+                        }
+                        _ => continue,
+                    };
+
+                    if !(1000..=9999).contains(&year) {
+                        continue;
+                    }
+
+                    if let Some((member_name, cube)) = Self::filter_member_name(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        column_var,
+                        members_var,
+                        &aliases,
+                    ) {
+                        if !cube.contains_member(&member_name) {
                             continue;
                         }
 
-                        if let Some((member_name, cube)) = Self::filter_member_name(
-                            egraph,
-                            subst,
-                            &meta_context,
-                            alias_to_cube_var,
-                            column_var,
-                            members_var,
-                            &aliases,
-                        ) {
-                            if !cube.contains_member(&member_name) {
-                                continue;
-                            }
+                        subst.insert(
+                            member_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                                FilterMemberMember(member_name.to_string()),
+                            )),
+                        );
 
-                            subst.insert(
-                                member_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberMember(
-                                    FilterMemberMember(member_name.to_string()),
-                                )),
-                            );
+                        subst.insert(
+                            values_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                FilterMemberValues(vec![
+                                    format!("{}-01-01", year),
+                                    format!("{}-12-31", year),
+                                ]),
+                            )),
+                        );
 
-                            subst.insert(
-                                values_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                                    FilterMemberValues(vec![
-                                        format!("{}-01-01", year),
-                                        format!("{}-12-31", year),
-                                    ]),
-                                )),
-                            );
-
-                            return true;
-                        }
+                        return true;
                     }
                 }
             }
@@ -4568,36 +4636,36 @@ impl FilterRules {
         let date_range_start_op_var = date_range_start_op_var.parse().unwrap();
         let date_range_end_op_var = date_range_end_op_var.parse().unwrap();
         move |egraph, subst| {
-            fn resolve_time_delta(date_var: &String, op: &String) -> String {
+            fn resolve_time_delta(date_var: &String, op: &String) -> Option<String> {
                 if op == "afterDate" {
                     return increment_iso_timestamp_time(date_var);
                 } else if op == "beforeDate" {
                     return decrement_iso_timestamp_time(date_var);
                 } else {
-                    return date_var.clone();
+                    return Some(date_var.clone());
                 }
             }
 
-            fn increment_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
+            fn increment_iso_timestamp_time(date_var: &String) -> Option<String> {
+                let timestamp = parse_date_str(date_var);
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_add_signed(Duration::milliseconds(1)).unwrap(),
                     ),
-                    Err(_) => date_var.clone(),
+                    Err(_) => return None,
                 };
-                return value;
+                return Some(value);
             }
 
-            fn decrement_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
+            fn decrement_iso_timestamp_time(date_var: &String) -> Option<String> {
+                let timestamp = parse_date_str(date_var);
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
                     ),
-                    Err(_) => date_var.clone(),
+                    Err(_) => return None,
                 };
-                return value;
+                return Some(value);
             }
 
             for date_range_start in
@@ -4630,10 +4698,16 @@ impl FilterRules {
                             }
 
                             let mut result = Vec::new();
-                            let resolved_start_date =
-                                resolve_time_delta(&date_range_start[0], date_range_start_op);
-                            let resolved_end_date =
-                                resolve_time_delta(&date_range_end[0], date_range_end_op);
+                            let Some(resolved_start_date) =
+                                resolve_time_delta(&date_range_start[0], date_range_start_op)
+                            else {
+                                return false;
+                            };
+                            let Some(resolved_end_date) =
+                                resolve_time_delta(&date_range_end[0], date_range_end_op)
+                            else {
+                                return false;
+                            };
 
                             if swap_left_and_right {
                                 result.extend(vec![resolved_end_date]);
@@ -5222,12 +5296,7 @@ impl FilterRules {
         let Some(str) = str else {
             return Some(None);
         };
-        let dt = NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S%.f")
-            .or_else(|_| NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S"))
-            .or_else(|_| {
-                NaiveDate::parse_from_str(str, "%Y-%m-%d")
-                    .map(|date| date.and_hms_opt(0, 0, 0).unwrap())
-            });
+        let dt = parse_date_str(str.as_str());
         let Ok(dt) = dt else {
             return None;
         };

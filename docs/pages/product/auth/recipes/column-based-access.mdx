@@ -10,7 +10,7 @@ products. A supplier can't see other supplier's products.
 
 To implement column-based access, we will use supplier's email from a
 [JSON Web Token](/product/auth), and the
-[`queryRewrite`](/product/auth/context#using-queryrewrite) extension point to
+[`queryRewrite`](/product/auth/context#using-query_rewrite) extension point to
 manage data access.
 
 We have `products` and `suppliers` cubes with a `many_to_one` relationship from
@@ -41,17 +41,17 @@ cube(`products`, {
   joins: {
     suppliers: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.supplier_id = ${suppliers.id}`,
-    },
+      sql: `${CUBE}.supplier_id = ${suppliers.id}`
+    }
   },
 
   dimensions: {
     name: {
       sql: `name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -82,15 +82,15 @@ cube(`suppliers`, {
     id: {
       sql: `id`,
       type: `string`,
-      primary_key: true,
+      primary_key: true
     },
 
     email: {
       sql: `email`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -105,24 +105,24 @@ module.exports = {
   queryRewrite: (query, { securityContext }) => {
     const cubeNames = [
       ...(query.dimensions || []),
-      ...(query.measures || []),
-    ].map((e) => e.split(".")[0]);
+      ...(query.measures || [])
+    ].map((e) => e.split(".")[0])
 
     if (cubeNames.includes("products")) {
       if (!securityContext.email) {
-        throw new Error("No email found in Security Context!");
+        throw new Error("No email found in Security Context!")
       }
 
       query.filters.push({
         member: `suppliers.email`,
         operator: "equals",
-        values: [securityContext.email],
-      });
+        values: [securityContext.email]
+      })
     }
 
-    return query;
-  },
-};
+    return query
+  }
+}
 ```
 
 ## Query
@@ -154,21 +154,21 @@ We have received different data depending on the supplier's email.
 // purus.accumsan@Proin.org
 [
   {
-    "products.name": "Awesome Soft Salad",
+    "products.name": "Awesome Soft Salad"
   },
   {
-    "products.name": "Rustic Granite Gloves",
-  },
-];
+    "products.name": "Rustic Granite Gloves"
+  }
+]
 ```
 
 ```javascript
 // gravida.sit.amet@risus.net
 [
   {
-    "products.name": "Incredible Granite Cheese",
-  },
-];
+    "products.name": "Incredible Granite Cheese"
+  }
+]
 ```
 
 ## Source code

@@ -29,7 +29,7 @@ impl TraversalVisitor for CubeNamesCollector {
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
-                if e.owned_by_cube() {
+                if !e.is_view() {
                     if !path.is_empty() {
                         for p in path {
                             self.names.insert(p.clone());
@@ -46,7 +46,7 @@ impl TraversalVisitor for CubeNamesCollector {
                 return self.on_node_traverse(e.base_symbol(), path, &())
             }
             MemberSymbol::Measure(e) => {
-                if e.owned_by_cube() {
+                if !e.is_view() {
                     if !path.is_empty() {
                         for p in path {
                             self.names.insert(p.clone());

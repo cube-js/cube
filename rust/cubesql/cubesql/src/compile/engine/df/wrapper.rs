@@ -415,11 +415,16 @@ impl Remapper {
         static NON_ID_REGEX: LazyLock<Regex> =
             LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9_]").unwrap());
 
-        let alias = start_from;
-        let mut truncated_alias = NON_ID_REGEX
-            .replace_all(&alias, "_")
-            .trim_start_matches("_")
-            .to_lowercase();
+        let alias_lower = start_from.clone().to_lowercase();
+        let mut truncated_alias = if alias_lower != "__user" && alias_lower != "__cubejoinfield" {
+            NON_ID_REGEX
+                .replace_all(&alias_lower, "_")
+                .trim_start_matches("_")
+                .to_string()
+        } else {
+            alias_lower
+        };
+
         truncated_alias.truncate(16);
         let mut alias = truncated_alias.clone();
         for i in 1..10000 {

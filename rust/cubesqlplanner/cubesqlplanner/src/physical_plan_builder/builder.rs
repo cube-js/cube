@@ -1,10 +1,10 @@
 use crate::logical_plan::*;
 use crate::plan::schema::QualifiedColumnName;
 use crate::plan::*;
+use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::MeasureTimeShift;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -24,7 +24,7 @@ struct PhysicalPlanBuilderContext {
     pub alias_prefix: Option<String>,
     pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
     pub render_measure_for_ungrouped: bool,
-    pub time_shifts: HashMap<String, MeasureTimeShift>,
+    pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<String, String>,
 }
 
@@ -1061,7 +1061,7 @@ impl PhysicalPlanBuilder {
             MultiStageRollingWindowType::ToDate(to_date_rolling_window) => {
                 JoinCondition::new_to_date_rolling_join(
                     root_alias.clone(),
-                    to_date_rolling_window.granularity.clone(),
+                    to_date_rolling_window.granularity_obj.clone(),
                     Expr::Reference(QualifiedColumnName::new(
                         Some(measure_input_alias.clone()),
                         base_time_dimension_alias,
@@ -1092,7 +1092,7 @@ impl PhysicalPlanBuilder {
         let mut render_references = HashMap::new();
         let mut select_builder = SelectBuilder::new(from.clone());
 
-        //We insert render reference for main time dimension (with the some granularity as in time series to avoid unnecessary date_tranc)
+        //We insert render reference for main time dimension (with some granularity as in time series to avoid unnecessary date_tranc)
         render_references.insert(
             time_dimension.full_name(),
             QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),

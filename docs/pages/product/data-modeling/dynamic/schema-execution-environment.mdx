@@ -24,19 +24,19 @@ can be added outside the `model/` directory:
 **tablePrefix.js:**
 
 ```javascript
-exports.tableSchema = () => process.env.TABLE_SCHEMA;
+exports.tableSchema = () => process.env.TABLE_SCHEMA
 ```
 
 **model/cubes/Users.js**:
 
 ```javascript
-import { tableSchema } from "../tablePrefix";
+import { tableSchema } from "../tablePrefix"
 
 cube(`users`, {
   sql_table: `${tableSchema()}.users`,
 
   // ...
-});
+})
 ```
 
 ## console.log
@@ -64,13 +64,13 @@ expressions to corresponding Node.js calls. In fact `import` is routed to
 **constants.js:**
 
 ```javascript
-export const TEST_USER_IDS = [1, 2, 3, 4, 5];
+export const TEST_USER_IDS = [1, 2, 3, 4, 5]
 ```
 
 **usersSql.js:**
 
 ```javascript
-export default (usersTable) => `select * from ${usersTable}`;
+export default (usersTable) => `select * from ${usersTable}`
 ```
 
 Later, you can `import` into the cube, wherever needed:
@@ -79,8 +79,8 @@ Later, you can `import` into the cube, wherever needed:
 
 ```javascript
 // in users.js
-import { TEST_USER_IDS } from "./constants";
-import usersSql from "./usersSql";
+import { TEST_USER_IDS } from "./constants"
+import usersSql from "./usersSql"
 
 cube(`users`, {
   sql: usersSql(`users`),
@@ -94,10 +94,10 @@ cube(`users`, {
 
   segments: {
     excludeTestUsers: {
-      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(", ")})`,
-    },
-  },
-});
+      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(", ")})`
+    }
+  }
+})
 ```
 
 ## asyncModule
@@ -129,15 +129,15 @@ cube(`users`, {
 
   measures: {
     count: {
-      type: `count`,
+      type: `count`
     },
 
     ratio: {
       sql: `SUM(${CUBE}.amount) / ${count}`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 is transpiled to:
@@ -148,15 +148,15 @@ cube(`users`, {
 
   measures: {
     count: {
-      type: `count`,
+      type: `count`
     },
 
     ratio: {
       sql: (CUBE, count) => `SUM(${CUBE}.amount) / ${count}`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 So for example if you want to pass the definition of `ratio` outside of the
@@ -165,20 +165,20 @@ cube, you would define it as:
 ```javascript
 const measureRatioDefinition = {
   sql: (CUBE, count) => `sum(${CUBE}.amount) / ${count}`,
-  type: `number`,
-};
+  type: `number`
+}
 
 cube(`users`, {
   // ...
 
   measures: {
     count: {
-      type: `count`,
+      type: `count`
     },
 
-    ratio: measureRatioDefinition,
-  },
-});
+    ratio: measureRatioDefinition
+  }
+})
 ```
 
 [nodejs-vm]: https://nodejs.org/api/vm.html

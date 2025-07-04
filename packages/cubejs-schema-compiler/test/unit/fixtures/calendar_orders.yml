@@ -1,0 +1,62 @@
+cubes:
+  - name: calendar_orders
+    sql_table: public.orders
+
+    joins:
+      - name: custom_calendar
+        sql: "{CUBE}.created_at = {custom_calendar.date_val}"
+        relationship: many_to_one
+
+      - name: custom_calendar_js
+        sql: "{CUBE}.created_at = {custom_calendar_js.date_val}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        public: true
+
+      - name: user_id
+        sql: user_id
+        type: number
+
+      - name: status
+        sql: status
+        type: string
+        meta:
+          addDesc: The status of order
+          moreNum: 42
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+      - name: count_shifted
+        type: count
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - time_dimension: created_at
+            interval: 1 year
+            type: prior
+
+      - name: completed_count
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+
+      - name: completed_percentage
+        sql: "({completed_count} / NULLIF({count}, 0)) * 100.0"
+        type: number
+        format: percent
+
+      - name: total
+        type: count
+        rolling_window:
+          trailing: unbounded

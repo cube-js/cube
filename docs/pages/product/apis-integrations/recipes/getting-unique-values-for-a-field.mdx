@@ -35,15 +35,15 @@ cube(`users`, {
   dimensions: {
     city: {
       sql: `city`,
-      type: `string`,
+      type: `string`
     },
 
     state: {
       sql: `state`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -85,7 +85,7 @@ dropdown on the dashboard:
 
 In case we need to choose a dimension or render dropdowns for all dimensions, we
 can fetch the list of dimensions for all cubes from the
-[`/meta` endpoint](/product/apis-integrations/rest-api/reference#v1meta):
+[`/meta` endpoint](/product/apis-integrations/rest-api/reference#base_pathv1meta):
 
 ```bash
 curl http://localhost:4000/cubejs-api/v1/meta

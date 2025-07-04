@@ -24,10 +24,10 @@ cube(`orders`, {
   measures: {
     high_or_low: {
       type: `string`,
-      sql: `CASE WHEN ${CUBE.number} > 100 THEN 'high' ELSE 'low' END`,
-    },
-  },
-});
+      sql: `CASE WHEN ${CUBE.number} > 100 THEN 'high' ELSE 'low' END`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -61,17 +61,17 @@ cube(`orders`, {
   measures: {
     last_order: {
       sql: `MAX(created_at)`,
-      type: `time`,
-    },
+      type: `time`
+    }
   },
 
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -112,10 +112,10 @@ cube(`orders`, {
   measures: {
     is_completed: {
       sql: `BOOL_AND(status = 'completed')`,
-      type: `boolean`,
-    },
-  },
-});
+      type: `boolean`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -150,10 +150,10 @@ cube(`orders`, {
     purchases_ratio: {
       sql: `${purchases} / ${count} * 100.0`,
       type: `number`,
-      format: `percent`,
-    },
-  },
-});
+      format: `percent`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -182,10 +182,10 @@ cube(`orders`, {
   measures: {
     ratio: {
       sql: `SUM(${CUBE}.amount) / count(*)`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -272,10 +272,10 @@ cube(`orders`, {
     number_of_users: {
       type: `count`,
       // optional
-      drill_members: [id, name, email, company],
-    },
-  },
-});
+      drill_members: [id, name, email, company]
+    }
+  }
+})
 ```
 
 ```yaml
@@ -312,10 +312,10 @@ cube(`orders`, {
   measures: {
     unique_user_count: {
       sql: `user_id`,
-      type: `count_distinct`,
-    },
-  },
-});
+      type: `count_distinct`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -354,10 +354,10 @@ cube(`orders`, {
   measures: {
     unique_user_count: {
       sql: `user_id`,
-      type: `count_distinct_approx`,
-    },
-  },
-});
+      type: `count_distinct_approx`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -391,20 +391,20 @@ cube(`orders`, {
   measures: {
     revenue: {
       sql: `amount`,
-      type: `sum`,
+      type: `sum`
     },
 
     revenue_2: {
       sql: `${charges_amount}`,
-      type: `sum`,
+      type: `sum`
     },
 
     revenue_3: {
       sql: `fee * 0.1`,
-      type: `sum`,
-    },
-  },
-});
+      type: `sum`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -446,10 +446,10 @@ cube(`orders`, {
   measures: {
     avg_transaction: {
       sql: `${transaction_amount}`,
-      type: `avg`,
-    },
-  },
-});
+      type: `avg`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -481,10 +481,10 @@ cube(`orders`, {
   measures: {
     date_first_purchase: {
       sql: `date_purchase`,
-      type: `min`,
-    },
-  },
-});
+      type: `min`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -516,10 +516,10 @@ cube(`orders`, {
   measures: {
     date_last_purchase: {
       sql: `date_purchase`,
-      type: `max`,
-    },
-  },
-});
+      type: `max`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -554,10 +554,10 @@ cube(`orders`, {
     purchase_conversion: {
       sql: `${purchase} / ${checkout} * 100.0`,
       type: `number`,
-      format: `percent`,
-    },
-  },
-});
+      format: `percent`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -588,10 +588,10 @@ cube(`orders`, {
     total_amount: {
       sql: `amount`,
       type: `sum`,
-      format: `currency`,
-    },
-  },
-});
+      format: `currency`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -628,10 +628,10 @@ cube(`orders`, {
   dimensions: {
     completed_at: {
       sql: `completed_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -678,10 +678,10 @@ cube(`orders`, {
   dimensions: {
     full_name: {
       sql: `CONCAT(${first_name}, ' ', ${last_name})`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -710,10 +710,10 @@ cube(`orders`, {
   dimensions: {
     amount: {
       sql: `amount`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -743,10 +743,10 @@ cube(`orders`, {
   dimensions: {
     is_enabled: {
       sql: `is_enabled`,
-      type: `boolean`,
-    },
-  },
-});
+      type: `boolean`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -777,14 +777,14 @@ cube(`orders`, {
     location: {
       type: `geo`,
       latitude: {
-        sql: `${CUBE}.latitude`,
+        sql: `${CUBE}.latitude`
       },
       longitude: {
-        sql: `${CUBE}.longitude`,
-      },
-    },
-  },
-});
+        sql: `${CUBE}.longitude`
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -820,10 +820,10 @@ cube(`orders`, {
     image: {
       sql: `CONCAT('https://img.example.com/id/', ${id})`,
       type: `string`,
-      format: `imageUrl`,
-    },
-  },
-});
+      format: `imageUrl`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -856,10 +856,10 @@ cube(`orders`, {
     image: {
       sql: `id`,
       type: `number`,
-      format: `id`,
-    },
-  },
-});
+      format: `id`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -894,7 +894,7 @@ cube(`orders`, {
     order_link: {
       sql: `'http://myswebsite.com/orders/' || id`,
       type: `string`,
-      format: `link`,
+      format: `link`
     },
 
     crm_link: {
@@ -902,11 +902,11 @@ cube(`orders`, {
       type: `string`,
       format: {
         label: `View in Salesforce`,
-        type: `link`,
-      },
-    },
-  },
-});
+        type: `link`
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -944,10 +944,10 @@ cube(`orders`, {
     amount: {
       sql: `amount`,
       type: `number`,
-      format: `currency`,
-    },
-  },
-});
+      format: `currency`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -978,10 +978,10 @@ cube(`orders`, {
     open_rate: {
       sql: `COALESCE(100.0 * ${uniq_open_count} / NULLIF(${delivered_count}, 0), 0)`,
       type: `number`,
-      format: `percent`,
-    },
-  },
-});
+      format: `percent`
+    }
+  }
+})
 ```
 
 ```yaml

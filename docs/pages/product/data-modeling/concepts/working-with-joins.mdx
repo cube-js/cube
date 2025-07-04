@@ -20,15 +20,15 @@ cube(`customers`, {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     company: {
       sql: `company`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 
 cube(`orders`, {
   // ...
@@ -37,15 +37,15 @@ cube(`orders`, {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     customer_id: {
       sql: `customer_id`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -90,10 +90,10 @@ cube(`customers`, {
   joins: {
     orders: {
       relationship: `one_to_many`,
-      sql: `${CUBE}.id = ${orders.customer_id}`,
-    },
-  },
-});
+      sql: `${CUBE}.id = ${orders.customer_id}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -156,10 +156,10 @@ cube(`orders`, {
   joins: {
     customers: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.customer_id = ${customers.id}`,
-    },
-  },
-});
+      sql: `${CUBE}.customer_id = ${customers.id}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -249,10 +249,10 @@ cube(`posts`, {
   joins: {
     post_topics: {
       relationship: `one_to_many`,
-      sql: `${CUBE}.id = ${post_topics.post_id}`,
-    },
-  },
-});
+      sql: `${CUBE}.id = ${post_topics.post_id}`
+    }
+  }
+})
 
 cube(`topics`, {
   sql_table: `topics`,
@@ -261,10 +261,10 @@ cube(`topics`, {
     post_id: {
       sql: `id`,
       type: `string`,
-      primary_key: true,
-    },
-  },
-});
+      primary_key: true
+    }
+  }
+})
 
 cube(`post_topics`, {
   sql_table: `post_topics`,
@@ -272,17 +272,17 @@ cube(`post_topics`, {
   joins: {
     topic: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.topic_id = ${topics.id}`,
-    },
+      sql: `${CUBE}.topic_id = ${topics.id}`
+    }
   },
 
   dimensions: {
     post_id: {
       sql: `post_id`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -341,10 +341,10 @@ cube(`post_topics`, {
     id: {
       sql: `CONCAT(${CUBE}.post_id, ${CUBE}.topic_id)`,
       type: `number`,
-      primary_key: true,
-    },
-  },
-});
+      primary_key: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -383,28 +383,28 @@ cube(`emails`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     campaign_name: {
       sql: `campaign_name`,
-      type: `string`,
+      type: `string`
     },
 
     campaign_id: {
       sql: `campaign_id`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -451,23 +451,23 @@ cube(`campaigns`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     id: {
       sql: `campaign_id`,
       type: `string`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `campaign_name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -520,57 +520,57 @@ cube(`emails`, {
     campaigns: {
       relationship: `many_to_one`,
       sql: `${CUBE}.campaign_id = ${campaigns.id}
-      AND ${CUBE}.customer_name = ${campaigns.customer_name}`,
-    },
+      AND ${CUBE}.customer_name = ${campaigns.customer_name}`
+    }
   },
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     campaign_name: {
       sql: `campaign_name`,
-      type: `string`,
+      type: `string`
     },
 
     campaign_id: {
       sql: `campaign_id`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 
 cube(`campaigns`, {
   joins: {
     transactions: {
       relationship: `one_to_many`,
       sql: `${CUBE}.customer_name = ${transactions.customer_name}
-      AND ${CUBE}.campaign_id = ${transactions.campaign_id}`,
-    },
+      AND ${CUBE}.campaign_id = ${transactions.campaign_id}`
+    }
   },
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     customer_name: {
       sql: `customer_name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -642,23 +642,23 @@ cube(`orders`, {
   measures: {
     count: {
       sql: `id`,
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     customer_id: {
       sql: `customer_id`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 
 cube(`customers`, {
   sql_table: `customers`,
@@ -666,23 +666,23 @@ cube(`customers`, {
   measures: {
     count: {
       sql: `id`,
-      type: `count`,
+      type: `count`
     },
 
     total_revenue: {
       sql: `revenue`,
-      type: `sum`,
-    },
+      type: `sum`
+    }
   },
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
-    },
-  },
-});
+      primary_key: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -755,7 +755,7 @@ views:
 ```
 
 ```javascript
-view(`total_revenue_per_customer`, {});
+view(`total_revenue_per_customer`, {})
 ```
 
 </CodeTabs>
@@ -1104,6 +1104,6 @@ also shows that you can reach `companies` from `cubes` by going left to right.
 [ref-visual-model]: /product/workspace/visual-model
 [ref-cube]: /product/data-modeling/reference/cube
 [ref-cube-public]: /product/data-modeling/reference/cube#public
-[ref-rest-meta]: /product/apis-integrations/rest-api/reference#v1meta
+[ref-rest-meta]: /product/apis-integrations/rest-api/reference#base_pathv1meta
 [ref-preaggs]: /product/data-modeling/concepts#pre-aggregations
 [ref-primary-key]: /product/data-modeling/reference/dimensions#primary_key

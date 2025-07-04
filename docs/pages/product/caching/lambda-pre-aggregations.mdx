@@ -86,7 +86,7 @@ cube("users", {
     lambda: {
       type: `rollup_lambda`,
       union_with_source_data: true,
-      rollups: [CUBE.batch],
+      rollups: [CUBE.batch]
     },
 
     batch: {
@@ -96,14 +96,14 @@ cube("users", {
       granularity: `day`,
       partition_granularity: `day`,
       build_range_start: {
-        sql: `SELECT '2020-01-01'`,
+        sql: `SELECT '2020-01-01'`
       },
       build_range_end: {
-        sql: `SELECT '2022-05-30'`,
-      },
-    },
-  },
-});
+        sql: `SELECT '2022-05-30'`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -188,10 +188,10 @@ cube("streaming_users", {
       dimensions: [CUBE.name],
       time_dimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `day`,
-    },
-  },
-});
+      partition_granularity: `day`
+    }
+  }
+})
 
 // This cube uses a data source such as ClickHouse or BigQuery
 cube("users", {
@@ -200,7 +200,7 @@ cube("users", {
   pre_aggregations: {
     batch_streaming_lambda: {
       type: `rollup_lambda`,
-      rollups: [users.batch, streaming_users.streaming],
+      rollups: [users.batch, streaming_users.streaming]
     },
 
     batch: {
@@ -211,14 +211,14 @@ cube("users", {
       granularity: `day`,
       partition_granularity: `day`,
       build_range_start: {
-        sql: `SELECT '2020-01-01'`,
+        sql: `SELECT '2020-01-01'`
       },
       build_range_end: {
-        sql: `SELECT '2022-05-30'`,
-      },
-    },
-  },
-});
+        sql: `SELECT '2022-05-30'`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>

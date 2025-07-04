@@ -115,13 +115,13 @@ module.exports = {
       query.filters.push({
         member: "orders_view.users_id",
         operator: "equals",
-        values: [securityContext.user_id],
-      });  
+        values: [securityContext.user_id]
+      })
     }
 
-    return query;
-  },
-};
+    return query
+  }
+}
 ```
 
 </CodeTabs>
@@ -147,12 +147,12 @@ token = jwt.encode(token_payload, CUBE_API_SECRET, algorithm='HS256')
 ```
 
 ```javascript
-const jwt = require("jsonwebtoken");
-const CUBE_API_SECRET = "secret";
+const jwt = require("jsonwebtoken")
+const CUBE_API_SECRET = "secret"
 
 const cubeToken = jwt.sign({ user_id: 42 }, CUBE_API_SECRET, {
-  expiresIn: "30d",
-});
+  expiresIn: "30d"
+})
 ```
 </CodeTabs>
 
@@ -283,12 +283,11 @@ of your Cube Cloud deployment and using the <Btn>Enable Cloud Auth Integration</
 
 [link-auth0-jwks]:
   https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
-[link-multitenancy]: /product/configuration/advanced/multitenancy
+[link-multitenancy]: /product/configuration/multitenancy
 [ref-config-queryrewrite]: /product/configuration/reference/config#query_rewrite
 [ref-config-sched-refresh]:
   /product/configuration/reference/config#scheduledrefreshcontexts
 [ref-config-sec-ctx]: /product/configuration/reference/config#securitycontext
-[ref-schema-sec-ctx]: /product/data-modeling/reference/cube#security-context
 [ref-cubes-compile-ctx]: /product/data-modeling/reference/context-variables#compile_context
 [ref-devtools-playground]:
   /product/workspace/playground#editing-the-security-context

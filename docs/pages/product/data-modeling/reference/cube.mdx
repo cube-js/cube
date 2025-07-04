@@ -17,35 +17,35 @@ cube(`users`, {
   joins: {
     organizations: {
       relationship: `many_to_one`,
-      sql: `${users.organization_id} = ${organizations.id}`,
-    },
+      sql: `${users.organization_id} = ${organizations.id}`
+    }
   },
 
   measures: {
     count: {
       type: `count`,
-      sql: `id`,
-    },
+      sql: `id`
+    }
   },
 
   dimensions: {
     organization_id: {
       sql: `organization_id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     created_at: {
       sql: `created_at`,
-      type: `time`,
+      type: `time`
     },
 
     country: {
       sql: `country`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -92,8 +92,8 @@ conventions][ref-naming].
 
 ```javascript
 cube(`orders`, {
-  sql_table: orders,
-});
+  sql_table: orders
+})
 ```
 
 ```yaml
@@ -114,8 +114,8 @@ by databases such as Postgres:
 ```javascript
 cube(`order_facts_about_literally_everything_in_the_world`, {
   sql_table: `orders`,
-  sql_alias: `order_facts`,
-});
+  sql_alias: `order_facts`
+})
 ```
 
 ```yaml
@@ -147,10 +147,10 @@ cube(`order_facts`, {
   measures: {
     count: {
       type: `count`,
-      sql: `id`,
-    },
-  },
-});
+      sql: `id`
+    }
+  }
+})
 
 cube(`extended_order_facts`, {
   extends: order_facts,
@@ -158,10 +158,10 @@ cube(`extended_order_facts`, {
   measures: {
     double_count: {
       type: `number`,
-      sql: `${count} * 2`,
-    },
-  },
-});
+      sql: `${count} * 2`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -198,10 +198,10 @@ const order_facts = cube({
   measures: {
     count: {
       type: `count`,
-      sql: `id`,
-    },
-  },
-});
+      sql: `id`
+    }
+  }
+})
 
 cube(`extended_order_facts`, {
   extends: order_facts,
@@ -209,10 +209,10 @@ cube(`extended_order_facts`, {
   measures: {
     double_count: {
       type: `number`,
-      sql: `${count} * 2`,
-    },
-  },
-});
+      sql: `${count} * 2`
+    }
+  }
+})
 ```
 
 ### `data_source`
@@ -228,8 +228,8 @@ function as part of the `context` parameter. By default, each cube has a
 ```javascript
 cube(`order_facts`, {
   data_source: `prod_db`,
-  sql_table: `orders`,
-});
+  sql_table: `orders`
+})
 ```
 
 ```yaml
@@ -253,8 +253,8 @@ plain table, without aggregations.
 
 ```javascript
 cube(`orders`, {
-  sql: `SELECT * FROM orders`,
-});
+  sql: `SELECT * FROM orders`
+})
 ```
 
 ```yaml
@@ -277,8 +277,8 @@ cube(`companies`, {
       users.company_name,
       users.company_id
     FROM ${users.sql()} AS users
-  `,
-});
+  `
+})
 ```
 
 ```yaml
@@ -308,8 +308,8 @@ cube will query.
 
 ```javascript
 cube(`orders`, {
-  sql_table: `public.orders`,
-});
+  sql_table: `public.orders`
+})
 ```
 
 ```yaml
@@ -336,8 +336,8 @@ organization.
 ```javascript
 cube(`orders`, {
   sql_table: `orders`,
-  title: `Product Orders`,
-});
+  title: `Product Orders`
+})
 ```
 
 ```yaml
@@ -364,8 +364,8 @@ interpret the data correctly.
 cube(`orders`, {
   sql_table: `orders`,
   title: `Product Orders`,
-  description: `All orders-related information`,
-});
+  description: `All orders-related information`
+})
 ```
 
 ```yaml
@@ -389,8 +389,8 @@ be queried through the API. Defaults to `true`.
 ```javascript
 cube(`orders`, {
   sql_table: `public.orders`,
-  public: false,
-});
+  public: false
+})
 ```
 
 ```yaml
@@ -435,9 +435,9 @@ cube(`order_facts`, {
   // the value of previous MAX(updated_at_timestamp) changed.
   // By default Cube will check this refreshKey every 10 seconds
   refresh_key: {
-    sql: `SELECT MAX(updated_at_timestamp) FROM orders`,
-  },
-});
+    sql: `SELECT MAX(updated_at_timestamp) FROM orders`
+  }
+})
 ```
 
 ```yaml
@@ -459,9 +459,9 @@ cube(`order_facts`, {
   sql_table: `orders`,
 
   refresh_key: {
-    every: `1 hour`,
-  },
-});
+    every: `1 hour`
+  }
+})
 ```
 
 ```yaml
@@ -489,9 +489,9 @@ cube(`order_facts`, {
 
   refresh_key: {
     every: "30 5 * * 5",
-    timezone: "America/Los_Angeles",
-  },
-});
+    timezone: "America/Los_Angeles"
+  }
+})
 ```
 
 ```yaml
@@ -578,7 +578,7 @@ cube(`orders`, {
   meta: {
     any: `value`
   }
-});
+})
 ```
 
 ```yaml
@@ -623,15 +623,8 @@ The `access_policy` parameter is used to configure [data access policies][ref-re
 
 
 [ref-config-driverfactory]: /product/configuration/reference/config#driverfactory
-[ref-config-ext-ctx]: /product/configuration/reference/config#extend_context
-[ref-config-queryrewrite]: /product/configuration/reference/config#queryrewrite
-[ref-config-req-ctx]: /product/configuration/reference/config#requestcontext
-[ref-dev-playground]: /product/workspace/playground
 [ref-recipe-control-access-cubes-views]:
   /product/auth/recipes/controlling-access-to-cubes-and-views
-[ref-restapi-meta]: /product/apis-integrations/rest-api/reference#v1meta
-[ref-restapi-sql]: /product/apis-integrations/rest-api/reference#v1sql
-[ref-sec-ctx]: /product/auth/context
 [ref-naming]: /product/data-modeling/syntax#naming
 [ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations

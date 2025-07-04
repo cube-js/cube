@@ -25,33 +25,33 @@ funnel package.
 
 ```javascript
 // First step is to require the Funnel package
-const Funnels = require(`Funnels`);
+const Funnels = require(`Funnels`)
 
 cube(`PurchaseFunnel`, {
   extends: Funnels.eventFunnel({
     userId: {
-      sql: `user_id`,
+      sql: `user_id`
     },
     time: {
-      sql: `timestamp`,
+      sql: `timestamp`
     },
     steps: [
       {
         name: `view_product`,
         eventsView: {
-          sql: `select * from events where event = 'view_product'`,
-        },
+          sql: `select * from events where event = 'view_product'`
+        }
       },
       {
         name: `purchase_product`,
         eventsView: {
-          sql: `select * from events where event = 'purchase_product'`,
+          sql: `select * from events where event = 'purchase_product'`
         },
-        timeToConvert: "1 day",
-      },
-    ],
-  }),
-});
+        timeToConvert: "1 day"
+      }
+    ]
+  })
+})
 ```
 
 Cube will generate an SQL query for this funnel. Since funnel analysis in SQL is
@@ -163,7 +163,7 @@ A unique key to identify the users moving through the funnel.
 
 ```javascript
 userId: {
-  sql: `user_id`;
+  sql: `user_id`
 }
 ```
 
@@ -176,43 +176,43 @@ been tracked anonymously until that point in the funnel, you could use
 the first step and then by an identified user ID on subsequent steps.
 
 ```javascript
-const Funnels = require(`Funnels`);
+const Funnels = require(`Funnels`)
 
 cube(`OnboardingFunnel`, {
   extends: Funnels.eventFunnel({
     userId: {
-      sql: `id`,
+      sql: `id`
     },
     time: {
-      sql: `timestamp`,
+      sql: `timestamp`
     },
     steps: [
       {
         name: `View Page`,
         eventsView: {
-          sql: `select anonymous_id as id, timestamp from pages`,
-        },
+          sql: `select anonymous_id as id, timestamp from pages`
+        }
       },
       {
         name: `Sign Up`,
         eventsView: {
-          sql: `select anonymous_id as id, user_id, timestamp from sign_ups`,
+          sql: `select anonymous_id as id, user_id, timestamp from sign_ups`
         },
         nextStepUserId: {
-          sql: `user_id`,
+          sql: `user_id`
         },
-        timeToConvert: "1 day",
+        timeToConvert: "1 day"
       },
       {
         name: `Action`,
         eventsView: {
-          sql: `select user_id as id from actions`,
+          sql: `select user_id as id from actions`
         },
-        timeToConvert: "1 day",
-      },
-    ],
-  }),
-});
+        timeToConvert: "1 day"
+      }
+    ]
+  })
+})
 ```
 
 ### time
@@ -221,7 +221,7 @@ A timestamp of the event.
 
 ```javascript
 time: {
-  sql: `timestamp`;
+  sql: `timestamp`
 }
 ```
 
@@ -244,11 +244,11 @@ steps: [
   {
     name: `purchase_product`,
     eventsView: {
-      sql: `select * from events where event = 'purchase_product'`,
+      sql: `select * from events where event = 'purchase_product'`
     },
-    timeToConvert: "1 day",
-  },
-];
+    timeToConvert: "1 day"
+  }
+]
 ```
 
 ## Joining funnels
@@ -268,14 +268,14 @@ cube(`PurchaseFunnel`, {
   joins: {
     Users: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.first_step_user_id = ${Users.id}`,
-    },
+      sql: `${CUBE}.first_step_user_id = ${Users.id}`
+    }
   },
 
   extends: Funnels.eventFunnel({
     // ...
-  }),
-});
+  })
+})
 ```
 
 ## Using funnels
@@ -318,10 +318,10 @@ cube(`PurchaseFunnel`, {
 
   preAggregations: {
     main: {
-      type: `originalSql`,
-    },
-  },
-});
+      type: `originalSql`
+    }
+  }
+})
 ```
 
 [ref-modeling-syntax]: /product/data-modeling/syntax

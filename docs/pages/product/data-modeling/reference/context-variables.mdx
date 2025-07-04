@@ -25,23 +25,23 @@ cube(`users`, {
   joins: {
     contacts: {
       sql: `${CUBE}.contact_id = ${contacts.id}`,
-      relationship: `one_to_one`,
-    },
+      relationship: `one_to_one`
+    }
   },
 
   dimensions: {
     id: {
       sql: `${CUBE}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `COALESCE(${CUBE}.name, ${contacts.name})`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 
 cube(`contacts`, {
   sql_table: `contacts`,
@@ -50,15 +50,15 @@ cube(`contacts`, {
     id: {
       sql: `${CUBE}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `${CUBE}.name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -186,17 +186,17 @@ cube(`order_facts`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     date: {
       sql: `date`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -294,10 +294,10 @@ cube(`events`, {
   dimensions: {
     date: {
       sql: `date`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -663,16 +663,16 @@ cube(`visitors`, {
     // Do not use in timeDimensions query property
     created_at_converted: {
       sql: SQL_UTILS.convertTz(`created_at`),
-      type: `time`,
+      type: `time`
     },
 
     // Use in timeDimensions query property
     created_at: {
       sql: `created_at`,
-      type: "time",
-    },
-  },
-});
+      type: "time"
+    }
+  }
+})
 ```
 
 ```yaml
@@ -723,8 +723,8 @@ cubes:
 
 ```javascript
 cube(`users`, {
-  sql_table: `user_${COMPILE_CONTEXT.securityContext.deployment_id}.users`,
-});
+  sql_table: `user_${COMPILE_CONTEXT.securityContext.deployment_id}.users`
+})
 ```
 
 </CodeTabs>
@@ -754,10 +754,10 @@ cube(`orders`, {
   dimensions: {
     date: {
       sql: `date`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 To ensure filter value presents for all requests `requiredFilter` can be used:
@@ -775,10 +775,10 @@ cube(`orders`, {
   dimensions: {
     date: {
       sql: `date`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 You can access values of context variables directly in JavaScript in order to
@@ -802,17 +802,14 @@ cube(`orders`, {
   dimensions: {
     date: {
       sql: `date`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 [ref-config-ext-ctx]: /product/configuration/reference/config#extendcontext
 [ref-config-queryrewrite]: /product/configuration/reference/config#query_rewrite
-[ref-config-req-ctx]: /product/configuration/reference/config#requestcontext
-[ref-recipe-control-access-cubes-views]:
-  /product/auth/recipes/controlling-access-to-cubes-and-views
 [ref-sec-ctx]: /product/auth/context
 [ref-ref-cubes]: /product/data-modeling/reference/cube
 [ref-syntax-references]: /product/data-modeling/syntax#references

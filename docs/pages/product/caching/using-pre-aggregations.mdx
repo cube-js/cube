@@ -84,11 +84,11 @@ cube(`orders`, {
       time_dimension: created_at,
       granularity: `month`,
       refresh_key: {
-        every: `12 hour`,
-      },
-    },
-  },
-});
+        every: `12 hour`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -125,11 +125,11 @@ cube(`orders`, {
       granularity: `month`,
       refresh_key: {
         // every will default to `10 seconds` here
-        sql: `SELECT MAX(created_at) FROM orders`,
-      },
-    },
-  },
-});
+        sql: `SELECT MAX(created_at) FROM orders`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -165,11 +165,11 @@ cube(`orders`, {
       granularity: `month`,
       refresh_key: {
         every: `12 hour`,
-        sql: `SELECT MAX(created_at) FROM orders`,
-      },
-    },
-  },
-});
+        sql: `SELECT MAX(created_at) FROM orders`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -241,11 +241,11 @@ cube(`orders`, {
       refresh_key: {
         every: `1 day`,
         incremental: true,
-        update_window: `3 months`,
-      },
-    },
-  },
-});
+        update_window: `3 months`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -372,17 +372,17 @@ cube("orders", {
       refresh_key: {
         every: `1 hour`,
         incremental: true,
-        update_window: `1 day`,
+        update_window: `1 day`
       },
       build_range_start: {
-        sql: `SELECT DATE_SUB(NOW(), 365)`,
+        sql: `SELECT DATE_SUB(NOW(), 365)`
       },
       build_range_end: {
-        sql: `SELECT NOW()`,
-      },
-    },
-  },
-});
+        sql: `SELECT NOW()`
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -480,12 +480,12 @@ cube(`orders`, {
             product_category,
             zip_code,
             product_name
-          ],
-        },
-      },
-    },
-  },
-});
+          ]
+        }
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -569,12 +569,12 @@ cube("orders", {
 
         zip_code_index: {
           columns: [zip_code],
-          type: `aggregate`,
-        },
-      },
-    },
-  },
-});
+          type: `aggregate`
+        }
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -759,27 +759,27 @@ cube(`orders`, {
       measures: [CUBE.count],
       dimensions: [CUBE.user_id, CUBE.status],
       time_dimension: CUBE.created_at,
-      granularity: `day`,
-    },
+      granularity: `day`
+    }
   },
 
   joins: {
     users: {
       sql: `${CUBE.user_id} = ${users.id}`,
-      relationship: `many_to_one`,
-    },
-  },
-});
+      relationship: `many_to_one`
+    }
+  }
+})
 
 cube(`users`, {
   // ...
 
   pre_aggregations: {
     users_rollup: {
-      dimensions: [CUBE.id, CUBE.name],
-    },
-  },
-});
+      dimensions: [CUBE.id, CUBE.name]
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -814,12 +814,12 @@ cube(`orders`, {
 
       indexes: {
         user_index: {
-          columns: [CUBE.user_id],
-        },
-      },
-    },
-  },
-});
+          columns: [CUBE.user_id]
+        }
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -862,10 +862,10 @@ cube(`orders`, {
       dimensions: [users.name],
       time_dimension: CUBE.created_at,
       granularity: `day`,
-      rollups: [users.users_rollup, CUBE.orders_rollup],
-    },
-  },
-});
+      rollups: [users.users_rollup, CUBE.orders_rollup]
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -1032,21 +1032,8 @@ of this member. For numeric types, it will most likely be an integer, a float,
 or a decimal type, depending on the nature of your data.
 
 
-[ref-caching-in-mem-default-refresh-key]: /product/caching#default-refresh-keys
 [ref-config-db]: /product/configuration/data-sources
-[ref-config-driverfactory]: /product/configuration/reference/config#driverfactory
-[ref-config-extdriverfactory]:
-  /product/configuration/reference/config#externaldriverfactory
-[ref-connect-db-athena]: /product/configuration/data-sources/aws-athena
-[ref-connect-db-redshift]: /product/configuration/data-sources/aws-redshift
-[ref-connect-db-bigquery]: /product/configuration/data-sources/google-bigquery
-[ref-connect-db-mysql]: /product/configuration/data-sources/mysql
-[ref-connect-db-postgres]: /product/configuration/data-sources/postgres
-[ref-connect-db-snowflake]: /product/configuration/data-sources/snowflake
-[ref-schema-timedimension]: /product/data-modeling/reference/types-and-formats#time-1
 [ref-schema-ref-preaggs]: /product/data-modeling/reference/pre-aggregations
-[ref-schema-ref-preaggs-index]:
-  /product/data-modeling/reference/pre-aggregations#indexes
 [ref-schema-ref-preaggs-refresh-key]:
   /product/data-modeling/reference/pre-aggregations#refresh_key
 [ref-schema-ref-preaggs-refresh-key-every]:
@@ -1054,8 +1041,6 @@ or a decimal type, depending on the nature of your data.
 [ref-schema-ref-preaggs-refresh-key-sql]:
   /product/data-modeling/reference/pre-aggregations#sql
 [ref-deploy-refresh-wrkr]: /product/deployment#refresh-worker
-[ref-schema-ref-preaggs-sched-refresh]:
-  /product/data-modeling/reference/pre-aggregations#scheduled_refresh
 [ref-prod-list-refresh]:
   /product/deployment/production-checklist#set-up-refresh-worker
 [ref-original-sql]:

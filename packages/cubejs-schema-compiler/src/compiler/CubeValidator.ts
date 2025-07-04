@@ -185,6 +185,10 @@ const BaseDimensionWithoutSubQuery = {
             return isValid ? value : helper.message(msg);
           }),
           offset: GranularityOffset.optional(),
+        }),
+        Joi.object().keys({
+          title: Joi.string(),
+          sql: Joi.func().required()
         })
       ])).optional(),
     otherwise: Joi.forbidden()
@@ -786,6 +790,7 @@ const baseSchema = {
 const cubeSchema = inherit(baseSchema, {
   sql: Joi.func(),
   sqlTable: Joi.func(),
+  calendar: Joi.boolean().strict(),
 }).xor('sql', 'sqlTable').messages({
   'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });

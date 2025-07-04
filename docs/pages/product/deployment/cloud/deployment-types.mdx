@@ -148,9 +148,9 @@ def context_to_app_id(ctx: dict) -> str:
 ```js
 module.exports = {
   contextToAppId: ({ securityContext }) => {
-    return `CUBE_APP_${securityContext.tenant_id}`;
+    return `CUBE_APP_${securityContext.tenant_id}`
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -177,6 +177,6 @@ and select from the available options:
 [ref-ctx-to-app-id]: /product/configuration/reference/config#context_to_app_id
 [ref-limits]: /product/deployment/cloud/limits#resources
 [ref-scalability]: /product/deployment/cloud/scalability
-[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-multitenancy]: /product/configuration/multitenancy
 [ref-auto-sus]: /product/deployment/cloud/auto-suspension
 [ref-refresh-worker]: /product/deployment#refresh-worker

@@ -23,15 +23,15 @@ cube(`products`, {
   dimensions: {
     price: {
       sql: `price`,
-      type: `number`,
+      type: `number`
     },
 
     brand_name: {
       sql: `brand_name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -78,13 +78,13 @@ cube(`products`, {
           { sql: `${CUBE}.size_value = 'xl-en'`, label: `xl` },
           { sql: `${CUBE}.size_value = 'xl'`, label: `xl` },
           { sql: `${CUBE}.size_value = 'xxl-en'`, label: `xxl` },
-          { sql: `${CUBE}.size_value = 'xxl'`, label: `xxl` },
+          { sql: `${CUBE}.size_value = 'xxl'`, label: `xxl` }
         ],
-        else: { label: `Unknown` },
-      },
-    },
-  },
-});
+        else: { label: `Unknown` }
+      }
+    }
+  }
+})
 
 ```
 
@@ -126,26 +126,26 @@ cube(`products`, {
         when: [
           {
             sql: `${CUBE}.meta_value = 'xl-en'`,
-            label: { sql: `${CUBE}.english_size` },
+            label: { sql: `${CUBE}.english_size` }
           },
           {
             sql: `${CUBE}.meta_value = 'xl'`,
-            label: { sql: `${CUBE}.euro_size` },
+            label: { sql: `${CUBE}.euro_size` }
           },
           {
             sql: `${CUBE}.meta_value = 'xxl-en'`,
-            label: { sql: `${CUBE}.english_size` },
+            label: { sql: `${CUBE}.english_size` }
           },
           {
             sql: `${CUBE}.meta_value = 'xxl'`,
-            label: { sql: `${CUBE}.euro_size` },
-          },
+            label: { sql: `${CUBE}.euro_size` }
+          }
         ],
-        else: { label: `Unknown` },
-      },
-    },
-  },
-});
+        else: { label: `Unknown` }
+      }
+    }
+  }
+})
 ```
 
 ### `description`
@@ -164,10 +164,10 @@ cube(`products`, {
     comment: {
       description: `Comments for orders`,
       sql: `comments`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -201,10 +201,10 @@ cube(`orders`, {
     total: {
       sql: `amount`,
       type: `number`,
-      format: `currency`,
-    },
-  },
-});
+      format: `currency`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -236,11 +236,11 @@ cube(`products`, {
       sql: `${users.count}`,
       type: `number`,
       meta: {
-        any: "value",
-      },
-    },
-  },
-});
+        any: "value"
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -283,10 +283,10 @@ cube(`products`, {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
-    },
-  },
-});
+      primary_key: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -398,10 +398,10 @@ cube(`products`, {
       sql: `${users.count}`,
       type: `number`,
       sub_query: true,
-      propagate_filters_to_sub_query: true,
-    },
-  },
-});
+      propagate_filters_to_sub_query: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -482,10 +482,10 @@ cube(`orders`, {
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -505,10 +505,10 @@ cube(`products`, {
     users_count: {
       sql: `${users.count}`,
       type: `number`,
-      sub_query: true,
-    },
-  },
-});
+      sub_query: true
+    }
+  }
+})
 ```
 
 ```yaml
@@ -541,10 +541,10 @@ cube(`products`, {
     meta_value: {
       title: `Size`,
       sql: `meta_value`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -576,10 +576,10 @@ cube(`orders`, {
   dimensions: {
     rating: {
       sql: `rating`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -712,7 +712,7 @@ cube(`orders`, {
   /product/data-modeling/reference/types-and-formats#dimension-formats
 [ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations
-[ref-time-dimensions]: /product/data-modeling/reference/types-and-formats#time-1
+[ref-time-dimensions]: /product/data-modeling/reference/types-and-formats#time
 [link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
 [ref-custom-granularity-recipe]: /product/data-modeling/recipes/custom-granularity
 [ref-ref-hierarchies]: /product/data-modeling/reference/hierarchies

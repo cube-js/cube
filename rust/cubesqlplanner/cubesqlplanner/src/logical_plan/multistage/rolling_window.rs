@@ -1,6 +1,7 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::Granularity;
 use std::rc::Rc;
 
 pub struct MultiStageRegularRollingWindow {
@@ -24,14 +25,17 @@ impl PrettyPrint for MultiStageRegularRollingWindow {
 }
 
 pub struct MultiStageToDateRollingWindow {
-    pub granularity: String,
+    pub granularity_obj: Rc<Granularity>,
 }
 
 impl PrettyPrint for MultiStageToDateRollingWindow {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println("ToDate Rolling Window", state);
         let state = state.new_level();
-        result.println(&format!("granularity: {}", self.granularity), &state);
+        result.println(
+            &format!("granularity: {}", self.granularity_obj.granularity()),
+            &state,
+        );
     }
 }
 

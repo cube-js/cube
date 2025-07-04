@@ -17,10 +17,10 @@ cube(`events`, {
   dimensions: {
     date: {
       sql: `PARSE_TIMESTAMP('%Y-%m-%d', date)`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -50,5 +50,5 @@ most likely will. Adding timestamp columns with indexes or transforming the
 data upstream should strongly be considered in this case.
 
 
-[ref-time-dimension]: /product/data-modeling/reference/types-and-formats#time-1
+[ref-time-dimension]: /product/data-modeling/reference/types-and-formats#time
 [bq-parse-timestamp]: https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp

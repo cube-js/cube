@@ -14,13 +14,13 @@ module.exports = {
     if (username === "fooUser") {
       return {
         password: "mypassword",
-        securityContext: {},
-      };
+        securityContext: {}
+      }
     }
 
-    throw new Error("Incorrect user name or password");
-  },
-};
+    throw new Error("Incorrect user name or password")
+  }
+}
 ```
 
 Check [this recipe](/product/auth/recipes/sql-api-ldap) for an example of
@@ -55,7 +55,7 @@ module.exports = {
   // other's data
   // https://cube.dev/docs/product/configuration/reference/config#contexttoappid
   contextToAppId: ({ securityContext }) => {
-    return securityContext.team;
+    return securityContext.team
   },
 
   // Enforce a default value for `team` if one is not provided
@@ -63,27 +63,27 @@ module.exports = {
   // https://cube.dev/docs/product/configuration/reference/config#extendcontext
   extendContext: ({ securityContext }) => {
     if (!securityContext.team) {
-      securityContext.team = "public";
+      securityContext.team = "public"
     }
 
     return {
-      securityContext,
-    };
+      securityContext
+    }
   },
 
   // Here we create a new security context for each team so that we can
   // use it in our data model later
   checkSqlAuth: (query, username) => {
     const securityContext = {
-      team: username,
-    };
+      team: username
+    }
 
     return {
       password: process.env.CUBEJS_SQL_PASSWORD,
-      securityContext: securityContext,
-    };
-  },
-};
+      securityContext: securityContext
+    }
+  }
+}
 ```
 
 Now, you can use the `securityContext` in your data model:
@@ -167,4 +167,3 @@ SELECT * FROM orders WHERE __user = 'anotheruser';
 [ref-config-ctx-to-app-id]: /product/configuration/reference/config#contexttoappid
 [ref-config-queryrewrite]: /product/configuration/reference/config#queryrewrite
 [ref-dynamic-schemas]: /product/data-modeling/dynamic
-[ref-config-js]: /product/configuration/reference/config

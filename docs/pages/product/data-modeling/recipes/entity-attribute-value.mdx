@@ -21,17 +21,17 @@ cube(`users`, {
   joins: {
     orders: {
       relationship: "one_to_many",
-      sql: `${CUBE}.id = ${orders.user_id}`,
-    },
+      sql: `${CUBE}.id = ${orders.user_id}`
+    }
   },
 
   dimensions: {
     name: {
       sql: `first_name || ' ' || last_name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 The `users` cube is joined with the `orders` cube to reflect that there might be
@@ -46,20 +46,20 @@ cube(`orders`, {
   dimensions: {
     user_id: {
       sql: `user_id`,
-      type: `string`,
+      type: `string`
     },
 
     status: {
       sql: `status`,
-      type: `string`,
+      type: `string`
     },
 
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 Currently, the dataset contains orders in the following statuses:
@@ -67,15 +67,15 @@ Currently, the dataset contains orders in the following statuses:
 ```javascript
 [
   {
-    "orders.status": "completed",
+    "orders.status": "completed"
   },
   {
-    "orders.status": "processing",
+    "orders.status": "processing"
   },
   {
-    "orders.status": "shipped",
-  },
-];
+    "orders.status": "shipped"
+  }
+]
 ```
 
 Let's say that we'd like to know, for each user, the earliest creation date for
@@ -120,25 +120,25 @@ cube(`users_statuses_joins`, {
   dimensions: {
     name: {
       sql: `first_name || ' ' || last_name`,
-      type: `string`,
+      type: `string`
     },
 
     completed_created_at: {
       sql: `cCreatedAt`,
-      type: `time`,
+      type: `time`
     },
 
     processing_created_at: {
       sql: `pCreatedAt`,
-      type: `time`,
+      type: `time`
     },
 
     shipped_created_at: {
       sql: `sCreatedAt`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 Querying the cube would yield data like this. As we can see, every user has
@@ -152,21 +152,21 @@ doesn't have orders in this status).
     "users_statuses_joins.name": "Ally Blanda",
     "users_statuses_joins.completed_created_at": "2019-03-05T00:00:00.000",
     "users_statuses_joins.processing_created_at": null,
-    "users_statuses_joins.shipped_created_at": "2019-04-06T00:00:00.000",
+    "users_statuses_joins.shipped_created_at": "2019-04-06T00:00:00.000"
   },
   {
     "users_statuses_joins.name": "Cayla Mayert",
     "users_statuses_joins.completed_created_at": "2019-06-14T00:00:00.000",
     "users_statuses_joins.processing_created_at": "2021-05-20T00:00:00.000",
-    "users_statuses_joins.shipped_created_at": null,
+    "users_statuses_joins.shipped_created_at": null
   },
   {
     "users_statuses_joins.name": "Concepcion Maggio",
     "users_statuses_joins.completed_created_at": null,
     "users_statuses_joins.processing_created_at": "2020-07-14T00:00:00.000",
-    "users_statuses_joins.shipped_created_at": "2019-07-19T00:00:00.000",
-  },
-];
+    "users_statuses_joins.shipped_created_at": "2019-07-19T00:00:00.000"
+  }
+]
 ```
 
 The drawback is that when the set of statuses changes, we'll need to amend the
@@ -183,10 +183,10 @@ so we can move all repeated code patterns into handy functions and iterate over
 statuses in relevant parts of the cube's code.
 
 ```javascript
-const statuses = ["completed", "processing", "shipped"];
+const statuses = ["completed", "processing", "shipped"]
 
 const createValue = (status, index) =>
-  `MIN(orders_${index}.created_at) AS created_at_${index}`;
+  `MIN(orders_${index}.created_at) AS created_at_${index}`
 
 const createJoin = (status, index) =>
   `LEFT JOIN public.orders AS orders_${index}
@@ -196,9 +196,9 @@ const createJoin = (status, index) =>
 const createDimension = (status, index) => ({
   [`${status}_created_at`]: {
     sql: (CUBE) => `created_at_${index}`,
-    type: `time`,
-  },
-});
+    type: `time`
+  }
+})
 
 cube(`users_statuses_DRY`, {
   sql: `
@@ -215,18 +215,18 @@ cube(`users_statuses_DRY`, {
     {
       name: {
         sql: `first_name || ' ' || last_name`,
-        type: `string`,
-      },
+        type: `string`
+      }
     },
     statuses.reduce(
       (all, status, index) => ({
         ...all,
-        ...createDimension(status, index),
+        ...createDimension(status, index)
       }),
       {}
     )
-  ),
-});
+  )
+})
 ```
 
 The new `users_statuses_DRY` cube is functionally identical to the
@@ -243,15 +243,15 @@ statuses from the database. Note that it uses the `pg` package (Node.js client
 for Postgres) and reuses the credentials from Cube.
 
 ```javascript
-const { Pool } = require("pg");
+const { Pool } = require("pg")
 
 const pool = new Pool({
   host: process.env.CUBEJS_DB_HOST,
   port: process.env.CUBEJS_DB_PORT,
   user: process.env.CUBEJS_DB_USER,
   password: process.env.CUBEJS_DB_PASS,
-  database: process.env.CUBEJS_DB_NAME,
-});
+  database: process.env.CUBEJS_DB_NAME
+})
 
 const statusesQuery = `
   SELECT DISTINCT status
@@ -259,12 +259,12 @@ const statusesQuery = `
 `;
 
 exports.fetchStatuses = async () => {
-  const client = await pool.connect();
-  const result = await client.query(statusesQuery);
-  client.release();
+  const client = await pool.connect()
+  const result = await client.query(statusesQuery)
+  client.release()
 
-  return result.rows.map((row) => row.status);
-};
+  return result.rows.map((row) => row.status)
+}
 ```
 
 In the cube file, we will use the `fetchStatuses` function to load the list of
@@ -273,13 +273,13 @@ function that allows the data model to be created
 [dynamically](/product/data-modeling/dynamic).
 
 ```javascript
-const fetchStatuses = require("../fetch").fetchStatuses;
+const fetchStatuses = require("../fetch").fetchStatuses
 
 asyncModule(async () => {
-  const statuses = await fetchStatuses();
+  const statuses = await fetchStatuses()
 
   const createValue = (status, index) =>
-    `MIN(orders_${index}.created_at) AS created_at_${index}`;
+    `MIN(orders_${index}.created_at) AS created_at_${index}`
 
   const createJoin = (status, index) =>
     `LEFT JOIN public.orders AS orders_${index}
@@ -289,9 +289,9 @@ asyncModule(async () => {
   const createDimension = (status, index) => ({
     [`${status}_created_at`]: {
       sql: (CUBE) => `created_at_${index}`,
-      type: `time`,
-    },
-  });
+      type: `time`
+    }
+  })
 
   cube(`users_statuses_dynamic`, {
     sql: `
@@ -308,19 +308,19 @@ asyncModule(async () => {
       {
         name: {
           sql: `first_name || ' ' || last_name`,
-          type: `string`,
-        },
+          type: `string`
+        }
       },
       statuses.reduce(
         (all, status, index) => ({
           ...all,
-          ...createDimension(status, index),
+          ...createDimension(status, index)
         }),
         {}
       )
-    ),
-  });
-});
+    )
+  })
+})
 ```
 
 Again, the new `users_statuses_dynamic` cube is functionally identical to the

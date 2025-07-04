@@ -18,7 +18,7 @@ conventions][ref-naming].
 <CodeTabs>
 
 ```javascript
-view(`active_users`, {});
+view(`active_users`, {})
 
 ```
 
@@ -84,8 +84,8 @@ Use the `title` parameter to change the display name of the view.
 ```javascript
 cube(`orders`, {
   sql_table: `orders`,
-  title: `Product Orders`,
-});
+  title: `Product Orders`
+})
 ```
 
 ```yaml
@@ -110,8 +110,8 @@ interpret the data correctly.
 
 ```javascript
 view(`active_users`, {
-  description: `14 days rolling count of active users`,
-});
+  description: `14 days rolling count of active users`
+})
 ```
 
 ```yaml
@@ -138,8 +138,8 @@ views:
 
 ```javascript
 view(`orders`, {
-  public: false,
-});
+  public: false
+})
 ```
 
 </CodeTabs>
@@ -206,7 +206,7 @@ view(`active_users`, {
   meta: {
     any: `value`
   }
-});
+})
 ```
 
 ```yaml
@@ -266,7 +266,7 @@ view(`orders`, {
       ]
     }
   ]
-});
+})
 ```
 
 ```yaml
@@ -447,8 +447,6 @@ The `access_policy` parameter is used to configure [data access policies][ref-re
 
 [ref-recipe-control-access-cubes-views]:
   /product/auth/recipes/controlling-access-to-cubes-and-views
-[ref-schema-joins-direction]:
-  /product/data-modeling/concepts/working-with-joins#directions-of-joins
 [ref-naming]: /product/data-modeling/syntax#naming
 [ref-apis]: /product/apis-integrations
 [ref-ref-cubes]: /product/data-modeling/reference/cube

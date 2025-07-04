@@ -32,12 +32,12 @@ cube(`orders`, {
       ],
       measures: [
         count
-      ],
-    },
+      ]
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -118,12 +118,12 @@ cube(`orders`, {
       ],
       dimensions: [
         status
-      ],
-    },
+      ]
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -182,12 +182,12 @@ cube(`completed_orders`, {
 
   pre_aggregations: {
     main: {
-      type: `original_sql`,
-    },
+      type: `original_sql`
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -259,14 +259,14 @@ cube(`users`, {
 
   pre_aggregations: {
     users_rollup: {
-      dimensions: [CUBE.id, CUBE.name],
-    },
+      dimensions: [CUBE.id, CUBE.name]
+    }
   },
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
@@ -274,15 +274,15 @@ cube(`users`, {
       sql: `id`,
       type: `number`,
       // We need to set this field as the primary key for joins to work
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `first_name || last_name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 
 cube(`orders`, {
   data_source: `mssql`,
@@ -293,7 +293,7 @@ cube(`orders`, {
       measures: [CUBE.count],
       dimensions: [CUBE.user_id, CUBE.status],
       time_dimension: CUBE.created_at,
-      granularity: `day`,
+      granularity: `day`
     },
 
     // Here we add a new pre-aggregation of type `rollup_join`
@@ -301,8 +301,8 @@ cube(`orders`, {
       type: `rollup_join`,
       measures: [CUBE.count],
       dimensions: [users.name],
-      rollups: [users.users_rollup, CUBE.orders_rollup],
-    },
+      rollups: [users.users_rollup, CUBE.orders_rollup]
+    }
   },
 
   joins: {
@@ -310,39 +310,39 @@ cube(`orders`, {
       relationship: `many_to_one`,
       // Make sure the join uses dimensions on the cube, rather than
       // the column names from the underlying SQL
-      sql: `${CUBE.user_id} = ${users.id}`,
-    },
+      sql: `${CUBE.user_id} = ${users.id}`
+    }
   },
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     user_id: {
       sql: `user_id`,
-      type: `number`,
+      type: `number`
     },
 
     status: {
       sql: `status`,
-      type: `string`,
+      type: `string`
     },
 
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -444,10 +444,10 @@ cube(`orders`, {
       measures: [CUBE.count],
       dimensions: [users.name, CUBE.status],
       time_dimension: CUBE.created_at,
-      granularity: `day`,
-    },
-  },
-});
+      granularity: `day`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -499,16 +499,16 @@ cube(`orders`, {
 
   pre_aggregations: {
     users_rollup: {
-      measures: [CUBE.count],
-    },
+      measures: [CUBE.count]
+    }
   },
 
   measures: {
     count: {
-      type: `count`,
-    },
-  },
-});
+      type: `count`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -541,17 +541,17 @@ cube(`orders`, {
 
   pre_aggregations: {
     users_rollup: {
-      dimensions: [CUBE.status],
-    },
+      dimensions: [CUBE.status]
+    }
   },
 
   dimensions: {
     status: {
       type: `string`,
-      sql: `status`,
-    },
-  },
-});
+      sql: `status`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -590,28 +590,28 @@ cube(`orders`, {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
       time_dimension: CUBE.created_at,
-      granularity: `day`,
-    },
+      granularity: `day`
+    }
   },
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     status: {
       type: `string`,
-      sql: `status`,
+      sql: `status`
     },
 
     created_at: {
       type: `time`,
-      sql: `created_at`,
-    },
-  },
-});
+      sql: `created_at`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -664,12 +664,12 @@ cube(`orders`, {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
       time_dimension: CUBE.created_at,
-      granularity: `week`,
-    },
+      granularity: `week`
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -708,22 +708,22 @@ cube(`orders`, {
   pre_aggregations: {
     main: {
       measures: [CUBE.count],
-      segments: [CUBE.only_complete],
-    },
+      segments: [CUBE.only_complete]
+    }
   },
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   segments: {
     only_complete: {
-      sql: `${CUBE}.status = 'completed'`,
-    },
-  },
-});
+      sql: `${CUBE}.status = 'completed'`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -766,12 +766,12 @@ cube(`orders`, {
       dimensions: [CUBE.status],
       time_dimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `month`,
-    },
+      partition_granularity: `month`
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -841,13 +841,13 @@ cube(`orders`, {
     main: {
       measures: [CUBE.count],
       refresh_key: {
-        sql: `SELECT MAX(created_at) FROM orders`,
-      },
-    },
+        sql: `SELECT MAX(created_at) FROM orders`
+      }
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -889,13 +889,13 @@ cube(`orders`, {
     main: {
       measures: [CUBE.count],
       refresh_key: {
-        every: `1 day`,
-      },
-    },
+        every: `1 day`
+      }
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -937,11 +937,11 @@ cube(`orders`, {
       measures: [CUBE.count],
       refreshKey: {
         every: `1 hour`,
-        sql: `SELECT MAX(created_at) FROM orders`,
-      },
-    },
-  },
-});
+        sql: `SELECT MAX(created_at) FROM orders`
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -999,13 +999,13 @@ cube(`orders`, {
       partition_granularity: `day`,
       refresh_key: {
         every: `1 day`,
-        incremental: true,
-      },
-    },
+        incremental: true
+      }
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1068,13 +1068,13 @@ cube(`orders`, {
       refresh_key: {
         every: `1 day`,
         incremental: true,
-        update_window: `7 day`,
-      },
-    },
+        update_window: `7 day`
+      }
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1131,12 +1131,12 @@ cube(`orders`, {
       time_dimension: CUBE.created_at,
       granularity: `day`,
       partition_granularity: `day`,
-      allow_non_strict_date_range_match: true,
-    },
+      allow_non_strict_date_range_match: true
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1187,25 +1187,25 @@ cube(`orders`, {
 
   pre_aggregations: {
     main: {
-      type: `original_sql`,
+      type: `original_sql`
     },
 
     statuses: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
-      use_original_sql_pre_aggregations: true,
+      use_original_sql_pre_aggregations: true
     },
 
     completed_orders: {
       measures: [CUBE.count],
       time_dimension: CUBE.completed_at,
       granularity: `day`,
-      use_original_sql_pre_aggregations: true,
-    },
+      use_original_sql_pre_aggregations: true
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1272,12 +1272,12 @@ cube(`orders`, {
       dimensions: [CUBE.status],
       time_dimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `month`,
-    },
+      partition_granularity: `month`
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1352,16 +1352,16 @@ cube(`orders`, {
       granularity: `day`,
       partition_granularity: `month`,
       build_range_start: {
-        sql: `SELECT NOW() - INTERVAL '300 day'`,
+        sql: `SELECT NOW() - INTERVAL '300 day'`
       },
       build_range_end: {
-        sql: `SELECT NOW()`,
-      },
-    },
+        sql: `SELECT NOW()`
+      }
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1409,19 +1409,19 @@ cube(`orders`, {
       granularity: `day`,
       partition_granularity: `month`,
       build_range_start: {
-        sql: `SELECT NOW() - INTERVAL '365 day'`,
+        sql: `SELECT NOW() - INTERVAL '365 day'`
       },
       build_range_end: {
-        sql: `SELECT NOW()`,
+        sql: `SELECT NOW()`
       },
       refresh_key: {
-        update_window: `1 week`,
-      },
-    },
+        update_window: `1 week`
+      }
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1465,10 +1465,10 @@ cube(`orders`, {
     lambda: {
       type: `rollup_lambda`,
       union_with_source_data: true,
-      rollups: [orders.main],
-    },
-  },
-});
+      rollups: [orders.main]
+    }
+  }
+})
 ```
 
 ```yaml
@@ -1515,14 +1515,14 @@ cube(`orders`, {
         category_index: {
           columns: [
             category
-          ],
-        },
-      },
-    },
+          ]
+        }
+      }
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1573,14 +1573,14 @@ cube(`orders`, {
           columns: [
             CUBE.category,
             `orders__created_at_day`
-          ],
-        },
-      },
-    },
+          ]
+        }
+      }
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1621,12 +1621,12 @@ cube(`orders`, {
         timestamp_index: {
           columns: [
             `timestamp`
-          ],
-        },
-      },
-    },
-  },
-});
+          ]
+        }
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -1681,20 +1681,20 @@ cube(`orders`, {
           columns: [
             CUBE.status,
             products.name
-          ],
+          ]
         },
         aggregating_index: {
           columns: [
             CUBE.status
           ],
-          type: `aggregate`,
-        },
-      },
-    },
+          type: `aggregate`
+        }
+      }
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -1725,27 +1725,23 @@ cubes:
 
 </CodeTabs>
 
-[ref-api-ref-query-ref]:
-  /product/apis-integrations/rest-api/query-format#query-properties
 [ref-caching-lambda-preaggs]: /product/caching/lambda-pre-aggregations
 [ref-caching-partitioning]: /product/caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
   /product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries
 [ref-config-downstream-superset]:
   /product/configuration/visualization-tools/superset
-[ref-config-driverfactory]: /config/#driver-factory
 [ref-cube-refreshkey]: /product/data-modeling/reference/cube#refresh_key
 [ref-production-checklist-refresh]:
   /product/deployment/production-checklist#set-up-refresh-worker
 [ref-recipe-funnels]: /product/data-modeling/recipes/funnels
-[ref-sqlalias]: /product/data-modeling/reference/cube#sql_alias
 [ref-schema-ref-cube-datasource]:
   /product/data-modeling/reference/cube#data_source
 [ref-schema-dimensions]: /product/data-modeling/reference/dimensions
 [ref-schema-measures]: /product/data-modeling/reference/measures
 [ref-schema-segments]: /product/data-modeling/reference/segments
 [ref-schema-types-dim-time]:
-  /product/data-modeling/reference/types-and-formats#time-1
+  /product/data-modeling/reference/types-and-formats#time
 [ref-naming]: /product/data-modeling/syntax#naming
 [self-granularity]: #granularity
 [self-incremental]: #incremental

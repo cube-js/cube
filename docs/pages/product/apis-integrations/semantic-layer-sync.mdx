@@ -124,12 +124,12 @@ module.exports = {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
           url: "superset.example.com",
-          database: "Cube Cloud: staging-deployment",
-        },
-      },
-    ];
-  },
-};
+          database: "Cube Cloud: staging-deployment"
+        }
+      }
+    ]
+  }
+}
 ```
 
 </CodeTabs>
@@ -181,7 +181,7 @@ def semantic_layer_sync(ctx: dict) -> list[dict]:
 ```javascript
 module.exports = {
   semanticLayerSync: ({ securityContext }) => {
-    const department = securityContext.department;
+        const department = securityContext.department
 
     return [
       {
@@ -191,12 +191,12 @@ module.exports = {
           user: "mail@example.com",
           password: "4dceae-606a03-93ae6dc7",
           url: "example.metabaseapp.com",
-          database: `Cube Cloud: ${department}`,
-        },
-      },
-    ];
-  },
-};
+          database: `Cube Cloud: ${department}`
+        }
+      }
+        ]
+  }
+}
 ```
 
 </CodeTabs>
@@ -252,8 +252,8 @@ module.exports = {
             user: "mail@example.com",
             password: "4dceae-606a03-93ae6dc7",
             url: "superset.example.com",
-            database: "Cube Cloud: sls-test (admin)",
-          },
+            database: "Cube Cloud: sls-test (admin)"
+          }
         },
         {
           type: "preset",
@@ -262,16 +262,16 @@ module.exports = {
             api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
             api_secret: "c19fbab4fd4945899795d32898f2e1165bef8e5ee653",
             workspace_url: "12345678.us1a.app.preset.io",
-            database: "Cube Cloud: sls-test (admin)",
-          },
-        },
-      ];
+            database: "Cube Cloud: sls-test (admin)"
+          }
+        }
+            ]
     } else {
       // Only sync the 'admin' data model
-      return [];
+            return []
     }
-  },
-};
+  }
+}
 ```
 
 </CodeTabs>
@@ -401,9 +401,7 @@ on, i.e., your development mode branch, shared branch, or main branch.
 [ref-powerbi]: /product/configuration/visualization-tools/powerbi
 [ref-dax-api]: /product/apis-integrations/dax-api
 [ref-config-file]: /product/configuration#configuration-options
-[ref-config-sls]: /product/configuration/reference/config#semanticlayersync
 [ref-config-contexts]: /product/configuration/reference/config#scheduledrefreshcontexts
 [ref-config-schemaversion]: /product/configuration/reference/config#schema_version
-[ref-workspace-sls]: /workspace/bi-integrations
 [ref-dev-mode]: /product/workspace/dev-mode
 [ref-auto-sus]: /product/deployment/cloud/auto-suspension

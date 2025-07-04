@@ -237,6 +237,8 @@ export class PreAggregations {
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName);
     const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+    // Atm this is only defined in KsqlQuery but without it partitions are recreated on every refresh
+    const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries?.(cube, preAggregation);
 
     const allBackAliasMembers = this.query.allBackAliasMembers();
 
@@ -298,6 +300,7 @@ export class PreAggregations {
       timestampPrecision: queryForSqlEvaluation.timestampPrecision(),
       tableName,
       invalidateKeyQueries,
+      partitionInvalidateKeyQueries,
       type: preAggregation.type,
       external: preAggregation.external,
       previewSql: queryForSqlEvaluation.preAggregationPreviewSql(tableName),

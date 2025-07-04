@@ -62,6 +62,15 @@ impl PlanSqlTemplates {
             .time_grouped_column(granularity, dimension)
     }
 
+    pub fn date_bin(
+        &self,
+        interval: String,
+        source: String,
+        origin: String,
+    ) -> Result<String, CubeError> {
+        self.driver_tools.date_bin(interval, source, origin)
+    }
+
     pub fn timestamp_precision(&self) -> Result<u32, CubeError> {
         self.driver_tools.timestamp_precision()
     }
@@ -84,6 +93,10 @@ impl PlanSqlTemplates {
 
     pub fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
         self.driver_tools.add_interval(date, interval)
+    }
+
+    pub fn interval_string(&self, interval: String) -> Result<String, CubeError> {
+        self.driver_tools.interval_string(interval)
     }
 
     pub fn add_timestamp_interval(
@@ -117,14 +130,6 @@ impl PlanSqlTemplates {
         self.driver_tools.count_distinct_approx(sql)
     }
 
-    pub fn date_bin(
-        &self,
-        interval: String,
-        source: String,
-        origin: String,
-    ) -> Result<String, CubeError> {
-        self.driver_tools.date_bin(interval, source, origin)
-    }
     pub fn alias_name(name: &str) -> String {
         let res = name
             .with_boundaries(&[
@@ -669,6 +674,21 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn series_bounds_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template(&"tesseract/series_bounds_cast", context! { expr => expr })
+    }
+
+    pub fn bool_param_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template(&"tesseract/bool_param_cast", context! { expr => expr })
+    }
+
+    pub fn number_param_cast(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template(&"tesseract/number_param_cast", context! { expr => expr })
+    }
+
     pub fn additional_null_check(&self, need: bool, column: &String) -> Result<String, CubeError> {
         if need {
             self.or_is_null_check(column.clone())
@@ -699,6 +719,15 @@ impl PlanSqlTemplates {
                 expr => column,
                 negated => not,
                 pattern => pattern
+            },
+        )
+    }
+    pub fn rolling_window_expr_timestamp_cast(&self, value: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/rolling_window_expr_timestamp_cast",
+            context! {
+                value => value
+
             },
         )
     }

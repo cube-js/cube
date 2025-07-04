@@ -1,24 +1,26 @@
-export type SqlQueryTuple = [string, any[], any];
+export type SqlQueryTuple = [string, any[], any?];
 
 export type SqlData = {
   aliasNameToMember: Record<string, string>;
   cacheKeyQueries: SqlQueryTuple[];
-  dataSource: boolean;
+  dataSource: string;
   external: boolean;
   sql: SqlQueryTuple;
   preAggregations: any[];
   rollupMatchResults: any[];
 };
 
-export default class SqlQuery {
-  private readonly sqlQuery: SqlData;
+export type SqlQueryWrapper = { sql: SqlData };
 
-  public constructor(sqlQuery: SqlData) {
+export default class SqlQuery {
+  private readonly sqlQuery: SqlQueryWrapper;
+
+  public constructor(sqlQuery: SqlQueryWrapper) {
     this.sqlQuery = sqlQuery;
   }
 
   public rawQuery(): SqlData {
-    return this.sqlQuery;
+    return this.sqlQuery.sql;
   }
 
   public sql(): string {

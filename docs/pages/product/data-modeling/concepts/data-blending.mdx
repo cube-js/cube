@@ -48,22 +48,22 @@ cube(`retail_orders`, {
   measures: {
     customer_count: {
       sql: `customer_id`,
-      type: `count_distinct`,
+      type: `count_distinct`
     },
 
     revenue: {
       sql: `amount`,
-      type: `sum`,
-    },
+      type: `sum`
+    }
   },
 
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -99,22 +99,22 @@ cube(`online_orders`, {
   measures: {
     customer_count: {
       sql: `user_id`,
-      type: `count_distinct`,
+      type: `count_distinct`
     },
 
     revenue: {
       sql: `amount`,
-      type: `sum`,
-    },
+      type: `sum`
+    }
   },
 
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -144,24 +144,24 @@ cube(`all_sales`, {
   measures: {
     customer_count: {
       sql: `customer_id`,
-      type: `count_distinct`,
+      type: `count_distinct`
     },
 
     revenue: {
       sql: `amount`,
-      type: `sum`,
+      type: `sum`
     },
 
     online_revenue: {
       sql: `amount`,
       type: `sum`,
-      filters: [{ sql: `${CUBE}.row_type = 'online'` }],
+      filters: [{ sql: `${CUBE}.row_type = 'online'` }]
     },
 
     offline_revenue: {
       sql: `amount`,
       type: `sum`,
-      filters: [{ sql: `${CUBE}.row_type = 'retail'` }],
+      filters: [{ sql: `${CUBE}.row_type = 'retail'` }]
     },
 
     online_revenue_percentage: {
@@ -170,22 +170,22 @@ cube(`all_sales`, {
         NULLIF(${online_revenue} + ${offline_revenue}, 0)
       `,
       type: `number`,
-      format: `percent`,
-    },
+      format: `percent`
+    }
   },
 
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
+      type: `time`
     },
 
     revenue_type: {
       sql: `row_type`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -255,14 +255,14 @@ correlate. You can simply pass the queries to the Cube client, and it will merge
 the results which will let you easily display it on the chart.
 
 ```javascript
-import cube from "@cubejs-client/core";
+import cube from "@cubejs-client/core"
 
-const API_URL = "http://localhost:4000";
-const CUBE_TOKEN = "YOUR_TOKEN";
+const API_URL = "http://localhost:4000"
+const CUBE_TOKEN = "YOUR_TOKEN"
 
 const cubeApi = cube(CUBE_TOKEN, {
-  apiUrl: `${API_URL}/cubejs-api/v1`,
-});
+  apiUrl: `${API_URL}/cubejs-api/v1`
+})
 
 const queries = [
   {
@@ -271,9 +271,9 @@ const queries = [
       {
         dimension: "online_orders.created_at",
         granularity: "day",
-        dateRange: ["2020-08-01", "2020-08-07"],
-      },
-    ],
+        dateRange: ["2020-08-01", "2020-08-07"]
+      }
+    ]
   },
   {
     measures: ["retail_orders.revenue"],
@@ -281,13 +281,12 @@ const queries = [
       {
         dimension: "retail_orders.created_at",
         granularity: "day",
-        dateRange: ["2020-08-01", "2020-08-07"],
-      },
-    ],
-  },
-];
+        dateRange: ["2020-08-01", "2020-08-07"]
+      }
+    ]
+  }
+]
 
-const resultSet = await cubeApi.load(queries);
+const resultSet = await cubeApi.load(queries)
 ```
 
-[ref-cube-sql-func]: /product/data-modeling/syntax#cubesql-function

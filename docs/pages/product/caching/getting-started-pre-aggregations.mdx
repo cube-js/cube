@@ -67,28 +67,28 @@ cube(`orders`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     status: {
       sql: `status`,
-      type: `string`,
+      type: `string`
     },
 
     completed_at: {
       sql: `completed_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -134,10 +134,10 @@ cube(`orders`, {
 
   pre_aggregations: {
     order_statuses: {
-      dimensions: [status],
-    },
-  },
-});
+      dimensions: [status]
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -181,10 +181,10 @@ cube(`orders`, {
     orders_by_completed_at: {
       measures: [count],
       time_dimension: completed_at,
-      granularity: `month`,
-    },
-  },
-});
+      granularity: `month`
+    }
+  }
+})
 ```
 
 </CodeTabs>

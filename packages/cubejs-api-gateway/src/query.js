@@ -6,7 +6,6 @@ import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
 import { QueryType } from './types/enums';
-import { PreAggsJobsRequest } from "./types/request";
 
 const getQueryGranularity = (queries) => R.pipe(
   R.map(({ timeDimensions }) => timeDimensions[0]?.granularity),
@@ -57,7 +56,8 @@ const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
 });
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
+// It might be member name, td+granularity or member expression
+const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/);
 const parsedMemberExpression = Joi.object().keys({
   expression: Joi.alternatives(
@@ -184,8 +184,8 @@ const querySchema = Joi.object().keys({
   ),
   segments: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
   timezone: Joi.string(),
-  limit: Joi.number().integer().min(0),
-  offset: Joi.number().integer().min(0),
+  limit: Joi.number().integer().strict().min(0),
+  offset: Joi.number().integer().strict().min(0),
   total: Joi.boolean(),
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean(),

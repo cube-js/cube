@@ -25,14 +25,14 @@ analysis. You can define it once and `export` it like this:
 
 ```javascript
 // in constants.js
-export const TEST_USER_IDS = [1, 2, 3, 4, 5];
+export const TEST_USER_IDS = [1, 2, 3, 4, 5]
 ```
 
 Later, you can `import` into the cube whenever needed:
 
 ```javascript
 // in Users.js
-import { TEST_USER_IDS } from "./constants";
+import { TEST_USER_IDS } from "./constants"
 
 cube(`users`, {
   // ...
@@ -47,10 +47,10 @@ cube(`users`, {
 
   segments: {
     exclude_test_users: {
-      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(", ")})`,
-    },
-  },
-});
+      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(", ")})`
+    }
+  }
+})
 ```
 
 ## Helper functions
@@ -65,12 +65,12 @@ here][ref-schema-string-time-dims].
 ```javascript
 // in helpers.js
 export const parseDateWithTimeZone = (column) =>
-  `PARSE_TIMESTAMP('%F %T %Ez', ${column})`;
+  `PARSE_TIMESTAMP('%F %T %Ez', ${column})`
 ```
 
 ```javascript
 // in events.js
-import { parseDateWithTimeZone } from "./helpers";
+import { parseDateWithTimeZone } from "./helpers"
 
 cube(`events`, {
   sql_table: `events`,
@@ -79,10 +79,10 @@ cube(`events`, {
   dimensions: {
     date: {
       sql: `${parseDateWithTimeZone("date")}`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 ## Import from parent directories
@@ -105,12 +105,12 @@ which is located in a parent directory.
 
 ```javascript
 // in model/sales/orders.js
-import { capitalize } from "./shared_utils/utils";
+import { capitalize } from "./shared_utils/utils"
 ```
 
 ```javascript
 // in model/shared_utils/utils.js
-export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 ```
 
 

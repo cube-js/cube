@@ -78,14 +78,14 @@ cubes:
 cube(`orders`, {
   // ...
 
-  data_source: `default`,
-});
+  data_source: `default`
+})
 
 cube(`orders_from_other_data_source`, {
   // ...
 
-  data_source: `other_data_source`,
-});
+  data_source: `other_data_source`
+})
 ```
 
 </CodeTabs>
@@ -94,7 +94,7 @@ cube(`orders_from_other_data_source`, {
 [ref-config-ref-driverfactory]: /product/configuration/reference/config#driverfactory
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-multitenancy]:
-  /product/configuration/advanced/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources
+  /product/configuration/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources
 
 ## Cube Cloud
 
@@ -102,7 +102,7 @@ Follow these steps to connect to multiple data sources in Cube Cloud:
 
 - Set up the `default` database connection when creating a new deployment.
 - Ensure you have the correct
-  [multitenancy](/product/configuration/advanced/multitenancy) configuration in
+  [multitenancy](/product/configuration/multitenancy) configuration in
   your `cube.js` file.
 - Configure the corresponding environment variables in <Btn>Settings →
   Environment variables</Btn>.

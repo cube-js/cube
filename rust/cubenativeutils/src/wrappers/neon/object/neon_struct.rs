@@ -97,19 +97,17 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
             .map(|arg| -> Result<_, CubeError> { Ok(arg.into_object().get_object()) })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
-            let neon_method = neon_object
-                .get::<JsFunction, _, _>(cx, method)
-                .map_err(|_| CubeError::internal(format!("Method `{}` not found", method)))?;
-            neon_method
-                .call(cx, *neon_object, neon_args)
-                .map_err(|err| {
-                    CubeError::internal(format!(
-                        "Failed to call method `{} {} {:?}",
-                        method, err, err
-                    ))
-                })
-        })??;
+        let neon_reuslt =
+            self.object
+                .map_neon_object_with_safe_call_fn(|cx, neon_object, safe_call_fn| {
+                    let neon_method =
+                        neon_object
+                            .get::<JsFunction, _, _>(cx, method)
+                            .map_err(|_| {
+                                CubeError::internal(format!("Method `{}` not found", method))
+                            })?;
+                    safe_call_fn.safe_call(cx, &neon_method, *neon_object, neon_args)
+                })??;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),
             neon_reuslt,

@@ -6,7 +6,9 @@ use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
+use crate::planner::{
+    BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension, GranularityHelper,
+};
 use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
@@ -16,7 +18,7 @@ use std::rc::Rc;
 
 pub struct MultiStageMemberQueryPlanner {
     query_tools: Rc<QueryTools>,
-    _query_properties: Rc<QueryProperties>,
+    query_properties: Rc<QueryProperties>,
     description: Rc<MultiStageQueryDescription>,
 }
 
@@ -28,7 +30,7 @@ impl MultiStageMemberQueryPlanner {
     ) -> Self {
         Self {
             query_tools,
-            _query_properties: query_properties,
+            query_properties,
             description,
         }
     }
@@ -73,6 +75,7 @@ impl MultiStageMemberQueryPlanner {
             true,
             false,
             false,
+            Rc::new(vec![]),
         )?;
 
         let simple_query_planer =
@@ -125,8 +128,30 @@ impl MultiStageMemberQueryPlanner {
                 })
             }
             RollingWindowType::ToDate(to_date_rolling_window) => {
+                let time_dimension = &rolling_window_desc.time_dimension;
+                let query_granularity = to_date_rolling_window.granularity.clone();
+
+                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
+                let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
+                    self.query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    self.query_tools.timezone().clone(),
+                    time_dimension.cube_name(),
+                    time_dimension.name(),
+                    Some(query_granularity.clone()),
+                )?
+                else {
+                    return Err(CubeError::internal(format!(
+                        "Rolling window granularity '{}' is not found in time dimension '{}'",
+                        query_granularity,
+                        time_dimension.name()
+                    )));
+                };
+
                 MultiStageRollingWindowType::ToDate(MultiStageToDateRollingWindow {
-                    granularity: to_date_rolling_window.granularity.clone(),
+                    granularity_obj: Rc::new(granularity_obj),
                 })
             }
             RollingWindowType::RunningTotal => MultiStageRollingWindowType::RunningTotal,
@@ -266,6 +291,7 @@ impl MultiStageMemberQueryPlanner {
             self.description.member().is_ungrupped(),
             false,
             false,
+            self.query_properties.query_join_hints().clone(),
         )?;
 
         let query_planner =
@@ -339,13 +365,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if !reduce_by.is_empty() {
             dimensions
                 .into_iter()
-                .filter(|d| {
-                    if reduce_by.iter().any(|m| d.full_name() == m.full_name()) {
-                        false
-                    } else {
-                        true
-                    }
-                })
+                .filter(|d| !reduce_by.iter().any(|m| d.has_member_in_reference_chain(m)))
                 .collect_vec()
         } else {
             dimensions
@@ -353,13 +373,7 @@ impl MultiStageMemberQueryPlanner {
         let dimensions = if let Some(group_by) = group_by {
             dimensions
                 .into_iter()
-                .filter(|d| {
-                    if group_by.iter().any(|m| d.full_name() == m.full_name()) {
-                        true
-                    } else {
-                        false
-                    }
-                })
+                .filter(|d| group_by.iter().any(|m| d.has_member_in_reference_chain(m)))
                 .collect_vec()
         } else {
             dimensions

@@ -93,11 +93,11 @@ sometimes known as `trustedConnection`), instantiate the driver with
 `trustedConnection: true` in your `cube.js` configuration file:
 
 ```javascript
-const MssqlDriver = require("@cubejs-backend/mssql-driver");
+const MssqlDriver = require("@cubejs-backend/mssql-driver")
 module.exports = {
   driverFactory: ({ dataSource }) =>
-    new MssqlDriver({ database: dataSource, trustedConnection: true }),
-};
+    new MssqlDriver({ database: dataSource, trustedConnection: true })
+}
 ```
 
 [mssql]: https://www.microsoft.com/en-gb/sql-server/sql-server-2019

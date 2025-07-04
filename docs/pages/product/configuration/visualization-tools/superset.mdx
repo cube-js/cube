@@ -74,22 +74,22 @@ cube(`orders`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     status: {
       sql: `status`,
-      type: `string`,
+      type: `string`
     },
 
     created_at: {
       sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -118,12 +118,7 @@ The `COUNT(*)` aggregate function is being mapped to a measure of type
 **Orders** data model file.
 
 
-[ref-getting-started]: /product/getting-started/cloud
-[ref-schema-ref-preagg-allownonstrict]:
-  /product/data-modeling/reference/pre-aggregations#allow_non_strict_date_range_match
 [superset]: https://superset.apache.org/
-[superset-docs-installation-docker]:
-  https://superset.apache.org/docs/installation/installing-superset-using-docker-compose
 [preset]: https://preset.io
 [ref-sls]: /product/apis-integrations/semantic-layer-sync
 [ref-sql-api]: /product/apis-integrations/sql-api

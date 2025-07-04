@@ -1,13 +1,5 @@
 # Implementing data snapshots
 
-<InfoBox>
-
-This functionality only works with data models written in JavaScript, not YAML.
-For more information, check out the [Data Modeling Syntax][ref-modeling-syntax]
-page.
-
-</InfoBox>
-
 ## Use case
 
 For a dataset that contains a sequence of changes to a property over time, we
@@ -102,10 +94,10 @@ cube(`status_snapshots`, {
   dimensions: {
     date: {
       sql: `date`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -134,7 +126,7 @@ cubes:
           WHERE sub_statuses.order_id = statuses.order_id
         )
     dimensions:
-      date:
+      - name: date
         sql: date
         type: time
 ```
@@ -212,4 +204,3 @@ Please feel free to check out the
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
 
-[ref-modeling-syntax]: /product/data-modeling/syntax

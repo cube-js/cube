@@ -184,12 +184,12 @@ configuration in the `cube.js` file, assuming that service accounts have
 module.exports = {
   contextToApiScopes: (securityContext, defaultScopes) => {
     if (securityContext.service) {
-      return ["meta", ...defaultScopes];
+      return ["meta", ...defaultScopes]
     }
 
-    return defaultScopes;
-  },
-};
+    return defaultScopes
+  }
+}
 ```
 
 ### CORS
@@ -205,10 +205,10 @@ following configuration in the `cube.js` file:
 module.exports = {
   http: {
     cors: {
-      origin: "https://example.com",
-    },
-  },
-};
+      origin: "https://example.com"
+    }
+  }
+}
 ```
 
 ## Prerequisites
@@ -279,7 +279,7 @@ warehouse][ref-data-warehouses].
 [ref-config-queryrewrite]: /product/configuration/reference/config#queryrewrite
 [ref-conf-queue-opts]: /product/configuration/reference/config#queueoptions
 [ref-rest-query-format]: /product/apis-integrations/rest-api/query-format#query-properties
-[ref-ref-meta-endpoint]: /product/apis-integrations/rest-api/reference#v1meta
+[ref-ref-meta-endpoint]: /product/apis-integrations/rest-api/reference#base_pathv1meta
 [ref-config-cors]: /product/configuration/reference/config#http
 [ref-schema-ref-cube-refresh-key]:
   /product/data-modeling/reference/cube#refresh_key

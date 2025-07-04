@@ -2,9 +2,12 @@
 
 Work with your Cube sales or customer success team to initiate this process.
 
-- [Sign up for a Cube Cloud account][cube-cloud-signup] if you haven't already.
-- Let the Cube team know your Cube Cloud tenant name (e.g. example.cubecloud.dev) and your desired GCP region for the deployment.  For best performance, select one of the "Supported Regions" listed below.
-- Cube will provision the VPC and provide the following information you can use to create the peering request:
+- VPC Peering requires Cube to be hosted in [dedicated infrastructure][dedicated-infra]. 
+Let the Cube team know your Cube Cloud tenant name (e.g. example.cubecloud.dev) and what region 
+the dedicated infrastructure should be hosted in. 
+For best performance, select one of the "Supported Regions" listed below.
+- Cube will provision the dedicated VPC and provide the following 
+information you can use to create the peering request:
   - [Google Cloud Project ID][gcp-docs-projects]
   - Google Cloud VPC Network Name
 
@@ -47,4 +50,4 @@ run the [Cloud SQL Auth Proxy][gcp-cloudsql-auth-proxy].
 [gcp-docs-projects]:
   https://cloud.google.com/resource-manager/docs/creating-managing-projects#before_you_begin
 [gcp-docs-vpc-peering]: https://cloud.google.com/vpc/docs/vpc-peering
-[cube-cloud-signup]: https://cubecloud.dev/auth/signup
+[dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure

@@ -68,9 +68,6 @@ on:
           - 'true'
           - 'false'
 
-env:
-  USE_TESSERACT_SQL_PLANNER: false
-
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-24.04
@@ -268,6 +265,14 @@ jobs:
           - snowflake-export-bucket-azure-via-storage-integration
           - snowflake-export-bucket-gcs
           - snowflake-export-bucket-gcs-prefix
+        use_tesseract_sql_planner: [ false ]
+        include:
+          - database: postgres
+            use_tesseract_sql_planner: true
+          - database: bigquery-export-bucket-gcs
+            use_tesseract_sql_planner: true
+          - database: athena-export-bucket-s3
+            use_tesseract_sql_planner: true
       fail-fast: false
 
     steps:
@@ -334,7 +339,7 @@ jobs:
           (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
           (!contains(env.CLOUD_DATABASES, matrix.database))
         env:
-          DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.use_tesseract_sql_planner || env.USE_TESSERACT_SQL_PLANNER }}
+          DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.use_tesseract_sql_planner) || matrix.use_tesseract_sql_planner }}
 
           # Athena
           DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}

@@ -12,6 +12,7 @@ COPY cubestore/cubezetasketch cubezetasketch
 COPY cubestore/cubedatasketches cubedatasketches
 COPY cubestore/cuberpc cuberpc
 COPY cubestore/cubestore-sql-tests cubestore-sql-tests
+COPY cubestore/cubestore/benches cubestore/benches
 COPY cubestore/cubestore/Cargo.toml cubestore/Cargo.toml
 RUN mkdir -p cubestore/src/bin && \
     echo "fn main() {print!(\"Dummy main\");} // dummy file" > cubestore/src/bin/cubestored.rs

@@ -45,23 +45,23 @@ cube(`base_events`, {
   joins: {
     users: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.user_id = ${users.id}`,
-    },
+      sql: `${CUBE}.user_id = ${users.id}`
+    }
   },
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     timestamp: {
       sql: `time`,
-      type: `time`,
-    },
-  },
-});
+      type: `time`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -109,10 +109,10 @@ cube(`product_purchases`, {
   dimensions: {
     product_name: {
       sql: `product_name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 
 cube(`page_views`, {
   sql_table: `page_views`,
@@ -121,10 +121,10 @@ cube(`page_views`, {
   dimensions: {
     page_path: {
       sql: `page_path`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -158,7 +158,7 @@ cube(`product_purchases`, {
   `,
 
   // ...
-});
+})
 ```
 
 </CodeTabs>
@@ -195,13 +195,12 @@ cube(`base_events`, {
   `,
 
   // ...
-});
+})
 ```
 
 </CodeTabs>
 
 
-[ref-schema-concepts-cubes]: /product/data-modeling/concepts#cubes
 [ref-cube-extends]: /product/data-modeling/reference/cube#extends
 [ref-view-extends]: /product/data-modeling/reference/view#extends
 [ref-schema-ref-cube-filter-params]: /product/data-modeling/reference/cube#filter-params

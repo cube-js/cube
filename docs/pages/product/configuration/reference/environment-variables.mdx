@@ -375,6 +375,14 @@ A comma-separated list of DuckDB community extensions	to install and load.
 | ----------------------------------------------------- | ---------------------- | --------------------- |
 | A comma-separated list of DuckDB community extensions | N/A                    | N/A                   |
 
+## `CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN`
+
+A flag to use credentials chain for secrets for S3 connections.
+
+| Possible Values                                       | Default in Development | Default in Production |
+| ----------------------------------------------------- | ---------------------- | --------------------- |
+| `true`, `false`                                       | `false`                | `false`               |
+
 ## `CUBEJS_DB_ELASTIC_APIKEY_ID`
 
 The [ID of the API key from elastic.co][elastic-docs-api-keys]. Required when
@@ -1128,6 +1136,26 @@ Until v0.35, the default value was `schema`.
 It can be also set using the [`schema_path` configuration
 option](/product/configuration/reference/config#schema_path).
 
+## `CUBEJS_SERVER_HEADERS_TIMEOUT`
+
+The number of milliseconds to limit the amount of time the parser will wait
+to receive the complete HTTP headers.
+If the timeout expires, the server responds with status 408 without
+forwarding the request to the request listener and then closes the connection.
+
+| Possible Values                           | Default in Development   | Default in Production    |
+| ----------------------------------------- | ------------------------ | ------------------------ |
+| A valid number or string representing one | NodeJS's version default | NodeJS's version default |
+
+## `CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT`
+
+The number of milliseconds of inactivity a server needs to wait for additional incoming data,
+after it has finished writing the last response, before a socket will be destroyed.
+
+| Possible Values                           | Default in Development   | Default in Production    |
+| ----------------------------------------- | ------------------------ | ------------------------ |
+| A valid number or string representing one | NodeJS's version default | NodeJS's version default |
+
 ## `CUBEJS_SQL_USER`
 
 A username required to access the [SQL API][ref-sql-api].
@@ -1729,8 +1757,6 @@ The port for a Cube deployment to listen to API connections on.
 [ietf-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [motherduck-docs-svc-token]:
   https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
-[ref-config]: /product/configuration/reference/config
-[ref-config-conf-ctx-to-appid]: /product/configuration/reference/config#context_to_app_id
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-multiple-ds-decorating-env]:
   /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables

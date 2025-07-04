@@ -722,7 +722,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5#454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=edbe6a8b62c1cc9f1feb0be83f089f155c662298#edbe6a8b62c1cc9f1feb0be83f089f155c662298"
 dependencies = [
  "arrow",
  "chrono",
@@ -740,8 +740,8 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "serde",
- "serde_derive",
  "serde_json",
+ "serde_repr",
  "tokio",
  "url",
  "uuid 1.10.0",
@@ -846,7 +846,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5#454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=edbe6a8b62c1cc9f1feb0be83f089f155c662298#edbe6a8b62c1cc9f1feb0be83f089f155c662298"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -879,7 +879,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5#454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=edbe6a8b62c1cc9f1feb0be83f089f155c662298#edbe6a8b62c1cc9f1feb0be83f089f155c662298"
 dependencies = [
  "arrow",
  "ordered-float 2.10.0",
@@ -890,7 +890,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5#454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=edbe6a8b62c1cc9f1feb0be83f089f155c662298#edbe6a8b62c1cc9f1feb0be83f089f155c662298"
 dependencies = [
  "async-trait",
  "chrono",
@@ -903,7 +903,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5#454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=edbe6a8b62c1cc9f1feb0be83f089f155c662298#edbe6a8b62c1cc9f1feb0be83f089f155c662298"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -914,7 +914,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5#454020d6ad0eb5987aa0dbc3a3b4db8c24ccc1b5"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=edbe6a8b62c1cc9f1feb0be83f089f155c662298#edbe6a8b62c1cc9f1feb0be83f089f155c662298"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -2856,6 +2856,17 @@ dependencies = [
  "memchr",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_repr"
+version = "0.1.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "175ee3e80ae9982737ca543e96133087cbd9a485eecc3bc4de9c1a37b47ea59c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
 ]
 
 [[package]]

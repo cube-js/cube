@@ -367,7 +367,7 @@ Let's configure Cube to use a specific data model path for each tenant using the
 `repositoryFactory` function along with `contextToAppId` and `scheduledRefreshContexts`:
 
 ```javascript
-const { FileRepository } = require("@cubejs-backend/server-core");
+const { FileRepository } = require("@cubejs-backend/server-core")
 
 module.exports = {
   contextToAppId: ({ securityContext }) =>
@@ -378,9 +378,9 @@ module.exports = {
 
   scheduledRefreshContexts: () => [
     { securityContext: { tenant: "avocado" } },
-    { securityContext: { tenant: "mango" } },
-  ],
-};
+    { securityContext: { tenant: "mango" } }
+  ]
+}
 ```
 
 In this example, we'll filter products differently for each tenant. For the `avocado`
@@ -405,7 +405,7 @@ cube(`products`, {
     WHERE MOD (id, 2) = 1`,
 
   // ...
-});
+})
 ```
 
 </CodeTabs>
@@ -428,7 +428,7 @@ cube(`products`, {
     WHERE MOD (id, 2) = 0`,
 
   // ...
-});
+})
 ```
 
 </CodeTabs>
@@ -507,7 +507,7 @@ Instead of using the `file_repository` utility, you would have to write your own
 code that fetches data model files for each tenant.
 
 
-[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-multitenancy]: /product/configuration/multitenancy
 [ref-scheduled-refresh-contexts]: /product/configuration/reference/config#scheduled_refresh_contexts
 [ref-context-to-app-id]: /product/configuration/reference/config#context_to_app_id
 [ref-config-files]: /product/configuration#cubepy-and-cubejs-files

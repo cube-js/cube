@@ -144,6 +144,10 @@ const variables: Record<string, (...args: any) => any> = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
+  serverHeadersTimeout: () => get('CUBEJS_SERVER_HEADERS_TIMEOUT')
+    .asInt(),
+  serverKeepAliveTimeout: () => get('CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT')
+    .asInt(),
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
@@ -336,6 +340,33 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_HOST', dataSource)
     ]
   ),
+
+  /**
+   * Use `SELECT 1` query for testConnection.
+   * It might be used in any driver where there is a specific testConnection
+   * like a REST call, but for some reason it's not possible to use it in
+   * deployment environment.
+   */
+  dbUseSelectTestConnection: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_USE_SELECT_TEST_CONNECTION', dataSource)
+    ] || 'false';
+    if (val.toLocaleLowerCase() === 'true') {
+      return true;
+    } else if (val.toLowerCase() === 'false') {
+      return false;
+    } else {
+      throw new TypeError(
+        `The ${
+          keyByDataSource('CUBEJS_DB_USE_SELECT_TEST_CONNECTION', dataSource)
+        } must be either 'true' or 'false'.`
+      );
+    }
+  },
 
   /**
    * Kafka host for direct downloads from ksqlDb
@@ -1784,6 +1815,7 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return [];
   },
+
   duckdbCommunityExtensions: ({
     dataSource
   }: {
@@ -1797,6 +1829,36 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return [];
   },
+
+  duckdbS3UseCredentialChain: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN', dataSource)
+    ];
+
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return false;
+    }
+  },
+
   /** ***************************************************************
    * Presto/Trino Driver                                                  *
    **************************************************************** */

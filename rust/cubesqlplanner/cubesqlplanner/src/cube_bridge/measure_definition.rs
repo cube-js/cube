@@ -19,7 +19,7 @@ pub struct TimeShiftReference {
     #[serde(rename = "type")]
     pub shift_type: Option<String>,
     #[serde(rename = "timeDimension")]
-    pub time_dimension: String,
+    pub time_dimension: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]

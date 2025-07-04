@@ -285,32 +285,32 @@ cube(`users`, {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     city: {
       sql: `city`,
-      type: `string`,
+      type: `string`
     },
 
     lifetime_value: {
       sql: `${line_items.total_amount}`,
       type: `number`,
-      sub_query: true,
-    },
+      sub_query: true
+    }
   },
 
   measures: {
     count: {
-      type: `count`,
+      type: `count`
     },
 
     total_orders_amount: {
       sql: `${lifetime_value}`,
-      type: `sum`,
-    },
-  },
-});
+      type: `sum`
+    }
+  }
+})
 ```
 
 ## Credits

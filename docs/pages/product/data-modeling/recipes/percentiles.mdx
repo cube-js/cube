@@ -27,25 +27,25 @@ information about users, including their age:
 [
   {
     "users.name": "Abbott, Breanne",
-    "users.age": 52,
+    "users.age": 52
   },
   {
     "users.name": "Abbott, Dallas",
-    "users.age": 43,
+    "users.age": 43
   },
   {
     "users.name": "Abbott, Gia",
-    "users.age": 36,
+    "users.age": 36
   },
   {
     "users.name": "Abbott, Tom",
-    "users.age": 39,
+    "users.age": 39
   },
   {
     "users.name": "Abbott, Ward",
-    "users.age": 67,
-  },
-];
+    "users.age": 67
+  }
+]
 ```
 
 Calculating the average age is as simple as defining a measure with the built-in
@@ -85,20 +85,20 @@ cube("users", {
   measures: {
     avg_age: {
       sql: `age`,
-      type: `avg`,
+      type: `avg`
     },
 
     median_age: {
       sql: `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY age)`,
-      type: `number`,
+      type: `number`
     },
 
     p95_age: {
       sql: `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY age)`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 </CodeTabs>

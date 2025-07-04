@@ -67,7 +67,7 @@ def check_sql_auth(req: dict, user_name: str, password: str) -> dict:
 module.exports = {
   checkSqlAuth: async (req, user_name, password) => {
     // Verify user_name and password
-    let authenticated = /* ... */;
+    let authenticated = /* ... */
 
     if (authenticated) {
       return {
@@ -78,9 +78,9 @@ module.exports = {
       }
     }
 
-    throw new Error('Incorrect user name or password');
+    throw new Error('Incorrect user name or password')
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -89,7 +89,7 @@ Here's an example code you can use to verify the credentials via the Secure
 LDAP service in Google Workspace:
 
 ```javascript filename="cube.js"
-const ldap = require('ldapjs');
+const ldap = require('ldapjs')
 
 const createLdapClient = () => ldap.createClient({
   url: [ 'ldaps://ldap.google.com:636' ],
@@ -100,75 +100,75 @@ const createLdapClient = () => ldap.createClient({
     requestCert: true,
     rejectUnauthorized: false
   }
-});
+})
 
-const client = createLdapClient();
+const client = createLdapClient()
 
 client.on('connectError', (err) => {
   console.log(`Can't connect to LDAP: ${err.stack || err}`);
-});
+})
 
 module.exports = {
   checkSqlAuth: async (req, user_name, password) => {
     const ldapSearchResult = await new Promise((resolve, reject) => {
-      const resultArray = [];
+      const resultArray = []
 
-      const userId = `${user_name}@example.com`;
-      console.log(`User id`, userId);
+      const userId = `${user_name}@example.com`
+      console.log(`User id`, userId)
 
       const opts = {
         filter: `mail=${userId}`,
         scope: 'sub',
         attributes: [ 'dn', 'sn', 'cn', 'memberOf' ]
-      };
+      }
 
       client.search('dc=example, dc=com', opts, (err, res) => {
         if (err) {
-          console.log(err);
+          console.log(err)
         }
 
         res.on('searchRequest', (searchRequest) => {
-          console.log('Search request: ', searchRequest.messageId);
-        });
+          console.log('Search request: ', searchRequest.messageId)
+        })
 
         res.on('searchEntry', (entry) => {
-          console.log('Search entry: ' + JSON.stringify(entry.object));
-          resultArray.push(entry.object);
-        });
+          console.log('Search entry: ' + JSON.stringify(entry.object))
+          resultArray.push(entry.object)
+        })
 
         res.on('searchReference', (referral) => {
-          console.log('Referral: ' + referral.uris.join());
-        });
+          console.log('Referral: ' + referral.uris.join())
+        })
 
         res.on('error', (err) => {
-          console.error('Error: ' + err.message);
-          reject(err);
-        });
+          console.error('Error: ' + err.message)
+          reject(err)
+        })
 
         res.on('end', (result) => {
-          console.log('Status: ' + result.status);
-          resolve(resultArray);
-        });
-      });
-    });
+              console.log('Status: ' + result.status)
+              resolve(resultArray)
+            })
+          })
+        })
 
     if (ldapSearchResult[0]) {
-      console.log(ldapSearchResult[0]);
+      console.log(ldapSearchResult[0])
 
       const canBind = await new Promise((resolve, reject) => {
-        console.log(`Authenticating ${userId}`);
+        console.log(`Authenticating ${userId}`)
 
         createLdapClient().bind(userId, password, (err) => {
           if (err) {
-            console.log(`Error binding LDAP: ${err}`);
-            resolve(false);
+            console.log(`Error binding LDAP: ${err}`)
+            resolve(false)
           }
           else {
             console.log(`Authentication for ${userId} has been successful`)
-            resolve(true);
+            resolve(true)
           }
-        });
-      });
+        })
+      })
 
       if (canBind) {
         return {
@@ -180,9 +180,9 @@ module.exports = {
       }
     }
 
-    throw new Error('Incorrect user name or password');
+    throw new Error('Incorrect user name or password')
   }
-};
+}
 
 ```
 

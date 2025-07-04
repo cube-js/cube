@@ -31,6 +31,7 @@ interface CubeDefinition {
   excludes?: any;
   cubes?: any;
   isView?: boolean;
+  calendar?: boolean;
   isSplitView?: boolean;
   includedMembers?: any[];
 }
@@ -683,7 +684,7 @@ export class CubeSymbols {
       return cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [referencedCube, name]));
     }, {
       // eslint-disable-next-line no-shadow
-      sqlResolveFn: (symbol, currentCube, n) => cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [currentCube, n])),
+      sqlResolveFn: (symbol, currentCube, refProperty, propertyName) => cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [currentCube, refProperty, ...(propertyName ? [propertyName] : [])])),
       // eslint-disable-next-line no-shadow
       cubeAliasFn: (currentCube) => cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [currentCube])),
       collectJoinHints: options.collectJoinHints,
@@ -773,6 +774,9 @@ export class CubeSymbols {
 
   protected joinHints() {
     const { joinHints } = this.resolveSymbolsCallContext || {};
+    if (Array.isArray(joinHints)) {
+      return R.uniq(joinHints);
+    }
     return joinHints;
   }
 
@@ -879,7 +883,7 @@ export class CubeSymbols {
       } else if (this.symbols[cubeName]?.[name]) {
         cube = this.cubeReferenceProxy(
           cubeName,
-          undefined,
+          collectJoinHints ? [] : undefined,
           name
         );
       }
@@ -979,8 +983,17 @@ export class CubeSymbols {
     const [cubeName, dimName, gr, granName] = Array.isArray(path) ? path : path.split('.');
     const cube = refCube || this.symbols[cubeName];
 
-    // Predefined granularity
+    // Calendar cubes time dimensions may define custom sql for predefined granularities,
+    // so we need to check if such granularity exists in cube definition.
     if (typeof granName === 'string' && /^(second|minute|hour|day|week|month|quarter|year)$/i.test(granName)) {
+      const customGranularity = cube?.[dimName]?.[gr]?.[granName];
+      if (customGranularity) {
+        return {
+          ...customGranularity,
+          interval: `1 ${granName}`, // It's still important to have interval for granularity math
+        };
+      }
+
       return { interval: `1 ${granName}` };
     }
 

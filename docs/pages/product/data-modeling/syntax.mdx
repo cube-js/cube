@@ -41,8 +41,8 @@ cube(`orders`, {
     SELECT *
     FROM orders, line_items
     WHERE orders.id = line_items.order_id
-  `,
-});
+  `
+})
 ```
 
 ```yaml
@@ -126,17 +126,17 @@ cube(`orders`, {
   measures: {
     statuses: {
       sql: `STRING_AGG(status)`,
-      type: `string`,
-    },
+      type: `string`
+    }
   },
 
   dimensions: {
     status: {
       sql: `UPPER(status)`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 <ReferenceBox>
@@ -170,8 +170,8 @@ cubes:
 
 ```javascript
 cube(`orders`, {
-  sql_table: `public."Orders"`,
-});
+  sql_table: `public."Orders"`
+})
 ```
 
 </CodeTabs>
@@ -208,10 +208,10 @@ cube(`users`, {
   dimensions: {
     name: {
       sql: `name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -255,20 +255,20 @@ cube(`users`, {
   dimensions: {
     name: {
       sql: `name`,
-      type: `string`,
+      type: `string`
     },
 
     surname: {
       sql: `UPPER(surname)`,
-      type: `string`,
+      type: `string`
     },
 
     full_name: {
       sql: `CONCAT(${name}, ' ', ${surname})`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -390,23 +390,23 @@ cube(`users`, {
   joins: {
     contacts: {
       sql: `${users}.contact_id = ${contacts.id}`,
-      relationship: `one_to_one`,
-    },
+      relationship: `one_to_one`
+    }
   },
 
   dimensions: {
     id: {
       sql: `${users}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `COALESCE(${users}.name, ${contacts.name})`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 
 cube(`contacts`, {
   sql_table: `contacts`,
@@ -415,15 +415,15 @@ cube(`contacts`, {
     id: {
       sql: `${contacts}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `${contacts}.name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -449,23 +449,23 @@ cube(`users`, {
   joins: {
     contacts: {
       sql: `${CUBE}.contact_id = ${contacts.id}`,
-      relationship: `one_to_one`,
-    },
+      relationship: `one_to_one`
+    }
   },
 
   dimensions: {
     id: {
       sql: `${CUBE}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `COALESCE(${CUBE}.name, ${contacts.name})`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 
 cube(`contacts`, {
   sql_table: `contacts`,
@@ -474,15 +474,15 @@ cube(`contacts`, {
     id: {
       sql: `${CUBE}.id`,
       type: `number`,
-      primary_key: true,
+      primary_key: true
     },
 
     name: {
       sql: `${CUBE}.name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -740,7 +740,7 @@ cube(`orders`, {
       measures: [CUBE.count]
     }
   }
-});
+})
 ```
 
 </CodeTabs>
@@ -774,7 +774,6 @@ string values in time dimensions.
 [self-folder-structure]: #folder-structure
 [self-naming]: #naming
 [self-syntax]: #code-syntax
-[self-cube-variable]: #cube-variable
 [self-sql-expressions]: #sql-expressions
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-dynamic-data-models-jinja]: /product/data-modeling/dynamic/jinja
@@ -789,7 +788,7 @@ string values in time dimensions.
 [link-snowflake-listagg]: https://docs.snowflake.com/en/sql-reference/functions/listagg
 [link-bigquery-stringagg]: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#string_agg
 [link-sql-udf]: https://en.wikipedia.org/wiki/User-defined_function#Databases
-[ref-time-dimension]: /product/data-modeling/reference/types-and-formats#time-1
+[ref-time-dimension]: /product/data-modeling/reference/types-and-formats#time
 [ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
 [ref-custom-granularities]: /product/data-modeling/reference/dimensions#granularities
 [ref-style-guide]: /product/data-modeling/recipes/style-guide

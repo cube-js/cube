@@ -370,9 +370,9 @@ use [timeDimensions](#time-dimensions-format) `dateRange` instead.
 </WarningBox>
 
 The operator `inDateRange` is used to filter a time dimension into a specific
-date range. The values must be an array of dates with the following format
-'YYYY-MM-DD'. If only one date specified the filter would be set exactly to this
-date.
+date range. The values must be an array of timestamps in the [ISO 8601][wiki-iso-8601]
+format, for example `2025-01-02` or `2025-01-02T03:04:05.067Z`. If only one timestamp
+is specified, the filter would be set exactly to this timestamp.
 
 There is a convenient way to use date filters with grouping -
 [learn more about the `timeDimensions` property here](#time-dimensions-format)
@@ -400,7 +400,7 @@ is just missing the filtered time dimension in
 </WarningBox>
 
 An opposite operator to `inDateRange`, use it when you want to exclude specific
-dates. The values format is the same as for `inDateRange`.
+timestamps. The values must be in the same format as for [`inDateRange`](#indaterange).
 
 - Dimension types: `time`.
 
@@ -424,8 +424,8 @@ just missing the filtered time dimension in
 
 </WarningBox>
 
-Use it when you want to retrieve all results before some specific date. The
-values should be an array of one element in `YYYY-MM-DD` format.
+Use it when you want to retrieve all results before some specific timestamp. The
+values should be an array of one element in the same format as for [`inDateRange`](#indaterange).
 
 - Dimension types: `time`.
 
@@ -433,6 +433,31 @@ values should be an array of one element in `YYYY-MM-DD` format.
 {
   "member": "posts.time",
   "operator": "beforeDate",
+  "values": ["2015-01-01"]
+}
+```
+
+### `beforeOrOnDate`
+
+<WarningBox>
+
+From a pre-aggregation standpoint, `beforeOrOnDate` filter is applied as a generic
+filter. All pre-aggregation granularity matching rules aren't applied in this
+case. It feels like pre-aggregation isn't matched. However, pre-aggregation is
+just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
+Use it when you want to retrieve all results before or on a specific timestamp. The
+values should be an array of one element in the same format as for [`inDateRange`](#indaterange).
+
+- Dimension types: `time`.
+
+```json
+{
+  "member": "posts.time",
+  "operator": "beforeOrOnDate",
   "values": ["2015-01-01"]
 }
 ```
@@ -449,7 +474,8 @@ just missing the filtered time dimension in
 
 </WarningBox>
 
-The same as `beforeDate`, but is used to get all results after a specific date.
+The same as `beforeDate`, but is used to get all results after a specific timestamp.
+The values should be an array of one element in the same format as for [`inDateRange`](#indaterange).
 
 - Dimension types: `time`.
 
@@ -457,6 +483,31 @@ The same as `beforeDate`, but is used to get all results after a specific date.
 {
   "member": "posts.time",
   "operator": "afterDate",
+  "values": ["2015-01-01"]
+}
+```
+
+### `afterOrOnDate`
+
+<WarningBox>
+
+From a pre-aggregation standpoint, `afterOrOnDate` filter is applied as a generic
+filter. All pre-aggregation granularity matching rules aren't applied in this
+case. It feels like pre-aggregation isn't matched. However, pre-aggregation is
+just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
+The same as `beforeOrOnDate`, but is used to get all results after or on a specific timestamp.
+The values should be an array of one element in the same format as for [`inDateRange`](#indaterange).
+
+- Dimension types: `time`.
+
+```json
+{
+  "member": "posts.time",
+  "operator": "afterOrOnDate",
   "values": ["2015-01-01"]
 }
 ```
@@ -572,10 +623,10 @@ const resultSet = await cubeApi.load({
     {
       dimension: "stories.time",
       compareDateRange: ["this week", ["2020-05-21", "2020-05-28"]],
-      granularity: "month",
-    },
-  ],
-});
+      granularity: "month"
+    }
+  ]
+})
 ```
 
 ### Relative date range
@@ -630,3 +681,4 @@ refer to its documentation for more examples.
 [ref-default-order]: /product/apis-integrations/queries#order
 [ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
 [ref-custom-granularities]: /product/data-modeling/reference/dimensions#granularities
+[wiki-iso-8601]: https://en.wikipedia.org/wiki/ISO_8601

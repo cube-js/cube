@@ -45,8 +45,8 @@ our `users` table.
 
 ```javascript
 cube(`users`, {
-  sql_table: `users`,
-});
+  sql_table: `users`
+})
 ```
 
 ```yaml
@@ -84,22 +84,22 @@ cube(`users`, {
   measures: {
     count: {
       sql: `id`,
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     city: {
       sql: `city`,
-      type: `string`,
+      type: `string`
     },
 
     company_name: {
       sql: `company_name`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -159,18 +159,18 @@ cube(`users`, {
   measures: {
     count: {
       sql: `id`,
-      type: `count`,
+      type: `count`
     },
 
     paying_count: {
       sql: `id`,
       type: `count`,
-      filters: [{ sql: `${CUBE}.paying = 'true'` }],
-    },
+      filters: [{ sql: `${CUBE}.paying = 'true'` }]
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml
@@ -231,24 +231,24 @@ cube(`users`, {
   measures: {
     count: {
       sql: `id`,
-      type: `count`,
+      type: `count`
     },
 
     paying_count: {
       sql: `id`,
       type: `count`,
-      filters: [{ sql: `${CUBE}.paying = 'true'` }],
+      filters: [{ sql: `${CUBE}.paying = 'true'` }]
     },
 
     paying_percentage: {
       sql: `100.0 * ${paying_count} / ${count}`,
       type: `number`,
-      format: `percent`,
-    },
+      format: `percent`
+    }
   },
 
   // ...
-});
+})
 ```
 
 ```yaml

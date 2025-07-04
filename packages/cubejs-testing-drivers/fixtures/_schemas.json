@@ -371,6 +371,14 @@
           "type": "sum"
         },
         {
+          "name": "customersCountPrev1Month",
+          "type": "count",
+          "rolling_window": {
+            "trailing": "1 month",
+            "offset": "start"
+          }
+        },
+        {
           "name": "totalProfitYearAgo",
           "type": "number",
           "sql": "{totalProfit}",
