@@ -128,14 +128,25 @@ export class SQLServer {
         };
       },
       checkSqlAuth: async ({ request, user, password }) => {
-        const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
+        try {
+          const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
 
-        return {
-          password: returnedPassword,
-          superuser: superuser || false,
-          securityContext,
-          skipPasswordCheck,
-        };
+          return {
+            password: returnedPassword,
+            superuser: superuser || false,
+            securityContext,
+            skipPasswordCheck,
+          };
+        } catch (e) {
+          this.apiGateway.log({
+            type: 'Auth Error',
+            protocol: (request as any).protocol,
+            method: (request as any).method,
+            apiType: 'sql',
+            error: (e as Error).stack || (e as Error).toString(),
+          });
+          throw e;
+        }
       },
       meta: async ({ request, session, onlyCompilerId }) => {
         const context = await this.apiGateway.contextByReq(<any> request, session.securityContext, request.id);
