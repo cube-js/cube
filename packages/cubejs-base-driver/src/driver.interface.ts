@@ -212,6 +212,18 @@ export type ForeignKeysQueryResult = {
   target_column: string
 };
 
+export type InformationSchemaColumn = {
+  // eslint-disable-next-line camelcase
+  table_schema: string;
+  // eslint-disable-next-line camelcase
+  table_name: string;
+  // eslint-disable-next-line camelcase
+  column_name: string;
+  // eslint-disable-next-line camelcase
+  data_type: string;
+  [key: string]: string
+};
+
 export type TableKeysFilter = {
   tableSchema: string,
   tableName: string[]

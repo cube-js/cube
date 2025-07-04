@@ -10,6 +10,7 @@ import {
   DatabaseStructure,
   DownloadTableMemoryData,
   IndexesSQL,
+  InformationSchemaColumn,
   StreamOptions,
   StreamTableDataWithTypes,
   TableStructure
@@ -173,11 +174,13 @@ export class MaterializeDriver extends PostgresDriver {
     return version.split(' ')[0];
   }
 
-  public async tablesSchema(): Promise<DatabaseStructure> {
+  public override async tablesSchema(): Promise<DatabaseStructure> {
     const version = await this.getMaterializeVersion();
     const query = this.informationSchemaQueryWithFilter(version);
+    const data: InformationSchemaColumn[] = await this.query(query, []);
+    const sortedData = this.informationColumnsSchemaSorter(data);
 
-    return this.query(query, []).then(data => data.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {}));
+    return sortedData.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {});
   }
 
   protected async* asyncFetcher<R extends unknown>(conn: PoolClient, cursorId: string): AsyncGenerator<R> {

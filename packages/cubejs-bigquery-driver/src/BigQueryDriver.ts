@@ -202,7 +202,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
       if (result.length) {
         return R.reduce(
-          this.informationColumnsSchemaReducer, {}, result[0]
+          this.informationColumnsSchemaReducer, {}, this.informationColumnsSchemaSorter(result[0])
         );
       }
 
