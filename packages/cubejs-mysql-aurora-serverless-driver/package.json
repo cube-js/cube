@@ -32,7 +32,7 @@
     "@types/data-api-client": "^1.2.1",
     "@types/jest": "^29",
     "jest": "^29",
-    "testcontainers": "^10.10.4"
+    "testcontainers": "^10.28.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {
