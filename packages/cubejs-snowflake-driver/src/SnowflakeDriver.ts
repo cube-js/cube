@@ -153,6 +153,7 @@ interface SnowflakeDriverOptions {
   clientSessionKeepAlive?: boolean,
   database?: string,
   authenticator?: string,
+  oauthToken?: string,
   oauthTokenPath?: string,
   token?: string,
   privateKeyPath?: string,
@@ -189,7 +190,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns the configurable driver options
    * Note: It returns the unprefixed option names.
-   * In case of using multisources options need to be prefixed manually.
+   * In case of using multi-sources options need to be prefixed manually.
    */
   public static driverEnvVariables() {
     return [
@@ -202,6 +203,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       'CUBEJS_DB_SNOWFLAKE_ROLE',
       'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
       'CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR',
+      'CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN',
       'CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH',
       'CUBEJS_DB_SNOWFLAKE_HOST',
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY',
@@ -286,6 +288,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       username: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       authenticator: getEnv('snowflakeAuthenticator', { dataSource }),
+      oauthToken: getEnv('snowflakeOAuthToken', { dataSource }),
       oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource }),
       privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
       privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
@@ -423,12 +426,39 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return token.trim();
   }
 
-  private async createConnection() {
+  private async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
+    const config: Record<string, any> = {
+      account: this.config.account,
+      region: this.config.region,
+      host: this.config.host,
+      application: this.config.application,
+      authenticator: this.config.authenticator,
+      clientSessionKeepAlive: this.config.clientSessionKeepAlive,
+      database: this.config.database,
+      warehouse: this.config.warehouse,
+      role: this.config.role,
+      resultPrefetch: this.config.resultPrefetch,
+    };
+
     if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
-      this.config.token = await this.readOAuthToken();
+      config.token = this.config.oauthToken || await this.readOAuthToken();
+    } else if (this.config.authenticator?.toUpperCase() === 'SNOWFLAKE_JWT') {
+      config.username = this.config.username;
+      config.privateKey = this.config.privateKey;
+      config.privateKeyPath = this.config.privateKeyPath;
+      config.privateKeyPass = this.config.privateKeyPass;
+    } else {
+      config.username = this.config.username;
+      config.password = this.config.password;
     }
 
-    return snowflake.createConnection(this.config);
+    return config as snowflake.ConnectionOptions;
+  }
+
+  private async createConnection() {
+    const config = await this.prepareConnectOptions();
+
+    return snowflake.createConnection(config);
   }
 
   /**
