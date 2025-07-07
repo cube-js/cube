@@ -43,10 +43,12 @@ impl SimpleQueryPlanner {
         let result = SimpleQuery {
             schema,
             filter: logical_filter,
-            offset: self.query_properties.offset(),
-            limit: self.query_properties.row_limit(),
-            ungrouped: self.query_properties.ungrouped(),
-            order_by: self.query_properties.order_by().clone(),
+            modifers: Rc::new(LogicalQueryModifiers {
+                offset: self.query_properties.offset(),
+                limit: self.query_properties.row_limit(),
+                ungrouped: self.query_properties.ungrouped(),
+                order_by: self.query_properties.order_by().clone(),
+            }),
             dimension_subqueries: subquery_dimension_queries,
             source: SimpleQuerySource::LogicalJoin(source),
         };

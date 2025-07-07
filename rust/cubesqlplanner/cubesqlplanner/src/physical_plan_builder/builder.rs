@@ -134,7 +134,7 @@ impl PhysicalPlanBuilder {
         };
 
         let mut select_builder = SelectBuilder::new(from);
-        context_factory.set_ungrouped(logical_plan.ungrouped);
+        context_factory.set_ungrouped(logical_plan.modifers.ungrouped);
         context_factory.set_pre_aggregation_measures_references(measure_references);
         context_factory.set_pre_aggregation_dimensions_references(dimensions_references);
 
@@ -143,7 +143,7 @@ impl PhysicalPlanBuilder {
             let member_ref: Rc<dyn BaseMember> =
                 MemberSymbolRef::try_new(member.clone(), self.query_tools.clone())?;
             select_builder.add_projection_member(&member_ref, None);
-            if !logical_plan.ungrouped {
+            if !logical_plan.modifers.ungrouped {
                 group_by.push(Expr::Member(MemberExpression::new(member_ref.clone())));
             }
         }
@@ -151,7 +151,7 @@ impl PhysicalPlanBuilder {
             let member_ref: Rc<dyn BaseMember> =
                 MemberSymbolRef::try_new(member.clone(), self.query_tools.clone())?;
             select_builder.add_projection_member(&member_ref, None);
-            if !logical_plan.ungrouped {
+            if !logical_plan.modifers.ungrouped {
                 group_by.push(Expr::Member(MemberExpression::new(member_ref.clone())));
             }
         }
@@ -174,15 +174,15 @@ impl PhysicalPlanBuilder {
         select_builder.set_filter(filter);
         select_builder.set_group_by(group_by);
         select_builder
-            .set_order_by(self.make_order_by(&logical_plan.schema, &logical_plan.order_by)?);
+            .set_order_by(self.make_order_by(&logical_plan.schema, &logical_plan.modifers.order_by)?);
         select_builder.set_having(having);
-        select_builder.set_limit(logical_plan.limit);
-        select_builder.set_offset(logical_plan.offset);
+        select_builder.set_limit(logical_plan.modifers.limit);
+        select_builder.set_offset(logical_plan.modifers.offset);
 
         context_factory
             .set_rendered_as_multiplied_measures(logical_plan.schema.multiplied_measures.clone());
         context_factory.set_render_references(render_references);
-        if logical_plan.ungrouped {
+        if logical_plan.modifers.ungrouped {
             context_factory.set_ungrouped(true);
         }
 
@@ -476,10 +476,10 @@ impl PhysicalPlanBuilder {
         };
 
         select_builder
-            .set_order_by(self.make_order_by(&logical_plan.schema, &logical_plan.order_by)?);
+            .set_order_by(self.make_order_by(&logical_plan.schema, &logical_plan.modifers.order_by)?);
         select_builder.set_filter(having);
-        select_builder.set_limit(logical_plan.limit);
-        select_builder.set_offset(logical_plan.offset);
+        select_builder.set_limit(logical_plan.modifers.limit);
+        select_builder.set_offset(logical_plan.modifers.offset);
         select_builder.set_ctes(ctes);
 
         let mut context_factory = context.make_sql_nodes_factory()?;

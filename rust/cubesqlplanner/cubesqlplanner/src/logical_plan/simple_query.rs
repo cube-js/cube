@@ -1,5 +1,4 @@
 use super::*;
-use crate::planner::query_properties::OrderByItem;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -22,10 +21,7 @@ pub struct SimpleQuery {
     pub schema: Rc<LogicalSchema>,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     pub filter: Rc<LogicalFilter>,
-    pub offset: Option<usize>,
-    pub limit: Option<usize>,
-    pub ungrouped: bool,
-    pub order_by: Vec<OrderByItem>,
+    pub modifers: Rc<LogicalQueryModifiers>,
     pub source: SimpleQuerySource,
 }
 
@@ -44,26 +40,7 @@ impl PrettyPrint for SimpleQuery {
         }
         result.println("filters:", &state);
         self.filter.pretty_print(result, &details_state);
-        if let Some(offset) = &self.offset {
-            result.println(&format!("offset:{}", offset), &state);
-        }
-        if let Some(limit) = &self.limit {
-            result.println(&format!("limit:{}", limit), &state);
-        }
-        result.println(&format!("ungrouped:{}", self.ungrouped), &state);
-        if !self.order_by.is_empty() {
-            result.println("order_by:", &state);
-            for order_by in self.order_by.iter() {
-                result.println(
-                    &format!(
-                        "{} {}",
-                        order_by.name(),
-                        if order_by.desc() { "desc" } else { "asc" }
-                    ),
-                    &details_state,
-                );
-            }
-        }
+        self.modifers.pretty_print(result, &state);
 
         result.println("source:", &state);
         self.source.pretty_print(result, &details_state);
