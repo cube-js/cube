@@ -245,7 +245,7 @@ export class ClickHouseQuery extends BaseQuery {
     // Clickhouse sometimes includes the "q_0" prefix in the column name, and this
     // leads to errors during the result mapping.
     if (cubeAlias === 'q_0') {
-      return this.dimensionAliasNames().map(alias => `${cubeAlias && `${cubeAlias}.` || ''}${alias} ${alias}`);
+      return this.dimensionAliasNames().map(alias => `${cubeAlias}.${alias} ${alias}`);
     } else {
       return super.dimensionColumns(cubeAlias);
     }
