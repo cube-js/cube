@@ -6,6 +6,7 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -24,6 +25,12 @@ pub struct DimensionCaseDefinition {
     pub else_label: DimenstionCaseLabel,
 }
 
+#[derive(Clone)]
+pub struct CalendarDimensionTimeShift {
+    pub interval: SqlInterval,
+    pub sql: Option<Rc<SqlCall>>,
+}
+
 pub struct DimensionSymbol {
     cube_name: String,
     name: String,
@@ -34,6 +41,7 @@ pub struct DimensionSymbol {
     definition: Rc<dyn DimensionDefinition>,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
     is_view: bool,
+    time_shift: Vec<CalendarDimensionTimeShift>,
 }
 
 impl DimensionSymbol {
@@ -47,6 +55,7 @@ impl DimensionSymbol {
         longitude: Option<Rc<SqlCall>>,
         case: Option<DimensionCaseDefinition>,
         definition: Rc<dyn DimensionDefinition>,
+        time_shift: Vec<CalendarDimensionTimeShift>,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_name,
@@ -58,6 +67,7 @@ impl DimensionSymbol {
             definition,
             case,
             is_view,
+            time_shift,
         })
     }
 
@@ -93,6 +103,10 @@ impl DimensionSymbol {
 
     pub fn member_sql(&self) -> &Option<Rc<SqlCall>> {
         &self.member_sql
+    }
+
+    pub fn time_shift(&self) -> &Vec<CalendarDimensionTimeShift> {
+        &self.time_shift
     }
 
     pub fn full_name(&self) -> String {
@@ -320,6 +334,31 @@ impl SymbolFactory for DimensionSymbolFactory {
         } else {
             None
         };
+
+        let time_shift = if let Some(time_shift) = definition.time_shift()? {
+            time_shift
+                .iter()
+                .map(|item| -> Result<_, CubeError> {
+                    let interval = item.static_data().interval.parse::<SqlInterval>()?;
+                    let interval = if item.static_data().timeshift_type == "next" {
+                        -interval
+                    } else {
+                        interval
+                    };
+                    let sql = if let Some(sql) = item.sql()? {
+                        Some(compiler.compile_sql_call(&cube_name, sql)?)
+                    } else {
+                        None
+                    };
+                    Ok(CalendarDimensionTimeShift { interval, sql })
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            vec![]
+        };
+
+        println!("time_shift.count: {:?}", time_shift.len());
+
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
         let is_view = cube.static_data().is_view.unwrap_or(false);
         let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
@@ -333,6 +372,7 @@ impl SymbolFactory for DimensionSymbolFactory {
                 && latitude.is_none()
                 && longitude.is_none()
                 && !is_multi_stage);
+
         Ok(MemberSymbol::new_dimension(DimensionSymbol::new(
             cube_name,
             name,
@@ -343,6 +383,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             longitude,
             case,
             definition,
+            time_shift,
         )))
     }
 }
