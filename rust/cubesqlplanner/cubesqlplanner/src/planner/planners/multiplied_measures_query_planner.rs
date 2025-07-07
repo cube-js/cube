@@ -317,12 +317,14 @@ impl MultipliedMeasuresQueryPlanner {
         let query = SimpleQuery {
             schema,
             filter: logical_filter,
-            offset: None,
-            limit: None,
-            ungrouped: self.query_properties.ungrouped(),
+            modifers: Rc::new(LogicalQueryModifiers {
+                offset: None,
+                limit: None,
+                ungrouped: self.query_properties.ungrouped(),
+                order_by: vec![],
+            }),
             dimension_subqueries: subquery_dimension_queries,
             source: SimpleQuerySource::LogicalJoin(source),
-            order_by: vec![],
         };
         Ok(Rc::new(query))
     }

@@ -72,10 +72,12 @@ impl FullKeyAggregateQueryPlanner {
             schema,
             multistage_members: all_multistage_members,
             filter: logical_filter,
-            offset: self.query_properties.offset(),
-            limit: self.query_properties.row_limit(),
-            ungrouped: self.query_properties.ungrouped(),
-            order_by: self.query_properties.order_by().clone(),
+            modifers: Rc::new(LogicalQueryModifiers {
+                offset: self.query_properties.offset(),
+                limit: self.query_properties.row_limit(),
+                ungrouped: self.query_properties.ungrouped(),
+                order_by: self.query_properties.order_by().clone(),
+            }),
             source,
         };
         Ok(Rc::new(Query::FullKeyAggregateQuery(result)))

@@ -114,10 +114,7 @@ impl PreAggregationOptimizer {
                 schema: query.schema.clone(),
                 dimension_subqueries: vec![],
                 filter: query.filter.clone(),
-                offset: query.offset,
-                limit: query.limit,
-                ungrouped: query.ungrouped,
-                order_by: query.order_by.clone(),
+                modifers: query.modifers.clone(),
                 source,
             };
             Ok(Some(Rc::new(Query::SimpleQuery(new_query))))
@@ -170,10 +167,12 @@ impl PreAggregationOptimizer {
                         schema: resolver_multiplied_measures.schema.clone(),
                         dimension_subqueries: vec![],
                         filter: resolver_multiplied_measures.filter.clone(),
-                        offset: None,
-                        limit: None,
-                        ungrouped: false,
-                        order_by: vec![],
+                        modifers: Rc::new(LogicalQueryModifiers {
+                            offset: None,
+                            limit: None,
+                            ungrouped: false,
+                            order_by: vec![],
+                        }),
                         source: SimpleQuerySource::PreAggregation(pre_aggregation_source),
                     };
                     Rc::new(FullKeyAggregate {
@@ -200,10 +199,12 @@ impl PreAggregationOptimizer {
             multistage_members: multi_stages_queries,
             schema: query.schema.clone(),
             filter: query.filter.clone(),
-            offset: query.offset,
-            limit: query.limit,
-            ungrouped: query.ungrouped,
-            order_by: query.order_by.clone(),
+            modifers: Rc::new(LogicalQueryModifiers {
+                offset: query.modifers.offset,
+                limit: query.modifers.limit,
+                ungrouped: query.modifers.ungrouped,
+                order_by: query.modifers.order_by.clone(),
+            }),
             source,
         };
         Ok(Some(Rc::new(Query::FullKeyAggregateQuery(result))))
