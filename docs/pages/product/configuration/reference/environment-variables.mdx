@@ -1297,6 +1297,21 @@ If `true`, the DAX API will expose time dimensions as calendar hierarchies.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true` | `true` |
 
+## `CUBEJS_NESTED_FOLDERS_DELIMITER`
+
+Specifies the delimiter used to flatten the names of nested [folder][ref-folders] in
+views when [visualization tools][ref-dataviz-tools] do not support nested folder
+structures. When set, nested folders will be presented at the root level with path-like
+names using the specified delimiter.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid string delimiter (e.g., ` / `) | N/A | N/A |
+
+For example, if set to `/`, a nested folder structure like the `Customer Information`
+folder with the `Personal Details` subfolder will be flattened to `Customer
+Information / Personal Details` at the root level.
+
 ## `CUBEJS_TELEMETRY`
 
 If `true`, then send telemetry to Cube.
@@ -1781,3 +1796,5 @@ The port for a Cube deployment to listen to API connections on.
 [ref-schema-ref-preagg-allownonstrict]: /product/data-modeling/reference/pre-aggregations#allow_non_strict_date_range_match
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage-calculations]: /product/data-modeling/concepts/multi-stage-calculations
+[ref-folders]: /product/data-modeling/reference/view#folders
+[ref-dataviz-tools]: /product/configuration/visualization-tools

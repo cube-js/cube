@@ -240,6 +240,9 @@ const variables: Record<string, (...args: any) => any> = {
   transpilationNative: () => get('CUBEJS_TRANSPILATION_NATIVE')
     .default('false')
     .asBoolStrict(),
+  nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
+    .default('')
+    .asString(),
 
   /** ****************************************************************
    * Common db options                                               *

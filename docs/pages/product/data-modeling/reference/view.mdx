@@ -441,6 +441,120 @@ views:
 
 </CodeTabs>
 
+Nested folders are also supported. The `includes` parameter can contain not only
+references to view members but also other folders:
+
+<CodeTabs>
+
+```javascript
+view(`customers`, {
+  cubes: [
+    {
+      join_path: `users`,
+      includes: `*`
+    },
+    {
+      join_path: `users.orders`,
+      prefix: true,
+      includes: [
+        `status`,
+        `price`,
+        `count`
+      ]
+    }
+  ],
+
+  folders: [
+    {
+      name: `Customer Information`,
+      includes: [
+        {
+          name: `Personal Details`,
+          includes: [
+            `name`,
+            `gender`
+          ]
+        },
+        {
+          name: `Location`,
+          includes: [
+            `address`,
+            `postal_code`,
+            `city`
+          ]
+        }
+      ]
+    },
+    {
+      name: `Order Analytics`,
+      includes: [
+        `orders_status`,
+        `orders_price`,
+        {
+          name: `Metrics`,
+          includes: [
+            `orders_count`,
+            `orders_average_value`
+          ]
+        }
+      ]
+    }
+  ]
+})
+```
+
+```yaml
+views:
+  - name: customers
+
+    cubes:
+      - join_path: users
+        includes: "*"
+
+      - join_path: users.orders
+        prefix: true
+        includes:
+          - status
+          - price
+          - count
+
+    folders:
+      - name: Customer Information
+        includes:
+          - name: Personal Details
+            includes:
+              - name
+              - gender
+
+          - name: Location
+            includes:
+              - address
+              - postal_code
+              - city
+
+      - name: Order Analytics
+        includes:
+          - orders_status
+          - orders_price
+          
+          - name: Metrics
+            includes:
+              - orders_count
+              - orders_average_value
+```
+
+</CodeTabs>
+
+You can still define nested folders in the data model even if some of your [visualization
+tools][ref-viz-tools] do not support them. Check [APIs & Integrations][ref-apis-support]
+for details on the nested folders support.
+
+For tools that do not support nested folders, the nested structure will be flattened:
+by default, the members of nested folders are merged into folders at the root level.
+You can also set the `CUBEJS_NESTED_FOLDERS_DELIMITER` environment variable to preserve
+nested folders and give them path-like names, e.g., `Customer Information / Personal
+Details`.
+
 ### `access_policy`
 
 The `access_policy` parameter is used to configure [data access policies][ref-ref-dap].

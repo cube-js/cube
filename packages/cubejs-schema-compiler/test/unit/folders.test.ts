@@ -43,6 +43,155 @@ describe('Cube Folders', () => {
     );
   });
 
+  it('a nested folders with some * and named members (merged)', async () => {
+    const testView = metaTransformer.cubes.find(
+      (it) => it.config.name === 'test_view4'
+    );
+
+    expect(testView.config.folders.length).toBe(3);
+
+    const folder1 = testView.config.folders.find(
+      (it) => it.name === 'folder1'
+    );
+    expect(folder1.members).toEqual([
+      'test_view4.users_age',
+      'test_view4.users_state',
+      'test_view4.renamed_orders_status',
+    ]);
+
+    const folder2 = testView.config.folders.find(
+      (it) => it.name === 'folder2'
+    );
+    expect(folder2.members).toEqual(
+      expect.arrayContaining(['test_view4.users_city', 'test_view4.users_renamed_in_view3_gender'])
+    );
+
+    const folder3 = testView.config.folders.find(
+      (it) => it.name === 'folder3'
+    );
+    expect(folder3.members.length).toBe(9);
+    expect(folder3.members).toEqual([
+      'test_view4.users_city',
+      'test_view4.renamed_orders_status',
+      'test_view4.renamed_orders_count',
+      'test_view4.renamed_orders_id',
+      'test_view4.renamed_orders_number',
+      'test_view4.users_age',
+      'test_view4.users_state',
+      'test_view4.users_gender',
+      'test_view4.users_renamed_in_view3_gender',
+    ]);
+  });
+
+  it('a nested folders with some * and named members (flattened)', async () => {
+    process.env.CUBEJS_NESTED_FOLDERS_DELIMITER = '/';
+    const modelContent = fs.readFileSync(
+      path.join(process.cwd(), '/test/unit/fixtures/folders.yml'),
+      'utf8'
+    );
+    const prepared = prepareYamlCompiler(modelContent);
+    const compilerL = prepared.compiler;
+    const metaTransformerL = prepared.metaTransformer;
+
+    await compilerL.compile();
+
+    const testView = metaTransformerL.cubes.find(
+      (it) => it.config.name === 'test_view4'
+    );
+
+    expect(testView.config.folders.length).toBe(5);
+
+    const folder1 = testView.config.folders.find(
+      (it) => it.name === 'folder1'
+    );
+    expect(folder1.members).toEqual([
+      'test_view4.users_age',
+      'test_view4.users_state',
+      'test_view4.renamed_orders_status',
+    ]);
+
+    const folder2 = testView.config.folders.find(
+      (it) => it.name === 'folder2'
+    );
+    expect(folder2.members).toEqual(
+      expect.arrayContaining(['test_view4.users_city', 'test_view4.users_renamed_in_view3_gender'])
+    );
+
+    const folder3 = testView.config.folders.find(
+      (it) => it.name === 'folder3'
+    );
+    expect(folder3.members.length).toBe(1);
+    expect(folder3.members).toEqual([
+      'test_view4.users_city',
+    ]);
+
+    const folder4 = testView.config.folders.find(
+      (it) => it.name === 'folder3/inner folder 4'
+    );
+    expect(folder4.members.length).toBe(1);
+    expect(folder4.members).toEqual(['test_view4.renamed_orders_status']);
+
+    const folder5 = testView.config.folders.find(
+      (it) => it.name === 'folder3/inner folder 5'
+    );
+    expect(folder5.members.length).toBe(9);
+    expect(folder5.members).toEqual([
+      'test_view4.renamed_orders_count',
+      'test_view4.renamed_orders_id',
+      'test_view4.renamed_orders_number',
+      'test_view4.renamed_orders_status',
+      'test_view4.users_age',
+      'test_view4.users_state',
+      'test_view4.users_gender',
+      'test_view4.users_city',
+      'test_view4.users_renamed_in_view3_gender',
+    ]);
+  });
+
+  it('a nested folders with some * and named members (nested)', async () => {
+    const testView = metaTransformer.cubes.find(
+      (it) => it.config.name === 'test_view4'
+    );
+
+    expect(testView.config.nestedFolders.length).toBe(3);
+
+    const folder1 = testView.config.nestedFolders.find(
+      (it) => it.name === 'folder1'
+    );
+    expect(folder1.members).toEqual([
+      'test_view4.users_age',
+      'test_view4.users_state',
+      'test_view4.renamed_orders_status',
+    ]);
+
+    const folder2 = testView.config.nestedFolders.find(
+      (it) => it.name === 'folder2'
+    );
+    expect(folder2.members).toEqual(
+      expect.arrayContaining(['test_view4.users_city', 'test_view4.users_renamed_in_view3_gender'])
+    );
+
+    const folder3 = testView.config.nestedFolders.find(
+      (it) => it.name === 'folder3'
+    );
+    expect(folder3.members.length).toBe(3);
+    expect(folder3.members[1]).toEqual(
+      { name: 'inner folder 4', members: ['test_view4.renamed_orders_status'] }
+    );
+    expect(folder3.members[2].name).toEqual('inner folder 5');
+    expect(folder3.members[2].members).toEqual([
+      'test_view4.renamed_orders_count',
+      'test_view4.renamed_orders_id',
+      'test_view4.renamed_orders_number',
+      'test_view4.renamed_orders_status',
+      'test_view4.users_age',
+      'test_view4.users_state',
+      'test_view4.users_gender',
+      'test_view4.users_city',
+      'test_view4.users_renamed_in_view3_gender',
+    ]);
+  });
+
   it('folders from view extending other view', async () => {
     const view2 = metaTransformer.cubes.find(
       (it) => it.config.name === 'test_view2'
@@ -93,6 +242,7 @@ describe('Cube Folders', () => {
       throw new Error('should throw earlier');
     } catch (e: any) {
       expect(e.toString()).toMatch(/Paths aren't allowed in the 'folders' but 'users.age' has been provided for test_view/);
+      expect(e.toString()).toMatch(/Paths aren't allowed in the 'folders' but 'users.renamed_gender' has been provided for test_view/);
       expect(e.toString()).toMatch(/Member 'users.age' included in folder 'folder1' not found/);
     }
   });

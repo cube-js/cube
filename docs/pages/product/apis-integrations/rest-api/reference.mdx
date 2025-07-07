@@ -254,7 +254,7 @@ Response
   - `dimensions` - Array of dimensions in this cube/view
   - `hierarchies` - Array of hierarchies in this cube
   - `segments` - Array of segments in this cube/view
-  - `folders` - Array of folders in this view
+  - `folders` and `nestedFolders` - Arrays of flat and nested [folder][ref-folders] structures in this view, respectively
   - `connectedComponent` - An integer representing a join relationship. If the same value is returned for two cubes, then there is
     at least one join path between them.
 
@@ -639,3 +639,4 @@ Keep-Alive: timeout=5
 [ref-query-wpd]: /product/apis-integrations/queries#query-with-pushdown
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api
+[ref-folders]: /product/data-modeling/reference/view#folders

@@ -93,6 +93,7 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
         segments: vec![],
         joins: None,
         folders: None,
+        nested_folders: None,
         hierarchies: None,
         meta: None,
     }]
