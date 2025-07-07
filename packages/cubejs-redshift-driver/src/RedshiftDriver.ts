@@ -10,6 +10,7 @@ import {
   DatabaseStructure,
   DownloadTableCSVData,
   DriverCapabilities,
+  InformationSchemaColumn,
   QueryColumnsResult,
   QuerySchemasResult,
   QueryTablesResult,
@@ -137,7 +138,9 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    */
   public override async tablesSchema(): Promise<DatabaseStructure> {
     const query = this.informationSchemaQuery();
-    const tablesSchema = await this.query(query, []).then(data => data.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {}));
+    const data: InformationSchemaColumn[] = await this.query(query, []);
+    const tablesSchema = this.informationColumnsSchemaSorter(data)
+      .reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {});
 
     const allSchemas = await this.getSchemas();
     const externalSchemas = allSchemas.filter(s => !tablesSchema[s.schema_name]).map(s => s.schema_name);
