@@ -5,17 +5,19 @@ use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::sql_evaluator::symbols::CalendarDimensionTimeShift;
 use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::planner::sql_evaluator::{DimensionTimeShift, MemberSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::BaseMemberHelper;
 use crate::planner::SqlJoinCondition;
 use crate::planner::{BaseMember, MemberSymbolRef};
 use cubenativeutils::CubeError;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
+
 const TOTAL_COUNT: &str = "total_count";
 const ORIGINAL_QUERY: &str = "original_query";
 
@@ -31,7 +33,31 @@ struct PhysicalPlanBuilderContext {
 impl PhysicalPlanBuilderContext {
     pub fn make_sql_nodes_factory(&self) -> SqlNodesFactory {
         let mut factory = SqlNodesFactory::new();
-        factory.set_time_shifts(self.time_shifts.clone());
+
+        let (time_shifts, calendar_time_shifts): (
+            HashMap<String, DimensionTimeShift>,
+            HashMap<String, CalendarDimensionTimeShift>,
+        ) = self
+            .time_shifts
+            .dimensions_shifts
+            .iter()
+            .partition_map(|(key, shift)| {
+                if let Ok(dimension) = shift.dimension.as_dimension() {
+                    if let Some((dim_key, cts)) =
+                        dimension.calendar_time_shift_for_interval(&shift.interval)
+                    {
+                        return Either::Right((dim_key.clone(), cts.clone()));
+                    }
+                }
+                Either::Left((key.clone(), shift.clone()))
+            });
+
+        let common_time_shifts = TimeShiftState {
+            dimensions_shifts: time_shifts,
+        };
+
+        factory.set_time_shifts(common_time_shifts);
+        factory.set_calendar_time_shifts(calendar_time_shifts);
         factory.set_count_approx_as_state(self.render_measure_as_state);
         factory.set_ungrouped_measure(self.render_measure_for_ungrouped);
         factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
