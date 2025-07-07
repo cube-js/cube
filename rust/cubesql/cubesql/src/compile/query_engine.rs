@@ -1,4 +1,3 @@
-use crate::compile::engine::df::planner::CubeQueryPlanner;
 use std::{
     backtrace::Backtrace, collections::HashMap, future::Future, pin::Pin, sync::Arc,
     time::SystemTime,
@@ -8,7 +7,10 @@ use crate::{
     compile::{
         engine::{
             df::{
-                optimizers::{FilterPushDown, FilterSplitMeta, LimitPushDown, SortPushDown},
+                optimizers::{
+                    FilterPushDown, FilterSplitMeta, LimitPushDown, PlanNormalize, SortPushDown,
+                },
+                planner::CubeQueryPlanner,
                 scan::CubeScanNode,
                 wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode},
             },
@@ -138,6 +140,7 @@ pub trait QueryEngine {
 
         let optimizer_config = OptimizerConfig::new();
         let optimizers: Vec<Arc<dyn OptimizerRule + Sync + Send>> = vec![
+            Arc::new(PlanNormalize::new()),
             Arc::new(ProjectionDropOut::new()),
             Arc::new(FilterPushDown::new()),
             Arc::new(SortPushDown::new()),

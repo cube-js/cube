@@ -1,9 +1,9 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"SELECT EXTRACT('YEAR' FROM CAST ('2020-12-25 22:48:48.000' AS timestamptz))\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"SELECT EXTRACT('YEAR' FROM CAST ('2020-12-25 22:48:48.000' AS timestamptz))\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
 +---------------------------------------------------------------------------------------------+
-| datepart(Utf8("YEAR"),CAST(Utf8("2020-12-25 22:48:48.000") AS Timestamp(Nanosecond, None))) |
+| datepart(Utf8("year"),CAST(Utf8("2020-12-25 22:48:48.000") AS Timestamp(Nanosecond, None))) |
 +---------------------------------------------------------------------------------------------+
 | 2020                                                                                        |
 +---------------------------------------------------------------------------------------------+

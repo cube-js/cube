@@ -1876,7 +1876,7 @@ GROUP BY
                         "replaceAggregationType": null,
                         "addFilters": [{
                             "cubeParams": ["MultiTypeCube"],
-                            "sql": "(((CAST(TRUNC(EXTRACT(YEAR FROM ${MultiTypeCube.dim_date0})) AS INTEGER) = 2024) AND (CAST(TRUNC(EXTRACT(MONTH FROM ${MultiTypeCube.dim_date0})) AS INTEGER) <= 11)) = TRUE)"
+                            "sql": "(((CAST(TRUNC(EXTRACT(year FROM ${MultiTypeCube.dim_date0})) AS INTEGER) = 2024) AND (CAST(TRUNC(EXTRACT(month FROM ${MultiTypeCube.dim_date0})) AS INTEGER) <= 11)) = TRUE)"
                         }],
                     },
                     "groupingSet": null,

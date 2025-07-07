@@ -26,7 +26,7 @@ impl SplitRules {
                                     binary_expr(
                                         self.fun_expr(
                                             "DatePart",
-                                            vec![literal_string("YEAR"), column_expr("?column")],
+                                            vec![literal_string("year"), column_expr("?column")],
                                         ),
                                         "*",
                                         literal_int(100),
@@ -75,7 +75,7 @@ impl SplitRules {
                                                 self.fun_expr(
                                                     "DatePart",
                                                     vec![
-                                                        literal_string("YEAR"),
+                                                        literal_string("year"),
                                                         "?column".to_string(),
                                                     ],
                                                 ),
@@ -120,7 +120,7 @@ impl SplitRules {
                             self.fun_expr(
                                 "DatePart",
                                 vec![
-                                    literal_string("DAY"),
+                                    literal_string("day"),
                                     udf_expr(
                                         "dateadd",
                                         vec![
@@ -223,7 +223,7 @@ impl SplitRules {
                                                 self.fun_expr(
                                                     "DatePart",
                                                     vec![
-                                                        literal_string("YEAR"),
+                                                        literal_string("year"),
                                                         column_expr("?column"),
                                                     ],
                                                 ),
@@ -234,7 +234,7 @@ impl SplitRules {
                                             self.fun_expr(
                                                 "DatePart",
                                                 vec![
-                                                    literal_string("MONTH"),
+                                                    literal_string("month"),
                                                     column_expr("?column"),
                                                 ],
                                             ),
@@ -256,7 +256,7 @@ impl SplitRules {
                                                                 self.fun_expr(
                                                                     "DatePart",
                                                                     vec![
-                                                                        literal_string("MONTH"),
+                                                                        literal_string("month"),
                                                                         column_expr("?column"),
                                                                     ],
                                                                 ),
@@ -329,7 +329,7 @@ impl SplitRules {
                             binary_expr(
                                 self.fun_expr(
                                     "DatePart",
-                                    vec![literal_string("YEAR"), column_expr("?column")],
+                                    vec![literal_string("year"), column_expr("?column")],
                                 ),
                                 "||",
                                 literal_string("-"),
@@ -344,7 +344,7 @@ impl SplitRules {
                                                 self.fun_expr(
                                                     "DatePart",
                                                     vec![
-                                                        literal_string("MONTH"),
+                                                        literal_string("month"),
                                                         column_expr("?column"),
                                                     ],
                                                 ),
@@ -401,7 +401,7 @@ impl SplitRules {
                                                 self.fun_expr(
                                                     "DatePart",
                                                     vec![
-                                                        literal_string("MONTH"),
+                                                        literal_string("month"),
                                                         column_expr("?column"),
                                                     ],
                                                 ),
@@ -422,7 +422,7 @@ impl SplitRules {
                                                             self.fun_expr(
                                                                 "DatePart",
                                                                 vec![
-                                                                    literal_string("YEAR"),
+                                                                    literal_string("year"),
                                                                     column_expr("?column"),
                                                                 ],
                                                             ),
@@ -433,7 +433,7 @@ impl SplitRules {
                                                         self.fun_expr(
                                                             "DatePart",
                                                             vec![
-                                                                literal_string("MONTH"),
+                                                                literal_string("month"),
                                                                 column_expr("?column"),
                                                             ],
                                                         ),
@@ -491,7 +491,7 @@ impl SplitRules {
                                                             self.fun_expr(
                                                                 "DatePart",
                                                                 vec![
-                                                                    literal_string("MONTH"),
+                                                                    literal_string("month"),
                                                                     column_expr("?column"),
                                                                 ],
                                                             ),
@@ -521,7 +521,7 @@ impl SplitRules {
                                                             self.fun_expr(
                                                                 "DatePart",
                                                                 vec![
-                                                                    literal_string("YEAR"),
+                                                                    literal_string("year"),
                                                                     column_expr("?column"),
                                                                 ],
                                                             ),
@@ -532,7 +532,7 @@ impl SplitRules {
                                                         self.fun_expr(
                                                             "DatePart",
                                                             vec![
-                                                                literal_string("MONTH"),
+                                                                literal_string("month"),
                                                                 column_expr("?column"),
                                                             ],
                                                         ),
