@@ -61,6 +61,11 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             r#type: V1CubeMetaType::Cube,
             dimensions: vec![
                 CubeMetaDimension {
+                    name: "KibanaSampleDataEcommerce.id".to_string(),
+                    r#type: "number".to_string(),
+                    ..CubeMetaDimension::default()
+                },
+                CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.order_date".to_string(),
                     r#type: "time".to_string(),
                     ..CubeMetaDimension::default()

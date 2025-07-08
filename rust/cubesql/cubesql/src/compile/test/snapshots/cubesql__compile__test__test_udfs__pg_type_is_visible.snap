@@ -91,12 +91,12 @@ expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspnam
 | 13410 | sql_identifier             | information_schema | false      |
 | 18001 | KibanaSampleDataEcommerce  | public             | true       |
 | 18002 | _KibanaSampleDataEcommerce | public             | true       |
-| 18020 | Logs                       | public             | true       |
-| 18021 | _Logs                      | public             | true       |
-| 18030 | NumberCube                 | public             | true       |
-| 18031 | _NumberCube                | public             | true       |
-| 18036 | WideCube                   | public             | true       |
-| 18037 | _WideCube                  | public             | true       |
-| 18246 | MultiTypeCube              | public             | true       |
-| 18247 | _MultiTypeCube             | public             | true       |
+| 18021 | Logs                       | public             | true       |
+| 18022 | _Logs                      | public             | true       |
+| 18031 | NumberCube                 | public             | true       |
+| 18032 | _NumberCube                | public             | true       |
+| 18037 | WideCube                   | public             | true       |
+| 18038 | _WideCube                  | public             | true       |
+| 18247 | MultiTypeCube              | public             | true       |
+| 18248 | _MultiTypeCube             | public             | true       |
 +-------+----------------------------+--------------------+------------+

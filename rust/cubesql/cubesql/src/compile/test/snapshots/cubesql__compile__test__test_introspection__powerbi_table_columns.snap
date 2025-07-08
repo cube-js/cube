@@ -11,14 +11,15 @@ expression: "execute_query(\"select COLUMN_NAME, ORDINAL_POSITION, IS_NULLABLE, 
 | minPrice           | 4                | NO          | numeric                     |
 | avgPrice           | 5                | NO          | numeric                     |
 | countDistinct      | 6                | NO          | bigint                      |
-| order_date         | 7                | YES         | timestamp without time zone |
-| last_mod           | 8                | YES         | timestamp without time zone |
-| customer_gender    | 9                | YES         | text                        |
-| notes              | 10               | YES         | text                        |
-| taxful_total_price | 11               | YES         | numeric                     |
-| has_subscription   | 12               | YES         | boolean                     |
-| is_male            | 13               | NO          | boolean                     |
-| is_female          | 14               | NO          | boolean                     |
-| __user             | 15               | YES         | text                        |
-| __cubeJoinField    | 16               | YES         | text                        |
+| id                 | 7                | YES         | numeric                     |
+| order_date         | 8                | YES         | timestamp without time zone |
+| last_mod           | 9                | YES         | timestamp without time zone |
+| customer_gender    | 10               | YES         | text                        |
+| notes              | 11               | YES         | text                        |
+| taxful_total_price | 12               | YES         | numeric                     |
+| has_subscription   | 13               | YES         | boolean                     |
+| is_male            | 14               | NO          | boolean                     |
+| is_female          | 15               | NO          | boolean                     |
+| __user             | 16               | YES         | text                        |
+| __cubeJoinField    | 17               | YES         | text                        |
 +--------------------+------------------+-------------+-----------------------------+
