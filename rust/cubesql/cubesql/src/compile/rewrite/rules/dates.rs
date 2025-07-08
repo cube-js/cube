@@ -271,7 +271,7 @@ impl RewriteRules for DateRules {
                     binary_expr(
                         negative_expr(self.fun_expr(
                             "DatePart",
-                            vec![literal_string("DOW"), column_expr("?column")],
+                            vec![literal_string("dow"), column_expr("?column")],
                         )),
                         "*",
                         // TODO match

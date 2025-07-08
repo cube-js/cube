@@ -1675,34 +1675,6 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         self.fun_expr(
                             "DatePart",
-                            vec![literal_string("YEAR"), column_expr("?column")],
-                        ),
-                        "=",
-                        literal_expr("?year"),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
-                self.transform_filter_extract_year_equals(
-                    "?year",
-                    "?column",
-                    "?alias_to_cube",
-                    "?members",
-                    "?member",
-                    "?values",
-                    "?filter_aliases",
-                ),
-            ),
-            // Same as the rule above, but it uses different case for granularity.
-            // TODO: Remove, whenever we will fix bug with granularity cases. CORE-1761
-            transforming_rewrite(
-                "extract-year-equals-lower-case",
-                filter_replacer(
-                    binary_expr(
-                        self.fun_expr(
-                            "DatePart",
                             vec![literal_string("year"), column_expr("?column")],
                         ),
                         "=",
@@ -1732,7 +1704,7 @@ impl RewriteRules for FilterRules {
                             "Trunc",
                             vec![self.fun_expr(
                                 "DatePart",
-                                vec![literal_string("YEAR"), column_expr("?column")],
+                                vec![literal_string("year"), column_expr("?column")],
                             )],
                         ),
                         "=",

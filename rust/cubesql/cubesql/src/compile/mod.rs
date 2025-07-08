@@ -13879,8 +13879,8 @@ ORDER BY "source"."str0" ASC
 
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
-        // check if contains `CAST(EXTRACT(YEAR FROM ..) || .. || .. || ..)`
-        let re = Regex::new(r"CAST.+EXTRACT.+YEAR FROM(.+ \|\|){3}").unwrap();
+        // check if contains `CAST(EXTRACT(year FROM ..) || .. || .. || ..)`
+        let re = Regex::new(r"CAST.+EXTRACT.+year FROM(.+ \|\|){3}").unwrap();
         assert!(re.is_match(&sql));
         // check if contains `LOWER(..) = .. AND LOWER(..) = ..`
         let re = Regex::new(r"LOWER ?\(.+\) = .+ AND .+LOWER ?\(.+\) = .+").unwrap();
@@ -14031,8 +14031,8 @@ ORDER BY "source"."str0" ASC
 
         if Rewriter::sql_push_down_enabled() {
             let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-            assert!(sql.contains("EXTRACT(YEAR"));
-            assert!(sql.contains("EXTRACT(MONTH"));
+            assert!(sql.contains("EXTRACT(year"));
+            assert!(sql.contains("EXTRACT(month"));
 
             let physical_plan = query_plan.as_physical_plan().await.unwrap();
             println!(
@@ -15114,7 +15114,7 @@ ORDER BY "source"."str0" ASC
             .find_cube_scan_wrapped_sql()
             .wrapped_sql
             .sql
-            .contains("EXTRACT(MONTH FROM "));
+            .contains("EXTRACT(month FROM "));
     }
 
     #[tokio::test]
@@ -15155,7 +15155,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("order_date"));
-        assert!(sql.contains("EXTRACT(DAY FROM"))
+        assert!(sql.contains("EXTRACT(day FROM"))
     }
 
     #[tokio::test]
@@ -16522,7 +16522,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        assert!(sql.contains("EXTRACT(EPOCH"));
+        assert!(sql.contains("EXTRACT(epoch"));
 
         // Databricks
         let query_plan = convert_select_to_query_plan_customized(
