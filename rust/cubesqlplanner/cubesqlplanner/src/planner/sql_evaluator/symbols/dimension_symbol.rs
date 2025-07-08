@@ -398,7 +398,7 @@ impl SymbolFactory for DimensionSymbolFactory {
                 .into_iter()
                 .filter(|pk_member| {
                     if let Ok(pk_dimension) = pk_member.as_dimension() {
-                        if pk_dimension.dimension_type() == "time" {
+                        if pk_dimension.dimension_type() == "time" { // TODO: What if calendar cube is joined via non-time dimension?
                             return true;
                         }
                     }
