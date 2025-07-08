@@ -1,19 +1,35 @@
-use super::super::{LogicalNodeProcessor, PullUpBuilderContext, PushDownBuilderContext};
+use super::super::{LogicalNodeProcessor, ProcessableNode};
+use super::super::context::PushDownBuilderContext;
 use crate::logical_plan::MultiStageMeasureCalculation;
+use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::QueryPlan;
+use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub struct MultiStageMeasureCalculationProcessor;
+pub struct MultiStageMeasureCalculationProcessor<'a> {
+    builder: &'a PhysicalPlanBuilder,
+}
 
-impl LogicalNodeProcessor for MultiStageMeasureCalculationProcessor {
-    type LogicalNode = MultiStageMeasureCalculation;
+impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
+    for MultiStageMeasureCalculationProcessor<'a>
+{
     type PhysycalNode = QueryPlan;
+    fn new(builder: &'a PhysicalPlanBuilder) -> Self {
+        Self { builder }
+    }
 
     fn process(
-        logical_plan: &Rc<Self::LogicalNode>,
+        &self,
+        logical_plan: &MultiStageMeasureCalculation,
         context: &PushDownBuilderContext,
-    ) -> Result<(Self::PhysycalNode, PullUpBuilderContext), CubeError> {
+    ) -> Result<Self::PhysycalNode, CubeError> {
         todo!()
     }
 }
+
+impl ProcessableNode for MultiStageMeasureCalculation {
+    type ProcessorType<'a> = MultiStageMeasureCalculationProcessor<'a>;
+}
+

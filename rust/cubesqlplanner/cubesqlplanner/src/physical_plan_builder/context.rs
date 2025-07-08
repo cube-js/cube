@@ -23,10 +23,3 @@ impl PushDownBuilderContext {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub(super) struct PullUpBuilderContext {
-    pub render_references: HashMap<String, QualifiedColumnName>,
-    pub measure_references: HashMap<String, QualifiedColumnName>,
-    pub dimensions_references: HashMap<String, QualifiedColumnName>,
-    pub aliases: HashMap<String, String>,
-}

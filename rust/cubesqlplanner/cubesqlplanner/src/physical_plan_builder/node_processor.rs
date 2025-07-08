@@ -1,12 +1,18 @@
-use super::context::*;
-use cubenativeutils::CubeError;
-use std::rc::Rc;
+use crate::physical_plan_builder::PhysicalPlanBuilder;
 
-pub(super) trait LogicalNodeProcessor {
-    type LogicalNode;
+use super::context::PushDownBuilderContext;
+use cubenativeutils::CubeError;
+
+pub(super) trait LogicalNodeProcessor<'a, LogicalNode> {
     type PhysycalNode;
+    fn new(builder: &'a PhysicalPlanBuilder) -> Self;
     fn process(
-        logical_plan: &Rc<Self::LogicalNode>,
+        &self,
+        logical_plan: &LogicalNode,
         context: &PushDownBuilderContext,
-    ) -> Result<(Self::PhysycalNode, PullUpBuilderContext), CubeError>;
+    ) -> Result<Self::PhysycalNode, CubeError>;
+}
+
+pub(super) trait ProcessableNode: Sized {
+    type ProcessorType<'a>: LogicalNodeProcessor<'a, Self>;
 }
