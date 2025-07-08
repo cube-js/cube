@@ -1,3 +1,5 @@
+use super::context::PushDownBuilderContext;
+use super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::*;
 use crate::plan::schema::QualifiedColumnName;
 use crate::plan::*;
@@ -58,6 +60,28 @@ impl PhysicalPlanBuilder {
             query_tools,
             plan_sql_templates,
         }
+    }
+
+    pub(super) fn query_tools(&self) -> &Rc<QueryTools> {
+        &self.query_tools
+    }
+
+    pub(super) fn plan_sql_templates(&self) -> &PlanSqlTemplates {
+        &self.plan_sql_templates
+    }
+
+    pub(super) fn qtools_and_templates(&self) -> (&Rc<QueryTools>, &PlanSqlTemplates) {
+        (&self.query_tools, &self.plan_sql_templates)
+    }
+
+    pub(super) fn process_node<T: ProcessableNode>(
+        &self,
+        logical_node: &T,
+        context: &PushDownBuilderContext,
+    ) -> Result<<T::ProcessorType<'_> as LogicalNodeProcessor<'_, T>>::PhysycalNode, CubeError>
+    {
+        let processor = T::ProcessorType::new(self);
+        processor.process(logical_node, context)
     }
 
     pub fn build(
@@ -173,8 +197,9 @@ impl PhysicalPlanBuilder {
 
         select_builder.set_filter(filter);
         select_builder.set_group_by(group_by);
-        select_builder
-            .set_order_by(self.make_order_by(&logical_plan.schema, &logical_plan.modifers.order_by)?);
+        select_builder.set_order_by(
+            self.make_order_by(&logical_plan.schema, &logical_plan.modifers.order_by)?,
+        );
         select_builder.set_having(having);
         select_builder.set_limit(logical_plan.modifers.limit);
         select_builder.set_offset(logical_plan.modifers.offset);
@@ -449,7 +474,6 @@ impl PhysicalPlanBuilder {
             &references_builder,
             &mut render_references,
             joins_len,
-            context,
         )?;
 
         for measure in logical_plan.schema.measures.iter() {
@@ -475,8 +499,9 @@ impl PhysicalPlanBuilder {
             Some(filter)
         };
 
-        select_builder
-            .set_order_by(self.make_order_by(&logical_plan.schema, &logical_plan.modifers.order_by)?);
+        select_builder.set_order_by(
+            self.make_order_by(&logical_plan.schema, &logical_plan.modifers.order_by)?,
+        );
         select_builder.set_filter(having);
         select_builder.set_limit(logical_plan.modifers.limit);
         select_builder.set_offset(logical_plan.modifers.offset);
@@ -489,7 +514,7 @@ impl PhysicalPlanBuilder {
     }
 
     //FIXME refactor required
-    fn process_full_key_aggregate_dimensions(
+    pub(super) fn process_full_key_aggregate_dimensions(
         &self,
         dimensions: &Vec<Rc<MemberSymbol>>,
         full_key_aggregate: &Rc<FullKeyAggregate>,
@@ -497,7 +522,6 @@ impl PhysicalPlanBuilder {
         references_builder: &ReferencesBuilder,
         render_references: &mut HashMap<String, QualifiedColumnName>,
         joins_len: usize,
-        _context: &PhysicalPlanBuilderContext,
     ) -> Result<(), CubeError> {
         let dimensions_for_join_names = full_key_aggregate
             .join_dimensions
@@ -1024,7 +1048,7 @@ impl PhysicalPlanBuilder {
         Ok(res)
     }
 
-    fn make_order_by(
+    pub(crate) fn make_order_by(
         &self,
         logical_schema: &LogicalSchema,
         order_by: &Vec<OrderByItem>,
@@ -1371,7 +1395,6 @@ impl PhysicalPlanBuilder {
             &references_builder,
             &mut render_references,
             joins_len,
-            context,
         )?;
 
         for measure in measure_calculation.schema.measures.iter() {

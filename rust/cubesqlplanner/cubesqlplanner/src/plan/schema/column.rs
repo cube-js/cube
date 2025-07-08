@@ -22,6 +22,12 @@ impl QualifiedColumnName {
     pub fn set_source(&mut self, source: Option<String>) {
         self.source = source;
     }
+
+    pub fn set_source_if_none(&mut self, source: &str) {
+        if self.source.is_none() {
+            self.source = Some(source.to_string());
+        }
+    }
 }
 
 impl Display for QualifiedColumnName {
