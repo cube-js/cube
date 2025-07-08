@@ -18,7 +18,7 @@ use crate::sql4sql::sql4sql;
 use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
-use crate::utils::batch_to_rows;
+use crate::utils::{batch_to_rows, NonDebugInRelease};
 use cubenativeutils::wrappers::neon::context::neon_run_with_guarded_lifetime;
 use cubenativeutils::wrappers::neon::inner_types::NeonInnerTypes;
 use cubenativeutils::wrappers::neon::object::NeonObject;
@@ -429,7 +429,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let native_auth_ctx = Arc::new(NativeSQLAuthContext {
         user: Some(String::from("unknown")),
         superuser: false,
-        security_context,
+        security_context: NonDebugInRelease::from(security_context),
     });
 
     let (deferred, promise) = cx.promise();

@@ -18,6 +18,7 @@ use crate::gateway::{
     GatewayAuthContext, GatewayAuthContextRef, GatewayAuthService, GatewayAuthenticateResponse,
     GatewayCheckAuthRequest,
 };
+use crate::utils::NonDebugInRelease;
 
 #[derive(Debug)]
 pub struct NodeBridgeAuthService {
@@ -90,7 +91,7 @@ struct CheckSQLAuthTransportResponse {
 pub struct NativeSQLAuthContext {
     pub user: Option<String>,
     pub superuser: bool,
-    pub security_context: Option<serde_json::Value>,
+    pub security_context: NonDebugInRelease<Option<serde_json::Value>>,
 }
 
 impl AuthContext for NativeSQLAuthContext {
@@ -141,7 +142,7 @@ impl SqlAuthService for NodeBridgeAuthService {
             context: Arc::new(NativeSQLAuthContext {
                 user,
                 superuser: response.superuser,
-                security_context: response.security_context,
+                security_context: NonDebugInRelease::from(response.security_context),
             }),
             password: response.password,
             skip_password_check: response.skip_password_check.unwrap_or(false),
