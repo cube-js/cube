@@ -43,7 +43,7 @@
     "@types/jest": "^29",
     "jest": "^29",
     "should": "^13.2.3",
-    "testcontainers": "^10.13.0",
+    "testcontainers": "^10.28.0",
     "typescript": "~5.2.2"
   },
   "eslintConfig": {
