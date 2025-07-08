@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 7213
-expression: "execute_queries_with_flags(vec![\"SET user = 'bad_user'\".to_string()],\n                    DatabaseProtocol::PostgreSQL).await.err().unwrap().to_string()"
+expression: "execute_queries_with_flags(vec![\"SET user = 'bad_user'\".to_string()],\nDatabaseProtocol::PostgreSQL).await.err().unwrap().to_string()"
 ---
-Error during planning: SQLCompilationError: User: HttpAuthContext { access_token: "access_token", base_path: "base_path" } is not allowed to switch to 'bad_user'
+Error during planning: SQLCompilationError: User: user 'not specified' is not allowed to switch to 'bad_user'
