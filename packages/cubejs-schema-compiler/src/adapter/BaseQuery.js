@@ -2048,7 +2048,6 @@ export class BaseQuery {
    * Returns a tuple: (formatted interval, minimal time unit)
    */
   intervalAndMinimalTimeUnit(interval) {
-    const intervalParsed = parseSqlInterval(interval);
     const minGranularity = this.diffTimeUnitForInterval(interval);
     return [interval, minGranularity];
   }

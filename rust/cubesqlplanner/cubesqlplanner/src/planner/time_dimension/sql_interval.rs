@@ -63,6 +63,24 @@ impl SqlInterval {
         Ok(res.to_string())
     }
 
+    pub fn is_trivial(&self) -> bool {
+        let fields = [
+            self.year,
+            self.quarter,
+            self.month,
+            self.week,
+            self.day,
+            self.hour,
+            self.minute,
+            self.second,
+        ];
+
+        let count_ones = fields.iter().filter(|&&v| v == 1).count();
+        let count_nonzeros = fields.iter().filter(|&&v| v != 0).count();
+
+        count_ones == 1 && count_nonzeros == 1
+    }
+
     pub fn to_sql(&self) -> String {
         let mut res = vec![];
         if self.year != 0 {

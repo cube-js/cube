@@ -155,6 +155,7 @@ export class PrestodbQuery extends BaseQuery {
     // Presto intervals have a YearMonth or DayTime type variants, but no universal type
     delete templates.types.interval;
     templates.types.binary = 'VARBINARY';
+    templates.tesseract.support_generated_series_for_custom_td = "YES";
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %}) ESCAPE \'\\\'';
     templates.statements.time_series_select = 'SELECT from_iso8601_timestamp(dates.f) date_from, from_iso8601_timestamp(dates.t) date_to \n' +

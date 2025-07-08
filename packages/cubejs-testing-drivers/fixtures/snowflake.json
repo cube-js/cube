@@ -232,6 +232,7 @@
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
 
     "---------------------------------------",
     "Requires Tesseract.                    ",
