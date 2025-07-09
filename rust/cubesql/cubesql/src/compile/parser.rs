@@ -73,6 +73,12 @@ pub fn parse_sql_to_statements(
         "SELECT n.oid,n.*,d.description FROM",
         "SELECT n.oid as _oid,n.*,d.description FROM",
     );
+    let query = query.replace("SELECT c.oid,c.*,", "SELECT c.oid as _oid,c.*,");
+    let query = query.replace("SELECT a.oid,a.*,", "SELECT a.oid as _oid,a.*,");
+    let query = query.replace(
+        "LEFT OUTER JOIN pg_depend dep on dep.refobjid = a.attrelid AND dep.deptype = 'i' and dep.refobjsubid = a.attnum and dep.classid = dep.refclassid",
+        "LEFT OUTER JOIN pg_depend dep on dep.refobjid = a.attrelid AND dep.deptype = 'i' and dep.refobjsubid = a.attnum",
+    );
 
     // TODO Superset introspection: LEFT JOIN by ANY() is not supported
     let query = query.replace(

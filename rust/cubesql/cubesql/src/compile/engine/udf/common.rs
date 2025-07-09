@@ -3999,6 +3999,59 @@ pub fn create_inet_server_addr_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_pg_get_partkeydef_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let table_oids = downcast_primitive_arg!(args[0], "table_oid", OidType);
+
+        let result = table_oids
+            .iter()
+            .map(|_| None::<String>)
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "pg_get_partkeydef",
+        vec![DataType::UInt32],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_relation_size_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let relids = downcast_primitive_arg!(args[0], "relid", OidType);
+
+        // 8192 is the lowest size for a table that has at least one column
+        // TODO: check if the requested table actually exists
+        let result = relids
+            .iter()
+            .map(|relid| relid.map(|_| 8192))
+            .collect::<PrimitiveArray<Int64Type>>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "pg_relation_size",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::UInt32]),
+                TypeSignature::Exact(vec![DataType::UInt32, DataType::Utf8]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     macro_rules! register_fun_stub {
         ($FTYP:ident, $NAME:expr, argc=$ARGC:expr $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {
@@ -4861,13 +4914,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         "pg_relation_filepath",
         tsig = [Regclass],
         rettyp = Utf8,
-        vol = Volatile
-    );
-    register_fun_stub!(
-        udf,
-        "pg_relation_size",
-        tsigs = [[Regclass], [Regclass, Utf8],],
-        rettyp = Int64,
         vol = Volatile
     );
     register_fun_stub!(
