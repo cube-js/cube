@@ -3,7 +3,6 @@ use crate::planner::sql_evaluator::SqlCall;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::rc::Rc;
 use std::str::FromStr;
 
