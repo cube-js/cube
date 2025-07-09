@@ -1,9 +1,11 @@
 use super::case_definition::{CaseDefinition, NativeCaseDefinition};
 use super::geo_item::{GeoItem, NativeGeoItem};
 use super::member_sql::{MemberSql, NativeMemberSql};
+use crate::cube_bridge::timeshift_definition::{NativeTimeShiftDefinition, TimeShiftDefinition};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
+use cubenativeutils::wrappers::NativeArray;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
@@ -38,4 +40,7 @@ pub trait DimensionDefinition {
 
     #[nbridge(field, optional)]
     fn longitude(&self) -> Result<Option<Rc<dyn GeoItem>>, CubeError>;
+
+    #[nbridge(field, vec, optional)]
+    fn time_shift(&self) -> Result<Option<Vec<Rc<dyn TimeShiftDefinition>>>, CubeError>;
 }

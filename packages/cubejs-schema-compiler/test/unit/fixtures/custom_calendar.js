@@ -33,7 +33,24 @@ cube(`custom_calendar_js`, {
         year: {
           sql: `{CUBE.retail_year_begin_date}`,
         }
-      }
+      },
+      timeShift: [
+          {
+              interval: '1 month',
+              type: 'prior',
+              sql: `{CUBE.retail_date_prev_month}`,
+          },
+          {
+              interval: '1 year',
+              type: 'prior',
+              sql: `{CUBE.retail_date_prev_year}`,
+          },
+          {
+              interval: '2 year',
+              type: 'prior',
+              sql: `{CUBE.retail_date_prev_prev_year}`,
+          }
+      ]
     },
 
     retail_year: {
@@ -83,6 +100,21 @@ cube(`custom_calendar_js`, {
 
     retail_week_in_month: {
       sql: `retail_week_in_month`,
+      type: `string`
+    },
+
+    retail_date_prev_month: {
+      sql: `retail_date_prev_month`,
+      type: `string`
+    },
+
+    retail_date_prev_year: {
+      sql: `retail_date_prev_year`,
+      type: `string`
+    },
+
+    retail_date_prev_prev_year: {
+      sql: `retail_date_prev_prev_year`,
       type: `string`
     },
 

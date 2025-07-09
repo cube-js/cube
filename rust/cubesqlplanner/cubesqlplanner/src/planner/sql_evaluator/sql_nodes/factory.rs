@@ -7,12 +7,15 @@ use super::{
 };
 use crate::plan::schema::QualifiedColumnName;
 use crate::planner::planners::multi_stage::TimeShiftState;
+use crate::planner::sql_evaluator::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
+use crate::planner::sql_evaluator::symbols::CalendarDimensionTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
+    calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
     ungrouped: bool,
     ungrouped_measure: bool,
     count_approx_as_state: bool,
@@ -34,6 +37,7 @@ impl SqlNodesFactory {
     pub fn new() -> Self {
         Self {
             time_shifts: TimeShiftState::default(),
+            calendar_time_shifts: HashMap::new(),
             ungrouped: false,
             ungrouped_measure: false,
             count_approx_as_state: false,
@@ -54,6 +58,13 @@ impl SqlNodesFactory {
 
     pub fn set_time_shifts(&mut self, time_shifts: TimeShiftState) {
         self.time_shifts = time_shifts;
+    }
+
+    pub fn set_calendar_time_shifts(
+        &mut self,
+        calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
+    ) {
+        self.calendar_time_shifts = calendar_time_shifts;
     }
 
     pub fn set_ungrouped(&mut self, value: bool) {
@@ -261,6 +272,12 @@ impl SqlNodesFactory {
 
         let input: Rc<dyn SqlNode> =
             AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
+
+        let input = if !self.calendar_time_shifts.is_empty() {
+            CalendarTimeShiftSqlNode::new(self.calendar_time_shifts.clone(), input)
+        } else {
+            input
+        };
 
         let input = if !self.time_shifts.is_empty() {
             TimeShiftSqlNode::new(self.time_shifts.clone(), input)

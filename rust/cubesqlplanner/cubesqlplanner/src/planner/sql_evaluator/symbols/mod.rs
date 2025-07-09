@@ -9,10 +9,7 @@ mod time_dimension_symbol;
 pub use cube_symbol::{
     CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
 };
-pub use dimension_symbol::{
-    DimensionCaseDefinition, DimensionCaseWhenItem, DimensionSymbol, DimensionSymbolFactory,
-    DimenstionCaseLabel,
-};
+pub use dimension_symbol::*;
 pub use measure_symbol::{
     DimensionTimeShift, MeasureSymbol, MeasureSymbolFactory, MeasureTimeShifts,
 };

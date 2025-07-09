@@ -6,6 +6,7 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -24,6 +25,12 @@ pub struct DimensionCaseDefinition {
     pub else_label: DimenstionCaseLabel,
 }
 
+#[derive(Clone)]
+pub struct CalendarDimensionTimeShift {
+    pub interval: SqlInterval,
+    pub sql: Option<Rc<SqlCall>>,
+}
+
 pub struct DimensionSymbol {
     cube_name: String,
     name: String,
@@ -34,6 +41,8 @@ pub struct DimensionSymbol {
     definition: Rc<dyn DimensionDefinition>,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
     is_view: bool,
+    time_shift: Vec<CalendarDimensionTimeShift>,
+    time_shift_pk: Option<Rc<MemberSymbol>>,
 }
 
 impl DimensionSymbol {
@@ -47,6 +56,8 @@ impl DimensionSymbol {
         longitude: Option<Rc<SqlCall>>,
         case: Option<DimensionCaseDefinition>,
         definition: Rc<dyn DimensionDefinition>,
+        time_shift: Vec<CalendarDimensionTimeShift>,
+        time_shift_pk: Option<Rc<MemberSymbol>>,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_name,
@@ -58,6 +69,8 @@ impl DimensionSymbol {
             definition,
             case,
             is_view,
+            time_shift,
+            time_shift_pk,
         })
     }
 
@@ -93,6 +106,14 @@ impl DimensionSymbol {
 
     pub fn member_sql(&self) -> &Option<Rc<SqlCall>> {
         &self.member_sql
+    }
+
+    pub fn time_shift(&self) -> &Vec<CalendarDimensionTimeShift> {
+        &self.time_shift
+    }
+
+    pub fn time_shift_pk(&self) -> Option<Rc<MemberSymbol>> {
+        self.time_shift_pk.clone()
     }
 
     pub fn full_name(&self) -> String {
@@ -202,6 +223,22 @@ impl DimensionSymbol {
 
     pub fn name(&self) -> &String {
         &self.name
+    }
+
+    pub fn calendar_time_shift_for_interval(
+        &self,
+        interval: &SqlInterval,
+    ) -> Option<(String, CalendarDimensionTimeShift)> {
+        if let Some(ts) = self
+            .time_shift
+            .iter()
+            .find(|shift| shift.interval == *interval)
+        {
+            if let Some(pk) = &self.time_shift_pk {
+                return Some((pk.full_name(), ts.clone()));
+            }
+        }
+        None
     }
 }
 
@@ -320,8 +357,75 @@ impl SymbolFactory for DimensionSymbolFactory {
         } else {
             None
         };
+
+        let time_shift = if let Some(time_shift) = definition.time_shift()? {
+            time_shift
+                .iter()
+                .map(|item| -> Result<_, CubeError> {
+                    let interval = item.static_data().interval.parse::<SqlInterval>()?;
+                    let interval = if item.static_data().timeshift_type == "next" {
+                        -interval
+                    } else {
+                        interval
+                    };
+                    let sql = if let Some(sql) = item.sql()? {
+                        Some(compiler.compile_sql_call(&cube_name, sql)?)
+                    } else {
+                        None
+                    };
+                    Ok(CalendarDimensionTimeShift { interval, sql })
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            vec![]
+        };
+
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
         let is_view = cube.static_data().is_view.unwrap_or(false);
+        let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
+
+        // If the cube is a calendar, we need to find the primary key member
+        // so that we can use it for time shifts processing.
+        let time_shift_pk = if is_calendar {
+            let pk_members = cube_evaluator
+                .static_data()
+                .primary_keys
+                .get(&cube_name)
+                .cloned()
+                .unwrap_or_else(|| vec![]);
+
+            if pk_members.iter().any(|pk| **pk == name) {
+                // To avoid evaluation loop.
+                None
+            } else {
+                let pk_member = pk_members
+                    .into_iter()
+                    .map(|primary_key| -> Result<_, CubeError> {
+                        let key_dimension_name = format!("{}.{}", cube_name, primary_key);
+                        let pk_member = compiler.add_dimension_evaluator(key_dimension_name)?;
+
+                        Ok(pk_member)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .filter(|pk_member| {
+                        if let Ok(pk_dimension) = pk_member.as_dimension() {
+                            // TODO: What if calendar cube is joined via non-time dimension?
+                            if pk_dimension.dimension_type() == "time" {
+                                return true;
+                            }
+                        }
+                        false
+                    })
+                    .collect::<Vec<_>>()
+                    .first()
+                    .cloned();
+                pk_member
+            }
+        } else {
+            None
+        };
+
         let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
         let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
@@ -333,6 +437,7 @@ impl SymbolFactory for DimensionSymbolFactory {
                 && latitude.is_none()
                 && longitude.is_none()
                 && !is_multi_stage);
+
         Ok(MemberSymbol::new_dimension(DimensionSymbol::new(
             cube_name,
             name,
@@ -343,6 +448,8 @@ impl SymbolFactory for DimensionSymbolFactory {
             longitude,
             case,
             definition,
+            time_shift,
+            time_shift_pk,
         )))
     }
 }

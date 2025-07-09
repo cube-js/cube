@@ -1,4 +1,5 @@
 pub mod auto_prefix;
+pub mod calendar_time_shift;
 pub mod case_dimension;
 pub mod evaluate_sql;
 pub mod factory;
