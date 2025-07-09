@@ -244,12 +244,8 @@ impl PlanSqlTemplates {
     }
 
     pub fn cast_to_string(&self, expr: &str) -> Result<String, CubeError> {
-        self.render.render_template(
-            "expressions/cast_to_string",
-            context! {
-                expr => expr,
-            },
-        )
+        let string_type = self.render.render_template("types/string", context! {})?;
+        self.cast(expr, &string_type)
     }
 
     pub fn count_distinct(&self, expr: &str) -> Result<String, CubeError> {
@@ -430,13 +426,23 @@ impl PlanSqlTemplates {
             .contains_template("operators/is_not_distinct_from")
     }
 
-    pub fn supports_generated_time_series(&self) -> bool {
-        self.render
+    pub fn supports_generated_time_series(
+        &self,
+        predifined_granularity: bool,
+    ) -> Result<bool, CubeError> {
+        Ok(self
+            .render
             .contains_template("statements/generated_time_series_select")
+            && (predifined_granularity
+                || self
+                    .driver_tools()
+                    .support_generated_series_for_custom_td()?))
     }
 
     pub fn generated_time_series_select(
         &self,
+        date_from: &str,
+        date_to: &str,
         start: &str,
         end: &str,
         granularity: &str,
@@ -445,7 +451,7 @@ impl PlanSqlTemplates {
     ) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/generated_time_series_select",
-            context! { start => start, end => end, granularity => granularity, granularity_offset => granularity_offset, minimal_time_unit => minimal_time_unit },
+            context! {date_from => date_from, date_to => date_to, start => start, end => end, granularity => granularity, granularity_offset => granularity_offset, minimal_time_unit => minimal_time_unit },
         )
     }
     pub fn generated_time_series_with_cte_range_source(

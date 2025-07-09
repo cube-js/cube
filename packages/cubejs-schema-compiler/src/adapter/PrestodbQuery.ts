@@ -122,6 +122,10 @@ export class PrestodbQuery extends BaseQuery {
     return `approx_distinct(${sql})`;
   }
 
+  public supportGeneratedSeriesForCustomTd() {
+    return true;
+  }
+
   protected limitOffsetClause(limit, offset) {
     const limitClause = limit != null ? ` LIMIT ${limit}` : '';
     const offsetClause = offset != null ? ` OFFSET ${offset}` : '';

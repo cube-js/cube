@@ -40,28 +40,35 @@ impl TimeSeries {
     }
 
     pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
-        if templates.supports_generated_time_series()
-            && self.granularity.is_predefined_granularity()
-        {
+        if templates.supports_generated_time_series(self.granularity.is_predefined_granularity())? {
             let interval_description = templates
-                .interval_and_minimal_time_unit(self.granularity.granularity_interval().clone())?;
+                .interval_and_minimal_time_unit(self.granularity.granularity_interval().to_sql())?;
             if interval_description.len() != 2 {
                 return Err(CubeError::internal(
                     "Interval description must have 2 elements".to_string(),
                 ));
             }
             let interval = interval_description[0].clone();
-            let interval = templates.interval_string(interval)?;
             let minimal_time_unit = interval_description[1].clone();
             match &self.date_range {
                 TimeSeriesDateRange::Filter(from_date, to_date) => {
-                    let from_date = format!("'{}'", from_date);
-                    let to_date = format!("'{}'", to_date);
+                    let start = templates.quote_string(from_date)?;
+                    let date_field = templates.quote_identifier("d")?;
+                    let date_from = templates.time_stamp_cast(date_field.clone())?;
+                    let end = templates.quote_string(to_date)?;
+                    let date_to = format!(
+                        "({})",
+                        templates.add_interval(date_from.clone(), interval.clone())?
+                    );
+                    let date_to =
+                        templates.subtract_interval(date_to, "1 millisecond".to_string())?;
 
                     templates.generated_time_series_select(
-                        &from_date,
-                        &to_date,
-                        &interval,
+                        &date_from,
+                        &date_to,
+                        &start,
+                        &end,
+                        &templates.interval_string(interval)?,
                         &self.granularity.granularity_offset(),
                         &minimal_time_unit,
                     )
@@ -73,7 +80,7 @@ impl TimeSeries {
                         &cte_name,
                         &min_date_name,
                         &max_date_name,
-                        &interval,
+                        &templates.interval_string(interval)?,
                         &minimal_time_unit,
                     )
                 }
@@ -99,7 +106,7 @@ impl TimeSeries {
                 )?
             } else {
                 self.query_tools.base_tools().generate_custom_time_series(
-                    self.granularity.granularity_interval().clone(),
+                    self.granularity.granularity_interval().to_sql(),
                     vec![raw_from_date.clone(), raw_to_date.clone()],
                     self.granularity.origin_local_formatted(),
                 )?

@@ -1117,6 +1117,11 @@ export class BaseQuery {
     return `${date} + interval ${intervalStr}`;
   }
 
+  // For use in Tesseract
+  supportGeneratedSeriesForCustomTd() {
+    return false;
+  }
+
   /**
    * @param {string} interval
    * @returns {string}
@@ -2048,7 +2053,6 @@ export class BaseQuery {
    * Returns a tuple: (formatted interval, minimal time unit)
    */
   intervalAndMinimalTimeUnit(interval) {
-    const intervalParsed = parseSqlInterval(interval);
     const minGranularity = this.diffTimeUnitForInterval(interval);
     return [interval, minGranularity];
   }
@@ -4138,7 +4142,6 @@ export class BaseQuery {
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %} NULLS {% if nulls_first %}FIRST{% else %}LAST{% endif %}',
         order_by: '{% if index %} {{ index }} {% else %} {{ expr }} {% endif %} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
-        cast_to_string: 'CAST({{ expr }} AS TEXT)',
         window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat or window_frame %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% if window_frame %} {% endif %}{% endif %}{% if window_frame %}{{ window_frame }}{% endif %})',
         window_frame_bounds: '{{ frame_type }} BETWEEN {{ frame_start }} AND {{ frame_end }}',
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',

@@ -127,9 +127,9 @@ export class BigqueryQuery extends BaseQuery {
       return [`'${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' HOUR TO SECOND`, 'SECOND'];
     } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
       return [`'${intervalParsed.minute}:${intervalParsed.second}' MINUTE TO SECOND`, 'SECOND'];
+    } else if (intervalParsed.millisecond && intKeys === 1) {
+      return [`'${intervalParsed.millisecond}' MILLISECOND`, 'MILLISECOND'];
     }
-
-    // No need to support microseconds.
 
     throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
   }
@@ -367,7 +367,6 @@ export class BigqueryQuery extends BaseQuery {
     templates.types.double = 'FLOAT64';
     templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
     templates.types.binary = 'BYTES';
-    templates.expressions.cast_to_string = 'CAST({{ expr }} AS STRING)';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.join_types.full = 'FULL';
     templates.statements.time_series_select = 'SELECT DATETIME(TIMESTAMP(f)) date_from, DATETIME(TIMESTAMP(t)) date_to \n' +

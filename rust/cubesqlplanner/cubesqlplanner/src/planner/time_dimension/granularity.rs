@@ -3,14 +3,13 @@ use crate::planner::sql_evaluator::SqlCall;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::rc::Rc;
 use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct Granularity {
     granularity: String,
-    granularity_interval: String,
+    granularity_interval: SqlInterval,
     granularity_offset: Option<String>,
     origin: QueryDateTime,
     is_predefined_granularity: bool,
@@ -20,7 +19,7 @@ pub struct Granularity {
 
 impl Granularity {
     pub fn try_new_predefined(timezone: Tz, granularity: String) -> Result<Self, CubeError> {
-        let granularity_interval = format!("1 {}", granularity);
+        let granularity_interval = format!("1 {}", granularity).parse()?;
         let origin = Self::default_origin(timezone)?;
 
         Ok(Self {
@@ -42,6 +41,7 @@ impl Granularity {
         calendar_sql: Option<Rc<SqlCall>>,
     ) -> Result<Self, CubeError> {
         // sql() is mutual exclusive with interval and offset/origin
+        let granularity_interval = granularity_interval.parse::<SqlInterval>()?;
         if calendar_sql.is_some() {
             return Ok(Self {
                 granularity,
@@ -64,22 +64,7 @@ impl Granularity {
             Self::default_origin(timezone)?
         };
 
-        let mut interval_parts = granularity_interval.split_whitespace().tuples::<(_, _)>();
-        let first_part = interval_parts.next();
-        let second_part = interval_parts.next();
-        let is_natural_aligned = if second_part.is_none() {
-            if let Some((value, _)) = first_part {
-                let value = value
-                    .parse::<i32>()
-                    .map_err(|_| CubeError::user(format!("Invalid interval value: {}", value)))?;
-                value == 1
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
+        let is_natural_aligned = granularity_interval.is_trivial();
         Ok(Self {
             granularity,
             granularity_interval,
@@ -107,7 +92,7 @@ impl Granularity {
         &self.granularity
     }
 
-    pub fn granularity_interval(&self) -> &String {
+    pub fn granularity_interval(&self) -> &SqlInterval {
         &self.granularity_interval
     }
 
@@ -116,9 +101,7 @@ impl Granularity {
     }
 
     pub fn granularity_from_interval(&self) -> Result<String, CubeError> {
-        self.granularity_interval
-            .parse::<SqlInterval>()?
-            .min_granularity()
+        self.granularity_interval.min_granularity()
     }
 
     pub fn granularity_from_offset(&self) -> Result<String, CubeError> {
@@ -160,8 +143,7 @@ impl Granularity {
     }
 
     pub fn align_date_to_origin(&self, date: QueryDateTime) -> Result<QueryDateTime, CubeError> {
-        let interval = self.granularity_interval.parse::<SqlInterval>()?;
-        date.align_to_origin(&self.origin, &interval)
+        date.align_to_origin(&self.origin, &self.granularity_interval)
     }
 
     fn default_origin(timezone: Tz) -> Result<QueryDateTime, CubeError> {
@@ -184,7 +166,7 @@ impl Granularity {
             }
         } else {
             templates.date_bin(
-                self.granularity_interval.clone(),
+                self.granularity_interval.to_sql(),
                 input,
                 self.origin_local_formatted(),
             )?
