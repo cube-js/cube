@@ -131,7 +131,6 @@ export class BigqueryQuery extends BaseQuery {
       return [`'${intervalParsed.millisecond}' MILLISECOND`, 'MILLISECOND'];
     }
 
-
     throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
   }
 
@@ -368,7 +367,6 @@ export class BigqueryQuery extends BaseQuery {
     templates.types.double = 'FLOAT64';
     templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
     templates.types.binary = 'BYTES';
-    templates.expressions.cast_to_string = 'CAST({{ expr }} AS STRING)';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.join_types.full = 'FULL';
     templates.statements.time_series_select = 'SELECT DATETIME(TIMESTAMP(f)) date_from, DATETIME(TIMESTAMP(t)) date_to \n' +
