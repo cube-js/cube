@@ -1117,7 +1117,7 @@ export class BaseQuery {
     return `${date} + interval ${intervalStr}`;
   }
 
-  //For use in Tesseract
+  // For use in Tesseract
   supportGeneratedSeriesForCustomTd() {
     return false;
   }
