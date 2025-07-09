@@ -1,3 +1,4 @@
+use super::PreAggregationsCompiler;
 use super::*;
 use crate::logical_plan::*;
 use crate::planner::query_tools::QueryTools;
@@ -352,25 +353,11 @@ impl OriginalSqlOptimizer {
         let res = if let Some(found_pre_aggregation) = self.foud_pre_aggregations.get(cube_name) {
             Some(found_pre_aggregation.clone())
         } else {
-            let pre_aggregations = self
-                .query_tools
-                .cube_evaluator()
-                .pre_aggregations_for_cube_as_array(cube_name.clone())?;
-            if let Some(found_pre_aggregation) = pre_aggregations
-                .iter()
-                .find(|p| p.static_data().pre_aggregation_type == "originalSql")
-            {
-                let compiled = CompiledPreAggregation::try_new(
-                    self.query_tools.clone(),
-                    cube_name,
-                    found_pre_aggregation.clone(),
-                )?;
-                self.foud_pre_aggregations
-                    .insert(cube_name.clone(), compiled.clone());
-                Some(compiled)
-            } else {
-                None
-            }
+            let mut compiler = PreAggregationsCompiler::try_new(
+                self.query_tools.clone(),
+                &vec![cube_name.clone()],
+            )?;
+            compiler.compile_origin_sql_pre_aggregation(&cube_name)?
         };
         Ok(res)
     }
