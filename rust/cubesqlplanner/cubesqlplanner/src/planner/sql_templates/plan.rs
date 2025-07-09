@@ -426,13 +426,17 @@ impl PlanSqlTemplates {
             .contains_template("operators/is_not_distinct_from")
     }
 
-    pub fn supports_generated_time_series(&self, predifined_granularity: bool) -> bool {
-        self.render
+    pub fn supports_generated_time_series(
+        &self,
+        predifined_granularity: bool,
+    ) -> Result<bool, CubeError> {
+        Ok(self
+            .render
             .contains_template("statements/generated_time_series_select")
             && (predifined_granularity
                 || self
-                    .render
-                    .contains_template("tesseract/support_generated_series_for_custom_td"))
+                    .driver_tools()
+                    .support_generated_series_for_custom_td()?))
     }
 
     pub fn generated_time_series_select(

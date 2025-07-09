@@ -967,7 +967,7 @@ impl PhysicalPlanBuilder {
 
         let ts_date_range = if self
             .plan_sql_templates
-            .supports_generated_time_series(granularity_obj.is_predefined_granularity())
+            .supports_generated_time_series(granularity_obj.is_predefined_granularity())?
         {
             if let Some(date_range) = time_dimension_symbol
                 .get_range_for_time_series(date_range, self.query_tools.timezone())?

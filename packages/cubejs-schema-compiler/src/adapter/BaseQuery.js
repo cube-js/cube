@@ -1117,6 +1117,10 @@ export class BaseQuery {
     return `${date} + interval ${intervalStr}`;
   }
 
+  supportGeneratedSeriesForCustomTd() {
+    return false;
+  }
+
   /**
    * @param {string} interval
    * @returns {string}

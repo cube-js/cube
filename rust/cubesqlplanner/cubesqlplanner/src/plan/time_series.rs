@@ -40,7 +40,7 @@ impl TimeSeries {
     }
 
     pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
-        if templates.supports_generated_time_series(self.granularity.is_predefined_granularity()) {
+        if templates.supports_generated_time_series(self.granularity.is_predefined_granularity())? {
             let interval_description = templates
                 .interval_and_minimal_time_unit(self.granularity.granularity_interval().to_sql())?;
             if interval_description.len() != 2 {

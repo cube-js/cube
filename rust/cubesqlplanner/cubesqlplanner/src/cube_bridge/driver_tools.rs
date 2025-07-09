@@ -31,6 +31,7 @@ pub trait DriverTools {
     fn hll_merge(&self, sql: String) -> Result<String, CubeError>;
     fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError>;
     fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError>;
+    fn support_generated_series_for_custom_td(&self) -> Result<bool, CubeError>;
     fn date_bin(
         &self,
         interval: String,
