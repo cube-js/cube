@@ -20044,12 +20044,12 @@ performance-now@^2.1.0:
   resolved "https://registry.yarnpkg.com/performance-now/-/performance-now-2.1.0.tgz#6309f4e0e5fa913ec1c69307ae364b4b377c9e7b"
   integrity sha1-Ywn04OX6kT7BxpMHrjZLSzd8nns=
 
-pg-cloudflare@^1.1.1, pg-cloudflare@^1.2.7:
+pg-cloudflare@^1.2.7:
   version "1.2.7"
   resolved "https://registry.yarnpkg.com/pg-cloudflare/-/pg-cloudflare-1.2.7.tgz#a1f3d226bab2c45ae75ea54d65ec05ac6cfafbef"
   integrity sha512-YgCtzMH0ptvZJslLM1ffsY4EuGaU0cx4XSdXLRFae8bPP4dS5xL1tNB3k2o/N64cHJpwU7dxKli/nZ2lUa5fLg==
 
-pg-connection-string@^2.5.0, pg-connection-string@^2.6.2, pg-connection-string@^2.9.1:
+pg-connection-string@^2.9.1:
   version "2.9.1"
   resolved "https://registry.yarnpkg.com/pg-connection-string/-/pg-connection-string-2.9.1.tgz#bb1fd0011e2eb76ac17360dc8fa183b2d3465238"
   integrity sha512-nkc6NpDcvPVpZXxrreI/FOtX3XemeLl8E0qFr6F2Lrm/I8WOnaWNhIPK2Z7OHpw7gh5XJThi6j6ppgNoaT1w4w==
@@ -20069,7 +20069,7 @@ pg-minify@1.8.0:
   resolved "https://registry.yarnpkg.com/pg-minify/-/pg-minify-1.8.0.tgz#c736f762fb987ab21e784554b7724f05397708d1"
   integrity sha512-jO/oJOununpx8DzKgvSsWm61P8JjwXlaxSlbbfTBo1nvSWoo/+I6qZYaSN96jm/KDwa5d+JMQwPGgcP6HXDRow==
 
-pg-pool@^3.10.1, pg-pool@^3.4.1, pg-pool@^3.5.1, pg-pool@^3.6.1:
+pg-pool@^3.10.1:
   version "3.10.1"
   resolved "https://registry.yarnpkg.com/pg-pool/-/pg-pool-3.10.1.tgz#481047c720be2d624792100cac1816f8850d31b2"
   integrity sha512-Tu8jMlcX+9d8+QVzKIvM/uJtp07PKr82IUOYEphaWcoBhIYkoHpLXN3qO59nAI11ripznDsEzEv8nUxBVWajGg==
@@ -20084,7 +20084,7 @@ pg-promise@^11.5.5:
     pg-minify "1.8.0"
     spex "3.4.1"
 
-pg-protocol@*, pg-protocol@^1.10.3, pg-protocol@^1.5.0, pg-protocol@^1.6.0:
+pg-protocol@*, pg-protocol@^1.10.3:
   version "1.10.3"
   resolved "https://registry.yarnpkg.com/pg-protocol/-/pg-protocol-1.10.3.tgz#ac9e4778ad3f84d0c5670583bab976ea0a34f69f"
   integrity sha512-6DIBgBQaTKDJyxnXaLiLR8wBpQQcGWuAESkRBX/t6OwA8YsqP+iVSiond2EDy6Y/dsGk8rh/jtax3js5NeV7JQ==
@@ -23095,7 +23095,7 @@ split2@^2.1.0:
   dependencies:
     through2 "^2.0.2"
 
-split2@^3.1.1, split2@^3.2.2:
+split2@^3.2.2:
   version "3.2.2"
   resolved "https://registry.yarnpkg.com/split2/-/split2-3.2.2.tgz#bf2cf2a37d838312c249c89206fd7a17dd12365f"
   integrity sha512-9NThjpgZnifTkJpzTZ7Eue85S49QwpNhZTq6GRJwObb6jnLFNGB7Qm73V5HewTROPyxD0C29xqmaI68bQtV+hg==
