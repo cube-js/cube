@@ -899,6 +899,55 @@ async fn dbeaver_introspection() -> Result<(), CubeError> {
             .await?
         );
 
+    insta::assert_snapshot!(
+        "dbeaver_introspection_tables_with_descriptions",
+        // NOTE: order by added manually to avoid random snapshot order
+        execute_query(
+            r#"
+            SELECT c.oid,c.*,d.description,pg_catalog.pg_get_expr(c.relpartbound, c.oid) as partition_expr,  pg_catalog.pg_get_partkeydef(c.oid) as partition_key 
+            FROM pg_catalog.pg_class c
+            LEFT OUTER JOIN pg_catalog.pg_description d ON d.objoid=c.oid AND d.objsubid=0 AND d.classoid='pg_class'::regclass
+            WHERE c.relnamespace=2200 AND c.relkind not in ('i','I','c')
+            ORDER BY c.oid
+            "#.to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    insta::assert_snapshot!(
+        "dbeaver_introspection_tables",
+        // NOTE: order by added manually to avoid random snapshot order
+        execute_query(
+            r#"
+            select c.oid,pg_catalog.pg_total_relation_size(c.oid) as total_rel_size,pg_catalog.pg_relation_size(c.oid) as rel_size
+            FROM pg_class c
+            WHERE c.relnamespace=2200
+            ORDER BY c.oid
+            "#.to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    insta::assert_snapshot!(
+        "dbeaver_introspection_columns",
+        execute_query(
+            r#"
+            SELECT c.relname,a.*,pg_catalog.pg_get_expr(ad.adbin, ad.adrelid, true) as def_value,dsc.description,dep.objid
+            FROM pg_catalog.pg_attribute a
+            INNER JOIN pg_catalog.pg_class c ON (a.attrelid=c.oid)
+            LEFT OUTER JOIN pg_catalog.pg_attrdef ad ON (a.attrelid=ad.adrelid AND a.attnum = ad.adnum)
+            LEFT OUTER JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)
+            LEFT OUTER JOIN pg_depend dep on dep.refobjid = a.attrelid AND dep.deptype = 'i' and dep.refobjsubid = a.attnum and dep.classid = dep.refclassid
+            WHERE NOT a.attisdropped AND c.relkind not in ('i','I','c') AND c.oid=18000
+            ORDER BY a.attnum
+            "#.to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
     Ok(())
 }
 

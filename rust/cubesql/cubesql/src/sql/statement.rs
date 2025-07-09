@@ -2,7 +2,7 @@ use itertools::Itertools;
 use log::trace;
 use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
-    BindValue, PgType,
+    BindValue, PgType, PgTypeId,
 };
 use sqlparser::ast::{
     self, ArrayAgg, Expr, Function, FunctionArg, FunctionArgExpr, Ident, ObjectName, Value,
@@ -13,6 +13,7 @@ use std::{collections::HashMap, error::Error};
 use super::types::ColumnType;
 use crate::sql::shim::ConnectionError;
 
+#[derive(Debug)]
 enum PlaceholderType {
     String,
     Number,
@@ -521,14 +522,16 @@ impl FoundParameter {
 }
 
 #[derive(Debug)]
-pub struct PostgresStatementParamsFinder {
-    parameters: HashMap<String, FoundParameter>,
+pub struct PostgresStatementParamsFinder<'t> {
+    parameters: HashMap<usize, FoundParameter>,
+    types: &'t [u32],
 }
 
-impl PostgresStatementParamsFinder {
-    pub fn new() -> Self {
+impl<'t> PostgresStatementParamsFinder<'t> {
+    pub fn new(types: &'t [u32]) -> Self {
         Self {
             parameters: HashMap::new(),
+            types,
         }
     }
 
@@ -544,7 +547,7 @@ impl PostgresStatementParamsFinder {
     }
 }
 
-impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder {
+impl<'ast, 't> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder<'t> {
     fn visit_value(
         &mut self,
         v: &mut ast::Value,
@@ -554,8 +557,15 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder {
             Value::Placeholder(name) => {
                 let position = self.extract_placeholder_index(&name)?;
 
+                let coltype = self
+                    .types
+                    .get(position)
+                    .and_then(|pg_type_oid| PgTypeId::from_oid(*pg_type_oid))
+                    .and_then(|pg_type| ColumnType::from_pg_tid(pg_type).ok())
+                    .unwrap_or_else(|| pt.to_coltype());
+
                 self.parameters
-                    .insert(position.to_string(), FoundParameter::new(pt.to_coltype()));
+                    .insert(position, FoundParameter::new(coltype));
             }
             _ => {}
         };
@@ -650,6 +660,8 @@ impl<'ast> Visitor<'ast, ConnectionError> for StatementPlaceholderReplacer {
         placeholder_type: PlaceholderType,
     ) -> Result<(), ConnectionError> {
         match &value {
+            // NOTE: it does not do any harm if a numeric placeholder is replaced with a string,
+            // this will be handled with Bind anyway
             ast::Value::Placeholder(_) => {
                 *value = match placeholder_type {
                     PlaceholderType::String => {
@@ -1238,7 +1250,7 @@ mod tests {
     ) -> Result<(), CubeError> {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
-        let finder = PostgresStatementParamsFinder::new();
+        let finder = PostgresStatementParamsFinder::new(&[]);
         let result = finder.find(&stmts[0]).unwrap();
 
         assert_eq!(result, expected);

@@ -5723,6 +5723,20 @@ ORDER BY
     }
 
     #[tokio::test]
+    async fn test_pgcatalog_pgshdescription_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgshdescription_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_shdescription".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_constraint_column_usage_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "constraint_column_usage_postgres",

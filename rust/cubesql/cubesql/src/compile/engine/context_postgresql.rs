@@ -23,9 +23,9 @@ use super::information_schema::postgres::{
     PgCatalogIndexProvider, PgCatalogInheritsProvider, PgCatalogMatviewsProvider,
     PgCatalogNamespaceProvider, PgCatalogPartitionedTableProvider, PgCatalogProcProvider,
     PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
-    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatUserTablesProvider,
-    PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider, PgCatalogUserProvider, PgCatalogViewsProvider,
+    PgCatalogSettingsProvider, PgCatalogShdescriptionProvider, PgCatalogStatActivityProvider,
+    PgCatalogStatUserTablesProvider, PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider,
+    PgCatalogTableProvider, PgCatalogTypeProvider, PgCatalogUserProvider, PgCatalogViewsProvider,
     PgPreparedStatementsProvider,
 };
 use crate::{
@@ -136,6 +136,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_views".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogStatUserTablesProvider>() {
             "pg_catalog.pg_stat_user_tables".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogShdescriptionProvider>() {
+            "pg_catalog.pg_shdescription".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftPgExternalSchemaProvider>() {
             "pg_catalog.pg_external_schema".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
@@ -401,6 +403,7 @@ impl DatabaseProtocol {
                         &context.meta.tables,
                     )))
                 }
+                "pg_shdescription" => return Some(Arc::new(PgCatalogShdescriptionProvider::new())),
                 "pg_external_schema" => {
                     return Some(Arc::new(RedshiftPgExternalSchemaProvider::new()))
                 }
