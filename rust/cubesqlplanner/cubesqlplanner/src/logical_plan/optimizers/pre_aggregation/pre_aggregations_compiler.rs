@@ -38,9 +38,7 @@ impl PreAggregationFullName {
             })
         }
     }
-}
 
-impl PreAggregationFullName {
     pub fn new(cube_name: String, name: String) -> Self {
         Self { cube_name, name }
     }
