@@ -626,6 +626,7 @@ mod tests {
                 .request
                 .dimensions,
             Some(vec![
+                "KibanaSampleDataEcommerce.id".to_string(),
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.last_mod".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -651,6 +652,7 @@ mod tests {
                 .request
                 .dimensions,
             Some(vec![
+                "KibanaSampleDataEcommerce.id".to_string(),
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.last_mod".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -756,6 +758,7 @@ mod tests {
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.id".to_string(),
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.last_mod".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -8217,6 +8220,7 @@ ORDER BY "source"."str0" ASC
                     "Logs.agentCountApprox".to_string(),
                 ]),
                 dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.id".to_string(),
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.last_mod".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -8402,6 +8406,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
                 ]),
                 dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.id".to_string(),
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.last_mod".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -17109,5 +17114,44 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             "Physical plan: {}",
             displayable(physical_plan.as_ref()).indent()
         );
+    }
+
+    #[tokio::test]
+    async fn test_sort_normalize() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                q2.id,
+                q3.id
+            FROM KibanaSampleDataEcommerce q1
+            LEFT JOIN Logs q2 ON q1.__cubeJoinField = q2.__cubeJoinField
+            LEFT JOIN Logs q3 ON q1.__cubeJoinField = q3.__cubeJoinField
+            ORDER BY
+                q2.id,
+                q3.id
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["Logs.id".to_string(),]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                ungrouped: Some(true),
+                join_hints: Some(vec![
+                    vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string()],
+                    vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string()],
+                ]),
+                ..Default::default()
+            }
+        )
     }
 }

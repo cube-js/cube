@@ -169,6 +169,7 @@ async fn test_join_three_cubes() {
                 "NumberCube.someNumber".to_string(),
             ]),
             dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.id".to_string(),
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.last_mod".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),

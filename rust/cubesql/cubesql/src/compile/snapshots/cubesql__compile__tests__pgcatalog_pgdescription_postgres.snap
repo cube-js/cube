@@ -7,82 +7,82 @@ expression: "execute_query(\"SELECT * FROM pg_catalog.pg_description\".to_string
 +--------+----------+----------+-------------------------------------------------------+
 | 18000  | 1259     | 0        | Sample data for tracking eCommerce orders from Kibana |
 | 18000  | 1259     | 1        | Events count                                          |
-| 18000  | 1259     | 9        | Customer gender                                       |
-| 18000  | 1259     | 13       | Male users segment                                    |
-| 18000  | 1259     | 15       | Virtual column for security context switching         |
-| 18000  | 1259     | 16       | Virtual column for joining cubes                      |
-| 18019  | 1259     | 6        | Virtual column for security context switching         |
-| 18019  | 1259     | 7        | Virtual column for joining cubes                      |
-| 18029  | 1259     | 2        | Virtual column for security context switching         |
-| 18029  | 1259     | 3        | Virtual column for joining cubes                      |
-| 18035  | 1259     | 206      | Virtual column for security context switching         |
-| 18035  | 1259     | 207      | Virtual column for joining cubes                      |
-| 18245  | 1259     | 0        | Test cube with a little bit of everything             |
-| 18245  | 1259     | 1        | Test number measure 0                                 |
-| 18245  | 1259     | 2        | Test max(string) measure 0                            |
-| 18245  | 1259     | 3        | Test max(time) measure 0                              |
-| 18245  | 1259     | 4        | Test number measure 1                                 |
-| 18245  | 1259     | 5        | Test max(string) measure 1                            |
-| 18245  | 1259     | 6        | Test max(time) measure 1                              |
-| 18245  | 1259     | 7        | Test number measure 2                                 |
-| 18245  | 1259     | 8        | Test max(string) measure 2                            |
-| 18245  | 1259     | 9        | Test max(time) measure 2                              |
-| 18245  | 1259     | 10       | Test number measure 3                                 |
-| 18245  | 1259     | 11       | Test max(string) measure 3                            |
-| 18245  | 1259     | 12       | Test max(time) measure 3                              |
-| 18245  | 1259     | 13       | Test number measure 4                                 |
-| 18245  | 1259     | 14       | Test max(string) measure 4                            |
-| 18245  | 1259     | 15       | Test max(time) measure 4                              |
-| 18245  | 1259     | 16       | Test number measure 5                                 |
-| 18245  | 1259     | 17       | Test max(string) measure 5                            |
-| 18245  | 1259     | 18       | Test max(time) measure 5                              |
-| 18245  | 1259     | 19       | Test number measure 6                                 |
-| 18245  | 1259     | 20       | Test max(string) measure 6                            |
-| 18245  | 1259     | 21       | Test max(time) measure 6                              |
-| 18245  | 1259     | 22       | Test number measure 7                                 |
-| 18245  | 1259     | 23       | Test max(string) measure 7                            |
-| 18245  | 1259     | 24       | Test max(time) measure 7                              |
-| 18245  | 1259     | 25       | Test number measure 8                                 |
-| 18245  | 1259     | 26       | Test max(string) measure 8                            |
-| 18245  | 1259     | 27       | Test max(time) measure 8                              |
-| 18245  | 1259     | 28       | Test number measure 9                                 |
-| 18245  | 1259     | 29       | Test max(string) measure 9                            |
-| 18245  | 1259     | 30       | Test max(time) measure 9                              |
-| 18245  | 1259     | 31       | Test count measure                                    |
-| 18245  | 1259     | 32       | Test maxPrice measure                                 |
-| 18245  | 1259     | 33       | Test minPrice measure                                 |
-| 18245  | 1259     | 34       | Test avgPrice measure                                 |
-| 18245  | 1259     | 35       | Test countDistinct measure                            |
-| 18245  | 1259     | 36       | Test numeric dimention 0                              |
-| 18245  | 1259     | 37       | Test string dimention 0                               |
-| 18245  | 1259     | 38       | Test time dimention 0                                 |
-| 18245  | 1259     | 39       | Test numeric dimention 1                              |
-| 18245  | 1259     | 40       | Test string dimention 1                               |
-| 18245  | 1259     | 41       | Test time dimention 1                                 |
-| 18245  | 1259     | 42       | Test numeric dimention 2                              |
-| 18245  | 1259     | 43       | Test string dimention 2                               |
-| 18245  | 1259     | 44       | Test time dimention 2                                 |
-| 18245  | 1259     | 45       | Test numeric dimention 3                              |
-| 18245  | 1259     | 46       | Test string dimention 3                               |
-| 18245  | 1259     | 47       | Test time dimention 3                                 |
-| 18245  | 1259     | 48       | Test numeric dimention 4                              |
-| 18245  | 1259     | 49       | Test string dimention 4                               |
-| 18245  | 1259     | 50       | Test time dimention 4                                 |
-| 18245  | 1259     | 51       | Test numeric dimention 5                              |
-| 18245  | 1259     | 52       | Test string dimention 5                               |
-| 18245  | 1259     | 53       | Test time dimention 5                                 |
-| 18245  | 1259     | 54       | Test numeric dimention 6                              |
-| 18245  | 1259     | 55       | Test string dimention 6                               |
-| 18245  | 1259     | 56       | Test time dimention 6                                 |
-| 18245  | 1259     | 57       | Test numeric dimention 7                              |
-| 18245  | 1259     | 58       | Test string dimention 7                               |
-| 18245  | 1259     | 59       | Test time dimention 7                                 |
-| 18245  | 1259     | 60       | Test numeric dimention 8                              |
-| 18245  | 1259     | 61       | Test string dimention 8                               |
-| 18245  | 1259     | 62       | Test time dimention 8                                 |
-| 18245  | 1259     | 63       | Test numeric dimention 9                              |
-| 18245  | 1259     | 64       | Test string dimention 9                               |
-| 18245  | 1259     | 65       | Test time dimention 9                                 |
-| 18245  | 1259     | 66       | Virtual column for security context switching         |
-| 18245  | 1259     | 67       | Virtual column for joining cubes                      |
+| 18000  | 1259     | 10       | Customer gender                                       |
+| 18000  | 1259     | 14       | Male users segment                                    |
+| 18000  | 1259     | 16       | Virtual column for security context switching         |
+| 18000  | 1259     | 17       | Virtual column for joining cubes                      |
+| 18020  | 1259     | 6        | Virtual column for security context switching         |
+| 18020  | 1259     | 7        | Virtual column for joining cubes                      |
+| 18030  | 1259     | 2        | Virtual column for security context switching         |
+| 18030  | 1259     | 3        | Virtual column for joining cubes                      |
+| 18036  | 1259     | 206      | Virtual column for security context switching         |
+| 18036  | 1259     | 207      | Virtual column for joining cubes                      |
+| 18246  | 1259     | 0        | Test cube with a little bit of everything             |
+| 18246  | 1259     | 1        | Test number measure 0                                 |
+| 18246  | 1259     | 2        | Test max(string) measure 0                            |
+| 18246  | 1259     | 3        | Test max(time) measure 0                              |
+| 18246  | 1259     | 4        | Test number measure 1                                 |
+| 18246  | 1259     | 5        | Test max(string) measure 1                            |
+| 18246  | 1259     | 6        | Test max(time) measure 1                              |
+| 18246  | 1259     | 7        | Test number measure 2                                 |
+| 18246  | 1259     | 8        | Test max(string) measure 2                            |
+| 18246  | 1259     | 9        | Test max(time) measure 2                              |
+| 18246  | 1259     | 10       | Test number measure 3                                 |
+| 18246  | 1259     | 11       | Test max(string) measure 3                            |
+| 18246  | 1259     | 12       | Test max(time) measure 3                              |
+| 18246  | 1259     | 13       | Test number measure 4                                 |
+| 18246  | 1259     | 14       | Test max(string) measure 4                            |
+| 18246  | 1259     | 15       | Test max(time) measure 4                              |
+| 18246  | 1259     | 16       | Test number measure 5                                 |
+| 18246  | 1259     | 17       | Test max(string) measure 5                            |
+| 18246  | 1259     | 18       | Test max(time) measure 5                              |
+| 18246  | 1259     | 19       | Test number measure 6                                 |
+| 18246  | 1259     | 20       | Test max(string) measure 6                            |
+| 18246  | 1259     | 21       | Test max(time) measure 6                              |
+| 18246  | 1259     | 22       | Test number measure 7                                 |
+| 18246  | 1259     | 23       | Test max(string) measure 7                            |
+| 18246  | 1259     | 24       | Test max(time) measure 7                              |
+| 18246  | 1259     | 25       | Test number measure 8                                 |
+| 18246  | 1259     | 26       | Test max(string) measure 8                            |
+| 18246  | 1259     | 27       | Test max(time) measure 8                              |
+| 18246  | 1259     | 28       | Test number measure 9                                 |
+| 18246  | 1259     | 29       | Test max(string) measure 9                            |
+| 18246  | 1259     | 30       | Test max(time) measure 9                              |
+| 18246  | 1259     | 31       | Test count measure                                    |
+| 18246  | 1259     | 32       | Test maxPrice measure                                 |
+| 18246  | 1259     | 33       | Test minPrice measure                                 |
+| 18246  | 1259     | 34       | Test avgPrice measure                                 |
+| 18246  | 1259     | 35       | Test countDistinct measure                            |
+| 18246  | 1259     | 36       | Test numeric dimention 0                              |
+| 18246  | 1259     | 37       | Test string dimention 0                               |
+| 18246  | 1259     | 38       | Test time dimention 0                                 |
+| 18246  | 1259     | 39       | Test numeric dimention 1                              |
+| 18246  | 1259     | 40       | Test string dimention 1                               |
+| 18246  | 1259     | 41       | Test time dimention 1                                 |
+| 18246  | 1259     | 42       | Test numeric dimention 2                              |
+| 18246  | 1259     | 43       | Test string dimention 2                               |
+| 18246  | 1259     | 44       | Test time dimention 2                                 |
+| 18246  | 1259     | 45       | Test numeric dimention 3                              |
+| 18246  | 1259     | 46       | Test string dimention 3                               |
+| 18246  | 1259     | 47       | Test time dimention 3                                 |
+| 18246  | 1259     | 48       | Test numeric dimention 4                              |
+| 18246  | 1259     | 49       | Test string dimention 4                               |
+| 18246  | 1259     | 50       | Test time dimention 4                                 |
+| 18246  | 1259     | 51       | Test numeric dimention 5                              |
+| 18246  | 1259     | 52       | Test string dimention 5                               |
+| 18246  | 1259     | 53       | Test time dimention 5                                 |
+| 18246  | 1259     | 54       | Test numeric dimention 6                              |
+| 18246  | 1259     | 55       | Test string dimention 6                               |
+| 18246  | 1259     | 56       | Test time dimention 6                                 |
+| 18246  | 1259     | 57       | Test numeric dimention 7                              |
+| 18246  | 1259     | 58       | Test string dimention 7                               |
+| 18246  | 1259     | 59       | Test time dimention 7                                 |
+| 18246  | 1259     | 60       | Test numeric dimention 8                              |
+| 18246  | 1259     | 61       | Test string dimention 8                               |
+| 18246  | 1259     | 62       | Test time dimention 8                                 |
+| 18246  | 1259     | 63       | Test numeric dimention 9                              |
+| 18246  | 1259     | 64       | Test string dimention 9                               |
+| 18246  | 1259     | 65       | Test time dimention 9                                 |
+| 18246  | 1259     | 66       | Virtual column for security context switching         |
+| 18246  | 1259     | 67       | Virtual column for joining cubes                      |
 +--------+----------+----------+-------------------------------------------------------+
