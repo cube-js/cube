@@ -104,10 +104,10 @@ export function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
 
   for (let i = 0; i < parts.length; i += 2) {
     const value = parseInt(parts[i], 10);
-    const unit = parts[i + 1];
+    const unit = parts[i + 1].toLowerCase();
 
     // Remove ending 's' (e.g., 'days' -> 'day')
-    const singularUnit = ((unit.endsWith('s') ? unit.slice(0, -1) : unit).toLowerCase()) as unitOfTime.DurationConstructor;
+    const singularUnit = (unit.endsWith('s') ? unit.slice(0, -1) : unit) as unitOfTime.DurationConstructor;
     interval[singularUnit] = value;
   }
 
