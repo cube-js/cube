@@ -149,6 +149,7 @@
     "querying BigECommerce: rolling window YTD without date range",
     "week granularity is not supported for intervals",
     "querying BigECommerce: rolling window by 2 week",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
 
     "---------------------------------------",
     "Custom Granularities                   ",
