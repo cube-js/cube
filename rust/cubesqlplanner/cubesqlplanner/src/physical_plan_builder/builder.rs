@@ -47,6 +47,10 @@ impl PhysicalPlanBuilderContext {
                         dimension.calendar_time_shift_for_interval(&shift.interval)
                     {
                         return Either::Right((dim_key.clone(), cts.clone()));
+                    } else if let Some(calendar_pk) = dimension.time_shift_pk() {
+                        let mut shift = shift.clone();
+                        shift.interval = shift.interval.inverse();
+                        return Either::Left((calendar_pk.full_name(), shift.clone()));
                     }
                 }
                 Either::Left((key.clone(), shift.clone()))

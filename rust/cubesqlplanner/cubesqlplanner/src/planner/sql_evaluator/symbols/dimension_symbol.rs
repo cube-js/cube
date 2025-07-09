@@ -380,40 +380,52 @@ impl SymbolFactory for DimensionSymbolFactory {
             vec![]
         };
 
-        let time_shift_pk = if !time_shift.is_empty() {
-            let pk_member = cube_evaluator
+        let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
+        let is_view = cube.static_data().is_view.unwrap_or(false);
+        let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
+
+        // If the cube is a calendar, we need to find the primary key member
+        // so that we can use it for time shifts processing.
+        let time_shift_pk = if is_calendar {
+            let pk_members = cube_evaluator
                 .static_data()
                 .primary_keys
                 .get(&cube_name)
                 .cloned()
-                .unwrap_or_else(|| vec![])
-                .into_iter()
-                .map(|primary_key| -> Result<_, CubeError> {
-                    let key_dimension_name = format!("{}.{}", cube_name, primary_key);
-                    let pk_member = compiler.add_dimension_evaluator(key_dimension_name)?;
+                .unwrap_or_else(|| vec![]);
 
-                    Ok(pk_member)
-                })
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .filter(|pk_member| {
-                    if let Ok(pk_dimension) = pk_member.as_dimension() {
-                        if pk_dimension.dimension_type() == "time" { // TODO: What if calendar cube is joined via non-time dimension?
-                            return true;
+            if pk_members.iter().any(|pk| **pk == name) {
+                // To avoid evaluation loop.
+                None
+            } else {
+                let pk_member = pk_members
+                    .into_iter()
+                    .map(|primary_key| -> Result<_, CubeError> {
+                        let key_dimension_name = format!("{}.{}", cube_name, primary_key);
+                        let pk_member = compiler.add_dimension_evaluator(key_dimension_name)?;
+
+                        Ok(pk_member)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .filter(|pk_member| {
+                        if let Ok(pk_dimension) = pk_member.as_dimension() {
+                            // TODO: What if calendar cube is joined via non-time dimension?
+                            if pk_dimension.dimension_type() == "time" {
+                                return true;
+                            }
                         }
-                    }
-                    false
-                })
-                .collect::<Vec<_>>()
-                .first()
-                .cloned();
-            pk_member
+                        false
+                    })
+                    .collect::<Vec<_>>()
+                    .first()
+                    .cloned();
+                pk_member
+            }
         } else {
             None
         };
 
-        let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
-        let is_view = cube.static_data().is_view.unwrap_or(false);
         let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
         let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
