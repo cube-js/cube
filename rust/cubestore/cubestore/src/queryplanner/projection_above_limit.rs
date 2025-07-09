@@ -107,38 +107,18 @@ fn projection_above_limit(plan: &LogicalPlan) -> Result<LogicalPlan> {
     }
 }
 
-/// A `Vec<Column>` -- or, when we don't need that, a `()`.
-trait ColumnCollector {
-    fn push(&mut self, column: &Column);
-}
-
-impl ColumnCollector for () {
-    fn push(&mut self, _column: &Column) {}
-}
-
-impl ColumnCollector for Vec<Column> {
-    fn push(&mut self, column: &Column) {
-        self.push(column.clone());
-    }
-}
-
 #[derive(Default)]
-struct ColumnRecorder<T: ColumnCollector> {
-    column_hash: HashSet<Column>,
-    /// The purpose is to store a `Vec<Column>` in the order that the columns were seen, so that
-    /// the intermediate projection layer looks "natural" instead of having columns in some sorted
-    /// order or nondeterministic hash table ordering.
-    collector: T,
+struct ColumnRecorder {
+    /// We use indexmap IndexSet because we want iteration order to be deterministic and
+    /// specifically, to match left-to-right insertion order.
+    columns: indexmap::IndexSet<Column>,
 }
 
-impl<T: ColumnCollector> ExpressionVisitor for ColumnRecorder<T> {
+impl ExpressionVisitor for ColumnRecorder {
     fn pre_visit(mut self, expr: &Expr) -> Result<Recursion<Self>> {
         match expr {
             Expr::Column(c) => {
-                let inserted = self.column_hash.insert(c.clone());
-                if inserted {
-                    self.collector.push(c);
-                }
+                self.columns.insert(c.clone());
             }
             Expr::ScalarVariable(_var_names) => {
                 // expr_to_columns, with its ColumnNameVisitor includes ScalarVariable for some
@@ -203,7 +183,7 @@ fn looks_expensive(ex: &Expr) -> Result<bool> {
 
 fn lift_up_expensive_projections(
     plan: &LogicalPlan,
-    used_columns: ColumnRecorder<()>,
+    used_columns: ColumnRecorder,
 ) -> Result<(LogicalPlan, Option<Vec<Expr>>)> {
     match plan {
         LogicalPlan::Sort { expr, input } => {
@@ -231,10 +211,7 @@ fn lift_up_expensive_projections(
             input,
             schema,
         } => {
-            let mut column_recorder = ColumnRecorder::<Vec<Column>> {
-                column_hash: HashSet::new(),
-                collector: Vec::new(),
-            };
+            let mut column_recorder = ColumnRecorder::default();
 
             let mut this_projection_exprs = Vec::<usize>::new();
 
@@ -260,7 +237,7 @@ fn lift_up_expensive_projections(
                     already_retained_cols.push((col.clone(), Some(alias.clone())));
                 }
 
-                if used_columns.column_hash.contains(&field.qualified_column()) {
+                if used_columns.columns.contains(&field.qualified_column()) {
                     pal_debug!(
                         "Expr {}: used_columns contains field {:?}",
                         i,
@@ -315,7 +292,7 @@ fn lift_up_expensive_projections(
             let mut expensive_expr_column_replacements = Vec::<(Column, Column)>::new();
 
             let mut generated_col_number = 0;
-            let needed_columns = column_recorder.collector;
+            let needed_columns = column_recorder.columns;
             'outer: for col in needed_columns {
                 pal_debug!("Processing column {:?} in needed_columns", col);
 
