@@ -6260,6 +6260,171 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": 1,
+    "BigECommerce.totalCountRetailMonthAgo": 1,
+    "RetailCalendar.retail_date": "2020-02-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 2,
+    "BigECommerce.totalCountRetailMonthAgo": 1,
+    "RetailCalendar.retail_date": "2020-03-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 1,
+    "BigECommerce.totalCountRetailMonthAgo": 2,
+    "RetailCalendar.retail_date": "2020-04-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 5,
+    "BigECommerce.totalCountRetailMonthAgo": 1,
+    "RetailCalendar.retail_date": "2020-05-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 7,
+    "BigECommerce.totalCountRetailMonthAgo": 5,
+    "RetailCalendar.retail_date": "2020-06-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 4,
+    "BigECommerce.totalCountRetailMonthAgo": 6,
+    "RetailCalendar.retail_date": "2020-10-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 9,
+    "BigECommerce.totalCountRetailMonthAgo": 5,
+    "RetailCalendar.retail_date": "2020-11-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 7,
+    "BigECommerce.totalCountRetailMonthAgo": 8,
+    "RetailCalendar.retail_date": "2020-12-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-12-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": 1,
+    "BigECommerce.totalCountRetailWeekAgo": 1,
+    "RetailCalendar.retail_date": "2020-03-22T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-03-22T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 1,
+    "BigECommerce.totalCountRetailWeekAgo": 2,
+    "RetailCalendar.retail_date": "2020-05-31T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-31T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 2,
+    "BigECommerce.totalCountRetailWeekAgo": 1,
+    "RetailCalendar.retail_date": "2020-06-07T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-07T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 2,
+    "BigECommerce.totalCountRetailWeekAgo": 2,
+    "RetailCalendar.retail_date": "2020-06-14T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-14T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 2,
+    "BigECommerce.totalCountRetailWeekAgo": 2,
+    "RetailCalendar.retail_date": "2020-06-21T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-21T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 1,
+    "BigECommerce.totalCountRetailWeekAgo": 2,
+    "RetailCalendar.retail_date": "2020-09-06T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-06T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 2,
+    "BigECommerce.totalCountRetailWeekAgo": 1,
+    "RetailCalendar.retail_date": "2020-09-13T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-13T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 1,
+    "BigECommerce.totalCountRetailWeekAgo": 2,
+    "RetailCalendar.retail_date": "2020-09-20T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-20T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 2,
+    "BigECommerce.totalCountRetailWeekAgo": 1,
+    "RetailCalendar.retail_date": "2020-10-18T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-18T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 1,
+    "BigECommerce.totalCountRetailWeekAgo": 2,
+    "RetailCalendar.retail_date": "2020-10-25T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-25T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 3,
+    "BigECommerce.totalCountRetailWeekAgo": 1,
+    "RetailCalendar.retail_date": "2020-11-01T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 2,
+    "BigECommerce.totalCountRetailWeekAgo": 3,
+    "RetailCalendar.retail_date": "2020-11-08T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-08T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 3,
+    "BigECommerce.totalCountRetailWeekAgo": 2,
+    "RetailCalendar.retail_date": "2020-11-15T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-15T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 1,
+    "BigECommerce.totalCountRetailWeekAgo": 3,
+    "RetailCalendar.retail_date": "2020-11-22T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-22T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 3,
+    "BigECommerce.totalCountRetailWeekAgo": 1,
+    "RetailCalendar.retail_date": "2020-11-29T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-29T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": 2,
+    "BigECommerce.totalCountRetailWeekAgo": 2,
+    "RetailCalendar.retail_date": "2020-12-20T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-20T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce with Retail Calendar: totalCountRetailYearAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": 42,
+    "BigECommerce.totalCountRetailYearAgo": 2,
+    "RetailCalendar.retail_date": "2020-02-02T00:00:00.000",
+    "RetailCalendar.retail_date.year": "2020-02-02T00:00:00.000",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce: filtering with possible casts 1`] = `
 Array [
   Object {
