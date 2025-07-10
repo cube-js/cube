@@ -258,6 +258,11 @@
           "name": "Customers",
           "relationship": "belongs_to",
           "sql": "{CUBE}.customer_id = {Customers}.customer_id"
+        },
+        {
+          "name": "RetailCalendar",
+          "relationship": "many_to_one",
+          "sql": "{CUBE}.order_date = {RetailCalendar.date_val}"
         }
       ],
       "dimensions": [
@@ -390,6 +395,36 @@
           }]
         },
         {
+          "name": "totalCountRetailYearAgo",
+          "type": "number",
+          "sql": "{count}",
+          "multi_stage": true,
+          "time_shift": [{
+            "interval": "1 year",
+            "type": "prior"
+          }]
+        },
+        {
+          "name": "totalCountRetailMonthAgo",
+          "type": "number",
+          "sql": "{count}",
+          "multi_stage": true,
+          "time_shift": [{
+            "interval": "1 month",
+            "type": "prior"
+          }]
+        },
+        {
+          "name": "totalCountRetailWeekAgo",
+          "type": "number",
+          "sql": "{count}",
+          "multi_stage": true,
+          "time_shift": [{
+            "interval": "1 week",
+            "type": "prior"
+          }]
+        },
+        {
           "name": "totalProfitForStatus",
           "type": "sum",
           "sql": "{totalProfit}",
@@ -460,6 +495,55 @@
           "rolling_window": {
             "trailing": "2 month"
           }
+        }
+      ]
+    },
+    {
+      "name": "RetailCalendar",
+      "calendar": true,
+      "dimensions": [
+        {
+          "name": "date_val",
+          "sql": "date_val",
+          "type": "time",
+          "primary_key": true,
+          "shown": true
+        },
+        {
+          "name": "retail_date",
+          "sql": "date_val",
+          "type": "time",
+          "granularities": [
+            {
+              "name": "week",
+              "sql": "{CUBE}.retail_week_begin_date"
+            },
+            {
+              "name": "quarter",
+              "sql": "{CUBE}.retail_quarter_begin_date"
+            },
+            {
+              "name": "year",
+              "sql": "{CUBE}.retail_year_begin_date"
+            }
+          ],
+          "timeShift": [
+            {
+              "interval": "1 month",
+              "type": "prior",
+              "sql": "{CUBE}.retail_date_prev_month"
+            },
+            {
+              "interval": "1 quarter",
+              "type": "prior",
+              "sql": "{CUBE}.retail_date_prev_quarter"
+            },
+            {
+              "interval": "1 year",
+              "type": "prior",
+              "sql": "{CUBE}.retail_date_prev_year"
+            }
+          ]
         }
       ]
     }
