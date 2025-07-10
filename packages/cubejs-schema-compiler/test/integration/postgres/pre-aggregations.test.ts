@@ -1922,6 +1922,7 @@ describe('PreAggregations', () => {
       }, {
         id: 'visitors.source'
       }],
+      cubestoreSupportMultistage: getEnv("nativeSqlPlanner")
     });
 
     const queryAndParams = query.buildSqlAndParams();
@@ -1999,6 +2000,7 @@ describe('PreAggregations', () => {
       }, {
         id: 'visitors.source'
       }],
+      cubestoreSupportMultistage: getEnv("nativeSqlPlanner")
     });
 
     const queryAndParams = query.buildSqlAndParams();

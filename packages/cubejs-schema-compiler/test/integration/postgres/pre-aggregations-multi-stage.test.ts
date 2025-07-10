@@ -69,7 +69,7 @@ describe('PreAggregationsMultiStage', () => {
 
       testMeas: {
         type: 'countDistinct',
-        sql: \`\${createdAtDay}\` 
+        sql: \`\${createdAtDay}\`
       }
     },
 
@@ -188,7 +188,8 @@ describe('PreAggregationsMultiStage', () => {
         order: [{
           id: 'visitors.createdAt'
         }],
-        preAggregationsSchema: ''
+        preAggregationsSchema: '',
+        cubestoreSupportMultistage: true
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
@@ -231,7 +232,8 @@ describe('PreAggregationsMultiStage', () => {
         order: [{
           id: 'visitors.source'
         }],
-        preAggregationsSchema: ''
+        preAggregationsSchema: '',
+        cubestoreSupportMultistage: true
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
@@ -262,7 +264,8 @@ describe('PreAggregationsMultiStage', () => {
         order: [{
           id: 'visitors.source'
         }],
-        preAggregationsSchema: ''
+        preAggregationsSchema: '',
+        cubestoreSupportMultistage: true
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
