@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.36](https://github.com/cube-js/cube/compare/v1.3.35...v1.3.36) (2025-07-10)
+
+### Bug Fixes
+
+- **cubestore:** Avoid bug in topk planning when projection column order is permuted ([#9765](https://github.com/cube-js/cube/issues/9765)) ([49a58ff](https://github.com/cube-js/cube/commit/49a58fffb8ffa064debe9b4cfecc078e5da01004))
+- **cubestore:** Make projection_above_limit optimization behave deter… ([#9766](https://github.com/cube-js/cube/issues/9766)) ([08f21b6](https://github.com/cube-js/cube/commit/08f21b67dbf6f05739822409ef0c48265bc0d429))
+
 ## [1.3.35](https://github.com/cube-js/cube/compare/v1.3.34...v1.3.35) (2025-07-09)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

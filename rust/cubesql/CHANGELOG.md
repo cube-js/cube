@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.36](https://github.com/cube-js/cube/compare/v1.3.35...v1.3.36) (2025-07-10)
+
+### Bug Fixes
+
+- **cubesql:** Fix adding missing columns for `ORDER BY` clause ([#9764](https://github.com/cube-js/cube/issues/9764)) ([185db54](https://github.com/cube-js/cube/commit/185db547e0c83c0e276c9a89618b4753c969dea7))
+- **cubesql:** Improve DBeaver compatibility ([#9769](https://github.com/cube-js/cube/issues/9769)) ([c206c90](https://github.com/cube-js/cube/commit/c206c901e9da14a230a2b358dfc4ea577adf9f49))
+
 ## [1.3.35](https://github.com/cube-js/cube/compare/v1.3.34...v1.3.35) (2025-07-09)
 
 ### Bug Fixes

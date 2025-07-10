@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.36](https://github.com/cube-js/cube/compare/v1.3.35...v1.3.36) (2025-07-10)
+
+### Features
+
+- **tesseract:** Rolling window with custom granularities without date range ([#9762](https://github.com/cube-js/cube/issues/9762)) ([d81c57d](https://github.com/cube-js/cube/commit/d81c57db80e96a211c1d12a67b06cefd868e111e))
+
 ## [1.3.35](https://github.com/cube-js/cube/compare/v1.3.34...v1.3.35) (2025-07-09)
 
 ### Features

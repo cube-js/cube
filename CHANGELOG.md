@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.36](https://github.com/cube-js/cube/compare/v1.3.35...v1.3.36) (2025-07-10)
+
+### Bug Fixes
+
+- **cubesql:** Fix adding missing columns for `ORDER BY` clause ([#9764](https://github.com/cube-js/cube/issues/9764)) ([185db54](https://github.com/cube-js/cube/commit/185db547e0c83c0e276c9a89618b4753c969dea7))
+- **cubesql:** Improve DBeaver compatibility ([#9769](https://github.com/cube-js/cube/issues/9769)) ([c206c90](https://github.com/cube-js/cube/commit/c206c901e9da14a230a2b358dfc4ea577adf9f49))
+- **cubestore:** Avoid bug in topk planning when projection column order is permuted ([#9765](https://github.com/cube-js/cube/issues/9765)) ([49a58ff](https://github.com/cube-js/cube/commit/49a58fffb8ffa064debe9b4cfecc078e5da01004))
+- **cubestore:** Make projection_above_limit optimization behave deter… ([#9766](https://github.com/cube-js/cube/issues/9766)) ([08f21b6](https://github.com/cube-js/cube/commit/08f21b67dbf6f05739822409ef0c48265bc0d429))
+
+### Features
+
+- **tesseract:** Rolling window with custom granularities without date range ([#9762](https://github.com/cube-js/cube/issues/9762)) ([d81c57d](https://github.com/cube-js/cube/commit/d81c57db80e96a211c1d12a67b06cefd868e111e))
+- **tesseract:** Rollup Join support ([#9745](https://github.com/cube-js/cube/issues/9745)) ([05bb520](https://github.com/cube-js/cube/commit/05bb52091ad2d3ac09303c0fa50603cd24c99d61))
+- **tesseract:** Support for time shifts over calendar cubes dimensions ([#9758](https://github.com/cube-js/cube/issues/9758)) ([70dfa52](https://github.com/cube-js/cube/commit/70dfa52a2aa0cafd80cdf21229d70795392009ec))
+
 ## [1.3.35](https://github.com/cube-js/cube/compare/v1.3.34...v1.3.35) (2025-07-09)
 
 ### Bug Fixes

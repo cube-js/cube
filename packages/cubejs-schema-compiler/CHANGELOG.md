@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.36](https://github.com/cube-js/cube/compare/v1.3.35...v1.3.36) (2025-07-10)
+
+### Features
+
+- **tesseract:** Rolling window with custom granularities without date range ([#9762](https://github.com/cube-js/cube/issues/9762)) ([d81c57d](https://github.com/cube-js/cube/commit/d81c57db80e96a211c1d12a67b06cefd868e111e))
+- **tesseract:** Rollup Join support ([#9745](https://github.com/cube-js/cube/issues/9745)) ([05bb520](https://github.com/cube-js/cube/commit/05bb52091ad2d3ac09303c0fa50603cd24c99d61))
+- **tesseract:** Support for time shifts over calendar cubes dimensions ([#9758](https://github.com/cube-js/cube/issues/9758)) ([70dfa52](https://github.com/cube-js/cube/commit/70dfa52a2aa0cafd80cdf21229d70795392009ec))
+
 ## [1.3.35](https://github.com/cube-js/cube/compare/v1.3.34...v1.3.35) (2025-07-09)
 
 ### Bug Fixes
