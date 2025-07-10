@@ -42,7 +42,8 @@
     "products": "products",
     "customers": "customers",
     "ecommerce": "ecommerce",
-    "bigecommerce": "bigecommerce"
+    "bigecommerce": "bigecommerce",
+    "retailcalendar": "retailcalendar"
   },
   "preAggregations": {
     "Products": [],
@@ -163,7 +164,10 @@
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
     "querying BigECommerce: rolling window YTD without date range",
-    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range"
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+    "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",

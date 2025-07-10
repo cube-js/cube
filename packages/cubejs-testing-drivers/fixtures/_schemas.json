@@ -395,9 +395,9 @@
           }]
         },
         {
-          "name": "totalProfitRetailYearAgo",
+          "name": "totalCountRetailYearAgo",
           "type": "number",
-          "sql": "{totalProfit}",
+          "sql": "{count}",
           "multi_stage": true,
           "time_shift": [{
             "interval": "1 year",
@@ -405,9 +405,9 @@
           }]
         },
         {
-          "name": "totalProfitRetailMonthAgo",
+          "name": "totalCountRetailMonthAgo",
           "type": "number",
-          "sql": "{totalProfit}",
+          "sql": "{count}",
           "multi_stage": true,
           "time_shift": [{
             "interval": "1 month",
@@ -415,9 +415,9 @@
           }]
         },
         {
-          "name": "totalProfitRetailWeekAgo",
+          "name": "totalCountRetailWeekAgo",
           "type": "number",
-          "sql": "{totalProfit}",
+          "sql": "{count}",
           "multi_stage": true,
           "time_shift": [{
             "interval": "1 week",
