@@ -386,7 +386,7 @@ impl SymbolFactory for DimensionSymbolFactory {
 
         // If the cube is a calendar, we need to find the primary key member
         // so that we can use it for time shifts processing.
-        let time_shift_pk = if is_calendar {
+        let time_shift_pk = if is_calendar && !time_shift.is_empty() {
             let pk_members = cube_evaluator
                 .static_data()
                 .primary_keys
