@@ -43,9 +43,9 @@ pub struct DimensionSymbol {
     is_view: bool,
     time_shift: Vec<CalendarDimensionTimeShift>,
     time_shift_pk_full_name: Option<String>,
-    is_self_time_shift_pk: bool,    // If the dimension itself is a primary key and has time shifts,
-                                    // we can not reevaluate itself again while processing time shifts
-                                    // to avoid infinite recursion. So we raise this flag instead.
+    is_self_time_shift_pk: bool, // If the dimension itself is a primary key and has time shifts,
+                                 // we can not reevaluate itself again while processing time shifts
+                                 // to avoid infinite recursion. So we raise this flag instead.
 }
 
 impl DimensionSymbol {
