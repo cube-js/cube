@@ -1892,6 +1892,7 @@ Object {
   "timeShiftReferences": Array [
     Object {
       "interval": "1 year",
+      "name": undefined,
       "timeDimension": "createdAt",
       "type": "prior",
     },
