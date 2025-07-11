@@ -28,15 +28,17 @@ export type DimensionDefinition = {
 };
 
 export type TimeShiftDefinition = {
-  timeDimension?: (...args: Array<unknown>) => ToString,
-  interval: string,
-  type: 'next' | 'prior',
+  timeDimension?: (...args: Array<unknown>) => ToString;
+  name?: string;
+  interval?: string;
+  type?: 'next' | 'prior';
 };
 
 export type TimeShiftDefinitionReference = {
-  timeDimension?: string,
-  interval: string,
-  type: 'next' | 'prior',
+  timeDimension?: string;
+  name?: string;
+  interval?: string;
+  type?: 'next' | 'prior';
 };
 
 export type MeasureDefinition = {
@@ -393,6 +395,7 @@ export class CubeEvaluator extends CubeSymbols {
         }
         if (member.timeShift) {
           member.timeShiftReferences = member.timeShift.map((s): TimeShiftDefinitionReference => ({
+            name: s.name,
             interval: s.interval,
             type: s.type,
             ...(typeof s.timeDimension === 'function'

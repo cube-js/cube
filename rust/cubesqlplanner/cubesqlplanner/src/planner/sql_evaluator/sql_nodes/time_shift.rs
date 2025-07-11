@@ -43,7 +43,7 @@ impl SqlNode for TimeShiftSqlNode {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() && ev.dimension_type() == "time" {
                     if let Some(shift) = self.shifts.dimensions_shifts.get(&ev.full_name()) {
-                        let shift = shift.interval.to_sql();
+                        let shift = shift.interval.clone().unwrap().to_sql(); // Common time shifts should always have an interval
                         let res = templates.add_timestamp_interval(input, shift)?;
                         format!("({})", res)
                     } else {

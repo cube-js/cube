@@ -2,6 +2,7 @@ use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::sql_evaluator::{DimensionTimeShift, MeasureTimeShifts, MemberSymbol};
 use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
+use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
@@ -72,15 +73,25 @@ impl MultiStageAppliedState {
             .collect_vec();
     }
 
-    pub fn add_time_shifts(&mut self, time_shifts: MeasureTimeShifts) {
+    pub fn add_time_shifts(&mut self, time_shifts: MeasureTimeShifts) -> Result<(), CubeError> {
         let resolved_shifts = match time_shifts {
             MeasureTimeShifts::Dimensions(dimensions) => dimensions,
             MeasureTimeShifts::Common(interval) => self
                 .all_time_members()
                 .into_iter()
                 .map(|m| DimensionTimeShift {
-                    interval: interval.clone(),
+                    interval: Some(interval.clone()),
                     dimension: m,
+                    name: None,
+                })
+                .collect_vec(),
+            MeasureTimeShifts::Named(named_shift) => self
+                .all_time_members()
+                .into_iter()
+                .map(|m| DimensionTimeShift {
+                    interval: None,
+                    dimension: m,
+                    name: Some(named_shift.clone()),
                 })
                 .collect_vec(),
         };
@@ -90,13 +101,41 @@ impl MultiStageAppliedState {
                 .dimensions_shifts
                 .get_mut(&ts.dimension.full_name())
             {
-                exists.interval += ts.interval;
+                if let Some(interval) = exists.interval.clone() {
+                    if let Some(new_interval) = ts.interval {
+                        exists.interval = Some(interval + new_interval);
+                    } else {
+                        return Err(CubeError::internal(format!(
+                            "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
+                            ts.name.clone().unwrap_or("-".to_string()),
+                            interval.to_sql(),
+                            ts.dimension.full_name(),
+                        )));
+                    }
+                } else if let Some(named_shift) = exists.name.clone() {
+                    return if let Some(new_interval) = ts.interval {
+                        Err(CubeError::internal(format!(
+                            "Cannot use both named ({}) and interval ({}) shifts for the same dimension: {}.",
+                            named_shift,
+                            new_interval.to_sql(),
+                            ts.dimension.full_name(),
+                        )))
+                    } else {
+                        Err(CubeError::internal(format!(
+                            "Cannot use more than one named shifts ({}, {}) for the same dimension: {}.",
+                            ts.name.clone().unwrap_or("-".to_string()),
+                            named_shift,
+                            ts.dimension.full_name(),
+                        )))
+                    };
+                }
             } else {
                 self.time_shifts
                     .dimensions_shifts
                     .insert(ts.dimension.full_name(), ts);
             }
         }
+        Ok(())
     }
 
     pub fn time_shifts(&self) -> &TimeShiftState {

@@ -11,9 +11,10 @@ use std::rc::Rc;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TimeShiftDefinitionStatic {
-    pub interval: String,
+    pub interval: Option<String>,
     #[serde(rename = "type")]
-    pub timeshift_type: String,
+    pub timeshift_type: Option<String>,
+    pub name: Option<String>,
 }
 
 #[nativebridge::native_bridge(TimeShiftDefinitionStatic)]
