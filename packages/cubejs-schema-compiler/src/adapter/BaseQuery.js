@@ -335,7 +335,7 @@ export class BaseQuery {
     if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
       const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
 
-      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0 || fullAggregateMeasures.cumulativeMeasures.length > 0;
+      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0;
     }
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
@@ -880,6 +880,7 @@ export class BaseQuery {
       preAggregationQuery: this.options.preAggregationQuery,
       totalQuery: this.options.totalQuery,
       joinHints: this.options.joinHints,
+      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin')
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
@@ -929,7 +930,8 @@ export class BaseQuery {
       baseTools: this,
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
-      preAggregationQuery: this.options.preAggregationQuery
+      preAggregationQuery: this.options.preAggregationQuery,
+      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin')
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);

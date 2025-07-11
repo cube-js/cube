@@ -20,6 +20,7 @@ pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
     query_tools: Rc<QueryTools>,
     request: Rc<QueryProperties>,
+    cubestore_support_multistage: bool,
 }
 
 impl<IT: InnerTypes> BaseQuery<IT> {
@@ -27,6 +28,10 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         context: NativeContextHolder<IT>,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Self, CubeError> {
+        let cubestore_support_multistage = options
+            .static_data()
+            .cubestore_support_multistage
+            .unwrap_or(false);
         let query_tools = QueryTools::try_new(
             options.cube_evaluator()?,
             options.base_tools()?,
@@ -41,6 +46,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             context,
             query_tools,
             request,
+            cubestore_support_multistage,
         })
     }
 
@@ -142,8 +148,10 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         plan: Rc<Query>,
     ) -> Result<(Rc<Query>, Vec<Rc<PreAggregation>>), CubeError> {
         let result = if !self.request.is_pre_aggregation_query() {
-            let mut pre_aggregation_optimizer =
-                PreAggregationOptimizer::new(self.query_tools.clone());
+            let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
+                self.query_tools.clone(),
+                self.cubestore_support_multistage,
+            );
             if let Some(result) = pre_aggregation_optimizer.try_optimize(plan.clone())? {
                 if pre_aggregation_optimizer.get_used_pre_aggregations().len() == 1 {
                     (

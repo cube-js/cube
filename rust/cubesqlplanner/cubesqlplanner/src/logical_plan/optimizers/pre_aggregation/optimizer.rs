@@ -29,13 +29,15 @@ impl MatchState {
 
 pub struct PreAggregationOptimizer {
     query_tools: Rc<QueryTools>,
+    allow_multi_stage: bool,
     used_pre_aggregations: HashMap<(String, String), Rc<PreAggregation>>,
 }
 
 impl PreAggregationOptimizer {
-    pub fn new(query_tools: Rc<QueryTools>) -> Self {
+    pub fn new(query_tools: Rc<QueryTools>, allow_multi_stage: bool) -> Self {
         Self {
             query_tools,
+            allow_multi_stage,
             used_pre_aggregations: HashMap::new(),
         }
     }
@@ -96,7 +98,10 @@ impl PreAggregationOptimizer {
         query: &FullKeyAggregateQuery,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        if !query.multistage_members.is_empty() {
+        if !self.allow_multi_stage && !query.multistage_members.is_empty() {
+            return Ok(None);
+        }
+        if self.allow_multi_stage && !query.multistage_members.is_empty() {
             return self
                 .try_rewrite_full_key_aggregate_query_with_multi_stages(query, pre_aggregation);
         }
