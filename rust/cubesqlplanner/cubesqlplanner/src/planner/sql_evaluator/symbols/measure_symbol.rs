@@ -38,13 +38,16 @@ impl MeasureOrderBy {
 
 #[derive(Clone, Debug)]
 pub struct DimensionTimeShift {
-    pub interval: SqlInterval,
+    pub interval: Option<SqlInterval>,
+    pub name: Option<String>,
     pub dimension: Rc<MemberSymbol>,
 }
 
 impl PartialEq for DimensionTimeShift {
     fn eq(&self, other: &Self) -> bool {
-        self.interval == other.interval && self.dimension.full_name() == other.dimension.full_name()
+        self.interval == other.interval
+            && self.dimension.full_name() == other.dimension.full_name()
+            && self.name == other.name
     }
 }
 
@@ -54,6 +57,7 @@ impl Eq for DimensionTimeShift {}
 pub enum MeasureTimeShifts {
     Dimensions(Vec<DimensionTimeShift>),
     Common(SqlInterval),
+    Named(String),
 }
 
 #[derive(Clone)]
@@ -567,19 +571,29 @@ impl SymbolFactory for MeasureSymbolFactory {
             let mut shifts: HashMap<String, DimensionTimeShift> = HashMap::new();
             let mut common_shift = None;
             for shift_ref in time_shift_references.iter() {
-                let interval = shift_ref.interval.parse::<SqlInterval>()?;
-                let interval =
-                    if shift_ref.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
-                        -interval
-                    } else {
-                        interval
-                    };
+                let interval = match &shift_ref.interval {
+                    Some(raw) => {
+                        let mut iv = raw.parse::<SqlInterval>()?;
+                        if shift_ref
+                            .shift_type
+                            .as_deref()
+                            .unwrap_or("prior")
+                            == "next"
+                        {
+                            iv = -iv;
+                        }
+
+                        Some(iv)
+                    }
+                    None => None,
+                };
+                let name = shift_ref.name.clone();
                 if let Some(time_dimension) = &shift_ref.time_dimension {
                     let dimension = compiler.add_dimension_evaluator(time_dimension.clone())?;
                     let dimension = find_owned_by_cube_child(&dimension)?;
                     let dimension_name = dimension.full_name();
                     if let Some(exists) = shifts.get(&dimension_name) {
-                        if exists.interval != interval {
+                        if exists.interval != interval || exists.name != name {
                             return Err(CubeError::user(format!(
                                 "Different time shifts for one dimension {} not allowed",
                                 dimension_name
@@ -590,15 +604,16 @@ impl SymbolFactory for MeasureSymbolFactory {
                             dimension_name,
                             DimensionTimeShift {
                                 interval: interval.clone(),
+                                name: name.clone(),
                                 dimension: dimension.clone(),
                             },
                         );
                     };
                 } else {
                     if common_shift.is_none() {
-                        common_shift = Some(interval);
+                        common_shift = interval;
                     } else {
-                        if common_shift != Some(interval) {
+                        if common_shift != interval {
                             return Err(CubeError::user(format!(
                                     "Measure can contain only one common time_shift (without time_dimension).",
                                 )));

@@ -15,7 +15,8 @@ use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct TimeShiftReference {
-    pub interval: String,
+    pub interval: Option<String>,
+    pub name: Option<String>,
     #[serde(rename = "type")]
     pub shift_type: Option<String>,
     #[serde(rename = "timeDimension")]
