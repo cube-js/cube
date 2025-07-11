@@ -284,10 +284,18 @@ impl HttpServer {
                                 command,
                             },
                             Err(e) => {
+                                let command_text = match &command {
+                                    HttpCommand::Query { query, .. } => format!("HttpCommand::Query {{ query: {:?} }}", query),
+                                    HttpCommand::Error { error } => format!("HttpCommand::Error {{ error: {:?} }}", error),
+                                    HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
+                                    HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
+                                };
                                 log::error!(
-                                "Error processing HTTP command: {}\n",
-                                e.display_with_backtrace()
-                            );
+                                    "Error processing HTTP command (connection_id={}): {}\nThe command: {}",
+                                    if let Some(c) = connection_id.as_ref() { c.as_str() } else { "(None)" },
+                                    e.display_with_backtrace(),
+                                    command_text,
+                                );
                                 let command = if e.is_wrong_connection() {
                                     HttpCommand::CloseConnection {
                                         error: e.to_string(),
@@ -356,9 +364,11 @@ impl HttpServer {
                     });
                 } else {
                     cube_ext::spawn(async move {
-                        let command_query = match &command {
-                            HttpCommand::Query { query, .. } => Some(query.clone()),
-                            _ => None,
+                        let command_text = match &command {
+                            HttpCommand::Query { query, .. } => format!("HttpCommand::Query {{ query: {:?} }}", query),
+                            HttpCommand::Error { error } => format!("HttpCommand::Error {{ error: {:?} }}", error),
+                            HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
+                            HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
                         };
                         let res = HttpServer::process_command(
                             sql_service.clone(),
@@ -374,12 +384,9 @@ impl HttpServer {
                             },
                             Err(e) => {
                                 log::error!(
-                                    "Error processing HTTP command: {}{}",
+                                    "Error processing HTTP command: {}\nThe command: {}",
                                     e.display_with_backtrace(),
-                                    match command_query {
-                                        Some(query) => format!("\nWith query: '''\n{}\n'''", query),
-                                        None => String::new(),
-                                    },
+                                    command_text,
                                 );
                                 HttpMessage {
                                     message_id,
