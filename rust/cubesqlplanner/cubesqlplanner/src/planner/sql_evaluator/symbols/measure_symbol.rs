@@ -636,10 +636,10 @@ impl SymbolFactory for MeasureSymbolFactory {
                 return Err(CubeError::user(format!(
                     "Measure cannot mix common unnamed and named time_shifts.",
                 )));
-            } else if common_shift.is_some() {
-                Some(MeasureTimeShifts::Common(common_shift.unwrap()))
-            } else if named_shift.is_some() {
-                Some(MeasureTimeShifts::Named(named_shift.unwrap()))
+            } else if let Some(cs) = common_shift {
+                Some(MeasureTimeShifts::Common(cs))
+            } else if let Some(ns) = named_shift {
+                Some(MeasureTimeShifts::Named(ns))
             } else {
                 Some(MeasureTimeShifts::Dimensions(
                     shifts.into_values().collect_vec(),
