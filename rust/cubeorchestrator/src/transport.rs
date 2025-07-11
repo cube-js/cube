@@ -159,7 +159,8 @@ pub type MembersMap = HashMap<String, String>;
 pub struct GranularityMeta {
     pub name: String,
     pub title: String,
-    pub interval: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interval: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

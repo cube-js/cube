@@ -211,6 +211,39 @@ cubes:
         type: time
         primary_key: true
 
+        granularities:
+          - name: year
+            sql: "{CUBE}.retail_year_begin_date"
+
+          - name: quarter
+            sql: "{CUBE}.retail_quarter_year"
+
+#          - name: month
+#            sql: "{CUBE}.retail_month_begin_date"
+
+          - name: week
+            sql: "{CUBE}.retail_week_begin_date"
+
+            # Casually defining custom granularities should also work.
+            # While maybe not very sound from a business standpoint,
+            # such definition should be allowed in this data model
+          - name: fortnight
+            interval: 2 week
+            origin: "2025-01-01"
+
+        time_shift:
+          - interval: 1 month
+            type: prior
+            sql: "{CUBE}.retail_date_prev_month"
+
+          - interval: 1 quarter
+            type: prior
+            sql: "{CUBE}.retail_date_prev_quarter"
+
+          - interval: 1 year
+            type: prior
+            sql: "{CUBE}.retail_date_prev_year"
+
       ##### Retail Dates ####
       - name: retail_date
         sql: retail_date
@@ -305,149 +338,87 @@ cubes:
     );
   }
 
-  it('Count by retail year', async () => runQueryTest({
-    measures: ['calendar_orders.count'],
-    timeDimensions: [{
-      dimension: 'custom_calendar.retail_date',
-      granularity: 'year',
-      dateRange: ['2025-02-02', '2026-02-01']
-    }],
-    order: [{ id: 'custom_calendar.retail_date' }]
-  }, [
-    {
-      calendar_orders__count: '37',
-      custom_calendar__retail_date_year: '2025-02-02T00:00:00.000Z',
-    }
-  ]));
+  describe('Common queries to calendar cube', () => {
+    it('Value of time-shift custom granularity non-pk time dimension', async () => runQueryTest({
+      dimensions: ['custom_calendar.retail_date'],
+      timeDimensions: [{
+        dimension: 'custom_calendar.retail_date',
+        dateRange: ['2025-02-02', '2025-02-06']
+      }],
+      order: [{ id: 'custom_calendar.retail_date' }]
+    }, [
+      {
+        custom_calendar__retail_date: '2025-02-02T00:00:00.000Z',
+      },
+      {
+        custom_calendar__retail_date: '2025-02-03T00:00:00.000Z',
+      },
+      {
+        custom_calendar__retail_date: '2025-02-04T00:00:00.000Z',
+      },
+      {
+        custom_calendar__retail_date: '2025-02-05T00:00:00.000Z',
+      },
+      {
+        custom_calendar__retail_date: '2025-02-06T00:00:00.000Z',
+      },
+    ]));
 
-  it('Count by retail month', async () => runQueryTest({
-    measures: ['calendar_orders.count'],
-    timeDimensions: [{
-      dimension: 'custom_calendar.retail_date',
-      granularity: 'month',
-      dateRange: ['2025-02-02', '2026-02-01']
-    }],
-    order: [{ id: 'custom_calendar.retail_date' }]
-  }, [
-    {
-      calendar_orders__count: '3',
-      custom_calendar__retail_date_month: '2025-02-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '3',
-      custom_calendar__retail_date_month: '2025-03-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '3',
-      custom_calendar__retail_date_month: '2025-04-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '3',
-      custom_calendar__retail_date_month: '2025-05-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '4',
-      custom_calendar__retail_date_month: '2025-06-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '4',
-      custom_calendar__retail_date_month: '2025-07-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '4',
-      custom_calendar__retail_date_month: '2025-08-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '4',
-      custom_calendar__retail_date_month: '2025-09-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '3',
-      custom_calendar__retail_date_month: '2025-10-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '3',
-      custom_calendar__retail_date_month: '2025-11-01T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '3',
-      custom_calendar__retail_date_month: '2025-12-01T00:00:00.000Z',
-    },
-  ]));
+    it('Year granularity of time-shift custom granularity non-pk time dimension', async () => runQueryTest({
+      timeDimensions: [{
+        dimension: 'custom_calendar.retail_date',
+        granularity: 'year',
+        dateRange: ['2025-02-02', '2025-02-06']
+      }],
+      order: [{ id: 'custom_calendar.retail_date' }]
+    }, [
+      {
+        custom_calendar__retail_date_year: '2025-02-02T00:00:00.000Z',
+      },
+    ]));
 
-  it('Count by retail week', async () => runQueryTest({
-    measures: ['calendar_orders.count'],
-    timeDimensions: [{
-      dimension: 'custom_calendar.retail_date',
-      granularity: 'week',
-      dateRange: ['2025-02-02', '2025-04-01']
-    }],
-    order: [{ id: 'custom_calendar.retail_date' }]
-  }, [
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_week: '2025-02-02T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_week: '2025-02-09T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_week: '2025-02-16T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_week: '2025-02-23T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_week: '2025-03-09T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_week: '2025-03-16T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_week: '2025-03-30T00:00:00.000Z',
-    },
-  ]));
+    it('Value of time-shift custom granularity pk time dimension', async () => runQueryTest({
+      dimensions: ['custom_calendar.date_val'],
+      timeDimensions: [{
+        dimension: 'custom_calendar.date_val',
+        dateRange: ['2025-02-02', '2025-02-06']
+      }],
+      order: [{ id: 'custom_calendar.date_val' }]
+    }, [
+      {
+        custom_calendar__date_val: '2025-02-02T00:00:00.000Z',
+      },
+      {
+        custom_calendar__date_val: '2025-02-03T00:00:00.000Z',
+      },
+      {
+        custom_calendar__date_val: '2025-02-04T00:00:00.000Z',
+      },
+      {
+        custom_calendar__date_val: '2025-02-05T00:00:00.000Z',
+      },
+      {
+        custom_calendar__date_val: '2025-02-06T00:00:00.000Z',
+      },
+    ]));
 
-  it('Count by fortnight custom granularity', async () => runQueryTest({
-    measures: ['calendar_orders.count'],
-    timeDimensions: [{
-      dimension: 'custom_calendar.retail_date',
-      granularity: 'fortnight',
-      dateRange: ['2025-02-02', '2025-04-01']
-    }],
-    order: [{ id: 'custom_calendar.retail_date' }]
-  }, [
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_fortnight: '2025-01-29T00:00:00.000Z', // Notice it starts on 2025-01-29, not 2025-02-01
-    },
-    {
-      calendar_orders__count: '2',
-      custom_calendar__retail_date_fortnight: '2025-02-12T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '2',
-      custom_calendar__retail_date_fortnight: '2025-02-26T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_fortnight: '2025-03-12T00:00:00.000Z',
-    },
-    {
-      calendar_orders__count: '1',
-      custom_calendar__retail_date_fortnight: '2025-03-26T00:00:00.000Z',
-    },
-  ]));
+    it('Year granularity of time-shift custom granularity pk time dimension', async () => runQueryTest({
+      timeDimensions: [{
+        dimension: 'custom_calendar.date_val',
+        granularity: 'year',
+        dateRange: ['2025-02-02', '2025-02-06']
+      }],
+      order: [{ id: 'custom_calendar.date_val' }]
+    }, [
+      {
+        custom_calendar__date_val_year: '2025-02-02T00:00:00.000Z',
+      },
+    ]));
+  });
 
-  describe('Time-shifts', () => {
-    it('Count shifted by retail year (custom shift + custom granularity)', async () => runQueryTest({
-      measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_y'],
+  describe('Custom granularities', () => {
+    it('Count by retail year', async () => runQueryTest({
+      measures: ['calendar_orders.count'],
       timeDimensions: [{
         dimension: 'custom_calendar.retail_date',
         granularity: 'year',
@@ -457,13 +428,12 @@ cubes:
     }, [
       {
         calendar_orders__count: '37',
-        calendar_orders__count_shifted_calendar_y: '39',
         custom_calendar__retail_date_year: '2025-02-02T00:00:00.000Z',
-      },
+      }
     ]));
 
-    it('Count shifted by retail month (custom shift  common granularity)', async () => runQueryTest({
-      measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_m'],
+    it('Count by retail month', async () => runQueryTest({
+      measures: ['calendar_orders.count'],
       timeDimensions: [{
         dimension: 'custom_calendar.retail_date',
         granularity: 'month',
@@ -473,190 +443,360 @@ cubes:
     }, [
       {
         calendar_orders__count: '3',
-        calendar_orders__count_shifted_calendar_m: '3',
         custom_calendar__retail_date_month: '2025-02-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '3',
-        calendar_orders__count_shifted_calendar_m: '4',
         custom_calendar__retail_date_month: '2025-03-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '3',
-        calendar_orders__count_shifted_calendar_m: '2',
         custom_calendar__retail_date_month: '2025-04-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '3',
-        calendar_orders__count_shifted_calendar_m: '2',
         custom_calendar__retail_date_month: '2025-05-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '4',
-        calendar_orders__count_shifted_calendar_m: '3',
         custom_calendar__retail_date_month: '2025-06-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '4',
-        calendar_orders__count_shifted_calendar_m: '4',
         custom_calendar__retail_date_month: '2025-07-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '4',
-        calendar_orders__count_shifted_calendar_m: '4',
         custom_calendar__retail_date_month: '2025-08-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '4',
-        calendar_orders__count_shifted_calendar_m: '3',
         custom_calendar__retail_date_month: '2025-09-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '3',
-        calendar_orders__count_shifted_calendar_m: '4',
         custom_calendar__retail_date_month: '2025-10-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '3',
-        calendar_orders__count_shifted_calendar_m: '3',
         custom_calendar__retail_date_month: '2025-11-01T00:00:00.000Z',
       },
       {
         calendar_orders__count: '3',
-        calendar_orders__count_shifted_calendar_m: '3',
         custom_calendar__retail_date_month: '2025-12-01T00:00:00.000Z',
       },
     ]));
 
-    it('Count shifted by retail week (common shift  custom granularity)', async () => runQueryTest({
-      measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_w'],
+    it('Count by retail week', async () => runQueryTest({
+      measures: ['calendar_orders.count'],
       timeDimensions: [{
         dimension: 'custom_calendar.retail_date',
         granularity: 'week',
-        dateRange: ['2025-02-02', '2026-02-01']
+        dateRange: ['2025-02-02', '2025-04-01']
       }],
       order: [{ id: 'custom_calendar.retail_date' }]
     }, [
       {
         calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
+        custom_calendar__retail_date_week: '2025-02-02T00:00:00.000Z',
+      },
+      {
+        calendar_orders__count: '1',
         custom_calendar__retail_date_week: '2025-02-09T00:00:00.000Z',
       },
       {
         calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
         custom_calendar__retail_date_week: '2025-02-16T00:00:00.000Z',
       },
       {
         calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
         custom_calendar__retail_date_week: '2025-02-23T00:00:00.000Z',
       },
       {
         calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
+        custom_calendar__retail_date_week: '2025-03-09T00:00:00.000Z',
+      },
+      {
+        calendar_orders__count: '1',
         custom_calendar__retail_date_week: '2025-03-16T00:00:00.000Z',
       },
       {
         calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-04-06T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-04-13T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-05-11T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-05-18T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-06-08T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-06-15T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-06-22T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-06-29T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '2',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-07-20T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '2',
-        custom_calendar__retail_date_week: '2025-07-27T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-08-03T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-08-10T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-08-17T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '2',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-09-07T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '2',
-        custom_calendar__retail_date_week: '2025-09-14T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-10-12T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-10-19T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-11-23T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-11-30T00:00:00.000Z',
-      },
-      {
-        calendar_orders__count: '1',
-        calendar_orders__count_shifted_calendar_w: '1',
-        custom_calendar__retail_date_week: '2025-12-21T00:00:00.000Z',
+        custom_calendar__retail_date_week: '2025-03-30T00:00:00.000Z',
       },
     ]));
+
+    it('Count by fortnight custom granularity', async () => runQueryTest({
+      measures: ['calendar_orders.count'],
+      timeDimensions: [{
+        dimension: 'custom_calendar.retail_date',
+        granularity: 'fortnight',
+        dateRange: ['2025-02-02', '2025-04-01']
+      }],
+      order: [{ id: 'custom_calendar.retail_date' }]
+    }, [
+      {
+        calendar_orders__count: '1',
+        custom_calendar__retail_date_fortnight: '2025-01-29T00:00:00.000Z', // Notice it starts on 2025-01-29, not 2025-02-01
+      },
+      {
+        calendar_orders__count: '2',
+        custom_calendar__retail_date_fortnight: '2025-02-12T00:00:00.000Z',
+      },
+      {
+        calendar_orders__count: '2',
+        custom_calendar__retail_date_fortnight: '2025-02-26T00:00:00.000Z',
+      },
+      {
+        calendar_orders__count: '1',
+        custom_calendar__retail_date_fortnight: '2025-03-12T00:00:00.000Z',
+      },
+      {
+        calendar_orders__count: '1',
+        custom_calendar__retail_date_fortnight: '2025-03-26T00:00:00.000Z',
+      },
+    ]));
+  });
+
+  describe('Time-shifts', () => {
+    describe('Non-PK dimension time-shifts', () => {
+      it('Count shifted by retail year (custom shift + custom granularity)', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_y'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.retail_date',
+          granularity: 'year',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.retail_date' }]
+      }, [
+        {
+          calendar_orders__count: '37',
+          calendar_orders__count_shifted_calendar_y: '39',
+          custom_calendar__retail_date_year: '2025-02-02T00:00:00.000Z',
+        },
+      ]));
+
+      it('Count shifted by retail month (custom shift + common granularity)', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_m'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.retail_date',
+          granularity: 'month',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.retail_date' }]
+      }, [
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__retail_date_month: '2025-02-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__retail_date_month: '2025-03-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '2',
+          custom_calendar__retail_date_month: '2025-04-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '2',
+          custom_calendar__retail_date_month: '2025-05-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__retail_date_month: '2025-06-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__retail_date_month: '2025-07-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__retail_date_month: '2025-08-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__retail_date_month: '2025-09-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__retail_date_month: '2025-10-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__retail_date_month: '2025-11-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__retail_date_month: '2025-12-01T00:00:00.000Z',
+        },
+      ]));
+
+      it('Count shifted by retail week (common shift + custom granularity)', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_w'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.retail_date',
+          granularity: 'week',
+          dateRange: ['2025-02-02', '2025-04-12']
+        }],
+        order: [{ id: 'custom_calendar.retail_date' }]
+      }, [
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__retail_date_week: '2025-02-09T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__retail_date_week: '2025-02-16T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__retail_date_week: '2025-02-23T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__retail_date_week: '2025-03-16T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__retail_date_week: '2025-04-06T00:00:00.000Z',
+        },
+      ]));
+    });
+
+    describe('PK dimension time-shifts', () => {
+      it.skip('Count shifted by retail year (custom shift + custom granularity)1', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_y'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.date_val',
+          granularity: 'year',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.date_val' }]
+      }, [
+        {
+          calendar_orders__count: '37',
+          calendar_orders__count_shifted_calendar_y: '39',
+          custom_calendar__date_val_year: '2025-02-02T00:00:00.000Z',
+        },
+      ]));
+
+      it.skip('Count shifted by retail month (custom shift + common granularity)', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_m'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.date_val',
+          granularity: 'month',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.date_val' }]
+      }, [
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-02-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__date_val_month: '2025-03-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '2',
+          custom_calendar__date_val_month: '2025-04-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '2',
+          custom_calendar__date_val_month: '2025-05-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-06-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__date_val_month: '2025-07-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__date_val_month: '2025-08-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-09-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__date_val_month: '2025-10-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-11-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-12-01T00:00:00.000Z',
+        },
+      ]));
+
+      it.skip('Count shifted by retail week (common shift + custom granularity)', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_w'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.date_val',
+          granularity: 'week',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.date_val' }]
+      }, [
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-02-09T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-02-16T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-02-23T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-03-16T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-04-06T00:00:00.000Z',
+        },
+      ]));
+    });
   });
 });
