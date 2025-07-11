@@ -570,6 +570,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         {
             let mut shifts: HashMap<String, DimensionTimeShift> = HashMap::new();
             let mut common_shift = None;
+            let mut named_shift = None;
             for shift_ref in time_shift_references.iter() {
                 let interval = match &shift_ref.interval {
                     Some(raw) => {
@@ -604,6 +605,16 @@ impl SymbolFactory for MeasureSymbolFactory {
                             },
                         );
                     };
+                } else if let Some(name) = &shift_ref.name {
+                    if named_shift.is_none() {
+                        named_shift = Some(name.clone());
+                    } else {
+                        if named_shift != Some(name.clone()) {
+                            return Err(CubeError::user(format!(
+                                "Measure can contain only one named time_shift (without time_dimension).",
+                            )));
+                        }
+                    }
                 } else {
                     if common_shift.is_none() {
                         common_shift = interval;
@@ -616,12 +627,19 @@ impl SymbolFactory for MeasureSymbolFactory {
                     }
                 }
             }
-            if common_shift.is_some() && !shifts.is_empty() {
+
+            if (common_shift.is_some() || named_shift.is_some()) && !shifts.is_empty() {
                 return Err(CubeError::user(format!(
                         "Measure cannot mix common time_shifts (without time_dimension) with dimension-specific ones.",
                     )));
+            } else if common_shift.is_some() && named_shift.is_some() {
+                return Err(CubeError::user(format!(
+                    "Measure cannot mix common unnamed and named time_shifts.",
+                )));
             } else if common_shift.is_some() {
                 Some(MeasureTimeShifts::Common(common_shift.unwrap()))
+            } else if named_shift.is_some() {
+                Some(MeasureTimeShifts::Named(named_shift.unwrap()))
             } else {
                 Some(MeasureTimeShifts::Dimensions(
                     shifts.into_values().collect_vec(),
