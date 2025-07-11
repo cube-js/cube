@@ -356,6 +356,10 @@ impl HttpServer {
                     });
                 } else {
                     cube_ext::spawn(async move {
+                        let command_query = match &command {
+                            HttpCommand::Query { query, .. } => Some(query.clone()),
+                            _ => None,
+                        };
                         let res = HttpServer::process_command(
                             sql_service.clone(),
                             sql_query_context,
@@ -370,9 +374,13 @@ impl HttpServer {
                             },
                             Err(e) => {
                                 log::error!(
-                                "Error processing HTTP command: {}\n",
-                                e.display_with_backtrace()
-                            );
+                                    "Error processing HTTP command: {}{}",
+                                    e.display_with_backtrace(),
+                                    match command_query {
+                                        Some(query) => format!("\nWith query: '''\n{}\n'''", query),
+                                        None => String::new(),
+                                    },
+                                );
                                 HttpMessage {
                                     message_id,
                                     connection_id,
