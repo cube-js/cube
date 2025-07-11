@@ -43,6 +43,9 @@ pub struct DimensionSymbol {
     is_view: bool,
     time_shift: Vec<CalendarDimensionTimeShift>,
     time_shift_pk: Option<Rc<MemberSymbol>>,
+    is_self_time_shift_pk: bool,    // If the dimension itself is a primary key and has time shifts,
+                                    // we can not reevaluate itself again while processing time shifts
+                                    // to avoid infinite recursion. So we raise this flag instead.
 }
 
 impl DimensionSymbol {
@@ -58,6 +61,7 @@ impl DimensionSymbol {
         definition: Rc<dyn DimensionDefinition>,
         time_shift: Vec<CalendarDimensionTimeShift>,
         time_shift_pk: Option<Rc<MemberSymbol>>,
+        is_self_time_shift_pk: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_name,
@@ -71,6 +75,7 @@ impl DimensionSymbol {
             is_view,
             time_shift,
             time_shift_pk,
+            is_self_time_shift_pk,
         })
     }
 
@@ -236,6 +241,8 @@ impl DimensionSymbol {
         {
             if let Some(pk) = &self.time_shift_pk {
                 return Some((pk.full_name(), ts.clone()));
+            } else if self.is_self_time_shift_pk {
+                return Some((self.full_name(), ts.clone()));
             }
         }
         None
@@ -383,6 +390,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
         let is_view = cube.static_data().is_view.unwrap_or(false);
         let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
+        let mut is_self_time_shift_pk = false;
 
         // If the cube is a calendar, we need to find the primary key member
         // so that we can use it for time shifts processing.
@@ -395,7 +403,10 @@ impl SymbolFactory for DimensionSymbolFactory {
                 .unwrap_or_else(|| vec![]);
 
             if pk_members.iter().any(|pk| **pk == name) {
-                // To avoid evaluation loop.
+                is_self_time_shift_pk = true;
+                // If the dimension itself is a primary key and has time shifts,
+                // we can not reevaluate itself again as this will lead
+                // to infinite recursion. So we raise this flag instead.
                 None
             } else {
                 let pk_member = pk_members
@@ -450,6 +461,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             definition,
             time_shift,
             time_shift_pk,
+            is_self_time_shift_pk,
         )))
     }
 }
