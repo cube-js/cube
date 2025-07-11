@@ -87,9 +87,8 @@ Object {
           "type": "prior",
         },
         Object {
-          "interval": "1 year",
+          "name": "retail_date_prev_year",
           "sql": [Function],
-          "type": "prior",
         },
         Object {
           "interval": "2 year",
@@ -273,9 +272,8 @@ Object {
           "type": "prior",
         },
         Object {
-          "interval": "1 year",
+          "name": "retail_date_prev_year",
           "sql": [Function],
-          "type": "prior",
         },
         Object {
           "interval": "2 year",
