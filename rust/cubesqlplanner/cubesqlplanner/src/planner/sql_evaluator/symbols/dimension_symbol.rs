@@ -42,7 +42,7 @@ pub struct DimensionSymbol {
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
     is_view: bool,
     time_shift: Vec<CalendarDimensionTimeShift>,
-    time_shift_pk: Option<Rc<MemberSymbol>>,
+    time_shift_pk_full_name: Option<String>,
     is_self_time_shift_pk: bool,    // If the dimension itself is a primary key and has time shifts,
                                     // we can not reevaluate itself again while processing time shifts
                                     // to avoid infinite recursion. So we raise this flag instead.
@@ -60,7 +60,7 @@ impl DimensionSymbol {
         case: Option<DimensionCaseDefinition>,
         definition: Rc<dyn DimensionDefinition>,
         time_shift: Vec<CalendarDimensionTimeShift>,
-        time_shift_pk: Option<Rc<MemberSymbol>>,
+        time_shift_pk_full_name: Option<String>,
         is_self_time_shift_pk: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
@@ -74,7 +74,7 @@ impl DimensionSymbol {
             case,
             is_view,
             time_shift,
-            time_shift_pk,
+            time_shift_pk_full_name,
             is_self_time_shift_pk,
         })
     }
@@ -117,8 +117,8 @@ impl DimensionSymbol {
         &self.time_shift
     }
 
-    pub fn time_shift_pk(&self) -> Option<Rc<MemberSymbol>> {
-        self.time_shift_pk.clone()
+    pub fn time_shift_pk_full_name(&self) -> Option<String> {
+        self.time_shift_pk_full_name.clone()
     }
 
     pub fn full_name(&self) -> String {
@@ -239,8 +239,8 @@ impl DimensionSymbol {
             .iter()
             .find(|shift| shift.interval == *interval)
         {
-            if let Some(pk) = &self.time_shift_pk {
-                return Some((pk.full_name(), ts.clone()));
+            if let Some(pk) = &self.time_shift_pk_full_name {
+                return Some((pk.clone(), ts.clone()));
             } else if self.is_self_time_shift_pk {
                 return Some((self.full_name(), ts.clone()));
             }
@@ -394,7 +394,7 @@ impl SymbolFactory for DimensionSymbolFactory {
 
         // If the cube is a calendar, we need to find the primary key member
         // so that we can use it for time shifts processing.
-        let time_shift_pk = if is_calendar && !time_shift.is_empty() {
+        let time_shift_pk = if is_calendar {
             let pk_members = cube_evaluator
                 .static_data()
                 .primary_keys
@@ -404,35 +404,16 @@ impl SymbolFactory for DimensionSymbolFactory {
 
             if pk_members.iter().any(|pk| **pk == name) {
                 is_self_time_shift_pk = true;
-                // If the dimension itself is a primary key and has time shifts,
-                // we can not reevaluate itself again as this will lead
-                // to infinite recursion. So we raise this flag instead.
-                None
-            } else {
-                let pk_member = pk_members
-                    .into_iter()
-                    .map(|primary_key| -> Result<_, CubeError> {
-                        let key_dimension_name = format!("{}.{}", cube_name, primary_key);
-                        let pk_member = compiler.add_dimension_evaluator(key_dimension_name)?;
-
-                        Ok(pk_member)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter()
-                    .filter(|pk_member| {
-                        if let Ok(pk_dimension) = pk_member.as_dimension() {
-                            // TODO: What if calendar cube is joined via non-time dimension?
-                            if pk_dimension.dimension_type() == "time" {
-                                return true;
-                            }
-                        }
-                        false
-                    })
-                    .collect::<Vec<_>>()
-                    .first()
-                    .cloned();
-                pk_member
             }
+
+            if pk_members.len() > 1 {
+                return Err(CubeError::user(format!(
+                    "Cube '{}' has multiple primary keys, but only one is allowed for calendar cubes",
+                    cube_name
+                )));
+            }
+
+            pk_members.first().map(|pk| format!("{}.{}", cube_name, pk))
         } else {
             None
         };
