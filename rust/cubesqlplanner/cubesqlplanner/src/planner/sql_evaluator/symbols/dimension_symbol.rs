@@ -242,8 +242,8 @@ impl DimensionSymbol {
                 false
             }
         }) {
-            if let Some(pk) = &self.time_shift_pk {
-                return Some((pk.full_name(), ts.clone()));
+            if let Some(pk) = &self.time_shift_pk_full_name() {
+                return Some((pk.clone(), ts.clone()));
             }
         }
         None

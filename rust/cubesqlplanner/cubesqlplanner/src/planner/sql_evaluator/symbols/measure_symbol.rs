@@ -574,12 +574,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                 let interval = match &shift_ref.interval {
                     Some(raw) => {
                         let mut iv = raw.parse::<SqlInterval>()?;
-                        if shift_ref
-                            .shift_type
-                            .as_deref()
-                            .unwrap_or("prior")
-                            == "next"
-                        {
+                        if shift_ref.shift_type.as_deref().unwrap_or("prior") == "next" {
                             iv = -iv;
                         }
 
