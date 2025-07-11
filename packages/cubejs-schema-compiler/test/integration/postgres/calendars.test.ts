@@ -678,5 +678,125 @@ cubes:
         },
       ]));
     });
+
+    describe('PK dimension time-shifts', () => {
+      it.skip('Count shifted by retail year (custom shift + custom granularity)1', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_y'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.date_val',
+          granularity: 'year',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.date_val' }]
+      }, [
+        {
+          calendar_orders__count: '37',
+          calendar_orders__count_shifted_calendar_y: '39',
+          custom_calendar__date_val_year: '2025-02-02T00:00:00.000Z',
+        },
+      ]));
+
+      it.skip('Count shifted by retail month (custom shift + common granularity)', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_m'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.date_val',
+          granularity: 'month',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.date_val' }]
+      }, [
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-02-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__date_val_month: '2025-03-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '2',
+          custom_calendar__date_val_month: '2025-04-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '2',
+          custom_calendar__date_val_month: '2025-05-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-06-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__date_val_month: '2025-07-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__date_val_month: '2025-08-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '4',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-09-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '4',
+          custom_calendar__date_val_month: '2025-10-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-11-01T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '3',
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__date_val_month: '2025-12-01T00:00:00.000Z',
+        },
+      ]));
+
+      it.skip('Count shifted by retail week (common shift + custom granularity)', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_calendar_w'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.date_val',
+          granularity: 'week',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.date_val' }]
+      }, [
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-02-09T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-02-16T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-02-23T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-03-16T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__date_val_week: '2025-04-06T00:00:00.000Z',
+        },
+      ]));
+    });
   });
 });
