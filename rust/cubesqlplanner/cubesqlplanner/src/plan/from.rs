@@ -144,6 +144,20 @@ impl From {
         )))
     }
 
+    pub fn all_sources(&self) -> Vec<String> {
+        match &self.source {
+            FromSource::Empty => vec![],
+            FromSource::Single(s) => vec![s.alias.clone()],
+            FromSource::Join(j) => {
+                let mut sources = vec![j.root.alias.clone()];
+                for itm in j.joins.iter() {
+                    sources.push(itm.from.alias.clone());
+                }
+                sources
+            }
+        }
+    }
+
     pub fn to_sql(
         &self,
         templates: &PlanSqlTemplates,
