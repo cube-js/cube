@@ -246,6 +246,7 @@ impl MultiStageMemberQueryPlanner {
             partition_by,
             window_function_to_use,
             order_by: self.query_order_by()?,
+
             source: Rc::new(FullKeyAggregate {
                 join_dimensions: input_dimensions
                     .iter()

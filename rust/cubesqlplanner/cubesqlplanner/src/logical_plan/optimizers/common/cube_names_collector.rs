@@ -38,10 +38,10 @@ impl CubeNamesCollector {
         &mut self,
         query: &FullKeyAggregateQuery,
     ) -> Result<(), CubeError> {
-        self.collect_from_full_key_aggregate(&query.source)?;
+        /* self.collect_from_full_key_aggregate(&query.source)?;
         for member in query.multistage_members.iter() {
             self.collect_from_multi_stage_member(member)?;
-        }
+        } */
         Ok(())
     }
 
