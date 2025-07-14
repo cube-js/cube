@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.37](https://github.com/cube-js/cube/compare/v1.3.36...v1.3.37) (2025-07-14)
+
+### Bug Fixes
+
+- **tesseract:** Fix infinite loops during calendar time dimension processing ([#9772](https://github.com/cube-js/cube/issues/9772)) ([3f16a39](https://github.com/cube-js/cube/commit/3f16a39c27ac7da2d5671031cb1745e0053b4a42))
+
+### Features
+
+- **tesseract:** Introduce named multistage time shifts for use with calendars ([#9773](https://github.com/cube-js/cube/issues/9773)) ([e033aaf](https://github.com/cube-js/cube/commit/e033aaf34af65192f981b942d834e33b1e61b851))
+
 ## [1.3.36](https://github.com/cube-js/cube/compare/v1.3.35...v1.3.36) (2025-07-10)
 
 ### Bug Fixes
