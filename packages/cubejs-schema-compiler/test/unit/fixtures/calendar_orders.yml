@@ -46,6 +46,13 @@ cubes:
             interval: 1 year
             type: prior
 
+      - name: count_shifted_named
+        type: count
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - name: retail_date_prev_year
+
       - name: completed_count
         type: count
         filters:

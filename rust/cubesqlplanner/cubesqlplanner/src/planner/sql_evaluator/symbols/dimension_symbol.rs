@@ -27,7 +27,8 @@ pub struct DimensionCaseDefinition {
 
 #[derive(Clone)]
 pub struct CalendarDimensionTimeShift {
-    pub interval: SqlInterval,
+    pub interval: Option<SqlInterval>,
+    pub name: Option<String>,
     pub sql: Option<Rc<SqlCall>>,
 }
 
@@ -234,11 +235,31 @@ impl DimensionSymbol {
         &self,
         interval: &SqlInterval,
     ) -> Option<(String, CalendarDimensionTimeShift)> {
-        if let Some(ts) = self
-            .time_shift
-            .iter()
-            .find(|shift| shift.interval == *interval)
-        {
+        if let Some(ts) = self.time_shift.iter().find(|shift| {
+            if let Some(s_i) = &shift.interval {
+                s_i == interval
+            } else {
+                false
+            }
+        }) {
+            if let Some(pk) = &self.time_shift_pk_full_name() {
+                return Some((pk.clone(), ts.clone()));
+            }
+        }
+        None
+    }
+
+    pub fn calendar_time_shift_for_named_interval(
+        &self,
+        interval_name: &String,
+    ) -> Option<(String, CalendarDimensionTimeShift)> {
+        if let Some(ts) = self.time_shift.iter().find(|shift| {
+            if let Some(s_n) = &shift.name {
+                s_n == interval_name
+            } else {
+                false
+            }
+        }) {
             if let Some(pk) = &self.time_shift_pk_full_name {
                 return Some((pk.clone(), ts.clone()));
             } else if self.is_self_time_shift_pk {
@@ -369,18 +390,28 @@ impl SymbolFactory for DimensionSymbolFactory {
             time_shift
                 .iter()
                 .map(|item| -> Result<_, CubeError> {
-                    let interval = item.static_data().interval.parse::<SqlInterval>()?;
-                    let interval = if item.static_data().timeshift_type == "next" {
-                        -interval
-                    } else {
-                        interval
+                    let interval = match &item.static_data().interval {
+                        Some(raw) => {
+                            let mut iv = raw.parse::<SqlInterval>()?;
+                            if item.static_data().timeshift_type.as_deref() == Some("next") {
+                                iv = -iv;
+                            }
+
+                            Some(iv)
+                        }
+                        None => None,
                     };
+                    let name = item.static_data().name.clone();
                     let sql = if let Some(sql) = item.sql()? {
                         Some(compiler.compile_sql_call(&cube_name, sql)?)
                     } else {
                         None
                     };
-                    Ok(CalendarDimensionTimeShift { interval, sql })
+                    Ok(CalendarDimensionTimeShift {
+                        interval,
+                        name,
+                        sql,
+                    })
                 })
                 .collect::<Result<Vec<_>, _>>()?
         } else {

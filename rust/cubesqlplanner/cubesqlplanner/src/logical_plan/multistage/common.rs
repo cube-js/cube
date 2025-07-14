@@ -58,7 +58,13 @@ impl PrettyPrint for MultiStageAppliedState {
                 &format!(
                     "- {}: {}",
                     time_shift.dimension.full_name(),
-                    time_shift.interval.to_sql()
+                    if let Some(interval) = &time_shift.interval {
+                        interval.to_sql()
+                    } else if let Some(name) = &time_shift.name {
+                        format!("{} (named)", name.to_string())
+                    } else {
+                        "None".to_string()
+                    }
                 ),
                 &details_state,
             );

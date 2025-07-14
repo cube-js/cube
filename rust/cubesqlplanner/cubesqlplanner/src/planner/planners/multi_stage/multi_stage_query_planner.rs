@@ -225,7 +225,7 @@ impl MultiStageQueryPlanner {
                     new_state.add_dimensions(dimensions_to_add);
                 }
                 if let Some(time_shift) = multi_stage_member.time_shift() {
-                    new_state.add_time_shifts(time_shift.clone());
+                    new_state.add_time_shifts(time_shift.clone())?;
                 }
                 if state.has_filters_for_member(&member_name) {
                     new_state.remove_filter_for_member(&member_name);

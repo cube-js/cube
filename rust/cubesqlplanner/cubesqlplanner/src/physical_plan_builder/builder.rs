@@ -43,14 +43,24 @@ impl PhysicalPlanBuilderContext {
             .iter()
             .partition_map(|(key, shift)| {
                 if let Ok(dimension) = shift.dimension.as_dimension() {
-                    if let Some((dim_key, cts)) =
-                        dimension.calendar_time_shift_for_interval(&shift.interval)
-                    {
-                        return Either::Right((dim_key.clone(), cts.clone()));
-                    } else if let Some(calendar_pk) = dimension.time_shift_pk_full_name() {
-                        let mut shift = shift.clone();
-                        shift.interval = shift.interval.inverse();
-                        return Either::Left((calendar_pk, shift.clone()));
+                    if let Some(dim_shift_name) = &shift.name {
+                        if let Some((dim_key, cts)) =
+                            dimension.calendar_time_shift_for_named_interval(dim_shift_name)
+                        {
+                            return Either::Right((dim_key.clone(), cts.clone()));
+                        } else if let Some(_calendar_pk) = dimension.time_shift_pk_full_name() {
+                            // TODO: Handle case when named shift is not found
+                        }
+                    } else if let Some(dim_shift_interval) = &shift.interval {
+                        if let Some((dim_key, cts)) =
+                            dimension.calendar_time_shift_for_interval(dim_shift_interval)
+                        {
+                            return Either::Right((dim_key.clone(), cts.clone()));
+                        } else if let Some(calendar_pk) = dimension.time_shift_pk_full_name() {
+                            let mut shift = shift.clone();
+                            shift.interval = Some(dim_shift_interval.inverse());
+                            return Either::Left((calendar_pk, shift.clone()));
+                        }
                     }
                 }
                 Either::Left((key.clone(), shift.clone()))

@@ -41,8 +41,7 @@ cube(`custom_calendar_js`, {
               sql: `{CUBE.retail_date_prev_month}`,
           },
           {
-              interval: '1 year',
-              type: 'prior',
+              name: 'retail_date_prev_year',
               sql: `{CUBE.retail_date_prev_year}`,
           },
           {

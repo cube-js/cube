@@ -576,9 +576,12 @@ const timeShiftItemRequired = Joi.object({
 
 const timeShiftItemOptional = Joi.object({
   timeDimension: Joi.func(), // not required
-  interval: regexTimeInterval.required(),
-  type: Joi.string().valid('next', 'prior').required(),
-});
+  interval: regexTimeInterval,
+  name: identifier,
+  type: Joi.string().valid('next', 'prior'),
+})
+  .xor('name', 'interval')
+  .and('interval', 'type');
 
 const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.multiStage'), [
   {
@@ -622,6 +625,16 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
     }
   ]
 ));
+
+const CalendarTimeShiftItem = Joi.object({
+  name: identifier,
+  interval: regexTimeInterval,
+  type: Joi.string().valid('next', 'prior'),
+  sql: Joi.func().required(),
+})
+  .or('name', 'interval')
+  .with('interval', 'type')
+  .with('type', 'interval');
 
 const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().try(
   inherit(BaseDimensionWithoutSubQuery, {
@@ -667,11 +680,7 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
   inherit(BaseDimensionWithoutSubQuery, {
     type: Joi.any().valid('time').required(),
     sql: Joi.func().required(),
-    timeShift: Joi.array().items(Joi.object({
-      interval: regexTimeInterval.required(),
-      type: Joi.string().valid('next', 'prior').required(),
-      sql: Joi.func().required(),
-    })),
+    timeShift: Joi.array().items(CalendarTimeShiftItem),
   })
 ));
 
