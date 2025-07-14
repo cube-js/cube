@@ -55,7 +55,6 @@ use datafusion::physical_expr::{
     Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
 };
 use datafusion::physical_optimizer::aggregate_statistics::AggregateStatistics;
-use datafusion::physical_optimizer::coalesce_batches::CoalesceBatches;
 use datafusion::physical_optimizer::combine_partial_final_agg::CombinePartialFinalAggregate;
 use datafusion::physical_optimizer::enforce_sorting::EnforceSorting;
 use datafusion::physical_optimizer::join_selection::JoinSelection;
@@ -471,7 +470,8 @@ impl QueryExecutorImpl {
             Arc::new(EnforceSorting::new()),
             Arc::new(OptimizeAggregateOrder::new()),
             Arc::new(ProjectionPushdown::new()),
-            Arc::new(CoalesceBatches::new()),
+            // Also disabled before DF 46 upgrade; re-disabled because it uses too much memory.
+            // Arc::new(CoalesceBatches::new()),
             Arc::new(OutputRequirements::new_remove_mode()),
             Arc::new(TopKAggregation::new()),
             Arc::new(ProjectionPushdown::new()),
