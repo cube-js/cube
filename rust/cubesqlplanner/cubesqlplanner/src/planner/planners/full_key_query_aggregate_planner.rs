@@ -2,6 +2,7 @@ use crate::logical_plan::*;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct FullKeyAggregateQueryPlanner {
@@ -28,18 +29,23 @@ impl FullKeyAggregateQueryPlanner {
                     resolve_multiplied_measures.clone(),
                 )
             });
-        let join_dimensions = self
-            .query_properties
-            .dimension_symbols()
-            .iter()
-            .chain(self.query_properties.time_dimension_symbols().iter())
-            .cloned()
-            .collect_vec();
+        let mut measures = if let Some(multiplied_source) = &resolved_multiplied_source {
+            multiplied_source.schema().measures.clone()
+        } else {
+            Vec::new()
+        };
+
+        let schema = Rc::new(LogicalSchema {
+            dimensions: self.query_properties.dimension_symbols(),
+            time_dimensions: self.query_properties.time_dimension_symbols(),
+            measures,
+            multiplied_measures: HashSet::new(),
+        });
         Ok(Rc::new(FullKeyAggregate {
             multiplied_measures_resolver: resolved_multiplied_source,
             multi_stage_subquery_refs,
             use_full_join_and_coalesce: true,
-            join_dimensions,
+            schema,
         }))
     }
 
@@ -51,6 +57,8 @@ impl FullKeyAggregateQueryPlanner {
     ) -> Result<Rc<Query>, CubeError> {
         let source =
             self.plan_logical_source(resolve_multiplied_measures, multi_stage_subqueries)?;
+        let source = QuerySource::FullKeyAggregate(source);
+
         let multiplied_measures = self
             .query_properties
             .full_key_aggregate_measures()?
@@ -68,9 +76,10 @@ impl FullKeyAggregateQueryPlanner {
             measures_filter: self.query_properties.measures_filters().clone(),
             segments: self.query_properties.segments().clone(),
         });
-        let result = FullKeyAggregateQuery {
+        let result = Query {
             schema,
             multistage_members: all_multistage_members,
+            dimension_subqueries: vec![],
             filter: logical_filter,
             modifers: Rc::new(LogicalQueryModifiers {
                 offset: self.query_properties.offset(),
@@ -80,6 +89,6 @@ impl FullKeyAggregateQueryPlanner {
             }),
             source,
         };
-        Ok(Rc::new(Query::FullKeyAggregateQuery(result)))
+        Ok(Rc::new(result))
     }
 }

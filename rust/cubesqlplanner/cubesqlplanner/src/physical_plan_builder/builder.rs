@@ -118,9 +118,29 @@ impl PhysicalPlanBuilder {
         logical_plan: Rc<Query>,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Select>, CubeError> {
-        match logical_plan.as_ref() {
-            Query::SimpleQuery(query) => self.process_node(query, context),
-            Query::FullKeyAggregateQuery(query) => self.process_node(query, context),
+        self.process_node(logical_plan.as_ref(), context)
+    }
+
+    pub(super) fn extend_measures(
+        &self,
+        node_measures: &Vec<Rc<MemberSymbol>>,
+        context: &PushDownBuilderContext,
+    ) -> Vec<(Rc<MemberSymbol>, bool)> {
+        if let Some(required_measures) = &context.required_measures {
+            required_measures
+                .iter()
+                .map(|member| {
+                    (
+                        member.clone(),
+                        node_measures.iter().find(|m| m == &member).is_some(),
+                    )
+                })
+                .collect_vec()
+        } else {
+            node_measures
+                .iter()
+                .map(|member| (member.clone(), true))
+                .collect_vec()
         }
     }
 
@@ -512,7 +532,7 @@ impl PhysicalPlanBuilder {
     } */
 
     //FIXME refactor required
-    pub(super) fn process_full_key_aggregate_dimensions(
+    /* pub(super) fn process_full_key_aggregate_dimensions(
         &self,
         dimensions: &Vec<Rc<MemberSymbol>>,
         full_key_aggregate: &Rc<FullKeyAggregate>,
@@ -630,7 +650,7 @@ impl PhysicalPlanBuilder {
             }
         }
         Ok(())
-    }
+    } */
 
     /* fn process_full_key_aggregate(
         &self,

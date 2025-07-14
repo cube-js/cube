@@ -40,7 +40,8 @@ impl SimpleQueryPlanner {
             measures_filter: self.query_properties.measures_filters().clone(),
             segments: self.query_properties.segments().clone(),
         });
-        let result = SimpleQuery {
+        let result = Query {
+            multistage_members: vec![],
             schema,
             filter: logical_filter,
             modifers: Rc::new(LogicalQueryModifiers {
@@ -50,9 +51,9 @@ impl SimpleQueryPlanner {
                 order_by: self.query_properties.order_by().clone(),
             }),
             dimension_subqueries: subquery_dimension_queries,
-            source: SimpleQuerySource::LogicalJoin(source),
+            source: QuerySource::LogicalJoin(source),
         };
-        Ok(Rc::new(Query::SimpleQuery(result)))
+        Ok(Rc::new(result))
     }
 
     pub fn source_and_subquery_dimensions(

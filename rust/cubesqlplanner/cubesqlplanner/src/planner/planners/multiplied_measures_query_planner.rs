@@ -271,7 +271,7 @@ impl MultipliedMeasuresQueryPlanner {
         &self,
         measures: &Vec<Rc<BaseMeasure>>,
         join: Rc<dyn JoinDefinition>,
-    ) -> Result<Rc<SimpleQuery>, CubeError> {
+    ) -> Result<Rc<Query>, CubeError> {
         let measures_symbols = measures
             .iter()
             .map(|m| m.member_evaluator().clone())
@@ -314,7 +314,7 @@ impl MultipliedMeasuresQueryPlanner {
             segments: self.query_properties.segments().clone(),
         });
 
-        let query = SimpleQuery {
+        let query = Query {
             schema,
             filter: logical_filter,
             modifers: Rc::new(LogicalQueryModifiers {
@@ -324,7 +324,8 @@ impl MultipliedMeasuresQueryPlanner {
                 order_by: vec![],
             }),
             dimension_subqueries: subquery_dimension_queries,
-            source: SimpleQuerySource::LogicalJoin(source),
+            source: QuerySource::LogicalJoin(source),
+            multistage_members: vec![],
         };
         Ok(Rc::new(query))
     }

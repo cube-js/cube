@@ -39,6 +39,10 @@ impl LogicalSchema {
     pub fn all_dimensions(&self) -> impl Iterator<Item = &Rc<MemberSymbol>> {
         self.dimensions.iter().chain(self.time_dimensions.iter())
     }
+
+    pub fn all_members(&self) -> impl Iterator<Item = &Rc<MemberSymbol>> {
+        self.all_dimensions().chain(self.measures.iter())
+    }
 }
 
 impl PrettyPrint for LogicalSchema {

@@ -24,6 +24,17 @@ pub enum ResolvedMultipliedMeasures {
     PreAggregation(Rc<SimpleQuery>),
 }
 
+impl ResolvedMultipliedMeasures {
+    pub fn schema(&self) -> Rc<LogicalSchema> {
+        match self {
+            ResolvedMultipliedMeasures::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
+                resolve_multiplied_measures.schema.clone()
+            }
+            ResolvedMultipliedMeasures::PreAggregation(simple_query) => simple_query.schema.clone(),
+        }
+    }
+}
+
 impl PrettyPrint for ResolvedMultipliedMeasures {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         match self {
@@ -39,7 +50,7 @@ impl PrettyPrint for ResolvedMultipliedMeasures {
 }
 
 pub struct FullKeyAggregate {
-    pub join_dimensions: Vec<Rc<MemberSymbol>>,
+    pub schema: Rc<LogicalSchema>,
     pub use_full_join_and_coalesce: bool,
     pub multiplied_measures_resolver: Option<ResolvedMultipliedMeasures>,
     pub multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
@@ -50,10 +61,8 @@ impl PrettyPrint for FullKeyAggregate {
         result.println("FullKeyAggregate: ", state);
         let state = state.new_level();
         let details_state = state.new_level();
-        result.println(
-            &format!("join_dimensions: {}", print_symbols(&self.join_dimensions)),
-            &state,
-        );
+        result.println(&format!("schema:"), &state);
+        self.schema.pretty_print(result, &details_state);
         result.println(
             &format!(
                 "use_full_join_and_coalesce: {}",

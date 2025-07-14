@@ -75,6 +75,59 @@ impl SelectBuilder {
             .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
     }
 
+    pub fn add_projection_member_reference(
+        &mut self,
+        member: &Rc<dyn BaseMember>,
+        reference: QualifiedColumnName,
+    ) {
+        let alias = reference.name().clone();
+
+        let expr = Expr::Reference(reference);
+        let aliased_expr = AliasedExpr {
+            expr,
+            alias: alias.clone(),
+        };
+
+        self.projection_columns.push(aliased_expr);
+        self.result_schema
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+    }
+
+    pub fn add_projection_group_any_member(
+        &mut self,
+        member: &Rc<dyn BaseMember>,
+        reference: QualifiedColumnName,
+    ) {
+        let alias = reference.name().clone();
+
+        let expr = Expr::GroupAny(reference);
+        let aliased_expr = AliasedExpr {
+            expr,
+            alias: alias.clone(),
+        };
+
+        self.projection_columns.push(aliased_expr);
+        self.result_schema
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+    }
+
+    pub fn add_null_projection(&mut self, member: &Rc<dyn BaseMember>, alias: Option<String>) {
+        let alias = if let Some(alias) = alias {
+            alias
+        } else {
+            member.alias_name()
+        };
+
+        let aliased_expr = AliasedExpr {
+            expr: Expr::Null,
+            alias: alias.clone(),
+        };
+
+        self.projection_columns.push(aliased_expr);
+        self.result_schema
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+    }
+
     pub fn add_count_all(&mut self, alias: String) {
         let func = Expr::Function(FunctionExpression {
             function: "COUNT".to_string(),

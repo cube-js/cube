@@ -145,19 +145,26 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             group_by.push(Expr::Member(MemberExpression::new(member_ref.clone())));
             select_builder.add_projection_member(&member_ref, alias);
         }
-        for member in aggregate_multiplied_subquery.schema.measures.iter() {
-            if matches!(
-                aggregate_multiplied_subquery.source.as_ref(),
-                AggregateMultipliedSubquerySouce::Cube
-            ) {
-                references_builder.resolve_references_for_member(
-                    member.clone(),
-                    &None,
-                    &mut render_references,
-                )?;
+        for (measure, exists) in self
+            .builder
+            .extend_measures(&aggregate_multiplied_subquery.schema.measures, &context)
+        {
+            let member_ref = measure.clone().as_base_member(query_tools.clone())?;
+            if exists {
+                if matches!(
+                    aggregate_multiplied_subquery.source.as_ref(),
+                    AggregateMultipliedSubquerySouce::Cube
+                ) {
+                    references_builder.resolve_references_for_member(
+                        measure.clone(),
+                        &None,
+                        &mut render_references,
+                    )?;
+                }
+                select_builder.add_projection_member(&member_ref, None);
+            } else {
+                select_builder.add_null_projection(&member_ref, None);
             }
-            select_builder
-                .add_projection_member(&member.clone().as_base_member(query_tools.clone())?, None);
         }
         select_builder.set_group_by(group_by);
         context_factory.set_render_references(render_references);
