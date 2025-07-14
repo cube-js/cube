@@ -1,7 +1,9 @@
 use crate::plan::schema::QualifiedColumnName;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::MemberSymbol;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct PushDownBuilderContext {
@@ -10,6 +12,7 @@ pub(super) struct PushDownBuilderContext {
     pub render_measure_for_ungrouped: bool,
     pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<String, String>,
+    pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
 }
 
 impl PushDownBuilderContext {
@@ -22,4 +25,3 @@ impl PushDownBuilderContext {
         factory
     }
 }
-

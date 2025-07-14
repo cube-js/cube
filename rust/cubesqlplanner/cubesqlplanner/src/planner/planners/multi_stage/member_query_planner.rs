@@ -239,7 +239,8 @@ impl MultiStageMemberQueryPlanner {
             })
             .collect_vec();
 
-        let result = MultiStageMeasureCalculation {
+        todo!()
+        /* let result = MultiStageMeasureCalculation {
             schema: Rc::new(logical_schema),
             is_ungrouped: self.description.member().is_ungrupped(),
             calculation_type,
@@ -262,7 +263,7 @@ impl MultiStageMemberQueryPlanner {
             name: self.description.alias().clone(),
             member_type: MultiStageMemberLogicalType::MeasureCalculation(result),
         };
-        Ok(Rc::new(result))
+        Ok(Rc::new(result)) */
     }
 
     fn plan_for_leaf_cte_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {

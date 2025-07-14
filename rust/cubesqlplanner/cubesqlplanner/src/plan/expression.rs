@@ -31,8 +31,10 @@ pub struct FunctionExpression {
 
 #[derive(Clone)]
 pub enum Expr {
+    Null,
     Member(MemberExpression),
     Reference(QualifiedColumnName),
+    GroupAny(QualifiedColumnName),
     Function(FunctionExpression),
     Asterisk,
 }
@@ -50,9 +52,15 @@ impl Expr {
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
         match self {
+            Self::Null => Ok(format!("CAST(NULL as integer)")),
             Self::Member(member) => member.to_sql(templates, context),
             Self::Reference(reference) => {
                 templates.column_reference(reference.source(), &reference.name())
+            }
+            Self::GroupAny(reference) => {
+                let reference =
+                    templates.column_reference(reference.source(), &reference.name())?;
+                templates.group_any(&reference)
             }
             Expr::Function(FunctionExpression {
                 function,

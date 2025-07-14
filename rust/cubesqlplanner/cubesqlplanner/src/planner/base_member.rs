@@ -35,7 +35,7 @@ impl MemberSymbolRef {
     pub fn try_new(
         member_evaluator: Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
-    ) -> Result<Rc<Self>, CubeError> {
+    ) -> Result<Rc<dyn BaseMember>, CubeError> {
         let default_alias = match member_evaluator.as_ref() {
             &MemberSymbol::TimeDimension(_)
             | &MemberSymbol::Dimension(_)

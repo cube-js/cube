@@ -4,7 +4,7 @@ use std::rc::Rc;
 pub struct ResolveMultipliedMeasures {
     pub schema: Rc<LogicalSchema>,
     pub filter: Rc<LogicalFilter>,
-    pub regular_measure_subqueries: Vec<Rc<SimpleQuery>>,
+    pub regular_measure_subqueries: Vec<Rc<Query>>,
     pub aggregate_multiplied_subqueries: Vec<Rc<AggregateMultipliedSubquery>>,
 }
 
