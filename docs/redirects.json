@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/deployment/cloud/byoc/aws",
+    "destination": "/product/deployment/cloud/byoc/deployment",
+    "permanent": true
+  },
+  {
     "source": "/product/apis-integrations/rest-api/real-time-data-fetch",
     "destination": "/product/apis-integrations/recipes/real-time-data-fetch",
     "permanent": true
