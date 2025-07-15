@@ -64,6 +64,8 @@ impl PhysicalPlanBuilderContext {
                         let mut shift = shift.clone();
                         shift.interval = Some(dim_shift_interval.inverse());
                         time_shifts.insert(calendar_pk, shift.clone());
+                    } else {
+                        time_shifts.insert(key.clone(), shift.clone());
                     }
                 }
             } else {
