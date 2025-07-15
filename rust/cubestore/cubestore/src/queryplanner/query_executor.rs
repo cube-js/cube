@@ -411,6 +411,7 @@ impl QueryExecutorImpl {
         })
     }
 
+    /// Only used for create_physical_plan, not executing the plan.  TODO upgrade DF: Make fewer distinct SessionContexts.
     fn router_context(
         &self,
         cluster: Arc<dyn Cluster>,
@@ -423,6 +424,7 @@ impl QueryExecutorImpl {
         ))
     }
 
+    /// Only used for create_physical_plan, not executing the plan.  TODO upgrade DF: Make fewer distinct SessionContexts.
     fn worker_context(
         &self,
         serialized_plan: Arc<PreSerializedPlan>,
@@ -437,6 +439,7 @@ impl QueryExecutorImpl {
         ))
     }
 
+    /// Currently, only used for physical planning, not even execution.  TODO upgrade DF: Make fewer distinct SessionContexts.
     fn make_context(
         &self,
         query_planner: CubeQueryPlanner,
@@ -450,13 +453,13 @@ impl QueryExecutorImpl {
             .with_query_planner(Arc::new(query_planner))
             .with_aggregate_functions(registerable_arc_aggregate_udfs())
             .with_scalar_functions(registerable_arc_scalar_udfs())
-            .with_physical_optimizer_rules(self.optimizer_rules())
+            .with_physical_optimizer_rules(self.physical_optimizer_rules())
             .build();
         let ctx = SessionContext::new_with_state(session_state);
         Ok(Arc::new(ctx))
     }
 
-    fn optimizer_rules(&self) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
+    fn physical_optimizer_rules(&self) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
         vec![
             // Cube rules
             Arc::new(PreOptimizeRule::new()),
@@ -481,6 +484,8 @@ impl QueryExecutorImpl {
     }
 
     fn session_config(&self) -> SessionConfig {
+        // Currently, only used for physical planning.
+
         let mut config = self
             .metadata_cache_factory
             .make_session_config()
@@ -490,6 +495,14 @@ impl QueryExecutorImpl {
             .with_prefer_existing_sort(true)
             .with_round_robin_repartition(false);
         config.options_mut().optimizer.prefer_hash_join = false;
+        // Redundant with the commented CoalesceBatches::new() line in `Self::optimizer_rules`
+        config.options_mut().execution.coalesce_batches = false;
+        // Not used in physical planning... included in QueryPlannerImpl::make_execution_context
+        // too; we should try and dedup these two places.
+        config
+            .options_mut()
+            .execution
+            .dont_parallelize_sort_preserving_merge_exec_inputs = true;
         config
     }
 }
