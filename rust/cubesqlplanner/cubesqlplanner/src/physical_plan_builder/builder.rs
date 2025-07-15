@@ -38,12 +38,16 @@ impl PhysicalPlanBuilderContext {
 
         for (key, shift) in self.time_shifts.dimensions_shifts.iter() {
             if let Ok(dimension) = shift.dimension.as_dimension() {
+                // 1. Shift might be referenced by name or by interval
+                // 2. Shift body might be defined in calendar dimension as:
+                //      * sql reference
+                //      * interval + type
+
                 if let Some(dim_shift_name) = &shift.name {
                     if let Some((dim_key, cts)) =
                         dimension.calendar_time_shift_for_named_interval(dim_shift_name)
                     {
                         calendar_time_shifts.insert(dim_key.clone(), cts.clone());
-                        continue;
                     } else if let Some(_calendar_pk) = dimension.time_shift_pk_full_name() {
                         return Err(CubeError::internal(format!(
                             "Time shift with name {} not found for dimension {}",
@@ -56,16 +60,15 @@ impl PhysicalPlanBuilderContext {
                         dimension.calendar_time_shift_for_interval(dim_shift_interval)
                     {
                         calendar_time_shifts.insert(dim_key.clone(), cts.clone());
-                        continue;
                     } else if let Some(calendar_pk) = dimension.time_shift_pk_full_name() {
                         let mut shift = shift.clone();
                         shift.interval = Some(dim_shift_interval.inverse());
                         time_shifts.insert(calendar_pk, shift.clone());
-                        continue;
                     }
                 }
+            } else {
+                time_shifts.insert(key.clone(), shift.clone());
             }
-            time_shifts.insert(key.clone(), shift.clone());
         }
 
         let common_time_shifts = TimeShiftState {
