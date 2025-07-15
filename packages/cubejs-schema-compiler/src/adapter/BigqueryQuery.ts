@@ -42,7 +42,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public convertTz(field) {
-    return `TIMESTAMP(DATETIME(${field}), '${this.timezone}')`;
+    return `TIMESTAMP(DATETIME(${field}, '${this.timezone}'))`;
   }
 
   public timeStampCast(value) {
