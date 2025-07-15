@@ -59,6 +59,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("in_list", in_list),
         t("in_list_with_union", in_list_with_union),
         t("numeric_cast", numeric_cast),
+        t("planning_numeric_cast", planning_numeric_cast),
         t("cast_timestamp_to_utf8", cast_timestamp_to_utf8),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
@@ -237,6 +238,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "filter_multiple_in_for_decimal",
             filter_multiple_in_for_decimal,
         ),
+        t(
+            "planning_filter_multiple_in_for_decimal",
+            planning_filter_multiple_in_for_decimal,
+        ),
         t("panic_worker", panic_worker),
         t(
             "planning_filter_index_selection",
@@ -350,6 +355,8 @@ lazy_static::lazy_static! {
 
         // New tests
         "decimal_math",
+        "planning_filter_multiple_in_for_decimal",
+        "planning_numeric_cast",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -1167,7 +1174,7 @@ async fn in_list_with_union(service: Box<dyn SqlClient>) {
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(6)]));
 }
 
-async fn numeric_cast(service: Box<dyn SqlClient>) {
+async fn numeric_cast_setup(service: &dyn SqlClient) -> &'static str {
     service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
     service
@@ -1179,12 +1186,45 @@ async fn numeric_cast(service: Box<dyn SqlClient>) {
             "INSERT INTO foo.managers (id, department_id) VALUES ('a', 1), ('b', 3), ('c', 3), ('d', 5)"
         ).await.unwrap();
 
-    let result = service
-        .exec_query("SELECT count(*) from foo.managers WHERE department_id in ('3', '5')")
-        .await
-        .unwrap();
+    let query = "SELECT count(*) from foo.managers WHERE department_id in ('3', '5')";
+    query
+}
+
+async fn numeric_cast(service: Box<dyn SqlClient>) {
+    let query = numeric_cast_setup(service.as_ref()).await;
+
+    let result = service.exec_query(query).await.unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
+}
+
+async fn planning_numeric_cast(service: Box<dyn SqlClient>) {
+    let query = numeric_cast_setup(service.as_ref()).await;
+
+    // Check that we're casting '3' to int and not department_id to Utf8, with our Cube-specific type_coercion changes in DF.
+    let plans = service.plan_query(query).await.unwrap();
+    let expected =
+        "Projection, [count(Int64(1))@0:count(*)]\
+        \n  LinearFinalAggregate\
+        \n    CoalescePartitions\
+        \n      ClusterSend, partitions: [[1]]\
+        \n        CoalescePartitions\
+        \n          LinearPartialAggregate\
+        \n            Projection, []\
+        \n              Filter, predicate: department_id@0 = 3 OR department_id@0 = 5\
+        \n                Scan, index: default:1:[1], fields: [department_id], predicate: department_id = Int64(3) OR department_id = Int64(5)\
+        \n                  Empty";
+    assert_eq!(
+        expected,
+        pp_phys_plan_ext(
+            plans.router.as_ref(),
+            &PPOptions {
+                traverse_past_clustersend: true,
+                show_filters: true,
+                ..PPOptions::none()
+            }
+        ),
+    );
 }
 
 async fn cast_timestamp_to_utf8(service: Box<dyn SqlClient>) {
@@ -7624,7 +7664,7 @@ async fn panic_worker(service: Box<dyn SqlClient>) {
     assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
 }
 
-async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
+async fn filter_multiple_in_for_decimal_setup(service: &dyn SqlClient) -> &'static str {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
         .exec_query("CREATE TABLE s.t(i decimal)")
@@ -7634,12 +7674,47 @@ async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
         .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
         .await
         .unwrap();
-    let r = service
-        .exec_query("SELECT count(*) FROM s.t WHERE i in ('2', '3')")
-        .await
-        .unwrap();
+    let query = "SELECT count(*) FROM s.t WHERE i in ('2', '3')";
+    query
+}
+
+async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
+    let query = filter_multiple_in_for_decimal_setup(service.as_ref()).await;
+
+    let r = service.exec_query(query).await.unwrap();
 
     assert_eq!(to_rows(&r), rows(&[(2)]));
+}
+
+async fn planning_filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
+    let query = filter_multiple_in_for_decimal_setup(service.as_ref()).await;
+
+    // Verify we're casting '2' and '3' to decimal type and not casting i to Utf8, with Cube-specific DF comparison coercion changes.
+    let plans = service.plan_query(query).await.unwrap();
+    let expected =
+        "Projection, [count(Int64(1))@0:count(*)]\
+        \n  LinearFinalAggregate\
+        \n    CoalescePartitions\
+        \n      ClusterSend, partitions: [[1]]\
+        \n        CoalescePartitions\
+        \n          LinearPartialAggregate\
+        \n            Projection, []\
+        \n              Filter, predicate: i@0 = Some(200000),18,5 OR i@0 = Some(300000),18,5\
+        \n                Scan, index: default:1:[1], fields: *, predicate: i = Decimal128(Some(200000),18,5) OR i = Decimal128(Some(300000),18,5)\
+        \n                  Sort\
+        \n                    Empty";
+
+    assert_eq!(
+        expected,
+        pp_phys_plan_ext(
+            plans.router.as_ref(),
+            &PPOptions {
+                traverse_past_clustersend: true,
+                show_filters: true,
+                ..PPOptions::none()
+            }
+        ),
+    );
 }
 
 async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
