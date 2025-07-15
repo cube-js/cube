@@ -80,6 +80,13 @@ cubes:
         time_shift:
           - name: one_year
 
+      - name: count_shifted_y_named_common_interval
+        type: number
+        multi_stage: true
+        sql: "{count}"
+        time_shift:
+          - name: one_year_common_interval
+
       - name: count_shifted_y1d_named
         type: number
         multi_stage: true
@@ -261,6 +268,10 @@ cubes:
           - name: one_year
             sql: "{CUBE}.retail_date_prev_year"
 
+          - name: one_year_common_interval
+            interval: 1 year
+            type: prior
+
           - name: one_year_and_one_day
             sql: "({CUBE}.retail_date_prev_year + interval '1 day')"
 
@@ -304,6 +315,10 @@ cubes:
 
           - name: one_year
             sql: "{CUBE}.retail_date_prev_year"
+
+          - name: one_year_common_interval
+            interval: 1 year
+            type: prior
 
           - name: one_year_and_one_day
             sql: "({CUBE}.retail_date_prev_year + interval '1 day')"
@@ -736,6 +751,22 @@ cubes:
           custom_calendar__retail_date_year: '2025-02-02T00:00:00.000Z',
         },
       ]));
+
+      it('Count shifted by year (custom named shift with common interval + custom granularity)', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_y_named_common_interval'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.retail_date',
+          granularity: 'year',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.retail_date' }]
+      }, [
+        {
+          calendar_orders__count: '37',
+          calendar_orders__count_shifted_y_named_common_interval: '39',
+          custom_calendar__retail_date_year: '2025-02-02T00:00:00.000Z',
+        },
+      ]));
     });
 
     describe('PK dimension time-shifts', () => {
@@ -887,6 +918,22 @@ cubes:
           calendar_orders__count_shifted_y_named: '39',
           calendar_orders__count_shifted_y1d_named: '39',
           custom_calendar__date_val_year: '2025-02-02T00:00:00.000Z',
+        },
+      ]));
+
+      it.skip('Count shifted by year (custom named shift with common interval + custom granularity)', async () => runQueryTest({
+        measures: ['calendar_orders.count', 'calendar_orders.count_shifted_y_named_common_interval'],
+        timeDimensions: [{
+          dimension: 'custom_calendar.date_val',
+          granularity: 'year',
+          dateRange: ['2025-02-02', '2026-02-01']
+        }],
+        order: [{ id: 'custom_calendar.date_val' }]
+      }, [
+        {
+          calendar_orders__count: '37',
+          calendar_orders__count_shifted_y_named_common_interval: '39',
+          custom_calendar__retail_date_year: '2025-02-02T00:00:00.000Z',
         },
       ]));
     });
