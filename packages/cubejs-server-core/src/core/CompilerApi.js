@@ -1,5 +1,12 @@
 import crypto from 'crypto';
-import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
+import {
+  createQuery,
+  compile,
+  queryClass,
+  PreAggregations,
+  QueryFactory,
+  prepareCompiler
+} from '@cubejs-backend/schema-compiler';
 import { v4 as uuidv4, parse as uuidParse } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
@@ -86,6 +93,25 @@ export class CompilerApi {
     }
 
     return this.compilers;
+  }
+
+  /**
+   * Returns the compilers instances without model compilation,
+   * because it could fail and no compilers will be returned.
+   */
+  getCompilersInstances() {
+    if (this.compilers) {
+      return this.compilers;
+    }
+
+    return prepareCompiler(this.repository, {
+      allowNodeRequire: this.allowNodeRequire,
+      compileContext: this.compileContext,
+      allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
+      standalone: this.standalone,
+      nativeInstance: this.nativeInstance,
+      compiledScriptCache: this.compiledScriptCache,
+    });
   }
 
   async compileSchema(compilerVersion, requestId) {
