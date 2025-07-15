@@ -282,7 +282,13 @@ impl QueryPlannerImpl {
 }
 
 impl QueryPlannerImpl {
-    pub fn make_execution_context(config: SessionConfig) -> SessionContext {
+    pub fn make_execution_context(mut config: SessionConfig) -> SessionContext {
+        // The config parameter is from metadata_cache_factor (which we need to rename) but doesn't
+        // include all necessary configs.
+        config
+            .options_mut()
+            .execution
+            .dont_parallelize_sort_preserving_merge_exec_inputs = true;
         let context = SessionContext::new_with_config(config);
         // TODO upgrade DF: build SessionContexts consistently
         for udaf in registerable_aggregate_udfs() {
