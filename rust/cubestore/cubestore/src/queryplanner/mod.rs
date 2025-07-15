@@ -17,7 +17,6 @@ pub mod serialized_plan;
 mod tail_limit;
 mod topk;
 pub mod trace_data_loaded;
-use rewrite_inlist_literals::RewriteInListLiterals;
 use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 use udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
@@ -26,7 +25,6 @@ pub mod info_schema;
 pub mod merge_sort;
 pub mod metadata_cache;
 pub mod providers;
-mod rewrite_inlist_literals;
 mod rolling;
 #[cfg(test)]
 mod test_utils;
@@ -283,7 +281,7 @@ impl QueryPlannerImpl {
 
 impl QueryPlannerImpl {
     pub fn make_execution_context(mut config: SessionConfig) -> SessionContext {
-        // The config parameter is from metadata_cache_factor (which we need to rename) but doesn't
+        // The config parameter is from metadata_cache_factory (which we need to rename) but doesn't
         // include all necessary configs.
         config
             .options_mut()
@@ -297,7 +295,6 @@ impl QueryPlannerImpl {
         for udf in registerable_scalar_udfs() {
             context.register_udf(udf);
         }
-        context.add_analyzer_rule(Arc::new(RewriteInListLiterals {}));
         context.add_optimizer_rule(Arc::new(RollingOptimizerRule {}));
 
         // TODO upgrade DF
