@@ -54,8 +54,9 @@ impl SqlNode for CalendarTimeShiftSqlNode {
                                 query_tools.clone(),
                                 templates,
                             )?
-                        } else if let Some (interval) = &shift.interval {
-                            let res = templates.add_timestamp_interval(input, interval.inverse().to_sql())?;
+                        } else if let Some(interval) = &shift.interval {
+                            let res = templates
+                                .add_timestamp_interval(input, interval.inverse().to_sql())?;
                             format!("({})", res)
                         } else {
                             input
