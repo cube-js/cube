@@ -3,13 +3,15 @@ import R from 'ramda';
 
 import { CubeSymbols, type ToString } from './CubeSymbols';
 import { UserError } from './UserError';
-import { BaseQuery } from '../adapter';
+import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
 
+// TODO replace Function with proper types
+
 export type SegmentDefinition = {
   type: string,
-  sql: Function,
+  sql(): string,
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
@@ -19,7 +21,7 @@ export type SegmentDefinition = {
 
 export type DimensionDefinition = {
   type: string,
-  sql: Function,
+  sql(): string,
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
@@ -43,7 +45,7 @@ export type TimeShiftDefinitionReference = {
 
 export type MeasureDefinition = {
   type: string,
-  sql: Function,
+  sql(): string,
   ownedByCube: boolean,
   rollingWindow?: any
   filters?: any
@@ -117,14 +119,37 @@ export type PreAggregationTimeDimensionReference = {
   granularity: string,
 };
 
+// TODO: Move to JonGraph when it will be ts
+export type JoinEdge = {
+  from: string;
+  to: string;
+  originalFrom: string;
+  originalTo: string;
+  join: {
+    relationship: string; // TODO Use an enum from validator
+    sql: Function,
+  }
+};
+
+// TODO: Move to JonGraph when it will be ts
+export type JoinTree = {
+  root: string;
+  joins: JoinEdge[];
+  multiplicationFactor: Record<string, boolean>;
+};
+
 /// Strings in `dimensions`, `measures` and `timeDimensions[*].dimension` can contain full join path, not just `cube.member`
 export type PreAggregationReferences = {
   allowNonStrictDateRangeMatch?: boolean,
   dimensions: Array<string>,
+  fullNameDimensions: Array<string>,
   measures: Array<string>,
+  fullNameMeasures: Array<string>,
   timeDimensions: Array<PreAggregationTimeDimensionReference>,
+  fullNameTimeDimensions: Array<PreAggregationTimeDimensionReference>,
   rollups: Array<string>,
   multipliedMeasures?: Array<string>,
+  joinTree?: JoinTree;
 };
 
 export type PreAggregationInfo = {
@@ -511,14 +536,15 @@ export class CubeEvaluator extends CubeSymbols {
       if (member.sql && !member.subQuery) {
         const funcArgs = this.funcArguments(member.sql);
         const { cubeReferencesUsed, evaluatedSql, pathReferencesUsed } = this.collectUsedCubeReferences(cube.name, member.sql);
-        // We won't check for FILTER_PARAMS here as it shouldn't affect ownership and it should obey the same reference rules.
+        // We won't check for FILTER_PARAMS here as it shouldn't affect ownership, and it should obey the same reference rules.
         // To affect ownership FILTER_PARAMS can be declared as `${FILTER_PARAMS.Foo.bar.filter(`${Foo.bar}`)}`.
         // It isn't owned if there are non {CUBE} references
         if (funcArgs.length > 0 && cubeReferencesUsed.length === 0) {
           ownedByCube = false;
         }
         // Aliases one to one some another member as in case of views
-        if (!ownedByCube && !member.filters && CubeSymbols.isCalculatedMeasureType(member.type) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
+        // Note: Segments do not have type set
+        if (!ownedByCube && !member.filters && (!member.type || CubeSymbols.isCalculatedMeasureType(member.type)) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
           aliasMember = this.pathFromArray(pathReferencesUsed[0]);
         }
         const foreignCubes = cubeReferencesUsed.filter(usedCube => usedCube !== cube.name);
@@ -683,7 +709,7 @@ export class CubeEvaluator extends CubeSymbols {
     return this.byPath('segments', segmentPath);
   }
 
-  public cubeExists(cube) {
+  public cubeExists(cube: string): boolean {
     return !!this.evaluatedCubes[cube];
   }
 
@@ -842,6 +868,9 @@ export class CubeEvaluator extends CubeSymbols {
       timeDimensions,
       rollups:
         aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences, { originalSorting: true }) || [],
+      fullNameDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
+      fullNameMeasures: [], // May be filled in PreAggregations.evaluateAllReferences()
+      fullNameTimeDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
     };
   }
 }
