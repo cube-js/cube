@@ -48,6 +48,10 @@ cubes:
           - name: retail_date_prev_year
             sql: "{CUBE.retail_date_prev_year}"
 
+          - name: prev_year_named_common_interval
+            interval: 1 year
+            type: prior
+
           # All needed intervals should be defined explicitly
           - interval: 2 year
             type: prior

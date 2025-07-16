@@ -1,24 +1,13 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
+use crate::planner::planners::multi_stage::time_shift_state::TimeShiftState;
 use crate::planner::sql_evaluator::{DimensionTimeShift, MeasureTimeShifts, MemberSymbol};
 use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::PartialEq;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
-
-#[derive(Clone, Default, Debug)]
-pub struct TimeShiftState {
-    pub dimensions_shifts: HashMap<String, DimensionTimeShift>,
-}
-
-impl TimeShiftState {
-    pub fn is_empty(&self) -> bool {
-        self.dimensions_shifts.is_empty()
-    }
-}
 
 #[derive(Clone)]
 pub struct MultiStageAppliedState {

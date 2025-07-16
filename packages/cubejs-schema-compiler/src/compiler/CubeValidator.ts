@@ -626,15 +626,26 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
   ]
 ));
 
-const CalendarTimeShiftItem = Joi.object({
-  name: identifier,
-  interval: regexTimeInterval,
-  type: Joi.string().valid('next', 'prior'),
-  sql: Joi.func().required(),
-})
-  .or('name', 'interval')
-  .with('interval', 'type')
-  .with('type', 'interval');
+const CalendarTimeShiftItem = Joi.alternatives().try(
+  Joi.object({
+    name: identifier.required(),
+    interval: regexTimeInterval.required(),
+    type: Joi.string().valid('next', 'prior').required(),
+    sql: Joi.forbidden()
+  }),
+  Joi.object({
+    name: identifier.required(),
+    sql: Joi.func().required(),
+    interval: Joi.forbidden(),
+    type: Joi.forbidden()
+  }),
+  Joi.object({
+    interval: regexTimeInterval.required(),
+    type: Joi.string().valid('next', 'prior').required(),
+    sql: Joi.func().required(),
+    name: Joi.forbidden()
+  })
+);
 
 const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().try(
   inherit(BaseDimensionWithoutSubQuery, {

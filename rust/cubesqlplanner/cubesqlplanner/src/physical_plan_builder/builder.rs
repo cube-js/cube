@@ -5,15 +5,14 @@ use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::symbols::CalendarDimensionTimeShift;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::ReferencesBuilder;
-use crate::planner::sql_evaluator::{DimensionTimeShift, MemberSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::BaseMemberHelper;
 use crate::planner::SqlJoinCondition;
 use crate::planner::{BaseMember, MemberSymbolRef};
 use cubenativeutils::CubeError;
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -31,41 +30,10 @@ struct PhysicalPlanBuilderContext {
 }
 
 impl PhysicalPlanBuilderContext {
-    pub fn make_sql_nodes_factory(&self) -> SqlNodesFactory {
+    pub fn make_sql_nodes_factory(&self) -> Result<SqlNodesFactory, CubeError> {
         let mut factory = SqlNodesFactory::new();
 
-        let (time_shifts, calendar_time_shifts): (
-            HashMap<String, DimensionTimeShift>,
-            HashMap<String, CalendarDimensionTimeShift>,
-        ) = self
-            .time_shifts
-            .dimensions_shifts
-            .iter()
-            .partition_map(|(key, shift)| {
-                if let Ok(dimension) = shift.dimension.as_dimension() {
-                    if let Some(dim_shift_name) = &shift.name {
-                        if let Some((dim_key, cts)) =
-                            dimension.calendar_time_shift_for_named_interval(dim_shift_name)
-                        {
-                            return Either::Right((dim_key.clone(), cts.clone()));
-                        } else if let Some(_calendar_pk) = dimension.time_shift_pk_full_name() {
-                            // TODO: Handle case when named shift is not found
-                        }
-                    } else if let Some(dim_shift_interval) = &shift.interval {
-                        if let Some((dim_key, cts)) =
-                            dimension.calendar_time_shift_for_interval(dim_shift_interval)
-                        {
-                            return Either::Right((dim_key.clone(), cts.clone()));
-                        } else if let Some(calendar_pk) = dimension.time_shift_pk_full_name() {
-                            let mut shift = shift.clone();
-                            shift.interval = Some(dim_shift_interval.inverse());
-                            return Either::Left((calendar_pk, shift.clone()));
-                        }
-                    }
-                }
-                Either::Left((key.clone(), shift.clone()))
-            });
-
+        let (time_shifts, calendar_time_shifts) = self.time_shifts.extract_time_shifts()?;
         let common_time_shifts = TimeShiftState {
             dimensions_shifts: time_shifts,
         };
@@ -75,7 +43,7 @@ impl PhysicalPlanBuilderContext {
         factory.set_count_approx_as_state(self.render_measure_as_state);
         factory.set_ungrouped_measure(self.render_measure_for_ungrouped);
         factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
-        factory
+        Ok(factory)
     }
 }
 
@@ -117,7 +85,7 @@ impl PhysicalPlanBuilder {
         let from = From::new_from_subselect(source.clone(), ORIGINAL_QUERY.to_string());
         let mut select_builder = SelectBuilder::new(from);
         select_builder.add_count_all(TOTAL_COUNT.to_string());
-        let context_factory = context.make_sql_nodes_factory();
+        let context_factory = context.make_sql_nodes_factory()?;
         Ok(Rc::new(select_builder.build(context_factory)))
     }
 
@@ -142,7 +110,7 @@ impl PhysicalPlanBuilder {
         let mut render_references = HashMap::new();
         let mut measure_references = HashMap::new();
         let mut dimensions_references = HashMap::new();
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let from = match &logical_plan.source {
             SimpleQuerySource::LogicalJoin(join) => self.process_logical_join(
                 &join,
@@ -400,7 +368,7 @@ impl PhysicalPlanBuilder {
         select_builder.set_offset(logical_plan.offset);
         select_builder.set_ctes(ctes);
 
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         context_factory.set_render_references(render_references);
 
         Ok(Rc::new(select_builder.build(context_factory)))
@@ -735,7 +703,7 @@ impl PhysicalPlanBuilder {
         let mut join_builder =
             JoinBuilder::new_from_subselect(keys_query.clone(), keys_query_alias.clone());
 
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let primary_keys_dimensions = &aggregate_multiplied_subquery
             .keys_subquery
             .primary_keys_dimensions;
@@ -873,7 +841,7 @@ impl PhysicalPlanBuilder {
             &measure_subquery.dimension_subqueries,
             &mut render_references,
         )?;
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let mut select_builder = SelectBuilder::new(from);
 
         context_factory.set_ungrouped_measure(true);
@@ -936,7 +904,7 @@ impl PhysicalPlanBuilder {
 
         select_builder.set_distinct();
         select_builder.set_filter(keys_subquery.filter.all_filters());
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         context_factory.set_render_references(render_references);
         let res = Rc::new(select_builder.build(context_factory));
         Ok(res)
@@ -1022,7 +990,7 @@ impl PhysicalPlanBuilder {
             &mut render_references,
         )?;
         let mut select_builder = SelectBuilder::new(from);
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let args = vec![get_date_range
             .time_dimension
             .clone()
@@ -1181,7 +1149,7 @@ impl PhysicalPlanBuilder {
             on,
         );
 
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         context_factory.set_rolling_window(true);
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
@@ -1320,7 +1288,7 @@ impl PhysicalPlanBuilder {
             );
         }
 
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let partition_by = measure_calculation
             .partition_by
             .iter()
