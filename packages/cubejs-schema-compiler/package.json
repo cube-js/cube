@@ -68,6 +68,7 @@
     "@types/inflection": "^1.5.28",
     "@types/jest": "^29",
     "@types/node": "^20",
+    "@types/node-dijkstra": "^2.5.6",
     "@types/ramda": "^0.27.34",
     "@types/sqlstring": "^2.3.0",
     "@types/syntax-error": "^1.4.1",
