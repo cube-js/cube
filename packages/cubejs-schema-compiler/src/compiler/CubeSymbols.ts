@@ -448,15 +448,31 @@ export class CubeSymbols {
       const includeMembers = this.generateIncludeMembers(cubeIncludes, cube.name, type);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
 
-      cube.includedMembers = R.uniqWith(R.equals, [...(cube.includedMembers || []), ...Array.from(new Set(cubeIncludes.map((it: any) => {
-        const split = it.member.split('.');
-        const memberPath = this.pathFromArray([split[split.length - 2], split[split.length - 1]]);
-        return {
-          type,
-          memberPath,
-          name: it.name
-        };
-      })))]);
+      const existing = cube.includedMembers ?? [];
+      const seen = new Set(
+        existing.map(({ type: t, memberPath, name }) => `${t}|${memberPath}|${name}`)
+      );
+
+      const additions: {
+        type: string;
+        memberPath: string;
+        name: string;
+      }[] = [];
+
+      for (const { member, name } of cubeIncludes) {
+        const parts = member.split('.');
+        const memberPath = this.pathFromArray(parts.slice(-2));
+        const key = `${type}|${memberPath}|${name}`;
+
+        if (!seen.has(key)) {
+          seen.add(key);
+          additions.push({ type, memberPath, name });
+        }
+      }
+
+      if (additions.length) {
+        cube.includedMembers = [...existing, ...additions];
+      }
     }
 
     [...memberSets.allMembers].filter(it => !memberSets.resolvedMembers.has(it)).forEach(it => {
@@ -474,26 +490,47 @@ export class CubeSymbols {
     }
   }
 
-  protected membersFromCubes(parentCube: CubeDefinition, cubes: any[], type: string, errorReporter: ErrorReporter, splitViews: SplitViews, memberSets: any) {
-    return R.uniqWith(R.equals, R.unnest(cubes.map(cubeInclude => {
-      // TODO recheck `cubeInclude.joinPath` typing
-      const fullPath = this.evaluateReferences(null, cubeInclude.joinPath as () => ToString, { collectJoinHints: true });
+  protected membersFromCubes(
+    parentCube: CubeDefinition,
+    cubes: any[],
+    type: string,
+    errorReporter: ErrorReporter,
+    splitViews: SplitViews,
+    memberSets: any
+  ) {
+    const result: any[] = [];
+    const seen = new Set<string>();
+
+    for (const cubeInclude of cubes) {
+      const fullPath = this.evaluateReferences(
+        null,
+        // TODO recheck `cubeInclude.joinPath` typing
+        cubeInclude.joinPath as () => ToString,
+        { collectJoinHints: true }
+      );
+
       const split = fullPath.split('.');
       const cubeReference = split[split.length - 1];
       const cubeName = cubeInclude.alias || cubeReference;
 
-      let includes: any[];
       const fullMemberName = (memberName: string) => (cubeInclude.prefix ? `${cubeName}_${memberName}` : memberName);
+
+      let includes: any[];
 
       if (cubeInclude.includes === '*') {
         const membersObj = this.symbols[cubeReference]?.cubeObj()?.[type] || {};
-        includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}`, name: fullMemberName(memberName) }));
+        includes = Object.keys(membersObj).map((memberName) => ({
+          member: `${fullPath}.${memberName}`,
+          name: fullMemberName(memberName),
+        }));
       } else {
         includes = cubeInclude.includes.map((include: any) => {
           const member = include.alias || include.name || include;
 
           if (member.includes('.')) {
-            errorReporter.error(`Paths aren't allowed in cube includes but '${member}' provided as include member`);
+            errorReporter.error(
+              `Paths aren't allowed in cube includes but '${member}' provided as include member`
+            );
           }
 
           const name = fullMemberName(member);
@@ -501,39 +538,50 @@ export class CubeSymbols {
 
           const includedMemberName = include.name || include;
 
-          const resolvedMember = this.getResolvedMember(type, cubeReference, includedMemberName) ? {
+          const resolved = this.getResolvedMember(
+            type,
+            cubeReference,
+            includedMemberName
+          );
+
+          if (!resolved) return undefined;
+
+          memberSets.resolvedMembers.add(name);
+
+          const override = (include.title || include.description || include.format || include.meta)
+            ? {
+              title: include.title,
+              description: include.description,
+              format: include.format,
+              meta: include.meta,
+            }
+            : undefined;
+
+          return {
             member: `${fullPath}.${includedMemberName}`,
             name,
-            ...(include.title || include.description || include.format || include.meta) ? {
-              override: {
-                title: include.title,
-                description: include.description,
-                format: include.format,
-                meta: include.meta,
-              }
-            } : {}
-          } : undefined;
-
-          if (resolvedMember) {
-            memberSets.resolvedMembers.add(name);
-          }
-
-          return resolvedMember;
+            ...(override ? { override } : {}),
+          };
         });
       }
 
-      const excludes = (cubeInclude.excludes || []).map((exclude: any) => {
-        if (exclude.includes('.')) {
-          errorReporter.error(`Paths aren't allowed in cube excludes but '${exclude}' provided as exclude member`);
-        }
+      const excludes = (cubeInclude.excludes || [])
+        .map((exclude: any) => {
+          if (exclude.includes('.')) {
+            errorReporter.error(
+              `Paths aren't allowed in cube excludes but '${exclude}' provided as exclude member`
+            );
+          }
 
-        const resolvedMember = this.getResolvedMember(type, cubeReference, exclude);
-        return resolvedMember ? {
-          member: `${fullPath}.${exclude}`
-        } : undefined;
-      });
+          const resolved = this.getResolvedMember(type, cubeReference, exclude);
+          return resolved ? { member: `${fullPath}.${exclude}` } : undefined;
+        })
+        .filter(Boolean);
 
-      const finalIncludes = this.diffByMember(includes.filter(Boolean), excludes.filter(Boolean));
+      const finalIncludes = this.diffByMember(
+        includes.filter(Boolean),
+        excludes
+      );
 
       if (cubeInclude.split) {
         const viewName = `${parentCube.name}_${cubeName}`;
@@ -548,14 +596,24 @@ export class CubeSymbols {
           splitViewDef = splitViews[viewName];
         }
 
-        const includeMembers = this.generateIncludeMembers(finalIncludes, parentCube.name, type);
+        const includeMembers = this.generateIncludeMembers(
+          finalIncludes,
+          parentCube.name,
+          type
+        );
         this.applyIncludeMembers(includeMembers, splitViewDef, type, errorReporter);
-
-        return [];
       } else {
-        return finalIncludes;
+        for (const member of finalIncludes) {
+          const key = `${member.member}|${member.name}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            result.push(member);
+          }
+        }
       }
-    })));
+    }
+
+    return result;
   }
 
   protected diffByMember(includes: any[], excludes: any[]) {
