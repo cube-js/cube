@@ -131,8 +131,7 @@ paths.
 <Diagram src="https://ucarecdn.com/bfc3e04a-b690-40bc-a6f8-14a9175fb4fd/" />
 
 Views do **not** define their own members. Instead, they reference cubes by
-specific join paths and include their members. Optionally, you can also group
-members of a view into [folders][ref-ref-folders].
+specific join paths and include their members.
 
 In the example below, we create the `orders` view which includes select members
 from `base_orders`, `products`, and `users` cubes:
@@ -211,6 +210,16 @@ models][ref-dynamic-data-models].
 See the reference documentaton for the full list of view [parameters][ref-views].
 
 </ReferenceBox>
+
+### Folders
+
+Optionally, members of a view can be organized into [folders][ref-ref-folders].
+Each folder would contain a subset of members of the view.
+
+Cube supports both flat and nested folder structures, which can be used with various
+[visualization tools][ref-viz-tools]. If a specific tool does not support nested folders,
+they will be exposed to such a tool as an equivalent flat structure. Check [APIs &
+Integrations][ref-apis-support] for details on the nested folders support.
 
 ## Dimensions
 
@@ -842,3 +851,5 @@ See the reference documentaton for the full list of pre-aggregation
 [ref-period-over-period-recipe]: /product/data-modeling/recipes/period-over-period
 [ref-custom-calendar-recipe]: /product/data-modeling/recipes/custom-calendar
 [ref-cube-with-dbt]: /product/data-modeling/recipes/dbt
+[ref-apis-support]: /product/apis-integrations#data-modeling
+[ref-viz-tools]: /product/configuration/visualization-tools

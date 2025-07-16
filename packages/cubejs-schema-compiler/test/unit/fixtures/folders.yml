@@ -105,6 +105,17 @@ views:
         includes:
           - users_city
           - users_renamed_in_view3_gender
+  - name: test_view4
+    extends: test_view3
+    folders:
+      - name: folder3
+        includes:
+          - users_city
+          - name: inner folder 4
+            includes:
+              - renamed_orders_status
+          - name: inner folder 5
+            includes: "*"
 
   # - name: empty_view
   #   cubes:

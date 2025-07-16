@@ -72,6 +72,9 @@ views:
           - age
           - renamed_gender
           - users.age
+          - name: inner folder
+            includes:
+              - users.renamed_gender
       - name: folder2
         includes: '*'
   - name: test_view2
