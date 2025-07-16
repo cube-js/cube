@@ -10,7 +10,7 @@ import type { ErrorReporter } from './ErrorReporter';
 
 export type ToString = { toString(): string };
 
-interface CubeDefinition {
+export interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
   sql?: string | (() => string);
