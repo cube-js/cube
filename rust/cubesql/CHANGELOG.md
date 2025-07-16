@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.38](https://github.com/cube-js/cube/compare/v1.3.37...v1.3.38) (2025-07-16)
+
+### Features
+
+- **cubesql:** Push Limit-Sort down Projection ([#9776](https://github.com/cube-js/cube/issues/9776)) ([72e6059](https://github.com/cube-js/cube/commit/72e605966100bb24d44b715d96cfb2cc4d8d793d))
+- **schema-compiler,api-gateway:** Nested folders support ([#9659](https://github.com/cube-js/cube/issues/9659)) ([720f048](https://github.com/cube-js/cube/commit/720f0485c8b11f16eb99490259a881c21b845c73))
+
 ## [1.3.37](https://github.com/cube-js/cube/compare/v1.3.36...v1.3.37) (2025-07-14)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

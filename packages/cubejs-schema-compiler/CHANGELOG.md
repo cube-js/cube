@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.38](https://github.com/cube-js/cube/compare/v1.3.37...v1.3.38) (2025-07-16)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix BigQuery convertTz implementation ([#9782](https://github.com/cube-js/cube/issues/9782)) ([75f4813](https://github.com/cube-js/cube/commit/75f48139abccc341398980c7b9abfd78bc7d21aa))
+
+### Features
+
+- **schema-compiler,api-gateway:** Nested folders support ([#9659](https://github.com/cube-js/cube/issues/9659)) ([720f048](https://github.com/cube-js/cube/commit/720f0485c8b11f16eb99490259a881c21b845c73))
+- **tesseract:** Allow named calendar timeshifts for common intervals ([#9777](https://github.com/cube-js/cube/issues/9777)) ([a5f8a2e](https://github.com/cube-js/cube/commit/a5f8a2e0d93bf5de0291389d846660f6491651fe))
+
 ## [1.3.37](https://github.com/cube-js/cube/compare/v1.3.36...v1.3.37) (2025-07-14)
 
 ### Bug Fixes

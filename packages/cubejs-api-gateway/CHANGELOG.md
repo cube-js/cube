@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.38](https://github.com/cube-js/cube/compare/v1.3.37...v1.3.38) (2025-07-16)
+
+### Bug Fixes
+
+- **cubesql:** Propagate errors from SqlAuthService to the user ([#9665](https://github.com/cube-js/cube/issues/9665)) ([3037ada](https://github.com/cube-js/cube/commit/3037adaa55dcb20ac6a3b3064de4292fc454fdc2))
+
+### Features
+
+- **schema-compiler,api-gateway:** Nested folders support ([#9659](https://github.com/cube-js/cube/issues/9659)) ([720f048](https://github.com/cube-js/cube/commit/720f0485c8b11f16eb99490259a881c21b845c73))
+
 ## [1.3.37](https://github.com/cube-js/cube/compare/v1.3.36...v1.3.37) (2025-07-14)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway
