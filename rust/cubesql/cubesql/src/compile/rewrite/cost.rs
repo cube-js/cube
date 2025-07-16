@@ -51,11 +51,6 @@ impl BestCubePlan {
             _ => 0,
         };
 
-        let non_pushed_down_limit_sort = match enode {
-            LogicalPlanLanguage::Sort(_) => 1,
-            _ => 0,
-        };
-
         let ast_size_inside_wrapper = match enode {
             LogicalPlanLanguage::WrappedSelect(_) => 1,
             _ => 0,
@@ -130,6 +125,8 @@ impl BestCubePlan {
             LogicalPlanLanguage::JoinCheckStage(_) => 1,
             LogicalPlanLanguage::JoinCheckPushDown(_) => 1,
             LogicalPlanLanguage::JoinCheckPullUp(_) => 1,
+            LogicalPlanLanguage::SortProjectionPushdownReplacer(_) => 1,
+            LogicalPlanLanguage::SortProjectionPullupReplacer(_) => 1,
             // Not really replacers but those should be deemed as mandatory rewrites and as soon as
             // there's always rewrite rule it's fine to have replacer cost.
             // Needs to be added as alias rewrite always more expensive than original function.
@@ -220,7 +217,8 @@ impl BestCubePlan {
             member_errors,
             non_pushed_down_window,
             non_pushed_down_grouping_sets,
-            non_pushed_down_limit_sort,
+            // Will be filled in finalize
+            non_pushed_down_limit_sort: 0,
             zero_members_wrapper,
             cube_members,
             errors: this_errors,
@@ -405,9 +403,8 @@ impl CubePlanCost {
                 CubePlanState::Wrapper => 0,
             },
             non_pushed_down_limit_sort: match sort_state {
-                SortState::DirectChild => self.non_pushed_down_limit_sort,
-                SortState::Current => self.non_pushed_down_limit_sort,
-                _ => 0,
+                SortState::Current => self.non_pushed_down_limit_sort + 1,
+                _ => self.non_pushed_down_limit_sort,
             },
             // Don't track state here: we want representation that have fewer wrappers with zero members _in total_
             zero_members_wrapper: self.zero_members_wrapper,

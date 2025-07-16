@@ -477,7 +477,7 @@ impl Rewriter {
                 eval_stable_functions,
             ),
             &DateRules::new(config_obj.clone()),
-            &OrderRules::new(),
+            &OrderRules::new(config_obj.clone()),
             &CommonRules::new(config_obj.clone()),
         ];
         let mut rewrites = Vec::new();

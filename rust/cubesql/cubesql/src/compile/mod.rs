@@ -17168,4 +17168,59 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_push_down_limit_sort_projection() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                "ta_1"."customer_gender" AS "ca_1",
+                DATE_TRUNC('MONTH', CAST("ta_1"."order_date" AS date)) AS "ca_2",
+                COALESCE(sum("ta_1"."sumPrice"), 0) AS "ca_3"
+            FROM
+                "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            WHERE
+                (
+                    "ta_1"."order_date" >= TIMESTAMP '2024-01-01 00:00:00.0'
+                    AND "ta_1"."order_date" < TIMESTAMP '2025-01-01 00:00:00.0'
+                )
+            GROUP BY
+                "ca_1",
+                "ca_2"
+            ORDER BY
+                "ca_2" ASC NULLS LAST
+            LIMIT
+                5000
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: Some(json!(vec![
+                        "2024-01-01T00:00:00.000Z".to_string(),
+                        "2024-12-31T23:59:59.999Z".to_string()
+                    ])),
+                },]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(5000),
+                ..Default::default()
+            }
+        )
+    }
 }
