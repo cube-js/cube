@@ -1,7 +1,7 @@
 [
   {
     "source": "/product/deployment/cloud/byoc/aws",
-    "destination": "/product/deployment/cloud/byoc/deployment",
+    "destination": "/product/deployment/cloud/byoc/aws/deployment",
     "permanent": true
   },
   {
