@@ -46,8 +46,7 @@ use datafusion::datasource::physical_plan::{
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
-use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::execution::{SessionStateBuilder, TaskContext};
+use datafusion::execution::TaskContext;
 use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
 use datafusion::physical_expr::LexOrdering;
@@ -96,7 +95,6 @@ use std::time::SystemTime;
 use tracing::{instrument, Instrument};
 
 use super::serialized_plan::PreSerializedPlan;
-use super::udfs::{registerable_arc_aggregate_udfs, registerable_arc_scalar_udfs};
 use super::{try_make_memory_data_source, QueryPlannerImpl};
 
 #[automock]
@@ -444,15 +442,9 @@ impl QueryExecutorImpl {
         &self,
         query_planner: CubeQueryPlanner,
     ) -> Result<Arc<SessionContext>, CubeError> {
-        let runtime = Arc::new(RuntimeEnv::default());
         let config = self.session_config();
-        let session_state = SessionStateBuilder::new()
-            .with_config(config)
-            .with_runtime_env(runtime)
-            .with_default_features()
+        let session_state = QueryPlannerImpl::minimal_session_state_from_final_config(config)
             .with_query_planner(Arc::new(query_planner))
-            .with_aggregate_functions(registerable_arc_aggregate_udfs())
-            .with_scalar_functions(registerable_arc_scalar_udfs())
             .with_physical_optimizer_rules(self.physical_optimizer_rules())
             .build();
         let ctx = SessionContext::new_with_state(session_state);

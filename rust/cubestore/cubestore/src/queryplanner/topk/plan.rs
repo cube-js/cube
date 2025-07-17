@@ -3,7 +3,7 @@ use crate::queryplanner::topk::execute::{AggregateTopKExec, TopKAggregateFunctio
 use crate::queryplanner::topk::{
     ClusterAggregateTopKLower, ClusterAggregateTopKUpper, SortColumn, MIN_TOPK_STREAM_ROWS,
 };
-use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeScalarUDFKind, HllCardinality};
+use crate::queryplanner::udfs::HllCardinality;
 use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::common::tree_node::{Transformed, TreeNode};
@@ -21,7 +21,8 @@ use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
 use datafusion::common::{DFSchema, DFSchemaRef, Spans};
 use datafusion::logical_expr::{
-    Aggregate, Extension, FetchType, Filter, Limit, LogicalPlan, Projection, SkipType, SortExpr,
+    Aggregate, Extension, FetchType, Filter, Limit, LogicalPlan, Projection, ScalarUDF, SkipType,
+    SortExpr,
 };
 use datafusion::physical_planner::{create_aggregate_expr_and_maybe_filter, PhysicalPlanner};
 use datafusion::prelude::Expr;
@@ -678,7 +679,7 @@ pub fn make_sort_expr(
     // schema in create_physical_expr.
     match fun {
         TopKAggregateFunction::Merge => {
-            let udf = scalar_udf_by_kind(CubeScalarUDFKind::HllCardinality);
+            let udf = Arc::new(ScalarUDF::new_from_impl(HllCardinality::new()));
             Arc::new(ScalarFunctionExpr::new(
                 HllCardinality::static_name(),
                 udf,

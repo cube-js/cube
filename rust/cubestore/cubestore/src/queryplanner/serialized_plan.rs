@@ -1,4 +1,3 @@
-use super::udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
@@ -7,7 +6,9 @@ use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
 use crate::queryplanner::rolling::RollingWindowAggregate;
 use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper};
-use crate::queryplanner::{pretty_printers, CubeTableLogical, InfoSchemaTableProvider};
+use crate::queryplanner::{
+    pretty_printers, CubeTableLogical, InfoSchemaTableProvider, QueryPlannerImpl,
+};
 use crate::table::Row;
 use crate::CubeError;
 use datafusion::arrow::datatypes::SchemaRef;
@@ -27,7 +28,7 @@ use datafusion::logical_expr::{
     Projection, RecursiveQuery, Repartition, Sort, Subquery, SubqueryAlias, TableScan, Union,
     Unnest, Values, Window,
 };
-use datafusion::prelude::SessionContext;
+use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion_proto::bytes::logical_plan_from_bytes_with_extension_codec;
 use datafusion_proto::logical_plan::LogicalExtensionCodec;
 use std::collections::HashMap;
@@ -1037,16 +1038,13 @@ impl SerializedPlan {
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
         parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
     ) -> Result<LogicalPlan, CubeError> {
-        // TODO DF upgrade SessionContext::new()
-        // After this comment was made, we now register_udaf... what else?
-        let session_context = SessionContext::new();
-        // TODO DF upgrade: consistently build SessionContexts/register udafs/udfs.
-        for udaf in registerable_aggregate_udfs() {
-            session_context.register_udaf(udaf);
-        }
-        for udf in registerable_scalar_udfs() {
-            session_context.register_udf(udf);
-        }
+        // TODO upgrade DF: We might avoid constructing so many one-time-use SessionContexts.
+
+        // We need registered Cube UDFs and UDAFs (and there are no UDWFs) to deserialize the plan,
+        // but not much else.
+        let session_context = SessionContext::new_with_state(
+            QueryPlannerImpl::minimal_session_state_from_final_config(SessionConfig::new()).build(),
+        );
 
         let logical_plan = logical_plan_from_bytes_with_extension_codec(
             self.logical_plan.as_slice(),
