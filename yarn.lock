@@ -7848,6 +7848,11 @@
   dependencies:
     "@types/node" "*"
 
+"@types/node-dijkstra@^2.5.6":
+  version "2.5.6"
+  resolved "https://registry.yarnpkg.com/@types/node-dijkstra/-/node-dijkstra-2.5.6.tgz#df4621e50df10b2e98229796ab1c2a3ca74b65b8"
+  integrity sha512-+n0D+FdGuCLsKoH7fwX3iWfkKSAG0e4z1F96UG5gAnlE2V/1AZO6LuPLzHQd1MC2fZJDcE2cpTS2Ln1lywgUvw==
+
 "@types/node-fetch@^2.5.7", "@types/node-fetch@^2.5.8":
   version "2.6.12"
   resolved "https://registry.yarnpkg.com/@types/node-fetch/-/node-fetch-2.6.12.tgz#8ab5c3ef8330f13100a7479e2cd56d3386830a03"

@@ -1,10 +1,10 @@
 import R from 'ramda';
 
-import { CubeSymbols } from '../compiler/CubeSymbols';
+import { CubeSymbols, PreAggregationDefinition } from '../compiler/CubeSymbols';
 import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
 import {
-  PreAggregationDefinition, PreAggregationDefinitions,
+  PreAggregationDefinitions,
   PreAggregationReferences,
   PreAggregationTimeDimensionReference
 } from '../compiler/CubeEvaluator';
@@ -47,6 +47,10 @@ export type PreAggregationForQuery = {
   referencedPreAggregations?: PreAggregationForQuery[];
   rollupJoin?: RollupJoin;
   sqlAlias?: string;
+};
+
+export type PreAggregationForQueryWithTableName = PreAggregationForQuery & {
+  tableName: string;
 };
 
 export type PreAggregationForCube = {
@@ -125,7 +129,7 @@ export class PreAggregations {
       !isInPreAggregationQuery ||
       isInPreAggregationQuery && this.query.options.useOriginalSqlPreAggregationsInPreAggregation) {
       return R.pipe(
-        R.map(cube => {
+        R.map((cube: string) => {
           const { preAggregations } = this.collectOriginalSqlPreAggregations(() => this.query.cubeSql(cube));
           return R.unnest(preAggregations.map(p => this.preAggregationDescriptionsFor(p)));
         }),
@@ -138,6 +142,10 @@ export class PreAggregations {
 
   private preAggregationCubes(): string[] {
     const { join } = this.query;
+    if (!join) {
+      // This can happen with Tesseract, or when there's no cubes to join
+      throw new Error('Unexpected missing join tree for query');
+    }
     return join.joins.map(j => j.originalTo).concat([join.root]);
   }
 
@@ -767,7 +775,7 @@ export class PreAggregations {
             if (td[1] === '*') {
               return R.any((tdtc: [string, string]) => tdtc[0] === td[0]); // need to match the dimension at least
             } else {
-              return R.contains(td);
+              return R.includes(td);
             }
           }))
         )
@@ -945,14 +953,12 @@ export class PreAggregations {
   private findRollupPreAggregationsForCube(cube: string, canUsePreAggregation: CanUsePreAggregationFn, preAggregations: PreAggregationDefinitions): PreAggregationForQuery[] {
     return R.pipe(
       R.toPairs,
-      // eslint-disable-next-line no-unused-vars
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      R.filter(([k, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda'),
+      R.filter(([_k, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda'),
       R.map(([preAggregationName, preAggregation]) => this.evaluatedPreAggregationObj(cube, preAggregationName, preAggregation, canUsePreAggregation))
     )(preAggregations);
   }
 
-  public getRollupPreAggregationByName(cube, preAggregationName) {
+  public getRollupPreAggregationByName(cube, preAggregationName): PreAggregationForQueryWithTableName | {} {
     const canUsePreAggregation = () => true;
     const preAggregation = R.pipe(
       R.toPairs,
@@ -1075,7 +1081,7 @@ export class PreAggregations {
           return this.evaluatedPreAggregationObj(
             joinCube,
             joinPreAggregationName,
-            this.query.cubeEvaluator.byPath('preAggregations', name),
+            this.query.cubeEvaluator.byPath('preAggregations', name) as PreAggregationDefinitionExtended,
             canUsePreAggregation
           );
         }
@@ -1093,7 +1099,7 @@ export class PreAggregations {
           return this.evaluatedPreAggregationObj(
             referencedCube,
             referencedPreAggregation,
-            this.query.cubeEvaluator.byPath('preAggregations', name),
+            this.query.cubeEvaluator.byPath('preAggregations', name) as PreAggregationDefinitionExtended,
             canUsePreAggregation
           );
         }
@@ -1311,7 +1317,7 @@ export class PreAggregations {
       if (aggregation.type === 'rollupLambda') {
         if (references.rollups.length > 0) {
           const [firstLambdaCube] = this.query.cubeEvaluator.parsePath('preAggregations', references.rollups[0]);
-          const firstLambdaPreAggregation = this.query.cubeEvaluator.byPath('preAggregations', references.rollups[0]);
+          const firstLambdaPreAggregation = this.query.cubeEvaluator.byPath('preAggregations', references.rollups[0]) as PreAggregationDefinitionExtended;
           const firstLambdaReferences = this.query.cubeEvaluator.evaluatePreAggregationReferences(firstLambdaCube, firstLambdaPreAggregation);
 
           if (references.measures.length === 0 &&
