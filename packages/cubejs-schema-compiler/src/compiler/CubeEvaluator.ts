@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import R from 'ramda';
 
-import { CubeSymbols, type ToString } from './CubeSymbols';
+import { CubeDefinitionExtended, CubeSymbols, type ToString } from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
@@ -211,7 +211,7 @@ export class CubeEvaluator extends CubeSymbols {
 
   public primaryKeys: Record<string, string[]> = {};
 
-  public byFileName: Record<string, EvaluatedCube[]> = {};
+  public byFileName: Record<string, CubeDefinitionExtended[]> = {};
 
   private isRbacEnabledCache: boolean | null = null;
 
@@ -237,7 +237,7 @@ export class CubeEvaluator extends CubeSymbols {
       this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
     }
 
-    this.byFileName = R.groupBy(v => v.fileName, validCubes);
+    this.byFileName = R.groupBy(v => v.fileName || v.name, validCubes);
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
         const primaryKeyNamesToSymbols = R.compose(

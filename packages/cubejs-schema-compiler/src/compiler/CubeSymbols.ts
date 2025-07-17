@@ -10,13 +10,29 @@ import type { ErrorReporter } from './ErrorReporter';
 
 export type ToString = { toString(): string };
 
+export type GranularityDefinition = {
+  sql?: (...args: any[]) => string;
+  title?: string;
+  interval?: string;
+  offset?: string;
+  origin?: string;
+};
+
+export type TimeshiftDefinition = {
+  interval?: string;
+  type?: string;
+  name?: string;
+  timeDimension?: (...args: any[]) => string;
+};
+
 export interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
-  sql?: string | (() => string);
+  sql?: string | ((...args: any[]) => string);
   // eslint-disable-next-line camelcase
-  sql_table?: string | (() => string);
-  sqlTable?: string | (() => string);
+  sql_table?: string | ((...args: any[]) => string);
+  sqlTable?: string | ((...args: any[]) => string);
+  dataSource?: string;
   measures?: Record<string, any>;
   dimensions?: Record<string, any>;
   segments?: Record<string, any>;
@@ -34,9 +50,10 @@ export interface CubeDefinition {
   calendar?: boolean;
   isSplitView?: boolean;
   includedMembers?: any[];
+  fileName?: string;
 }
 
-interface CubeDefinitionExtended extends CubeDefinition {
+export interface CubeDefinitionExtended extends CubeDefinition {
   allDefinitions: (type: string) => Record<string, any>;
   rawFolders: () => any[];
   rawCubes: () => any[];
@@ -45,6 +62,22 @@ interface CubeDefinitionExtended extends CubeDefinition {
 interface SplitViews {
   [key: string]: any;
 }
+
+export type CubeSymbolDefinition = {
+  type?: string;
+  sql?: (...args: any[]) => string;
+  primaryKey?: boolean;
+  granularities?: Record<string, GranularityDefinition>;
+  timeShift?: TimeshiftDefinition[];
+  format?: string;
+};
+
+export interface CubeSymbolsBase {
+  cubeName: () => string;
+  cubeObj: () => CubeDefinitionExtended;
+}
+
+export type CubeSymbolsDefinition = CubeSymbolsBase & Record<string, CubeSymbolDefinition>;
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 export const CONTEXT_SYMBOLS = {
@@ -61,15 +94,15 @@ export const CONTEXT_SYMBOLS = {
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
 export class CubeSymbols {
-  public symbols: Record<string | symbol, any>;
+  public symbols: Record<string | symbol, CubeSymbolsDefinition>;
 
-  private builtCubes: Record<string, any>;
+  private builtCubes: Record<string, CubeDefinitionExtended>;
 
   private cubeDefinitions: Record<string, CubeDefinition>;
 
   private funcArgumentsValues: Record<string, string[]>;
 
-  public cubeList: any[];
+  public cubeList: CubeDefinitionExtended[];
 
   private readonly evaluateViews: boolean;
 
@@ -959,7 +992,7 @@ export class CubeSymbols {
             ),
           };
         }
-        if (cube[propertyName]) {
+        if (cube[propertyName as string]) {
           return this.cubeReferenceProxy(cubeName, joinHints, propertyName);
         }
         if (self.symbols[propertyName]) {
@@ -1022,9 +1055,9 @@ export class CubeSymbols {
         if (propertyName === '_objectWithResolvedProperties') {
           return true;
         }
-        if (cube[propertyName]) {
+        if (cube[propertyName as string]) {
           const index = depsResolveFn(propertyName, parentIndex);
-          if (cube[propertyName].type === 'time') {
+          if (cube[propertyName as string].type === 'time') {
             return this.timeDimDependenciesProxy(index);
           }
 
