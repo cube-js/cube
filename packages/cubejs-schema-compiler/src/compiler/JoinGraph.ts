@@ -57,6 +57,7 @@ export class JoinGraph {
     this.edges = {};
     this.builtJoins = {};
     this.cachedConnectedComponents = null;
+    this.graph = null;
   }
 
   public compile(cubes: unknown, errorReporter: ErrorReporter): void {
@@ -240,11 +241,11 @@ export class JoinGraph {
           prevNode = toJoin;
           return { joins: [] };
         }
-        const path = this.graph.path(prevNode, toJoin);
+        const path = this.graph.path(prevNode, toJoin) as string[] | null;
         if (!path) {
           return null;
         }
-        const foundJoins = self.joinsByPath(path);
+        const foundJoins = self.joinsByPath(path!);
         prevNode = toJoin;
         nodesJoined[toJoin] = true;
         return { cubes: path, joins: foundJoins };
