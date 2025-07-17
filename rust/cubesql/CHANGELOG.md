@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.39](https://github.com/cube-js/cube/compare/v1.3.38...v1.3.39) (2025-07-17)
+
+### Bug Fixes
+
+- **cubesql:** Fix sort push down projection on complex expressions ([#9787](https://github.com/cube-js/cube/issues/9787)) ([cd1c983](https://github.com/cube-js/cube/commit/cd1c9832386e69ab154f8d01f2bf67c63ff5c685))
+
 ## [1.3.38](https://github.com/cube-js/cube/compare/v1.3.37...v1.3.38) (2025-07-16)
 
 ### Features
