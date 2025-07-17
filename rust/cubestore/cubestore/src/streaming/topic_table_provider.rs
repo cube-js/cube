@@ -1,5 +1,5 @@
 use crate::metastore::Column;
-use crate::queryplanner::udfs::{registerable_arc_aggregate_udfs, registerable_arc_scalar_udfs};
+use crate::queryplanner::udfs::{registerable_aggregate_udfs_iter, registerable_scalar_udfs_iter};
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
@@ -47,7 +47,7 @@ impl TopicTableProvider {
                 .collect::<Vec<Field>>(),
         ));
         let mut udfs = SessionStateDefaults::default_scalar_functions();
-        udfs.append(&mut registerable_arc_scalar_udfs());
+        udfs.extend(registerable_scalar_udfs_iter().map(Arc::new));
         udfs.push(Arc::new(
             ScalarUDF::new_from_impl(ParseTimestampFunc::new()),
         ));
@@ -62,7 +62,7 @@ impl TopicTableProvider {
             .collect();
 
         let mut udafs = SessionStateDefaults::default_aggregate_functions();
-        udafs.append(&mut registerable_arc_aggregate_udfs());
+        udafs.extend(registerable_aggregate_udfs_iter().map(Arc::new));
 
         let udafs = udafs
             .into_iter()

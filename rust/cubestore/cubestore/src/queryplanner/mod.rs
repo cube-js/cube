@@ -3,6 +3,7 @@ pub mod optimizations;
 pub mod panic;
 mod partition_filter;
 mod planning;
+use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::logical_expr::planner::ExprPlanner;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion_datasource::memory::MemorySourceConfig;
@@ -19,7 +20,6 @@ mod topk;
 pub mod trace_data_loaded;
 use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
-use udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
 mod filter_by_key_range;
 pub mod info_schema;
 pub mod merge_sort;
@@ -56,6 +56,7 @@ use crate::queryplanner::topk::ClusterAggregateTopKLower;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
+use crate::queryplanner::udfs::{registerable_aggregate_udfs_iter, registerable_scalar_udfs_iter};
 use crate::sql::cache::SqlResultCache;
 use crate::sql::InlineTables;
 use crate::store::DataFrame;
@@ -72,7 +73,7 @@ use datafusion::common::{plan_datafusion_err, TableReference};
 use datafusion::config::ConfigOptions;
 use datafusion::datasource::{provider_as_source, TableType};
 use datafusion::error::DataFusionError;
-use datafusion::execution::{SessionState, TaskContext};
+use datafusion::execution::{SessionState, SessionStateBuilder, TaskContext};
 use datafusion::logical_expr::{
     AggregateUDF, Expr, Extension, LogicalPlan, ScalarUDF, TableProviderFilterPushDown,
     TableSource, WindowUDF,
@@ -280,6 +281,25 @@ impl QueryPlannerImpl {
 }
 
 impl QueryPlannerImpl {
+    /// Has the user defined functions to define query language behavior, but might exclude Cube
+    /// optimizer rules or other parameters affecting execution performance.  This is used by
+    /// `QueryPlannerImpl::make_execution_context`.
+    pub fn minimal_session_state_from_final_config(config: SessionConfig) -> SessionStateBuilder {
+        let mut state_builder = SessionStateBuilder::new()
+            .with_config(config)
+            .with_runtime_env(Arc::new(RuntimeEnv::default()))
+            .with_default_features();
+        state_builder
+            .aggregate_functions()
+            .get_or_insert_default()
+            .extend(registerable_aggregate_udfs_iter().map(Arc::new));
+        state_builder
+            .scalar_functions()
+            .get_or_insert_default()
+            .extend(registerable_scalar_udfs_iter().map(Arc::new));
+        state_builder
+    }
+
     pub fn make_execution_context(mut config: SessionConfig) -> SessionContext {
         // The config parameter is from metadata_cache_factory (which we need to rename) but doesn't
         // include all necessary configs.
@@ -287,15 +307,13 @@ impl QueryPlannerImpl {
             .options_mut()
             .execution
             .dont_parallelize_sort_preserving_merge_exec_inputs = true;
-        let context = SessionContext::new_with_config(config);
+
         // TODO upgrade DF: build SessionContexts consistently
-        for udaf in registerable_aggregate_udfs() {
-            context.register_udaf(udaf);
-        }
-        for udf in registerable_scalar_udfs() {
-            context.register_udf(udf);
-        }
-        context.add_optimizer_rule(Arc::new(RollingOptimizerRule {}));
+        let state = Self::minimal_session_state_from_final_config(config)
+            .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
+            .build();
+
+        let context = SessionContext::new_with_state(state);
 
         // TODO upgrade DF
         // context
