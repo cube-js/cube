@@ -1,7 +1,10 @@
 use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
 use cubeorchestrator::query_message_parser::QueryResult;
-use cubeorchestrator::query_result_transform::{DBResponsePrimitive, DBResponseValue, RequestResultData, RequestResultDataMulti, TransformedData};
+use cubeorchestrator::query_result_transform::{
+    DBResponsePrimitive, DBResponseValue, RequestResultData, RequestResultDataMulti,
+    TransformedData,
+};
 use cubeorchestrator::transport::{JsRawData, TransformDataRequest};
 use cubesql::compile::engine::df::scan::{FieldValue, ValueObject};
 use cubesql::CubeError;
