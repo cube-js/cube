@@ -7676,13 +7676,6 @@
   dependencies:
     "@types/node" "*"
 
-"@types/generic-pool@^3.8.2":
-  version "3.8.3"
-  resolved "https://registry.yarnpkg.com/@types/generic-pool/-/generic-pool-3.8.3.tgz#7e542afd682b18fd1e8d9e251ac94037c7a48004"
-  integrity sha512-ZGnwaX+JGSCMnjf4/CmLkTjJwE5bnT45Z3y+3HvoYymKU5vPMCEZAFtrl3sBpg+rjFpEvhSBTJX7jfJArBKjYQ==
-  dependencies:
-    generic-pool "*"
-
 "@types/glob@*", "@types/glob@^7.1.1":
   version "7.2.0"
   resolved "https://registry.yarnpkg.com/@types/glob/-/glob-7.2.0.tgz#bc1b5bf3aa92f25bd5dd39f35c57361bdce5b2eb"
@@ -14379,7 +14372,7 @@ generate-object-property@^1.0.0:
   dependencies:
     is-property "^1.0.0"
 
-generic-pool@*, generic-pool@^3.8.2:
+generic-pool@^3.8.2, generic-pool@^3.9.0:
   version "3.9.0"
   resolved "https://registry.yarnpkg.com/generic-pool/-/generic-pool-3.9.0.tgz#36f4a678e963f4fdb8707eab050823abc4e8f5e4"
   integrity sha512-hymDOu5B53XvN4QT9dBmZxPX4CWhBPPLguTZ9MMFeFa/Kg0xWVfylOVNlJji/E7yTZWFd/q9GO5TxDLq156D7g==
