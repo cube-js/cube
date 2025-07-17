@@ -24,45 +24,16 @@ use std::any::Any;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum CubeScalarUDFKind {
-    HllCardinality, // cardinality(), accepting the HyperLogLog sketches.
-    UnixTimestamp,
-    DateAdd,
-    DateSub,
-    DateBin,
-    ConvertTz,
-}
-
-pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Arc<ScalarUDF> {
-    match k {
-        CubeScalarUDFKind::HllCardinality => Arc::new(HllCardinality::descriptor()),
-        CubeScalarUDFKind::UnixTimestamp => {
-            Arc::new(ScalarUDF::new_from_impl(UnixTimestamp::new()))
-        }
-        CubeScalarUDFKind::DateAdd => Arc::new(ScalarUDF::new_from_impl(DateAddSub::new_add())),
-        CubeScalarUDFKind::DateSub => Arc::new(ScalarUDF::new_from_impl(DateAddSub::new_sub())),
-        CubeScalarUDFKind::DateBin => Arc::new(ScalarUDF::new_from_impl(DateBin::new())),
-        CubeScalarUDFKind::ConvertTz => Arc::new(ScalarUDF::new_from_impl(ConvertTz::new())),
-    }
-}
-
-pub fn registerable_scalar_udfs() -> Vec<ScalarUDF> {
-    vec![
-        HllCardinality::descriptor(),
+pub fn registerable_scalar_udfs_iter() -> impl Iterator<Item = ScalarUDF> {
+    [
+        ScalarUDF::new_from_impl(HllCardinality::new()),
         ScalarUDF::new_from_impl(DateBin::new()),
         ScalarUDF::new_from_impl(DateAddSub::new_add()),
         ScalarUDF::new_from_impl(DateAddSub::new_sub()),
         ScalarUDF::new_from_impl(UnixTimestamp::new()),
         ScalarUDF::new_from_impl(ConvertTz::new()),
     ]
-}
-
-pub fn registerable_arc_scalar_udfs() -> Vec<Arc<ScalarUDF>> {
-    registerable_scalar_udfs()
-        .into_iter()
-        .map(Arc::new)
-        .collect()
+    .into_iter()
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -71,18 +42,12 @@ pub enum CubeAggregateUDFKind {
     Xirr,
 }
 
-pub fn registerable_aggregate_udfs() -> Vec<AggregateUDF> {
-    vec![
+pub fn registerable_aggregate_udfs_iter() -> impl Iterator<Item = AggregateUDF> {
+    [
         AggregateUDF::new_from_impl(HllMergeUDF::new()),
         AggregateUDF::new_from_impl(XirrUDF::new()),
     ]
-}
-
-pub fn registerable_arc_aggregate_udfs() -> Vec<Arc<AggregateUDF>> {
-    registerable_aggregate_udfs()
-        .into_iter()
-        .map(Arc::new)
-        .collect()
+    .into_iter()
 }
 
 pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> AggregateUDF {
@@ -675,9 +640,6 @@ impl HllCardinality {
         );
 
         HllCardinality { signature }
-    }
-    fn descriptor() -> ScalarUDF {
-        return ScalarUDF::new_from_impl(HllCardinality::new());
     }
 
     /// Lets us call [`ScalarFunctionExpr::new`] in some cases without elaborately computing return
