@@ -857,7 +857,7 @@ export class CubeSymbols {
     }
   }
 
-  protected funcArguments(func: Function): string[] {
+  public funcArguments(func: Function): string[] {
     const funcDefinition = func.toString();
     if (!this.funcArgumentsValues[funcDefinition]) {
       const match = funcDefinition.match(FunctionRegex);
