@@ -7,7 +7,7 @@ use egg::Subst;
 
 use crate::{
     compile::{
-        datafusion::logical_plan::Column,
+        datafusion::logical_plan::{Column, Expr},
         rewrite::{
             analysis::OriginalExpr,
             column_expr, column_name_to_member_vec,
@@ -369,6 +369,13 @@ impl OrderRules {
                     }) else {
                         continue;
                     };
+
+                    // TODO: workaround the issue with `generate_sql_for_push_to_cube`
+                    // accepting only columns and erroring on more complex expressions.
+                    // Remove this when `generate_sql_for_push_to_cube` is fixed.
+                    if !matches!(expr, Expr::Column(_)) {
+                        continue;
+                    }
 
                     let Ok(new_expr_id) =
                         LogicalPlanToLanguageConverter::add_expr(egraph, expr, flat_list)
