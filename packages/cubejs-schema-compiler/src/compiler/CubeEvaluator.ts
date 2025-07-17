@@ -145,9 +145,16 @@ export type EvaluatedCubeMeasures = Record<string, MeasureDefinition>;
 export type EvaluatedCubeSegments = Record<string, SegmentDefinition>;
 export type EvaluatedJoins = Record<string, unknown>;
 
+export type HierarchyDefinition = {
+  title?: string;
+  public?: boolean;
+  levels?: (...args: any[]) => string[];
+};
+
 export type EvaluatedHierarchy = {
   name: string;
   title?: string;
+  public?: boolean;
   levels: string[];
   aliasMember?: string;
   [key: string]: any;
@@ -189,13 +196,13 @@ export type EvaluatedCube = {
   dimensions: EvaluatedCubeDimensions;
   segments: EvaluatedCubeSegments;
   joins: EvaluatedJoins;
-  hierarchies: unknown;
+  hierarchies: Record<string, HierarchyDefinition>;
   evaluatedHierarchies: EvaluatedHierarchy[];
   preAggregations: Record<string, PreAggregationDefinitionExtended>;
   dataSource?: string;
   folders: EvaluatedFolder[];
-  sql: unknown;
-  sqlTable: unknown;
+  sql?: (...args: any[]) => string;
+  sqlTable?: (...args: any[]) => string;
   accessPolicy?: AccessPolicy[];
 };
 
@@ -204,7 +211,7 @@ export class CubeEvaluator extends CubeSymbols {
 
   public primaryKeys: Record<string, string[]> = {};
 
-  public byFileName: Record<string, any> = {};
+  public byFileName: Record<string, EvaluatedCube[]> = {};
 
   private isRbacEnabledCache: boolean | null = null;
 
