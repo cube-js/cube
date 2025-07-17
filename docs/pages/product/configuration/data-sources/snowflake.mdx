@@ -134,9 +134,14 @@ Storage][google-cloud-storage] for export bucket functionality.
 <InfoBox>
 
 Ensure the AWS credentials are correctly configured in IAM to allow reads and
-writes to the export bucket in S3.
+writes to the export bucket in S3 if you are not using storage integration.
+If you are using storage integration then you still need to configure access keys
+for Cube Store to be able to read from the export bucket.
+It's possible to authenticate with IAM roles instead of access keys for Cube Store.
 
 </InfoBox>
+
+Using IAM user credentials:
 
 ```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
@@ -145,6 +150,27 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
 CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
 CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 ```
+
+[Using Storage Integration][snowflake-docs-aws-integration] to write to Export Bucket and 
+then Access Keys to read from Cube Store:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_INTEGRATION=aws_int
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+Using Storage Integration to write to export bocket and IAM role to read from Cube Store:
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_INTEGRATION=aws_int
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
 
 #### Google Cloud Storage
 
@@ -203,6 +229,7 @@ connections are made over HTTPS.
 [snowflake-docs-account-id]:
   https://docs.snowflake.com/en/user-guide/admin-account-identifier.html
 [snowflake-docs-connection-options]: https://docs.snowflake.com/en/developer-guide/node-js/nodejs-driver-options#additional-connection-options
+[snowflake-docs-aws-integration]: https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration
 [snowflake-docs-gcs-integration]:
   https://docs.snowflake.com/en/user-guide/data-load-gcs-config.html
 [snowflake-docs-regions]:
