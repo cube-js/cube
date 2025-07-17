@@ -11,6 +11,7 @@ pub type CubeMetaSegment = cubeclient::models::V1CubeMetaSegment;
 pub type CubeMetaJoin = cubeclient::models::V1CubeMetaJoin;
 pub type CubeMetaFolder = cubeclient::models::V1CubeMetaFolder;
 pub type CubeMetaNestedFolder = cubeclient::models::V1CubeMetaNestedFolder;
+pub type CubeMetaNestedFolderMember = cubeclient::models::V1CubeMetaNestedFolderMember;
 pub type CubeMetaHierarchy = cubeclient::models::V1CubeMetaHierarchy;
 // Request/Response
 pub type TransportLoadResponse = cubeclient::models::V1LoadResponse;
