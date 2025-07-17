@@ -1,5 +1,9 @@
 import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
-import { CubeSymbols } from '../../src/compiler/CubeSymbols';
+import {
+  CubeRefreshKey,
+  CubeSymbols,
+  PreAggregationDefinitionOriginalSql
+} from '../../src/compiler/CubeSymbols';
 import { ErrorReporter } from '../../src/compiler/ErrorReporter';
 
 describe('Cube Validation', () => {
@@ -696,10 +700,10 @@ describe('Cube Validation', () => {
           type: 'originalSql',
           time_dimension: () => 'createdAt',
           partition_granularity: 'day',
-          refresh_key: {
+          refreshKey: {
             sql: () => 'SELECT MAX(created_at) FROM orders',
-          },
-        }
+          } satisfies CubeRefreshKey,
+        } satisfies PreAggregationDefinitionOriginalSql
       },
       data_source: 'default',
       rewrite_queries: true,

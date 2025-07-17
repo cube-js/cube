@@ -32,7 +32,7 @@ export type JoinRelationship = 'hasOne' | 'hasMany' | 'belongsTo';
 type ColumnsToJoin = {
   cubeToJoin: string;
   columnToJoin: string;
-  tableName: string;
+  tableName: TableName;
 };
 
 export type CubeDescriptorMember = {
@@ -112,7 +112,7 @@ export type DatabaseSchema = Record<string, { [key: string]: ColumnData[] }>;
 type TableData = {
   schema: string,
   table: string,
-  tableName: string;
+  tableName: TableName;
   tableDefinition: ColumnData[],
 };
 
@@ -122,7 +122,7 @@ type ScaffoldingSchemaOptions = {
 };
 
 export class ScaffoldingSchema {
-  private tableNamesToTables: { [key: string]: TableData[] } = {};
+  private tableNamesToTables: Record<string, TableData[]> = {};
 
   public constructor(
     private readonly dbSchema: DatabaseSchema,
@@ -198,7 +198,7 @@ export class ScaffoldingSchema {
       tableNames.map(tableName => {
         const [schema, table] = this.parseTableName(tableName);
         const tableDefinition = this.resolveTableDefinition(tableName);
-        const definition = {
+        const definition: TableData = {
           schema, table, tableDefinition, tableName
         };
         const tableizeName = inflection.tableize(this.fixCase(table));
@@ -237,7 +237,7 @@ export class ScaffoldingSchema {
     };
   }
 
-  protected parseTableName(tableName: TableName) {
+  protected parseTableName(tableName: TableName): [string, string] {
     let schemaAndTable;
     if (Array.isArray(tableName)) {
       schemaAndTable = tableName;

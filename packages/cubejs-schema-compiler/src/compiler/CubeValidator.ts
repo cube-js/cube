@@ -1,7 +1,7 @@
 import Joi from 'joi';
 import cronParser from 'cron-parser';
 
-import type { CubeSymbols } from './CubeSymbols';
+import type { CubeSymbols, CubeDefinition } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
 
 /* *****************************
@@ -952,13 +952,13 @@ export class CubeValidator {
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error), result.error);
     } else {
-      this.validCubes[cube.name] = true;
+      this.validCubes.set(cube.name, true);
     }
 
     return result;
   }
 
-  public isCubeValid(cube) {
-    return this.validCubes[cube.name] || cube.isSplitView;
+  public isCubeValid(cube: CubeDefinition): boolean {
+    return this.validCubes.get(cube.name) ?? cube.isSplitView ?? false;
   }
 }

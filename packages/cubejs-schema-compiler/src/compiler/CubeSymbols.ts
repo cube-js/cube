@@ -10,21 +10,116 @@ import type { ErrorReporter } from './ErrorReporter';
 
 export type ToString = { toString(): string };
 
-interface CubeDefinition {
+export type GranularityDefinition = {
+  sql?: (...args: any[]) => string;
+  title?: string;
+  interval?: string;
+  offset?: string;
+  origin?: string;
+};
+
+export type TimeshiftDefinition = {
+  interval?: string;
+  type?: string;
+  name?: string;
+  timeDimension?: (...args: any[]) => string;
+};
+
+export type CubeSymbolDefinition = {
+  type?: string;
+  sql?: (...args: any[]) => string;
+  primaryKey?: boolean;
+  granularities?: Record<string, GranularityDefinition>;
+  timeShift?: TimeshiftDefinition[];
+  format?: string;
+};
+
+export type HierarchyDefinition = {
+  title?: string;
+  public?: boolean;
+  levels?: (...args: any[]) => string[];
+};
+
+export type EveryInterval = string;
+type EveryCronInterval = string;
+type EveryCronTimeZone = string;
+
+export type CubeRefreshKeySqlVariant = {
+  sql: () => string;
+  every?: EveryInterval;
+};
+
+export type CubeRefreshKeyEveryVariant = {
+  every: EveryInterval | EveryCronInterval;
+  timezone?: EveryCronTimeZone;
+  incremental?: boolean;
+  updateWindow?: EveryInterval;
+};
+
+export type CubeRefreshKeyImmutableVariant = {
+  immutable: true;
+};
+
+export type CubeRefreshKey =
+  | CubeRefreshKeySqlVariant
+  | CubeRefreshKeyEveryVariant
+  | CubeRefreshKeyImmutableVariant;
+
+type BasePreAggregationDefinition = {
+  allowNonStrictDateRangeMatch?: boolean;
+  useOriginalSqlPreAggregations?: boolean;
+  timeDimensionReference?: (...args: any[]) => ToString;
+  indexes?: Record<string, any>;
+  refreshKey?: CubeRefreshKey;
+  ownedByCube?: boolean;
+};
+
+export type PreAggregationDefinitionOriginalSql = BasePreAggregationDefinition & {
+  type: 'originalSql';
+  partitionGranularity?: string;
+  // eslint-disable-next-line camelcase
+  partition_granularity?: string;
+  // eslint-disable-next-line camelcase
+  time_dimension?: (...args: any[]) => ToString;
+};
+
+export type PreAggregationDefinitionRollup = BasePreAggregationDefinition & {
+  type: 'autoRollup' | 'rollupJoin' | 'rollupLambda' | 'rollup';
+  granularity: string;
+  timeDimensionReferences: Array<{ dimension: () => ToString; granularity: string }>;
+  dimensionReferences: (...args: any[]) => ToString[];
+  segmentReferences: (...args: any[]) => ToString[];
+  measureReferences: (...args: any[]) => ToString[];
+  rollupReferences: (...args: any[]) => ToString[];
+  scheduledRefresh: boolean;
+  external: boolean;
+};
+
+// PreAggregationDefinition is widely used in the codebase, but it's assumed to be rollup,
+// originalSql is not refreshed and so on.
+export type PreAggregationDefinition = PreAggregationDefinitionRollup;
+
+export type JoinDefinition = {
+  relationship: string,
+  sql: (...args: any[]) => string,
+};
+
+export interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
-  sql?: string | (() => string);
+  sql?: string | ((...args: any[]) => string);
   // eslint-disable-next-line camelcase
-  sql_table?: string | (() => string);
-  sqlTable?: string | (() => string);
-  measures?: Record<string, any>;
-  dimensions?: Record<string, any>;
-  segments?: Record<string, any>;
-  hierarchies?: Record<string, any>;
-  preAggregations?: Record<string, any>;
+  sql_table?: string | ((...args: any[]) => string);
+  sqlTable?: string | ((...args: any[]) => string);
+  dataSource?: string;
+  measures?: Record<string, CubeSymbolDefinition>;
+  dimensions?: Record<string, CubeSymbolDefinition>;
+  segments?: Record<string, CubeSymbolDefinition>;
+  hierarchies?: Record<string, HierarchyDefinition>;
+  preAggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
   // eslint-disable-next-line camelcase
-  pre_aggregations?: Record<string, any>;
-  joins?: Record<string, any>;
+  pre_aggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
+  joins?: Record<string, JoinDefinition>;
   accessPolicy?: any[];
   folders?: any[];
   includes?: any;
@@ -34,9 +129,10 @@ interface CubeDefinition {
   calendar?: boolean;
   isSplitView?: boolean;
   includedMembers?: any[];
+  fileName?: string;
 }
 
-interface CubeDefinitionExtended extends CubeDefinition {
+export interface CubeDefinitionExtended extends CubeDefinition {
   allDefinitions: (type: string) => Record<string, any>;
   rawFolders: () => any[];
   rawCubes: () => any[];
@@ -45,6 +141,13 @@ interface CubeDefinitionExtended extends CubeDefinition {
 interface SplitViews {
   [key: string]: any;
 }
+
+export interface CubeSymbolsBase {
+  cubeName: () => string;
+  cubeObj: () => CubeDefinitionExtended;
+}
+
+export type CubeSymbolsDefinition = CubeSymbolsBase & Record<string, CubeSymbolDefinition>;
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 export const CONTEXT_SYMBOLS = {
@@ -61,15 +164,15 @@ export const CONTEXT_SYMBOLS = {
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
 export class CubeSymbols {
-  public symbols: Record<string | symbol, any>;
+  public symbols: Record<string | symbol, CubeSymbolsDefinition>;
 
-  private builtCubes: Record<string, any>;
+  private builtCubes: Record<string, CubeDefinitionExtended>;
 
   private cubeDefinitions: Record<string, CubeDefinition>;
 
   private funcArgumentsValues: Record<string, string[]>;
 
-  public cubeList: any[];
+  public cubeList: CubeDefinitionExtended[];
 
   private readonly evaluateViews: boolean;
 
@@ -85,13 +188,10 @@ export class CubeSymbols {
   }
 
   public compile(cubes: CubeDefinition[], errorReporter: ErrorReporter) {
-    // @ts-ignore
-    this.cubeDefinitions = R.pipe(
-      // @ts-ignore
-      R.map((c: CubeDefinition) => [c.name, c]),
-      R.fromPairs
-      // @ts-ignore
-    )(cubes);
+    this.cubeDefinitions = Object.fromEntries(
+      cubes.map((c): [string, CubeDefinition] => [c.name, c])
+    );
+
     this.cubeList = cubes.map(c => (c.name ? this.getCubeDefinition(c.name) : this.createCube(c)));
     // TODO support actual dependency sorting to allow using views inside views
     const sortedByDependency = R.pipe(
@@ -815,7 +915,7 @@ export class CubeSymbols {
     }
   }
 
-  protected funcArguments(func) {
+  public funcArguments(func: Function): string[] {
     const funcDefinition = func.toString();
     if (!this.funcArgumentsValues[funcDefinition]) {
       const match = funcDefinition.match(FunctionRegex);
@@ -1017,7 +1117,7 @@ export class CubeSymbols {
             ),
           };
         }
-        if (cube[propertyName]) {
+        if (cube[propertyName as string]) {
           return this.cubeReferenceProxy(cubeName, joinHints, propertyName);
         }
         if (self.symbols[propertyName]) {
@@ -1080,9 +1180,9 @@ export class CubeSymbols {
         if (propertyName === '_objectWithResolvedProperties') {
           return true;
         }
-        if (cube[propertyName]) {
+        if (cube[propertyName as string]) {
           const index = depsResolveFn(propertyName, parentIndex);
-          if (cube[propertyName].type === 'time') {
+          if (cube[propertyName as string].type === 'time') {
             return this.timeDimDependenciesProxy(index);
           }
 
