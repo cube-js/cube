@@ -223,6 +223,13 @@ export class JoinGraph {
 
   protected buildJoinTreeForRoot(root: JoinHint, cubesToJoin: JoinHints): JoinTree | null {
     const self = this;
+
+    const { graph } = this;
+    if (graph === null) {
+      // JoinGraph was not compiled
+      return null;
+    }
+
     if (Array.isArray(root)) {
       const [newRoot, ...additionalToJoin] = root;
       if (additionalToJoin.length > 0) {
@@ -241,11 +248,17 @@ export class JoinGraph {
           prevNode = toJoin;
           return { joins: [] };
         }
-        const path = this.graph.path(prevNode, toJoin) as string[] | null;
+
+        const path = graph.path(prevNode, toJoin);
         if (!path) {
           return null;
         }
-        const foundJoins = self.joinsByPath(path!);
+        if (!Array.isArray(path)) {
+          // Unexpected object return from graph, it should do so only when path cost was requested
+          return null;
+        }
+
+        const foundJoins = self.joinsByPath(path);
         prevNode = toJoin;
         nodesJoined[toJoin] = true;
         return { cubes: path, joins: foundJoins };
