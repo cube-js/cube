@@ -4,7 +4,7 @@ import R from 'ramda';
 import {
   CubeDefinitionExtended,
   CubeSymbols,
-  HierarchyDefinition,
+  HierarchyDefinition, JoinDefinition,
   PreAggregationDefinition, PreAggregationDefinitionRollup,
   type ToString
 } from './CubeSymbols';
@@ -76,8 +76,6 @@ export type PreAggregationFilters = {
 
 export type PreAggregationDefinitions = Record<string, PreAggregationDefinition>;
 
-export type PreAggregationDefinitionsExtended = Record<string, PreAggregationDefinitionExtended>;
-
 export type PreAggregationTimeDimensionReference = {
   dimension: string,
   granularity: string,
@@ -102,11 +100,6 @@ export type PreAggregationInfo = {
   refreshKey: unknown,
   indexesReferences: unknown,
 };
-
-export type EvaluatedCubeDimensions = Record<string, DimensionDefinition>;
-export type EvaluatedCubeMeasures = Record<string, MeasureDefinition>;
-export type EvaluatedCubeSegments = Record<string, SegmentDefinition>;
-export type EvaluatedJoins = Record<string, unknown>;
 
 export type EvaluatedHierarchy = {
   name: string;
@@ -149,10 +142,10 @@ export type EvaluatedFolder = {
 };
 
 export type EvaluatedCube = {
-  measures: EvaluatedCubeMeasures;
-  dimensions: EvaluatedCubeDimensions;
-  segments: EvaluatedCubeSegments;
-  joins: EvaluatedJoins;
+  measures: Record<string, MeasureDefinition>;
+  dimensions: Record<string, DimensionDefinition>;
+  segments: Record<string, SegmentDefinition>;
+  joins: Record<string, JoinDefinition>;
   hierarchies: Record<string, HierarchyDefinition>;
   evaluatedHierarchies: EvaluatedHierarchy[];
   preAggregations: Record<string, PreAggregationDefinitionExtended>;
@@ -595,11 +588,11 @@ export class CubeEvaluator extends CubeSymbols {
     )(this.evaluatedCubes[cube].dimensions || {});
   }
 
-  public measuresForCube(cube: string): EvaluatedCubeMeasures {
+  public measuresForCube(cube: string): Record<string, MeasureDefinition> {
     return this.cubeFromPath(cube).measures || {};
   }
 
-  public timeDimensionsForCube(cube: string): EvaluatedCubeDimensions {
+  public timeDimensionsForCube(cube: string): Record<string, DimensionDefinition> {
     return R.filter(
       (d: any) => d.type === 'time',
       this.cubeFromPath(cube).dimensions || {}

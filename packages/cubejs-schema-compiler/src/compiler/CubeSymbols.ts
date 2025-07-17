@@ -7,7 +7,6 @@ import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
-import { PreAggregationDefinitionExtended } from '../adapter';
 
 export type ToString = { toString(): string };
 
@@ -100,6 +99,11 @@ export type PreAggregationDefinitionRollup = BasePreAggregationDefinition & {
 // originalSql is not refreshed and so on.
 export type PreAggregationDefinition = PreAggregationDefinitionRollup;
 
+export type JoinDefinition = {
+  relationship: string,
+  sql: (...args: any[]) => string,
+};
+
 export interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
@@ -115,7 +119,7 @@ export interface CubeDefinition {
   preAggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
   // eslint-disable-next-line camelcase
   pre_aggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
-  joins?: Record<string, any>;
+  joins?: Record<string, JoinDefinition>;
   accessPolicy?: any[];
   folders?: any[];
   includes?: any;
@@ -184,13 +188,10 @@ export class CubeSymbols {
   }
 
   public compile(cubes: CubeDefinition[], errorReporter: ErrorReporter) {
-    // @ts-ignore
-    this.cubeDefinitions = R.pipe(
-      // @ts-ignore
-      R.map((c: CubeDefinition) => [c.name, c]),
-      R.fromPairs
-      // @ts-ignore
-    )(cubes);
+    this.cubeDefinitions = Object.fromEntries(
+      cubes.map((c): [string, CubeDefinition] => [c.name, c])
+    );
+
     this.cubeList = cubes.map(c => (c.name ? this.getCubeDefinition(c.name) : this.createCube(c)));
     // TODO support actual dependency sorting to allow using views inside views
     const sortedByDependency = R.pipe(
@@ -856,7 +857,7 @@ export class CubeSymbols {
     }
   }
 
-  protected funcArguments(func) {
+  protected funcArguments(func: Function): string[] {
     const funcDefinition = func.toString();
     if (!this.funcArgumentsValues[funcDefinition]) {
       const match = funcDefinition.match(FunctionRegex);
