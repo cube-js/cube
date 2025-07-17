@@ -11,16 +11,23 @@
 use crate::models;
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum V1CubeMetaNestedFolderMember {
+    Simple(String),
+    Folder(V1CubeMetaNestedFolder),
+}
+
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct V1CubeMetaNestedFolder {
     #[serde(rename = "name")]
     pub name: String,
     #[serde(rename = "members")]
-    pub members: Vec<String>,
+    pub members: Vec<V1CubeMetaNestedFolderMember>,
 }
 
 impl V1CubeMetaNestedFolder {
-    pub fn new(name: String, members: Vec<String>) -> V1CubeMetaNestedFolder {
+    pub fn new(name: String, members: Vec<V1CubeMetaNestedFolderMember>) -> V1CubeMetaNestedFolder {
         V1CubeMetaNestedFolder { name, members }
     }
 }
