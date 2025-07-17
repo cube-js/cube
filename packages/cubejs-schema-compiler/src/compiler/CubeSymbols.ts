@@ -7,6 +7,7 @@ import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
+import { PreAggregationDefinitionExtended } from '../adapter';
 
 export type ToString = { toString(): string };
 
@@ -25,6 +26,80 @@ export type TimeshiftDefinition = {
   timeDimension?: (...args: any[]) => string;
 };
 
+export type CubeSymbolDefinition = {
+  type?: string;
+  sql?: (...args: any[]) => string;
+  primaryKey?: boolean;
+  granularities?: Record<string, GranularityDefinition>;
+  timeShift?: TimeshiftDefinition[];
+  format?: string;
+};
+
+export type HierarchyDefinition = {
+  title?: string;
+  public?: boolean;
+  levels?: (...args: any[]) => string[];
+};
+
+export type EveryInterval = string;
+type EveryCronInterval = string;
+type EveryCronTimeZone = string;
+
+export type CubeRefreshKeySqlVariant = {
+  sql: () => string;
+  every?: EveryInterval;
+};
+
+export type CubeRefreshKeyEveryVariant = {
+  every: EveryInterval | EveryCronInterval;
+  timezone?: EveryCronTimeZone;
+  incremental?: boolean;
+  updateWindow?: EveryInterval;
+};
+
+export type CubeRefreshKeyImmutableVariant = {
+  immutable: true;
+};
+
+export type CubeRefreshKey =
+  | CubeRefreshKeySqlVariant
+  | CubeRefreshKeyEveryVariant
+  | CubeRefreshKeyImmutableVariant;
+
+type BasePreAggregationDefinition = {
+  allowNonStrictDateRangeMatch?: boolean;
+  useOriginalSqlPreAggregations?: boolean;
+  timeDimensionReference?: (...args: any[]) => ToString;
+  indexes?: Record<string, any>;
+  refreshKey?: CubeRefreshKey;
+  ownedByCube?: boolean;
+};
+
+export type PreAggregationDefinitionOriginalSql = BasePreAggregationDefinition & {
+  type: 'originalSql';
+  partitionGranularity?: string;
+  // eslint-disable-next-line camelcase
+  partition_granularity?: string;
+  // eslint-disable-next-line camelcase
+  time_dimension?: (...args: any[]) => ToString;
+};
+
+export type PreAggregationDefinitionRollup = BasePreAggregationDefinition & {
+  type: 'autoRollup' | 'rollupJoin' | 'rollupLambda' | 'rollup';
+  granularity: string;
+  timeDimensionReferences: Array<{ dimension: () => ToString; granularity: string }>;
+  dimensionReferences: (...args: any[]) => ToString[];
+  segmentReferences: (...args: any[]) => ToString[];
+  measureReferences: (...args: any[]) => ToString[];
+  rollupReferences: (...args: any[]) => ToString[];
+  scheduledRefresh: boolean;
+  external: boolean;
+};
+
+// PreAggregationDefinition is widely used in the codebase, but it's assumed to be rollup,
+// originalSql is not refreshed and so on.
+export type PreAggregationDefinition = PreAggregationDefinitionRollup;
+
 export interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
@@ -33,13 +108,13 @@ export interface CubeDefinition {
   sql_table?: string | ((...args: any[]) => string);
   sqlTable?: string | ((...args: any[]) => string);
   dataSource?: string;
-  measures?: Record<string, any>;
-  dimensions?: Record<string, any>;
-  segments?: Record<string, any>;
-  hierarchies?: Record<string, any>;
-  preAggregations?: Record<string, any>;
+  measures?: Record<string, CubeSymbolDefinition>;
+  dimensions?: Record<string, CubeSymbolDefinition>;
+  segments?: Record<string, CubeSymbolDefinition>;
+  hierarchies?: Record<string, HierarchyDefinition>;
+  preAggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
   // eslint-disable-next-line camelcase
-  pre_aggregations?: Record<string, any>;
+  pre_aggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
   joins?: Record<string, any>;
   accessPolicy?: any[];
   folders?: any[];
@@ -62,15 +137,6 @@ export interface CubeDefinitionExtended extends CubeDefinition {
 interface SplitViews {
   [key: string]: any;
 }
-
-export type CubeSymbolDefinition = {
-  type?: string;
-  sql?: (...args: any[]) => string;
-  primaryKey?: boolean;
-  granularities?: Record<string, GranularityDefinition>;
-  timeShift?: TimeshiftDefinition[];
-  format?: string;
-};
 
 export interface CubeSymbolsBase {
   cubeName: () => string;

@@ -1,7 +1,13 @@
 /* eslint-disable no-restricted-syntax */
 import R from 'ramda';
 
-import { CubeDefinitionExtended, CubeSymbols, type ToString } from './CubeSymbols';
+import {
+  CubeDefinitionExtended,
+  CubeSymbols,
+  HierarchyDefinition,
+  PreAggregationDefinition, PreAggregationDefinitionRollup,
+  type ToString
+} from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
@@ -68,49 +74,6 @@ export type PreAggregationFilters = {
   scheduled?: boolean;
 };
 
-export type EveryInterval = string;
-type EveryCronInterval = string;
-type EveryCronTimeZone = string;
-
-export type CubeRefreshKeySqlVariant = {
-  sql: () => string;
-  every?: EveryInterval;
-};
-
-export type CubeRefreshKeyEveryVariant = {
-  every: EveryInterval | EveryCronInterval;
-  timezone?: EveryCronTimeZone;
-  incremental?: boolean;
-  updateWindow?: EveryInterval;
-};
-
-export type CubeRefreshKeyImmutableVariant = {
-  immutable: true;
-};
-
-export type CubeRefreshKey =
-  | CubeRefreshKeySqlVariant
-  | CubeRefreshKeyEveryVariant
-  | CubeRefreshKeyImmutableVariant;
-
-export type PreAggregationDefinition = {
-  type: 'autoRollup' | 'originalSql' | 'rollupJoin' | 'rollupLambda' | 'rollup';
-  allowNonStrictDateRangeMatch?: boolean;
-  useOriginalSqlPreAggregations?: boolean;
-  timeDimensionReference?: () => ToString;
-  granularity: string;
-  timeDimensionReferences: Array<{ dimension: () => ToString, granularity: string }>;
-  dimensionReferences: () => Array<ToString>;
-  segmentReferences: () => Array<ToString>;
-  measureReferences: () => Array<ToString>;
-  rollupReferences: () => Array<ToString>;
-  indexes?: Record<string, any>;
-  refreshKey?: CubeRefreshKey;
-  scheduledRefresh: boolean;
-  external: boolean;
-  ownedByCube?: boolean; // To be compatible with measures and dimensions
-};
-
 export type PreAggregationDefinitions = Record<string, PreAggregationDefinition>;
 
 export type PreAggregationDefinitionsExtended = Record<string, PreAggregationDefinitionExtended>;
@@ -144,12 +107,6 @@ export type EvaluatedCubeDimensions = Record<string, DimensionDefinition>;
 export type EvaluatedCubeMeasures = Record<string, MeasureDefinition>;
 export type EvaluatedCubeSegments = Record<string, SegmentDefinition>;
 export type EvaluatedJoins = Record<string, unknown>;
-
-export type HierarchyDefinition = {
-  title?: string;
-  public?: boolean;
-  levels?: (...args: any[]) => string[];
-};
 
 export type EvaluatedHierarchy = {
   name: string;
@@ -901,7 +858,7 @@ export class CubeEvaluator extends CubeSymbols {
     return this.evaluateReferences(cube, rollupReferences, { originalSorting: true });
   }
 
-  public evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinition): PreAggregationReferences {
+  public evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinitionRollup): PreAggregationReferences {
     const timeDimensions: Array<PreAggregationTimeDimensionReference> = [];
 
     if (aggregation.timeDimensionReference) {

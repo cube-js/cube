@@ -1,10 +1,10 @@
 import R from 'ramda';
 
-import { CubeSymbols } from '../compiler/CubeSymbols';
+import { CubeSymbols, PreAggregationDefinition } from '../compiler/CubeSymbols';
 import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
 import {
-  PreAggregationDefinition, PreAggregationDefinitions,
+  PreAggregationDefinitions,
   PreAggregationReferences,
   PreAggregationTimeDimensionReference
 } from '../compiler/CubeEvaluator';
