@@ -146,8 +146,6 @@ fn finalize_physical_plan(
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    // TODO upgrade DF
-    // let p = rewrite_physical_plan(p.as_ref(), &mut |p| try_switch_to_inplace_aggregates(p))?;
     let p = rewrite_physical_plan(p, &mut |p| add_check_memory_exec(p, memory_handler.clone()))?;
     let p = if let Some(data_loaded_size) = data_loaded_size {
         rewrite_physical_plan(p, &mut |p| add_trace_data_loaded_exec(p, &data_loaded_size))?
