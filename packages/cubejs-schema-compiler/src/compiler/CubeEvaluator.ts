@@ -2,10 +2,13 @@
 import R from 'ramda';
 
 import {
+  AccessPolicyDefinition,
   CubeDefinitionExtended,
   CubeSymbols,
-  HierarchyDefinition, JoinDefinition,
-  PreAggregationDefinition, PreAggregationDefinitionRollup,
+  HierarchyDefinition,
+  JoinDefinition,
+  PreAggregationDefinition,
+  PreAggregationDefinitionRollup,
   type ToString
 } from './CubeSymbols';
 import { UserError } from './UserError';
@@ -110,30 +113,6 @@ export type EvaluatedHierarchy = {
   [key: string]: any;
 };
 
-export type Filter =
-  | {
-      member: string;
-      memberReference?: string;
-      [key: string]: any;
-    }
-  | {
-      and?: Filter[];
-      or?: Filter[];
-      [key: string]: any;
-    };
-
-export type AccessPolicy = {
-  rowLevel?: {
-    filters: Filter[];
-  };
-  memberLevel?: {
-    includes?: string | string[];
-    excludes?: string | string[];
-    includesMembers?: string[];
-    excludesMembers?: string[];
-  };
-};
-
 export type EvaluatedFolder = {
   name: string;
   includes: (EvaluatedFolder | DimensionDefinition | MeasureDefinition)[];
@@ -153,7 +132,7 @@ export type EvaluatedCube = {
   folders: EvaluatedFolder[];
   sql?: (...args: any[]) => string;
   sqlTable?: (...args: any[]) => string;
-  accessPolicy?: AccessPolicy[];
+  accessPolicy?: AccessPolicyDefinition[];
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -200,7 +179,7 @@ export class CubeEvaluator extends CubeSymbols {
     );
   }
 
-  protected prepareCube(cube, errorReporter: ErrorReporter) {
+  protected prepareCube(cube, errorReporter: ErrorReporter): EvaluatedCube {
     this.prepareJoins(cube, errorReporter);
     this.preparePreAggregations(cube, errorReporter);
     this.prepareMembers(cube.measures, cube, errorReporter);
