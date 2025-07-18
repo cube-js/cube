@@ -1,5 +1,4 @@
 module.exports = {
-  "aws": "AWS",
-  "aws-privatelink": "AWS PrivateLink",
-  "azure": "Azure",
-}
+  aws: "AWS",
+  azure: "Azure",
+};
