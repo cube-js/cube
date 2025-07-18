@@ -100,7 +100,7 @@ export type PreAggregationDefinitionRollup = BasePreAggregationDefinition & {
 export type PreAggregationDefinition = PreAggregationDefinitionRollup;
 
 export type JoinDefinition = {
-  name?: string, // TODO: Make it required
+  name: string,
   relationship: string,
   sql: (...args: any[]) => string,
 };
@@ -144,7 +144,7 @@ export interface CubeDefinition {
   preAggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
   // eslint-disable-next-line camelcase
   pre_aggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
-  joins?: Record<string, JoinDefinition>;
+  joins?: JoinDefinition[];
   accessPolicy?: AccessPolicyDefinition[];
   // eslint-disable-next-line camelcase
   access_policy?: any[];
@@ -322,7 +322,8 @@ export class CubeSymbols {
 
       get joins() {
         if (!joins) {
-          joins = this.allDefinitions('joins');
+          const parentJoins = cubeDefinition.extends ? super.joins : [];
+          joins = [...parentJoins, ...(cubeDefinition.joins || [])];
         }
         return joins;
       },
