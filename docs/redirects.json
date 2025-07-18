@@ -1613,5 +1613,10 @@
     "source": "/reference/configuration/config",
     "destination": "/product/configuration/reference/config",
     "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/azure",
+    "destination": "/product/deployment/cloud/vpc/azure/vpc-peering",
+    "permanent": true
   }
 ]
