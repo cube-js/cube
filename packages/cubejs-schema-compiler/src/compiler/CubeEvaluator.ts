@@ -124,7 +124,7 @@ export type EvaluatedCube = {
   measures: Record<string, MeasureDefinition>;
   dimensions: Record<string, DimensionDefinition>;
   segments: Record<string, SegmentDefinition>;
-  joins: Record<string, JoinDefinition>;
+  joins: JoinDefinition[];
   hierarchies: Record<string, HierarchyDefinition>;
   evaluatedHierarchies: EvaluatedHierarchy[];
   preAggregations: Record<string, PreAggregationDefinitionExtended>;
