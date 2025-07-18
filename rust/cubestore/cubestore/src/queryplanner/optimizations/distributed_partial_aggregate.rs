@@ -78,6 +78,8 @@ pub fn push_aggregate_to_workers(
             Arc::new(WorkerExec::new(
                 worker_input,
                 w.max_batch_rows,
+                // TODO upgrade DF: WorkerExec limit_and_reverse must be wrong here.  Should be
+                // None.  Same applies to cs.with_changed_schema.
                 w.limit_and_reverse.clone(),
                 p_final_agg
                     .required_input_ordering()
@@ -195,19 +197,26 @@ pub fn ensure_partition_merge_with_acceptable_parent(
 pub fn add_limit_to_workers(
     p: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    let limit_and_reverse;
+    let input;
     if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
-        if let Some((limit, reverse)) = w.limit_and_reverse {
-            if reverse {
-                let limit = Arc::new(TailLimitExec::new(w.input.clone(), limit));
-                p.with_new_children(vec![limit])
-            } else {
-                let limit = Arc::new(GlobalLimitExec::new(w.input.clone(), 0, Some(limit)));
-                p.with_new_children(vec![limit])
-            }
-        } else {
-            Ok(p)
-        }
+        limit_and_reverse = w.limit_and_reverse;
+        input = &w.input;
+    } else if let Some(cs) = p.as_any().downcast_ref::<ClusterSendExec>() {
+        limit_and_reverse = cs.limit_and_reverse;
+        input = &cs.input_for_optimizations;
     } else {
-        Ok(p)
+        return Ok(p);
+    }
+
+    let Some((limit, reverse)) = limit_and_reverse else {
+        return Ok(p);
+    };
+    if reverse {
+        let limit = Arc::new(TailLimitExec::new(input.clone(), limit));
+        p.with_new_children(vec![limit])
+    } else {
+        let limit = Arc::new(GlobalLimitExec::new(input.clone(), 0, Some(limit)));
+        p.with_new_children(vec![limit])
     }
 }

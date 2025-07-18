@@ -1815,6 +1815,7 @@ impl CubeExtensionPlanner {
                 snapshots,
                 input,
                 use_streaming,
+                limit_and_reverse,
                 required_input_ordering,
             )?))
         } else {
