@@ -447,11 +447,7 @@ describe('Schema Testing', () => {
     ]);
     await compiler.compile();
 
-    expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchObject({
-      CubeB: { relationship: 'hasOne' },
-      CubeC: { relationship: 'hasMany' },
-      CubeD: { relationship: 'belongsTo' }
-    });
+    expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
   });
 
   describe('Access Policies', () => {
