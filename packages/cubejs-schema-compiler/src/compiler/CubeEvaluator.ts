@@ -423,35 +423,39 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   protected prepareJoins(cube: any, _errorReporter: ErrorReporter) {
-    if (cube.joins) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const join of Object.values(cube.joins) as any[]) {
-        // eslint-disable-next-line default-case
-        switch (join.relationship) {
-          case 'belongs_to':
-          case 'many_to_one':
-          case 'manyToOne':
-            join.relationship = 'belongsTo';
-            break;
-          case 'has_many':
-          case 'one_to_many':
-          case 'oneToMany':
-            join.relationship = 'hasMany';
-            break;
-          case 'has_one':
-          case 'one_to_one':
-          case 'oneToOne':
-            join.relationship = 'hasOne';
-            break;
-        }
-      }
+    if (!cube.joins) {
+      return;
     }
+
+    const joins: JoinDefinition[] = Array.isArray(cube.joins) ? cube.joins : Object.values(cube.joins);
+
+    joins.forEach(join => {
+      // eslint-disable-next-line default-case
+      switch (join.relationship) {
+        case 'belongs_to':
+        case 'many_to_one':
+        case 'manyToOne':
+          join.relationship = 'belongsTo';
+          break;
+        case 'has_many':
+        case 'one_to_many':
+        case 'oneToMany':
+          join.relationship = 'hasMany';
+          break;
+        case 'has_one':
+        case 'one_to_one':
+        case 'oneToOne':
+          join.relationship = 'hasOne';
+          break;
+      }
+    });
   }
 
   protected preparePreAggregations(cube: any, errorReporter: ErrorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
       for (const preAggregation of Object.values(cube.preAggregations) as any) {
+        // preAggregation is actually (PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql)
         if (preAggregation.timeDimension) {
           preAggregation.timeDimensionReference = preAggregation.timeDimension;
           delete preAggregation.timeDimension;
@@ -553,7 +557,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  public cubesByFileName(fileName) {
+  public cubesByFileName(fileName): CubeDefinitionExtended[] {
     return this.byFileName[fileName] || [];
   }
 
@@ -670,7 +674,7 @@ export class CubeEvaluator extends CubeSymbols {
     return this.preAggregations({ scheduled: true });
   }
 
-  public cubeNames() {
+  public cubeNames(): string[] {
     return Object.keys(this.evaluatedCubes);
   }
 
