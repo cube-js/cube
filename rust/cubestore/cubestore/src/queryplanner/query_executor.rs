@@ -1286,6 +1286,8 @@ pub struct ClusterSendExec {
     pub cluster: Arc<dyn Cluster>,
     pub serialized_plan: Arc<PreSerializedPlan>,
     pub use_streaming: bool,
+    /// Not used in execution, only stored to allow consistent optimization on router and worker.
+    pub limit_and_reverse: Option<(usize, bool)>,
     // Used to prevent SortExec on workers (e.g. with ClusterAggregateTopK) from being optimized away.
     pub required_input_ordering: Option<LexRequirement>,
 }
@@ -1309,6 +1311,7 @@ impl ClusterSendExec {
         union_snapshots: &[Snapshots],
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
+        limit_and_reverse: Option<(usize, bool)>,
         required_input_ordering: Option<LexRequirement>,
     ) -> Result<Self, CubeError> {
         let partitions = Self::distribute_to_workers(
@@ -1326,6 +1329,7 @@ impl ClusterSendExec {
             serialized_plan,
             input_for_optimizations,
             use_streaming,
+            limit_and_reverse,
             required_input_ordering,
         })
     }
@@ -1578,6 +1582,10 @@ impl ClusterSendExec {
             serialized_plan: self.serialized_plan.clone(),
             input_for_optimizations,
             use_streaming: self.use_streaming,
+            // TODO upgrade DF: limit_and_reverse should be reset to None or taken as a parameter.
+            // This is only set to self.limit_and_reverse to be consistent with WorkerExec having
+            // the bug.
+            limit_and_reverse: self.limit_and_reverse,
             required_input_ordering: new_required_input_ordering,
         }
     }
@@ -1644,6 +1652,7 @@ impl ExecutionPlan for ClusterSendExec {
             serialized_plan: self.serialized_plan.clone(),
             input_for_optimizations,
             use_streaming: self.use_streaming,
+            limit_and_reverse: self.limit_and_reverse,
             required_input_ordering: self.required_input_ordering.clone(),
         }))
     }
