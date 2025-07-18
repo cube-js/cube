@@ -105,6 +105,30 @@ export type JoinDefinition = {
   sql: (...args: any[]) => string,
 };
 
+export type Filter =
+  | {
+      member: string;
+      memberReference?: string;
+      [key: string]: any;
+    }
+  | {
+      and?: Filter[];
+      or?: Filter[];
+      [key: string]: any;
+    };
+
+export type AccessPolicyDefinition = {
+  rowLevel?: {
+    filters: Filter[];
+  };
+  memberLevel?: {
+    includes?: string | string[];
+    excludes?: string | string[];
+    includesMembers?: string[];
+    excludesMembers?: string[];
+  };
+};
+
 export interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
@@ -121,7 +145,7 @@ export interface CubeDefinition {
   // eslint-disable-next-line camelcase
   pre_aggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
   joins?: Record<string, JoinDefinition>;
-  accessPolicy?: any[];
+  accessPolicy?: AccessPolicyDefinition[];
   // eslint-disable-next-line camelcase
   access_policy?: any[];
   folders?: any[];
