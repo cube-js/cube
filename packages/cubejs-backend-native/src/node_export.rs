@@ -1,9 +1,9 @@
 use cubesql::compile::parser::parse_sql_to_statement;
 use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
-use cubesql::transport::{SpanId, TransportService};
-use cubesql::sql::dataframe::{Column, arrow_to_column_type};
+use cubesql::sql::dataframe::{arrow_to_column_type, Column};
 use cubesql::sql::ColumnFlags;
+use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
 use serde_json::Map;
@@ -201,7 +201,7 @@ async fn write_jsonl_message(
     value: serde_json::Value,
 ) -> Result<bool, CubeError> {
     let message = format!("{}{}", serde_json::to_string(&value)?, CHUNK_DELIM);
-    
+
     call_js_fn(
         channel,
         write_fn,
@@ -300,12 +300,12 @@ async fn handle_sql_query(
                     ColumnFlags::empty(),
                 ));
             }
-            
+
             // Send schema first
             let columns_json = serde_json::to_value(&columns)?;
             let mut schema_response = Map::new();
             schema_response.insert("schema".into(), columns_json);
-            
+
             write_jsonl_message(
                 channel.clone(),
                 stream_methods.write.clone(),
@@ -341,7 +341,7 @@ async fn handle_sql_query(
             if !has_data {
                 let mut rows = Map::new();
                 rows.insert("data".into(), serde_json::Value::Array(vec![]));
-                
+
                 write_jsonl_message(
                     channel.clone(),
                     stream_methods.write.clone(),
