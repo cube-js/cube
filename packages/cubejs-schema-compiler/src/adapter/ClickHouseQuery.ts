@@ -200,23 +200,22 @@ export class ClickHouseQuery extends BaseQuery {
     //
     // ClickHouse orders string by bytes, so we need to use COLLATE 'en' to order by string
     //
-    if (R.isEmpty(this.order)) {
-      return '';
+if (this.order.length === 0) {
+  return '';
+}
+
+const collation = this.getCollation();
+
+const orderByString = this.order
+  .map((order) => {
+    let orderString = this.orderHashToString(order);
+    if (collation && this.getFieldType(order) === 'string') {
+      orderString = `${orderString} COLLATE '${collation}'`;
     }
-
-    const collation = this.getCollation();
-
-    const orderByString = R.pipe(
-      R.map((order) => {
-        let orderString = this.orderHashToString(order);
-        if (collation && this.getFieldType(order) === 'string') {
-          orderString = `${orderString} COLLATE '${collation}'`;
-        }
-        return orderString;
-      }),
-      R.reject(R.isNil),
-      R.join(', ')
-    )(this.order);
+    return orderString;
+  })
+  .filter(Boolean) // Analogue `R.reject(R.isNil)`
+  .join(', ');
 
     if (!orderByString) {
       return '';
