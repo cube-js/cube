@@ -125,7 +125,7 @@ export class ClickHouseQuery extends BaseQuery {
       .join(' AND ');
   }
 
-  public getField(id) {
+  private getField(id) {
     const equalIgnoreCase = (a, b) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
@@ -188,7 +188,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `${fieldAlias} ${direction}`;
   }
 
-  public getCollation() {
+  private getCollation() {
     const useCollation = getEnv('clickhouseUseCollation', { dataSource: this.dataSource });
     if (useCollation) {
       return getEnv('clickhouseSortCollation', { dataSource: this.dataSource });
