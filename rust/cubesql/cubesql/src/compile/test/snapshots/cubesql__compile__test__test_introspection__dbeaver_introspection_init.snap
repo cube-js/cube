@@ -2,8 +2,8 @@
 source: cubesql/src/compile/test/test_introspection.rs
 expression: "execute_query(\"SELECT current_schema(), session_user;\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
-+------------------+----------------+
-| current_schema() | session_user() |
-+------------------+----------------+
-| public           | ovr            |
-+------------------+----------------+
++----------------+--------------+
+| current_schema | session_user |
++----------------+--------------+
+| public         | ovr          |
++----------------+--------------+

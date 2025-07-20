@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /deployment/platforms/docker
----
-
 # Deploying Cube Core with Docker
 
 This guide walks you through deploying Cube with Docker.
@@ -254,7 +249,7 @@ need to make sure that none of the Cube Store services have any exposed
 
 All Cube logs can be found by through the Docker Compose CLI:
 
-```bash{outputLines: 2-9,11-18}
+```bash
 docker-compose ps
 
            Name                           Command               State                    Ports
@@ -383,6 +378,6 @@ installed with `npm install` reside, and result in errors like this:
 [link-nginx]: https://www.nginx.com/
 [ref-config-files]: /product/configuration#cubepy-and-cubejs-files
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
-[ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
+[ref-config-queryrewrite]: /product/configuration/reference/config#queryrewrite
 [ref-config-sched-ref-ctx]:
-  /reference/configuration/config#scheduledrefreshcontexts
+  /product/configuration/reference/config#scheduledrefreshcontexts

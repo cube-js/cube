@@ -52,6 +52,8 @@ const schemaOptions = Joi.object().keys({
     cors: corsOptions,
   }),
   gracefulShutdown: Joi.number().min(0).integer(),
+  serverHeadersTimeout: Joi.number(),
+  serverKeepAliveTimeout: Joi.number(),
   // Additional from WebSocketServerOptions
   processSubscriptionsInterval: Joi.number(),
   webSocketsBasePath: Joi.string(),
@@ -145,6 +147,7 @@ const schemaOptions = Joi.object().keys({
   // Additional system flags
   serverless: Joi.boolean(),
   allowNodeRequire: Joi.boolean(),
+  fastReload: Joi.boolean(),
 });
 
 export default (options: any) => {

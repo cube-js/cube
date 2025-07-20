@@ -1,11 +1,11 @@
 import { BaseQuery, PostgresQuery } from '../../../src/adapter';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('Views Join Order', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
 cube(\`fact\`, {
   sql: \`SELECT 1 as id, 1 as id_product, 10 as quantity\`,
   dimensions: {

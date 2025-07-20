@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /monitoring/datadog
----
-
 # Integration with Datadog
 
 [Datadog][datadog] is a popular fully managed observability service. This guide
@@ -31,7 +26,6 @@ type = "datadog_logs"
 inputs = [
   "cubejs-server",
   "refresh-scheduler",
-  "ext-db",
   "warmup-job",
   "cubestore"
 ]

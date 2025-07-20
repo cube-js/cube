@@ -71,6 +71,7 @@ pub enum FilterOperator {
 pub struct QueryFilter {
     pub member: String,
     pub operator: FilterOperator,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub values: Option<Vec<String>>,
 }
 
@@ -89,6 +90,21 @@ pub enum CompareDateRangeType {
     Multi(Vec<Vec<String>>),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct ExtendedDimensionFormat {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(rename = "type")]
+    pub format_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum DimensionFormat {
+    Single(String),
+    Extended(ExtendedDimensionFormat),
+}
+
 // We can do nothing with JS functions here,
 // but to keep DTOs in sync with reality, let's keep it.
 pub type JsFunction = String;
@@ -97,6 +113,7 @@ pub type JsFunction = String;
 #[serde(rename_all = "camelCase")]
 pub struct MemberExpression {
     // Made as Option and JsValueDeserializer set's it to None.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expression: Option<JsFunction>,
     pub cube_name: String,
     pub name: String,
@@ -126,8 +143,11 @@ pub struct ParsedMemberExpression {
 #[serde(rename_all = "camelCase")]
 pub struct QueryTimeDimension {
     pub dimension: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub date_range: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compare_date_range: Option<CompareDateRangeType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub granularity: Option<String>,
 }
 
@@ -139,7 +159,8 @@ pub type MembersMap = HashMap<String, String>;
 pub struct GranularityMeta {
     pub name: String,
     pub title: String,
-    pub interval: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interval: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -159,7 +180,7 @@ pub struct ConfigItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub member_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
+    pub format: Option<DimensionFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -193,7 +214,7 @@ pub struct AnnotatedConfigItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub member_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
+    pub format: Option<DimensionFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]

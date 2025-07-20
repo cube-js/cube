@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /monitoring/grafana-cloud
----
-
 # Integration with Grafana Cloud
 
 [Grafana Cloud][grafana] is a popular fully managed observability service. This
@@ -31,7 +26,6 @@ type = "loki"
 inputs = [
   "cubejs-server",
   "refresh-scheduler",
-  "ext-db",
   "warmup-job",
   "cubestore"
 ]

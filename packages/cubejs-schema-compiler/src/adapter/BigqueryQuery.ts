@@ -42,7 +42,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public convertTz(field) {
-    return `DATETIME(${field}, '${this.timezone}')`;
+    return `TIMESTAMP(DATETIME(${field}, '${this.timezone}'))`;
   }
 
   public timeStampCast(value) {
@@ -58,7 +58,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public timeGroupedColumn(granularity, dimension) {
-    return `DATETIME_TRUNC(${dimension}, ${GRANULARITY_TO_INTERVAL[granularity]})`;
+    return this.timeStampCast(`DATETIME_TRUNC(${dimension}, ${GRANULARITY_TO_INTERVAL[granularity]})`);
   }
 
   /**
@@ -72,7 +72,7 @@ export class BigqueryQuery extends BaseQuery {
 
     return `(${this.dateTimeCast(`'${origin}'`)} + INTERVAL ${intervalFormatted} *
       CAST(FLOOR(
-        DATETIME_DIFF(${source}, ${this.dateTimeCast(`'${origin}'`)}, ${timeUnit}) /
+        DATETIME_DIFF(${this.dateTimeCast(source)}, ${this.dateTimeCast(`'${origin}'`)}, ${timeUnit}) /
         DATETIME_DIFF(${beginOfTime} + INTERVAL ${intervalFormatted}, ${beginOfTime}, ${timeUnit})
       ) AS INT64))`;
   }
@@ -127,26 +127,26 @@ export class BigqueryQuery extends BaseQuery {
       return [`'${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' HOUR TO SECOND`, 'SECOND'];
     } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
       return [`'${intervalParsed.minute}:${intervalParsed.second}' MINUTE TO SECOND`, 'SECOND'];
+    } else if (intervalParsed.millisecond && intKeys === 1) {
+      return [`'${intervalParsed.millisecond}' MILLISECOND`, 'MILLISECOND'];
     }
 
-    // No need to support microseconds.
-
     throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
+  }
+
+  public override intervalAndMinimalTimeUnit(interval: string): [string, string] {
+    return this.formatInterval(interval);
   }
 
   public newFilter(filter) {
     return new BigqueryFilter(this, filter);
   }
 
-  public dateSeriesSql(timeDimension: BaseTimeDimension) {
-    return `${timeDimension.dateSeriesAliasName()} AS (${this.seriesSql(timeDimension)})`;
-  }
-
   public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
-    return `SELECT ${this.dateTimeCast('dates.f')} date_from, ${this.dateTimeCast('dates.t')} date_to FROM (${values}) AS dates`;
+    return `SELECT ${this.timeStampCast('dates.f')} date_from, ${this.timeStampCast('dates.t')} date_to FROM (${values}) AS dates`;
   }
 
   public timestampFormat() {
@@ -157,40 +157,34 @@ export class BigqueryQuery extends BaseQuery {
     return 6;
   }
 
-  public overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
-    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
-    const outerSeriesAlias = this.cubeAlias('outer_series');
-    const outerBase = this.cubeAlias('outer_base');
-    const timeDimensionAlias = this.timeDimensions.map(d => d.aliasName()).filter(d => !!d)[0];
-    const aliasesForSelect = this.timeDimensions.map(d => d.dateSeriesSelectColumn(outerSeriesAlias)).concat(
-      this.dimensions.concat(cumulativeMeasures).map(s => s.aliasName())
-    ).filter(c => !!c).join(', ');
-    const dateSeriesAlias = this.timeDimensions.map(d => `${d.dateSeriesAliasName()}`).filter(c => !!c)[0];
-    return `
-    WITH ${dateSeriesSql} SELECT ${aliasesForSelect} FROM
-    ${dateSeriesAlias} ${outerSeriesAlias}
-    LEFT JOIN (
-      SELECT ${forSelect} FROM ${dateSeriesAlias}
-      INNER JOIN (${baseQuery}) AS ${baseQueryAlias} ON ${dateJoinConditionSql}
-      ${this.groupByClause()}
-    ) AS ${outerBase} ON ${outerSeriesAlias}.${this.escapeColumnName('date_from')} = ${outerBase}.${timeDimensionAlias}
-    `;
-  }
-
   public subtractInterval(date, interval) {
-    return `DATETIME_SUB(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
+    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
+    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
+      return this.timeStampCast(`DATETIME_SUB(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
+    }
+
+    return `TIMESTAMP_SUB(${date}, INTERVAL ${intervalFormatted})`;
   }
 
   public addInterval(date, interval) {
-    return `DATETIME_ADD(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
+    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
+    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit) || intervalFormatted.includes('WEEK')) {
+      return this.timeStampCast(`DATETIME_ADD(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
+    }
+
+    return `TIMESTAMP_ADD(${date}, INTERVAL ${intervalFormatted})`;
   }
 
-  public subtractTimestampInterval(date, interval) {
-    return `TIMESTAMP_SUB(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
+  public subtractTimestampInterval(timestamp, interval) {
+    return this.subtractInterval(timestamp, interval);
   }
 
-  public addTimestampInterval(date, interval) {
-    return `TIMESTAMP_ADD(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
+  public intervalString(interval: string): string {
+    return `${interval}`;
+  }
+
+  public addTimestampInterval(timestamp, interval) {
+    return this.addInterval(timestamp, interval);
   }
 
   public nowTimestampSql() {
@@ -199,6 +193,115 @@ export class BigqueryQuery extends BaseQuery {
 
   public unixTimestampSql() {
     return `UNIX_SECONDS(${this.nowTimestampSql()})`;
+  }
+
+  /**
+   * Should be protected, but BaseQuery is in js
+   * Overridden from BaseQuery to support BigQuery strict data types for
+   * joining conditions (note timeStampCast)
+   */
+  public override runningTotalDateJoinCondition() {
+    return this.timeDimensions
+      .map(
+        d => [
+          d,
+          (_dateFrom: string, dateTo: string, dateField: string, dimensionDateFrom: string, _dimensionDateTo: string) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
+        ]
+      );
+  }
+
+  /**
+   * Should be protected, but BaseQuery is in js
+   * Overridden from BaseQuery to support BigQuery strict data types for
+   * joining conditions (note timeStampCast)
+   */
+  public override rollingWindowToDateJoinCondition(granularity) {
+    return Object.values(
+      this.timeDimensions.reduce((acc, td) => {
+        const key = td.dimension;
+
+        if (!acc[key]) {
+          acc[key] = td;
+        }
+
+        if (!acc[key].granularity && td.granularity) {
+          acc[key] = td;
+        }
+
+        return acc;
+      }, {})
+    ).map(
+      d => [
+        d,
+        (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, _isFromStartToEnd: boolean) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
+      ]
+    );
+  }
+
+  /**
+   * Should be protected, but BaseQuery is in js
+   * Overridden from BaseQuery to support BigQuery strict data types for
+   * joining conditions (note timeStampCast)
+   */
+  public override rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
+    offset = offset || 'end';
+    return Object.values(
+      this.timeDimensions.reduce((acc, td) => {
+        const key = td.dimension;
+
+        if (!acc[key]) {
+          acc[key] = td;
+        }
+
+        if (!acc[key].granularity && td.granularity) {
+          acc[key] = td;
+        }
+
+        return acc;
+      }, {})
+    )
+      .map(
+        d => [d, (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, isFromStartToEnd: boolean) => {
+        // dateFrom based window
+          const conditions: string[] = [];
+          if (trailingInterval !== 'unbounded') {
+            const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
+            const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
+            const sign = offset === 'start' ? '>=' : '>';
+            conditions.push(`${dateField} ${sign} ${this.timeStampCast(trailingStart)}`);
+          }
+          if (leadingInterval !== 'unbounded') {
+            const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
+            const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
+            const sign = offset === 'end' ? '<=' : '<';
+            conditions.push(`${dateField} ${sign} ${this.timeStampCast(leadingEnd)}`);
+          }
+          return conditions.length ? conditions.join(' AND ') : '1 = 1';
+        }]
+      );
+  }
+
+  // Should be protected, but BaseQuery is in js
+  public override dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
+    return dateJoinCondition.map(
+      ([d, f]) => ({
+        filterToWhere: () => {
+          const timeSeries = d.timeSeries();
+          return f(
+            isFromStartToEnd ?
+              this.timeStampCast(this.paramAllocator.allocateParam(timeSeries[0][0])) :
+              `${this.timeStampInClientTz(d.dateFromParam())}`,
+            isFromStartToEnd ?
+              this.timeStampCast(this.paramAllocator.allocateParam(timeSeries[timeSeries.length - 1][1])) :
+              `${this.timeStampInClientTz(d.dateToParam())}`,
+            `${fromRollup ? this.dimensionSql(d) : d.convertedToTz()}`,
+            `${this.timeStampInClientTz(d.dateFromParam())}`,
+            `${this.timeStampInClientTz(d.dateToParam())}`,
+            isFromStartToEnd
+          );
+        }
+      })
+    );
   }
 
   // eslint-disable-next-line no-unused-vars
@@ -236,21 +339,29 @@ export class BigqueryQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
-    templates.functions.DATETRUNC = 'DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
+    templates.functions.DATETRUNC = 'TIMESTAMP(DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part|upper == \'WEEK\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %}))';
     templates.functions.LOG = 'LOG({{ args_concat }}{% if args[1] is undefined %}, 10{% endif %})';
     templates.functions.BTRIM = 'TRIM({{ args_concat }})';
     templates.functions.STRPOS = 'STRPOS({{ args_concat }})';
     templates.functions.DATEDIFF = 'DATETIME_DIFF(CAST({{ args[2] }} AS DATETIME), CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
     // DATEADD is being rewritten to DATE_ADD
-    // templates.functions.DATEADD = 'DATETIME_ADD(CAST({{ args[2] }} AS DATETTIME), INTERVAL {{ interval }} {{ date_part }})';
+    templates.functions.DATE_ADD = 'DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.DATE = 'TIMESTAMP({{ args_concat }})';
     delete templates.functions.TO_CHAR;
+    delete templates.functions.PERCENTILECONT;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
+    templates.expressions.rolling_window_expr_timestamp_cast = 'TIMESTAMP({{ value }})';
     delete templates.expressions.ilike;
     delete templates.expressions.like_escape;
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
+    templates.tesseract.series_bounds_cast = 'TIMESTAMP({{ expr }})';
+    templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOL)';
+    templates.tesseract.number_param_cast = 'CAST({{ expr }} AS FLOAT64)';
     templates.types.boolean = 'BOOL';
     templates.types.float = 'FLOAT64';
     templates.types.double = 'FLOAT64';
@@ -258,6 +369,32 @@ export class BigqueryQuery extends BaseQuery {
     templates.types.binary = 'BYTES';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.join_types.full = 'FULL';
+    templates.statements.time_series_select = 'SELECT DATETIME(TIMESTAMP(f)) date_from, DATETIME(TIMESTAMP(t)) date_to \n' +
+    'FROM (\n' +
+    '{% for time_item in seria  %}' +
+    '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
+    '{% if not loop.last %} UNION ALL\n{% endif %}' +
+    '{% endfor %}' +
+    ') AS dates';
+    templates.statements.generated_time_series_select = 'SELECT DATETIME(d) AS date_from,\n' +
+    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    'FROM UNNEST(\n' +
+    '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
+    'GENERATE_DATE_ARRAY(DATE({{ start }}), DATE({{ end }}), INTERVAL {{ granularity }})\n' +
+    '{% else %}' +
+    'GENERATE_TIMESTAMP_ARRAY(TIMESTAMP({{ start }}), TIMESTAMP({{ end }}), INTERVAL {{ granularity }})\n' +
+    '{% endif %}' +
+    ') AS d';
+
+    templates.statements.generated_time_series_with_cte_range_source = 'SELECT DATETIME(d) AS date_from,\n' +
+    'DATETIME_SUB(DATETIME_ADD(DATETIME(d),  INTERVAL {{ granularity }}), INTERVAL 1 MILLISECOND) AS date_to \n' +
+    'FROM {{ range_source }}, UNNEST(\n' +
+    '{% if minimal_time_unit|upper in ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] %}' +
+    'GENERATE_DATE_ARRAY(DATE({{ range_source }}.{{ min_name }}), DATE({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
+    '{% else %}' +
+    'GENERATE_TIMESTAMP_ARRAY(TIMESTAMP({{ range_source }}.{{ min_name }}), TIMESTAMP({{ range_source }}.{{ max_name }}), INTERVAL {{ granularity }})\n' +
+    '{% endif %}' +
+    ') AS d';
     return templates;
   }
 }

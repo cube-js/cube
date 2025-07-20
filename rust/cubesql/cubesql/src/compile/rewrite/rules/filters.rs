@@ -1,15 +1,17 @@
 use super::utils;
+use crate::compile::date_parser::parse_date_str;
 use crate::{
     compile::rewrite::{
         alias_expr,
         analysis::{ConstantFolding, Member, OriginalExpr},
-        between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
-        column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
-        dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
-        filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
+        between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, cast_expr_explicit,
+        change_user_member, column_expr, cube_scan, cube_scan_filters,
+        cube_scan_filters_empty_tail, cube_scan_members, dimension_expr, expr_column_name, filter,
+        filter_member, filter_op, filter_op_filters, filter_op_filters_empty_tail, filter_replacer,
+        filter_simplify_pull_up_replacer, filter_simplify_push_down_replacer, fun_expr,
         fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, inlist_expr_list, is_not_null_expr,
         is_null_expr, like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int,
-        literal_string, measure_expr, negative_expr, not_expr, projection, rewrite,
+        literal_null, literal_string, measure_expr, negative_expr, not_expr, projection, rewrite,
         rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
         time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
@@ -24,6 +26,7 @@ use crate::{
         TimeDimensionGranularity, TimeDimensionName,
     },
     config::ConfigObj,
+    copy_value,
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
     var, var_iter,
 };
@@ -34,7 +37,7 @@ use chrono::{
         Numeric::{Day, Hour, Minute, Month, Second, Year},
         Pad::Zero,
     },
-    DateTime, Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, Timelike, Weekday,
+    DateTime, Datelike, Days, Duration, Months, NaiveDateTime, Timelike, Weekday,
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -69,7 +72,7 @@ impl RewriteRules for FilterRules {
     fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![
             transforming_rewrite(
-                "push-down-filter",
+                "push-down-filter-simplify",
                 filter(
                     "?expr",
                     cube_scan(
@@ -83,20 +86,13 @@ impl RewriteRules for FilterRules {
                         "?can_pushdown_join",
                         "?wrapped",
                         "?ungrouped",
+                        "?join_hints",
                     ),
                 ),
                 cube_scan(
                     "?alias_to_cube",
                     "?members",
-                    cube_scan_filters(
-                        "?filters",
-                        filter_replacer(
-                            filter_simplify_replacer("?expr"),
-                            "?filter_alias_to_cube",
-                            "?members",
-                            "?filter_aliases",
-                        ),
-                    ),
+                    cube_scan_filters("?filters", filter_simplify_push_down_replacer("?expr")),
                     "?order",
                     "?limit",
                     "?offset",
@@ -104,13 +100,9 @@ impl RewriteRules for FilterRules {
                     "?can_pushdown_join",
                     "?wrapped",
                     "?ungrouped",
+                    "?join_hints",
                 ),
-                self.push_down_filter(
-                    "?alias_to_cube",
-                    "?expr",
-                    "?filter_alias_to_cube",
-                    "?filter_aliases",
-                ),
+                self.push_down_filter_simplify("?expr"),
             ),
             // Transform Filter: Boolean(False)
             transforming_rewrite(
@@ -128,6 +120,7 @@ impl RewriteRules for FilterRules {
                         "?can_pushdown_join",
                         "?wrapped",
                         "?ungrouped",
+                        "?join_hints",
                     ),
                 ),
                 limit(
@@ -144,6 +137,7 @@ impl RewriteRules for FilterRules {
                         "?can_pushdown_join",
                         "?wrapped",
                         "?ungrouped",
+                        "?join_hints",
                     ),
                 ),
                 self.push_down_limit_filter(
@@ -188,6 +182,7 @@ impl RewriteRules for FilterRules {
                             "?can_pushdown_join",
                             "?wrapped",
                             "?ungrouped",
+                            "?join_hints",
                         ),
                     ),
                 ),
@@ -207,6 +202,7 @@ impl RewriteRules for FilterRules {
                             "?can_pushdown_join",
                             "?wrapped",
                             "?ungrouped",
+                            "?join_hints",
                         ),
                     ),
                 ),
@@ -245,6 +241,7 @@ impl RewriteRules for FilterRules {
                             "?can_pushdown_join",
                             "?wrapped",
                             "?ungrouped",
+                            "?join_hints",
                         ),
                     ),
                     "?alias",
@@ -266,11 +263,50 @@ impl RewriteRules for FilterRules {
                             "?can_pushdown_join",
                             "?wrapped",
                             "?ungrouped",
+                            "?join_hints",
                         ),
                         "?alias",
                         "?projection_split",
                     ),
                 ),
+            ),
+            transforming_rewrite(
+                "push-down-filter-pickup-simplified",
+                cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    cube_scan_filters("?filters", filter_simplify_pull_up_replacer("?filter")),
+                    "?order",
+                    "?limit",
+                    "?offset",
+                    "?split",
+                    "?can_pushdown_join",
+                    "?wrapped",
+                    "?ungrouped",
+                    "?join_hints",
+                ),
+                cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    cube_scan_filters(
+                        "?filters",
+                        filter_replacer(
+                            "?filter",
+                            "?filter_alias_to_cube",
+                            "?members",
+                            "?filter_aliases",
+                        ),
+                    ),
+                    "?order",
+                    "?limit",
+                    "?offset",
+                    "?split",
+                    "?can_pushdown_join",
+                    "?wrapped",
+                    "?ungrouped",
+                    "?join_hints",
+                ),
+                self.push_down_filter("?alias_to_cube", "?filter_alias_to_cube", "?filter_aliases"),
             ),
             // Transform Filter: Boolean(True) same as TRUE = TRUE, which is useless
             transforming_rewrite(
@@ -788,7 +824,11 @@ impl RewriteRules for FilterRules {
                     "FilterOpOp:and",
                 ),
             ),
-            rewrite(
+            // OR filters presents an issue: it must be a single filter with LogicalOp inside, so it can't have both measures and dimensions together
+            // There's no need to check AND operation for measure-dimension mixup
+            // Any number of AND's between root and terminal filter will be split to separate filters in CubeScan
+            // It's enough to stop on first OR, because FilterReplacer goes top-down
+            transforming_rewrite(
                 "filter-replacer-or",
                 filter_replacer(
                     binary_expr("?left", "OR", "?right"),
@@ -802,6 +842,13 @@ impl RewriteRules for FilterRules {
                         filter_replacer("?right", "?alias_to_cube", "?members", "?filter_aliases"),
                     ),
                     "FilterOpOp:or",
+                ),
+                self.transform_filter_or(
+                    "?left",
+                    "?right",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
                 ),
             ),
             // Unwrap lower for case-insensitive operators
@@ -1621,15 +1668,43 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
+            // DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") = 2019
             transforming_rewrite(
                 "extract-year-equals",
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DatePart",
+                            vec![literal_string("year"), column_expr("?column")],
+                        ),
+                        "=",
+                        literal_expr("?year"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                self.transform_filter_extract_year_equals(
+                    "?year",
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?member",
+                    "?values",
+                    "?filter_aliases",
+                ),
+            ),
+            // TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) = 2019
+            transforming_rewrite(
+                "extract-trunc-year-equals",
                 filter_replacer(
                     binary_expr(
                         self.fun_expr(
                             "Trunc",
                             vec![self.fun_expr(
                                 "DatePart",
-                                vec![literal_string("YEAR"), column_expr("?column")],
+                                vec![literal_string("year"), column_expr("?column")],
                             )],
                         ),
                         "=",
@@ -1785,6 +1860,38 @@ impl RewriteRules for FilterRules {
                     "?end_date",
                 ),
             ),
+            transforming_rewrite(
+                "filter-date-trunc-neq-literal",
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec!["?granularity".to_string(), column_expr("?column")],
+                        ),
+                        "!=",
+                        "?date".to_string(),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(column_expr("?column"), "<", literal_expr("?start_date")),
+                        "OR",
+                        binary_expr(column_expr("?column"), ">=", literal_expr("?end_date")),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_date_trunc_eq_literal(
+                    "?granularity",
+                    "?date",
+                    "?start_date",
+                    "?end_date",
+                ),
+            ),
             rewrite(
                 "between-move-interval-beyond-equal-sign",
                 between_expr(
@@ -1867,36 +1974,55 @@ impl RewriteRules for FilterRules {
             // Simplify rules
             transforming_rewrite(
                 "filter-simplify-cast-unwrap",
-                filter_simplify_replacer(cast_expr("?expr", "?data_type")),
-                // TODO alias to make it equivalent transformation
-                filter_simplify_replacer("?expr"),
+                filter_simplify_push_down_replacer(cast_expr("?expr", "?data_type")),
+                filter_simplify_push_down_replacer("?expr"),
                 self.transform_filter_cast_unwrap("?expr", "?data_type", false),
             ),
             transforming_rewrite(
                 "filter-simplify-cast-push-down",
-                filter_simplify_replacer(cast_expr("?expr", "?data_type")),
-                cast_expr(filter_simplify_replacer("?expr"), "?data_type"),
+                filter_simplify_push_down_replacer(cast_expr("?expr", "?data_type")),
+                cast_expr(filter_simplify_push_down_replacer("?expr"), "?data_type"),
                 self.transform_filter_cast_unwrap("?expr", "?data_type", true),
             ),
+            rewrite(
+                "filter-simplify-cast-pull-up",
+                cast_expr(filter_simplify_pull_up_replacer("?expr"), "?data_type"),
+                filter_simplify_pull_up_replacer(cast_expr("?expr", "?data_type")),
+            ),
             // Alias
+            // TODO remove alias completely during simplification, they should be irrelevant in filters
             rewrite(
                 "filter-simplify-alias-push-down",
-                filter_simplify_replacer(alias_expr("?expr", "?alias")),
-                alias_expr(filter_simplify_replacer("?expr"), "?alias"),
+                filter_simplify_push_down_replacer(alias_expr("?expr", "?alias")),
+                alias_expr(filter_simplify_push_down_replacer("?expr"), "?alias"),
+            ),
+            rewrite(
+                "filter-simplify-alias-pull-up",
+                alias_expr(filter_simplify_pull_up_replacer("?expr"), "?alias"),
+                filter_simplify_pull_up_replacer(alias_expr("?expr", "?alias")),
             ),
             // Binary expr
             rewrite(
                 "filter-simplify-binary-push-down",
-                filter_simplify_replacer(binary_expr("?left", "?op", "?right")),
+                filter_simplify_push_down_replacer(binary_expr("?left", "?op", "?right")),
                 binary_expr(
-                    filter_simplify_replacer("?left"),
+                    filter_simplify_push_down_replacer("?left"),
                     "?op",
-                    filter_simplify_replacer("?right"),
+                    filter_simplify_push_down_replacer("?right"),
                 ),
             ),
             rewrite(
+                "filter-simplify-binary-pull-up",
+                binary_expr(
+                    filter_simplify_pull_up_replacer("?left"),
+                    "?op",
+                    filter_simplify_pull_up_replacer("?right"),
+                ),
+                filter_simplify_pull_up_replacer(binary_expr("?left", "?op", "?right")),
+            ),
+            rewrite(
                 "filter-simplify-like-push-down",
-                filter_simplify_replacer(like_expr(
+                filter_simplify_push_down_replacer(like_expr(
                     "?like_type",
                     "?negated",
                     "?expr",
@@ -1906,98 +2032,194 @@ impl RewriteRules for FilterRules {
                 like_expr(
                     "?like_type",
                     "?negated",
-                    filter_simplify_replacer("?expr"),
-                    filter_simplify_replacer("?pattern"),
+                    filter_simplify_push_down_replacer("?expr"),
+                    filter_simplify_push_down_replacer("?pattern"),
                     "?escape_char",
                 ),
             ),
             rewrite(
+                "filter-simplify-like-pull-up",
+                like_expr(
+                    "?like_type",
+                    "?negated",
+                    filter_simplify_pull_up_replacer("?expr"),
+                    filter_simplify_pull_up_replacer("?pattern"),
+                    "?escape_char",
+                ),
+                filter_simplify_pull_up_replacer(like_expr(
+                    "?like_type",
+                    "?negated",
+                    "?expr",
+                    "?pattern",
+                    "?escape_char",
+                )),
+            ),
+            rewrite(
                 "filter-simplify-not-push-down",
-                filter_simplify_replacer(not_expr("?expr")),
-                not_expr(filter_simplify_replacer("?expr")),
+                filter_simplify_push_down_replacer(not_expr("?expr")),
+                not_expr(filter_simplify_push_down_replacer("?expr")),
+            ),
+            rewrite(
+                "filter-simplify-not-pull-up",
+                not_expr(filter_simplify_pull_up_replacer("?expr")),
+                filter_simplify_pull_up_replacer(not_expr("?expr")),
             ),
             rewrite(
                 "filter-simplify-inlist-push-down",
-                filter_simplify_replacer(inlist_expr("?expr", "?list", "?negated")),
+                filter_simplify_push_down_replacer(inlist_expr("?expr", "?list", "?negated")),
                 // TODO unwrap list as well
-                inlist_expr(filter_simplify_replacer("?expr"), "?list", "?negated"),
+                inlist_expr(
+                    filter_simplify_push_down_replacer("?expr"),
+                    "?list",
+                    "?negated",
+                ),
+            ),
+            rewrite(
+                "filter-simplify-inlist-pull-up",
+                // TODO unwrap list as well
+                inlist_expr(
+                    filter_simplify_pull_up_replacer("?expr"),
+                    "?list",
+                    "?negated",
+                ),
+                filter_simplify_pull_up_replacer(inlist_expr("?expr", "?list", "?negated")),
             ),
             rewrite(
                 "filter-simplify-is-null-push-down",
-                filter_simplify_replacer(is_null_expr("?expr")),
-                is_null_expr(filter_simplify_replacer("?expr")),
+                filter_simplify_push_down_replacer(is_null_expr("?expr")),
+                is_null_expr(filter_simplify_push_down_replacer("?expr")),
+            ),
+            rewrite(
+                "filter-simplify-is-null-pull-up",
+                is_null_expr(filter_simplify_pull_up_replacer("?expr")),
+                filter_simplify_pull_up_replacer(is_null_expr("?expr")),
             ),
             rewrite(
                 "filter-simplify-is-not-null-push-down",
-                filter_simplify_replacer(is_not_null_expr("?expr")),
-                is_not_null_expr(filter_simplify_replacer("?expr")),
+                filter_simplify_push_down_replacer(is_not_null_expr("?expr")),
+                is_not_null_expr(filter_simplify_push_down_replacer("?expr")),
             ),
             rewrite(
-                "filter-simplify-literal-push-down",
-                filter_simplify_replacer(literal_expr("?literal")),
-                literal_expr("?literal"),
+                "filter-simplify-is-not-null-pull-up",
+                is_not_null_expr(filter_simplify_pull_up_replacer("?expr")),
+                filter_simplify_pull_up_replacer(is_not_null_expr("?expr")),
             ),
             rewrite(
-                "filter-simplify-column-push-down",
-                filter_simplify_replacer(column_expr("?column")),
-                column_expr("?column"),
+                "filter-simplify-literal",
+                filter_simplify_push_down_replacer(literal_expr("?literal")),
+                filter_simplify_pull_up_replacer(literal_expr("?literal")),
+            ),
+            rewrite(
+                "filter-simplify-column",
+                filter_simplify_push_down_replacer(column_expr("?column")),
+                filter_simplify_pull_up_replacer(column_expr("?column")),
             ),
             // scalar
             rewrite(
                 "filter-simplify-scalar-fun-push-down",
-                filter_simplify_replacer(fun_expr_var_arg("?fun", "?args")),
-                fun_expr_var_arg("?fun", filter_simplify_replacer("?args")),
+                filter_simplify_push_down_replacer(fun_expr_var_arg("?fun", "?args")),
+                fun_expr_var_arg("?fun", filter_simplify_push_down_replacer("?args")),
             ),
             rewrite(
-                "filter-simplify-scalar-args-empty-tail-push-down",
-                filter_simplify_replacer(scalar_fun_expr_args_empty_tail()),
-                scalar_fun_expr_args_empty_tail(),
+                "filter-simplify-scalar-fun-pull-up",
+                fun_expr_var_arg("?fun", filter_simplify_pull_up_replacer("?args")),
+                filter_simplify_pull_up_replacer(fun_expr_var_arg("?fun", "?args")),
+            ),
+            rewrite(
+                "filter-simplify-scalar-args-empty-tail",
+                filter_simplify_push_down_replacer(scalar_fun_expr_args_empty_tail()),
+                filter_simplify_pull_up_replacer(scalar_fun_expr_args_empty_tail()),
             ),
             // udf
             rewrite(
                 "filter-simplify-udf-fun-push-down",
-                filter_simplify_replacer(udf_expr_var_arg("?fun", "?args")),
-                udf_expr_var_arg("?fun", filter_simplify_replacer("?args")),
+                filter_simplify_push_down_replacer(udf_expr_var_arg("?fun", "?args")),
+                udf_expr_var_arg("?fun", filter_simplify_push_down_replacer("?args")),
+            ),
+            rewrite(
+                "filter-simplify-udf-fun-pull-up",
+                udf_expr_var_arg("?fun", filter_simplify_pull_up_replacer("?args")),
+                filter_simplify_pull_up_replacer(udf_expr_var_arg("?fun", "?args")),
             ),
             rewrite(
                 "filter-simplify-udf-args-push-down",
-                filter_simplify_replacer(udf_fun_expr_args("?left", "?right")),
+                filter_simplify_push_down_replacer(udf_fun_expr_args("?left", "?right")),
                 udf_fun_expr_args(
-                    filter_simplify_replacer("?left"),
-                    filter_simplify_replacer("?right"),
+                    filter_simplify_push_down_replacer("?left"),
+                    filter_simplify_push_down_replacer("?right"),
                 ),
             ),
             rewrite(
-                "filter-simplify-udf-args-empty-tail-push-down",
-                filter_simplify_replacer(udf_fun_expr_args_empty_tail()),
-                udf_fun_expr_args_empty_tail(),
+                "filter-simplify-udf-args-pull-up",
+                udf_fun_expr_args(
+                    filter_simplify_pull_up_replacer("?left"),
+                    filter_simplify_pull_up_replacer("?right"),
+                ),
+                filter_simplify_pull_up_replacer(udf_fun_expr_args("?left", "?right")),
+            ),
+            rewrite(
+                "filter-simplify-udf-args-empty-tail",
+                filter_simplify_push_down_replacer(udf_fun_expr_args_empty_tail()),
+                filter_simplify_pull_up_replacer(udf_fun_expr_args_empty_tail()),
             ),
             // case
             rewrite(
                 "filter-simplify-case-push-down",
-                filter_simplify_replacer(case_expr_var_arg("?expr", "?when_then", "?else")),
+                filter_simplify_push_down_replacer(case_expr_var_arg(
+                    "?expr",
+                    "?when_then",
+                    "?else",
+                )),
                 case_expr_var_arg(
-                    filter_simplify_replacer("?expr"),
-                    filter_simplify_replacer("?when_then"),
-                    filter_simplify_replacer("?else"),
+                    filter_simplify_push_down_replacer("?expr"),
+                    filter_simplify_push_down_replacer("?when_then"),
+                    filter_simplify_push_down_replacer("?else"),
                 ),
             ),
             rewrite(
+                "filter-simplify-case-pull-up",
+                case_expr_var_arg(
+                    filter_simplify_pull_up_replacer("?expr"),
+                    filter_simplify_pull_up_replacer("?when_then"),
+                    filter_simplify_pull_up_replacer("?else"),
+                ),
+                filter_simplify_pull_up_replacer(case_expr_var_arg("?expr", "?when_then", "?else")),
+            ),
+            rewrite(
                 "filter-simplify-between-push-down",
-                filter_simplify_replacer(between_expr("?expr", "?negated", "?low", "?high")),
+                filter_simplify_push_down_replacer(between_expr(
+                    "?expr", "?negated", "?low", "?high",
+                )),
                 between_expr(
+                    // TODO why expr is not simplified?
                     "?expr",
                     "?negated",
-                    filter_simplify_replacer("?low"),
-                    filter_simplify_replacer("?high"),
+                    filter_simplify_push_down_replacer("?low"),
+                    filter_simplify_push_down_replacer("?high"),
                 ),
             ),
+            rewrite(
+                "filter-simplify-between-pull-up",
+                between_expr(
+                    // TODO why expr is not simplified?
+                    "?expr",
+                    "?negated",
+                    filter_simplify_pull_up_replacer("?low"),
+                    filter_simplify_pull_up_replacer("?high"),
+                ),
+                filter_simplify_pull_up_replacer(between_expr(
+                    "?expr", "?negated", "?low", "?high",
+                )),
+            ),
             filter_simplify_push_down("CaseExprExpr"),
-            filter_simplify_push_down_tail("CaseExprExpr"),
+            filter_simplify_pull_up("CaseExprExpr"),
+            filter_simplify_tail("CaseExprExpr"),
             filter_simplify_push_down("CaseExprWhenThenExpr"),
-            filter_simplify_push_down_tail("CaseExprWhenThenExpr"),
+            filter_simplify_pull_up("CaseExprWhenThenExpr"),
+            filter_simplify_tail("CaseExprWhenThenExpr"),
             filter_simplify_push_down("CaseExprElseExpr"),
-            filter_simplify_push_down_tail("CaseExprElseExpr"),
+            filter_simplify_pull_up("CaseExprElseExpr"),
+            filter_simplify_tail("CaseExprElseExpr"),
             rewrite(
                 "filter-flatten-upper-and-left",
                 cube_scan_filters(
@@ -2269,6 +2491,67 @@ impl RewriteRules for FilterRules {
                 self.transform_not_column_equals_date("?literal", "?one_day"),
             ),
             rewrite(
+                "filter-tableau-case-when-not-null",
+                filter_replacer(
+                    binary_expr(
+                        case_expr(
+                            None,
+                            vec![(
+                                not_expr(is_null_expr("?left_expr")),
+                                "?left_expr".to_string(),
+                            )],
+                            Some(literal_null()),
+                        ),
+                        "?op",
+                        "?right_expr",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr("?left_expr", "?op", "?right_expr"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            rewrite(
+                "filter-tableau-cast-text-to-timestamp-to-date",
+                filter_replacer(
+                    binary_expr(
+                        cast_expr_explicit(
+                            udf_expr(
+                                "str_to_date",
+                                vec![
+                                    column_expr("?column"),
+                                    literal_string("YYYY-MM-DD\"T\"HH24:MI:SS.MS"),
+                                ],
+                            ),
+                            DataType::Date32,
+                        ),
+                        "?op",
+                        "?right_expr",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec![literal_string("day"), column_expr("?column")],
+                        ),
+                        "?op",
+                        "?right_expr",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            rewrite(
                 "in-date-range-to-time-dimension-pull-up-left",
                 cube_scan_filters(
                     time_dimension_date_range_replacer(
@@ -2317,6 +2600,7 @@ impl RewriteRules for FilterRules {
                     "?can_pushdown_join",
                     "?wrapped",
                     "?ungrouped",
+                    "?join_hints",
                 ),
                 cube_scan(
                     "?source_table_name",
@@ -2333,6 +2617,7 @@ impl RewriteRules for FilterRules {
                     "?can_pushdown_join",
                     "?wrapped",
                     "?ungrouped",
+                    "?join_hints",
                 ),
             ),
             transforming_rewrite(
@@ -2450,45 +2735,74 @@ impl RewriteRules for FilterRules {
                 "filter-simplify-scalar-args-push-down",
                 ListType::ScalarFunctionExprArgs,
                 ListPattern {
-                    pattern: filter_simplify_replacer("?args"),
+                    pattern: filter_simplify_push_down_replacer("?args"),
                     list_var: "?args".to_string(),
                     elem: "?arg".to_string(),
                 },
                 ListPattern {
                     pattern: "?new_args".to_string(),
                     list_var: "?new_args".to_string(),
-                    elem: filter_simplify_replacer("?arg"),
+                    elem: filter_simplify_push_down_replacer("?arg"),
+                },
+            ));
+            rules.push(list_rewrite(
+                "filter-simplify-scalar-args-pull-up",
+                ListType::ScalarFunctionExprArgs,
+                ListPattern {
+                    pattern: "?args".to_string(),
+                    list_var: "?args".to_string(),
+                    elem: filter_simplify_pull_up_replacer("?arg"),
+                },
+                ListPattern {
+                    pattern: filter_simplify_pull_up_replacer("?new_args"),
+                    list_var: "?new_args".to_string(),
+                    elem: "?arg".to_string(),
                 },
             ));
         } else {
             rules.push(rewrite(
                 "filter-simplify-scalar-args-push-down",
-                filter_simplify_replacer(fun_expr_args_legacy("?left", "?right")),
+                filter_simplify_push_down_replacer(fun_expr_args_legacy("?left", "?right")),
                 fun_expr_args_legacy(
-                    filter_simplify_replacer("?left"),
-                    filter_simplify_replacer("?right"),
+                    filter_simplify_push_down_replacer("?left"),
+                    filter_simplify_push_down_replacer("?right"),
                 ),
+            ));
+            rules.push(rewrite(
+                "filter-simplify-scalar-args-pull-up",
+                fun_expr_args_legacy(
+                    filter_simplify_pull_up_replacer("?left"),
+                    filter_simplify_pull_up_replacer("?right"),
+                ),
+                filter_simplify_pull_up_replacer(fun_expr_args_legacy("?left", "?right")),
             ));
         }
         if self.eval_stable_functions {
             rules.extend(vec![
                 rewrite(
                     "filter-simplify-now",
-                    filter_simplify_replacer(self.fun_expr("Now", Vec::<String>::new())),
-                    // TODO alias to make it equivalent transformation
-                    udf_expr("eval_now", Vec::<String>::new()),
+                    filter_simplify_push_down_replacer(self.fun_expr("Now", Vec::<String>::new())),
+                    filter_simplify_pull_up_replacer(udf_expr("eval_now", Vec::<String>::new())),
                 ),
                 rewrite(
                     "filter-simplify-utc-timestamp",
-                    filter_simplify_replacer(self.fun_expr("UtcTimestamp", Vec::<String>::new())),
-                    // TODO alias to make it equivalent transformation
-                    udf_expr("eval_utc_timestamp", Vec::<String>::new()),
+                    filter_simplify_push_down_replacer(
+                        self.fun_expr("UtcTimestamp", Vec::<String>::new()),
+                    ),
+                    filter_simplify_pull_up_replacer(udf_expr(
+                        "eval_utc_timestamp",
+                        Vec::<String>::new(),
+                    )),
                 ),
                 rewrite(
                     "filter-simplify-current-date",
-                    filter_simplify_replacer(self.fun_expr("CurrentDate", Vec::<String>::new())),
-                    // TODO alias to make it equivalent transformation
-                    udf_expr("eval_current_date", Vec::<String>::new()),
+                    filter_simplify_push_down_replacer(
+                        self.fun_expr("CurrentDate", Vec::<String>::new()),
+                    ),
+                    filter_simplify_pull_up_replacer(udf_expr(
+                        "eval_current_date",
+                        Vec::<String>::new(),
+                    )),
                 ),
             ]);
         }
@@ -2513,40 +2827,45 @@ impl FilterRules {
         fun_expr(fun_name, args, self.config_obj.push_down_pull_up_split())
     }
 
+    fn push_down_filter_simplify(
+        &self,
+        exp_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let exp_var = var!(exp_var);
+        move |egraph, subst| {
+            // TODO check referenced_expr
+            egraph.index(subst[exp_var]).data.referenced_expr.is_some()
+        }
+    }
+
     fn push_down_filter(
         &self,
         alias_to_cube_var: &'static str,
-        exp_var: &'static str,
         filter_alias_to_cube_var: &'static str,
         filter_aliases_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let exp_var = var!(exp_var);
         let filter_aliases_var = var!(filter_aliases_var);
         let filter_alias_to_cube_var = var!(filter_alias_to_cube_var);
         move |egraph, subst| {
-            for alias_to_cube in
-                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
-            {
-                if let Some(_referenced_expr) = &egraph.index(subst[exp_var]).data.referenced_expr {
-                    // TODO check referenced_expr
-                    subst.insert(
-                        filter_alias_to_cube_var,
-                        egraph.add(LogicalPlanLanguage::FilterReplacerAliasToCube(
-                            FilterReplacerAliasToCube(alias_to_cube),
-                        )),
-                    );
-
-                    let filter_replacer_aliases = egraph.add(
-                        LogicalPlanLanguage::FilterReplacerAliases(FilterReplacerAliases(vec![])),
-                    );
-                    subst.insert(filter_aliases_var, filter_replacer_aliases);
-
-                    return true;
-                }
+            if !copy_value!(
+                egraph,
+                subst,
+                Vec<(String, String)>,
+                alias_to_cube_var,
+                CubeScanAliasToCube,
+                filter_alias_to_cube_var,
+                FilterReplacerAliasToCube
+            ) {
+                return false;
             }
 
-            false
+            let filter_replacer_aliases = egraph.add(LogicalPlanLanguage::FilterReplacerAliases(
+                FilterReplacerAliases(vec![]),
+            ));
+            subst.insert(filter_aliases_var, filter_replacer_aliases);
+
+            true
         }
     }
 
@@ -2614,6 +2933,74 @@ impl FilterRules {
                     _ => (),
                 }
             }
+            true
+        }
+    }
+
+    fn transform_filter_or(
+        &self,
+        left_var: &'static str,
+        right_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let left_var = var!(left_var);
+        let right_var = var!(right_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            let Some(left_columns) = &egraph[subst[left_var]].data.referenced_expr else {
+                return false;
+            };
+            let Some(right_columns) = &egraph[subst[right_var]].data.referenced_expr else {
+                return false;
+            };
+            let columns = left_columns
+                .iter()
+                .chain(right_columns.iter())
+                .cloned()
+                .collect::<Vec<_>>();
+
+            let aliases_es: Vec<Vec<(String, String)>> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es {
+                let mut has_dimensions = false;
+                let mut has_measures = false;
+
+                for column in &columns {
+                    let Expr::Column(column) = column else {
+                        // Unexpected non-column in referenced_expr
+                        return false;
+                    };
+
+                    let Some((member_name, _, cube)) = Self::filter_member_name_on_columns(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        &[column.clone()],
+                        members_var,
+                        &aliases,
+                    ) else {
+                        // TODO is this necessary? When predicate in a filter references column that is not-a-member, is it ok to push it?
+                        return false;
+                    };
+
+                    has_dimensions |= cube.lookup_dimension_by_member_name(&member_name).is_some();
+                    has_measures |= cube.lookup_measure_by_member_name(&member_name).is_some();
+                }
+                if has_dimensions && has_measures {
+                    // This filter references both measure and dimension in a single OR
+                    // It is not supported by Cube.js
+                    return false;
+                }
+            }
+
             true
         }
     }
@@ -3220,44 +3607,54 @@ impl FilterRules {
                     .collect();
             for year in years {
                 for aliases in aliases_es.iter() {
-                    if let ScalarValue::Int64(Some(year)) = year {
-                        let year = year.clone();
-                        if year < 1000 || year > 9999 {
+                    let year = match year {
+                        ScalarValue::Int64(Some(year)) => year,
+                        ScalarValue::Int32(Some(year)) => year as i64,
+                        ScalarValue::Utf8(Some(ref year_str)) if year_str.len() == 4 => {
+                            if let Ok(year) = year_str.parse::<i64>() {
+                                year
+                            } else {
+                                continue;
+                            }
+                        }
+                        _ => continue,
+                    };
+
+                    if !(1000..=9999).contains(&year) {
+                        continue;
+                    }
+
+                    if let Some((member_name, cube)) = Self::filter_member_name(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        column_var,
+                        members_var,
+                        &aliases,
+                    ) {
+                        if !cube.contains_member(&member_name) {
                             continue;
                         }
 
-                        if let Some((member_name, cube)) = Self::filter_member_name(
-                            egraph,
-                            subst,
-                            &meta_context,
-                            alias_to_cube_var,
-                            column_var,
-                            members_var,
-                            &aliases,
-                        ) {
-                            if !cube.contains_member(&member_name) {
-                                continue;
-                            }
+                        subst.insert(
+                            member_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                                FilterMemberMember(member_name.to_string()),
+                            )),
+                        );
 
-                            subst.insert(
-                                member_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberMember(
-                                    FilterMemberMember(member_name.to_string()),
-                                )),
-                            );
+                        subst.insert(
+                            values_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                FilterMemberValues(vec![
+                                    format!("{}-01-01", year),
+                                    format!("{}-12-31", year),
+                                ]),
+                            )),
+                        );
 
-                            subst.insert(
-                                values_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                                    FilterMemberValues(vec![
-                                        format!("{}-01-01", year),
-                                        format!("{}-12-31", year),
-                                    ]),
-                                )),
-                            );
-
-                            return true;
-                        }
+                        return true;
                     }
                 }
             }
@@ -3503,7 +3900,7 @@ impl FilterRules {
             for aliases in aliases_es {
                 if let Some(list) = &egraph[subst[list_var]].data.constant_in_list {
                     let values = list
-                        .into_iter()
+                        .iter()
                         .map(|literal| FilterRules::scalar_to_value(literal))
                         .collect::<Result<Vec<_>, _>>();
                     let Ok(values) = values else {
@@ -3760,6 +4157,30 @@ impl FilterRules {
         members_var: Var,
         aliases: &Vec<(String, String)>,
     ) -> Option<(String, Option<String>, &'meta V1CubeMeta)> {
+        let columns: Vec<_> = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+            .cloned()
+            .collect();
+
+        Self::filter_member_name_on_columns(
+            egraph,
+            subst,
+            meta_context,
+            alias_to_cube_var,
+            &columns,
+            members_var,
+            aliases,
+        )
+    }
+
+    fn filter_member_name_on_columns<'meta>(
+        egraph: &mut CubeEGraph,
+        subst: &Subst,
+        meta_context: &'meta MetaContext,
+        alias_to_cube_var: Var,
+        columns: &[Column],
+        members_var: Var,
+        aliases: &Vec<(String, String)>,
+    ) -> Option<(String, Option<String>, &'meta V1CubeMeta)> {
         let alias_to_cubes: Vec<_> =
             var_iter!(egraph[subst[alias_to_cube_var]], FilterReplacerAliasToCube)
                 .cloned()
@@ -3767,9 +4188,6 @@ impl FilterRules {
         if alias_to_cubes.is_empty() {
             return None;
         }
-        let columns: Vec<_> = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
-            .cloned()
-            .collect();
         for alias_to_cube in alias_to_cubes {
             for column in columns.iter() {
                 let alias_name = expr_column_name(&Expr::Column(column.clone()), &None);
@@ -4168,7 +4586,7 @@ impl FilterRules {
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let filter_ops_var = var!(filter_ops_var);
         move |egraph, subst| {
-            if let Some(true) = egraph[subst[filter_ops_var]].data.is_empty_list.clone() {
+            if let Some(true) = egraph[subst[filter_ops_var]].data.is_empty_list {
                 return true;
             }
 
@@ -4190,36 +4608,36 @@ impl FilterRules {
         let date_range_start_op_var = date_range_start_op_var.parse().unwrap();
         let date_range_end_op_var = date_range_end_op_var.parse().unwrap();
         move |egraph, subst| {
-            fn resolve_time_delta(date_var: &String, op: &String) -> String {
+            fn resolve_time_delta(date_var: &String, op: &String) -> Option<String> {
                 if op == "afterDate" {
                     return increment_iso_timestamp_time(date_var);
                 } else if op == "beforeDate" {
                     return decrement_iso_timestamp_time(date_var);
                 } else {
-                    return date_var.clone();
+                    return Some(date_var.clone());
                 }
             }
 
-            fn increment_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
+            fn increment_iso_timestamp_time(date_var: &String) -> Option<String> {
+                let timestamp = parse_date_str(date_var);
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_add_signed(Duration::milliseconds(1)).unwrap(),
                     ),
-                    Err(_) => date_var.clone(),
+                    Err(_) => return None,
                 };
-                return value;
+                return Some(value);
             }
 
-            fn decrement_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
+            fn decrement_iso_timestamp_time(date_var: &String) -> Option<String> {
+                let timestamp = parse_date_str(date_var);
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
                     ),
-                    Err(_) => date_var.clone(),
+                    Err(_) => return None,
                 };
-                return value;
+                return Some(value);
             }
 
             for date_range_start in
@@ -4234,19 +4652,17 @@ impl FilterRules {
                         for date_range_end_op in
                             var_iter!(egraph[subst[date_range_end_op_var]], FilterMemberOp)
                         {
-                            let valid_left_filters =
-                                vec!["afterDate".to_string(), "afterOrOnDate".to_string()];
-                            let valid_right_filters =
-                                vec!["beforeDate".to_string(), "beforeOrOnDate".to_string()];
+                            let valid_left_filters = ["afterDate", "afterOrOnDate"];
+                            let valid_right_filters = ["beforeDate", "beforeOrOnDate"];
 
                             let swap_left_and_right;
 
-                            if valid_left_filters.contains(date_range_start_op)
-                                && valid_right_filters.contains(date_range_end_op)
+                            if valid_left_filters.contains(&date_range_start_op.as_str())
+                                && valid_right_filters.contains(&date_range_end_op.as_str())
                             {
                                 swap_left_and_right = false;
-                            } else if valid_left_filters.contains(date_range_end_op)
-                                && valid_right_filters.contains(date_range_start_op)
+                            } else if valid_left_filters.contains(&date_range_end_op.as_str())
+                                && valid_right_filters.contains(&date_range_start_op.as_str())
                             {
                                 swap_left_and_right = true;
                             } else {
@@ -4254,10 +4670,16 @@ impl FilterRules {
                             }
 
                             let mut result = Vec::new();
-                            let resolved_start_date =
-                                resolve_time_delta(&date_range_start[0], date_range_start_op);
-                            let resolved_end_date =
-                                resolve_time_delta(&date_range_end[0], date_range_end_op);
+                            let Some(resolved_start_date) =
+                                resolve_time_delta(&date_range_start[0], date_range_start_op)
+                            else {
+                                return false;
+                            };
+                            let Some(resolved_end_date) =
+                                resolve_time_delta(&date_range_end[0], date_range_end_op)
+                            else {
+                                return false;
+                            };
 
                             if swap_left_and_right {
                                 result.extend(vec![resolved_end_date]);
@@ -4507,8 +4929,8 @@ impl FilterRules {
             if literals.is_empty() {
                 return false;
             }
-            for escape_char in escape_chars {
-                if let Some('!') = escape_char {
+            for escape_char in escape_chars.into_iter().flatten() {
+                if escape_char == '!' {
                     for literal in literals.iter() {
                         let literal_value = match &literal {
                             ScalarValue::Utf8(Some(literal_value)) => literal_value.to_string(),
@@ -4717,7 +5139,7 @@ impl FilterRules {
 
                 for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
                     let Some(values) = list
-                        .into_iter()
+                        .iter()
                         .map(|literal| Self::scalar_dt_to_naive_datetime(literal))
                         .collect::<Option<HashSet<_>>>()
                         .map(|values| {
@@ -4846,12 +5268,7 @@ impl FilterRules {
         let Some(str) = str else {
             return Some(None);
         };
-        let dt = NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S%.f")
-            .or_else(|_| NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S"))
-            .or_else(|_| {
-                NaiveDate::parse_from_str(str, "%Y-%m-%d")
-                    .map(|date| date.and_hms_opt(0, 0, 0).unwrap())
-            });
+        let dt = parse_date_str(str.as_str());
         let Ok(dt) = dt else {
             return None;
         };
@@ -4907,7 +5324,7 @@ impl FilterRules {
             return None;
         }
 
-        let new_dt = dt.clone();
+        let new_dt = dt;
         let new_dt = match granularity.as_str() {
             "year" => new_dt.checked_add_months(Months::new(12)),
             "quarter" | "qtr" => new_dt.checked_add_months(Months::new(3)),
@@ -5018,21 +5435,34 @@ impl FilterRules {
 fn filter_simplify_push_down(node_type: impl Display) -> CubeRewrite {
     rewrite(
         &format!("filter-simplify-{}-push-down", node_type),
-        filter_simplify_replacer(format!("({} ?left ?right)", node_type)),
+        filter_simplify_push_down_replacer(format!("({} ?left ?right)", node_type)),
         format!(
             "({} {} {})",
             node_type,
-            filter_simplify_replacer("?left"),
-            filter_simplify_replacer("?right")
+            filter_simplify_push_down_replacer("?left"),
+            filter_simplify_push_down_replacer("?right")
         ),
     )
 }
 
-fn filter_simplify_push_down_tail(node_type: impl Display) -> CubeRewrite {
+fn filter_simplify_pull_up(node_type: impl Display) -> CubeRewrite {
     rewrite(
-        &format!("filter-simplify-{}-empty-tail-push-down", node_type),
-        filter_simplify_replacer(node_type.to_string()),
-        node_type.to_string(),
+        &format!("filter-simplify-{}-pull-up", node_type),
+        format!(
+            "({} {} {})",
+            node_type,
+            filter_simplify_pull_up_replacer("?left"),
+            filter_simplify_pull_up_replacer("?right")
+        ),
+        filter_simplify_pull_up_replacer(format!("({} ?left ?right)", node_type)),
+    )
+}
+
+fn filter_simplify_tail(node_type: impl Display) -> CubeRewrite {
+    rewrite(
+        &format!("filter-simplify-{}-empty-tail", node_type),
+        filter_simplify_push_down_replacer(node_type.to_string()),
+        filter_simplify_pull_up_replacer(node_type.to_string()),
     )
 }
 

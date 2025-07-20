@@ -37,7 +37,7 @@ export interface InlineTable {
 }
 export type InlineTables = InlineTable[];
 
-// It's more easy to use this interface with optional method release as a base interface instead of type assertion
+// It's easier to use this interface with optional method release as a base interface instead of type assertion
 export interface DownloadTableBase {
   /**
    * Optional function to release stream/cursor/connection
@@ -210,6 +210,18 @@ export type ForeignKeysQueryResult = {
   target_table: string
   // eslint-disable-next-line camelcase
   target_column: string
+};
+
+export type InformationSchemaColumn = {
+  // eslint-disable-next-line camelcase
+  table_schema: string;
+  // eslint-disable-next-line camelcase
+  table_name: string;
+  // eslint-disable-next-line camelcase
+  column_name: string;
+  // eslint-disable-next-line camelcase
+  data_type: string;
+  [key: string]: string
 };
 
 export type TableKeysFilter = {

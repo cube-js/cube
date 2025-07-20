@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
+import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Cube hierarchies', () => {
   it('base cases', async () => {
@@ -23,16 +23,19 @@ describe('Cube hierarchies', () => {
         name: 'orders_users_view.orders_hierarchy',
         title: 'Hello Hierarchy',
         public: true,
+        aliasMember: 'orders.orders_hierarchy',
         levels: [
           'orders_users_view.status',
-          'orders_users_view.number'
+          'orders_users_view.number',
+          'orders_users_view.user_city'
         ],
       },
       {
         name: 'orders_users_view.some_other_hierarchy',
         public: true,
+        aliasMember: 'orders.some_other_hierarchy',
         title: 'Some other hierarchy',
-        levels: ['orders_users_view.state']
+        levels: ['orders_users_view.state', 'orders_users_view.user_city']
       }
     ]);
 
@@ -53,7 +56,42 @@ describe('Cube hierarchies', () => {
 
     const prefixedHierarchy = allHierarchyView.config.hierarchies.find((it) => it.name === 'all_hierarchy_view.users_users_hierarchy');
     expect(prefixedHierarchy).toBeTruthy();
+    expect(prefixedHierarchy?.aliasMember).toEqual('users.users_hierarchy');
     expect(prefixedHierarchy?.levels).toEqual(['all_hierarchy_view.users_age', 'all_hierarchy_view.users_city']);
+  });
+
+  it('auto include hierarchy members', async () => {
+    const modelContent = fs.readFileSync(
+      path.join(process.cwd(), '/test/unit/fixtures/hierarchies.yml'),
+      'utf8'
+    );
+    const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+
+    await compiler.compile();
+
+    const view1 = metaTransformer.cubes.find(
+      (it) => it.config.name === 'only_hierarchy_included_view'
+    );
+
+    expect(view1.config.dimensions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'only_hierarchy_included_view.status' }),
+        expect.objectContaining({ name: 'only_hierarchy_included_view.number' }),
+        expect.objectContaining({ name: 'only_hierarchy_included_view.city' })
+      ])
+    );
+
+    // Members from the `users` cube are not included as `users` is not selected (not joined)
+    const view2 = metaTransformer.cubes.find(
+      (it) => it.config.name === 'auto_include_view'
+    );
+    expect(view2.config.dimensions.length).toEqual(2);
+    expect(view2.config.dimensions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'auto_include_view.status' }),
+        expect.objectContaining({ name: 'auto_include_view.number' }),
+      ])
+    );
   });
 
   it(('hierarchy with measure'), async () => {
@@ -111,12 +149,14 @@ describe('Cube hierarchies', () => {
 
     expect(testView?.config.hierarchies).toEqual([
       {
+        aliasMember: 'orders.base_orders_hierarchy',
         name: 'test_view.base_orders_hierarchy',
         title: 'Hello Hierarchy',
         levels: ['test_view.status', 'test_view.number'],
         public: true
       },
       {
+        aliasMember: 'orders.orders_hierarchy',
         name: 'test_view.orders_hierarchy',
         levels: ['test_view.state', 'test_view.city'],
         public: true
@@ -129,7 +169,7 @@ describe('Cube hierarchies', () => {
       path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
       'utf8'
     );
-    const { compiler, metaTransformer } = prepareCompiler(modelContent);
+    const { compiler, metaTransformer } = prepareJsCompiler(modelContent);
 
     await compiler.compile();
 
@@ -139,6 +179,7 @@ describe('Cube hierarchies', () => {
 
     expect(ordersCube.config.hierarchies).toEqual([
       {
+        aliasMember: undefined,
         name: 'orders.hello',
         title: 'World',
         levels: ['orders.status'],

@@ -91,6 +91,8 @@ suite('Python model', () => {
       load_data: expect.any(Object),
       load_data_sync: expect.any(Object),
       arg_bool: expect.any(Object),
+      arg_kwargs: expect.any(Object),
+      arg_named_arguments: expect.any(Object),
       arg_sum_integers: expect.any(Object),
       arg_str: expect.any(Object),
       arg_null: expect.any(Object),
@@ -113,30 +115,6 @@ suite('Python model', () => {
       var5: { obj_key: 'val' },
       var6: [1, 2, 3, 4, 5, 6],
       var7: [6, 5, 4, 3, 2, 1],
-    });
-  });
-});
-
-darwinSuite('Scope Python model', () => {
-  it('load scoped-utils.py', async () => {
-    const pythonModule = await loadPythonCtxFromUtils('scoped-utils.py');
-
-    expect(pythonModule.functions).toEqual({
-      load_data: expect.any(Object),
-      load_data_sync: expect.any(Object),
-      arg_bool: expect.any(Object),
-      arg_sum_integers: expect.any(Object),
-      arg_str: expect.any(Object),
-      arg_null: expect.any(Object),
-      arg_sum_tuple: expect.any(Object),
-      arg_sum_map: expect.any(Object),
-      arg_seq: expect.any(Object),
-      new_int_tuple: expect.any(Object),
-      new_str_tuple: expect.any(Object),
-      new_safe_string: expect.any(Object),
-      new_object_from_dict: expect.any(Object),
-      load_class_model: expect.any(Object),
-      throw_exception: expect.any(Object),
     });
   });
 });

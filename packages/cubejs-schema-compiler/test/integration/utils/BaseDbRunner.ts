@@ -109,7 +109,7 @@ export class BaseDbRunner {
     desc,
     suffix,
     partitionGranularity: string | null = null,
-    dateRange: string[] | null = null
+    dateRange: [string, string] | null = null
   ) {
     const [toReplace, params] = query;
     const tableName = partitionGranularity && dateRange ? PreAggregationPartitionRangeLoader.partitionTableName(
@@ -171,17 +171,17 @@ export class BaseDbRunner {
 
   public async evaluateQueryWithPreAggregations(query, seed = this.nextSeed++) {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
-    // console.log(preAggregationsDescription);
-
     await Promise.all(preAggregationsDescription.map(
       async desc => {
         if (desc.partitionGranularity) {
           desc.dateRange = [
             PreAggregationPartitionRangeLoader.extractDate(
-              await this.testQueries([desc.preAggregationStartEndQueries[0]])
+              await this.testQueries([desc.preAggregationStartEndQueries[0]]),
+              desc.timezone,
             ),
             PreAggregationPartitionRangeLoader.extractDate(
-              await this.testQueries([desc.preAggregationStartEndQueries[1]])
+              await this.testQueries([desc.preAggregationStartEndQueries[1]]),
+              desc.timezone,
             )
           ];
           // console.log(desc);

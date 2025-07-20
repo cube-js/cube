@@ -91,12 +91,12 @@ expression: "execute_query(\"\n                SELECT t.oid, information_schema.
 | 13410 | NULL |
 | 18001 | NULL |
 | 18002 | NULL |
-| 18020 | NULL |
 | 18021 | NULL |
-| 18030 | NULL |
+| 18022 | NULL |
 | 18031 | NULL |
-| 18036 | NULL |
+| 18032 | NULL |
 | 18037 | NULL |
-| 18246 | NULL |
+| 18038 | NULL |
 | 18247 | NULL |
+| 18248 | NULL |
 +-------+------+

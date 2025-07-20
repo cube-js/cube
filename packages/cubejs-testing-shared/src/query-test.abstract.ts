@@ -13,7 +13,7 @@ export const prepareCompiler = (content: any, options?: any) => originalPrepareC
 }, { adapter: 'postgres', ...options });
 
 export abstract class QueryTestAbstract<T extends BaseDriver> {
-  abstract getQueryClass(): any;
+  public abstract getQueryClass(): any;
 
   protected getQuery(compilers: any, options: any): BaseQuery {
     const QueryClass = this.getQueryClass();

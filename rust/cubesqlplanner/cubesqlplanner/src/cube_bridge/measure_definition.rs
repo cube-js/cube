@@ -1,7 +1,7 @@
 use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
-use super::measure_filter::{MeasureFilter, NativeMeasureFilter};
 use super::member_order_by::{MemberOrderBy, NativeMemberOrderBy};
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::struct_with_sql_member::{NativeStructWithSqlMember, StructWithSqlMember};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -15,11 +15,12 @@ use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct TimeShiftReference {
-    pub interval: String,
+    pub interval: Option<String>,
+    pub name: Option<String>,
     #[serde(rename = "type")]
     pub shift_type: Option<String>,
     #[serde(rename = "timeDimension")]
-    pub time_dimension: String,
+    pub time_dimension: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -54,24 +55,17 @@ pub struct MeasureDefinitionStatic {
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic)]
 pub trait MeasureDefinition {
-    #[optional]
-    #[field]
+    #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 
     fn cube(&self) -> Result<Rc<dyn CubeDefinition>, CubeError>;
 
-    #[optional]
-    #[field]
-    #[vec]
-    fn filters(&self) -> Result<Option<Vec<Rc<dyn MeasureFilter>>>, CubeError>;
+    #[nbridge(field, optional, vec)]
+    fn filters(&self) -> Result<Option<Vec<Rc<dyn StructWithSqlMember>>>, CubeError>;
 
-    #[optional]
-    #[field]
-    #[vec]
-    fn drill_filters(&self) -> Result<Option<Vec<Rc<dyn MeasureFilter>>>, CubeError>;
+    #[nbridge(field, optional, vec)]
+    fn drill_filters(&self) -> Result<Option<Vec<Rc<dyn StructWithSqlMember>>>, CubeError>;
 
-    #[optional]
-    #[field]
-    #[vec]
+    #[nbridge(field, optional, vec)]
     fn order_by(&self) -> Result<Option<Vec<Rc<dyn MemberOrderBy>>>, CubeError>;
 }

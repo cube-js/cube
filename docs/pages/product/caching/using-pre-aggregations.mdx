@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /caching/using-pre-aggregations
----
-
 # Using pre-aggregations
 
 Pre-aggregations is an implementation of aggregate awareness in Cube.
@@ -89,11 +84,11 @@ cube(`orders`, {
       time_dimension: created_at,
       granularity: `month`,
       refresh_key: {
-        every: `12 hour`,
-      },
-    },
-  },
-});
+        every: `12 hour`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -130,11 +125,11 @@ cube(`orders`, {
       granularity: `month`,
       refresh_key: {
         // every will default to `10 seconds` here
-        sql: `SELECT MAX(created_at) FROM orders`,
-      },
-    },
-  },
-});
+        sql: `SELECT MAX(created_at) FROM orders`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -170,11 +165,11 @@ cube(`orders`, {
       granularity: `month`,
       refresh_key: {
         every: `12 hour`,
-        sql: `SELECT MAX(created_at) FROM orders`,
-      },
-    },
-  },
-});
+        sql: `SELECT MAX(created_at) FROM orders`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -187,12 +182,20 @@ new results, then the pre-aggregation will be refreshed.
 
 [Partitioning][wiki-partitioning] is an extremely effective optimization for
 accelerating pre-aggregations build and refresh time. It effectively "shards"
-the data between multiple tables, splitting them by a defined attribute. Cube
-can be configured to incrementally refresh only the last set of partitions
+the data between multiple tables, splitting them by a defined attribute.
+
+Cube can be configured to incrementally refresh only the last set of partitions
 through the `updateWindow` property. This leads to faster refresh times due to
 unnecessary data not being reloaded, and even reduced cost for some databases
 like [BigQuery](/product/configuration/data-sources/google-bigquery) or
 [AWS Athena](/product/configuration/data-sources/aws-athena).
+
+<ReferenceBox>
+
+See [this recipe][ref-incremental-refresh-recipe] for an example of optimized
+incremental refresh.
+
+</ReferenceBox>
 
 Any `rollup` pre-aggregation can be partitioned by time using the
 `partition_granularity` property in [a pre-aggregation
@@ -238,11 +241,11 @@ cube(`orders`, {
       refresh_key: {
         every: `1 day`,
         incremental: true,
-        update_window: `3 months`,
-      },
-    },
-  },
-});
+        update_window: `3 months`
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -369,17 +372,17 @@ cube("orders", {
       refresh_key: {
         every: `1 hour`,
         incremental: true,
-        update_window: `1 day`,
+        update_window: `1 day`
       },
       build_range_start: {
-        sql: `SELECT DATE_SUB(NOW(), 365)`,
+        sql: `SELECT DATE_SUB(NOW(), 365)`
       },
       build_range_end: {
-        sql: `SELECT NOW()`,
-      },
-    },
-  },
-});
+        sql: `SELECT NOW()`
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -477,12 +480,12 @@ cube(`orders`, {
             product_category,
             zip_code,
             product_name
-          ],
-        },
-      },
-    },
-  },
-});
+          ]
+        }
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -566,12 +569,12 @@ cube("orders", {
 
         zip_code_index: {
           columns: [zip_code],
-          type: `aggregate`,
-        },
-      },
-    },
-  },
-});
+          type: `aggregate`
+        }
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -614,7 +617,7 @@ simple queries using a familiar SQL syntax. You can connect using the MySQL CLI
 client, for example:
 
 ```bash
-mysql -h <CUBESTORE_IP> --user=cubestore -pcubestore
+mysql -h <CUBESTORE_IP> --user=cubestore -pcubestore --protocol=TCP
 ```
 
 <WarningBox>
@@ -756,27 +759,27 @@ cube(`orders`, {
       measures: [CUBE.count],
       dimensions: [CUBE.user_id, CUBE.status],
       time_dimension: CUBE.created_at,
-      granularity: `day`,
-    },
+      granularity: `day`
+    }
   },
 
   joins: {
     users: {
       sql: `${CUBE.user_id} = ${users.id}`,
-      relationship: `many_to_one`,
-    },
-  },
-});
+      relationship: `many_to_one`
+    }
+  }
+})
 
 cube(`users`, {
   // ...
 
   pre_aggregations: {
     users_rollup: {
-      dimensions: [CUBE.id, CUBE.name],
-    },
-  },
-});
+      dimensions: [CUBE.id, CUBE.name]
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -811,12 +814,12 @@ cube(`orders`, {
 
       indexes: {
         user_index: {
-          columns: [CUBE.user_id],
-        },
-      },
-    },
-  },
-});
+          columns: [CUBE.user_id]
+        }
+      }
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -859,10 +862,10 @@ cube(`orders`, {
       dimensions: [users.name],
       time_dimension: CUBE.created_at,
       granularity: `day`,
-      rollups: [users.users_rollup, CUBE.orders_rollup],
-    },
-  },
-});
+      rollups: [users.users_rollup, CUBE.orders_rollup]
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -1029,44 +1032,30 @@ of this member. For numeric types, it will most likely be an integer, a float,
 or a decimal type, depending on the nature of your data.
 
 
-[ref-caching-in-mem-default-refresh-key]: /product/caching#default-refresh-keys
 [ref-config-db]: /product/configuration/data-sources
-[ref-config-driverfactory]: /reference/configuration/config#driverfactory
-[ref-config-extdriverfactory]:
-  /reference/configuration/config#externaldriverfactory
-[ref-connect-db-athena]: /product/configuration/data-sources/aws-athena
-[ref-connect-db-redshift]: /product/configuration/data-sources/aws-redshift
-[ref-connect-db-bigquery]: /product/configuration/data-sources/google-bigquery
-[ref-connect-db-mysql]: /product/configuration/data-sources/mysql
-[ref-connect-db-postgres]: /product/configuration/data-sources/postgres
-[ref-connect-db-snowflake]: /product/configuration/data-sources/snowflake
-[ref-schema-timedimension]: /reference/data-model/types-and-formats#time-1
-[ref-schema-ref-preaggs]: /reference/data-model/pre-aggregations
-[ref-schema-ref-preaggs-index]:
-  /reference/data-model/pre-aggregations#indexes
+[ref-schema-ref-preaggs]: /product/data-modeling/reference/pre-aggregations
 [ref-schema-ref-preaggs-refresh-key]:
-  /reference/data-model/pre-aggregations#refresh_key
+  /product/data-modeling/reference/pre-aggregations#refresh_key
 [ref-schema-ref-preaggs-refresh-key-every]:
-  /reference/data-model/pre-aggregations#every
+  /product/data-modeling/reference/pre-aggregations#every
 [ref-schema-ref-preaggs-refresh-key-sql]:
-  /reference/data-model/pre-aggregations#sql
+  /product/data-modeling/reference/pre-aggregations#sql
 [ref-deploy-refresh-wrkr]: /product/deployment#refresh-worker
-[ref-schema-ref-preaggs-sched-refresh]:
-  /reference/data-model/pre-aggregations#scheduled_refresh
 [ref-prod-list-refresh]:
   /product/deployment/production-checklist#set-up-refresh-worker
 [ref-original-sql]:
-  /reference/data-model/pre-aggregations#original_sql
+  /product/data-modeling/reference/pre-aggregations#original_sql
 [self-batching]: #batching
 [self-export-bucket]: #export-bucket
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
-[ref-ref-indexes]: /reference/data-model/pre-aggregations#indexes
+[ref-ref-indexes]: /product/data-modeling/reference/pre-aggregations#indexes
 [ref-additivity]: /product/caching/getting-started-pre-aggregations#additivity
-[ref-ref-index-type]: /reference/data-model/pre-aggregations#type-1
+[ref-ref-index-type]: /product/data-modeling/reference/pre-aggregations#type-1
 [ref-flame-graph]: /product/workspace/query-history#flame-graph
 [ref-perf-insights]: /product/workspace/performance
 [ref-build-history]: /product/workspace/pre-aggregations#build-history
 [ref-matching-preaggs]: /product/caching/matching-pre-aggregations
 [ref-cube-store]: /product/caching/running-in-production#architecture
 [ref-cube-store-storage]: /product/caching/running-in-production#storage
-[ref-member-sql]: /reference/data-model/dimensions#sql
+[ref-member-sql]: /product/data-modeling/reference/dimensions#sql
+[ref-incremental-refresh-recipe]: /product/caching/recipes/incrementally-building-pre-aggregations-for-a-date-range

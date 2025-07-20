@@ -1,4 +1,4 @@
-FROM node:20.17.0-bookworm-slim AS builder
+FROM node:22.16.0-bookworm-slim AS builder
 
 WORKDIR /cube
 COPY . .
@@ -11,7 +11,7 @@ RUN yarn config set network-timeout 120000 -g
 RUN apt-get update \
     # python3 package is necessary to install `python3` executable for node-gyp
     # libpython3-dev is needed to trigger post-installer to download native with python
-    && apt-get install -y python3 python3.11 libpython3.11-dev gcc g++ make cmake \
+    && apt-get install -y python3 python3.11 libpython3.11-dev gcc g++ make cmake ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # We are copying root yarn.lock file to the context folder during the Publish GH
@@ -21,7 +21,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/duckdb/src \
     && yarn cache clean
 
-FROM node:20.17.0-bookworm-slim
+FROM node:22.16.0-bookworm-slim
 
 ARG IMAGE_VERSION=unknown
 

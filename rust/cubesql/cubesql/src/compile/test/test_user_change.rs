@@ -163,7 +163,7 @@ async fn test_change_user_via_filter_or() {
         convert_sql_to_cube_query(
             &"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' OR customer_gender = 'male'".to_string(),
             meta.clone(),
-            get_test_session(DatabaseProtocol::PostgreSQL, meta).await
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         ).await;
 
     // TODO: We need to propagate error to result, to assert message
@@ -193,6 +193,10 @@ async fn test_user_with_join() {
             segments: Some(vec![]),
             order: Some(vec![]),
             ungrouped: Some(true),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     );
@@ -258,6 +262,7 @@ FROM
     KibanaSampleDataEcommerce
 WHERE
     __user = 'gopher'
+    AND LOWER(customer_gender) = 'test'
 GROUP BY 1
 ;
         "#
@@ -273,4 +278,162 @@ GROUP BY 1
     // It would mean that SQL generation used changed user
     assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
     assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
+}
+
+/// This should test that query with CubeScanWrapper uses proper change_user
+/// for both SQL generation and execution calls
+#[tokio::test]
+async fn test_user_change_sql_generation_cast() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+    context
+        .execute_query(
+            // language=PostgreSQL
+            r#"
+SELECT
+    COALESCE(customer_gender, 'N/A'),
+    AVG(avgPrice)
+FROM
+    KibanaSampleDataEcommerce
+WHERE
+    CAST(__user AS TEXT) = 'gopher'
+    AND LOWER(customer_gender) = 'test'
+GROUP BY 1
+;
+        "#
+            .to_string(),
+        )
+        .await
+        .expect_err("Test transport does not support load with SQL");
+
+    let load_calls = context.load_calls().await;
+    assert_eq!(load_calls.len(), 1);
+    let sql_query = load_calls[0].sql_query.as_ref().unwrap();
+    // This should be placed from load meta to query by TestConnectionTransport::sql
+    // It would mean that SQL generation used changed user
+    assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
+    assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
+}
+
+/// This should test that query with CubeScanWrapper and joins with multiple WHERE clauses
+/// uses proper change_user for both SQL generation and execution calls
+#[tokio::test]
+async fn test_user_change_sql_push_down_with_joins() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+    context
+        .execute_query(
+            // language=PostgreSQL
+            r#"
+SELECT
+    COALESCE(customer_gender, 'N/A') AS customer_gender,
+    AVG(avgPrice)
+FROM
+    KibanaSampleDataEcommerce
+    INNER JOIN (
+        SELECT
+            COALESCE(customer_gender, 'N/A') AS customer_gender
+        FROM
+            KibanaSampleDataEcommerce
+        WHERE
+            CAST(__user AS TEXT) = 'gopher'
+            AND LOWER(customer_gender) = 'test'
+        GROUP BY 1
+    ) t0 ON (
+        CAST(KibanaSampleDataEcommerce.customer_gender AS TEXT)
+        IS NOT DISTINCT FROM
+        CAST(t0.customer_gender AS TEXT)
+    )
+WHERE
+    CAST(KibanaSampleDataEcommerce.__user AS TEXT) = 'gopher'
+    AND LOWER(KibanaSampleDataEcommerce.customer_gender) = 'test'
+GROUP BY 1
+;
+        "#
+            .to_string(),
+        )
+        .await
+        .expect_err("Test transport does not support load with SQL");
+
+    let load_calls = context.load_calls().await;
+    assert_eq!(load_calls.len(), 1);
+    let sql_query = load_calls[0].sql_query.as_ref().unwrap();
+    // This should be placed from load meta to query by TestConnectionTransport::sql
+    // It would mean that SQL generation used changed user
+    assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
+    assert!(!sql_query.sql.contains("= 'gopher'"));
+    assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
+}
+
+/// Repeated aggregation should be flattened even in presence of __user filter
+#[tokio::test]
+async fn flatten_aggregation_into_user_change() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+  dim_str0
+FROM
+  (
+    SELECT
+      dim_str0
+    FROM
+      (
+        SELECT
+          dim_str0,
+          AVG(avgPrice)
+        FROM
+          MultiTypeCube
+        WHERE
+          __user = 'gopher'
+        GROUP BY
+          1
+      ) t
+    GROUP BY
+      dim_str0
+  ) AS t
+GROUP BY
+  dim_str0
+ORDER BY
+  dim_str0 ASC
+LIMIT
+  1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // This query should rewrite completely as CubeScan
+    let logical_plan = query_plan.as_logical_plan();
+    let cube_scan = logical_plan.expect_root_cube_scan();
+
+    assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+
+    assert_eq!(
+        cube_scan.request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string(),]),
+            order: Some(vec![vec![
+                "MultiTypeCube.dim_str0".to_string(),
+                "asc".to_string(),
+            ],],),
+            limit: Some(1),
+            ..Default::default()
+        }
+    )
 }

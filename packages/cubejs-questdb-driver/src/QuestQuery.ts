@@ -1,4 +1,8 @@
-import { BaseFilter, BaseQuery, ParamAllocator } from '@cubejs-backend/schema-compiler';
+import {
+  BaseFilter,
+  BaseQuery,
+  ParamAllocator
+} from '@cubejs-backend/schema-compiler';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   second: 's',
@@ -6,7 +10,7 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   hour: 'h',
   day: 'd',
   month: 'M',
-  year: 'Y'
+  year: 'y'
 };
 
 class QuestParamAllocator extends ParamAllocator {
@@ -109,7 +113,7 @@ export class QuestQuery extends BaseQuery {
     }
   }
 
-  public orderHashToString(hash: any): string | null {
+  public orderHashToString(hash: { id: string, desc: boolean }): string | null {
     // QuestDB has partial support for order by index column, so map these to the alias names.
     // So, instead of:
     // SELECT col_a as "a", col_b as "b" FROM tab ORDER BY 2 ASC
@@ -129,32 +133,6 @@ export class QuestQuery extends BaseQuery {
 
     const direction = hash.desc ? 'DESC' : 'ASC';
     return `${fieldAlias} ${direction}`;
-  }
-
-  private getFieldAlias(id: string): string | null {
-    const equalIgnoreCase = (a: any, b: any) => (
-      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
-    );
-
-    let field;
-
-    field = this.dimensionsForSelect().find(
-      (d: any) => equalIgnoreCase(d.dimension, id),
-    );
-
-    if (field) {
-      return field.aliasName();
-    }
-
-    field = this.measures.find(
-      (d: any) => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
-    );
-
-    if (field) {
-      return field.aliasName();
-    }
-
-    return null;
   }
 
   public groupByClause(): string {

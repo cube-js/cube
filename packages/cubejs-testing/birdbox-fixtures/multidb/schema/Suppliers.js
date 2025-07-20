@@ -32,3 +32,10 @@ cube(`Suppliers`, {
 
   dataSource: 'suppliers',
 });
+
+view(`SuppliersView`, {
+  cubes: [{
+    joinPath: Suppliers,
+    includes: `*`,
+  }]
+});

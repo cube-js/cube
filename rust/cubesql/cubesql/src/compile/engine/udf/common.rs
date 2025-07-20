@@ -1,10 +1,12 @@
 use std::{
     any::type_name,
+    convert::TryInto,
+    mem::swap,
     sync::{Arc, LazyLock},
     thread,
 };
 
-use chrono::{Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use datafusion::{
     arrow::{
         array::{
@@ -21,10 +23,11 @@ use datafusion::{
             IntervalDayTimeType, IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType,
             TimeUnit, TimestampNanosecondType, UInt32Type,
         },
+        temporal_conversions::timestamp_ns_to_datetime,
     },
     error::{DataFusionError, Result},
     execution::context::SessionContext,
-    logical_plan::{create_udaf, create_udf},
+    logical_plan::create_udf,
     physical_plan::{
         functions::{
             datetime_expressions::date_trunc, make_scalar_function, make_table_function, Signature,
@@ -815,7 +818,7 @@ pub fn create_convert_tz_udf() -> ScalarUDF {
         }
 
         if let Some(tz) = input_tz {
-            if tz != &"UTC" {
+            if tz != "UTC" {
                 return Err(DataFusionError::NotImplemented(format!(
                     "convert_tz does not non UTC timezone as input, actual {}",
                     tz
@@ -1021,7 +1024,7 @@ pub fn create_date_udf() -> ScalarUDF {
         assert!(args.len() == 1);
 
         let mut args = args
-            .into_iter()
+            .iter()
             .map(|i| -> Result<ColumnarValue> {
                 if let Some(strings) = i.as_any().downcast_ref::<StringArray>() {
                     let mut builder = TimestampNanosecondArray::builder(strings.len());
@@ -1491,14 +1494,14 @@ fn date_addsub_day_time(
 }
 
 fn change_ym(t: NaiveDateTime, y: i32, m: u32) -> Option<NaiveDateTime> {
-    debug_assert!(1 <= m && m <= 12);
+    debug_assert!((1..=12).contains(&m));
     let mut d = t.day();
     d = d.min(last_day_of_month(y, m));
     t.with_day(1)?.with_year(y)?.with_month(m)?.with_day(d)
 }
 
 fn last_day_of_month(y: i32, m: u32) -> u32 {
-    debug_assert!(1 <= m && m <= 12);
+    debug_assert!((1..=12).contains(&m));
     if m == 12 {
         return 31;
     }
@@ -2259,14 +2262,66 @@ pub fn create_pg_get_constraintdef_udf() -> ScalarUDF {
     )
 }
 
+pub const MEASURE_UDAF_NAME: &str = "measure";
+
 pub fn create_measure_udaf() -> AggregateUDF {
-    create_udaf(
-        "measure",
-        DataType::Float64,
-        Arc::new(DataType::Float64),
-        Volatility::Immutable,
-        Arc::new(|| todo!("Not implemented")),
-        Arc::new(vec![DataType::Float64]),
+    let signature = Signature::any(1, Volatility::Immutable);
+
+    // MEASURE(cube.measure) should have same type as just cube.measure
+    let return_type: ReturnTypeFunction = Arc::new(move |inputs| {
+        if inputs.len() != 1 {
+            Err(DataFusionError::Internal(format!(
+                "Unexpected argument types for MEASURE: {inputs:?}"
+            )))
+        } else {
+            Ok(Arc::new(inputs[0].clone()))
+        }
+    });
+
+    let accumulator: AccumulatorFunctionImplementation = Arc::new(|| todo!("Not implemented"));
+
+    let state_type = Arc::new(vec![DataType::Float64]);
+    let state_type: StateTypeFunction = Arc::new(move |_| Ok(state_type.clone()));
+
+    AggregateUDF::new(
+        MEASURE_UDAF_NAME,
+        &signature,
+        &return_type,
+        &accumulator,
+        &state_type,
+    )
+}
+
+pub const PATCH_MEASURE_UDAF_NAME: &str = "__patch_measure";
+
+// TODO add sanity check on incoming query to disallow it in input
+pub fn create_patch_measure_udaf() -> AggregateUDF {
+    // TODO actually signature should look like (any, text, boolean)
+    let signature = Signature::any(3, Volatility::Immutable);
+
+    // __PATCH_MEASURE(cube.measure, type, filter) should have same type as just cube.measure
+    let return_type: ReturnTypeFunction = Arc::new(move |inputs| {
+        if inputs.len() != 3 {
+            Err(DataFusionError::Internal(format!(
+                "Unexpected argument types for {PATCH_MEASURE_UDAF_NAME}: {inputs:?}"
+            )))
+        } else {
+            Ok(Arc::new(inputs[0].clone()))
+        }
+    });
+
+    let accumulator: AccumulatorFunctionImplementation =
+        Arc::new(|| todo!("Internal, should not execute"));
+
+    let state_type = Arc::new(vec![DataType::Float64]);
+    let state_type: StateTypeFunction = Arc::new(move |_| Ok(state_type.clone()));
+
+    AggregateUDF::new(
+        PATCH_MEASURE_UDAF_NAME,
+        &signature,
+        &return_type,
+        &accumulator,
+        &state_type,
     )
 }
 
@@ -3700,6 +3755,130 @@ pub fn create_pg_get_indexdef_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_age_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| match args.len() {
+        1 => {
+            let older_dates =
+                downcast_primitive_arg!(args[0], "older_date", TimestampNanosecondType);
+            let current_date = Utc::now().date_naive().and_time(NaiveTime::default());
+
+            let result = older_dates
+                .iter()
+                .map(|older_date| {
+                    older_date
+                        .map(|older_date| {
+                            let older_date = timestamp_ns_to_datetime(older_date);
+                            timestamp_difference_to_interval_month_day_nano(
+                                current_date,
+                                older_date,
+                            )
+                        })
+                        .transpose()
+                })
+                .collect::<Result<IntervalMonthDayNanoArray>>()?;
+
+            Ok(Arc::new(result) as ArrayRef)
+        }
+        2 => {
+            let newer_dates =
+                downcast_primitive_arg!(args[0], "newer_date", TimestampNanosecondType);
+            let older_dates =
+                downcast_primitive_arg!(args[1], "older_date", TimestampNanosecondType);
+
+            let result = newer_dates
+                .iter()
+                .zip(older_dates)
+                .map(|dates| match dates {
+                    (Some(newer_date), Some(older_date)) => {
+                        let newer_date = timestamp_ns_to_datetime(newer_date);
+                        let older_date = timestamp_ns_to_datetime(older_date);
+                        timestamp_difference_to_interval_month_day_nano(newer_date, older_date)
+                            .map(Some)
+                    }
+                    _ => Ok(None),
+                })
+                .collect::<Result<IntervalMonthDayNanoArray>>()?;
+
+            Ok(Arc::new(result) as ArrayRef)
+        }
+        _ => Err(DataFusionError::Execution(
+            "AGE function requires 1 or 2 arguments".to_string(),
+        )),
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Interval(IntervalUnit::MonthDayNano))));
+
+    ScalarUDF::new(
+        "age",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Timestamp(TimeUnit::Nanosecond, None)]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                ]),
+            ],
+            // NOTE: volatility should be `Stable` but we have no access
+            // to `query_execution_start_time`
+            Volatility::Volatile,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+fn timestamp_difference_to_interval_month_day_nano(
+    newer_date: NaiveDateTime,
+    older_date: NaiveDateTime,
+) -> Result<i128> {
+    if newer_date == older_date {
+        return Ok(0);
+    }
+    let mut newer_date = newer_date;
+    let mut older_date = older_date;
+    let reverse = if older_date > newer_date {
+        swap(&mut newer_date, &mut older_date);
+        true
+    } else {
+        false
+    };
+
+    let years = newer_date.year() - older_date.year();
+    let mut months: i32 = (newer_date.month() as i32) - (older_date.month() as i32);
+    months += years * 12;
+    if newer_date.day() < older_date.day()
+        || (newer_date.day() == older_date.day() && newer_date.time() < older_date.time())
+    {
+        months -= 1;
+    }
+
+    let offset_older_date = older_date
+        .checked_add_months(Months::new(months as u32))
+        .ok_or_else(|| DataFusionError::Execution("Cannot add months to date".to_string()))?;
+    let duration = newer_date - offset_older_date;
+    let mut days: i32 = duration
+        .num_days()
+        .try_into()
+        .map_err(|_| DataFusionError::Execution("Cannot convert days to i32".to_string()))?;
+
+    let offset_older_date = offset_older_date
+        .checked_add_days(Days::new(days as u64))
+        .ok_or_else(|| DataFusionError::Execution("Cannot add days to date".to_string()))?;
+    let duration = newer_date - offset_older_date;
+    let mut nanos = duration.num_nanoseconds().ok_or_else(|| {
+        DataFusionError::Execution("Cannot convert duration to nanoseconds".to_string())
+    })?;
+
+    if reverse {
+        months = -months;
+        days = -days;
+        nanos = -nanos;
+    }
+    let result = IntervalMonthDayNanoType::make_value(months, days, nanos);
+    Ok(result)
+}
+
 pub fn create_udf_stub(
     name: &'static str,
     type_signature: TypeSignature,
@@ -3820,6 +3999,59 @@ pub fn create_inet_server_addr_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_pg_get_partkeydef_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let table_oids = downcast_primitive_arg!(args[0], "table_oid", OidType);
+
+        let result = table_oids
+            .iter()
+            .map(|_| None::<String>)
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "pg_get_partkeydef",
+        vec![DataType::UInt32],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_relation_size_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let relids = downcast_primitive_arg!(args[0], "relid", OidType);
+
+        // 8192 is the lowest size for a table that has at least one column
+        // TODO: check if the requested table actually exists
+        let result = relids
+            .iter()
+            .map(|relid| relid.map(|_| 8192))
+            .collect::<PrimitiveArray<Int64Type>>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "pg_relation_size",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::UInt32]),
+                TypeSignature::Exact(vec![DataType::UInt32, DataType::Utf8]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     macro_rules! register_fun_stub {
         ($FTYP:ident, $NAME:expr, argc=$ARGC:expr $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {
@@ -3935,13 +4167,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     // NOTE: lack of "rettyp" implies "type of first arg"
     register_fun_stub!(udf, "acosd", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "acosh", tsig = [Float64], rettyp = Float64);
-    register_fun_stub!(
-        udf,
-        "age",
-        tsigs = [[Timestamp], [Timestamp, Timestamp],],
-        rettyp = Interval,
-        vol = Stable
-    );
     register_fun_stub!(udf, "asind", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "asinh", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "atan2", tsig = [Float64, Float64], rettyp = Float64);
@@ -4689,13 +4914,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         "pg_relation_filepath",
         tsig = [Regclass],
         rettyp = Utf8,
-        vol = Volatile
-    );
-    register_fun_stub!(
-        udf,
-        "pg_relation_size",
-        tsigs = [[Regclass], [Regclass, Utf8],],
-        rettyp = Int64,
         vol = Volatile
     );
     register_fun_stub!(

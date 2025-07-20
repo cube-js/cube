@@ -28,10 +28,10 @@ use std::{
     task::{Context, Poll},
 };
 
+use crate::compile::date_parser::parse_date_str;
 use crate::{
     compile::{
         engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
-        rewrite::WrappedSelectType,
         test::find_cube_scans_deep_search,
     },
     config::ConfigObj,
@@ -39,7 +39,7 @@ use crate::{
     transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
     CubeError,
 };
-use chrono::{Datelike, NaiveDate, NaiveDateTime};
+use chrono::{Datelike, NaiveDate};
 use datafusion::{
     arrow::{
         array::{
@@ -49,15 +49,34 @@ use datafusion::{
         datatypes::{IntervalUnit, TimeUnit},
     },
     execution::context::TaskContext,
-    logical_plan::JoinType,
     scalar::ScalarValue,
 };
 use serde_json::Value;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct RegularMember {
+    pub member: String,
+    /// Field name in Cube response for this member. Can be different from member, i.e. for
+    /// time dimension with granularity: member is `cube.dimension`, field is `cube.dim.granularity`
+    pub field_name: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MemberField {
-    Member(String),
+    Member(RegularMember),
     Literal(ScalarValue),
+}
+
+impl MemberField {
+    pub fn regular(member: String) -> Self {
+        let field_name = member.clone();
+        MemberField::Member(RegularMember { member, field_name })
+    }
+
+    pub fn time_dimension(member: String, granularity: String) -> Self {
+        let field_name = format!("{}.{}", member, granularity);
+        MemberField::Member(RegularMember { member, field_name })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -141,219 +160,6 @@ impl UserDefinedLogicalNode for CubeScanNode {
             used_cubes: self.used_cubes.clone(),
             span_id: self.span_id.clone(),
         })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct WrappedSelectNode {
-    pub schema: DFSchemaRef,
-    pub select_type: WrappedSelectType,
-    pub projection_expr: Vec<Expr>,
-    pub subqueries: Vec<Arc<LogicalPlan>>,
-    pub group_expr: Vec<Expr>,
-    pub aggr_expr: Vec<Expr>,
-    pub window_expr: Vec<Expr>,
-    pub from: Arc<LogicalPlan>,
-    pub joins: Vec<(Arc<LogicalPlan>, Expr, JoinType)>,
-    pub filter_expr: Vec<Expr>,
-    pub having_expr: Vec<Expr>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
-    pub order_expr: Vec<Expr>,
-    pub alias: Option<String>,
-    pub distinct: bool,
-
-    /// States if this node actually a query to Cube or not.
-    /// When `false` this node will generate SQL on its own, using its fields and templates.
-    /// When `true` this node will generate SQL with load query to JS side of Cube.
-    /// It expects to be flattened: `from` is expected to be ungrouped CubeScan.
-    /// There's no point in doing this for grouped CubeScan, we can just use load query from that CubeScan and SQL API generation on top.
-    /// Load query generated for this case can be grouped when this node is an aggregation.
-    /// Most fields will be rendered as a member expressions in generated load query.
-    pub push_to_cube: bool,
-}
-
-impl WrappedSelectNode {
-    pub fn new(
-        schema: DFSchemaRef,
-        select_type: WrappedSelectType,
-        projection_expr: Vec<Expr>,
-        subqueries: Vec<Arc<LogicalPlan>>,
-        group_expr: Vec<Expr>,
-        aggr_expr: Vec<Expr>,
-        window_expr: Vec<Expr>,
-        from: Arc<LogicalPlan>,
-        joins: Vec<(Arc<LogicalPlan>, Expr, JoinType)>,
-        filter_expr: Vec<Expr>,
-        having_expr: Vec<Expr>,
-        limit: Option<usize>,
-        offset: Option<usize>,
-        order_expr: Vec<Expr>,
-        alias: Option<String>,
-        distinct: bool,
-        push_to_cube: bool,
-    ) -> Self {
-        Self {
-            schema,
-            select_type,
-            projection_expr,
-            subqueries,
-            group_expr,
-            aggr_expr,
-            window_expr,
-            from,
-            joins,
-            filter_expr,
-            having_expr,
-            limit,
-            offset,
-            order_expr,
-            alias,
-            distinct,
-            push_to_cube,
-        }
-    }
-}
-
-impl UserDefinedLogicalNode for WrappedSelectNode {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn inputs(&self) -> Vec<&LogicalPlan> {
-        let mut inputs = vec![self.from.as_ref()];
-        inputs.extend(self.joins.iter().map(|(j, _, _)| j.as_ref()));
-        inputs
-    }
-
-    fn schema(&self) -> &DFSchemaRef {
-        &self.schema
-    }
-
-    fn expressions(&self) -> Vec<Expr> {
-        let mut exprs = vec![];
-        exprs.extend(self.projection_expr.clone());
-        exprs.extend(self.group_expr.clone());
-        exprs.extend(self.aggr_expr.clone());
-        exprs.extend(self.window_expr.clone());
-        exprs.extend(self.joins.iter().map(|(_, expr, _)| expr.clone()));
-        exprs.extend(self.filter_expr.clone());
-        exprs.extend(self.having_expr.clone());
-        exprs.extend(self.order_expr.clone());
-        exprs
-    }
-
-    fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}, distinct={:?}",
-            self.select_type,
-            self.projection_expr,
-            self.group_expr,
-            self.aggr_expr,
-            self.window_expr,
-            self.from,
-            self.joins,
-            self.filter_expr,
-            self.having_expr,
-            self.limit,
-            self.offset,
-            self.order_expr,
-            self.alias,
-            self.distinct,
-        )
-    }
-
-    fn from_template(
-        &self,
-        exprs: &[datafusion::logical_plan::Expr],
-        inputs: &[datafusion::logical_plan::LogicalPlan],
-    ) -> std::sync::Arc<dyn UserDefinedLogicalNode + Send + Sync> {
-        assert_eq!(inputs.len(), self.inputs().len(), "input size inconsistent");
-        assert_eq!(
-            exprs.len(),
-            self.expressions().len(),
-            "expression size inconsistent"
-        );
-
-        let from = Arc::new(inputs[0].clone());
-        let joins = (1..self.joins.len() + 1)
-            .map(|i| Arc::new(inputs[i].clone()))
-            .collect::<Vec<_>>();
-        let mut joins_expr = vec![];
-        let join_types = self
-            .joins
-            .iter()
-            .map(|(_, _, t)| t.clone())
-            .collect::<Vec<_>>();
-        let mut filter_expr = vec![];
-        let mut having_expr = vec![];
-        let mut order_expr = vec![];
-        let mut projection_expr = vec![];
-        let mut group_expr = vec![];
-        let mut aggregate_expr = vec![];
-        let mut window_expr = vec![];
-        let limit = None;
-        let offset = None;
-        let alias = None;
-
-        let mut exprs_iter = exprs.iter();
-        for _ in self.projection_expr.iter() {
-            projection_expr.push(exprs_iter.next().unwrap().clone());
-        }
-
-        for _ in self.group_expr.iter() {
-            group_expr.push(exprs_iter.next().unwrap().clone());
-        }
-
-        for _ in self.aggr_expr.iter() {
-            aggregate_expr.push(exprs_iter.next().unwrap().clone());
-        }
-
-        for _ in self.window_expr.iter() {
-            window_expr.push(exprs_iter.next().unwrap().clone());
-        }
-
-        for _ in self.joins.iter() {
-            joins_expr.push(exprs_iter.next().unwrap().clone());
-        }
-
-        for _ in self.filter_expr.iter() {
-            filter_expr.push(exprs_iter.next().unwrap().clone());
-        }
-
-        for _ in self.having_expr.iter() {
-            having_expr.push(exprs_iter.next().unwrap().clone());
-        }
-
-        for _ in self.order_expr.iter() {
-            order_expr.push(exprs_iter.next().unwrap().clone());
-        }
-
-        Arc::new(WrappedSelectNode::new(
-            self.schema.clone(),
-            self.select_type.clone(),
-            projection_expr,
-            self.subqueries.clone(),
-            group_expr,
-            aggregate_expr,
-            window_expr,
-            from,
-            joins
-                .into_iter()
-                .zip(joins_expr)
-                .zip(join_types)
-                .map(|((plan, expr), join_type)| (plan, expr, join_type))
-                .collect(),
-            filter_expr,
-            having_expr,
-            limit,
-            offset,
-            order_expr,
-            alias,
-            self.distinct,
-            self.push_to_cube,
-        ))
     }
 }
 
@@ -527,9 +333,10 @@ macro_rules! build_column {
 macro_rules! build_column_custom_builder {
     ($data_type:expr, $len:expr, $builder:expr, $response:expr, $field_name: expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         match $field_name {
-            MemberField::Member(field_name) => {
+            MemberField::Member(member) => {
+                let field_name = &member.field_name;
                 for i in 0..$len {
-                    let value = $response.get(i, field_name)?;
+                    let value = $response.get(i, &field_name)?;
                     match (value, &mut $builder) {
                         (FieldValue::Null, builder) => builder.append_null()?,
                         $($builder_block)*
@@ -976,7 +783,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Int16(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Int16(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1001,7 +808,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Int32(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Int32(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1026,7 +833,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Int64(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Int64(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1051,7 +858,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Float32(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Float32(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1076,7 +883,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Float64(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Float64(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1099,7 +906,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Boolean(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Boolean(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1111,21 +918,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%d %H:%M:%S%.f"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.fZ"))
-                                .or_else(|_| {
-                                    NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d").map(|date| {
-                                        date.and_hms_opt(0, 0, 0).unwrap()
-                                    })
-                                })
-                                .map_err(|e| {
-                                    DataFusionError::Execution(format!(
-                                        "Can't parse timestamp: '{}': {}",
-                                        s, e
-                                    ))
-                                })?;
+                            let timestamp = parse_date_str(s.as_ref())?;
                             // TODO switch parsing to microseconds
                             if timestamp.and_utc().timestamp_millis() > (((1i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
@@ -1141,7 +934,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1153,21 +946,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%d %H:%M:%S%.f"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.fZ"))
-                                .or_else(|_| {
-                                    NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d").map(|date| {
-                                        date.and_hms_opt(0, 0, 0).unwrap()
-                                    })
-                                })
-                                .map_err(|e| {
-                                    DataFusionError::Execution(format!(
-                                        "Can't parse timestamp: '{}': {}",
-                                        s, e
-                                    ))
-                                })?;
+                            let timestamp = parse_date_str(s.as_ref())?;
                             // TODO switch parsing to microseconds
                             if timestamp.and_utc().timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
@@ -1177,7 +956,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1217,7 +996,7 @@ pub fn transform_response<V: ValueObject>(
                         }
                     },
                     {
-                        (ScalarValue::Date32(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Date32(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1279,7 +1058,7 @@ pub fn transform_response<V: ValueObject>(
                         // TODO
                     },
                     {
-                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1293,7 +1072,7 @@ pub fn transform_response<V: ValueObject>(
                         // TODO
                     },
                     {
-                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1307,7 +1086,7 @@ pub fn transform_response<V: ValueObject>(
                         // TODO
                     },
                     {
-                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1511,7 +1290,7 @@ mod tests {
                     if f.name() == "KibanaSampleDataEcommerce.is_female" {
                         MemberField::Literal(ScalarValue::Boolean(None))
                     } else {
-                        MemberField::Member(f.name().to_string())
+                        MemberField::regular(f.name().to_string())
                     }
                 })
                 .collect(),

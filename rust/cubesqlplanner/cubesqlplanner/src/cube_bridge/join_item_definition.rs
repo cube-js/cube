@@ -16,6 +16,6 @@ pub struct JoinItemDefinitionStatic {
 
 #[nativebridge::native_bridge(JoinItemDefinitionStatic)]
 pub trait JoinItemDefinition {
-    #[field]
+    #[nbridge(field)]
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;
 }

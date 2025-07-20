@@ -61,17 +61,17 @@ correspond to [measure types][ref-measure-types]:
 
 | Measure type in Cube | Aggregate function in an aggregated query |
 | --- | --- |
-| [`avg`](/reference/data-model/types-and-formats#avg) | `MEASURE` or `AVG` | 
-| [`boolean`](/reference/data-model/types-and-formats#boolean) | `MEASURE` |
-| [`count`](/reference/data-model/types-and-formats#count) | `MEASURE` or `COUNT` |
-| [`count_distinct`](/reference/data-model/types-and-formats#count_distinct) | `MEASURE` or `COUNT(DISTINCT …)` |
-| [`count_distinct_approx`](/reference/data-model/types-and-formats#count_distinct_approx) | `MEASURE` or `COUNT(DISTINCT …)` |
-| [`max`](/reference/data-model/types-and-formats#max) | `MEASURE` or `MAX` |
-| [`min`](/reference/data-model/types-and-formats#min) | `MEASURE` or `MIN` |
-| [`number`](/reference/data-model/types-and-formats#number) | `MEASURE` or any other function from this table |
-| [`string`](/reference/data-model/types-and-formats#string) | `MEASURE` or `STRING_AGG` |
-| [`sum`](/reference/data-model/types-and-formats#sum) | `MEASURE` or `SUM` |
-| [`time`](/reference/data-model/types-and-formats#time) | `MEASURE` or `MAX` or `MIN` |
+| [`avg`](/product/data-modeling/reference/types-and-formats#avg) | `MEASURE` or `AVG` | 
+| [`boolean`](/product/data-modeling/reference/types-and-formats#boolean) | `MEASURE` |
+| [`count`](/product/data-modeling/reference/types-and-formats#count) | `MEASURE` or `COUNT` |
+| [`count_distinct`](/product/data-modeling/reference/types-and-formats#count_distinct) | `MEASURE` or `COUNT(DISTINCT …)` |
+| [`count_distinct_approx`](/product/data-modeling/reference/types-and-formats#count_distinct_approx) | `MEASURE` or `COUNT(DISTINCT …)` |
+| [`max`](/product/data-modeling/reference/types-and-formats#max) | `MEASURE` or `MAX` |
+| [`min`](/product/data-modeling/reference/types-and-formats#min) | `MEASURE` or `MIN` |
+| [`number`](/product/data-modeling/reference/types-and-formats#number) | `MEASURE` or any other function from this table |
+| [`string`](/product/data-modeling/reference/types-and-formats#string) | `MEASURE` or `STRING_AGG` |
+| [`sum`](/product/data-modeling/reference/types-and-formats#sum) | `MEASURE` or `SUM` |
+| [`time`](/product/data-modeling/reference/types-and-formats#time) | `MEASURE` or `MAX` or `MIN` |
 
 <WarningBox>
 
@@ -432,13 +432,11 @@ As you can see, the sorting operation is done after the regular query and the pr
 ```
 
 
-[ref-sql-api-conf-query-plan]: /product/apis-integrations/sql-api#query-planning
 [ref-regular-queries]: /product/apis-integrations/queries#regular-query
 [ref-queries-wpp]: /product/apis-integrations/queries#query-with-post-processing
 [ref-queries-wpd]: /product/apis-integrations/queries#query-with-pushdown
-[ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
 [ref-data-model-concepts]: /product/data-modeling/concepts
-[ref-measure-types]: /reference/data-model/types-and-formats#measure-types
+[ref-measure-types]: /product/data-modeling/reference/types-and-formats#measure-types
 [ref-query-default-limit]: /product/apis-integrations/queries#row-limit
 [ref-ref-sql-api]: /product/apis-integrations/sql-api/reference
 

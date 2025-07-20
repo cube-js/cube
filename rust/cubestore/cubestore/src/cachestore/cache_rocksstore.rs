@@ -15,7 +15,7 @@ use std::env;
 
 use crate::metastore::{
     BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow,
-    RocksStore, RocksStoreDetails, RocksTable, RocksTableStats,
+    RocksStore, RocksStoreDetails, RocksStoreRWLoop, RocksTable, RocksTableStats,
 };
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
@@ -184,6 +184,7 @@ pub struct RocksCacheStore {
     cache_eviction_manager: CacheEvictionManager,
     upload_loop: Arc<WorkerLoop>,
     metrics_loop: Arc<WorkerLoop>,
+    rw_loop_queue_cf: RocksStoreRWLoop,
 }
 
 impl RocksCacheStore {
@@ -222,6 +223,7 @@ impl RocksCacheStore {
             cache_eviction_manager,
             upload_loop: Arc::new(WorkerLoop::new("Cachestore upload")),
             metrics_loop: Arc::new(WorkerLoop::new("Cachestore metrics")),
+            rw_loop_queue_cf: RocksStoreRWLoop::new("queue"),
         }))
     }
 
@@ -389,13 +391,29 @@ impl RocksCacheStore {
         self.store.add_listener(listener).await;
     }
 
+    pub fn prepare_bench_cachestore(
+        test_name: &str,
+        config: Config,
+    ) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("db-tmp")
+            .join("benchmarks")
+            .join(format!("{}", test_name));
+        let _ = std::fs::remove_dir_all(store_path.clone());
+
+        Self::prepare_test_cachestore_impl(test_name, store_path, config)
+    }
+
     pub fn prepare_test_cachestore(
         test_name: &str,
         config: Config,
     ) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
         let store_path = env::current_dir()
             .unwrap()
-            .join(format!("test-{}-local", test_name));
+            .join("db-tmp")
+            .join("tests")
+            .join(format!("{}-local", test_name));
         let _ = std::fs::remove_dir_all(store_path.clone());
 
         Self::prepare_test_cachestore_impl(test_name, store_path, config)
@@ -484,29 +502,60 @@ impl RocksCacheStore {
 }
 
 impl RocksCacheStore {
-    async fn queue_result_delete_by_id(&self, id: u64) -> Result<(), CubeError> {
+    #[inline(always)]
+    pub async fn write_operation_queue<F, R>(
+        &self,
+        op_name: &'static str,
+        f: F,
+    ) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
+            + Send
+            + Sync
+            + 'static,
+        R: Send + Sync + 'static,
+    {
         self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                result_schema.try_delete(id, batch_pipe)?;
-
-                Ok(())
-            })
+            .write_operation_impl::<F, R>(&self.rw_loop_queue_cf, op_name, f)
             .await
+    }
+
+    #[inline(always)]
+    pub async fn read_operation_queue<F, R>(
+        &self,
+        op_name: &'static str,
+        f: F,
+    ) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
+    {
+        self.store
+            .read_operation_impl::<F, R>(&self.rw_loop_queue_cf, op_name, f)
+            .await
+    }
+
+    async fn queue_result_delete_by_id(&self, id: u64) -> Result<(), CubeError> {
+        self.write_operation_queue("queue_result_delete_by_id", move |db_ref, batch_pipe| {
+            let result_schema = QueueResultRocksTable::new(db_ref.clone());
+            result_schema.try_delete(id, batch_pipe)?;
+
+            Ok(())
+        })
+        .await
     }
 
     /// This method should be called when we are sure that we return data to the consumer
     async fn queue_result_ready_to_delete(&self, id: u64) -> Result<(), CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                if let Some(row) = result_schema.get_row(id)? {
-                    Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, row)?;
-                }
+        self.write_operation_queue("queue_result_ready_to_delete", move |db_ref, batch_pipe| {
+            let result_schema = QueueResultRocksTable::new(db_ref.clone());
+            if let Some(row) = result_schema.get_row(id)? {
+                Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, row)?;
+            }
 
-                Ok(())
-            })
-            .await
+            Ok(())
+        })
+        .await
     }
 
     /// This method should be called when we are sure that we return data to the consumer
@@ -538,33 +587,32 @@ impl RocksCacheStore {
         &self,
         key: QueueKey,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                let query_key_is_path = key.is_path();
-                let queue_result = result_schema.get_row_by_key(key.clone())?;
+        self.write_operation_queue("lookup_queue_result_by_key", move |db_ref, batch_pipe| {
+            let result_schema = QueueResultRocksTable::new(db_ref.clone());
+            let query_key_is_path = key.is_path();
+            let queue_result = result_schema.get_row_by_key(key.clone())?;
 
-                if let Some(queue_result) = queue_result {
-                    if query_key_is_path {
-                        if queue_result.get_row().is_deleted() {
-                            Ok(None)
-                        } else {
-                            Self::queue_result_ready_to_delete_impl(
-                                &result_schema,
-                                batch_pipe,
-                                queue_result,
-                            )
-                        }
+            if let Some(queue_result) = queue_result {
+                if query_key_is_path {
+                    if queue_result.get_row().is_deleted() {
+                        Ok(None)
                     } else {
-                        Ok(Some(QueueResultResponse::Success {
-                            value: Some(queue_result.into_row().value),
-                        }))
+                        Self::queue_result_ready_to_delete_impl(
+                            &result_schema,
+                            batch_pipe,
+                            queue_result,
+                        )
                     }
                 } else {
-                    Ok(None)
+                    Ok(Some(QueueResultResponse::Success {
+                        value: Some(queue_result.into_row().value),
+                    }))
                 }
-            })
-            .await
+            } else {
+                Ok(None)
+            }
+        })
+        .await
     }
 
     fn filter_to_cancel(
@@ -850,7 +898,7 @@ impl CacheStore for RocksCacheStore {
 
         let (result, inserted) = self
             .store
-            .write_operation(move |db_ref, batch_pipe| {
+            .write_operation("cache_set", move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let index_key = CacheItemIndexKey::ByPath(item.get_path());
                 let id_row_opt = cache_schema
@@ -884,7 +932,7 @@ impl CacheStore for RocksCacheStore {
 
         let result = self
             .store
-            .write_operation(move |db_ref, batch_pipe| {
+            .write_operation("cache_truncate", move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref);
                 cache_schema.truncate(batch_pipe)?;
 
@@ -901,7 +949,7 @@ impl CacheStore for RocksCacheStore {
     async fn cache_delete(&self, key: String) -> Result<(), CubeError> {
         let result = self
             .store
-            .write_operation(move |db_ref, batch_pipe| {
+            .write_operation("cache_delete", move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let index_key = CacheItemIndexKey::ByPath(key);
                 let row_opt = cache_schema
@@ -931,7 +979,7 @@ impl CacheStore for RocksCacheStore {
     async fn cache_get(&self, key: String) -> Result<Option<IdRow<CacheItem>>, CubeError> {
         let res = self
             .store
-            .read_operation(move |db_ref| {
+            .read_operation("cache_get", move |db_ref| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let index_key = CacheItemIndexKey::ByPath(key);
                 let id_row_opt = cache_schema
@@ -950,7 +998,7 @@ impl CacheStore for RocksCacheStore {
 
     async fn cache_keys(&self, prefix: String) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
         self.store
-            .read_operation(move |db_ref| {
+            .read_operation("cache_keys", move |db_ref| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let index_key =
                     CacheItemIndexKey::ByPrefix(CacheItem::parse_path_to_prefix(prefix));
@@ -965,7 +1013,7 @@ impl CacheStore for RocksCacheStore {
     async fn cache_incr(&self, path: String) -> Result<IdRow<CacheItem>, CubeError> {
         let item = self
             .store
-            .write_operation(move |db_ref, batch_pipe| {
+            .write_operation("cache_incr", move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let index_key = CacheItemIndexKey::ByPath(path.clone());
                 let id_row_opt = cache_schema
@@ -993,7 +1041,7 @@ impl CacheStore for RocksCacheStore {
 
     async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<QueueAllItem>, CubeError> {
         self.store
-            .read_operation(move |db_ref| {
+            .read_operation("queue_all", move |db_ref| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
                 let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
 
@@ -1024,92 +1072,89 @@ impl CacheStore for RocksCacheStore {
         &self,
         limit: Option<usize>,
     ) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
-        self.store
-            .read_operation(move |db_ref| Ok(QueueResultRocksTable::new(db_ref).scan_rows(limit)?))
-            .await
+        self.read_operation_queue("queue_results_all", move |db_ref| {
+            Ok(QueueResultRocksTable::new(db_ref).scan_rows(limit)?)
+        })
+        .await
     }
 
     async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let queue_result_schema = QueueResultRocksTable::new(db_ref);
+        self.write_operation_queue("queue_results_multi_delete", move |db_ref, batch_pipe| {
+            let queue_result_schema = QueueResultRocksTable::new(db_ref);
 
-                for id in ids {
-                    queue_result_schema.try_delete(id, batch_pipe)?;
-                }
+            for id in ids {
+                queue_result_schema.try_delete(id, batch_pipe)?;
+            }
 
-                Ok(())
-            })
-            .await
+            Ok(())
+        })
+        .await
     }
 
     async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let pending = queue_schema.count_rows_by_index(
-                    &QueueItemIndexKey::ByPrefixAndStatus(
-                        QueueItem::extract_prefix(payload.path.clone()).unwrap_or("".to_string()),
-                        QueueItemStatus::Pending,
+        self.write_operation_queue("queue_add", move |db_ref, batch_pipe| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+            let pending = queue_schema.count_rows_by_index(
+                &QueueItemIndexKey::ByPrefixAndStatus(
+                    QueueItem::extract_prefix(payload.path.clone()).unwrap_or("".to_string()),
+                    QueueItemStatus::Pending,
+                ),
+                &QueueItemRocksIndex::ByPrefixAndStatus,
+            )?;
+
+            let index_key = QueueItemIndexKey::ByPath(payload.path.clone());
+            let id_row_opt = queue_schema
+                .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
+
+            let (id, added) = if let Some(row) = id_row_opt {
+                (row.id, false)
+            } else {
+                let queue_item_row = queue_schema.insert(
+                    QueueItem::new(
+                        payload.path,
+                        QueueItem::status_default(),
+                        payload.priority,
+                        payload.orphaned.clone(),
                     ),
-                    &QueueItemRocksIndex::ByPrefixAndStatus,
+                    batch_pipe,
+                )?;
+                let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+                queue_payload_schema.insert_with_pk(
+                    queue_item_row.id,
+                    QueueItemPayload::new(
+                        payload.value,
+                        queue_item_row.row.get_created().clone(),
+                        queue_item_row.row.get_expire().clone(),
+                    ),
+                    batch_pipe,
                 )?;
 
-                let index_key = QueueItemIndexKey::ByPath(payload.path.clone());
-                let id_row_opt = queue_schema
-                    .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
+                (queue_item_row.id, true)
+            };
 
-                let (id, added) = if let Some(row) = id_row_opt {
-                    (row.id, false)
-                } else {
-                    let queue_item_row = queue_schema.insert(
-                        QueueItem::new(
-                            payload.path,
-                            QueueItem::status_default(),
-                            payload.priority,
-                            payload.orphaned.clone(),
-                        ),
-                        batch_pipe,
-                    )?;
-
-                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
-                    queue_payload_schema.insert_with_pk(
-                        queue_item_row.id,
-                        QueueItemPayload::new(
-                            payload.value,
-                            queue_item_row.row.get_created().clone(),
-                            queue_item_row.row.get_expire().clone(),
-                        ),
-                        batch_pipe,
-                    )?;
-
-                    (queue_item_row.id, true)
-                };
-
-                Ok(QueueAddResponse {
-                    id,
-                    added,
-                    pending: if added { pending + 1 } else { pending },
-                })
+            Ok(QueueAddResponse {
+                id,
+                added,
+                pending: if added { pending + 1 } else { pending },
             })
-            .await
+        })
+        .await
     }
 
     async fn queue_truncate(&self) -> Result<(), CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
-                queue_item_schema.truncate(batch_pipe)?;
+        self.write_operation_queue("queue_truncate", move |db_ref, batch_pipe| {
+            let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
+            queue_item_schema.truncate(batch_pipe)?;
 
-                let queue_item_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
-                queue_item_payload_schema.truncate(batch_pipe)?;
+            let queue_item_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+            queue_item_payload_schema.truncate(batch_pipe)?;
 
-                let queue_result_schema = QueueResultRocksTable::new(db_ref);
-                queue_result_schema.truncate(batch_pipe)?;
+            let queue_result_schema = QueueResultRocksTable::new(db_ref);
+            queue_result_schema.truncate(batch_pipe)?;
 
-                Ok(())
-            })
-            .await?;
+            Ok(())
+        })
+        .await?;
 
         Ok(())
     }
@@ -1120,21 +1165,20 @@ impl CacheStore for RocksCacheStore {
         orphaned_timeout: Option<u32>,
         heartbeat_timeout: Option<u32>,
     ) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
-        self.store
-            .read_operation(move |db_ref| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let index_key = QueueItemIndexKey::ByPrefix(prefix);
-                let items =
-                    queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?;
+        self.read_operation_queue("queue_to_cancel", move |db_ref| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+            let index_key = QueueItemIndexKey::ByPrefix(prefix);
+            let items =
+                queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?;
 
-                Ok(Self::filter_to_cancel(
-                    db_ref.start_time.clone(),
-                    items,
-                    orphaned_timeout,
-                    heartbeat_timeout,
-                ))
-            })
-            .await
+            Ok(Self::filter_to_cancel(
+                db_ref.start_time.clone(),
+                items,
+                orphaned_timeout,
+                heartbeat_timeout,
+            ))
+        })
+        .await
     }
 
     async fn queue_list(
@@ -1144,130 +1188,124 @@ impl CacheStore for RocksCacheStore {
         priority_sort: bool,
         with_payload: bool,
     ) -> Result<Vec<QueueListItem>, CubeError> {
-        self.store
-            .read_operation(move |db_ref| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+        self.read_operation_queue("queue_list", move |db_ref| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
 
-                let items = if let Some(status_filter) = status_filter {
-                    let index_key = QueueItemIndexKey::ByPrefixAndStatus(prefix, status_filter);
-                    queue_schema
-                        .get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefixAndStatus)?
-                } else {
-                    let index_key = QueueItemIndexKey::ByPrefix(prefix);
-                    queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?
-                };
+            let items = if let Some(status_filter) = status_filter {
+                let index_key = QueueItemIndexKey::ByPrefixAndStatus(prefix, status_filter);
+                queue_schema
+                    .get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefixAndStatus)?
+            } else {
+                let index_key = QueueItemIndexKey::ByPrefix(prefix);
+                queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?
+            };
 
-                let items = if priority_sort {
-                    items
-                        .into_iter()
-                        .sorted_by(|a, b| b.row.cmp(&a.row))
-                        .collect()
-                } else {
-                    items
-                };
+            let items = if priority_sort {
+                items
+                    .into_iter()
+                    .sorted_by(|a, b| b.row.cmp(&a.row))
+                    .collect()
+            } else {
+                items
+            };
 
-                if with_payload {
-                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
-                    let mut res = Vec::with_capacity(items.len());
+            if with_payload {
+                let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+                let mut res = Vec::with_capacity(items.len());
 
-                    for item in items {
-                        if let Some(payload_row) = queue_payload_schema.get_row(item.get_id())? {
-                            res.push(QueueListItem::WithPayload(
-                                item,
-                                payload_row.into_row().value,
-                            ));
-                        } else {
-                            res.push(QueueListItem::ItemOnly(item));
-                        }
+                for item in items {
+                    if let Some(payload_row) = queue_payload_schema.get_row(item.get_id())? {
+                        res.push(QueueListItem::WithPayload(
+                            item,
+                            payload_row.into_row().value,
+                        ));
+                    } else {
+                        res.push(QueueListItem::ItemOnly(item));
                     }
-
-                    Ok(res)
-                } else {
-                    Ok(items
-                        .into_iter()
-                        .map(|item| QueueListItem::ItemOnly(item))
-                        .collect())
                 }
-            })
-            .await
+
+                Ok(res)
+            } else {
+                Ok(items
+                    .into_iter()
+                    .map(|item| QueueListItem::ItemOnly(item))
+                    .collect())
+            }
+        })
+        .await
     }
 
     async fn queue_get(&self, key: QueueKey) -> Result<Option<QueueGetResponse>, CubeError> {
-        self.store
-            .read_operation(move |db_ref| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+        self.read_operation_queue("queue_get", move |db_ref| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
 
-                if let Some(item_row) = queue_schema.get_row_by_key(key)? {
-                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+            if let Some(item_row) = queue_schema.get_row_by_key(key)? {
+                let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
 
-                    if let Some(payload_row) = queue_payload_schema.get_row(item_row.get_id())? {
-                        Ok(Some(QueueGetResponse {
-                            extra: item_row.into_row().extra,
-                            payload: payload_row.into_row().value,
-                        }))
-                    } else {
-                        error!(
-                            "Unable to find payload for queue item, id = {}",
-                            item_row.get_id()
-                        );
-
-                        Ok(None)
-                    }
+                if let Some(payload_row) = queue_payload_schema.get_row(item_row.get_id())? {
+                    Ok(Some(QueueGetResponse {
+                        extra: item_row.into_row().extra,
+                        payload: payload_row.into_row().value,
+                    }))
                 } else {
+                    error!(
+                        "Unable to find payload for queue item, id = {}",
+                        item_row.get_id()
+                    );
+
                     Ok(None)
                 }
-            })
-            .await
+            } else {
+                Ok(None)
+            }
+        })
+        .await
     }
 
     async fn queue_cancel(&self, key: QueueKey) -> Result<Option<QueueCancelResponse>, CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+        self.write_operation_queue("queue_cancel", move |db_ref, batch_pipe| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+            let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
 
-                if let Some(id_row) = queue_schema.get_row_by_key(key)? {
-                    let row_id = id_row.get_id();
-                    let queue_item = queue_schema.delete_row(id_row, batch_pipe)?;
+            if let Some(id_row) = queue_schema.get_row_by_key(key)? {
+                let row_id = id_row.get_id();
+                let queue_item = queue_schema.delete_row(id_row, batch_pipe)?;
 
-                    if let Some(queue_payload) =
-                        queue_payload_schema.try_delete(row_id, batch_pipe)?
-                    {
-                        Ok(Some(QueueCancelResponse {
-                            extra: queue_item.into_row().extra,
-                            value: queue_payload.into_row().value,
-                        }))
-                    } else {
-                        error!("Unable to find payload for queue item, id = {}", row_id);
-
-                        Ok(None)
-                    }
+                if let Some(queue_payload) = queue_payload_schema.try_delete(row_id, batch_pipe)? {
+                    Ok(Some(QueueCancelResponse {
+                        extra: queue_item.into_row().extra,
+                        value: queue_payload.into_row().value,
+                    }))
                 } else {
+                    error!("Unable to find payload for queue item, id = {}", row_id);
+
                     Ok(None)
                 }
-            })
-            .await
+            } else {
+                Ok(None)
+            }
+        })
+        .await
     }
 
     async fn queue_heartbeat(&self, key: QueueKey) -> Result<(), CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let id_row_opt = queue_schema.get_row_by_key(key.clone())?;
+        self.write_operation_queue("queue_heartbeat", move |db_ref, batch_pipe| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+            let id_row_opt = queue_schema.get_row_by_key(key.clone())?;
 
-                if let Some(id_row) = id_row_opt {
-                    let mut new = id_row.get_row().clone();
-                    new.update_heartbeat();
+            if let Some(id_row) = id_row_opt {
+                let mut new = id_row.get_row().clone();
+                new.update_heartbeat();
 
-                    queue_schema.update(id_row.id, new, id_row.get_row(), batch_pipe)?;
-                    Ok(())
-                } else {
-                    trace!("Unable to update heartbeat, unknown key: {:?}", key);
+                queue_schema.update(id_row.id, new, id_row.get_row(), batch_pipe)?;
+                Ok(())
+            } else {
+                trace!("Unable to update heartbeat, unknown key: {:?}", key);
 
-                    Ok(())
-                }
-            })
-            .await
+                Ok(())
+            }
+        })
+        .await
     }
 
     async fn queue_retrieve_by_path(
@@ -1275,125 +1313,120 @@ impl CacheStore for RocksCacheStore {
         path: String,
         allow_concurrency: u32,
     ) -> Result<QueueRetrieveResponse, CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let prefix = QueueItem::parse_path(path.clone())
-                    .0
-                    .unwrap_or("".to_string());
+        self.write_operation_queue("queue_retrieve_by_path", move |db_ref, batch_pipe| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+            let prefix = QueueItem::parse_path(path.clone())
+                .0
+                .unwrap_or("".to_string());
+            let mut pending = queue_schema.count_rows_by_index(
+                &QueueItemIndexKey::ByPrefixAndStatus(prefix.clone(), QueueItemStatus::Pending),
+                &QueueItemRocksIndex::ByPrefixAndStatus,
+            )?;
 
-                let mut pending = queue_schema.count_rows_by_index(
-                    &QueueItemIndexKey::ByPrefixAndStatus(prefix.clone(), QueueItemStatus::Pending),
+            let mut active: Vec<String> = queue_schema
+                .get_rows_by_index(
+                    &QueueItemIndexKey::ByPrefixAndStatus(prefix, QueueItemStatus::Active),
                     &QueueItemRocksIndex::ByPrefixAndStatus,
-                )?;
+                )?
+                .into_iter()
+                .map(|item| item.into_row().key)
+                .collect();
+            if active.len() >= (allow_concurrency as usize) {
+                return Ok(QueueRetrieveResponse::NotEnoughConcurrency { pending, active });
+            }
 
-                let mut active: Vec<String> = queue_schema
-                    .get_rows_by_index(
-                        &QueueItemIndexKey::ByPrefixAndStatus(prefix, QueueItemStatus::Active),
-                        &QueueItemRocksIndex::ByPrefixAndStatus,
-                    )?
-                    .into_iter()
-                    .map(|item| item.into_row().key)
-                    .collect();
-                if active.len() >= (allow_concurrency as usize) {
-                    return Ok(QueueRetrieveResponse::NotFound { pending, active });
-                }
+            let id_row = queue_schema.get_single_opt_row_by_index(
+                &QueueItemIndexKey::ByPath(path.clone()),
+                &QueueItemRocksIndex::ByPath,
+            )?;
+            let id_row = if let Some(id_row) = id_row {
+                id_row
+            } else {
+                return Ok(QueueRetrieveResponse::NotFound { pending, active });
+            };
 
-                let id_row = queue_schema.get_single_opt_row_by_index(
-                    &QueueItemIndexKey::ByPath(path.clone()),
-                    &QueueItemRocksIndex::ByPath,
-                )?;
-                let id_row = if let Some(id_row) = id_row {
-                    id_row
+            if id_row.get_row().get_status() == &QueueItemStatus::Pending {
+                let mut new = id_row.get_row().clone();
+                new.status = QueueItemStatus::Active;
+                // It's  important to insert heartbeat, because
+                // without that created datetime will be used for orphaned filtering
+                new.update_heartbeat();
+
+                let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+
+                let res =
+                    queue_schema.update(id_row.get_id(), new, id_row.get_row(), batch_pipe)?;
+                let payload = if let Some(r) = queue_payload_schema.get_row(res.get_id())? {
+                    r.into_row().value
                 } else {
+                    error!(
+                        "Unable to find payload for queue item, id = {}",
+                        res.get_id()
+                    );
+
+                    queue_schema.delete_row(res, batch_pipe)?;
+
                     return Ok(QueueRetrieveResponse::NotFound { pending, active });
                 };
 
-                if id_row.get_row().get_status() == &QueueItemStatus::Pending {
-                    let mut new = id_row.get_row().clone();
-                    new.status = QueueItemStatus::Active;
-                    // It's an important to insert heartbeat, because
-                    // without that created datetime will be used for orphaned filtering
-                    new.update_heartbeat();
-
-                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
-
-                    let res =
-                        queue_schema.update(id_row.get_id(), new, id_row.get_row(), batch_pipe)?;
-                    let payload = if let Some(r) = queue_payload_schema.get_row(res.get_id())? {
-                        r.into_row().value
-                    } else {
-                        error!(
-                            "Unable to find payload for queue item, id = {}",
-                            res.get_id()
-                        );
-
-                        queue_schema.delete_row(res, batch_pipe)?;
-
-                        return Ok(QueueRetrieveResponse::NotFound { pending, active });
-                    };
-
-                    active.push(res.get_row().get_key().clone());
-                    pending -= 1;
-
-                    Ok(QueueRetrieveResponse::Success {
-                        id: id_row.get_id(),
-                        payload,
-                        item: res.into_row(),
-                        pending,
-                        active,
-                    })
-                } else {
-                    Ok(QueueRetrieveResponse::LockFailed { pending, active })
-                }
-            })
-            .await
+                active.push(res.get_row().get_key().clone());
+                pending -= 1;
+                Ok(QueueRetrieveResponse::Success {
+                    id: id_row.get_id(),
+                    payload,
+                    item: res.into_row(),
+                    pending,
+                    active,
+                })
+            } else {
+                Ok(QueueRetrieveResponse::LockFailed { pending, active })
+            }
+        })
+        .await
     }
 
     async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let queue_item_tbl = QueueItemRocksTable::new(db_ref.clone());
-                let queue_item_payload_tbl = QueueItemPayloadRocksTable::new(db_ref.clone());
+        self.write_operation_queue("queue_ack", move |db_ref, batch_pipe| {
+            let queue_item_tbl = QueueItemRocksTable::new(db_ref.clone());
+            let queue_item_payload_tbl = QueueItemPayloadRocksTable::new(db_ref.clone());
 
-                let item_row = queue_item_tbl.get_row_by_key(key.clone())?;
-                if let Some(item_row) = item_row {
-                    let path = item_row.get_row().get_path();
-                    let id = item_row.get_id();
+            let item_row = queue_item_tbl.get_row_by_key(key.clone())?;
+            if let Some(item_row) = item_row {
+                let path = item_row.get_row().get_path();
+                let id = item_row.get_id();
 
-                    queue_item_tbl.delete_row(item_row, batch_pipe)?;
-                    queue_item_payload_tbl.try_delete(id, batch_pipe)?;
+                queue_item_tbl.delete_row(item_row, batch_pipe)?;
+                queue_item_payload_tbl.try_delete(id, batch_pipe)?;
 
-                    if let Some(result) = result {
-                        let queue_result = QueueResult::new(path.clone(), result);
-                        let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                        // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
-                        let result_row =
-                            result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
+                if let Some(result) = result {
+                    let queue_result = QueueResult::new(path.clone(), result);
+                    let result_schema = QueueResultRocksTable::new(db_ref.clone());
+                    // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
+                    let result_row = result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
 
-                        batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                            id,
-                            path,
-                            result: QueueResultAckEventResult::WithResult {
-                                result: Arc::new(result_row.into_row().value),
-                            },
-                        }));
-                    } else {
-                        batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                            id,
-                            path,
-                            result: QueueResultAckEventResult::Empty {},
-                        }));
-                    }
-
-                    Ok(true)
+                    batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
+                        id,
+                        path,
+                        result: QueueResultAckEventResult::WithResult {
+                            result: Arc::new(result_row.into_row().value),
+                        },
+                    }));
                 } else {
-                    warn!("Unable to ack queue, unknown key: {:?}", key);
-
-                    Ok(false)
+                    batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
+                        id,
+                        path,
+                        result: QueueResultAckEventResult::Empty {},
+                    }));
                 }
-            })
-            .await
+
+                Ok(true)
+            } else {
+                warn!("Unable to ack queue, unknown key: {:?}", key);
+
+                Ok(false)
+            }
+        })
+        .await
     }
 
     async fn queue_result_by_path(
@@ -1409,8 +1442,8 @@ impl CacheStore for RocksCacheStore {
         key: QueueKey,
         timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        // It's an important to open listener at the beginning to protect race condition
-        // it will fix position (subscribe) of broadcast channel
+        // It's important to open listener at the beginning to protect race condition
+        // it will fix the position (subscribe) of a broadcast channel
         let listener = self.get_listener().await;
 
         let store_in_result = self.lookup_queue_result_by_key(key.clone()).await?;
@@ -1453,22 +1486,22 @@ impl CacheStore for RocksCacheStore {
     }
 
     async fn queue_merge_extra(&self, key: QueueKey, payload: String) -> Result<(), CubeError> {
-        self.store
-            .write_operation(move |db_ref, batch_pipe| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let id_row_opt = queue_schema.get_row_by_key(key.clone())?;
+        self.write_operation_queue("queue_merge_extra", move |db_ref, batch_pipe| {
+            let queue_schema = QueueItemRocksTable::new(db_ref.clone());
 
-                if let Some(id_row) = id_row_opt {
-                    let new = id_row.get_row().merge_extra(payload)?;
+            let id_row_opt = queue_schema.get_row_by_key(key.clone())?;
 
-                    queue_schema.update(id_row.id, new, id_row.get_row(), batch_pipe)?;
-                } else {
-                    warn!("Unable to merge extra, unknown key: {:?}", key);
-                }
+            if let Some(id_row) = id_row_opt {
+                let new = id_row.get_row().merge_extra(payload)?;
 
-                Ok(())
-            })
-            .await
+                queue_schema.update(id_row.id, new, id_row.get_row(), batch_pipe)?;
+            } else {
+                warn!("Unable to merge extra, unknown key: {:?}", key);
+            }
+
+            Ok(())
+        })
+        .await
     }
 
     async fn compaction(&self) -> Result<(), CubeError> {

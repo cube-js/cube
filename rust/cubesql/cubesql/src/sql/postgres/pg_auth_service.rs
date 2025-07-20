@@ -3,6 +3,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use async_trait::async_trait;
 
 use crate::{
+    sql::auth_service::SqlAuthServiceAuthenticateRequest,
     sql::{AuthContextRef, SqlAuthService},
     CubeError,
 };
@@ -74,8 +75,16 @@ impl PostgresAuthService for PostgresAuthServiceDefaultImpl {
         }
 
         let user = parameters.get("user").unwrap().clone();
+        let sql_auth_request = SqlAuthServiceAuthenticateRequest {
+            protocol: "postgres".to_string(),
+            method: "password".to_string(),
+        };
         let authenticate_response = service
-            .authenticate(Some(user.clone()), Some(password_message.password.clone()))
+            .authenticate(
+                sql_auth_request,
+                Some(user.clone()),
+                Some(password_message.password.clone()),
+            )
             .await;
 
         let auth_fail = || {

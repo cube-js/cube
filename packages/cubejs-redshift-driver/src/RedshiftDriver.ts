@@ -10,12 +10,14 @@ import {
   DatabaseStructure,
   DownloadTableCSVData,
   DriverCapabilities,
+  InformationSchemaColumn,
   QueryColumnsResult,
   QuerySchemasResult,
   QueryTablesResult,
   StreamOptions,
   StreamTableDataWithTypes,
   TableColumn,
+  TableStructure,
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
@@ -116,13 +118,29 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
   }
 
   /**
+   * In Redshift schemas not owned by the current user are not shown in regular information_schema,
+   * so it needs to be queried through the pg_namespace table. Because user might be granted specific
+   * permissions on the concrete schema (like CREATE tables in already existing but not owned pre-aggregation schema).
+   * @override
+   */
+  public override async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    const schemaExistsQuery = `SELECT nspname FROM pg_namespace where nspname = ${this.param(0)}`;
+    const schemas = await this.query(schemaExistsQuery, [schemaName]);
+    if (schemas.length === 0) {
+      await this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
+    }
+  }
+
+  /**
    * In Redshift external tables are not shown in regular Postgres information_schema,
    * so it needs to be queried separately.
    * @override
    */
   public override async tablesSchema(): Promise<DatabaseStructure> {
     const query = this.informationSchemaQuery();
-    const tablesSchema = await this.query(query, []).then(data => data.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {}));
+    const data: InformationSchemaColumn[] = await this.query(query, []);
+    const tablesSchema = this.informationColumnsSchemaSorter(data)
+      .reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {});
 
     const allSchemas = await this.getSchemas();
     const externalSchemas = allSchemas.filter(s => !tablesSchema[s.schema_name]).map(s => s.schema_name);
@@ -339,6 +357,19 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
   public async loadUserDefinedTypes(): Promise<void> {
     // @todo Implement for Redshift, column \"typcategory\" does not exist in pg_type
+  }
+
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    const [schema, name] = table.split('.');
+
+    // We might get table from Spectrum schema, so common request via `information_schema.columns`
+    // won't return anything. `getColumnsForSpecificTables` is aware of Spectrum tables.
+    const columns = await this.getColumnsForSpecificTables([{
+      schema_name: schema,
+      table_name: name,
+    }]);
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
   public async isUnloadSupported() {

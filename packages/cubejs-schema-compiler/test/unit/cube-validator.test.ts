@@ -1,5 +1,9 @@
 import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
-import { CubeSymbols } from '../../src/compiler/CubeSymbols';
+import {
+  CubeRefreshKey,
+  CubeSymbols,
+  PreAggregationDefinitionOriginalSql
+} from '../../src/compiler/CubeSymbols';
 import { ErrorReporter } from '../../src/compiler/ErrorReporter';
 
 describe('Cube Validation', () => {
@@ -134,6 +138,78 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeFalsy();
   });
 
+  it('view with incorrect included member with alias', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      // it's a hidden field which we use internally
+      isView: true,
+      fileName: 'fileName',
+      cubes: [
+        {
+          joinPath: () => '',
+          prefix: false,
+          includes: [
+            'member-by-name',
+            {
+              name: 'member-by-alias',
+              alias: 'incorrect Alias'
+            }
+          ]
+        }
+      ]
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message: any, _e: any) => {
+        console.log(message);
+      }
+    } as any);
+
+    expect(validationResult.error).toBeTruthy();
+  });
+
+  it('view with overridden included members properties', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      // it's a hidden field which we use internally
+      isView: true,
+      fileName: 'fileName',
+      cubes: [
+        {
+          joinPath: () => '',
+          prefix: false,
+          includes: [
+            'member_by_name',
+            {
+              name: 'member_by_alias',
+              alias: 'correct_alias'
+            },
+            {
+              name: 'member_by_alias_with_overrides',
+              title: 'Overridden title',
+              description: 'Overridden description',
+              format: 'percent',
+              meta: {
+                f1: 'Overridden 1',
+                f2: 'Overridden 2',
+              },
+            }
+          ]
+        }
+      ]
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message: any, _e: any) => {
+        console.log(message);
+      }
+    } as any);
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
   it('refreshKey alternatives', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
@@ -179,27 +255,136 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeTruthy();
   });
 
-  it('measures alternatives', async () => {
-    const cubeValidator = new CubeValidator(new CubeSymbols());
-    const cube = {
-      name: 'name',
-      sql: () => '',
-      fileName: 'fileName',
-      measures: {
-        number: {
-          type: 'suma'
+  describe('Measures', () => {
+    it('measures alternatives', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          number: {
+            type: 'suma'
+          }
         }
-      }
-    };
+      };
 
-    const validationResult = cubeValidator.validate(cube, {
-      error: (message: any, _e: any) => {
-        console.log(message);
-        expect(message).toContain('must be one of [count, number,');
-      }
-    } as any);
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('must be one of [count, number,');
+        }
+      } as any);
 
-    expect(validationResult.error).toBeTruthy();
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('2 timeShifts, 1 without timeDimension', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          measure_with_time_shift: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            timeShift: [
+              {
+                timeDimension: () => '',
+                interval: '1 day',
+                type: 'prior',
+              },
+              {
+                interval: '1 day',
+                type: 'prior',
+              }
+            ]
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('(measures.measure_with_time_shift.timeShift[1].timeDimension) is required');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('3 timeShifts', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          measure_with_time_shift: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            timeShift: [
+              {
+                timeDimension: () => '',
+                interval: '1 day',
+                type: 'prior',
+              },
+              {
+                timeDimension: () => '',
+                interval: '1 year',
+                type: 'next',
+              },
+              {
+                timeDimension: () => '',
+                interval: '1 week',
+                type: 'prior',
+              }
+            ]
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+        }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('1 timeShift without timeDimension', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: {
+          measure_with_time_shift: {
+            multiStage: true,
+            type: 'sum',
+            sql: () => '',
+            timeShift: [
+              {
+                interval: '1 day',
+                type: 'prior',
+              }
+            ]
+          }
+        }
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+        }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
   });
 
   it('OriginalSqlSchema', async () => {
@@ -515,10 +700,10 @@ describe('Cube Validation', () => {
           type: 'originalSql',
           time_dimension: () => 'createdAt',
           partition_granularity: 'day',
-          refresh_key: {
+          refreshKey: {
             sql: () => 'SELECT MAX(created_at) FROM orders',
-          },
-        }
+          } satisfies CubeRefreshKey,
+        } satisfies PreAggregationDefinitionOriginalSql
       },
       data_source: 'default',
       rewrite_queries: true,
@@ -528,6 +713,7 @@ describe('Cube Validation', () => {
 
     const cubeSymbols = new CubeSymbols();
     cubeSymbols.compile([cubeA], {
+      // @ts-ignore
       inContext: () => false,
       error: (message, _e) => {
         console.log(message);

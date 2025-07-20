@@ -1,28 +1,45 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::sql_nodes::{SqlNode, SqlNodesFactory};
 use super::sql_evaluator::{MemberSymbol, SqlCall};
+use crate::plan::Filter;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Default)]
+pub struct FiltersContext {
+    pub use_local_tz: bool,
+}
+
 pub struct VisitorContext {
     node_processor: Rc<dyn SqlNode>,
+    all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
+    filters_context: FiltersContext,
 }
 
 impl VisitorContext {
-    pub fn new(nodes_factory: &SqlNodesFactory) -> Self {
+    pub fn new(nodes_factory: &SqlNodesFactory, all_filters: Option<Filter>) -> Self {
+        let filters_context = FiltersContext {
+            use_local_tz: nodes_factory.use_local_tz_in_date_range(),
+        };
         Self {
             node_processor: nodes_factory.default_node_processor(),
+            all_filters,
+            filters_context,
         }
     }
 
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {
-        SqlEvaluatorVisitor::new(query_tools)
+        SqlEvaluatorVisitor::new(query_tools, self.all_filters.clone())
     }
 
     pub fn node_processor(&self) -> Rc<dyn SqlNode> {
         self.node_processor.clone()
+    }
+
+    pub fn filters_context(&self) -> &FiltersContext {
+        &self.filters_context
     }
 }
 

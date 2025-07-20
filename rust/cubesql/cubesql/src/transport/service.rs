@@ -420,7 +420,7 @@ impl SqlTemplates {
             .iter()
             .chain(aggregate.iter())
             .chain(projection.iter())
-            .map(|c| c.clone())
+            .cloned()
             .collect::<Vec<_>>();
         let quoted_from_alias = self.quote_identifier(&alias)?;
         let has_grouping_sets = group_descs.iter().any(|d| d.is_some());
@@ -547,12 +547,22 @@ impl SqlTemplates {
         aggregate_function: AggregateFunction,
         args: Vec<String>,
         distinct: bool,
+        within_group: Vec<String>,
     ) -> Result<String, CubeError> {
         let function = self.aggregate_function_name(aggregate_function, distinct);
         let args_concat = args.join(", ");
-        self.render_template(
+        let sql = self.render_template(
             &format!("functions/{}", function),
             context! { args_concat => args_concat, args => args, distinct => distinct },
+        )?;
+        if within_group.len() == 0 {
+            return Ok(sql);
+        }
+
+        let within_group_concat = within_group.join(", ");
+        self.render_template(
+            "expressions/within_group",
+            context! { fun_sql => sql, within_group_concat => within_group_concat },
         )
     }
 

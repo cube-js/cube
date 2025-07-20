@@ -2,7 +2,6 @@ use crate::{
     compile::rewrite::{
         literal_expr, rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
         wrapper_pushdown_replacer, LiteralExprValue, LogicalPlanLanguage,
-        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -29,6 +28,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
                 wrapper_pullup_replacer(
@@ -40,9 +40,10 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
-                self.transform_literal("?alias_to_cube", "?value"),
+                self.transform_literal("?input_data_source", "?value"),
             ),
             transforming_rewrite(
                 "wrapper-push-down-interval-literal",
@@ -55,6 +56,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
                 wrapper_pullup_replacer(
@@ -66,46 +68,47 @@ impl WrapperRules {
                         "?cube_members",
                         "?grouped_subqueries",
                         "?ungrouped_scan",
+                        "?input_data_source",
                     ),
                 ),
-                self.transform_interval_literal("?alias_to_cube", "?value", "?new_value"),
+                self.transform_interval_literal("?input_data_source", "?value", "?new_value"),
             ),
         ]);
     }
 
     fn transform_literal(
         &self,
-        alias_to_cube_var: &str,
+        input_data_source_var: &str,
         value_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let value_var = var!(value_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                WrapperReplacerContextAliasToCube
-            ) {
-                if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(alias_to_cube) {
-                    for literal in var_iter!(egraph[subst[value_var]], LiteralExprValue) {
-                        match literal {
-                            ScalarValue::TimestampNanosecond(_, _)
-                            | ScalarValue::TimestampMillisecond(_, _)
-                            | ScalarValue::TimestampMicrosecond(_, _)
-                            | ScalarValue::TimestampSecond(_, _) => {
-                                return sql_generator
-                                    .get_sql_templates()
-                                    .contains_template("expressions/timestamp_literal");
-                            }
+            let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var)
+            else {
+                return false;
+            };
 
-                            // transform_inteval_literal
-                            ScalarValue::IntervalYearMonth(_) => return false,
-                            ScalarValue::IntervalDayTime(_) => return false,
-                            ScalarValue::IntervalMonthDayNano(_) => return false,
-
-                            _ => return true,
-                        }
+            for literal in var_iter!(egraph[subst[value_var]], LiteralExprValue) {
+                match literal {
+                    ScalarValue::TimestampNanosecond(_, _)
+                    | ScalarValue::TimestampMillisecond(_, _)
+                    | ScalarValue::TimestampMicrosecond(_, _)
+                    | ScalarValue::TimestampSecond(_, _) => {
+                        return Self::can_rewrite_template(
+                            &data_source,
+                            &meta,
+                            "expressions/timestamp_literal",
+                        );
                     }
+
+                    // transform_inteval_literal
+                    ScalarValue::IntervalYearMonth(_) => return false,
+                    ScalarValue::IntervalDayTime(_) => return false,
+                    ScalarValue::IntervalMonthDayNano(_) => return false,
+
+                    _ => return true,
                 }
             }
             false
@@ -114,67 +117,64 @@ impl WrapperRules {
 
     fn transform_interval_literal(
         &self,
-        alias_to_cube_var: &str,
+        input_data_source_var: &str,
         value_var: &str,
         new_value_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let alias_to_cube_var = var!(alias_to_cube_var);
+        let input_data_source_var = var!(input_data_source_var);
         let value_var = var!(value_var);
         let new_value_var = var!(new_value_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                WrapperReplacerContextAliasToCube
-            ) {
-                if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(alias_to_cube) {
-                    let contains_template =
-                        |name| sql_generator.get_sql_templates().contains_template(name);
+            let Ok(data_source) = Self::get_data_source(egraph, subst, input_data_source_var)
+            else {
+                return false;
+            };
 
-                    let id = subst[value_var];
+            let contains_template = |name| Self::can_rewrite_template(&data_source, &meta, name);
 
-                    macro_rules! ret {
-                        () => {{
-                            // return without changing:
-                            // id is `LiteralExprValue`
-                            // literal_expr("?value") --> literal_expr("?value")
-                            let id = egraph.add(LogicalPlanLanguage::LiteralExpr([id]));
-                            subst.insert(new_value_var, id);
-                            return true;
-                        }};
+            let id = subst[value_var];
 
-                        ($interval:ident; $DecomposeTy:ty) => {{
-                            if contains_template("expressions/interval") {
-                                // we can use nondecomposed intervals
-                                ret!()
-                            }
-                            let decomposed = <$DecomposeTy>::from_raw_interval_value(*$interval);
-                            if decomposed.is_single_part() {
-                                // interval already decomposed (only one date part)
-                                ret!()
-                            }
-                            let id = decomposed.add_decomposed_to_egraph(egraph);
-                            subst.insert(new_value_var, id);
-                            return true;
-                        }};
+            macro_rules! ret {
+                () => {{
+                    // return without changing:
+                    // id is `LiteralExprValue`
+                    // literal_expr("?value") --> literal_expr("?value")
+                    let id = egraph.add(LogicalPlanLanguage::LiteralExpr([id]));
+                    subst.insert(new_value_var, id);
+                    return true;
+                }};
+
+                ($interval:ident; $DecomposeTy:ty) => {{
+                    if contains_template("expressions/interval") {
+                        // we can use nondecomposed intervals
+                        ret!()
+                    }
+                    let decomposed = <$DecomposeTy>::from_raw_interval_value(*$interval);
+                    if decomposed.is_single_part() {
+                        // interval already decomposed (only one date part)
+                        ret!()
+                    }
+                    let id = decomposed.add_decomposed_to_egraph(egraph);
+                    subst.insert(new_value_var, id);
+                    return true;
+                }};
+            }
+
+            for literal in var_iter!(egraph[id], LiteralExprValue) {
+                match literal {
+                    ScalarValue::IntervalYearMonth(_)
+                    | ScalarValue::IntervalDayTime(None)
+                    | ScalarValue::IntervalMonthDayNano(None) => ret!(),
+
+                    ScalarValue::IntervalDayTime(Some(interval)) => {
+                        ret!(interval; DecomposedDayTime)
+                    }
+                    ScalarValue::IntervalMonthDayNano(Some(interval)) => {
+                        ret!(interval; DecomposedMonthDayNano)
                     }
 
-                    for literal in var_iter!(egraph[id], LiteralExprValue) {
-                        match literal {
-                            ScalarValue::IntervalYearMonth(_)
-                            | ScalarValue::IntervalDayTime(None)
-                            | ScalarValue::IntervalMonthDayNano(None) => ret!(),
-
-                            ScalarValue::IntervalDayTime(Some(interval)) => {
-                                ret!(interval; DecomposedDayTime)
-                            }
-                            ScalarValue::IntervalMonthDayNano(Some(interval)) => {
-                                ret!(interval; DecomposedMonthDayNano)
-                            }
-
-                            _ => return false,
-                        }
-                    }
+                    _ => return false,
                 }
             }
             false

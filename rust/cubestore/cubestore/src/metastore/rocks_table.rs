@@ -2,7 +2,7 @@ use crate::metastore::rocks_store::TableId;
 use crate::metastore::{
     get_fixed_prefix, BatchPipe, DbTableRef, IdRow, IndexId, KeyVal, MemorySequence,
     MetaStoreEvent, RocksSecondaryIndexValue, RocksSecondaryIndexValueTTLExtended,
-    RocksSecondaryIndexValueVersion, RocksTableStats, RowKey, SecondaryIndexInfo, SecondaryKey,
+    RocksSecondaryIndexValueVersion, RocksTableStats, RowKey, SecondaryIndexInfo, SecondaryKeyHash,
     TableInfo,
 };
 use crate::CubeError;
@@ -177,7 +177,7 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
                     expire,
                     RocksSecondaryIndexValueTTLExtended {
                         lfu: 0,
-                        // Setup currect time as a protection for LRU eviction
+                        // Specify the current time as protection from LRU eviction
                         lru: Some(Utc::now()),
                         raw_size: self.raw_value_size(row),
                     },
@@ -303,7 +303,7 @@ pub struct IndexScanIter<'a, RT: RocksTable + ?Sized> {
     table: &'a RT,
     index_id: u32,
     secondary_key_val: Vec<u8>,
-    secondary_key_hash: Vec<u8>,
+    secondary_key_hash: SecondaryKeyHash,
     iter: DBIterator<'a>,
 }
 
@@ -364,7 +364,7 @@ where
 #[derive(Debug)]
 pub struct SecondaryIndexValueScanIterItem {
     pub row_id: u64,
-    pub key_hash: SecondaryKey,
+    pub key_hash: SecondaryKeyHash,
     pub ttl: Option<DateTime<Utc>>,
     pub extended: Option<RocksSecondaryIndexValueTTLExtended>,
 }
@@ -496,11 +496,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             if index.is_unique() {
                 let hash = index.key_hash(&row);
                 let index_val = index.index_key_by(&row);
-                let existing_keys = self.get_row_ids_from_index(
-                    index.get_id(),
-                    &index_val,
-                    &hash.to_be_bytes().to_vec(),
-                )?;
+                let existing_keys =
+                    self.get_row_ids_from_index(index.get_id(), &index_val, hash.to_be_bytes())?;
                 if existing_keys.len() > 0 {
                     return Err(CubeError::user(
                         format!(
@@ -759,7 +756,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let existing_keys = self.get_row_ids_from_index(
             RocksSecondaryIndex::get_id(secondary_index),
             &index_val,
-            &hash.to_be_bytes().to_vec(),
+            hash.to_be_bytes(),
         )?;
 
         Ok(existing_keys)
@@ -832,8 +829,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         K: Hash,
     {
         let row_ids = self.get_row_ids_by_index(row_key, secondary_index)?;
-
-        let mut res = Vec::new();
+        let mut res = Vec::with_capacity(row_ids.len());
 
         for id in row_ids {
             if let Some(row) = self.get_row(id)? {
@@ -969,7 +965,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         &self,
         row_id: u64,
         secondary_index: &'a impl RocksSecondaryIndex<Self::T, K>,
-        secondary_key_hash: SecondaryKey,
+        secondary_key_hash: SecondaryKeyHash,
         extended: RocksSecondaryIndexValueTTLExtended,
         batch_pipe: &mut BatchPipe,
     ) -> Result<bool, CubeError>
@@ -1141,11 +1137,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     ) -> KeyVal {
         let hash = index.key_hash(row);
         let index_val = index.index_value(row);
-        let key = RowKey::SecondaryIndex(
-            Self::index_id(index.get_id()),
-            hash.to_be_bytes().to_vec(),
-            row_id,
-        );
+        let key =
+            RowKey::SecondaryIndex(Self::index_id(index.get_id()), hash.to_be_bytes(), row_id);
 
         KeyVal {
             key: key.to_bytes(),
@@ -1157,11 +1150,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let mut res = Vec::new();
         for index in Self::indexes().iter() {
             let hash = index.key_hash(&row);
-            let key = RowKey::SecondaryIndex(
-                Self::index_id(index.get_id()),
-                hash.to_be_bytes().to_vec(),
-                row_id,
-            );
+            let key =
+                RowKey::SecondaryIndex(Self::index_id(index.get_id()), hash.to_be_bytes(), row_id);
             res.push(KeyVal {
                 key: key.to_bytes(),
                 val: vec![],
@@ -1247,17 +1237,17 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         &self,
         secondary_id: u32,
         secondary_key_val: &Vec<u8>,
-        secondary_key_hash: &Vec<u8>,
+        secondary_key_hash: SecondaryKeyHash,
     ) -> Result<Vec<u64>, CubeError> {
         let ref db = self.snapshot();
         let key_len = secondary_key_hash.len();
-        let key_min =
-            RowKey::SecondaryIndex(Self::index_id(secondary_id), secondary_key_hash.clone(), 0);
+        let key_min = RowKey::SecondaryIndex(Self::index_id(secondary_id), secondary_key_hash, 0);
 
         let mut res: Vec<u64> = Vec::new();
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
+
         let iter = db.iterator_opt(
             IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
             opts,
@@ -1269,10 +1259,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             if let RowKey::SecondaryIndex(_, secondary_index_hash, row_id) =
                 RowKey::from_bytes(&key)
             {
-                if !secondary_index_hash
-                    .iter()
-                    .zip(secondary_key_hash)
-                    .all(|(a, b)| a == b)
+                if secondary_index_hash.len() != secondary_key_hash.len()
+                    || secondary_index_hash != secondary_key_hash
                 {
                     break;
                 }
@@ -1284,9 +1272,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                         RocksSecondaryIndexValue::HashAndTTLExtended(h, expire, _) => (h, expire),
                     };
 
-                if secondary_key_val.len() != hash.len()
-                    || !hash.iter().zip(secondary_key_val).all(|(a, b)| a == b)
-                {
+                if hash.len() != secondary_key_val.len() || hash != secondary_key_val.as_slice() {
                     continue;
                 }
 
@@ -1341,8 +1327,9 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         batch: &mut WriteBatch,
     ) -> Result<u64, CubeError> {
         let ref db = self.snapshot();
-        let zero_vec = vec![0 as u8; 8];
-        let key_min = RowKey::SecondaryIndex(Self::index_id(secondary_id), zero_vec.clone(), 0);
+
+        let zero_vec = [0 as u8; 8];
+        let key_min = RowKey::SecondaryIndex(Self::index_id(secondary_id), zero_vec, 0);
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(false);
@@ -1408,7 +1395,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let ref db = self.snapshot();
 
         let index_id = RocksSecondaryIndex::get_id(secondary_index);
-        let row_key = RowKey::SecondaryIndex(Self::index_id(index_id), vec![], 0);
+        let zero_vec = [0 as u8; 8];
+        let row_key = RowKey::SecondaryIndex(Self::index_id(index_id), zero_vec, 0);
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(false);
@@ -1433,16 +1421,12 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     {
         let ref db = self.snapshot();
 
-        let secondary_key_hash = secondary_index
-            .typed_key_hash(&row_key)
-            .to_be_bytes()
-            .to_vec();
+        let secondary_key_hash = secondary_index.typed_key_hash(&row_key).to_be_bytes() as [u8; 8];
         let secondary_key_val = secondary_index.key_to_bytes(&row_key);
 
         let index_id = RocksSecondaryIndex::get_id(secondary_index);
         let key_len = secondary_key_hash.len();
-        let key_min =
-            RowKey::SecondaryIndex(Self::index_id(index_id), secondary_key_hash.clone(), 0);
+        let key_min = RowKey::SecondaryIndex(Self::index_id(index_id), secondary_key_hash, 0);
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);

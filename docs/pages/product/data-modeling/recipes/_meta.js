@@ -1,0 +1,22 @@
+module.exports = {
+  "style-guide": "Style guide",
+  "designing-metrics": "Designing metrics",
+  "percentiles": "Averages and percentiles",
+  "nested-aggregates": "Nested aggregates",
+  "filtered-aggregates": "Filtered aggregates",
+  "period-over-period": "Period-over-period changes",
+  "passing-dynamic-parameters-in-a-query": "Dynamic parameters",
+  "using-dynamic-measures": "Dynamic data modeling",
+  "dynamic-union-tables": "Dynamic union tables",
+  "string-time-dimensions": "String time dimensions",
+  "custom-granularity": "Custom time dimension granularities",
+  "custom-calendar": "Custom calendars",
+  "entity-attribute-value": "EAV model",
+  "snapshots": "Data snapshots",
+  "active-users": "Active users",
+  "event-analytics": "Event analytics",
+  "funnels": "Funnel analysis",
+  "cohort-retention": "Retention analysis",
+  "xirr": "Rate of return",
+  "dbt": "Using Cube with dbt"
+}

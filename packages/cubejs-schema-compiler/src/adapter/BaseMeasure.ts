@@ -1,5 +1,7 @@
 import { UserError } from '../compiler/UserError';
 import type { BaseQuery } from './BaseQuery';
+import { MeasureDefinition } from '../compiler/CubeEvaluator';
+import { CubeSymbols } from '../compiler/CubeSymbols';
 
 export class BaseMeasure {
   public readonly expression: any;
@@ -9,6 +11,102 @@ export class BaseMeasure {
   public readonly expressionName: any;
 
   public readonly isMemberExpression: boolean = false;
+
+  protected readonly patchedMeasure: MeasureDefinition | null = null;
+
+  public readonly joinHint: Array<string> = [];
+
+  protected preparePatchedMeasure(sourceMeasure: string, newMeasureType: string | null, addFilters: Array<{sql: Function}>): MeasureDefinition {
+    const source = this.query.cubeEvaluator.measureByPath(sourceMeasure);
+
+    let resultMeasureType = source.type;
+    if (newMeasureType !== null) {
+      switch (source.type) {
+        case 'sum':
+        case 'avg':
+        case 'min':
+        case 'max':
+          switch (newMeasureType) {
+            case 'sum':
+            case 'avg':
+            case 'min':
+            case 'max':
+            case 'count_distinct':
+            case 'count_distinct_approx':
+              // Can change from avg/... to count_distinct
+              // Latter does not care what input value is
+              // ok, do nothing
+              break;
+            default:
+              throw new UserError(
+                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+              );
+          }
+          break;
+        case 'count_distinct':
+        case 'count_distinct_approx':
+          switch (newMeasureType) {
+            case 'count_distinct':
+            case 'count_distinct_approx':
+              // ok, do nothing
+              break;
+            default:
+              // Can not change from count_distinct to avg/...
+              // Latter do care what input value is, and original measure can be defined on strings
+              throw new UserError(
+                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+              );
+          }
+          break;
+        default:
+          // Can not change from string, time, boolean, number
+          // Aggregation is already included in SQL, it's hard to patch that
+          // Can not change from count
+          // There's no SQL at all
+          throw new UserError(
+            `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+          );
+      }
+
+      resultMeasureType = newMeasureType;
+    }
+
+    const resultFilters = source.filters ?? [];
+
+    if (addFilters.length > 0) {
+      switch (resultMeasureType) {
+        case 'sum':
+        case 'avg':
+        case 'min':
+        case 'max':
+        case 'count':
+        case 'count_distinct':
+        case 'count_distinct_approx':
+          // ok, do nothing
+          break;
+        default:
+          // Can not add filters to string, time, boolean, number
+          // Aggregation is already included in SQL, it's hard to patch that
+          throw new UserError(
+            `Unsupported additional filters for measure ${sourceMeasure} type ${source.type}`
+          );
+      }
+
+      resultFilters.push(...addFilters);
+    }
+
+    const patchedFrom = this.query.cubeEvaluator.parsePath('measures', sourceMeasure);
+
+    return {
+      ...source,
+      type: resultMeasureType,
+      filters: resultFilters,
+      patchedFrom: {
+        cubeName: patchedFrom[0],
+        name: patchedFrom[1],
+      },
+    };
+  }
 
   public constructor(
     protected readonly query: BaseQuery,
@@ -20,6 +118,20 @@ export class BaseMeasure {
       // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = measure.expressionName || `${measure.cubeName}.${measure.name}`;
       this.isMemberExpression = !!measure.definition;
+
+      if (measure.expression.type === 'PatchMeasure') {
+        this.patchedMeasure = this.preparePatchedMeasure(
+          measure.expression.sourceMeasure,
+          measure.expression.replaceAggregationType,
+          measure.expression.addFilters,
+        );
+      }
+    } else {
+      // TODO move this `as` to static types
+      const measurePath = measure as string;
+      const { path, joinHint } = CubeSymbols.joinHintFromPath(measurePath);
+      this.measure = path;
+      this.joinHint = joinHint;
     }
   }
 
@@ -74,10 +186,16 @@ export class BaseMeasure {
   }
 
   public measureDefinition() {
+    if (this.patchedMeasure) {
+      return this.patchedMeasure;
+    }
     return this.query.cubeEvaluator.measureByPath(this.measure);
   }
 
   public definition(): any {
+    if (this.patchedMeasure) {
+      return this.patchedMeasure;
+    }
     if (this.expression) {
       return {
         sql: this.expression,
@@ -88,32 +206,32 @@ export class BaseMeasure {
     return this.measureDefinition();
   }
 
-  public aliasName() {
+  public aliasName(): string {
     return this.query.escapeColumnName(this.unescapedAliasName());
   }
 
-  public unescapedAliasName() {
+  public unescapedAliasName(): string {
     if (this.expression) {
       return this.query.aliasName(this.expressionName);
     }
     return this.query.aliasName(this.measure);
   }
 
-  public isCumulative() {
+  public isCumulative(): boolean {
     if (this.expression) { // TODO
       return false;
     }
     return BaseMeasure.isCumulative(this.measureDefinition());
   }
 
-  public isMultiStage() {
+  public isMultiStage(): boolean {
     if (this.expression) { // TODO
       return false;
     }
     return this.definition().multiStage;
   }
 
-  public isAdditive() {
+  public isAdditive(): boolean {
     if (this.expression) { // TODO
       return false;
     }
@@ -125,7 +243,7 @@ export class BaseMeasure {
       definition.type === 'min' || definition.type === 'max';
   }
 
-  public static isCumulative(definition) {
+  public static isCumulative(definition): boolean {
     return definition.type === 'runningTotal' || !!definition.rollingWindow;
   }
 
@@ -176,7 +294,7 @@ export class BaseMeasure {
     return this.query.minGranularity(granularityA, granularityB);
   }
 
-  public granularityFromInterval(interval: string) {
+  public granularityFromInterval(interval: string): string | undefined {
     if (!interval) {
       return undefined;
     }
@@ -194,7 +312,7 @@ export class BaseMeasure {
     return undefined;
   }
 
-  public shouldUngroupForCumulative() {
+  public shouldUngroupForCumulative(): boolean {
     return this.measureDefinition().rollingWindow && !this.isAdditive();
   }
 
@@ -202,17 +320,23 @@ export class BaseMeasure {
     return this.measureDefinition().sql;
   }
 
-  public path() {
+  public path(): string[] | null {
     if (this.expression) {
       return null;
     }
     return this.query.cubeEvaluator.parsePath('measures', this.measure);
   }
 
-  public expressionPath() {
+  public expressionPath(): string {
     if (this.expression) {
       return `expr:${this.expression.expressionName}`;
     }
-    return this.query.cubeEvaluator.pathFromArray(this.path());
+
+    const path = this.path();
+    if (path === null) {
+      // Sanity check, this should not actually happen because we checked this.expression earlier
+      throw new Error('Unexpected null path');
+    }
+    return this.query.cubeEvaluator.pathFromArray(path);
   }
 }

@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /getting-started/cloud/create-data-model
----
-
 # Create your first data model
 
 Cube follows a dataset-oriented data modeling approach, which is inspired by and
@@ -37,7 +32,7 @@ environment.
 
 In the previous section, we generated four cubes from the Snowflake schema. To
 see the data graph of these four cubes and how they are connected to each other,
-click the <Btn>Show Graph</Btn> button on the Data Model page.
+navigate to the <Btn>[Visual Model][ref-visual-model]</Btn> page.
 
 Let's review the `orders` cube first and update it with additional dimensions
 and measures.
@@ -89,7 +84,7 @@ Let's add an additional measure to the `orders` cube to calculate only
 three possible statuses: **processing**, **shipped**, or **completed**. We will
 create a new measure `completed_count` by using a filter on that dimension. To
 do this, we will use a
-[filter parameter](/reference/data-model/measures#filters) of the
+[filter parameter](/product/data-modeling/reference/measures#filters) of the
 measure and [refer][ref-member-references] to the existing dimension.
 
 Add the following measure definition to your `model/cubes/orders.yml` file. It
@@ -216,3 +211,4 @@ In the next section, we will learn how to query our `orders_view` using a BI
 tool.
 
 [ref-member-references]: /product/data-modeling/syntax#references
+[ref-visual-model]: /product/workspace/visual-model

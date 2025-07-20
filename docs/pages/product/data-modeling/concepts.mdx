@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /schema/fundamentals/concepts
----
-
 # Concepts
 
 Cube borrows a lot of terminology from [OLAP
@@ -32,6 +27,16 @@ We'll use a sample e-commerce database with two tables, `orders` and
 | 4      | 71             | 4            | 8            | 223       | 2019-12-23 00:00:00.000000 |
 | 5      | 64             | 5            | 5            | 75        | 2019-04-20 00:00:00.000000 |
 
+We'll be following the [entity-first](#entity-first-approach) approach to
+designing the data model.
+
+<ReferenceBox>
+
+See [this recipe][ref-entities-vs-metrics-recipe] to learn about entity-first and
+metrics-first approaches.
+
+</ReferenceBox>
+
 ## Cubes
 
 _Cubes_ represent datasets in Cube and are conceptually similar to [views in
@@ -43,8 +48,8 @@ your database using the [`sql_table` property][ref-schema-ref-sql-table]:
 
 ```javascript
 cube(`orders`, {
-  sql_table: `orders`,
-});
+  sql_table: `orders`
+})
 ```
 
 ```yaml
@@ -54,6 +59,13 @@ cubes:
 ```
 
 </CodeTabs>
+
+<ReferenceBox>
+
+If you're using dbt, see [this recipe][ref-cube-with-dbt] to streamline defining cubes
+on top of dbt models.
+
+</ReferenceBox>
 
 You can also use the [`sql` property][ref-schema-ref-sql] to accommodate more
 complex SQL queries:
@@ -98,8 +110,8 @@ models][ref-dynamic-data-models].
 <InfoBox>
 
 Cube supports data models that consist of thousands of cubes and views.
-For massive [multi-tenancy][ref-multitenancy] configurations, e.g., with more than
-1,000 tenants, consider using a [multi-cluster deployment][ref-pmc].
+For large [multi-tenancy][ref-multitenancy] configurations, e.g., with more than
+100 tenants, consider using a [multi-cluster deployment][ref-pmc].
 
 </InfoBox>
 
@@ -119,8 +131,7 @@ paths.
 <Diagram src="https://ucarecdn.com/bfc3e04a-b690-40bc-a6f8-14a9175fb4fd/" />
 
 Views do **not** define their own members. Instead, they reference cubes by
-specific join paths and include their members. Optionally, you can also group
-members of a view into [folders][ref-ref-folders].
+specific join paths and include their members.
 
 In the example below, we create the `orders` view which includes select members
 from `base_orders`, `products`, and `users` cubes:
@@ -138,26 +149,26 @@ view(`orders`, {
         `total_amount`,
         `total_amount_shipped`,
         `count`,
-        `average_order_value`,
-      ],
+        `average_order_value`
+      ]
     },
     {
       join_path: base_orders.line_items.products,
       includes: [
         {
           name: `name`,
-          alias: `product`,
-        },
-      ],
+          alias: `product`
+        }
+      ]
     },
     {
       join_path: base_orders.users,
       prefix: true,
       includes: `*`,
-      excludes: [`company`],
-    },
-  ],
-});
+      excludes: [`company`]
+    }
+  ]
+})
 ```
 
 ```yaml
@@ -200,6 +211,16 @@ See the reference documentaton for the full list of view [parameters][ref-views]
 
 </ReferenceBox>
 
+### Folders
+
+Optionally, members of a view can be organized into [folders][ref-ref-folders].
+Each folder would contain a subset of members of the view.
+
+Cube supports both flat and nested folder structures, which can be used with various
+[visualization tools][ref-viz-tools]. If a specific tool does not support nested folders,
+they will be exposed to such a tool as an equivalent flat structure. Check [APIs &
+Integrations][ref-apis-support] for details on the nested folders support.
+
 ## Dimensions
 
 _Dimensions_ represent the properties of a **single** data point in the cube.
@@ -218,15 +239,15 @@ cube(`orders`, {
       type: `number`,
       // Here we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
-      primary_key: true,
+      primary_key: true
     },
 
     status: {
       sql: `status`,
-      type: `string`,
-    },
-  },
-});
+      type: `string`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -268,15 +289,15 @@ cube(`line_items`, {
       type: `number`,
       // Again, we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
-      primary_key: true,
+      primary_key: true
     },
 
     order_id: {
       sql: `order_id`,
-      type: `number`,
-    },
-  },
-});
+      type: `number`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -317,10 +338,10 @@ data types in SQL are mapped to dimension types in the following way:
 
 | Data type in SQL | Dimension type in Cube |
 | --- | --- |
-| `timestamp`, `date`, `time` | [`time`](/reference/data-model/types-and-formats#time-1) |
-| `text`, `varchar` | [`string`](/reference/data-model/types-and-formats#string-1) |
-| `integer`, `bigint`, `decimal` | [`number`](/reference/data-model/types-and-formats#number-1) |
-| `boolean` | [`boolean`](/reference/data-model/types-and-formats#boolean-1) |
+| `timestamp`, `date`, `time` | [`time`](/product/data-modeling/reference/types-and-formats#time) |
+| `text`, `varchar` | [`string`](/product/data-modeling/reference/types-and-formats#string) |
+| `integer`, `bigint`, `decimal` | [`number`](/product/data-modeling/reference/types-and-formats#number) |
+| `boolean` | [`boolean`](/product/data-modeling/reference/types-and-formats#boolean) |
 
 <ReferenceBox>
 
@@ -343,8 +364,9 @@ you need to use weeks starting on Sunday, fiscal years, etc.
 
 <ReferenceBox>
 
-See [this recipe][ref-custom-granularity-recipe] for more custom granularity
-examples.
+See the following recipes:
+- For a [custom granularity][ref-custom-granularity-recipe] example.
+- For a [custom calendar][ref-custom-calendar-recipe] example.
 
 </ReferenceBox>
 
@@ -423,10 +445,10 @@ cube(`orders`, {
 
   measures: {
     count: {
-      type: `count`,
-    },
-  },
-});
+      type: `count`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -453,10 +475,10 @@ cube(`line_items`, {
   measures: {
     total: {
       sql: `price`,
-      type: `sum`,
-    },
-  },
-});
+      type: `sum`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -473,7 +495,8 @@ cubes:
 </CodeTabs>
 
 [Calculated measures][ref-calculated-measures] and [subquery dimensions][ref-subquery-dimensions]
-can be used for measure composition.
+can be used for measure composition. [Multi-stage calculations][ref-multi-stage-calculations]
+enable data modeling of more sophisticated measures.
 
 <ReferenceBox>
 
@@ -488,21 +511,29 @@ aggregate functions in SQL are mapped to measure types in the following way:
 
 | Aggregate function in SQL | Measure type in Cube |
 | --- | --- |
-| `AVG` | [`avg`](/reference/data-model/types-and-formats#avg) |
-| `BOOL_AND`, `BOOL_OR` | [`boolean`](/reference/data-model/types-and-formats#boolean) |
-| `COUNT` | [`count`](/reference/data-model/types-and-formats#count) |
-| `COUNT(DISTINCT …)` | [`count_distinct`](/reference/data-model/types-and-formats#count_distinct) |
-| `APPROX_COUNT_DISTINCT` | [`count_distinct_approx`](/reference/data-model/types-and-formats#count_distinct_approx) |
-| `MAX` | [`max`](/reference/data-model/types-and-formats#max) |
-| `MIN` | [`min`](/reference/data-model/types-and-formats#min) |
-| `PERCENTILE_CONT`, `MEDIAN` | [`number`](/reference/data-model/types-and-formats#number) |
-| `STRING_AGG`, `LISTAGG` | [`string`](/reference/data-model/types-and-formats#string) |
-| `SUM` | [`sum`](/reference/data-model/types-and-formats#sum) |
-| Any function returning a timestamp, e.g., `MAX(time)` | [`time`](/reference/data-model/types-and-formats#time) |
+| `AVG` | [`avg`](/product/data-modeling/reference/types-and-formats#avg) |
+| `BOOL_AND`, `BOOL_OR` | [`boolean`](/product/data-modeling/reference/types-and-formats#boolean) |
+| `COUNT` | [`count`](/product/data-modeling/reference/types-and-formats#count) |
+| `COUNT(DISTINCT …)` | [`count_distinct`](/product/data-modeling/reference/types-and-formats#count_distinct) |
+| `APPROX_COUNT_DISTINCT` | [`count_distinct_approx`](/product/data-modeling/reference/types-and-formats#count_distinct_approx) |
+| `MAX` | [`max`](/product/data-modeling/reference/types-and-formats#max) |
+| `MIN` | [`min`](/product/data-modeling/reference/types-and-formats#min) |
+| `PERCENTILE_CONT`, `MEDIAN` | [`number`](/product/data-modeling/reference/types-and-formats#number) |
+| `STRING_AGG`, `LISTAGG` | [`string`](/product/data-modeling/reference/types-and-formats#string) |
+| `SUM` | [`sum`](/product/data-modeling/reference/types-and-formats#sum) |
+| Any function returning a timestamp, e.g., `MAX(time)` | [`time`](/product/data-modeling/reference/types-and-formats#time) |
 
 <ReferenceBox>
 
 See the [measure type reference][ref-ref-measure-types] for details.
+
+</ReferenceBox>
+
+<ReferenceBox>
+
+See the following recipes:
+- To learn how to define [average and percentile measures][ref-avg-and-percentile-recipe],
+- To learn how to calculate [period-over-period changes][ref-period-over-period-recipe].
 
 </ReferenceBox>
 
@@ -517,11 +548,11 @@ matching][ref-matching-preaggs].
 
 Additivity of a measure depends on its [type](#measure-types). Only measures
 with the following types are considered *additive*:
-[`count`](/reference/data-model/types-and-formats#count),
-[`count_distinct_approx`](/reference/data-model/types-and-formats#count_distinct_approx),
-[`min`](/reference/data-model/types-and-formats#min),
-[`max`](/reference/data-model/types-and-formats#max),
-[`sum`](/reference/data-model/types-and-formats#sum).
+[`count`](/product/data-modeling/reference/types-and-formats#count),
+[`count_distinct_approx`](/product/data-modeling/reference/types-and-formats#count_distinct_approx),
+[`min`](/product/data-modeling/reference/types-and-formats#min),
+[`max`](/product/data-modeling/reference/types-and-formats#max),
+[`sum`](/product/data-modeling/reference/types-and-formats#sum).
 Measures with all other types are considered *non-additive*.
 
 #### Example
@@ -647,10 +678,10 @@ cube(`orders`, {
       relationship: `many_to_one`,
       // Here we use the `CUBE` global to refer to the current cube,
       // so the following is equivalent to `orders.id = line_items.order_id`
-      sql: `${CUBE}.id = ${line_items.order_id}`,
-    },
-  },
-});
+      sql: `${CUBE}.id = ${line_items.order_id}`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -696,10 +727,10 @@ cube(`orders`, {
 
   segments: {
     only_completed: {
-      sql: `${CUBE}.status = 'completed'`,
-    },
-  },
-});
+      sql: `${CUBE}.status = 'completed'`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -737,10 +768,10 @@ cube(`orders`, {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
       timeDimension: CUBE.created_at,
-      granularity: `day`,
-    },
-  },
-});
+      granularity: `day`
+    }
+  }
+})
 ```
 
 ```yaml
@@ -776,20 +807,20 @@ See the reference documentaton for the full list of pre-aggregation
 [ref-caching-preaggs-intro]: /product/caching/getting-started-pre-aggregations
 [ref-caching-use-preaggs-partition-time]:
   /product/caching/using-pre-aggregations#partitioning
-[ref-ref-dimension-types]: /reference/data-model/types-and-formats#dimension-types
-[ref-ref-measure-types]: /reference/data-model/types-and-formats#measure-types
-[ref-ref-join-types]: /reference/data-model/joins#relationship
-[ref-schema-ref-sql]: /reference/data-model/cube#sql
-[ref-schema-ref-sql-table]: /reference/data-model/cube#sql_table
+[ref-ref-dimension-types]: /product/data-modeling/reference/types-and-formats#dimension-types
+[ref-ref-measure-types]: /product/data-modeling/reference/types-and-formats#measure-types
+[ref-ref-join-types]: /product/data-modeling/reference/joins#relationship
+[ref-schema-ref-sql]: /product/data-modeling/reference/cube#sql
+[ref-schema-ref-sql-table]: /product/data-modeling/reference/cube#sql_table
 [ref-tutorial-incremental-preagg]:
-  /reference/data-model/pre-aggregations#incremental
-[ref-cubes]: /reference/data-model/cube
-[ref-views]: /reference/data-model/view
-[ref-dimensions]: /reference/data-model/dimensions
-[ref-measures]: /reference/data-model/measures
-[ref-joins]: /reference/data-model/joins
-[ref-segments]: /reference/data-model/segments
-[ref-preaggs]: /reference/data-model/pre-aggregations
+  /product/data-modeling/reference/pre-aggregations#incremental
+[ref-cubes]: /product/data-modeling/reference/cube
+[ref-views]: /product/data-modeling/reference/view
+[ref-dimensions]: /product/data-modeling/reference/dimensions
+[ref-measures]: /product/data-modeling/reference/measures
+[ref-joins]: /product/data-modeling/reference/joins
+[ref-segments]: /product/data-modeling/reference/segments
+[ref-preaggs]: /product/data-modeling/reference/pre-aggregations
 [ref-extending-cubes]: /product/data-modeling/concepts/code-reusability-extending-cubes
 [ref-polymorphic-cubes]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
@@ -804,13 +835,21 @@ See the reference documentaton for the full list of pre-aggregation
 [ref-syntax-references]: /product/data-modeling/syntax#references
 [ref-syntax-references-column]: /product/data-modeling/syntax#column
 [ref-calculated-measures]: /product/data-modeling/overview#4-using-calculated-measures
-[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-multitenancy]: /product/configuration/multitenancy
 [ref-pmc]: /product/deployment/cloud/deployment-types#production-multi-cluster
-[ref-ref-time-dimensions]: /reference/data-model/types-and-formats#time-1
-[ref-ref-dimension-granularities]: /reference/data-model/dimensions#granularities
-[ref-ref-primary-key]: /reference/data-model/dimensions#primary_key
-[ref-custom-granularity-recipe]: /guides/recipes/data-modeling/custom-granularity
+[ref-ref-time-dimensions]: /product/data-modeling/reference/types-and-formats#time
+[ref-ref-dimension-granularities]: /product/data-modeling/reference/dimensions#granularities
+[ref-ref-primary-key]: /product/data-modeling/reference/dimensions#primary_key
+[ref-custom-granularity-recipe]: /product/data-modeling/recipes/custom-granularity
 [ref-proxy-granularity]: /product/data-modeling/concepts/calculated-members#time-dimension-granularity
 [ref-mls]: /product/auth/member-level-security
-[ref-ref-hierarchies]: /reference/data-model/hierarchies
-[ref-ref-folders]: /reference/data-model/view#folders
+[ref-ref-hierarchies]: /product/data-modeling/reference/hierarchies
+[ref-ref-folders]: /product/data-modeling/reference/view#folders
+[ref-multi-stage-calculations]: /product/data-modeling/concepts/multi-stage-calculations
+[ref-entities-vs-metrics-recipe]: /product/data-modeling/recipes/designing-metrics
+[ref-avg-and-percentile-recipe]: /product/data-modeling/recipes/percentiles
+[ref-period-over-period-recipe]: /product/data-modeling/recipes/period-over-period
+[ref-custom-calendar-recipe]: /product/data-modeling/recipes/custom-calendar
+[ref-cube-with-dbt]: /product/data-modeling/recipes/dbt
+[ref-apis-support]: /product/apis-integrations#data-modeling
+[ref-viz-tools]: /product/configuration/visualization-tools

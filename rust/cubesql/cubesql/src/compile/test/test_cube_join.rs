@@ -1,9 +1,11 @@
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
+use datafusion::physical_plan::displayable;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
+use crate::compile::test::TestContext;
 use crate::compile::{
     rewrite::rewriter::Rewriter,
     test::{
@@ -46,6 +48,10 @@ async fn powerbi_join() {
             dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
             segments: Some(vec![]),
             order: Some(vec![]),
+            join_hints: Some(vec![vec![
+                "Logs".to_string(),
+                "KibanaSampleDataEcommerce".to_string(),
+            ],]),
             ..Default::default()
         }
     );
@@ -116,6 +122,13 @@ async fn powerbi_transitive_join() {
             dimensions: Some(vec!["Logs.content".to_string()]),
             segments: Some(vec![]),
             order: Some(vec![]),
+            join_hints: Some(vec![
+                vec!["NumberCube".to_string(), "Logs".to_string(),],
+                vec![
+                    "KibanaSampleDataEcommerce".to_string(),
+                    "NumberCube".to_string(),
+                ],
+            ]),
             ..Default::default()
         }
     );
@@ -156,6 +169,7 @@ async fn test_join_three_cubes() {
                 "NumberCube.someNumber".to_string(),
             ]),
             dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.id".to_string(),
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.last_mod".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -169,6 +183,10 @@ async fn test_join_three_cubes() {
             segments: Some(vec![]),
             order: Some(vec![]),
             ungrouped: Some(true),
+            join_hints: Some(vec![
+                vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                vec!["Logs".to_string(), "NumberCube".to_string(),],
+            ]),
             ..Default::default()
         }
     )
@@ -215,6 +233,10 @@ async fn test_join_three_cubes_split() {
                 or: None,
                 and: None
             }]),
+            join_hints: Some(vec![
+                vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                vec!["Logs".to_string(), "NumberCube".to_string(),],
+            ]),
             ..Default::default()
         }
     )
@@ -244,10 +266,7 @@ async fn test_join_two_subqueries_with_filter_order_limit() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             dimensions: Some(vec!["Logs.read".to_string(),]),
             segments: Some(vec![]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -264,6 +283,10 @@ async fn test_join_two_subqueries_with_filter_order_limit() {
                     and: None
                 }
             ]),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     )
@@ -299,10 +322,7 @@ async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
                 granularity: Some("month".to_owned()),
                 date_range: None
             }]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -318,6 +338,10 @@ async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
                     or: None,
                     and: None
                 }
+            ]),
+            join_hints: Some(vec![
+                vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                vec!["Logs".to_string(), "NumberCube".to_string(),],
             ]),
             ..Default::default()
         }
@@ -348,10 +372,7 @@ async fn test_join_subquery_and_table_with_filter_order_limit() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             dimensions: Some(vec!["Logs.read".to_string(),]),
             segments: Some(vec![]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -368,6 +389,10 @@ async fn test_join_subquery_and_table_with_filter_order_limit() {
                     and: None
                 }
             ]),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     )
@@ -403,10 +428,7 @@ async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() 
                 granularity: Some("month".to_owned()),
                 date_range: None
             }]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -422,6 +444,10 @@ async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() 
                     or: None,
                     and: None
                 }
+            ]),
+            join_hints: Some(vec![
+                vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                vec!["Logs".to_string(), "NumberCube".to_string(),],
             ]),
             ..Default::default()
         }
@@ -484,6 +510,10 @@ async fn test_join_two_subqueries_filter_push_down() {
                     and: None
                 }
             ]),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     )
@@ -497,8 +527,8 @@ async fn test_join_cubes_on_wrong_field_error() {
     let query = convert_sql_to_cube_query(
         &r#"
             SELECT *
-            FROM KibanaSampleDataEcommerce
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.has_subscription = Logs.read)
+            FROM (SELECT customer_gender, has_subscription FROM KibanaSampleDataEcommerce) kibana
+            LEFT JOIN (SELECT read, content FROM Logs) logs ON (kibana.has_subscription = logs.read)
             "#
         .to_string(),
         meta.clone(),
@@ -567,112 +597,78 @@ async fn test_join_cubes_with_aggr_error() {
     )
 }
 
+/// CAST(dimension AS TEXT) should be pushed into CubeScan as regular dimension,
+/// so join could see both CubeScans
 #[tokio::test]
-async fn test_join_cubes_with_postprocessing() {
-    if !Rewriter::sql_push_down_enabled() {
-        return;
-    }
+async fn test_join_with_trivial_cast() {
     init_testing_logger();
 
-    let logical_plan = convert_select_to_query_plan(
-        r#"
-            SELECT *
-            FROM (SELECT count(count), __cubeJoinField, extract(MONTH from order_date) FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
-            "#
-            .to_string(),
-        DatabaseProtocol::PostgreSQL,
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+    // language=PostgreSQL
+    let query = r#"
+SELECT
+    KibanaSampleDataEcommerce.notes,
+    t0.content_cast
+FROM
+    KibanaSampleDataEcommerce
+    INNER JOIN (
+        SELECT
+            __cubeJoinField,
+            CAST(content AS TEXT) AS content_cast
+        FROM
+            Logs
+    ) t0 ON (
+        KibanaSampleDataEcommerce.__cubeJoinField = t0.__cubeJoinField
     )
-        .await
-        .as_logical_plan();
+;
+    "#;
 
-    let cube_scans = logical_plan
-        .find_cube_scans()
-        .iter()
-        .map(|cube| cube.request.clone())
-        .collect::<Vec<V1LoadRequestQuery>>();
+    let expected_cube_scan = V1LoadRequestQuery {
+        measures: Some(vec![]),
+        segments: Some(vec![]),
+        dimensions: Some(vec![
+            "KibanaSampleDataEcommerce.notes".to_string(),
+            "Logs.content".to_string(),
+        ]),
+        order: Some(vec![]),
+        ungrouped: Some(true),
+        join_hints: Some(vec![vec![
+            "KibanaSampleDataEcommerce".to_string(),
+            "Logs".to_string(),
+        ]]),
+        ..Default::default()
+    };
 
-    assert_eq!(
-        cube_scans.contains(&V1LoadRequestQuery {
-            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-            dimensions: Some(vec![]),
-            segments: Some(vec![]),
-            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                granularity: Some("month".to_string()),
-                date_range: None,
-            }]),
-            order: Some(vec![]),
-            ..Default::default()
-        }),
-        true
-    );
-
-    assert_eq!(
-        cube_scans.contains(&V1LoadRequestQuery {
-            measures: Some(vec![]),
-            dimensions: Some(vec!["Logs.read".to_string()]),
-            segments: Some(vec![]),
-            order: Some(vec![]),
-            ungrouped: Some(true),
-            ..Default::default()
-        }),
-        true
-    )
-}
-
-#[tokio::test]
-async fn test_join_cubes_with_postprocessing_and_no_cubejoinfield() {
-    if !Rewriter::sql_push_down_enabled() {
-        return;
-    }
-    init_testing_logger();
-
-    let logical_plan = convert_select_to_query_plan(
-        r#"
-            SELECT *
-            FROM (SELECT count(count), extract(MONTH from order_date), taxful_total_price FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT id, read FROM Logs) Logs ON (KibanaSampleDataEcommerce.taxful_total_price = Logs.id)
-            "#
-            .to_string(),
-        DatabaseProtocol::PostgreSQL,
-    )
-        .await
-        .as_logical_plan();
-
-    let cube_scans = logical_plan
-        .find_cube_scans()
-        .iter()
-        .map(|cube| cube.request.clone())
-        .collect::<Vec<V1LoadRequestQuery>>();
-
-    assert_eq!(
-        cube_scans.contains(&V1LoadRequestQuery {
-            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-            dimensions: Some(vec![
-                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+    context
+        .add_cube_load_mock(
+            expected_cube_scan.clone(),
+            crate::compile::tests::simple_load_response(vec![
+                json!({
+                    "KibanaSampleDataEcommerce.notes": "foo",
+                    "Logs.content": "bar",
+                }),
+                json!({
+                    "Logs.content": "quux",
+                    "KibanaSampleDataEcommerce.notes": "baz",
+                }),
             ]),
-            segments: Some(vec![]),
-            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                granularity: Some("month".to_string()),
-                date_range: None,
-            }]),
-            order: Some(vec![]),
-            ..Default::default()
-        }),
-        true
+        )
+        .await;
+
+    let query_plan = context.convert_sql_to_cube_query(&query).await.unwrap();
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
     );
 
     assert_eq!(
-        cube_scans.contains(&V1LoadRequestQuery {
-            measures: Some(vec![]),
-            dimensions: Some(vec!["Logs.id".to_string(), "Logs.read".to_string(),]),
-            segments: Some(vec![]),
-            order: Some(vec![]),
-            ungrouped: Some(true),
-            ..Default::default()
-        }),
-        true
-    )
+        query_plan.as_logical_plan().find_cube_scan().request,
+        expected_cube_scan
+    );
+
+    // Expect that query is executable, and properly assigns alias for cast
+    insta::assert_snapshot!(context.execute_query(query).await.unwrap());
 }

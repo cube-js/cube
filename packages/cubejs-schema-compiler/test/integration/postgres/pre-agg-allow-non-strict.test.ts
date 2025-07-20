@@ -1,5 +1,5 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 
 const getSql = () => `
   select 3060 as row_id, 'CA-2017-131492' as order_id, to_date('2020-10-19', 'YYYY-MM-DD') as order_date, 'HH-15010' as customer_id, 'San Francisco' as city, 'Furniture' as category, 'Tables' as sub_category, 'Anderson Hickey Conga Table Tops & Accessories' as product_name, 24.36800 as sales, 2 as quantity, 0.20000 as discount, -3.35060 as profit union all
@@ -195,6 +195,16 @@ const getQueries = (compiler, joinGraph, cubeEvaluator) => ([
     }],
     timezone: 'America/Los_Angeles',
   }),
+  // no granularity
+  new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    measures: ['cube.totalQuantity', 'cube.totalProfit'],
+    dimensions: ['cube.city'],
+    timeDimensions: [{
+      dimension: 'cube.orderDate',
+      dateRange: ['2020-01-01 00:00:00.000', '2020-03-30 22:50:50.999'],
+    }],
+    timezone: 'America/Los_Angeles',
+  }),
 ]);
 
 describe(
@@ -204,7 +214,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(true, false, false));
+        prepareJsCompiler(getCube(true, false, false));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -259,13 +269,22 @@ describe(
         expect(query.indexOf('cube__daily_data')).toEqual(-1);
         expect(query.indexOf('cube__hourly_data')).toEqual(-1);
       });
+
+      it('query with no granularity match MonthlyData', async () => {
+        await compiler.compile();
+        const [,,,,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
+        const [query] = request.buildSqlAndParams();
+        expect(query.indexOf('cube__monthly_data')).toBeGreaterThanOrEqual(0);
+        expect(query.indexOf('cube__daily_data')).toEqual(-1);
+        expect(query.indexOf('cube__hourly_data')).toEqual(-1);
+      });
     });
 
     describe('The `DailyData` pre-aggregation with the `allowNonStrictDateRangeMatch` enabled', () => {
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(false, true, false));
+        prepareJsCompiler(getCube(false, true, false));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -320,13 +339,22 @@ describe(
         expect(query.indexOf('cube__daily_data')).toBeGreaterThanOrEqual(0);
         expect(query.indexOf('cube__hourly_data')).toEqual(-1);
       });
+
+      it('query with no granularity match MonthlyData', async () => {
+        await compiler.compile();
+        const [,,,,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
+        const [query] = request.buildSqlAndParams();
+        expect(query.indexOf('cube__monthly_data')).toEqual(-1);
+        expect(query.indexOf('cube__daily_data')).toBeGreaterThanOrEqual(0);
+        expect(query.indexOf('cube__hourly_data')).toEqual(-1);
+      });
     });
 
     describe('The `HourlyData` pre-aggregation with the `allowNonStrictDateRangeMatch` enabled', () => {
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(false, false, true));
+        prepareJsCompiler(getCube(false, false, true));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -381,13 +409,22 @@ describe(
         expect(query.indexOf('cube__daily_data')).toEqual(-1);
         expect(query.indexOf('cube__hourly_data')).toBeGreaterThanOrEqual(0);
       });
+
+      it('query with no granularity match HourlyData', async () => {
+        await compiler.compile();
+        const [,,,,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
+        const [query] = request.buildSqlAndParams();
+        expect(query.indexOf('cube__monthly_data')).toEqual(-1);
+        expect(query.indexOf('cube__daily_data')).toEqual(-1);
+        expect(query.indexOf('cube__hourly_data')).toBeGreaterThanOrEqual(0);
+      });
     });
 
     describe('`MonthlyData` and `DailyData` pre-aggregations with the `allowNonStrictDateRangeMatch` enabled', () => {
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(true, true, false));
+        prepareJsCompiler(getCube(true, true, false));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -448,7 +485,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(true, false, true));
+        prepareJsCompiler(getCube(true, false, true));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -509,7 +546,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(false, true, true));
+        prepareJsCompiler(getCube(false, true, true));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
@@ -570,7 +607,7 @@ describe(
       jest.setTimeout(200000);
 
       const { compiler, joinGraph, cubeEvaluator } =
-        prepareCompiler(getCube(true, true, true));
+        prepareJsCompiler(getCube(true, true, true));
 
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();

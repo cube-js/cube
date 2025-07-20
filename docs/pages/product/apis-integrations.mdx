@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /apis-integrations
----
-
 # APIs & integrations
 
 With a rich set of APIs, Cube can power and deliver data to all kinds of data
@@ -12,7 +7,7 @@ applications.
 Despite varying protocols and query formats, all data APIs share common
 [querying concepts][ref-queries].
 
-<Diagram src="https://ucarecdn.com/4abc9729-66a3-489f-9d48-0bf27e728c87/" />
+<Diagram src="https://ucarecdn.com/aa9b3201-d254-4a38-a4a9-b3786af6167b/" />
 
 Also, there are [management APIs](#management-apis) to control Cube deployments
 externally.
@@ -38,8 +33,6 @@ Otherwise, connect via the [SQL API][ref-sql-api] directly.
 [REST API][ref-rest-api] or [GraphQL API][ref-graphql-api]. When using the REST API,
 the [JavaScript SDK][ref-js-sdk] can simplify integration with your front-end code.
 
-* For AI use cases, use the [AI API][ref-ai-api].
-
 <ReferenceBox>
 
 See this [GitHub issue](https://github.com/cube-js/cube/issues/1744#issuecomment-2291680777)
@@ -52,10 +45,11 @@ for an unofficial, community-maintained [client library for Python](https://gith
 Support for data modeling features differ across APIs, integrations, and [visualization
 tools][ref-viz-tools]. Some of the features with partial support are listed below:
 
-| Feature | ✅ Supported in | ❌ Not supported in |
-| --- | --- | --- |
-| [Hierarchies][ref-hierarchies] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls] | All other tools |
-| [Folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls] | All other tools |
+| Feature | ✅ Supported in |
+| --- | --- |
+| [Hierarchies][ref-hierarchies] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
+| Flat [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>[Apache Superset][ref-superset] via [Semantic Layer Sync][ref-sls]<br/>[Preset][ref-preset] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
+| Nested [folders][ref-folders] | Currently, not supported in any tool |
 
 ### Authentication methods
 
@@ -65,8 +59,9 @@ tools][ref-viz-tools]:
 | Method | ✅ Supported in |
 | --- | --- |
 | [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api]<br/>[Semantic Layer Sync][ref-sls]<br/>[SQL API][ref-sql-api] |
+| [Kerberos][ref-auth-kerberos] and [NTLM][ref-auth-ntlm] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api] |
 | [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
-| [Access token][ref-auth-tokens] | [REST API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api]<br/>[AI API][ref-ai-api] |
+| [JSON Web Token][ref-auth-jwt] | [REST API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api] |
 
 ## Management APIs
 
@@ -83,19 +78,23 @@ API][ref-orchestration-api].
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-graphql-api]: /product/apis-integrations/graphql-api
 [ref-mdx-api]: /product/apis-integrations/mdx-api
-[ref-ai-api]: /product/apis-integrations/ai-api
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api
 [ref-sls]: /product/apis-integrations/semantic-layer-sync
 [ref-js-sdk]: /product/apis-integrations/javascript-sdk
 [ref-cube-cloud-for-excel]: /product/apis-integrations/microsoft-excel
 [ref-cube-cloud-for-sheets]: /product/apis-integrations/google-sheets
 [ref-viz-tools]: /product/configuration/visualization-tools
-[ref-hierarchies]: /reference/data-model/hierarchies
-[ref-folders]: /reference/data-model/view#folders
+[ref-hierarchies]: /product/data-modeling/reference/hierarchies
+[ref-folders]: /product/data-modeling/reference/view#folders
 [ref-powerbi]: /product/configuration/visualization-tools/powerbi
 [ref-excel]: /product/configuration/visualization-tools/excel
 [ref-sheets]: /product/configuration/visualization-tools/google-sheets
 [ref-tableau]: /product/configuration/visualization-tools/tableau
-[ref-auth-user-pass]: /product/auth#user-name-and-password
-[ref-auth-idp]: /product/auth#identity-provider
-[ref-auth-tokens]: /product/auth#access-token
+[ref-auth-user-pass]: /product/auth/methods/name-password
+[ref-auth-idp]: /product/auth/methods/identity-provider
+[ref-auth-jwt]: /product/auth/methods/jwt
+[ref-auth-kerberos]: /product/auth/methods/kerberos
+[ref-auth-ntlm]: /product/auth/methods/ntlm
+[ref-superset]: /product/configuration/visualization-tools/superset
+[ref-preset]: /product/configuration/visualization-tools/superset
+[ref-playground]: /product/workspace/playground

@@ -3,7 +3,7 @@ import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
-import { QueryCache, QueryBody, TempTable } from './QueryCache';
+import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
@@ -224,28 +224,18 @@ export class QueryOrchestrator {
       };
     }
 
-    const usedPreAggregations = R.pipe(
+    const usedPreAggregations = R.pipe<
+      PreAggTableToTempTable[],
+      Record<string, TempTable>,
+      Record<string, unknown>
+    >(
       R.fromPairs,
-      R.map((pa: TempTable) => ({
+      R.mapObjIndexed((pa: TempTable) => ({
         targetTableName: pa.targetTableName,
         refreshKeyValues: pa.refreshKeyValues,
         lastUpdatedAt: pa.lastUpdatedAt,
       })),
-    )(
-      preAggregationsTablesToTempTables as unknown as [
-        number, // TODO: we actually have a string here
-        {
-          buildRangeEnd: string,
-          lastUpdatedAt: number,
-          queryKey: unknown,
-          refreshKeyValues: [{
-            'refresh_key': string,
-          }][],
-          targetTableName: string,
-          type: string,
-        },
-      ][]
-    );
+    )(preAggregationsTablesToTempTables);
 
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
       throw new Error(
@@ -379,7 +369,7 @@ export class QueryOrchestrator {
       preAggregations.map(p => {
         const { preAggregation } = p.preAggregation;
         const partition = p.partitions[0];
-        preAggregation.dataSource = (partition && partition.dataSource) || 'default';
+        preAggregation.dataSource = partition?.dataSource || 'default';
         preAggregation.preAggregationsSchema = preAggregationsSchema;
         return preAggregation;
       }),
@@ -448,11 +438,11 @@ export class QueryOrchestrator {
     return this.preAggregations.cancelQueriesFromQueue(queryKeys, dataSource);
   }
 
-  public async subscribeQueueEvents(id, callback) {
+  public async subscribeQueueEvents(id: string, callback) {
     return this.getQueueEventsBus().subscribe(id, callback);
   }
 
-  public async unSubscribeQueueEvents(id) {
+  public async unSubscribeQueueEvents(id: string) {
     return this.getQueueEventsBus().unsubscribe(id);
   }
 

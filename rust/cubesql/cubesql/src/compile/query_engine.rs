@@ -1,4 +1,3 @@
-use crate::compile::engine::df::planner::CubeQueryPlanner;
 use std::{
     backtrace::Backtrace, collections::HashMap, future::Future, pin::Pin, sync::Arc,
     time::SystemTime,
@@ -8,9 +7,12 @@ use crate::{
     compile::{
         engine::{
             df::{
-                optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
+                optimizers::{
+                    FilterPushDown, FilterSplitMeta, LimitPushDown, PlanNormalize, SortPushDown,
+                },
+                planner::CubeQueryPlanner,
                 scan::CubeScanNode,
-                wrapper::CubeScanWrapperNode,
+                wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode},
             },
             udf::*,
             CubeContext, VariablesProvider,
@@ -138,10 +140,12 @@ pub trait QueryEngine {
 
         let optimizer_config = OptimizerConfig::new();
         let optimizers: Vec<Arc<dyn OptimizerRule + Sync + Send>> = vec![
+            Arc::new(PlanNormalize::new()),
             Arc::new(ProjectionDropOut::new()),
             Arc::new(FilterPushDown::new()),
             Arc::new(SortPushDown::new()),
             Arc::new(LimitPushDown::new()),
+            Arc::new(FilterSplitMeta::new()),
         ];
         for optimizer in optimizers {
             // TODO: report an error when the plan can't be optimized
@@ -225,7 +229,6 @@ pub trait QueryEngine {
                 state.auth_context().unwrap(),
                 qtrace,
                 span_id.clone(),
-                self.config_ref().top_down_extractor(),
             )
             .await
             .map_err(|e| match e.cause {
@@ -393,15 +396,20 @@ impl QueryEngine for SqlQueryEngine {
             state.get_load_request_meta("sql"),
             self.config_ref().clone(),
         ));
-        let mut ctx = DFSessionContext::with_state(
-            default_session_builder(
-                DFSessionConfig::new()
-                    .create_default_catalog_and_schema(false)
-                    .with_information_schema(false)
-                    .with_default_catalog_and_schema("db", "public"),
-            )
-            .with_query_planner(query_planner),
-        );
+        let mut df_state = default_session_builder(
+            DFSessionConfig::new()
+                .create_default_catalog_and_schema(false)
+                .with_information_schema(false)
+                .with_default_catalog_and_schema("db", "public"),
+        )
+        .with_query_planner(query_planner);
+        df_state
+            .optimizer
+            .rules
+            // projection_push_down is broken even for non-OLAP queries
+            // TODO enable it back
+            .retain(|r| r.name() != "projection_push_down");
+        let mut ctx = DFSessionContext::with_state(df_state);
 
         if state.protocol == DatabaseProtocol::MySQL {
             let system_variable_provider =
@@ -507,9 +515,14 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udf(create_to_regtype_udf());
         ctx.register_udf(create_pg_get_indexdef_udf());
         ctx.register_udf(create_inet_server_addr_udf());
+        ctx.register_udf(create_age_udf());
+        ctx.register_udf(create_pg_get_partkeydef_udf());
+        ctx.register_udf(create_pg_relation_size_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
+        ctx.register_udaf(create_patch_measure_udaf());
+        ctx.register_udaf(create_xirr_udaf());
 
         // udtf
         ctx.register_udtf(create_generate_series_udtf());
@@ -579,7 +592,11 @@ fn is_olap_query(parent: &LogicalPlan) -> Result<bool, CompilationError> {
 
         fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
             if let LogicalPlan::Extension(ext) = plan {
-                if let Some(_) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
+                let node = ext.node.as_any();
+                if node.is::<CubeScanNode>()
+                    || node.is::<CubeScanWrapperNode>()
+                    || node.is::<CubeScanWrappedSqlNode>()
+                {
                     self.0 = true;
 
                     return Ok(false);

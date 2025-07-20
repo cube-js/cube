@@ -1,10 +1,10 @@
 import { QueryAlias } from '@cubejs-backend/shared';
 import { MssqlQuery } from '../../src/adapter/MssqlQuery';
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareJsCompiler } from './PrepareCompiler';
 import { createJoinedCubesSchema } from './utils';
 
 describe('MssqlQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -29,7 +29,7 @@ describe('MssqlQuery', () => {
           type: 'number',
           primaryKey: true,
         },
-        
+
         createdAt: {
           type: 'time',
           sql: 'created_at'
@@ -44,7 +44,7 @@ describe('MssqlQuery', () => {
 
     cube(\`Deals\`, {
       sql: \`select * from deals\`,
-    
+
       measures: {
         amount: {
           sql: \`amount\`,
@@ -60,31 +60,31 @@ describe('MssqlQuery', () => {
         }
       }
     })
-    
+
     cube(\`SalesManagers\`, {
       sql: \`select * from sales_managers\`,
-    
+
       joins: {
         Deals: {
           relationship: \`hasMany\`,
           sql: \`\${SalesManagers}.id = \${Deals}.sales_manager_id\`
         }
       },
-      
+
       measures: {
         averageDealAmount: {
           sql: \`\${dealsAmount}\`,
           type: \`avg\`
         }
       },
-    
+
       dimensions: {
         id: {
           sql: \`id\`,
           type: \`string\`,
           primaryKey: true
         },
-    
+
         dealsAmount: {
           sql: \`\${Deals.amount}\`,
           type: \`number\`,
@@ -94,7 +94,7 @@ describe('MssqlQuery', () => {
     });
     `);
 
-  const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+  const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
   it('should group by the created_at field on the calculated granularity for unbounded trailing windows',
     () => compiler.compile().then(() => {

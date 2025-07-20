@@ -1,9 +1,9 @@
-use std::{env, time::Duration};
+use std::{env, pin::pin, time::Duration};
 
 use async_trait::async_trait;
 use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
-use futures::{pin_mut, TryStreamExt};
+use futures::TryStreamExt;
 use portpicker::{pick_unused_port, Port};
 use rust_decimal::prelude::*;
 use tokio::time::sleep;
@@ -134,7 +134,7 @@ impl PostgresIntegrationTestSuite {
         for row in res.into_iter() {
             let mut values: Vec<String> = Vec::new();
 
-            for (idx, column) in row.columns().into_iter().enumerate() {
+            for (idx, column) in row.columns().iter().enumerate() {
                 if !description_done {
                     description.push(format!(
                         "{} type: {} ({})",
@@ -461,7 +461,7 @@ impl PostgresIntegrationTestSuite {
 
         let it = self.client.query_raw(&stmt, &["0"]).await.unwrap();
 
-        pin_mut!(it);
+        let mut it = pin!(it);
 
         let mut total = 1;
 
@@ -1272,7 +1272,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                 let columns = rows.first().unwrap().columns();
                 assert_eq!(
                     columns
-                        .into_iter()
+                        .iter()
                         .map(|col| col.type_().oid())
                         .collect::<Vec<u32>>(),
                     vec![1184, 1114]

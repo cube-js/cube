@@ -52,6 +52,10 @@ impl SingleAliasedSource {
         }
     }
 
+    pub fn new_from_source(source: SingleSource, alias: String) -> Self {
+        Self { source, alias }
+    }
+
     pub fn new_from_table_reference(
         reference: String,
         schema: Rc<Schema>,

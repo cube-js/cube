@@ -1,9 +1,15 @@
-import { prepareCompiler } from './PrepareCompiler';
+import { parse } from '@babel/parser';
+import babelGenerator from '@babel/generator';
+import babelTraverse from '@babel/traverse';
+
+import { prepareJsCompiler } from './PrepareCompiler';
+import { ImportExportTranspiler } from '../../src/compiler/transpilers';
+import { ErrorReporter } from '../../src/compiler/ErrorReporter';
 
 describe('Transpilers', () => {
   it('CubeCheckDuplicatePropTranspiler', async () => {
     try {
-      const { compiler } = prepareCompiler(`
+      const { compiler } = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'select * from test',
           dimensions: {
@@ -32,7 +38,7 @@ describe('Transpilers', () => {
   });
 
   it('CubePropContextTranspiler', async () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
         let { securityContext } = COMPILE_CONTEXT;
 
         cube(\`Test\`, {
@@ -42,5 +48,51 @@ describe('Transpilers', () => {
     `);
 
     await compiler.compile();
+  });
+
+  it('ImportExportTranspiler', async () => {
+    const ieTranspiler = new ImportExportTranspiler();
+    const errorsReport = new ErrorReporter();
+    const code = `
+      export const helperFunction = () => 'hello'
+      export { helperFunction as alias }
+      export default helperFunction
+      export function requireFilterParam() {
+        return 'required';
+      }
+      export const someVar = 42
+    `;
+    const ast = parse(
+      code,
+      {
+        sourceFilename: 'code.js',
+        sourceType: 'module',
+        plugins: ['objectRestSpread'],
+      },
+    );
+
+    babelTraverse(ast, ieTranspiler.traverseObject(errorsReport));
+    const content = babelGenerator(ast, {}, code).code;
+
+    expect(content).toEqual(`const helperFunction = () => 'hello';
+addExport({
+  helperFunction: helperFunction
+})
+addExport({
+  alias: helperFunction
+});
+setExport(helperFunction);
+function requireFilterParam() {
+  return 'required';
+}
+addExport({
+  requireFilterParam: requireFilterParam
+})
+const someVar = 42;
+addExport({
+  someVar: someVar
+})`);
+
+    errorsReport.throwIfAny(); // should not throw
   });
 });

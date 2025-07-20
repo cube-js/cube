@@ -1105,31 +1105,31 @@ describe('Multiple datasources', () => {
     process.env.CUBEJS_DB_DATABRICKS_URL = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_URL = 'postgres1';
     process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_URL = 'wrong1';
-    expect(getEnv('databrickUrl', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('databrickUrl', { dataSource: 'postgres' })).toEqual('postgres1');
-    expect(() => getEnv('databrickUrl', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksUrl', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('databricksUrl', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('databricksUrl', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     process.env.CUBEJS_DB_DATABRICKS_URL = 'default2';
     process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_URL = 'postgres2';
     process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_URL = 'wrong2';
-    expect(getEnv('databrickUrl', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('databrickUrl', { dataSource: 'postgres' })).toEqual('postgres2');
-    expect(() => getEnv('databrickUrl', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksUrl', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('databricksUrl', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('databricksUrl', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     delete process.env.CUBEJS_DB_DATABRICKS_URL;
     delete process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_URL;
     delete process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_URL;
-    expect(() => getEnv('databrickUrl', { dataSource: 'default' })).toThrow(
+    expect(() => getEnv('databricksUrl', { dataSource: 'default' })).toThrow(
       'The CUBEJS_DB_DATABRICKS_URL is required and missing.'
     );
-    expect(() => getEnv('databrickUrl', { dataSource: 'postgres' })).toThrow(
+    expect(() => getEnv('databricksUrl', { dataSource: 'postgres' })).toThrow(
       'The CUBEJS_DS_POSTGRES_DB_DATABRICKS_URL is required and missing.'
     );
-    expect(() => getEnv('databrickUrl', { dataSource: 'wrong' })).toThrow(
+    expect(() => getEnv('databricksUrl', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
   });
@@ -1138,27 +1138,27 @@ describe('Multiple datasources', () => {
     process.env.CUBEJS_DB_DATABRICKS_TOKEN = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_TOKEN = 'postgres1';
     process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_TOKEN = 'wrong1';
-    expect(getEnv('databrickToken', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('databrickToken', { dataSource: 'postgres' })).toEqual('postgres1');
-    expect(() => getEnv('databrickToken', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksToken', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('databricksToken', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('databricksToken', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     process.env.CUBEJS_DB_DATABRICKS_TOKEN = 'default2';
     process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_TOKEN = 'postgres2';
     process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_TOKEN = 'wrong2';
-    expect(getEnv('databrickToken', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('databrickToken', { dataSource: 'postgres' })).toEqual('postgres2');
-    expect(() => getEnv('databrickToken', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksToken', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('databricksToken', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('databricksToken', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
     delete process.env.CUBEJS_DB_DATABRICKS_TOKEN;
     delete process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_TOKEN;
     delete process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_TOKEN;
-    expect(getEnv('databrickToken', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('databrickToken', { dataSource: 'postgres' })).toBeUndefined();
-    expect(() => getEnv('databrickToken', { dataSource: 'wrong' })).toThrow(
+    expect(getEnv('databricksToken', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('databricksToken', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('databricksToken', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
   });
@@ -1190,34 +1190,6 @@ describe('Multiple datasources', () => {
     expect(() => getEnv('databricksCatalog', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
-  });
-
-  test('getEnv("databrickAcceptPolicy")', () => {
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'true';
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toEqual(true);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toEqual(true);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toEqual(true);
-
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'false';
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toEqual(false);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toEqual(false);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toEqual(false);
-
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'wrong';
-    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toThrow(
-      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
-    );
-    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toThrow(
-      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
-    );
-    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toThrow(
-      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
-    );
-
-    delete process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY;
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toBeUndefined();
   });
 
   test('getEnv("athenaAwsKey")', () => {
@@ -1511,20 +1483,33 @@ describe('Multiple datasources', () => {
   });
 
   test('getEnv("clickhouseReadOnly")', () => {
-    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'default1';
-    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_READONLY = 'postgres1';
-    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_READONLY = 'wrong1';
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual('postgres1');
+    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'true';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_READONLY = 'true';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_READONLY = 'true';
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual(true);
     expect(() => getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
-    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'default2';
-    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_READONLY = 'postgres2';
-    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_READONLY = 'wrong2';
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual('postgres2');
+    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'false';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_READONLY = 'false';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_READONLY = 'false';
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual(false);
+    expect(() => getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'wrong';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_READONLY = 'wrong';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_READONLY = 'wrong';
+    expect(() => getEnv('clickhouseReadOnly', { dataSource: 'default' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_READONLY" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toThrow(
+      'env-var: "CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_READONLY" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
     expect(() => getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
@@ -1532,14 +1517,14 @@ describe('Multiple datasources', () => {
     delete process.env.CUBEJS_DB_CLICKHOUSE_READONLY;
     delete process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_READONLY;
     delete process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_READONLY;
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual(false);
     expect(() => getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
   });
 
-  test('getEnv("clickhouseSortCollation")', () => {
+ test('getEnv("clickhouseSortCollation")', () => {
     process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_SORT_COLLATION = 'postgres1';
     process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_SORT_COLLATION = 'wrong1';
@@ -1606,6 +1591,48 @@ describe('Multiple datasources', () => {
     expect(getEnv('clickhouseUseCollation', { dataSource: 'default' })).toEqual(true);
     expect(getEnv('clickhouseUseCollation', { dataSource: 'postgres' })).toEqual(true);
     expect(() => getEnv('clickhouseUseCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
+  test('getEnv("clickhouseCompression")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'true';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_COMPRESSION = 'true';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_COMPRESSION = 'true';
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual(true);
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'false';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_COMPRESSION = 'false';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_COMPRESSION = 'false';
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual(false);
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'wrong';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_COMPRESSION = 'wrong';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_COMPRESSION = 'wrong';
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'default' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_COMPRESSION" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'postgres' })).toThrow(
+      'env-var: "CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_COMPRESSION" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_COMPRESSION;
+    delete process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_COMPRESSION;
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual(false);
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
   });

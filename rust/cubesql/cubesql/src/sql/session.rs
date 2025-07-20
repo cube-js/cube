@@ -339,12 +339,10 @@ impl SessionState {
             .expect("failed to unlock variables for reading");
 
         match &*guard {
-            Some(vars) => vars.get(name).map(|v| v.clone()),
+            Some(vars) => vars.get(name).cloned(),
             _ => match &self.protocol {
-                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).map(|v| v.clone()),
-                DatabaseProtocol::PostgreSQL => {
-                    POSTGRES_DEFAULT_VARIABLES.get(name).map(|v| v.clone())
-                }
+                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).cloned(),
+                DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.get(name).cloned(),
                 DatabaseProtocol::Extension(ext) => ext.get_session_variable_default(name),
             },
         }
@@ -462,7 +460,7 @@ impl From<&Session> for SessionStatActivity {
             application_name,
             client_addr: session.state.client_ip.clone(),
             client_hostname: None,
-            client_port: session.state.client_port.clone(),
+            client_port: session.state.client_port,
             query,
         }
     }

@@ -31,7 +31,7 @@ const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
 const Connection = require('@cubejs-backend/jdbc/lib/connection');
 const DatabaseMetaData = require('@cubejs-backend/jdbc/lib/databasemetadata');
 const jinst = require('@cubejs-backend/jdbc/lib/jinst');
-const mvn = require('node-java-maven');
+const mvn = require('@cubejs-backend/node-java-maven');
 
 let mvnPromise: Promise<void> | null = null;
 

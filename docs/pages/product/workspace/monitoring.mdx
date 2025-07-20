@@ -1,9 +1,3 @@
----
-redirect_from:
-  - /cloud/workspace/logs
-  - /monitoring/integrations
----
-
 # Monitoring Integrations
 
 Cube Cloud allows exporting logs and metrics to external monitoring tools so you
@@ -105,13 +99,15 @@ default_api_key = "$CUBE_CLOUD_MONITORING_DATADOG_API_KEY"
 ### Inputs for logs
 
 Sinks accept the `inputs` option that allows to specify which components of a
-Cube Cloud deployment should export their logs. Supported inputs:
+Cube Cloud deployment should export their logs:
 
-- `cubejs-server`
-- `refresh-scheduler`
-- `ext-db`
-- `warmup-job`
-- `cubestore`
+| Input name | Description |
+| --- | --- |
+| `cubejs-server` | Logs of API instances |
+| `refresh-scheduler` | Logs of the refresh worker |
+| `warmup-job` | Logs of the [pre-aggregation warm-up][ref-preagg-warmup] |
+| `cubestore` | Logs of Cube Store |
+| `query-history` | [Query History export](#query-history-export) |
 
 Example configuration for exporting logs to
 [Datadog][vector-docs-sinks-datadog]:
@@ -122,7 +118,6 @@ type = "datadog_logs"
 inputs = [
   "cubejs-server",
   "refresh-scheduler",
-  "ext-db",
   "warmup-job",
   "cubestore"
 ]
@@ -169,7 +164,6 @@ connection_string = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;Acc
 inputs = [
   "cubejs-server",
   "refresh-scheduler",
-  "ext-db",
   "warmup-job",
   "cubestore"
 ]
@@ -185,20 +179,28 @@ levels = [
 
 ### Inputs for metrics
 
-Metrics are exported using the `metrics` input. You can filter them by providing
-an array of metric names via the `list` option.
+Metrics are exported using the `metrics` input. Metrics will have their respective
+metric names and_types: [`gauge`][vector-docs-metrics-gauge] or
+[`counter`][vector-docs-metrics-counter].
 
-| Name                     | Type                                     | Applies to           | Description                                    |
-| ------------------------ | ---------------------------------------- | -------------------- | ---------------------------------------------- |
-| `cpu`                    | [`gauge`][vector-docs-metrics-gauge]     | Node of a deployment | Percent of free CPU against requests           |
-| `memory`                 | [`gauge`][vector-docs-metrics-gauge]     | Node of a deployment | Percent of free Memory against requests        |
-| `requests-count`         | [`counter`][vector-docs-metrics-counter] | Deployment           | Total number of processed requests             |
-| `requests-errors-count`  | [`counter`][vector-docs-metrics-counter] | Deployment           | Number of requests processed with errors       |
-| `requests-success-count` | [`counter`][vector-docs-metrics-counter] | Deployment           | Number of requests processed successfully      |
-| `requests-duration`      | [`counter`][vector-docs-metrics-counter] | Deployment           | Total time taken to process requests (seconds) |
+All metrics of the `counter` type reset to zero at the midnight (UTC) and increment
+during the next 24 hours.
 
-You can further filter exported metrics by providing an array of `inputs` that
-applies to metics only.
+You can filter metrics by providing an array of _input names_ via the `list` option.
+
+| Input name | Metric name, type | Description |
+| --- | --- | --- |
+| `cpu` | `cube_cpu_usage_ratio`, `gauge` | CPU usage of a particular node in the deployment. Usually, a number in the 0—100 range. May exceed 100 if the node is under load  |
+| `memory` | `cube_memory_usage_ratio`, `gauge` | Memory usage of a particular node in the deployment. Usually, a number in the 0—100 range. May exceed 100 if the node is under load |
+| `requests-count` | `cube_requests_total`, `counter` | Number of API requests to the deployment |
+| `requests-success-count` | `cube_requests_success_total`, `counter` | Number of successful API requests to the deployment |
+| `requests-errors-count` | `cube_requests_errors_total`, `counter` | Number of errorneous API requests to the deployment |
+| `requests-duration` | `cube_requests_duration_ms_total`, `counter` | Total time taken to process API requests, milliseconds |
+| `requests-success-duration` | `cube_requests_duration_ms_success`, `counter` | Total time taken to process successful API requests, milliseconds |
+| `requests-errors-duration` | `cube_requests_duration_ms_errors`, `counter` | Total time taken to process errorneous API requests, milliseconds |
+
+You can further filter exported metrics by providing an array of `inputs`. It applies to
+metics only.
 
 Example configuration for exporting all metrics from `cubejs-server` to
 [Prometheus][vector-docs-sinks-prometheus] using the `prometheus_remote_write`
@@ -273,9 +275,68 @@ You can also customize the user name and password for `prometheus_exporter` by
 setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
 `CUBE_CLOUD_MONITORING_METRICS_PASSWORD` environment variables, respectively.
 
+## Query History export
+
+With Query History export, you can bring [Query History][ref-query-history] data to an
+external monitoring solution for further analysis, for example:
+* Detect queries that do not hit pre-aggregations.
+* Set up alerts for queries that exceed a certain duration.
+* Attribute usage to specific users and implement chargebacks.
+
+<SuccessBox>
+
+Query History export requires the [M tier](/product/deployment/cloud/pricing#monitoring-integrations-tiers)
+of Monitoring Integrations.
+
+</SuccessBox>
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/6Xf2ayeQZC8"
+  aspectRatio={4/3}
+/>
+
+To configure Query History export, add the `query-history` input to the `inputs`
+option of the sink configuration. Example configuration for exporting Query History data
+to the standard output of the Vector agent:
+
+```toml
+[sinks.my_console]
+type = "console"
+inputs = [
+  "query-history"
+]
+target = "stdout"
+encoding = { codec = "json" }
+```
+
+Exported data includes the following fields:
+
+| Field | Description |
+| --- | --- |
+| `trace_id` | Unique identifier of the API request. |
+| `account_name` | Name of the Cube Cloud account. |
+| `deployment_id` | Identifier of the [deployment][ref-deployments]. |
+| `environment_name` | Name of the [environment][ref-environments], `NULL` for production. |
+| `api_type` | Type of [data API][ref-apis] used (`rest`, `sql`, etc.), `NULL` for errors. |
+| `api_query` | Query executed by the API, represented as string. |
+| `security_context` | [Security context][ref-security-context] of the request, represented as a string. |
+| `status` | Status of the request: `success` or `error`. |
+| `error_message` | Error message, if any. |
+| `start_time_unix_ms` | Start time of the execution, Unix timestamp in milliseconds. |
+| `end_time_unix_ms` | End time of the execution, Unix timestamp in milliseconds. |
+| `api_response_duration_ms` | Duration of the execution in milliseconds. |
+| `cache_type` | [Cache type][ref-cache-type]: `no_cache`, `pre_aggregations_in_cube_store`, etc. |
+
+<ReferenceBox>
+
+See [this recipe][ref-query-history-export-recipe] for an example of analyzing data from
+Query History export. 
+
+</ReferenceBox>
+
+
 [ref-autosuspend]: /product/deployment/cloud/auto-suspension#effects-on-experience
 [self-sinks-for-metrics]: #configuration-sinks-for-metrics
-[ref-dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
 [vector]: https://vector.dev/
 [vector-docs-config]: https://vector.dev/docs/reference/configuration/
 [vector-docs-sinks]: https://vector.dev/docs/reference/configuration/sinks/
@@ -301,3 +362,11 @@ setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
 [mimir]: https://grafana.com/oss/mimir/
 [grafana-cloud]: https://grafana.com/products/cloud/
 [ref-prod-env]: /product/workspace/environments#production-environment
+[ref-preagg-warmup]: /product/deployment/cloud/warm-up#pre-aggregation-warm-up
+[ref-query-history]: /product/workspace/query-history
+[ref-deployments]: /product/deployment/cloud/deployments
+[ref-environments]: /product/workspace/environments
+[ref-apis]: /product/apis-integrations
+[ref-security-context]: /product/auth/context
+[ref-cache-type]: /product/caching#cache-type
+[ref-query-history-export-recipe]: /product/workspace/recipes/query-history-export

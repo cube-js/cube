@@ -2,9 +2,17 @@ use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
 use super::dimension_definition::{DimensionDefinition, NativeDimensionDefinition};
 use super::measure_definition::{MeasureDefinition, NativeMeasureDefinition};
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::pre_aggregation_description::{
+    NativePreAggregationDescription, PreAggregationDescription,
+};
+use super::segment_definition::{NativeSegmentDefinition, SegmentDefinition};
+use crate::cube_bridge::granularity_definition::{
+    GranularityDefinition, NativeGranularityDefinition,
+};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
+use cubenativeutils::wrappers::NativeArray;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
@@ -19,7 +27,7 @@ pub struct CubeEvaluatorStatic {
     pub primary_keys: HashMap<String, Vec<String>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CallDep {
     pub name: String,
     pub parent: Option<usize>,
@@ -27,15 +35,17 @@ pub struct CallDep {
 
 #[nativebridge::native_bridge(CubeEvaluatorStatic)]
 pub trait CubeEvaluator {
-    #[field]
+    #[nbridge(field)]
     fn primary_keys(&self) -> Result<HashMap<String, String>, CubeError>;
     fn parse_path(&self, path_type: String, path: String) -> Result<Vec<String>, CubeError>;
     fn measure_by_path(&self, measure_path: String)
         -> Result<Rc<dyn MeasureDefinition>, CubeError>;
     fn dimension_by_path(
         &self,
-        measure_path: String,
+        dimension_path: String,
     ) -> Result<Rc<dyn DimensionDefinition>, CubeError>;
+    fn segment_by_path(&self, segment_path: String)
+        -> Result<Rc<dyn SegmentDefinition>, CubeError>;
     fn cube_from_path(&self, cube_path: String) -> Result<Rc<dyn CubeDefinition>, CubeError>;
     fn is_measure(&self, path: Vec<String>) -> Result<bool, CubeError>;
     fn is_dimension(&self, path: Vec<String>) -> Result<bool, CubeError>;
@@ -45,4 +55,25 @@ pub trait CubeEvaluator {
         cube_name: String,
         sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<CallDep>, CubeError>;
+    fn resolve_granularity(
+        &self,
+        path: Vec<String>,
+    ) -> Result<Rc<dyn GranularityDefinition>, CubeError>;
+    #[nbridge(vec)]
+    fn pre_aggregations_for_cube_as_array(
+        &self,
+        cube_name: String,
+    ) -> Result<Vec<Rc<dyn PreAggregationDescription>>, CubeError>;
+    #[nbridge(optional)]
+    fn pre_aggregation_description_by_name(
+        &self,
+        cube_name: String,
+        name: String,
+    ) -> Result<Option<Rc<dyn PreAggregationDescription>>, CubeError>;
+    #[nbridge(vec)]
+    fn evaluate_rollup_references(
+        &self,
+        cube: String,
+        sql: Rc<dyn MemberSql>,
+    ) -> Result<Vec<String>, CubeError>;
 }

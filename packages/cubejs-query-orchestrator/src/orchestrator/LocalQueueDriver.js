@@ -152,12 +152,14 @@ export class LocalQueueDriverConnection {
     }
 
     let added = 0;
-    if (!this.toProcess[key]) {
+
+    if (!this.toProcess[key] && !this.active[key]) {
       this.toProcess[key] = {
         order: keyScore,
         queueId: options.queueId,
         key
       };
+
       added = 1;
     }
 
@@ -291,10 +293,14 @@ export class LocalQueueDriverConnection {
     }
 
     let added = 0;
+
     if (Object.keys(this.active).length < this.concurrency && !this.active[key]) {
-      this.active[key] = { key, order: processingId };
+      this.active[key] = { key, order: processingId, queueId: processingId };
+      delete this.toProcess[key];
+
       added = 1;
     }
+
     this.heartBeat[key] = { key, order: new Date().getTime() };
 
     if (this.getQueueEventsBus) {

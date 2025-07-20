@@ -3,7 +3,7 @@ use neon::prelude::*;
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use crate::auth::NativeAuthContext;
+use crate::auth::NativeSQLAuthContext;
 use crate::channel::{call_raw_js_with_channel_as_callback, NodeSqlGenerator, ValueFromJs};
 use crate::node_obj_serializer::NodeObjSerializer;
 use crate::orchestrator::ResultWrapper;
@@ -116,7 +116,7 @@ impl TransportService for NodeBridgeTransport {
 
         let native_auth = ctx
             .as_any()
-            .downcast_ref::<NativeAuthContext>()
+            .downcast_ref::<NativeSQLAuthContext>()
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = Uuid::new_v4().to_string();
@@ -142,7 +142,7 @@ impl TransportService for NodeBridgeTransport {
 
         let channel = self.channel.clone();
 
-        let (cube_to_data_source, data_source_to_sql_generator) =
+        let (member_to_data_source, data_source_to_sql_generator) =
             call_raw_js_with_channel_as_callback(
                 self.channel.clone(),
                 self.sql_generators.clone(),
@@ -152,14 +152,14 @@ impl TransportService for NodeBridgeTransport {
                     let obj = v
                         .downcast::<JsObject, _>(cx)
                         .map_err(|e| CubeError::user(e.to_string()))?;
-                    let cube_to_data_source_obj = obj
-                        .get::<JsObject, _, _>(cx, "cubeNameToDataSource")
-                        .map_cube_err("Can't cast cubeNameToDataSource to object")?;
 
-                    let cube_to_data_source =
-                        key_to_values(cx, cube_to_data_source_obj, |cx, v| {
+                    let member_to_data_source_obj = obj
+                        .get::<JsObject, _, _>(cx, "memberToDataSource")
+                        .map_cube_err("Can't cast memberToDataSource to object")?;
+                    let member_to_data_source =
+                        key_to_values(cx, member_to_data_source_obj, |cx, v| {
                             let res = v.downcast::<JsString, _>(cx).map_cube_err(
-                                "Can't cast value to string in cube_to_data_source",
+                                "Can't cast value to string in member_to_data_source",
                             )?;
                             Ok(res.value(cx))
                         })?;
@@ -183,7 +183,7 @@ impl TransportService for NodeBridgeTransport {
                             Ok(res)
                         })?;
 
-                    Ok((cube_to_data_source, data_source_to_sql_generator))
+                    Ok((member_to_data_source, data_source_to_sql_generator))
                 }),
             )
             .await?;
@@ -208,7 +208,7 @@ impl TransportService for NodeBridgeTransport {
         })?;
         Ok(Arc::new(MetaContext::new(
             response.cubes.unwrap_or_default(),
-            cube_to_data_source,
+            member_to_data_source,
             data_source_to_sql_generator,
             compiler_id,
         )))
@@ -217,7 +217,7 @@ impl TransportService for NodeBridgeTransport {
     async fn compiler_id(&self, ctx: AuthContextRef) -> Result<Uuid, CubeError> {
         let native_auth = ctx
             .as_any()
-            .downcast_ref::<NativeAuthContext>()
+            .downcast_ref::<NativeSQLAuthContext>()
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = Uuid::new_v4().to_string();
@@ -263,7 +263,7 @@ impl TransportService for NodeBridgeTransport {
     ) -> Result<SqlResponse, CubeError> {
         let native_auth = ctx
             .as_any()
-            .downcast_ref::<NativeAuthContext>()
+            .downcast_ref::<NativeSQLAuthContext>()
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = span_id
@@ -343,7 +343,7 @@ impl TransportService for NodeBridgeTransport {
 
         let native_auth = ctx
             .as_any()
-            .downcast_ref::<NativeAuthContext>()
+            .downcast_ref::<NativeSQLAuthContext>()
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = span_id
@@ -508,7 +508,7 @@ impl TransportService for NodeBridgeTransport {
             req_seq_id += 1;
             let native_auth = ctx
                 .as_any()
-                .downcast_ref::<NativeAuthContext>()
+                .downcast_ref::<NativeSQLAuthContext>()
                 .expect("Unable to cast AuthContext to NativeAuthContext");
 
             let extra = serde_json::to_string(&LoadRequest {
@@ -555,7 +555,7 @@ impl TransportService for NodeBridgeTransport {
     ) -> Result<bool, CubeError> {
         let native_auth = ctx
             .as_any()
-            .downcast_ref::<NativeAuthContext>()
+            .downcast_ref::<NativeSQLAuthContext>()
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let res = call_raw_js_with_channel_as_callback(
@@ -594,7 +594,7 @@ impl TransportService for NodeBridgeTransport {
     ) -> Result<(), CubeError> {
         let native_auth = ctx
             .as_any()
-            .downcast_ref::<NativeAuthContext>()
+            .downcast_ref::<NativeSQLAuthContext>()
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = span_id

@@ -7,8 +7,8 @@ expression: "execute_query(\"SELECT\n                    oid,\n                 
 +-------+---------------------------+---------+
 | 1259  | pg_class                  | 8192    |
 | 18000 | KibanaSampleDataEcommerce | 8192    |
-| 18019 | Logs                      | 8192    |
-| 18029 | NumberCube                | 8192    |
-| 18035 | WideCube                  | 8192    |
-| 18245 | MultiTypeCube             | 8192    |
+| 18020 | Logs                      | 8192    |
+| 18030 | NumberCube                | 8192    |
+| 18036 | WideCube                  | 8192    |
+| 18246 | MultiTypeCube             | 8192    |
 +-------+---------------------------+---------+

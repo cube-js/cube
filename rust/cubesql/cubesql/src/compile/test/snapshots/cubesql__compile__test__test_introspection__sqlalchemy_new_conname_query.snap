@@ -11,6 +11,7 @@ expression: "execute_query(r#\"SELECT\n                a.attname,\n             
 | minPrice           | numeric                             | NULL    | true       | 18000     | NULL                                          |           | NULL             |
 | avgPrice           | numeric                             | NULL    | true       | 18000     | NULL                                          |           | NULL             |
 | countDistinct      | bigint                              | NULL    | true       | 18000     | NULL                                          |           | NULL             |
+| id                 | numeric                             | NULL    | false      | 18000     | NULL                                          |           | NULL             |
 | order_date         | timestamp without time zone         | NULL    | false      | 18000     | NULL                                          |           | NULL             |
 | last_mod           | timestamp without time zone         | NULL    | false      | 18000     | NULL                                          |           | NULL             |
 | customer_gender    | text                                | NULL    | false      | 18000     | Customer gender                               |           | NULL             |

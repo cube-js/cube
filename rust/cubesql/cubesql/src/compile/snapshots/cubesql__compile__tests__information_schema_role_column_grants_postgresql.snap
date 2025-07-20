@@ -1,7 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 6570
-expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
 +---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+
 | grantor | grantee | table_catalog | table_schema | table_name                | column_name        | privilege_type | is_grantable |
@@ -12,6 +11,7 @@ expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | minPrice           | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | avgPrice           | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | countDistinct      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | id                 | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | order_date         | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | last_mod           | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | customer_gender    | SELECT         | YES          |

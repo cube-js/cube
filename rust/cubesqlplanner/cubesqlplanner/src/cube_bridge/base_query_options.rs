@@ -1,4 +1,5 @@
 use super::join_graph::{JoinGraph, NativeJoinGraph};
+use super::join_hints::JoinHintItem;
 use super::options_member::OptionsMember;
 use crate::cube_bridge::base_tools::{BaseTools, NativeBaseTools};
 use crate::cube_bridge::evaluator::{CubeEvaluator, NativeCubeEvaluator};
@@ -23,7 +24,7 @@ pub struct TimeDimension {
 pub struct FilterItem {
     pub or: Option<Vec<FilterItem>>,
     pub and: Option<Vec<FilterItem>>,
-    member: Option<String>,
+    pub member: Option<String>,
     pub dimension: Option<String>,
     pub operator: Option<String>,
     pub values: Option<Vec<Option<String>>>,
@@ -49,7 +50,6 @@ impl FilterItem {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BaseQueryOptionsStatic {
-    pub measures: Option<Vec<String>>,
     #[serde(rename = "timeDimensions")]
     pub time_dimensions: Option<Vec<TimeDimension>>,
     pub timezone: Option<String>,
@@ -60,22 +60,30 @@ pub struct BaseQueryOptionsStatic {
     pub row_limit: Option<String>,
     pub offset: Option<String>,
     pub ungrouped: Option<bool>,
+    #[serde(rename = "exportAnnotatedSql")]
+    pub export_annotated_sql: bool,
+    #[serde(rename = "preAggregationQuery")]
+    pub pre_aggregation_query: Option<bool>,
+    #[serde(rename = "totalQuery")]
+    pub total_query: Option<bool>,
+    #[serde(rename = "cubestoreSupportMultistage")]
+    pub cubestore_support_multistage: Option<bool>,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]
 pub trait BaseQueryOptions {
-    #[field]
-    #[optional]
-    #[vec]
+    #[nbridge(field, optional, vec)]
     fn measures(&self) -> Result<Option<Vec<OptionsMember>>, CubeError>;
-    #[field]
-    #[optional]
-    #[vec]
+    #[nbridge(field, optional, vec)]
     fn dimensions(&self) -> Result<Option<Vec<OptionsMember>>, CubeError>;
-    #[field]
+    #[nbridge(field, optional, vec)]
+    fn segments(&self) -> Result<Option<Vec<OptionsMember>>, CubeError>;
+    #[nbridge(field)]
     fn cube_evaluator(&self) -> Result<Rc<dyn CubeEvaluator>, CubeError>;
-    #[field]
+    #[nbridge(field)]
     fn base_tools(&self) -> Result<Rc<dyn BaseTools>, CubeError>;
-    #[field]
+    #[nbridge(field)]
     fn join_graph(&self) -> Result<Rc<dyn JoinGraph>, CubeError>;
+    #[nbridge(field, optional, vec)]
+    fn join_hints(&self) -> Result<Option<Vec<JoinHintItem>>, CubeError>;
 }

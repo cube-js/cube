@@ -22,6 +22,7 @@ use datafusion::{
     prelude::JoinType,
 };
 use egg::{Id, Subst};
+use itertools::Itertools;
 
 impl WrapperRules {
     pub fn join_rules(&self, rules: &mut Vec<CubeRewrite>) {
@@ -59,6 +60,9 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?left_grouped_subqueries",
                                 "?left_ungrouped_scan",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -75,6 +79,9 @@ impl WrapperRules {
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -102,6 +109,7 @@ impl WrapperRules {
                                 // Can use it, because we've checked that left input allows push-to-Cube,
                                 // so it must be ungrouped, making this whole plan ungrouped
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -113,6 +121,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -124,6 +133,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -135,6 +145,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -146,6 +157,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -159,6 +171,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         // We don't want to use list rules here, because ?right_input is already done
@@ -173,6 +186,7 @@ impl WrapperRules {
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
+                                        "?input_data_source",
                                     ),
                                 ),
                                 wrapper_pushdown_replacer(
@@ -187,6 +201,7 @@ impl WrapperRules {
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
+                                        "?input_data_source",
                                     ),
                                 ),
                                 "?out_join_type",
@@ -201,6 +216,7 @@ impl WrapperRules {
                                     "?left_cube_members",
                                     "?out_grouped_subqueries",
                                     "WrapperReplacerContextUngroupedScan:true",
+                                    "?input_data_source",
                                 ),
                             ),
                         ),
@@ -213,6 +229,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
@@ -227,6 +244,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         "WrappedSelectAlias:None",
@@ -332,6 +350,9 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?left_grouped_subqueries",
                                 "?left_ungrouped_scan",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -348,6 +369,9 @@ impl WrapperRules {
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -365,6 +389,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -376,6 +401,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -387,6 +413,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -398,6 +425,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -409,6 +437,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -422,6 +451,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         // We don't want to use list rules here, because ?right_input is already done
@@ -436,6 +466,7 @@ impl WrapperRules {
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
+                                        "?input_data_source",
                                     ),
                                 ),
                                 wrapper_pushdown_replacer(
@@ -450,6 +481,7 @@ impl WrapperRules {
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
+                                        "?input_data_source",
                                     ),
                                 ),
                                 "?out_join_type",
@@ -464,6 +496,7 @@ impl WrapperRules {
                                     "?left_cube_members",
                                     "?out_grouped_subqueries",
                                     "WrapperReplacerContextUngroupedScan:true",
+                                    "?input_data_source",
                                 ),
                             ),
                         ),
@@ -476,6 +509,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
@@ -490,6 +524,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
+                                "?input_data_source",
                             ),
                         ),
                         "WrappedSelectAlias:None",
@@ -548,6 +583,9 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?left_grouped_subqueries",
                                 "?left_ungrouped_scan",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -564,6 +602,9 @@ impl WrapperRules {
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                // Data sources must match for both sides
+                                // TODO support unrestricted data source on one side
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -588,6 +629,7 @@ impl WrapperRules {
                                 "?left_cube_members",
                                 "?left_grouped_subqueries",
                                 "?left_ungrouped_scan",
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -604,6 +646,7 @@ impl WrapperRules {
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:false",
+                                "?input_data_source",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -679,7 +722,7 @@ impl WrapperRules {
     ) -> Option<Id> {
         let join_on_pairs = left_join_on
             .into_iter()
-            .zip(right_join_on.into_iter())
+            .zip(right_join_on)
             .collect::<Vec<_>>();
 
         let result_expr =
@@ -831,50 +874,66 @@ impl WrapperRules {
             // * Both inputs depend on a single data source
             // * SQL generator for that data source have `expressions/subquery` template
             // It could be checked later, in WrappedSelect as well
+            // TODO For views: check that each member is coming from same data source (or even cube?)
 
-            let left_columns = egraph[subst[left_expr_var]].data.referenced_expr.as_ref();
-            let Some(left_columns) = left_columns else {
-                return false;
+            let prepare_columns = |var| {
+                let columns = egraph[subst[var]].data.referenced_expr.as_ref();
+                let Some(columns) = columns else {
+                    return Err("Missing referenced_expr");
+                };
+                let columns = columns
+                    .iter()
+                    .map(|column| {
+                        let column = match column {
+                            Expr::Column(column) => column.clone(),
+                            _ => return Err("Unexpected expression in referenced_expr"),
+                        };
+                        Ok(column)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(columns)
             };
-            if left_columns.len() != 1 {
-                return false;
+
+            fn prepare_relation(columns: &[Column]) -> Result<&str, &'static str> {
+                let relation = columns
+                    .iter()
+                    .map(|column| &column.relation)
+                    .all_equal_value();
+                let Ok(Some(relation)) = relation else {
+                    // Outer Err means there's either no values at all, or more than one different value
+                    // Inner Err means that all referenced_expr are not columns
+                    // Inner None means that all columns are without relation, don't support that ATM
+                    return Err("Relation mismatch");
+                };
+                Ok(relation)
             }
-            let left_column = &left_columns[0];
 
-            let right_columns = egraph[subst[right_expr_var]].data.referenced_expr.as_ref();
-            let Some(right_columns) = right_columns else {
+            let Ok(left_columns) = prepare_columns(left_expr_var) else {
                 return false;
             };
-            if right_columns.len() != 1 {
+            let Ok(left_relation) = prepare_relation(&left_columns) else {
                 return false;
-            }
-            let right_column = &right_columns[0];
-
-            let left_column = match left_column {
-                Expr::Column(column) => column,
-                _ => return false,
             };
-            let right_column = match right_column {
-                Expr::Column(column) => column,
-                _ => return false,
+
+            let Ok(right_columns) = prepare_columns(right_expr_var) else {
+                return false;
+            };
+            let Ok(right_relation) = prepare_relation(&right_columns) else {
+                return false;
             };
 
             // Simple check that column expressions reference different join sides
-            let Some(left_relation) = left_column.relation.as_ref() else {
-                return false;
-            };
-            let Some(right_relation) = right_column.relation.as_ref() else {
-                return false;
-            };
             if left_relation == right_relation {
                 return false;
             }
 
-            let left_column = left_column.clone();
-
             // Don't check right, as it is already grouped
 
-            if !Self::are_join_members_supported(egraph, subst[left_members_var], [&left_column]) {
+            if !Self::are_join_members_supported(
+                egraph,
+                subst[left_members_var],
+                left_columns.iter(),
+            ) {
                 return false;
             }
 

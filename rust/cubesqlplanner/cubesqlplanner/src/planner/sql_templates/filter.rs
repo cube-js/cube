@@ -61,6 +61,22 @@ impl FilterTemplates {
         )
     }
 
+    pub fn time_not_in_range_filter(
+        &self,
+        column: String,
+        from_timestamp: String,
+        to_timestamp: String,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/time_not_in_range_filter",
+            context! {
+                column => column,
+                from_timestamp => from_timestamp,
+                to_timestamp => to_timestamp,
+            },
+        )
+    }
+
     pub fn in_where(
         &self,
         column: String,
@@ -100,26 +116,6 @@ impl FilterTemplates {
             &"filters/or_is_null_check",
             context! {
                 column => column,
-            },
-        )
-    }
-
-    pub fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
-        self.render.render_template(
-            &"expressions/add_interval",
-            context! {
-                date => date,
-                interval => interval
-            },
-        )
-    }
-
-    pub fn sub_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
-        self.render.render_template(
-            &"expressions/sub_interval",
-            context! {
-                date => date,
-                interval => interval
             },
         )
     }
@@ -211,7 +207,7 @@ impl FilterTemplates {
             },
         )?;
         self.render.render_template(
-            &"expressions/ilike",
+            &"tesseract/ilike",
             context! {
                 expr => column,
                 negated => not,

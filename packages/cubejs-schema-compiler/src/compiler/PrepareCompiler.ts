@@ -1,6 +1,8 @@
 import { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NativeInstance } from '@cubejs-backend/native';
 import { v4 as uuidv4 } from 'uuid';
+import { LRUCache } from 'lru-cache';
+import vm from 'vm';
 
 import { CubeValidator } from './CubeValidator';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
@@ -21,6 +23,7 @@ import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
 import { YamlCompiler } from './YamlCompiler';
 import { ViewCompilationGate } from './ViewCompilationGate';
+import type { ErrorReporter } from './ErrorReporter';
 
 export type PrepareCompilerOptions = {
   nativeInstance?: NativeInstance,
@@ -32,7 +35,12 @@ export type PrepareCompilerOptions = {
   standalone?: boolean;
   headCommitId?: string;
   adapter?: string;
+  compiledScriptCache?: LRUCache<string, vm.Script>;
 };
+
+export interface CompilerInterface {
+  compile: (cubes: any[], errorReporter: ErrorReporter) => void;
+}
 
 export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}) => {
   const nativeInstance = options.nativeInstance || new NativeInstance();
@@ -48,6 +56,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
   const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler);
+
+  const compiledScriptCache = options.compiledScriptCache || new LRUCache<string, vm.Script>({ max: 250 });
 
   const transpilers: TranspilerInterface[] = [
     new ValidationTranspiler(),
@@ -66,6 +76,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     preTranspileCubeCompilers: [cubeSymbols, cubeValidator],
     transpilers,
     viewCompilationGate,
+    compiledScriptCache,
     viewCompilers: [viewCompiler],
     cubeCompilers: [cubeEvaluator, joinGraph, metaTransformer],
     contextCompilers: [contextEvaluator],

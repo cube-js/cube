@@ -111,6 +111,15 @@ fn filter_push_down(
             )
         }
         LogicalPlan::Filter(Filter { predicate, input }) => {
+            // Current DataFusion version plans complex joins as Filter(CrossJoin)
+            // So for query like `SELECT ... FROM ... JOIN ... ON complex_condition WHERE predicate`
+            // Plan can look like Filter(predicate, Filter(join_condition, CrossJoin))
+            // This optimizer can mess with filter predicates, and break join detection later in rewrites
+            // So, for now, it just completely pessimizes plans like Filter(CrossJoin)
+            if let LogicalPlan::CrossJoin(_) = input.as_ref() {
+                return issue_filter(predicates, plan.clone());
+            }
+
             // When encountering a filter, collect it to our list of predicates,
             // remove the filter from the plan and continue down the plan.
 
@@ -120,7 +129,7 @@ fn filter_push_down(
             // let predicates = split_predicates(predicate)
             let predicates = vec![predicate.clone()]
                 .into_iter()
-                .chain(predicates.into_iter())
+                .chain(predicates)
                 .collect::<Vec<_>>();
             let mut pushable_predicates = vec![];
             let mut non_pushable_predicates = vec![];
@@ -326,10 +335,10 @@ fn filter_push_down(
                         optimizer_config,
                     )?),
                     on: on.clone(),
-                    join_type: join_type.clone(),
-                    join_constraint: join_constraint.clone(),
+                    join_type: *join_type,
+                    join_constraint: *join_constraint,
                     schema: schema.clone(),
-                    null_equals_null: null_equals_null.clone(),
+                    null_equals_null: *null_equals_null,
                 }),
             )
         }
@@ -483,8 +492,8 @@ fn filter_push_down(
             issue_filter(
                 predicates,
                 LogicalPlan::Limit(Limit {
-                    skip: skip.clone(),
-                    fetch: fetch.clone(),
+                    skip: *skip,
+                    fetch: *fetch,
                     input: Arc::new(filter_push_down(
                         optimizer,
                         input,
@@ -692,15 +701,10 @@ mod tests {
     };
     use datafusion::logical_plan::{binary_expr, col, count, lit, sum, LogicalPlanBuilder};
 
-    fn optimize(plan: &LogicalPlan) -> Result<LogicalPlan> {
+    fn optimize(plan: &LogicalPlan) -> LogicalPlan {
         let rule = FilterPushDown::new();
         rule.optimize(plan, &OptimizerConfig::new())
-    }
-
-    fn assert_optimized_plan_eq(plan: LogicalPlan, expected: &str) {
-        let optimized_plan = optimize(&plan).expect("failed to optimize plan");
-        let formatted_plan = format!("{:?}", optimized_plan);
-        assert_eq!(formatted_plan, expected);
+            .expect("failed to optimize plan")
     }
 
     #[test]
@@ -714,14 +718,7 @@ mod tests {
             .filter(col("t2.n2").gt(lit(5i32)))?
             .build()?;
 
-        let expected = "\
-              Projection: #t1.c1 AS n1, #t1.c3 AS n2, alias=t2\
-            \n  Filter: #t1.c3 > Int32(5)\
-            \n    Projection: #t1.c1, #t1.c3\
-            \n      TableScan: t1 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 
@@ -752,17 +749,7 @@ mod tests {
             .project(vec![col("c7"), col("c5"), col("c9")])?
             .build()?;
 
-        let expected = "\
-              Projection: #t3.c7, #t3.c5, #c9\
-            \n  Projection: #t3.c7, #t3.c5, #t3.c8 AS c9\
-            \n    Projection: #t2.c4 AS c7, #t2.c5, #t2.c6 AS c8, alias=t3\
-            \n      Projection: #t1.c1 AS c4, #t1.c2 AS c5, #t1.c3 AS c6, alias=t2\
-            \n        Filter: #t1.c2 > Int32(5) AND #t1.c2 <= Int32(10) AND #t1.c3 = Int32(0) AND NOT #t1.c1 < Int32(0)\
-            \n          Projection: #t1.c1, #t1.c2, #t1.c3\
-            \n            TableScan: t1 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 
@@ -782,18 +769,7 @@ mod tests {
             .project(vec![col("c1"), col("c2"), col("c3")])?
             .build()?;
 
-        let expected = "\
-              Projection: #t1.c1, #c2, #t1.c3\
-            \n  Filter: #t1.c1 > #t1.c3\
-            \n    Projection: #t1.c1, #c2, #t1.c3\
-            \n      Filter: #c2 = Int32(5)\
-            \n        Projection: #t1.c1, #t1.c2 + Int32(5) AS c2, #t1.c3\
-            \n          Filter: #t1.c3 < Int32(5)\
-            \n            Projection: #t1.c1, #t1.c2, #t1.c3\
-            \n              TableScan: t1 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 
@@ -847,16 +823,7 @@ mod tests {
             .filter(col("c3").eq(lit(0i32)))?
             .build()?;
 
-        let expected = "\
-              Projection: #t1.c1, #SUM(t1.c2) AS c2_sum, #t1.c3\
-            \n  Filter: #SUM(t1.c2) > Int32(10)\
-            \n    Aggregate: groupBy=[[#t1.c1, #t1.c3]], aggr=[[SUM(#t1.c2)]]\
-            \n      Filter: #t1.c3 = Int32(0)\
-            \n        Projection: #t1.c1, #t1.c2, #t1.c3\
-            \n          TableScan: t1 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 
@@ -897,14 +864,7 @@ mod tests {
             .filter(col("c3").eq(lit(5i32)))?
             .build()?;
 
-        let expected = "\
-              Sort: #t1.c2\
-            \n  Filter: #t1.c3 = Int32(5)\
-            \n    Projection: #t1.c1, #t1.c2, #t1.c3\
-            \n      TableScan: t1 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 
@@ -980,12 +940,12 @@ mod tests {
     #[test]
     fn test_filter_down_cross_join_right_one_row() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
-            LogicalPlanBuilder::from(make_sample_table("j1", vec!["c1"])?)
+            LogicalPlanBuilder::from(make_sample_table("j1", vec!["c1"], vec![])?)
                 .project(vec![col("c1")])?
                 .build()?,
         )
         .cross_join(
-            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["c2"])?)
+            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["c2"], vec![])?)
                 .project(vec![col("c2")])?
                 .aggregate(vec![] as Vec<Expr>, vec![count(lit(1u8))])?
                 .project_with_alias(
@@ -998,19 +958,7 @@ mod tests {
         .filter(col("c2").eq(lit(10i32)))?
         .build()?;
 
-        let expected = "\
-              Filter: #j2.c2 = Int32(10)\
-            \n  CrossJoin:\
-            \n    Filter: #j1.c1 = Int32(5)\
-            \n      Projection: #j1.c1\
-            \n        TableScan: j1 projection=None\
-            \n    Projection: #COUNT(UInt8(1)) AS c2, alias=j2\
-            \n      Aggregate: groupBy=[[]], aggr=[[COUNT(UInt8(1))]]\
-            \n        Projection: #j2.c2\
-            \n          TableScan: j2 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 

@@ -26,10 +26,10 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-      - name: Install Node.js 20.x
+      - name: Install Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -67,12 +67,13 @@ jobs:
         run: ./node_modules/.bin/lerna publish from-package --yes
 
   native_linux:
-    runs-on: ubuntu-20.04
+    # Please use minimal possible version of ubuntu, because it produces constraint on glibc
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [20]
+        node-version: [22]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         include:
@@ -151,7 +152,7 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.target }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
         os-version: ["macos-13"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
@@ -239,11 +240,11 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
         python-version: ["fallback"]
-        os-version: [windows-2019]
+        os-version: [windows-2022]
         include:
-          - os-version: windows-2019
+          - os-version: windows-2022
             package_target_arch: x64
             package_target_platform: win32
             package_target_libc: unknown
@@ -483,7 +484,7 @@ jobs:
             build-args: WITH_AVX2=1
             postfix: ""
             tag: "latest"
-          - os: self-hosted
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             platforms: linux/arm64
             build-args: WITH_AVX2=0
@@ -590,18 +591,18 @@ jobs:
           - aarch64-unknown-linux-gnu
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             executable_name: cubestored
             strip: true
             compress: false
           - target: x86_64-unknown-linux-musl
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             executable_name: cubestored
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
             compress: false
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             executable_name: cubestored
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
             strip: false
@@ -669,7 +670,7 @@ jobs:
           - aarch64-apple-darwin
         include:
           - target: x86_64-pc-windows-msvc
-            os: windows-2019
+            os: windows-2022
             executable_name: cubestored.exe
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
@@ -764,7 +765,7 @@ jobs:
 
   trigger-test-suites:
     name: Trigger test suites run
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: [docker-default]
     timeout-minutes: 15
     steps:
@@ -809,7 +810,7 @@ jobs:
 
   trigger-repo-sync:
     name: Trigger runtime repo
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: [docker-default, detect_branch]
     timeout-minutes: 15
     steps:

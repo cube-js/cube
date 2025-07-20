@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /configuration/overview
----
-
 # Overview
 
 Cube is configured via [environment variables][link-env-vars] and
@@ -21,7 +16,18 @@ to; changing that list would require the deployment to restart.
 
 </InfoBox>
 
+<ReferenceBox>
+
 See the [environment variables reference][link-env-vars] for all supported options.
+
+</ReferenceBox>
+
+<ReferenceBox>
+
+See [this recipe][ref-env-var-recipe] if you'd like to reference environment variables
+in code.
+
+</ReferenceBox>
 
 ### Cube Core
 
@@ -45,14 +51,19 @@ programmatically and applied dynamically while a Cube deployment is running.
 
 <InfoBox>
 
-For example, [`query_rewrite`](/reference/configuration/config#query_rewrite)
+For example, [`query_rewrite`](/product/configuration/reference/config#query_rewrite)
 provides a way to inspect, modify, or restrict every query that is being
 processed by Cube.
 
 </InfoBox>
 
 Configuration options take precedence over environment variables.
+
+<ReferenceBox>
+
 See the [configuration options reference][link-config] for all supported options.
+
+</ReferenceBox>
 
 ### `cube.py` and `cube.js` files
 
@@ -77,7 +88,7 @@ def query_rewrite(query: dict, ctx: dict) -> dict:
       'values': [ctx['securityContext']['order_id']]
     })
   return query
-  
+
 ```
 
 ```javascript
@@ -92,16 +103,36 @@ module.exports = {
         member: 'orders_view.id',
         operator: 'equals',
         values: [securityContext.order_id]
-      });
+      })
     }
-    return query;
-  },
-};
+    return query
+  }
+}
 ```
 
 </CodeTabs>
 
 Both ways are equivalent; when in doubt, use Python.
+
+Here is a minimal correct `cube.py` file. Note that the [`config`
+object][ref-cube-package-config] must be imported:
+
+```python
+from cube import config
+
+# Configuration goes here...
+```
+
+Here is a minimal correct `cube.js` file. Note that the `module.exports` object must be defined:
+
+```javascript
+module.exports = {
+  // Configuration goes here...
+}
+```
+
+You can read more about [Python][ref-python] and [JavaScript][ref-javascript] support
+in the dynamic data modeling section of the documentation.
 
 ### Cube Core
 
@@ -112,14 +143,15 @@ Docker container.
 ### Cube Cloud
 
 You can edit the configuration file by going into <Btn>Development Mode</Btn>
-and navigating to the <Btn>Data Model</Btn> page.
+and navigating to <Btn>[Data Model][ref-data-model]</Btn> or <Btn>[Visual
+Model][ref-visual-model]</Btn> pages.
 
 ## Runtimes and dependencies
 
 Cube uses Python and Node.js as runtime environments for the code of
 configuration and [dynamic data models][ref-dynamic-data-models]. You can look
 current versions up on GitHub: [Python][link-current-python-version],
-[Node.js][link-current-nodejs-version]. 
+[Node.js][link-current-nodejs-version].
 
 It's recommended to use `requirements.txt` and `package.json` files to
 specify dependencies for your Python and JavaScript code, respectively.
@@ -162,20 +194,22 @@ mode does the following:
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
   instead of throwing errors.
 
-[ref-ref-meta]: /product/apis-integrations/rest-api/reference#v1meta
-[ref-rest-api]: /product/apis-integrations/rest-api
-[ref-gql-api]: /product/apis-integrations/graphql-api
-[ref-sql-api]: /product/apis-integrations/sql-api
 [ref-folder-structure]:
   /product/data-modeling/syntax#folder-structure
-[link-config]: /reference/configuration/config
+[link-config]: /product/configuration/reference/config
 [link-dev-playground]: /product/workspace/playground
-[link-env-vars]: /reference/configuration/environment-variables
+[link-env-vars]: /product/configuration/reference/environment-variables
 [link-scheduled-refresh]:
-  /reference/data-model/pre-aggregations#scheduled_refresh
+  /product/data-modeling/reference/pre-aggregations#scheduled_refresh
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-custom-docker-image]: /product/deployment/core#extend-the-docker-image
 [link-docker-env-vars]: https://docs.docker.com/compose/environment-variables/set-environment-variables/
 [ref-mls]: /product/auth/member-level-security
 [link-current-python-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L13
 [link-current-nodejs-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L1
+[ref-data-model]: /product/workspace/data-model
+[ref-visual-model]: /product/workspace/visual-model
+[ref-python]: /product/data-modeling/dynamic/jinja#python
+[ref-javascript]: /product/data-modeling/dynamic/javascript
+[ref-cube-package-config]: /product/data-modeling/reference/cube-package#config-object
+[ref-env-var-recipe]: /product/configuration/recipes/environment-variables

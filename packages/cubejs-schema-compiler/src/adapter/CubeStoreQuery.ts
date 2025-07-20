@@ -1,8 +1,10 @@
 import moment from 'moment-timezone';
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { parseSqlInterval, getEnv } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseMeasure } from './BaseMeasure';
+import { BaseSegment } from './BaseSegment';
+import { BaseGroupFilter } from './BaseGroupFilter';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -30,6 +32,13 @@ type RollingWindow = {
 };
 
 export class CubeStoreQuery extends BaseQuery {
+  private readonly cubeStoreRollingWindowJoin: boolean;
+
+  public constructor(compilers, options) {
+    super(compilers, options);
+    this.cubeStoreRollingWindowJoin = getEnv('cubeStoreRollingWindowJoin');
+  }
+
   public newFilter(filter) {
     return new CubeStoreFilter(this, filter);
   }
@@ -55,15 +64,26 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string) {
+    if (this.cubeStoreRollingWindowJoin) {
+      return super.subtractInterval(date, interval);
+    }
     return `DATE_SUB(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
   public addInterval(date: string, interval: string) {
+    if (this.cubeStoreRollingWindowJoin) {
+      return super.addInterval(date, interval);
+    }
     return `DATE_ADD(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
   public timeGroupedColumn(granularity: string, dimension: string) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
+  }
+
+  // Temporary workaround to avoid checking for multistage in CubeStoreQuery, since that could lead to errors when HLL functions are present in the query.
+  public neverUseSqlPlannerPreaggregation() {
+    return true;
   }
 
   /**
@@ -134,13 +154,12 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public seriesSql(timeDimension) {
-    const values = timeDimension.timeSeries().map(
+    return timeDimension.timeSeries().map(
       ([from, to]) => `select to_timestamp('${from}') date_from, to_timestamp('${to}') date_to`
     ).join(' UNION ALL ');
-    return values;
   }
 
-  public concatStringsSql(strings) {
+  public concatStringsSql(strings: string[]) {
     return `CONCAT(${strings.join(', ')})`;
   }
 
@@ -148,7 +167,7 @@ export class CubeStoreQuery extends BaseQuery {
     return 'UNIX_TIMESTAMP()';
   }
 
-  public wrapSegmentForDimensionSelect(sql) {
+  public wrapSegmentForDimensionSelect(sql: string) {
     return `IF(${sql}, 1, 0)`;
   }
 
@@ -156,19 +175,19 @@ export class CubeStoreQuery extends BaseQuery {
     return `merge(${sql})`;
   }
 
-  public hllCardinalityMerge(sql) {
+  public hllCardinalityMerge(sql: string) {
     return `cardinality(merge(${sql}))`;
   }
 
-  public hllCardinality(sql) {
+  public hllCardinality(sql: string) {
     return `cardinality(${sql})`;
   }
 
-  public castToString(sql) {
+  public castToString(sql: string) {
     return `CAST(${sql} as VARCHAR)`;
   }
 
-  public countDistinctApprox(sql) {
+  public countDistinctApprox(sql: string) {
     // TODO: We should throw an error, but this gets called even when only `hllMerge` result is used.
     return `approx_distinct_is_unsupported_in_cubestore(${sql}))`;
   }
@@ -179,7 +198,7 @@ export class CubeStoreQuery extends BaseQuery {
     cumulativeMeasures: Array<[boolean, BaseMeasure]>,
     preAggregationForQuery: any
   ) {
-    if (!cumulativeMeasures.length) {
+    if (this.cubeStoreRollingWindowJoin || !cumulativeMeasures.length) {
       return super.regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery);
     }
     const cumulativeMeasuresWithoutMultiplied = cumulativeMeasures.map(([_, measure]) => measure);
@@ -192,9 +211,9 @@ export class CubeStoreQuery extends BaseQuery {
     const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <RollingWindow><unknown>null);
     const commonDateCondition =
       this.rollingWindowDateJoinCondition(maxRollingWindow.trailing, maxRollingWindow.leading, maxRollingWindow.offset);
-    const filters = this.segments.concat(this.filters).concat(
+    const filters: (BaseSegment | BaseFilter | BaseGroupFilter)[] = [...this.segments, ...this.filters, ...(
       timeDimension?.dateRange && this.dateFromStartToEndConditionSql(commonDateCondition, true, true) || []
-    );
+    )];
     const rollupGranularity = this.preAggregations?.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
     const granularityOverride = timeDimensionWithGranularity &&
       cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.minGranularity(a, b.windowGranularity()), timeDimensionWithGranularity.granularity) || rollupGranularity;
@@ -283,7 +302,7 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public overTimeSeriesForSelectRollup(cumulativeMeasures, otherMeasures, timeDimension, preAggregationForQuery) {
-    const rollupMeasures = this.preAggregations?.rollupMeasures(preAggregationForQuery);
+    const rollupMeasures = this.preAggregations.rollupMeasures(preAggregationForQuery);
     const renderedReference = rollupMeasures.map(measure => {
       const m = this.newMeasure(measure);
       const renderSql = () => {
@@ -327,5 +346,14 @@ export class CubeStoreQuery extends BaseQuery {
         renderedReference
       }
     );
+  }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.statements.time_series_select = '{% for time_item in seria  %}' +
+    'select to_timestamp(\'{{ time_item[0] }}\') date_from, to_timestamp(\'{{ time_item[1] }}\') date_to \n' +
+    '{% if not loop.last %} UNION ALL\n{% endif %}' +
+    '{% endfor %}';
+    return templates;
   }
 }

@@ -31,16 +31,19 @@ mod wrapper_pull_up;
 use crate::{
     compile::rewrite::{
         fun_expr, rewrite,
-        rewriter::{CubeRewrite, RewriteRules},
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::{
             replacer_flat_pull_up_node, replacer_flat_push_down_node, replacer_pull_up_node,
             replacer_push_down_node,
         },
         wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType,
+        WrapperReplacerContextInputDataSource,
     },
     config::ConfigObj,
-    transport::MetaContext,
+    singular_eclass,
+    transport::{DataSource, MetaContext},
 };
+use egg::{Subst, Var};
 use std::{fmt::Display, sync::Arc};
 
 pub struct WrapperRules {
@@ -183,5 +186,41 @@ impl WrapperRules {
             wrapper_pushdown_replacer(list_node, "?context"),
             wrapper_pullup_replacer(list_node, "?context"),
         )]);
+    }
+
+    fn get_data_source<'graph>(
+        egraph: &'graph CubeEGraph,
+        subst: &mut Subst,
+        input_data_source_var: Var,
+    ) -> Result<DataSource<'graph>, &'static str> {
+        let input_data_source = singular_eclass!(
+            egraph[subst[input_data_source_var]],
+            WrapperReplacerContextInputDataSource
+        );
+        let input_data_source =
+            input_data_source.ok_or("Non-singular eclass for pull up data source")?;
+        Ok(match input_data_source {
+            None => DataSource::Unrestricted,
+            Some(ds) => DataSource::Specific(ds),
+        })
+    }
+
+    fn can_rewrite_template(data_source: &DataSource, meta: &MetaContext, template: &str) -> bool {
+        let sql_generator = match data_source {
+            DataSource::Specific(data_source) => {
+                let Some(sql_generator) = meta.data_source_to_sql_generator.get(*data_source)
+                else {
+                    return false;
+                };
+                sql_generator
+            }
+            // TODO is it correct?
+            DataSource::Unrestricted => return true,
+        };
+
+        sql_generator
+            .get_sql_templates()
+            .templates
+            .contains_key(template)
     }
 }

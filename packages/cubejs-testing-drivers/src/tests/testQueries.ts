@@ -1,5 +1,6 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import { randomBytes } from 'crypto';
+import { get } from 'env-var';
 import { Client as PgClient } from 'pg';
 import { BaseDriver } from '@cubejs-backend/base-driver';
 import cubejs, { CubeApi } from '@cubejs-client/core';
@@ -25,6 +26,8 @@ type TestQueriesOptions = {
 export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
+
+    const isTesseractEnv = get('DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool();
 
     const fixtures = getFixtures(type, extendedEnv);
     let client: CubeApi;
@@ -65,7 +68,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
 
     function execute(name: string, test: () => Promise<void>) {
-      if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+      if (!isTesseractEnv && fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+        it.skip(name, test);
+      } else if (isTesseractEnv && fixtures.tesseractSkip && fixtures.tesseractSkip.indexOf(name) >= 0) {
         it.skip(name, test);
       } else {
         it(name, test);
@@ -73,7 +78,11 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
 
     function executePg(name: string, test: (connection: PgClient) => Promise<void>) {
-      if (!fixtures.cube.ports[1] || fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+      if (!isTesseractEnv && fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+        it.skip(name, () => {
+          // nothing to do
+        });
+      } else if (isTesseractEnv && fixtures.tesseractSkip && fixtures.tesseractSkip.indexOf(name) >= 0) {
         it.skip(name, () => {
           // nothing to do
         });
@@ -1483,6 +1492,23 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying BigECommerce: time series in rolling window', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.customersCountPrev1Month',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: {
+          'BigECommerce.orderDate': 'asc',
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('querying BigECommerce: null sum', async () => {
       const response = await client.load({
         measures: [
@@ -1525,6 +1551,19 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying BigECommerce: rolling window by 2 day without date range', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountBy2Day',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('querying BigECommerce: rolling window by 2 week', async () => {
       const response = await client.load({
         measures: [
@@ -1548,6 +1587,160 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           dimension: 'BigECommerce.orderDate',
           granularity: 'month',
           dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window by 2 month without date range', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountBy2Month',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window YTD (month)', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountYTD',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: [
+          ['BigECommerce.orderDate', 'asc'],
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window YTD (month + week)', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountYTD',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }, {
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'week',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: [
+          ['BigECommerce.orderDate', 'asc'],
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window YTD (month + week + no gran)', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountYTD',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }, {
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'week',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }, {
+          dimension: 'BigECommerce.orderDate',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: [
+          ['BigECommerce.orderDate', 'asc'],
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window YTD (month + week + day)', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountYTD',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-03-01'],
+        }, {
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'week',
+          dateRange: ['2020-01-01', '2020-03-01'],
+        }, {
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'day',
+          dateRange: ['2020-01-01', '2020-03-01'],
+        }],
+        order: [
+          ['BigECommerce.orderDate', 'asc'],
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window YTD (month + week + day + no gran)', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountYTD',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-03-01'],
+        }, {
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'week',
+          dateRange: ['2020-01-01', '2020-03-01'],
+        }, {
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'day',
+          dateRange: ['2020-01-01', '2020-03-01'],
+        }, {
+          dimension: 'BigECommerce.orderDate',
+          dateRange: ['2020-01-01', '2020-03-01'],
+        }],
+        order: [
+          ['BigECommerce.orderDate', 'asc'],
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window YTD without date range', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountYTD',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window YTD without granularity', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountYTD',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          dateRange: ['2020-01-01', '2020-03-01'],
         }],
       });
       expect(response.rawData()).toMatchSnapshot();
@@ -1607,6 +1800,89 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           granularity: 'month',
           dateRange: ['2020-01-01', '2020-12-31'],
         }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: filtering with possible casts', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalSales',
+        ],
+        filters: [
+          {
+            values: ['10'],
+            member: 'BigECommerce.sales',
+            operator: 'gte'
+          },
+          {
+            values: ['true'],
+            member: 'BigECommerce.returning',
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: {
+          'BigECommerce.orderDate': 'asc',
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce with Retail Calendar: totalCountRetailYearAgo', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.count',
+          'BigECommerce.totalCountRetailYearAgo',
+        ],
+        timeDimensions: [{
+          dimension: 'RetailCalendar.retail_date',
+          granularity: 'year',
+          dateRange: ['2020-02-02', '2021-02-01'],
+        }],
+        order: {
+          'RetailCalendar.retail_date': 'asc',
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.count',
+          'BigECommerce.totalCountRetailMonthAgo',
+        ],
+        timeDimensions: [{
+          dimension: 'RetailCalendar.retail_date',
+          granularity: 'month',
+          dateRange: ['2020-02-02', '2021-02-01'],
+        }],
+        order: {
+          'RetailCalendar.retail_date': 'asc',
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.count',
+          'BigECommerce.totalCountRetailWeekAgo',
+        ],
+        timeDimensions: [{
+          dimension: 'RetailCalendar.retail_date',
+          granularity: 'week',
+          dateRange: ['2020-02-02', '2021-03-07'],
+        }],
+        order: {
+          'RetailCalendar.retail_date': 'asc',
+        }
       });
       expect(response.rawData()).toMatchSnapshot();
     });
@@ -1752,6 +2028,19 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.rollingCountByLeading',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'two_mo_by_feb',
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension', async () => {
       const response = await client.load({
         measures: [
@@ -1854,7 +2143,7 @@ from
     from
       "public"."BigECommerce" "BigECommerce"
   `);
-      expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: reuse params', async (connection) => {
@@ -1889,7 +2178,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('simple_rollup');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Complex Rollup', async (connection) => {
@@ -1903,7 +2192,7 @@ from
     order by 1, 2, 3, 4
 
   `);
-      expect(res.rows).toMatchSnapshot('complex_rollup');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Rollup with aliases', async (connection) => {
@@ -1917,7 +2206,7 @@ from
     order by 1, 2, 3, 4
 
   `);
-      expect(res.rows).toMatchSnapshot('rollup_with_aliases');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Rollup over exprs', async (connection) => {
@@ -1931,7 +2220,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('rollup_over_exprs');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Nested Rollup', async (connection) => {
@@ -1950,7 +2239,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: Nested Rollup with aliases', async (connection) => {
@@ -1969,7 +2258,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup_with_aliases');
+      expect(res.rows).toMatchSnapshot();
     });
     executePg('SQL API: Nested Rollup over asterisk', async (connection) => {
       const res = await connection.query(`
@@ -1984,7 +2273,7 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup_over_asterisk');
+      expect(res.rows).toMatchSnapshot();
     });
     executePg('SQL API: Extended nested Rollup over asterisk', async (connection) => {
       const res = await connection.query(`
@@ -2003,7 +2292,7 @@ from
     ) q2 ORDER BY q2.order, q2.row DESC limit 100
 
   `);
-      expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asterisk');
+      expect(res.rows).toMatchSnapshot();
     });
 
     executePg('SQL API: metabase count cast to float32 from push down', async (connection) => {
@@ -2024,6 +2313,98 @@ from
         LIMIT 100
       `);
       expect(res.rows).toMatchSnapshot('nulls_first_last_sql_push_down');
+    });
+
+    executePg('SQL API: Timeshift measure from cube', async (connection) => {
+      const res = await connection.query(`
+        SELECT
+          DATE_TRUNC('month', orderDate) AS "orderDate",
+          MEASURE(totalQuantity) AS "totalQuantity",
+          MEASURE(totalQuantityPriorMonth) AS "totalQuantityPriorMonth"
+        FROM "ECommerce"
+        WHERE orderDate >= CAST('2020-01-01' AS DATE) AND orderDate < CAST('2021-01-01' AS DATE)
+        GROUP BY 1
+        ORDER BY 1 ASC NULLS FIRST;
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    executePg('SQL API: Rolling Window YTD (year + month + day + date_trunc equal)', async (connection) => {
+      // It's important to use day granularity - it tests for ambiguous names
+      const res = await connection.query(`
+        SELECT
+          DATE_TRUNC('year', orderDate) AS "orderDateY",
+          DATE_TRUNC('month', orderDate) AS "orderDateM",
+          DATE_TRUNC('day', orderDate) AS "orderDateD",
+          MEASURE(rollingCountYTD) AS "rollingCountYTD"
+        FROM "BigECommerce"
+        WHERE DATE_TRUNC('year', orderDate) = CAST('2020-01-01' AS DATE)
+        GROUP BY 1, 2, 3
+        ORDER BY 3 ASC NULLS FIRST;
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    executePg('SQL API: Rolling Window YTD (year + month + day + date_trunc IN)', async (connection) => {
+      // It's important to use day granularity - it tests for ambiguous names
+      const res = await connection.query(`
+        SELECT
+          DATE_TRUNC('year', orderDate) AS "orderDateY",
+          DATE_TRUNC('month', orderDate) AS "orderDateM",
+          DATE_TRUNC('day', orderDate) AS "orderDateD",
+          MEASURE(rollingCountYTD) AS "rollingCountYTD"
+        FROM "BigECommerce"
+        WHERE DATE_TRUNC('year', orderDate) IN (CAST('2020-01-01' AS DATE))
+        GROUP BY 1, 2, 3
+        ORDER BY 3 ASC NULLS FIRST;
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    executePg('SQL API: SQL push down push to cube quoted alias', async (connection) => {
+      const res = await connection.query(`
+        SELECT
+          (NOT ("t0"."$temp1_output" IS NULL)) AS "result"
+        FROM
+          "public"."ECommerce" "ECommerce"
+          LEFT JOIN (
+            SELECT
+              CAST("ECommerce"."customerName" AS TEXT) AS "customerName",
+              1 AS "$temp1_output",
+              MEASURE("ECommerce"."totalQuantity") AS "$__alias__0"
+            FROM "public"."ECommerce" "ECommerce"
+            GROUP BY 1
+            ORDER BY
+              3 DESC NULLS LAST,
+              1 ASC NULLS FIRST
+            LIMIT 3
+          ) "t0" ON (
+            CAST("ECommerce"."customerName" AS TEXT) IS NOT DISTINCT
+            FROM "t0"."customerName"
+          )
+        GROUP BY 1
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    executePg('SQL API: Date/time comparison with SQL push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT MEASURE(BigECommerce.rollingCountBy2Day)
+        FROM BigECommerce
+        WHERE BigECommerce.orderDate < CAST('2021-01-01' AS TIMESTAMP) AND
+              LOWER("city") = 'columbus'
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    executePg('SQL API: Date/time comparison with date_trunc with SQL push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT MEASURE(BigECommerce.rollingCountBy2Week)
+        FROM BigECommerce
+        WHERE date_trunc('day', BigECommerce.orderDate) < CAST('2021-01-01' AS TIMESTAMP) AND
+              LOWER("city") = 'columbus'
+      `);
+      expect(res.rows).toMatchSnapshot();
     });
   });
 }

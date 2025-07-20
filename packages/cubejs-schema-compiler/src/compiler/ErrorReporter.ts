@@ -28,7 +28,7 @@ interface File {
   content: string,
 }
 
-interface ErrorReporterOptions {
+export interface ErrorReporterOptions {
   logger: (msg: string) => void
 }
 

@@ -1,5 +1,6 @@
 import inflection from 'inflection';
 import R from 'ramda';
+import { notEmpty } from '@cubejs-backend/shared';
 import { UserError } from '../compiler';
 import { toSnakeCase } from './utils';
 
@@ -26,12 +27,12 @@ export type Dimension = {
 
 export type TableName = string | [string, string];
 
-type JoinRelationship = 'hasOne' | 'hasMany' | 'belongsTo';
+export type JoinRelationship = 'hasOne' | 'hasMany' | 'belongsTo';
 
 type ColumnsToJoin = {
   cubeToJoin: string;
   columnToJoin: string;
-  tableName: string;
+  tableName: TableName;
 };
 
 export type CubeDescriptorMember = {
@@ -45,11 +46,13 @@ export type CubeDescriptorMember = {
   isPrimaryKey?: boolean;
 };
 
-type Join = {
+export type Join = {
   thisTableColumn: string;
+  thisTableColumnIncludedAsDimension?: boolean;
   tableName: TableName;
   cubeToJoin: string;
   columnToJoin: string;
+  columnToJoinIncludedAsDimension?: boolean;
   relationship: JoinRelationship;
 };
 
@@ -109,7 +112,7 @@ export type DatabaseSchema = Record<string, { [key: string]: ColumnData[] }>;
 type TableData = {
   schema: string,
   table: string,
-  tableName: string;
+  tableName: TableName;
   tableDefinition: ColumnData[],
 };
 
@@ -119,7 +122,7 @@ type ScaffoldingSchemaOptions = {
 };
 
 export class ScaffoldingSchema {
-  private tableNamesToTables: { [key: string]: TableData[] } = {};
+  private tableNamesToTables: Record<string, TableData[]> = {};
 
   public constructor(
     private readonly dbSchema: DatabaseSchema,
@@ -195,7 +198,7 @@ export class ScaffoldingSchema {
       tableNames.map(tableName => {
         const [schema, table] = this.parseTableName(tableName);
         const tableDefinition = this.resolveTableDefinition(tableName);
-        const definition = {
+        const definition: TableData = {
           schema, table, tableDefinition, tableName
         };
         const tableizeName = inflection.tableize(this.fixCase(table));
@@ -234,7 +237,7 @@ export class ScaffoldingSchema {
     };
   }
 
-  protected parseTableName(tableName) {
+  protected parseTableName(tableName: TableName): [string, string] {
     let schemaAndTable;
     if (Array.isArray(tableName)) {
       schemaAndTable = tableName;
@@ -247,7 +250,7 @@ export class ScaffoldingSchema {
     return schemaAndTable;
   }
 
-  protected dimensions(tableDefinition): Dimension[] {
+  protected dimensions(tableDefinition: ColumnData[]): Dimension[] {
     return this.dimensionColumns(tableDefinition).map(column => {
       const res: Dimension = {
         name: column.name,
@@ -280,7 +283,7 @@ export class ScaffoldingSchema {
     return !column.name.match(new RegExp(idRegex, 'i')) && !!MEASURE_DICTIONARY.find(word => this.fixCase(column.name).endsWith(word));
   }
 
-  protected dimensionColumns(tableDefinition: any) {
+  protected dimensionColumns(tableDefinition: ColumnData[]): Array<ColumnData & { columnType?: string }> {
     const dimensionColumns = tableDefinition.filter(
       column => !column.name.startsWith('_') && ['string', 'boolean'].includes(this.columnType(column)) ||
         column.attributes?.includes('primaryKey') ||
@@ -307,7 +310,7 @@ export class ScaffoldingSchema {
     return value.toLocaleLowerCase();
   }
 
-  protected joins(tableName: TableName, tableDefinition: ColumnData[]) {
+  protected joins(tableName: TableName, tableDefinition: ColumnData[]): Join[] {
     const cubeName = (name: string) => (this.options.snakeCase ? toSnakeCase(name) : inflection.camelize(name));
 
     return R.unnest(tableDefinition
@@ -336,7 +339,7 @@ export class ScaffoldingSchema {
             return null;
           }
 
-          columnsToJoin = tablesToJoin.map<any>(definition => {
+          columnsToJoin = tablesToJoin.map(definition => {
             if (tableName === definition.tableName) {
               return null;
             }
@@ -350,14 +353,14 @@ export class ScaffoldingSchema {
               columnToJoin: columnForJoin.name,
               tableName: definition.tableName
             };
-          }).filter(R.identity);
+          }).filter(notEmpty);
         }
 
         if (!columnsToJoin.length) {
           return null;
         }
 
-        return columnsToJoin.map(columnToJoin => ({
+        return columnsToJoin.map<Join>(columnToJoin => ({
           thisTableColumn: column.name,
           tableName: columnToJoin.tableName,
           cubeToJoin: columnToJoin.cubeToJoin,
@@ -365,7 +368,7 @@ export class ScaffoldingSchema {
           relationship: 'belongsTo'
         }));
       })
-      .filter(R.identity)) as Join[];
+      .filter(notEmpty));
   }
 
   protected timeColumnIndex(column): number {

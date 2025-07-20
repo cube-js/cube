@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /cloud/configuration/deployment-types
----
-
 # Deployment types
 
 Cube Cloud provides you with three deployment types:
@@ -84,8 +79,8 @@ needs of your workload by adding more components as necessary; check the page on
 ## Production multi-cluster
 
 Production multi-cluster deployments are designed for demanding production
-workloads, high-scalability, high-availaility, and massive [multi-tenancy][ref-multitenancy]
-configurations, e.g., with more than 1,000 tenants.
+workloads, high-scalability, high-availaility, and large [multi-tenancy][ref-multitenancy]
+configurations, e.g., with more than 100 tenants.
 
 <SuccessBox>
 
@@ -136,7 +131,7 @@ for each tenant.
 
 The following implementation will make sure that all requests from a
 particular tenant are always routed to the same production cluster. This
-approach ensures that only one producton cluster keeps compiled data model
+approach ensures that only one production cluster keeps compiled data model
 cache for each tenant and serves its requests. It allows to reduce the
 footprint of the compiled data model cache on individual production clusters.
 
@@ -153,9 +148,9 @@ def context_to_app_id(ctx: dict) -> str:
 ```js
 module.exports = {
   contextToAppId: ({ securityContext }) => {
-    return `CUBE_APP_${securityContext.tenant_id}`;
+    return `CUBE_APP_${securityContext.tenant_id}`
   }
-};
+}
 ```
 
 </CodeTabs>
@@ -179,9 +174,9 @@ and select from the available options:
   src="https://ucarecdn.com/fbde6a1e-734a-4091-8edd-922dc1ee7e1c/"
 />
 
-[ref-ctx-to-app-id]: /reference/configuration/config#context_to_app_id
+[ref-ctx-to-app-id]: /product/configuration/reference/config#context_to_app_id
 [ref-limits]: /product/deployment/cloud/limits#resources
 [ref-scalability]: /product/deployment/cloud/scalability
-[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-multitenancy]: /product/configuration/multitenancy
 [ref-auto-sus]: /product/deployment/cloud/auto-suspension
 [ref-refresh-worker]: /product/deployment#refresh-worker

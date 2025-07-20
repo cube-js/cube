@@ -169,7 +169,7 @@ export class ClickHouseQuery extends BaseQuery {
     return null;
   }
 
-  public orderHashToString(hash) {
+  public override orderHashToString(hash: { id: string, desc: boolean }) {
     //
     // ClickHouse doesn't support order by index column, so map these to the alias names
     //
@@ -323,12 +323,24 @@ export class ClickHouseQuery extends BaseQuery {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 
+  public dimensionColumns(cubeAlias) {
+    // For the top-level SELECT statement, explicitly set the column alias.
+    // Clickhouse sometimes includes the "q_0" prefix in the column name, and this
+    // leads to errors during the result mapping.
+    if (cubeAlias === 'q_0') {
+      return this.dimensionAliasNames().map(alias => `${cubeAlias}.${alias} ${alias}`);
+    } else {
+      return super.dimensionColumns(cubeAlias);
+    }
+  }
+
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
     templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
+    delete templates.functions.PERCENTILECONT;
     delete templates.expressions.like_escape;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';

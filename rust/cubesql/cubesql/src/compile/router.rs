@@ -12,11 +12,11 @@ use crate::{
         DatabaseVariable, DatabaseVariablesToUpdate,
     },
     sql::{
+        auth_service::SqlAuthServiceAuthenticateRequest,
         dataframe,
         statement::{
-            ApproximateCountDistinctVisitor, CastReplacer, DateTokenNormalizeReplacer,
-            RedshiftDatePartReplacer, SensitiveDataSanitizer, ToTimestampReplacer,
-            UdfWildcardArgReplacer,
+            ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
+            SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
         },
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -447,12 +447,15 @@ impl QueryRouter {
                 })?
             {
                 self.state.set_user(Some(to_user.clone()));
+                let sql_auth_request = SqlAuthServiceAuthenticateRequest {
+                    protocol: "postgres".to_string(),
+                    method: "password".to_string(),
+                };
                 let authenticate_response = self
                     .session_manager
                     .server
                     .auth
-                    // TODO do we want to send actual password here?
-                    .authenticate(Some(to_user.clone()), None)
+                    .authenticate(sql_auth_request, Some(to_user.clone()), None)
                     .await
                     .map_err(|e| {
                         CompilationError::internal(format!("Error calling authenticate: {}", e))
@@ -461,8 +464,13 @@ impl QueryRouter {
                     .set_auth_context(Some(authenticate_response.context));
             } else {
                 return Err(CompilationError::user(format!(
-                    "{:?} is not allowed to switch to '{}'",
-                    auth_context, to_user
+                    "user '{}' is not allowed to switch to '{}'",
+                    auth_context
+                        .user()
+                        .as_ref()
+                        .map(|v| v.as_str())
+                        .unwrap_or("not specified"),
+                    to_user
                 )));
             }
         }
@@ -562,11 +570,15 @@ impl QueryRouter {
 
     async fn reauthenticate_if_needed(&self) -> CompilationResult<()> {
         if self.state.is_auth_context_expired() {
+            let sql_auth_request = SqlAuthServiceAuthenticateRequest {
+                protocol: "postgres".to_string(),
+                method: "password".to_string(),
+            };
             let authenticate_response = self
                 .session_manager
                 .server
                 .auth
-                .authenticate(self.state.user(), None)
+                .authenticate(sql_auth_request, self.state.user(), None)
                 .await
                 .map_err(|e| {
                     CompilationError::fatal(format!(
@@ -612,7 +624,6 @@ pub fn rewrite_statement(stmt: ast::Statement) -> ast::Statement {
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(stmt);
-    let stmt = DateTokenNormalizeReplacer::new().replace(stmt);
     let stmt = RedshiftDatePartReplacer::new().replace(stmt);
     let stmt = ApproximateCountDistinctVisitor::new().replace(stmt);
 
@@ -637,7 +648,7 @@ pub async fn convert_statement_to_cube_query(
 }
 
 pub async fn convert_sql_to_cube_query(
-    query: &String,
+    query: &str,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {

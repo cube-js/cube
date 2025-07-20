@@ -1,4 +1,4 @@
 module.exports = {
-  "aws": "AWS",
-  "azure": "Azure",
-}
+  aws: "AWS",
+  azure: "Azure",
+};

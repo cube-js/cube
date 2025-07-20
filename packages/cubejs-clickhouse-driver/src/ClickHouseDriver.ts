@@ -33,6 +33,8 @@ import sqlstring from 'sqlstring';
 
 import { transformRow, transformStreamRow } from './HydrationStream';
 
+const SUPPORTED_BUCKET_TYPES = ['s3'];
+
 const ClickhouseTypeToGeneric: Record<string, string> = {
   enum: 'text',
   string: 'text',
@@ -111,6 +113,7 @@ type ClickHouseDriverConfig = {
   database: string,
   requestTimeout: number,
   exportBucket: ClickhouseDriverExportAWS | null,
+  compression: { response?: boolean; request?: boolean },
   clickhouseSettings: ClickHouseSettings,
 };
 
@@ -142,7 +145,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const dataSource = config.dataSource ?? assertDataSource('default');
     const host = config.host ?? getEnv('dbHost', { dataSource });
     const port = config.port ?? getEnv('dbPort', { dataSource }) ?? 8123;
-    const protocol = config.protocol ?? getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:';
+    const protocol = config.protocol ?? (getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:');
     const url = `${protocol}//${host}:${port}`;
 
     const username = config.username ?? getEnv('dbUser', { dataSource });
@@ -150,8 +153,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const database = config.database ?? (getEnv('dbName', { dataSource }) as string) ?? 'default';
 
     // TODO this is a bit inconsistent with readOnly
-    this.readOnlyMode =
-      getEnv('clickhouseReadOnly', { dataSource }) === 'true';
+    this.readOnlyMode = getEnv('clickhouseReadOnly', { dataSource });
 
     // Expect that getEnv('dbQueryTimeout') will always return a value
     const requestTimeoutEnv: number = getEnv('dbQueryTimeout', { dataSource }) * 1000;
@@ -165,6 +167,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       exportBucket: this.getExportBucket(dataSource),
       readOnly: !!config.readOnly,
       requestTimeout,
+      compression: {
+        // Response compression can't be enabled for a user with readonly=1, as ClickHouse will not allow settings modifications for such user.
+        response: this.readOnlyMode ? false : getEnv('clickhouseCompression', { dataSource }),
+        request: getEnv('clickhouseCompression', { dataSource }),
+      },
       clickhouseSettings: {
         // If ClickHouse user's permissions are restricted with "readonly = 1",
         // change settings queries are not allowed. Thus, "join_use_nulls" setting
@@ -224,6 +231,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       username: this.config.username,
       password: this.config.password,
       database: this.config.database,
+      compression: this.config.compression,
       clickhouse_settings: this.config.clickhouseSettings,
       request_timeout: this.config.requestTimeout,
       max_open_connections: maxPoolSize,
@@ -260,7 +268,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
           abort_signal: signal,
         });
 
-        if (resultSet.response_headers['x-clickhouse-format'] !== format) {
+        // response_headers['x-clickhouse-format'] is optional, but if it exists,
+        // it should match the requested format.
+        if (resultSet.response_headers['x-clickhouse-format'] && resultSet.response_headers['x-clickhouse-format'] !== format) {
           throw new Error(`Unexpected x-clickhouse-format in response: expected ${format}, received ${resultSet.response_headers['x-clickhouse-format']}`);
         }
 
@@ -483,11 +493,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   protected getExportBucket(
     dataSource: string,
   ): ClickhouseDriverExportAWS | null {
-    const supportedBucketTypes = ['s3'];
-
     const requiredExportBucket: ClickhouseDriverExportRequiredAWS = {
       bucketType: getEnv('dbExportBucketType', {
-        supported: supportedBucketTypes,
+        supported: SUPPORTED_BUCKET_TYPES,
         dataSource,
       }),
       bucketName: getEnv('dbExportBucket', { dataSource }),
@@ -501,9 +509,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     };
 
     if (exportBucket.bucketType) {
-      if (!supportedBucketTypes.includes(exportBucket.bucketType)) {
+      if (!SUPPORTED_BUCKET_TYPES.includes(exportBucket.bucketType)) {
         throw new Error(
-          `Unsupported EXPORT_BUCKET_TYPE, supported: ${supportedBucketTypes.join(',')}`
+          `Unsupported EXPORT_BUCKET_TYPE, supported: ${SUPPORTED_BUCKET_TYPES.join(',')}`
         );
       }
 
@@ -523,11 +531,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public async isUnloadSupported() {
-    if (this.config.exportBucket) {
-      return true;
-    }
-
-    return false;
+    return !!this.config.exportBucket;
   }
 
   /**
@@ -582,18 +586,19 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     );
   }
 
-  public async unloadFromQuery(sql: string, params: unknown[], options: UnloadOptions): Promise<DownloadTableCSVData> {
+  public async unloadFromQuery(sql: string, params: unknown[], _options: UnloadOptions): Promise<DownloadTableCSVData> {
     if (!this.config.exportBucket) {
       throw new Error('Unload is not configured');
     }
 
     const types = await this.queryColumnTypes(`(${sql})`, params);
-    const exportPrefix = uuidv4();
+    const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
+    const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
     const formattedQuery = sqlstring.format(`
       INSERT INTO FUNCTION
          s3(
-             'https://${this.config.exportBucket.bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
+             'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
              '${this.config.exportBucket.keyId}',
              '${this.config.exportBucket.secretKey}',
              'CSV'
@@ -611,7 +616,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         },
         region: this.config.exportBucket.region,
       },
-      this.config.exportBucket.bucketName,
+      bucketName,
       exportPrefix,
     );
 

@@ -3,9 +3,11 @@ import {
   registerInterface,
   shutdownInterface,
   execSql,
+  sql4sql,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
+  Sql4SqlResponse,
 } from '@cubejs-backend/native';
 import type { ShutdownMode } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
@@ -27,6 +29,11 @@ export type SQLServerOptions = {
 
 export type SQLServerConstructorOptions = {
   gatewayPort?: number,
+};
+
+export type SqlAuthServiceAuthenticateRequest = {
+  protocol: string;
+  method: string;
 };
 
 export class SQLServer {
@@ -62,6 +69,10 @@ export class SQLServer {
     await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
   }
 
+  public async sql4sql(sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> {
+    return sql4sql(this.sqlInterfaceInstance!, sqlQuery, disablePostProcessing, securityContext);
+  }
+
   protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {
     return (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))
       || this.createDefaultCheckSqlAuthFn(options);
@@ -82,10 +93,14 @@ export class SQLServer {
       let { securityContext } = session;
 
       if (request.meta.changeUser && request.meta.changeUser !== session.user) {
+        const sqlAuthRequest: SqlAuthServiceAuthenticateRequest = {
+          protocol: request.meta.protocol,
+          method: 'password',
+        };
         const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
         if (canSwitch) {
           userForContext = request.meta.changeUser;
-          const current = await checkSqlAuth(request, userForContext, null);
+          const current = await checkSqlAuth({ ...request, ...sqlAuthRequest }, userForContext, null);
           securityContext = current.securityContext;
         } else {
           throw new Error(
@@ -101,16 +116,37 @@ export class SQLServer {
     this.sqlInterfaceInstance = await registerInterface({
       gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
-      checkAuth: async ({ request, user, password }) => {
-        const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
+      contextToApiScopes: async ({ securityContext }) => this.apiGateway.contextToApiScopesFn(
+        securityContext,
+        getEnv('defaultApiScope') || await this.apiGateway.contextToApiScopesDefFn()
+      ),
+      checkAuth: async ({ request, token }) => {
+        const { securityContext } = await this.apiGateway.checkAuthFn(request, token);
 
-        // Strip securityContext to improve speed deserialization
         return {
-          password: returnedPassword,
-          superuser: superuser || false,
-          securityContext,
-          skipPasswordCheck,
+          securityContext
         };
+      },
+      checkSqlAuth: async ({ request, user, password }) => {
+        try {
+          const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
+
+          return {
+            password: returnedPassword,
+            superuser: superuser || false,
+            securityContext,
+            skipPasswordCheck,
+          };
+        } catch (e) {
+          this.apiGateway.log({
+            type: 'Auth Error',
+            protocol: (request as any).protocol,
+            method: (request as any).method,
+            apiType: 'sql',
+            error: (e as Error).stack || (e as Error).toString(),
+          });
+          throw e;
+        }
       },
       meta: async ({ request, session, onlyCompilerId }) => {
         const context = await this.apiGateway.contextByReq(<any> request, session.securityContext, request.id);

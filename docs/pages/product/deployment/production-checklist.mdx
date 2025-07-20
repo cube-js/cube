@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /deployment/production-checklist
----
-
 # Production checklist
 
 <InfoBox>
@@ -139,24 +134,29 @@ partition pruning to optimize queries. `EXPLAIN ANALYZE` can be used to see
 scanned partitions involved in a Cube Store query. Cube Cloud ballpark
 performance numbers can differ as it has different Cube runtime.
 
+## Optimize usage
+
+<ReferenceBox>
+
+See [this recipe][ref-data-store-cost-saving-guide] to learn how to optimize
+data source usage.
+
+</ReferenceBox>
+
+
 [blog-migrate-to-cube-cloud]:
   https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
-[link-caddy]: https://caddyserver.com/
 [link-cube-cloud]: https://cubecloud.dev
 [link-cubejs-dev-vs-prod]: /product/configuration#development-mode
 [link-k8s-healthcheck-api]:
   https://kubernetes.io/docs/reference/using-api/health-checks/
-[link-kong]: https://konghq.com/kong/
-[link-nginx]: https://www.nginx.com/
-[link-nginx-docs]: https://nginx.org/en/docs/http/configuring_https_servers.html
 [ref-config-connect-db]: /connecting-to-the-database
 [ref-caching-cubestore]: /product/caching/running-in-production
-[ref-conf-ref-env-cachequeue-driver]:
-  /reference/configuration/environment-variables#cubejs_cache_and_queue_driver
-[ref-conf-preaggs-schema]: /reference/configuration/config#pre_aggregations_schema
-[ref-env-vars]: /reference/configuration/environment-variables
-[ref-schema-ref-preaggs]: /reference/data-model/pre-aggregations
+[ref-conf-preaggs-schema]: /product/configuration/reference/config#pre_aggregations_schema
+[ref-env-vars]: /product/configuration/reference/environment-variables
+[ref-schema-ref-preaggs]: /product/data-modeling/reference/pre-aggregations
 [ref-sec-ctx]: /product/auth/context
-[ref-config-jwt]: /reference/configuration/config#jwt
+[ref-config-jwt]: /product/configuration/reference/config#jwt
 [ref-api-readyz]: /product/apis-integrations/rest-api/reference#readyz
 [ref-api-livez]: /product/apis-integrations/rest-api/reference#livez
+[ref-data-store-cost-saving-guide]: /product/configuration/recipes/data-store-cost-saving-guide

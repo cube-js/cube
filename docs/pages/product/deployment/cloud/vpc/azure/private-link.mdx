@@ -1,0 +1,75 @@
+# Connecting to your VNet using Azure Private Link
+
+[Azure Private Link][azure-docs-private-link] enables you to access Azure PaaS services and Azure hosted customer-owned/partner services over a private endpoint in your virtual network.
+To set up a Private Link connection between Cube Cloud Dedicated Infrastructure and your own VNet,
+you'll need to prepare a Private Link Service,
+share service details with the Cube team, and approve the incoming connection request.
+
+## Preparing the Private Link Service
+
+There are two common scenarios for preparing the Private Link Service:
+- Connecting to a service in your Azure infrastructure
+- Connecting to a service provided by a third party such as Snowflake, Databricks, Confluent Cloud, etc.
+
+In the case of your own infrastructure, please follow the [official Azure documentation][azure-docs-private-link-service] to configure the Private Link Service
+behind a standard Azure Load Balancer.
+
+If your data source is hosted in a third-party infrastructure, please follow the vendor's documentation
+for creating and managing a Private Link Service.
+
+## Configuring Service Visibility
+
+Azure Private Link Service enables you to control the visibility of your private endpoint. You'll need to configure
+access permissions to allow Cube Cloud to connect to your service.
+
+To allow Cube Cloud access, please go to <Btn>Azure Portal</Btn> -> <Btn>Private Link Services</Btn> -> <Btn>Your service</Btn> -> <Btn>Manage visibility</Btn>
+and add the following subscription ID to the allowed list: `cd69336e-c628-4a88-a56e-86900a0df732`
+
+Alternatively, you can configure auto-approval for faster connection establishment by adding the same subscription ID
+to the auto-approval list under <Btn>Manage auto-approval</Btn>.
+
+## Gathering required information
+
+To request establishing a Private Link connection, please share the following information with the Cube team:
+
+- **Private Link Service Resource ID** (such as `/subscriptions/abc123/resourceGroups/myResourceGroup/providers/Microsoft.Network/privateLinkServices/myservice`)
+- **Reference Name** for the record (such as "Snowflake-prod" or "databricks-dev")
+- **Ports**: a list of ports that will be accessed through this connection
+- **DNS Name** (optional): an internal DNS name of the upstream service in case SSL needs to be supported
+- **Dedicated Infrastructure Region:** Private Link requires Cube to be hosted in
+    [dedicated infrastructure][dedicated-infra]. Please specify what region the Cube Cloud
+    dedicated infrastructure should be hosted in.
+
+If a DNS name is provided, an internal DNS record will be created pointing at the established Private Link
+connection, and the service will be addressable by that name inside the Cube Cloud infrastructure.
+
+## Approving the connection
+
+The connection approval process depends on your visibility configuration:
+
+### Manual Approval
+If you haven't configured auto-approval, the Cube Cloud team will notify you once the Private Endpoint connection request is sent. You can approve it by:
+
+1. Going to <Btn>Azure Portal</Btn> -> <Btn>Private Link Center</Btn> -> <Btn>Private Link Services</Btn> -> <Btn>Your Service</Btn> -> <Btn>Private endpoint connections</Btn>
+2. Finding the pending connection from Cube Cloud
+3. Clicking <Btn>Approve</Btn> and optionally providing an approval message
+
+Alternatively, you can approve the connection from the resource itself if it supports Private Link natively (e.g., Storage Accounts, SQL Databases).
+
+### Auto-Approval
+If you've added Cube Cloud's subscription ID to the auto-approval list, the connection will be automatically approved
+upon creation, and no manual action is required.
+
+## Using the connection
+
+Once the connection is established, you can access your data source by addressing it either via the
+supplied DNS Name or an Azure internal DNS name returned to you by the Cube team.
+
+## Supported Regions
+
+Private Link connections are supported in all Azure regions where Cube Cloud dedicated infrastructure is available.
+The Private Link Service and Private Endpoint must be in the same region as the Cube Cloud infrastructure.
+
+[azure-docs-private-link]: https://docs.microsoft.com/azure/private-link/
+[azure-docs-private-link-service]: https://docs.microsoft.com/azure/private-link/create-private-link-service-portal
+[dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure

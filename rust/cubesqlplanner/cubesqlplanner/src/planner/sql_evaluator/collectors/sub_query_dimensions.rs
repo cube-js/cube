@@ -1,3 +1,5 @@
+use crate::cube_bridge::join_definition::JoinDefinition;
+use crate::planner::planners::JoinPlanner;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{DimensionSymbol, MemberSymbol, TraversalVisitor};
 use crate::planner::{BaseDimension, BaseMember};
@@ -18,16 +20,18 @@ impl SubQueryDimensionsCollector {
 
     pub fn extract_result(self) -> Vec<Rc<MemberSymbol>> {
         self.sub_query_dimensions
+            .into_iter()
+            .unique_by(|m| m.full_name())
+            .collect()
     }
 
     fn check_dim_has_measures(&self, dim: &DimensionSymbol) -> bool {
         for dep in dim.get_dependencies().iter() {
-            match dep.as_ref() {
-                MemberSymbol::Measure(_) => return true,
-                _ => {}
+            if let MemberSymbol::Measure(_) = dep.as_ref() {
+                return true;
             }
         }
-        return false;
+        false
     }
 }
 
@@ -60,19 +64,29 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
 
 pub fn collect_sub_query_dimensions_from_members(
     members: &Vec<Rc<dyn BaseMember>>,
+    join_planner: &JoinPlanner,
+    join: &Rc<dyn JoinDefinition>,
     query_tools: Rc<QueryTools>,
 ) -> Result<Vec<Rc<BaseDimension>>, CubeError> {
     let symbols = members.iter().map(|m| m.member_evaluator()).collect_vec();
-    collect_sub_query_dimensions_from_symbols(&symbols, query_tools)
+    collect_sub_query_dimensions_from_symbols(&symbols, join_planner, join, query_tools)
 }
 
 pub fn collect_sub_query_dimensions_from_symbols(
     members: &Vec<Rc<MemberSymbol>>,
+    join_planner: &JoinPlanner,
+    join: &Rc<dyn JoinDefinition>,
     query_tools: Rc<QueryTools>,
 ) -> Result<Vec<Rc<BaseDimension>>, CubeError> {
     let mut visitor = SubQueryDimensionsCollector::new();
     for member in members.iter() {
         visitor.apply(&member, &())?;
+    }
+    for join_item in join.joins()? {
+        let condition = join_planner.compile_join_condition(join_item.clone())?;
+        for dep in condition.get_dependencies() {
+            visitor.apply(&dep, &())?;
+        }
     }
     visitor
         .extract_result()

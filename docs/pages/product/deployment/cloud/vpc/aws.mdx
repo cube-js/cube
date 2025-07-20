@@ -1,138 +1,15 @@
----
-redirect_from:
-  - /cloud/configuration/connecting-with-a-vpc/aws
----
-
 # Connecting with a VPC on AWS
 
-To connect with a VPC on AWS, you need to collect the necessary information and
-hand it over to your Cube Cloud representative. Next, you'll have to accept a
-VPC peering request sent by Cube Cloud. Finally, you'll need to configure
-security groups and route tables to ensure Cube Cloud can connect to your data
-source.
+[Dedicated infrastructure][dedicated-infrastructure] in Cube Cloud comes with
+an option of setting up a direct network connection between
+an AWS VPC on the Cube Cloud side and your own VPC(s). Such a connection allows you to
+access internal datasources without the need to expose any ports publicly.
 
-## Prerequisites
+On AWS, Cube Cloud supports two main ways of establishing a private network connection:
 
-To allow Cube Cloud to connect to a [VPC on AWS][aws-docs-vpc], the following
-information is required:
+- [AWS PrivateLink][aws-private-link]
+- [VPC Peering][aws-vpc-peering]
 
-- **AWS Account ID:** The AWS account ID of the VPC owner. This can be found in
-  the top-right corner of [the AWS Console][aws-console].
-- **AWS Region:** [The AWS region][aws-docs-regions] that the VPC resides in.
-- **AWS VPC ID:** The ID of the VPC that Cube Cloud will connect to, for
-  example, `vpc-0099aazz`
-- **AWS VPC CIDR:** The [CIDR block][wiki-cidr-block] of the VPC that Cube Cloud
-  will connect to, for example, `10.0.0.0/16`
-
-## Setup
-
-### VPC Peering Request
-
-After receiving the information above, Cube Cloud will send a [VPC peering
-request][aws-docs-vpc-peering] that must be accepted. This can be done either
-through the [AWS Web Console][aws-console] or through an infrastructure-as-code
-tool.
-
-To [accept the VPC peering request][aws-docs-vpc-peering-accept] through the AWS
-Web Console, follow the instructions below:
-
-1.  Open the [Amazon VPC console](https://console.aws.amazon.com/vpc/).
-
-  <WarningBox>
-
-    Ensure you have the necessary permissions to accept a VPC peering request. If
-    you are unsure, please contact your AWS administrator.
-
-  </WarningBox>
-
-2.  Use the Region selector to choose the Region of the accepter VPC.
-
-3.  In the navigation pane, choose <Btn>Peering connections</Btn>.
-
-4.  Select the pending VPC peering connection (the status should be
-    `pending-acceptance`), then choose <Btn>Actions</Btn>, followed by 
-    ​<Btn>Accept request</Btn>.
-
-  <WarningBox>
-
-    Ensure the peering request is from Cube Cloud by checking that the **AWS account
-    ID**, **region** and **VPC IDs** match those provided by your CSM.
-
-  </WarningBox>
-
-5.  When prompted for confirmation, choose <Btn>Accept request</Btn>.
-
-6.  Choose <Btn>Modify my route tables now</Btn> to add a route to the VPC route
-    table so that you can send and receive traffic across the peering
-    connection.
-
-<InfoBox>
-
-For more information about peering connection lifecycle statuses, check out the
-[VPC peering connection lifecycle on AWS][aws-docs-vpc-peering-lifecycle].
-
-</InfoBox>
-
-### Updating security groups
-
-The initial VPC setup will not allow traffic from Cube Cloud; this is because
-[the security group][aws-docs-vpc-security-group] for the database will need to
-allow access from the Cube Cloud CIDR block.
-
-This can be achieved by adding a new security group rule:
-
-| Protocol | Port Range | Source/Destination                            |
-| -------- | ---------- | --------------------------------------------- |
-| TCP      | 3306       | The Cube Cloud CIDR block for the AWS region. |
-
-### Update route tables
-
-The final step is to update route tables in your VPC to allow traffic from Cube
-Cloud to reach your database. The Cube Cloud CIDR block must be added to the
-route tables of all subnets that connect to the database. To do this, follow the
-instructions on [the AWS documentation][aws-docs-vpc-peering-routing].
-
-## Troubleshooting
-
-Database connection issues with misconfigured VPCs often manifest as connection
-timeouts. If you are experiencing connection issues, please check the following:
-
-- Verify that
-  [all security groups allow traffic](#setup-updating-security-groups) from the
-  Cube Cloud provided CIDR block.
-- Verify that
-  [a route exists to the Cube Cloud provided CIDR block](#setup-update-route-tables)
-  from the subnets that connect to the database.
-
-## Using dedicated pre-aggregation storage
-
-On the Enterprise Premier product tier, you get an option to supply your own S3 bucket to
-be used as an underlying storage for Cube Store pre-aggregated data. This
-allows you to keep all data at-rest fully within your infrastructure while
-still leveraging the full power of the Cube Cloud for managed compute.
-
-To activate this option, simply create an S3 bucket and generate a new AWS
-Access Key that would allow full bucket access for Cube Cloud. After it's done,
-request the dedicated pre-aggregation storage to be activated from your
-Customer Success Manager and share with them the following:
-
-- **AWS Access Key Id**
-- **AWS Secret Access Key**
-- **S3 Bucket ARN**
-
-[aws-console]: https://console.aws.amazon.com/
-[aws-docs-regions]:
-  https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
-[aws-docs-vpc]:
-  https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html
-[aws-docs-vpc-peering-accept]:
-  https://docs.aws.amazon.com/vpc/latest/peering/create-vpc-peering-connection.html#different-account-different-region
-[aws-docs-vpc-peering-lifecycle]:
-  https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-basics.html#vpc-peering-lifecycle
-[aws-docs-vpc-peering-routing]:
-  https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html
-[aws-docs-vpc-peering]:
-  https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html
-[aws-docs-vpc-security-group]: https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html
-[wiki-cidr-block]:
-  https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_blocks
+[dedicated-infrastructure]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
+[aws-private-link]: /product/deployment/cloud/vpc/aws/private-link
+[aws-vpc-peering]: /product/deployment/cloud/vpc/aws/vpc-peering

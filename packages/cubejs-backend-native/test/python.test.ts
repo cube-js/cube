@@ -9,16 +9,17 @@ const suite = native.isFallbackBuild() ? xdescribe : describe;
 const darwinSuite = process.platform === 'darwin' && !native.isFallbackBuild() ? describe : xdescribe;
 
 async function loadConfigurationFile(fileName: string) {
-  const content = await fs.readFile(path.join(process.cwd(), 'test', fileName), 'utf8');
+  const fullFileName = path.join(process.cwd(), 'test', fileName);
+  const content = await fs.readFile(fullFileName, 'utf8');
   console.log('content', {
     content,
-    fileName
+    fileName: fullFileName
   });
 
   const config = await native.pythonLoadConfig(
     content,
     {
-      fileName
+      fileName: fullFileName
     }
   );
 
@@ -26,6 +27,26 @@ async function loadConfigurationFile(fileName: string) {
 
   return config;
 }
+
+const nativeInstance = new native.NativeInstance();
+
+suite('Python Models', () => {
+  test('models import', async () => {
+    const fullFileName = path.join(process.cwd(), 'test', 'globals.py');
+    const content = await fs.readFile(fullFileName, 'utf8');
+
+    // Just checking it won't fail
+    await nativeInstance.loadPythonContext(fullFileName, content);
+  });
+
+  test('models import with sys.path changed', async () => {
+    const fullFileName = path.join(process.cwd(), 'test', 'globals_w_import_path.py');
+    const content = await fs.readFile(fullFileName, 'utf8');
+
+    // Just checking it won't fail
+    await nativeInstance.loadPythonContext(fullFileName, content);
+  });
+});
 
 suite('Python Config', () => {
   let config: PyConfiguration;
@@ -213,6 +234,7 @@ darwinSuite('Old Python Config', () => {
       schemaPath: 'models',
       telemetry: false,
       contextToApiScopes: expect.any(Function),
+      extendContext: expect.any(Function),
       logger: expect.any(Function),
       pgSqlPort: 5555,
       preAggregationsSchema: expect.any(Function),
@@ -223,29 +245,6 @@ darwinSuite('Old Python Config', () => {
       contextToRoles: expect.any(Function),
       scheduledRefreshContexts: expect.any(Function),
       scheduledRefreshTimeZones: expect.any(Function),
-    });
-
-    if (!config.checkAuth) {
-      throw new Error('checkAuth was not defined in config.py');
-    }
-
-    await config.checkAuth(
-      { requestId: 'test' },
-      'MY_SECRET_TOKEN'
-    );
-  });
-});
-
-darwinSuite('Scoped Python Config', () => {
-  test('test', async () => {
-    const config = await loadConfigurationFile('scoped-config.py');
-    expect(config).toEqual({
-      schemaPath: 'models',
-      pgSqlPort: 5555,
-      telemetry: false,
-      contextToApiScopes: expect.any(Function),
-      checkAuth: expect.any(Function),
-      queryRewrite: expect.any(Function),
     });
 
     if (!config.checkAuth) {

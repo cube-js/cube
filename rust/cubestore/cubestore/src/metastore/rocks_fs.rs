@@ -1,16 +1,15 @@
 use crate::config::ConfigObj;
 use crate::metastore::snapshot_info::SnapshotInfo;
 use crate::metastore::{RocksStore, RocksStoreDetails, WriteBatchContainer};
-use crate::remotefs::RemoteFs;
+use crate::remotefs::ExtendedRemoteFs;
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::cube_ext;
 use futures::future::join_all;
-use itertools::Itertools;
+use futures::StreamExt;
 use log::{error, info};
 use regex::Regex;
-use std::collections::BTreeSet;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, BinaryHeap, HashSet};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -53,37 +52,43 @@ pub trait MetaStoreFs: Send + Sync {
 
 #[derive(Clone)]
 pub struct BaseRocksStoreFs {
-    remote_fs: Arc<dyn RemoteFs>,
+    remote_fs: Arc<dyn ExtendedRemoteFs>,
     name: &'static str,
     minimum_snapshots_count: u64,
     snapshots_lifetime: u64,
+    // A copy of the upload-concurrency config -- we multiply this for our deletes.
+    snapshots_deletion_batch_size: u64,
 }
 
 impl BaseRocksStoreFs {
     pub fn new_for_metastore(
-        remote_fs: Arc<dyn RemoteFs>,
+        remote_fs: Arc<dyn ExtendedRemoteFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         let minimum_snapshots_count = config.minimum_metastore_snapshots_count();
         let snapshots_lifetime = config.metastore_snapshots_lifetime();
+        let snapshots_deletion_batch_size = config.snapshots_deletion_batch_size();
         Arc::new(Self {
             remote_fs,
             name: "metastore",
             minimum_snapshots_count,
             snapshots_lifetime,
+            snapshots_deletion_batch_size,
         })
     }
     pub fn new_for_cachestore(
-        remote_fs: Arc<dyn RemoteFs>,
+        remote_fs: Arc<dyn ExtendedRemoteFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
         let minimum_snapshots_count = config.minimum_cachestore_snapshots_count();
         let snapshots_lifetime = config.cachestore_snapshots_lifetime();
+        let snapshots_deletion_batch_size = config.snapshots_deletion_batch_size();
         Arc::new(Self {
             remote_fs,
             name: "cachestore",
             minimum_snapshots_count,
             snapshots_lifetime,
+            snapshots_deletion_batch_size,
         })
     }
 
@@ -97,7 +102,7 @@ impl BaseRocksStoreFs {
         Ok(meta_store_path)
     }
 
-    pub fn remote_fs(&self) -> Arc<dyn RemoteFs> {
+    pub fn remote_fs(&self) -> Arc<dyn ExtendedRemoteFs> {
         self.remote_fs.clone()
     }
 
@@ -135,77 +140,200 @@ impl BaseRocksStoreFs {
 
         Ok(upload_results)
     }
-    pub async fn delete_old_snapshots(&self) -> Result<Vec<String>, CubeError> {
-        let existing_metastore_files = self.remote_fs.list(format!("{}-", self.name)).await?;
-        let candidates = existing_metastore_files
-            .iter()
-            .filter_map(|existing| {
-                let path = existing.split("/").nth(0).map(|p| {
-                    u128::from_str(
-                        &p.replace(&format!("{}-", self.name), "")
-                            .replace("-index-logs", "")
-                            .replace("-logs", ""),
-                    )
-                });
-                if let Some(Ok(millis)) = path {
-                    Some((existing, millis))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+
+    // Currently, no longer used except by tests.
+    #[cfg(test)]
+    pub async fn list_files_by_snapshot(
+        remote_fs: &dyn ExtendedRemoteFs,
+        name: &str,
+    ) -> Result<std::collections::HashMap<u128, Vec<String>>, CubeError> {
+        let existing_metastore_files = remote_fs.list(format!("{}-", name)).await?;
+        // Log an info statement so that we can rule out the filename list itself being too large for memory.
+        log::info!(
+            "Listed existing {} files, count = {}",
+            name,
+            existing_metastore_files.len()
+        );
+        let mut snapshot_map = std::collections::HashMap::<u128, Vec<String>>::new();
+        for existing in existing_metastore_files.into_iter() {
+            let path = existing.split("/").nth(0).map(|p| {
+                u128::from_str(
+                    &p.replace(&format!("{}-", name), "")
+                        .replace("-index-logs", "")
+                        .replace("-logs", ""),
+                )
+            });
+            if let Some(Ok(millis)) = path {
+                snapshot_map
+                    .entry(millis)
+                    .or_insert(Vec::new())
+                    .push(existing);
+            }
+        }
+        Ok(snapshot_map)
+    }
+
+    fn metastore_file_snapshot_number(
+        remote_prefix: &String,
+        path_to_file_in_metastore: &String,
+    ) -> Option<u128> {
+        let p = path_to_file_in_metastore.split("/").nth(0)?;
+        u128::from_str(
+            &p.replace(remote_prefix, "")
+                .replace("-index-logs", "")
+                .replace("-logs", ""),
+        )
+        .ok()
+    }
+
+    pub async fn delete_old_snapshots(&self) -> Result<(), CubeError> {
+        // We do two passes, to avoid building a giant list of metastore files that might cause
+        // memory exhaustion.  The first pass figures out what snapshots we want to delete:  all but
+        // the `min_snapshots_count` most recent, but only those before `cutoff_time_ms`.
+
+        // We assume `list_by_page` does not stream file names in order.
 
         let lifetime_ms = (self.snapshots_lifetime as u128) * 1000;
-        let min_snapshots_count = self.minimum_snapshots_count as usize;
+        // Force min_snapshots_count to be nonzero.
+        let min_snapshots_count: usize = Ord::max(1, self.minimum_snapshots_count as usize);
 
-        let mut snapshots_list = candidates
-            .iter()
-            .map(|(_, ms)| ms.to_owned())
-            .unique()
-            .collect::<Vec<_>>();
-        snapshots_list.sort_unstable_by(|a, b| b.cmp(a));
+        let cutoff_time_ms: u128 = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+            - lifetime_ms;
 
-        let snapshots_to_delete = snapshots_list
-            .into_iter()
-            .skip(min_snapshots_count)
-            .filter(|ms| {
-                SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis()
-                    - ms
-                    > lifetime_ms
-            })
-            .collect::<HashSet<_>>();
+        let remote_prefix = format!("{}-", &self.name);
 
-        if !snapshots_to_delete.is_empty() {
-            let to_delete = candidates
-                .into_iter()
-                .filter_map(|(path, ms)| {
-                    if snapshots_to_delete.contains(&ms) {
-                        Some(path.to_owned())
-                    } else {
-                        None
+        // A priority queue with element uniqueness maintained by `snapshots_hash`, which has the
+        // same set of values.  Contains the top `min_snapshots_count` values.
+        let mut snapshots_priority_queue = BinaryHeap::<std::cmp::Reverse<u128>>::new();
+        let mut snapshots_hash = HashSet::<u128>::new();
+
+        let mut deletable_snapshot_present = false;
+        let mut files_count: i64 = 0;
+        {
+            let mut page_stream = self.remote_fs.list_by_page(remote_prefix.clone()).await?;
+
+            while let Some(names) = StreamExt::next(&mut page_stream).await {
+                let existing_metastore_files = names?;
+                files_count += existing_metastore_files.len() as i64;
+
+                for existing in existing_metastore_files {
+                    let Some(millis) =
+                        Self::metastore_file_snapshot_number(&remote_prefix, &existing)
+                    else {
+                        continue;
+                    };
+
+                    if snapshots_hash.contains(&millis) {
+                        // Maintains uniqueness in snapshots_priority_queue.
+                        continue;
                     }
-                })
-                .unique()
-                .collect::<Vec<_>>();
-            for v in join_all(
-                to_delete
-                    .iter()
-                    .map(|f| self.remote_fs.delete_file(f.to_string()))
-                    .collect::<Vec<_>>(),
-            )
-            .await
-            .into_iter()
-            {
-                v?;
-            }
 
-            Ok(to_delete)
-        } else {
-            Ok(vec![])
+                    if snapshots_priority_queue.len() < min_snapshots_count {
+                        snapshots_priority_queue.push(std::cmp::Reverse(millis));
+                        snapshots_hash.insert(millis);
+                        continue;
+                    }
+
+                    match snapshots_priority_queue.peek() {
+                        None => {
+                            unreachable!("snapshots_priority_queue.peek() returned None with queue length {}, min_snapshots_count {} (should be positive)", snapshots_priority_queue.len(), min_snapshots_count);
+                        }
+                        Some(std::cmp::Reverse(min_val)) => {
+                            let min_val = *min_val;
+                            if millis > min_val {
+                                snapshots_priority_queue.pop();
+                                snapshots_hash.remove(&min_val);
+                                snapshots_hash.insert(millis);
+                                snapshots_priority_queue.push(std::cmp::Reverse(millis));
+                                deletable_snapshot_present |= min_val < cutoff_time_ms;
+                            } else {
+                                deletable_snapshot_present |= millis < cutoff_time_ms;
+                            }
+                        }
+                    }
+                }
+            }
         }
+
+        log::info!(
+            "Listed {} files across all {} snapshots",
+            files_count,
+            self.name,
+        );
+
+        // We should delete everything less than the lesser of: cutoff_time_ms, or snapshots_priority_queue.peek().
+        let deletion_cutoff_time_ms: u128;
+        {
+            let earliest_snapshot_in_queue: u128;
+            if let Some(earliest_snapshot) = snapshots_priority_queue.peek() {
+                earliest_snapshot_in_queue = earliest_snapshot.0;
+                deletion_cutoff_time_ms = Ord::min(cutoff_time_ms, earliest_snapshot.0);
+            } else {
+                log::warn!(
+                    "No {} snapshot files found.  Skipping deletion pass.",
+                    self.name
+                );
+                return Ok(());
+            };
+
+            if !deletable_snapshot_present {
+                log::info!("Deleting no {} snapshots.  cutoff_time_ms = {}, earliest_snapshot_in_queue = {}, queue length = {}, min_snapshots_count = {}", self.name, cutoff_time_ms, earliest_snapshot_in_queue, snapshots_priority_queue.len(), min_snapshots_count);
+                return Ok(());
+            }
+        }
+
+        std::mem::drop(snapshots_priority_queue);
+        std::mem::drop(snapshots_hash);
+
+        log::info!(
+            "Deleting {} snapshots earlier than {}...",
+            self.name,
+            deletion_cutoff_time_ms,
+        );
+
+        {
+            let mut page_stream = self.remote_fs.list_by_page(remote_prefix.clone()).await?;
+
+            while let Some(names) = StreamExt::next(&mut page_stream).await {
+                let existing_metastore_files = names?;
+
+                let mut to_delete = Vec::<String>::new();
+                for existing in existing_metastore_files {
+                    if let Some(millis) =
+                        Self::metastore_file_snapshot_number(&remote_prefix, &existing)
+                    {
+                        if millis < deletion_cutoff_time_ms {
+                            to_delete.push(existing);
+                        }
+                    }
+                }
+
+                // This batching seems not necessary because we paginate reads, but some
+                // list_by_page implementations do not actually paginate.
+                for batch in to_delete.chunks(
+                    self.snapshots_deletion_batch_size
+                        .try_into()
+                        .unwrap_or(usize::MAX),
+                ) {
+                    for v in join_all(
+                        batch
+                            .iter()
+                            .map(|f| self.remote_fs.delete_file(f.to_string()))
+                            .collect::<Vec<_>>(),
+                    )
+                    .await
+                    .into_iter()
+                    {
+                        v?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn is_remote_metadata_exists(&self) -> Result<bool, CubeError> {
@@ -367,9 +495,9 @@ impl MetaStoreFs for BaseRocksStoreFs {
         self.upload_snapsots_files(&remote_path, &checkpoint_path)
             .await?;
 
-        self.delete_old_snapshots().await?;
-
         self.write_metastore_current(&remote_path).await?;
+
+        self.delete_old_snapshots().await?;
 
         Ok(())
     }

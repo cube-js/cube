@@ -705,42 +705,42 @@ describe('Single datasources', () => {
 
   test('getEnv("databrickUrl")', () => {
     process.env.CUBEJS_DB_DATABRICKS_URL = 'default1';
-    expect(getEnv('databrickUrl', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('databrickUrl', { dataSource: 'postgres' })).toEqual('default1');
-    expect(getEnv('databrickUrl', { dataSource: 'wrong' })).toEqual('default1');
+    expect(getEnv('databricksUrl', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('databricksUrl', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('databricksUrl', { dataSource: 'wrong' })).toEqual('default1');
 
     process.env.CUBEJS_DB_DATABRICKS_URL = 'default2';
-    expect(getEnv('databrickUrl', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('databrickUrl', { dataSource: 'postgres' })).toEqual('default2');
-    expect(getEnv('databrickUrl', { dataSource: 'wrong' })).toEqual('default2');
+    expect(getEnv('databricksUrl', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('databricksUrl', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('databricksUrl', { dataSource: 'wrong' })).toEqual('default2');
 
     delete process.env.CUBEJS_DB_DATABRICKS_URL;
-    expect(() => getEnv('databrickUrl', { dataSource: 'default' })).toThrow(
+    expect(() => getEnv('databricksUrl', { dataSource: 'default' })).toThrow(
       'The CUBEJS_DB_DATABRICKS_URL is required and missing.'
     );
-    expect(() => getEnv('databrickUrl', { dataSource: 'postgres' })).toThrow(
+    expect(() => getEnv('databricksUrl', { dataSource: 'postgres' })).toThrow(
       'The CUBEJS_DB_DATABRICKS_URL is required and missing.'
     );
-    expect(() => getEnv('databrickUrl', { dataSource: 'wrong' })).toThrow(
+    expect(() => getEnv('databricksUrl', { dataSource: 'wrong' })).toThrow(
       'The CUBEJS_DB_DATABRICKS_URL is required and missing.'
     );
   });
 
   test('getEnv("databrickToken")', () => {
     process.env.CUBEJS_DB_DATABRICKS_TOKEN = 'default1';
-    expect(getEnv('databrickToken', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('databrickToken', { dataSource: 'postgres' })).toEqual('default1');
-    expect(getEnv('databrickToken', { dataSource: 'wrong' })).toEqual('default1');
+    expect(getEnv('databricksToken', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('databricksToken', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('databricksToken', { dataSource: 'wrong' })).toEqual('default1');
 
     process.env.CUBEJS_DB_DATABRICKS_TOKEN = 'default2';
-    expect(getEnv('databrickToken', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('databrickToken', { dataSource: 'postgres' })).toEqual('default2');
-    expect(getEnv('databrickToken', { dataSource: 'wrong' })).toEqual('default2');
+    expect(getEnv('databricksToken', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('databricksToken', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('databricksToken', { dataSource: 'wrong' })).toEqual('default2');
 
     delete process.env.CUBEJS_DB_DATABRICKS_TOKEN;
-    expect(getEnv('databrickToken', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('databrickToken', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('databrickToken', { dataSource: 'wrong' })).toBeUndefined();
+    expect(getEnv('databricksToken', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('databricksToken', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('databricksToken', { dataSource: 'wrong' })).toBeUndefined();
   });
 
   test('getEnv("databricksCatalog")', () => {
@@ -758,34 +758,6 @@ describe('Single datasources', () => {
     expect(getEnv('databricksCatalog', { dataSource: 'default' })).toBeUndefined();
     expect(getEnv('databricksCatalog', { dataSource: 'postgres' })).toBeUndefined();
     expect(getEnv('databricksCatalog', { dataSource: 'wrong' })).toBeUndefined();
-  });
-
-  test('getEnv("databrickAcceptPolicy")', () => {
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'true';
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toEqual(true);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toEqual(true);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toEqual(true);
-
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'false';
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toEqual(false);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toEqual(false);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toEqual(false);
-
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'wrong';
-    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toThrow(
-      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
-    );
-    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toThrow(
-      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
-    );
-    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toThrow(
-      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
-    );
-
-    delete process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY;
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toBeUndefined();
   });
 
   test('getEnv("athenaAwsKey")', () => {
@@ -959,20 +931,59 @@ describe('Single datasources', () => {
   });
 
   test('getEnv("clickhouseReadOnly")', () => {
-    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'default1';
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual('default1');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual('default1');
+    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'true';
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual(true);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual(true);
 
-    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'default2';
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual('default2');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual('default2');
+    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'false';
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual(false);
+
+    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'wrong';
+    expect(() => getEnv('clickhouseReadOnly', { dataSource: 'default' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_READONLY" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_READONLY" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_READONLY" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
 
     delete process.env.CUBEJS_DB_CLICKHOUSE_READONLY;
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toBeUndefined();
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual(false);
+  });
+
+  test('getEnv("clickhouseCompression")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'true';
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual(true);
+    expect(getEnv('clickhouseCompression', { dataSource: 'wrong' })).toEqual(true);
+
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'false';
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'wrong' })).toEqual(false);
+
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'wrong';
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'default' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_COMPRESSION" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'postgres' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_COMPRESSION" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'wrong' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_COMPRESSION" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION;
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'wrong' })).toEqual(false);
   });
 
   test('getEnv("clickhouseSortCollation")', () => {

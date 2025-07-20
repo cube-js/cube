@@ -11,6 +11,7 @@ expression: "execute_query(\"\n                with\n                    nsp as 
 | minPrice           | numeric   | NULL                                          |
 | avgPrice           | numeric   | NULL                                          |
 | countDistinct      | int8      | NULL                                          |
+| id                 | numeric   | NULL                                          |
 | order_date         | timestamp | NULL                                          |
 | last_mod           | timestamp | NULL                                          |
 | customer_gender    | text      | Customer gender                               |

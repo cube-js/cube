@@ -83,7 +83,7 @@ export class KsqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  public partitionInvalidateKeyQueries(cube: string, preAggregation: any) {
+  public partitionInvalidateKeyQueries(_cube: string, _preAggregation: any) {
     return [];
   }
 
@@ -97,7 +97,7 @@ export class KsqlQuery extends BaseQuery {
       }
     }
     const res = this.evaluateSymbolSqlWithContext(() => [
-      
+
       preAggregation.refreshRangeStart && [this.evaluateSql(cube, preAggregation.refreshRangeStart.sql, {}), [], { external: true }],
       preAggregation.refreshRangeEnd && [this.evaluateSql(cube, preAggregation.refreshRangeEnd.sql, {}), [], { external: true }]
     ], { preAggregationQuery: true });

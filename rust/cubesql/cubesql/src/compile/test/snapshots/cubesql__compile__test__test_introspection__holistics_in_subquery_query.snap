@@ -12,6 +12,7 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.KibanaSampleDataEcommerce | countDistinct      | bigint                      |
 | public.KibanaSampleDataEcommerce | customer_gender    | text                        |
 | public.KibanaSampleDataEcommerce | has_subscription   | boolean                     |
+| public.KibanaSampleDataEcommerce | id                 | numeric                     |
 | public.KibanaSampleDataEcommerce | is_female          | boolean                     |
 | public.KibanaSampleDataEcommerce | is_male            | boolean                     |
 | public.KibanaSampleDataEcommerce | last_mod           | timestamp without time zone |

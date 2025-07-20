@@ -10,21 +10,21 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "dcf3e4aa26fd112043ef26fa4a78db5dbd443c86", default-features = false, features = [
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "7803f7e1cb8fa3d7b25451de35b8765e1ce4a3f6", default-features = false, features = [
     "regex_expressions",
     "unicode_expressions",
 ] }
 thiserror = "2"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "6a54d27d3b75a04b9f9cbe309a83078aa54b32fd" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "34f22de680caa5fe586def5b336d56efe43c8cc4" }
 base64 = "0.13.0"
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
 itertools = "0.14.0"
 serde_json = "^1.0"
 bytes = "1.2"
-futures = "0.3.23"
+futures = "0.3.31"
 rand = "0.8.3"
 hashbrown = "0.14.3"
 log = "0.4.21"
@@ -50,8 +50,6 @@ egg = { rev = "952f8c2a1033e5da097d23c523b0d8e392eb532b", git = "https://github.
 paste = "1.0.6"
 tracing = { version = "0.1.40", features = ["async-await"] }
 async-stream = "0.3.3"
-futures-core = "0.3.23"
-futures-util = "0.3.23"
 sha1_smol = "1.0.0"
 tera = { version = "1", default-features = false }
 minijinja = { version = "1", features = ["json", "loader"] }
@@ -93,25 +91,15 @@ harness = false
 # Feel free to remove any rule from here and fix all warnings with it
 # Or to write a comment why rule should stay disabled
 [lints.clippy]
-clone_on_copy = "allow"
 collapsible_if = "allow"
 collapsible_match = "allow"
 collapsible_else_if = "allow"
 comparison_chain = "allow"
 derive_ord_xor_partial_ord = "allow"
 field_reassign_with_default = "allow"
-if_same_then_else = "allow"
-into_iter_on_ref = "allow"
-iter_cloned_collect = "allow"
-iter_next_slice = "allow"
 len_without_is_empty = "allow"
 len_zero = "allow"
 let_and_return = "allow"
-manual_flatten = "allow"
-manual_range_contains = "allow"
-map_clone = "allow"
-map_flatten = "allow"
-map_identity = "allow"
 match_like_matches_macro = "allow"
 match_ref_pats = "allow"
 match_single_binding = "allow"
@@ -129,7 +117,6 @@ new_without_default = "allow"
 non_canonical_partial_ord_impl = "allow"
 nonminimal_bool = "allow"
 only_used_in_recursion = "allow"
-op_ref = "allow"
 option_as_ref_deref = "allow"
 partialeq_ne_impl = "allow"
 ptr_arg = "allow"
@@ -149,8 +136,5 @@ unnecessary_mut_passed = "allow"
 unnecessary_to_owned = "allow"
 unnecessary_unwrap = "allow"
 unused_unit = "allow"
-unwrap_or_default = "allow"
-useless_conversion = "allow"
 useless_format = "allow"
-useless_vec = "allow"
 wrong_self_convention = "allow"

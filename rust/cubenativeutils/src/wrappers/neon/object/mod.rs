@@ -10,7 +10,10 @@ use self::{
     neon_struct::NeonStruct,
 };
 use super::inner_types::NeonInnerTypes;
-use crate::wrappers::{neon::context::ContextHolder, object::NativeObject};
+use crate::wrappers::{
+    neon::context::{ContextHolder, SafeCallFn},
+    object::NativeObject,
+};
 use cubesql::CubeError;
 use neon::prelude::*;
 
@@ -62,6 +65,14 @@ impl<C: Context<'static> + 'static, V: Value + 'static> NeonTypeHandle<C, V> {
                 .map_err(|_| CubeError::internal("Downcast error".to_string()))?;
             f(cx, &obj)
         })?
+    }
+
+    pub fn map_neon_object_with_safe_call_fn<T, F>(&self, f: F) -> Result<T, CubeError>
+    where
+        F: FnOnce(&mut C, &Handle<'static, V>, SafeCallFn) -> T,
+    {
+        self.context
+            .with_context_and_safe_fn(|cx, safe_call_fn| f(cx, &self.object, safe_call_fn))
     }
 
     pub fn is_a<U: Value>(&self) -> Result<bool, CubeError> {

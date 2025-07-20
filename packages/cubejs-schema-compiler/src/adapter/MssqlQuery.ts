@@ -4,6 +4,7 @@ import moment from 'moment-timezone';
 import { QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import { BaseSegment } from './BaseSegment';
 import { ParamAllocator } from './ParamAllocator';
 
 const abbrs = {
@@ -53,9 +54,31 @@ class MssqlFilter extends BaseFilter {
   }
 }
 
+class MssqlSegment extends BaseSegment {
+  public filterToWhere(): string {
+    const where = super.filterToWhere();
+
+    const context = this.query.safeEvaluateSymbolContext();
+    if (context.rollupQuery) {
+      // Segment itself will be rendered as reference for rollupQuery
+      // In MSSQL using just `WHERE (segment_column) AND (other_filter)` is incorrect, because
+      // `segment_column` is not of boolean type, but of `BIT` type
+      // Correct way to work with them is to use `WHERE segment_column = 1`
+      // This relies on `wrapSegmentForDimensionSelect` mapping segment to a `BIT` data type
+      return `${where} = 1`;
+    }
+
+    return where;
+  }
+}
+
 export class MssqlQuery extends BaseQuery {
   public newFilter(filter) {
     return new MssqlFilter(this, filter);
+  }
+
+  public newSegment(segment): BaseSegment {
+    return new MssqlSegment(this, segment);
   }
 
   public castToString(sql) {
@@ -223,6 +246,8 @@ export class MssqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    // PERCENTILE_CONT works but requires PARTITION BY
+    delete templates.functions.PERCENTILECONT;
     delete templates.expressions.ilike;
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
