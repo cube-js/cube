@@ -350,20 +350,37 @@ const orderByString = this.order
     delete templates.types.interval;
     delete templates.types.binary;
 
+    templates.expressions.sort = '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %} NULLS {% if nulls_first %}FIRST{% else %}LAST{% endif %}';
+    templates.expressions.order_by = '{% if index %} {{ index }} {% else %} {{ expr }} {% endif %} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}';
+
+    const selectOrderBy = '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}';
+    templates.statements.select = '{% if ctes %} WITH \n' +
+          '{{ ctes | join(\',\n\') }}\n' +
+          '{% endif %}' +
+          'SELECT {% if distinct %}DISTINCT {% endif %}' +
+          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
+          'FROM (\n' +
+          '{{ from | indent(2, true) }}\n' +
+          ') AS {{ from_alias }}{% elif from_prepared %}\n' +
+          'FROM {{ from_prepared }}' +
+          '{% endif %}' +
+          '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+          '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
+          '{% if having %}\nHAVING {{ having }}{% endif %}' +
+          selectOrderBy +
+          '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}' +
+          '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}';
     const collation = this.getCollation();
 
     if (collation) {
       templates.expressions.sort = `${templates.expressions.sort}{% if data_type and data_type == 'string' %} COLLATE '${collation}'{% endif %}`;
       templates.expressions.order_by = `${templates.expressions.order_by}{% if data_type and data_type == 'string' %} COLLATE '${collation}'{% endif %}`;
 
-      const oldOrderBy = '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}';
-
-      const newOrderBy =
+      const collatedSelectOrderBy =
         '{% if order_by %}\nORDER BY {% for item in order_by %}{{ item.expr }}' +
         `{%- if item.data_type and item.data_type == 'string' %} COLLATE '${collation}'{% endif %}` +
         '{%- if not loop.last %}, {% endif %}{% endfor %}{% endif %}';
-
-      templates.statements.select = templates.statements.select.replace(oldOrderBy, newOrderBy);
+      templates.statements.select = templates.statements.select.replace(selectOrderBy, collatedSelectOrderBy);
     }
     return templates;
   }
