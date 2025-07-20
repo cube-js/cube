@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.40](https://github.com/cube-js/cube/compare/v1.3.39...v1.3.40) (2025-07-20)
+
+### Bug Fixes
+
+- **cubesql:** Add missing pub CubeMetaNestedFolder in cube client ([#9790](https://github.com/cube-js/cube/issues/9790)) ([d78cd6b](https://github.com/cube-js/cube/commit/d78cd6b8a7ac2439ed57ce9f3390bdb6d3fc69e4))
+- **docs:** fix a broken menu entry in docs ([#9793](https://github.com/cube-js/cube/issues/9793)) ([bf30940](https://github.com/cube-js/cube/commit/bf30940e75a29a838375659ea12653ca3dfd204c))
+- **native:** Handle null correctly as JsNull, not as JsString ([#9717](https://github.com/cube-js/cube/issues/9717)) ([0523f7a](https://github.com/cube-js/cube/commit/0523f7a823ffbd878292f6e422989e625985a31f))
+- Send column schema and empty data for empty /cubesql result sets instead of empty response ([#9798](https://github.com/cube-js/cube/issues/9798)) ([113f45b](https://github.com/cube-js/cube/commit/113f45b7a4417712ff57aab96e8b690c2c82de68))
+
 ## [1.3.39](https://github.com/cube-js/cube/compare/v1.3.38...v1.3.39) (2025-07-17)
 
 ### Bug Fixes

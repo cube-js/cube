@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.40](https://github.com/cube-js/cube/compare/v1.3.39...v1.3.40) (2025-07-20)
+
+### Bug Fixes
+
+- Send column schema and empty data for empty /cubesql result sets instead of empty response ([#9798](https://github.com/cube-js/cube/issues/9798)) ([113f45b](https://github.com/cube-js/cube/commit/113f45b7a4417712ff57aab96e8b690c2c82de68))
+
 ## [1.3.39](https://github.com/cube-js/cube/compare/v1.3.38...v1.3.39) (2025-07-17)
 
 **Note:** Version bump only for package @cubejs-backend/testing

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.40](https://github.com/cube-js/cube/compare/v1.3.39...v1.3.40) (2025-07-20)
+
+### Bug Fixes
+
+- **cubesql:** Add missing pub CubeMetaNestedFolder in cube client ([#9790](https://github.com/cube-js/cube/issues/9790)) ([d78cd6b](https://github.com/cube-js/cube/commit/d78cd6b8a7ac2439ed57ce9f3390bdb6d3fc69e4))
+
 ## [1.3.39](https://github.com/cube-js/cube/compare/v1.3.38...v1.3.39) (2025-07-17)
 
 ### Bug Fixes
