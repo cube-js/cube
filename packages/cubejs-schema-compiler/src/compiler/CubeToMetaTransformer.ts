@@ -11,6 +11,7 @@ import { ContextEvaluator } from './ContextEvaluator';
 import { CubeEvaluator, EvaluatedCube } from './CubeEvaluator';
 import { CubeValidator } from './CubeValidator';
 import { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
 
 export interface CubeTransformDefinition {
   config: {
@@ -82,7 +83,7 @@ export interface CubeTransformDefinition {
   };
 }
 
-export class CubeToMetaTransformer {
+export class CubeToMetaTransformer implements CompilerInterface {
   private cubeValidator: CubeValidator;
 
   private cubeSymbols: CubeEvaluator;

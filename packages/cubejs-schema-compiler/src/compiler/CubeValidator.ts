@@ -3,6 +3,7 @@ import cronParser from 'cron-parser';
 
 import type { CubeSymbols, CubeDefinition } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
 
 /* *****************************
  * ATTENTION:
@@ -940,7 +941,7 @@ export function functionFieldsPatterns(): string[] {
   return Array.from(functionPatterns);
 }
 
-export class CubeValidator {
+export class CubeValidator implements CompilerInterface {
   protected readonly validCubes: Map<string, boolean> = new Map();
 
   public constructor(
@@ -948,7 +949,7 @@ export class CubeValidator {
   ) {
   }
 
-  public compile(cubes, errorReporter: ErrorReporter) {
+  public compile(_cubes, errorReporter: ErrorReporter) {
     return this.cubeSymbols.cubeList.map(
       (v) => this.validate(this.cubeSymbols.getCubeDefinition(v.name), errorReporter.inContext(`${v.name} cube`))
     );

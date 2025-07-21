@@ -1,4 +1,6 @@
-export class ViewCompilationGate {
+import { CompilerInterface } from './PrepareCompiler';
+
+export class ViewCompilationGate implements CompilerInterface {
   private shouldCompile: any;
 
   public constructor() {

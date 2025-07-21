@@ -1,12 +1,13 @@
 import { CubeEvaluator } from './CubeEvaluator';
 import { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
 
 export type ContextDefinition = {
   name: string;
   contextMembers: string | string[];
 };
 
-export class ContextEvaluator {
+export class ContextEvaluator implements CompilerInterface {
   private cubeEvaluator: CubeEvaluator;
 
   public contextDefinitions: Record<string, ContextDefinition>;

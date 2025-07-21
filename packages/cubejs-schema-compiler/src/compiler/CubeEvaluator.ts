@@ -3,8 +3,7 @@ import R from 'ramda';
 
 import {
   AccessPolicyDefinition,
-  CubeDefinition,
-  CubeDefinitionExtended, CubeSymbolDefinition,
+  CubeDefinitionExtended,
   CubeSymbols,
   GranularityDefinition,
   HierarchyDefinition,
@@ -17,6 +16,7 @@ import { UserError } from './UserError';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
 
 export type SegmentDefinition = {
   type: string;
@@ -157,7 +157,7 @@ export interface EvaluatedCube {
   accessPolicy?: AccessPolicyDefinition[];
 }
 
-export class CubeEvaluator extends CubeSymbols {
+export class CubeEvaluator extends CubeSymbols implements CompilerInterface {
   public evaluatedCubes: Record<string, EvaluatedCube> = {};
 
   public primaryKeys: Record<string, string[]> = {};

@@ -1,6 +1,7 @@
 import { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
 
-export class CubeDictionary {
+export class CubeDictionary implements CompilerInterface {
   public byId: Record<string, any>;
 
   public constructor() {
