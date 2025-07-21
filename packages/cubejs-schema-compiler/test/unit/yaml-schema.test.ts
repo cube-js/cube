@@ -629,4 +629,51 @@ describe('Yaml Schema Testing', () => {
 
     await compiler.compile();
   });
+
+  it('joins with aliases - success', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `
+      cubes:
+      - name: CubeA
+        sql: "select * from tbl"
+        joins:
+          - name: CubeB
+            sql: SQL ON clause1
+            relationship: one_to_one
+            alias: CubeB_alias1
+
+          - name: CubeB
+            sql: SQL ON clause2
+            relationship: one_to_one
+            alias: CubeB_alias2
+
+          - name: CubeC
+            sql: SQL ON clause
+            relationship: one_to_many
+
+          - name: CubeD
+            sql: SQL ON clause
+            relationship: many_to_one
+        dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+          - name: created_at
+            sql: created_at
+            type: time
+        measures:
+          - name: count
+            type: count
+      - name: CubeB
+        sql: "select * from tbl"
+      - name: CubeC
+        sql: "select * from tbl"
+      - name: CubeD
+        sql: "select * from tbl"
+      `
+    );
+
+    await compiler.compile();
+  });
 });

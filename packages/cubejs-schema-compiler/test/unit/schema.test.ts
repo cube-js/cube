@@ -487,6 +487,50 @@ describe('Schema Testing', () => {
 
       expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
     });
+
+    it('join aliases (joins as array)', async () => {
+      const { compiler, cubeEvaluator } = prepareJsCompiler([
+        createCubeSchema({
+          name: 'CubeA',
+          joins: `[
+            {
+              name: 'CubeB',
+              sql: \`SQL ON clause1\`,
+              relationship: 'one_to_one',
+              alias: 'CubeB_alias1'
+            },
+            {
+              name: 'CubeB',
+              sql: \`SQL ON clause2\`,
+              relationship: 'one_to_one',
+              alias: 'CubeB_alias2'
+            },
+            {
+              name: 'CubeC',
+              sql: \`SQL ON clause\`,
+              relationship: 'one_to_many'
+            },
+            {
+              name: 'CubeD',
+              sql: \`SQL ON clause\`,
+              relationship: 'many_to_one'
+            },
+          ]`
+        }),
+        createCubeSchema({
+          name: 'CubeB',
+        }),
+        createCubeSchema({
+          name: 'CubeC',
+        }),
+        createCubeSchema({
+          name: 'CubeD',
+        }),
+      ]);
+      await compiler.compile();
+
+      expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
+    });
   });
 
   describe('Access Policies', () => {

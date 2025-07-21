@@ -818,7 +818,8 @@ const baseSchema = {
         'belongsTo', 'belongs_to', 'many_to_one', 'manyToOne',
         'hasMany', 'has_many', 'one_to_many', 'oneToMany',
         'hasOne', 'has_one', 'one_to_one', 'oneToOne'
-      ).required()
+      ).required(),
+      alias: identifier,
     }))
   ]),
   measures: MeasuresSchema,

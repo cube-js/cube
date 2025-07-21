@@ -1729,6 +1729,33 @@ Array [
 ]
 `;
 
+exports[`Schema Testing Joins join aliases (joins as array) 1`] = `
+Array [
+  Object {
+    "alias": "CubeB_alias1",
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "alias": "CubeB_alias2",
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeC",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeD",
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+]
+`;
+
 exports[`Schema Testing Views allows to override \`title\`, \`description\`, \`meta\`, and \`format\` on includes members 1`] = `
 Object {
   "accessPolicy": undefined,
