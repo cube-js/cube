@@ -1689,6 +1689,46 @@ Object {
 }
 `;
 
+exports[`Schema Testing Joins join types (joins as array) 1`] = `
+Array [
+  Object {
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeC",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeD",
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+]
+`;
+
+exports[`Schema Testing Joins join types (joins as object) 1`] = `
+Array [
+  Object {
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeC",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeD",
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+]
+`;
+
 exports[`Schema Testing Views allows to override \`title\`, \`description\`, \`meta\`, and \`format\` on includes members 1`] = `
 Object {
   "accessPolicy": undefined,
@@ -2087,66 +2127,6 @@ Array [
     ],
     "name": "folder2",
     "type": "folder",
-  },
-]
-`;
-
-exports[`Schema Testing join types (joins as array) 1`] = `
-Array [
-  Object {
-    "name": "CubeB",
-    "relationship": "hasOne",
-    "sql": [Function],
-  },
-  Object {
-    "name": "CubeC",
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  Object {
-    "name": "CubeD",
-    "relationship": "belongsTo",
-    "sql": [Function],
-  },
-]
-`;
-
-exports[`Schema Testing join types (joins as object) 1`] = `
-Array [
-  Object {
-    "name": "CubeB",
-    "relationship": "hasOne",
-    "sql": [Function],
-  },
-  Object {
-    "name": "CubeC",
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  Object {
-    "name": "CubeD",
-    "relationship": "belongsTo",
-    "sql": [Function],
-  },
-]
-`;
-
-exports[`Schema Testing join types 1`] = `
-Array [
-  Object {
-    "name": "CubeB",
-    "relationship": "hasOne",
-    "sql": [Function],
-  },
-  Object {
-    "name": "CubeC",
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  Object {
-    "name": "CubeD",
-    "relationship": "belongsTo",
-    "sql": [Function],
   },
 ]
 `;
