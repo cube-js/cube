@@ -3,8 +3,10 @@ import R from 'ramda';
 
 import {
   AccessPolicyDefinition,
-  CubeDefinitionExtended,
+  CubeDefinition,
+  CubeDefinitionExtended, CubeSymbolDefinition,
   CubeSymbols,
+  GranularityDefinition,
   HierarchyDefinition,
   JoinDefinition,
   PreAggregationDefinition,
@@ -18,22 +20,31 @@ import type { ErrorReporter } from './ErrorReporter';
 
 export type SegmentDefinition = {
   type: string;
-  sql(): string;
+  sql?: (...args: any[]) => string;
   primaryKey?: true;
   ownedByCube: boolean;
   fieldType?: string;
   // TODO should we have it here?
   multiStage?: boolean;
+  meta?: any;
+  description?: string;
+  aliasMember?: string;
 };
 
 export type DimensionDefinition = {
   type: string;
-  sql(): string;
+  sql?: (...args: any[]) => string;
   primaryKey?: true;
   ownedByCube: boolean;
   fieldType?: string;
   multiStage?: boolean;
   shiftInterval?: string;
+  meta?: any;
+  description?: string;
+  format?: string;
+  granularities?: Record<string, GranularityDefinition>;
+  aliasMember?: string;
+  suggestFilterValues?: boolean;
 };
 
 export type TimeShiftDefinition = {
@@ -52,7 +63,7 @@ export type TimeShiftDefinitionReference = {
 
 export type MeasureDefinition = {
   type: string;
-  sql(): string;
+  sql?: (...args: any[]) => string;
   ownedByCube: boolean;
   rollingWindow?: any
   filters?: any
@@ -68,6 +79,9 @@ export type MeasureDefinition = {
   addGroupByReferences?: string[];
   timeShiftReferences?: TimeShiftDefinitionReference[];
   patchedFrom?: { cubeName: string; name: string };
+  meta?: any;
+  description?: string;
+  aliasMember?: string;
 };
 
 export type PreAggregationFilters = {
@@ -120,20 +134,28 @@ export type EvaluatedFolder = {
   [key: string]: any;
 };
 
-export type EvaluatedCube = {
+export interface EvaluatedCube {
+  name: string;
+  extends?: (...args: Array<unknown>) => { __cubeName: string };
+  sql?: (...args: any[]) => string;
+  sqlTable?: (...args: any[]) => string;
+  isView?: boolean;
+  calendar?: boolean;
+  meta?: any;
+  description?: string;
+  title?: string;
   measures: Record<string, MeasureDefinition>;
   dimensions: Record<string, DimensionDefinition>;
   segments: Record<string, SegmentDefinition>;
   joins: JoinDefinition[];
   hierarchies: Record<string, HierarchyDefinition>;
   evaluatedHierarchies: EvaluatedHierarchy[];
+  aliasMember?: string;
   preAggregations: Record<string, PreAggregationDefinitionExtended>;
   dataSource?: string;
   folders: EvaluatedFolder[];
-  sql?: (...args: any[]) => string;
-  sqlTable?: (...args: any[]) => string;
   accessPolicy?: AccessPolicyDefinition[];
-};
+}
 
 export class CubeEvaluator extends CubeSymbols {
   public evaluatedCubes: Record<string, EvaluatedCube> = {};
@@ -150,7 +172,7 @@ export class CubeEvaluator extends CubeSymbols {
     super(true);
   }
 
-  public compile(cubes: any[], errorReporter: ErrorReporter) {
+  public compile(cubes: CubeDefinitionExtended[], errorReporter: ErrorReporter) {
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
       if (a.isView) {
@@ -391,7 +413,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  private evaluateMultiStageReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {
+  private evaluateMultiStageReferences(cubeName: string, obj: Record<string, MeasureDefinition>) {
     if (!obj) {
       return;
     }

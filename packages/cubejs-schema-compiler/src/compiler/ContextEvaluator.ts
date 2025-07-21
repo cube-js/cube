@@ -9,7 +9,7 @@ export type ContextDefinition = {
 export class ContextEvaluator {
   private cubeEvaluator: CubeEvaluator;
 
-  private contextDefinitions: Record<string, ContextDefinition>;
+  public contextDefinitions: Record<string, ContextDefinition>;
 
   public constructor(cubeEvaluator: CubeEvaluator) {
     this.cubeEvaluator = cubeEvaluator;

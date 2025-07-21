@@ -7,6 +7,7 @@ import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
+import { EvaluatedHierarchy } from './CubeEvaluator';
 
 export type ToString = { toString(): string };
 
@@ -26,12 +27,26 @@ export type TimeshiftDefinition = {
 };
 
 export type CubeSymbolDefinition = {
-  type?: string;
+  type: string;
   sql?: (...args: any[]) => string;
   primaryKey?: boolean;
+  description?: string;
+  meta?: any;
   granularities?: Record<string, GranularityDefinition>;
   timeShift?: TimeshiftDefinition[];
   format?: string;
+  aliasMember?: string;
+};
+
+export type CubeDimensionSymbolDefinition = CubeSymbolDefinition & {
+  suggestFilterValues?: boolean;
+};
+
+export type CubeMeasureSymbolDefinition = CubeSymbolDefinition & {
+  multiStage?: boolean;
+  groupBy?: (...args: any[]) => ToString;
+  reduceBy?: (...args: any[]) => ToString;
+  addGroupBy?: (...args: any[]) => ToString;
 };
 
 export type HierarchyDefinition = {
@@ -129,6 +144,11 @@ export type AccessPolicyDefinition = {
   };
 };
 
+export type FolderDefinition = {
+  name: string,
+  members: (string | FolderDefinition)[],
+};
+
 export interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
@@ -137,8 +157,11 @@ export interface CubeDefinition {
   sql_table?: string | ((...args: any[]) => string);
   sqlTable?: string | ((...args: any[]) => string);
   dataSource?: string;
-  measures?: Record<string, CubeSymbolDefinition>;
-  dimensions?: Record<string, CubeSymbolDefinition>;
+  meta?: any;
+  description?: string;
+  title?: string;
+  measures?: Record<string, CubeMeasureSymbolDefinition>;
+  dimensions?: Record<string, CubeDimensionSymbolDefinition>;
   segments?: Record<string, CubeSymbolDefinition>;
   hierarchies?: Record<string, HierarchyDefinition>;
   preAggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
@@ -146,7 +169,7 @@ export interface CubeDefinition {
   pre_aggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
   joins?: JoinDefinition[];
   accessPolicy?: AccessPolicyDefinition[];
-  folders?: any[];
+  folders?: FolderDefinition[];
   includes?: any;
   excludes?: any;
   cubes?: any;
@@ -161,6 +184,10 @@ export interface CubeDefinitionExtended extends CubeDefinition {
   allDefinitions: (type: string) => Record<string, any>;
   rawFolders: () => any[];
   rawCubes: () => any[];
+  // This is filled by CubeEvaluator later, but because of Javascript, it's been available here too,
+  // and it's been used in the CubeToMetaTransformer compiler.
+  // TODO: Think how to make it better.
+  evaluatedHierarchies?: EvaluatedHierarchy[];
 }
 
 interface SplitViews {

@@ -412,13 +412,13 @@ view(\`OrdersView3\`, {
   it('check includes are exposed in meta', async () => {
     await compiler.compile();
     const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
-    expect(cube.config.measures.find((({ name }) => name === 'OrdersView.count')).name).toBe('OrdersView.count');
+    expect(cube?.config.measures.find((({ name }) => name === 'OrdersView.count'))?.name).toBe('OrdersView.count');
   });
 
   it('orders are hidden', async () => {
     await compiler.compile();
     const cube = metaTransformer.cubes.find(c => c.config.name === 'Orders');
-    expect(cube.config.measures.filter((({ isVisible }) => isVisible)).length).toBe(0);
+    expect(cube?.config.measures.filter((({ isVisible }) => isVisible)).length).toBe(0);
   });
 
   it('split views', async () => runQueryTest({
