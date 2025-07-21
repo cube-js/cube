@@ -833,7 +833,7 @@ export class CubeSymbols {
     });
   }
 
-  protected evaluateReferences<T extends ToString | Array<ToString>>(
+  public evaluateReferences<T extends ToString | Array<ToString>>(
     cube: string | null,
     referencesFn: (...args: Array<unknown>) => T,
     options: { collectJoinHints?: boolean, originalSorting?: boolean } = {}
