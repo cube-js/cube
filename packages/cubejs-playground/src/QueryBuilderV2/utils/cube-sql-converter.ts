@@ -379,7 +379,7 @@ export class CubeSQLConverter {
     }
 
     if (filter.operator === 'startsWith') {
-      return repeatFilter(`starts_with(${filter.member}, '{{value}}')`, filter.values, false);
+      return repeatFilter(`${filter.member} LIKE '{{value}}%'`, filter.values, false);
     }
 
     if (filter.operator === 'notStartsWith') {
