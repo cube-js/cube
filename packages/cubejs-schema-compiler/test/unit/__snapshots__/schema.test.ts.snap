@@ -2091,6 +2091,46 @@ Array [
 ]
 `;
 
+exports[`Schema Testing join types (joins as array) 1`] = `
+Array [
+  Object {
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeC",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeD",
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+]
+`;
+
+exports[`Schema Testing join types (joins as object) 1`] = `
+Array [
+  Object {
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeC",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeD",
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+]
+`;
+
 exports[`Schema Testing join types 1`] = `
 Array [
   Object {
