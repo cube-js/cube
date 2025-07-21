@@ -5,7 +5,6 @@
 #![feature(hash_set_entry)]
 #![feature(is_sorted)]
 #![feature(result_flattening)]
-#![feature(extract_if)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);
