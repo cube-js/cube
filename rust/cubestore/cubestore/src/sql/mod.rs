@@ -2815,6 +2815,9 @@ mod tests {
 
                 println!("All partitions: {:#?}", partitions);
 
+                // TODO API to wait for all jobs to be completed and all events processed
+                Delay::new(Duration::from_millis(500)).await;
+
                 let plans = service
                     .plan_query("SELECT sum(num) from foo.numbers where num = 50")
                     .await

@@ -4954,6 +4954,11 @@ mod tests {
         assert_eq!(format_table_value!(s, name, String), "foo");
     }
 
+    #[test]
+    fn test_structures_size() {
+        assert_eq!(std::mem::size_of::<MetaStoreEvent>(), 680);
+    }
+
     #[tokio::test]
     async fn schema_test() {
         let config = Config::test("schema_test");
