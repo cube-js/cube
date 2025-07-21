@@ -416,38 +416,78 @@ describe('Schema Testing', () => {
     expect(gr.origin).toBe('2020-06-01 10:00:00');
   });
 
-  it('join types', async () => {
-    const { compiler, cubeEvaluator } = prepareJsCompiler([
-      createCubeSchema({
-        name: 'CubeA',
-        joins: `{
-          CubeB: {
-            sql: \`SQL ON clause\`,
-            relationship: 'one_to_one'
-          },
-          CubeC: {
-            sql: \`SQL ON clause\`,
-            relationship: 'one_to_many'
-          },
-          CubeD: {
-            sql: \`SQL ON clause\`,
-            relationship: 'many_to_one'
-          },
-        }`
-      }),
-      createCubeSchema({
-        name: 'CubeB',
-      }),
-      createCubeSchema({
-        name: 'CubeC',
-      }),
-      createCubeSchema({
-        name: 'CubeD',
-      }),
-    ]);
-    await compiler.compile();
+  describe('Joins', () => {
+    it('join types (joins as object)', async () => {
+      const { compiler, cubeEvaluator } = prepareJsCompiler([
+        createCubeSchema({
+          name: 'CubeA',
+          joins: `{
+            CubeB: {
+              sql: \`SQL ON clause\`,
+              relationship: 'one_to_one'
+            },
+            CubeC: {
+              sql: \`SQL ON clause\`,
+              relationship: 'one_to_many'
+            },
+            CubeD: {
+              sql: \`SQL ON clause\`,
+              relationship: 'many_to_one'
+            },
+          }`
+        }),
+        createCubeSchema({
+          name: 'CubeB',
+        }),
+        createCubeSchema({
+          name: 'CubeC',
+        }),
+        createCubeSchema({
+          name: 'CubeD',
+        }),
+      ]);
+      await compiler.compile();
 
-    expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
+      expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
+    });
+
+    it('join types (joins as array)', async () => {
+      const { compiler, cubeEvaluator } = prepareJsCompiler([
+        createCubeSchema({
+          name: 'CubeA',
+          joins: `[
+            {
+              name: 'CubeB',
+              sql: \`SQL ON clause\`,
+              relationship: 'one_to_one'
+            },
+            {
+              name: 'CubeC',
+              sql: \`SQL ON clause\`,
+              relationship: 'one_to_many'
+            },
+            {
+              name: 'CubeD',
+              sql: \`SQL ON clause\`,
+              relationship: 'many_to_one'
+            },
+          ]`
+        }),
+        createCubeSchema({
+          name: 'CubeB',
+        }),
+        createCubeSchema({
+          name: 'CubeC',
+        }),
+        createCubeSchema({
+          name: 'CubeD',
+        }),
+      ]);
+      await compiler.compile();
+
+      expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
+    });
+
   });
 
   describe('Access Policies', () => {
