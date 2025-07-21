@@ -821,32 +821,59 @@ impl PlanRewriter for ChooseIndex<'_> {
     type Context = ChooseIndexContext;
 
     fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
+        // TODO upgrade DF: This might be broken, or very sensitive to planning behavior.  For
+        // example we handle skips, but don't remove limit when we see a Filter.  It might have been
+        // so before the DF upgrade too.
         match n {
-            // TODO upgrade DF
             LogicalPlan::Limit(limit@Limit {
                 // fetch: Some(n),
                 // skip: 0,
                 ..
             }) => {
-                // TODO upgrade DF: Propogate the errors instead of .ok()? returning None.
-                if let FetchType::Literal(Some(n)) = limit.get_fetch_type().ok()? {
-                    // TODO upgrade DF: Handle skip non-zero (as in commented block below)
-                    if let SkipType::Literal(0) = limit.get_skip_type().ok()? {
-                        Some(context.update_limit(Some(n)))
+                // None means no update to limit.  Some(x) means call update_limit(x).
+                let maybe_limit_update: Option<Option<usize>> = match limit.get_fetch_type().ok()? {
+                    FetchType::Literal(Some(n)) =>
+                    if let Some(existing_limit) = context.limit {
+                        if n < existing_limit {
+                            Some(Some(n))
+                        } else {
+                            None
+                        }
                     } else {
-                        None
-                    }
+                        Some(Some(n))
+                    },
+                    FetchType::Literal(None) => None,
+                    FetchType::UnsupportedExpr =>
+                        // Remove the limit (and possible optimization) in case we get a non-constant limit.
+                        Some(None)
+                };
+
+                // Now handle the skip that comes underneath or "before" the limit.
+                let maybe_limit_update: Option<Option<usize>> = match limit.get_skip_type().ok()? {
+                    SkipType::Literal(skip_n) =>
+                    if skip_n == 0 {
+                        maybe_limit_update
+                    } else {
+                        // This is the limit (that would be applied or left in place by this function, if there were no skip) "above" the skip:
+                        let existing_limit = maybe_limit_update.as_ref().unwrap_or(&context.limit);
+
+                        if let Some(existing_limit_n) = existing_limit {
+                            Some(Some(existing_limit_n + skip_n))
+                        } else {
+                            maybe_limit_update
+                        }
+                    },
+                    SkipType::UnsupportedExpr =>
+                        // Remove the limit (and possible optimization) if we get a non-constant skip underneath it.
+                        Some(None),
+                };
+
+                if let Some(limit_update) = maybe_limit_update {
+                    Some(context.update_limit(limit_update))
                 } else {
                     None
                 }
             },
-            // LogicalPlan::Skip { n, .. } => {
-            //     if let Some(limit) = context.limit {
-            //         Some(context.update_limit(Some(limit + *n)))
-            //     } else {
-            //         None
-            //     }
-            // }
             LogicalPlan::Filter(Filter { predicate, .. }) => {
                 let mut single_filtered = Vec::new();
                 if single_value_filter_columns(predicate, &mut single_filtered) {
