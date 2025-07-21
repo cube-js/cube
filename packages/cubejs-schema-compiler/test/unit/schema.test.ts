@@ -487,7 +487,6 @@ describe('Schema Testing', () => {
 
       expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
     });
-
   });
 
   describe('Access Policies', () => {
