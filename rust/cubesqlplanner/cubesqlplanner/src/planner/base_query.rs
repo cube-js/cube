@@ -3,7 +3,7 @@ use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::pre_aggregation_obj::NativePreAggregationObj;
-use crate::logical_plan::optimizers::*;
+//use crate::logical_plan::optimizers::*;
 use crate::logical_plan::PreAggregation;
 use crate::logical_plan::Query;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
@@ -103,15 +103,15 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
         let physical_plan_builder =
             PhysicalPlanBuilder::new(self.query_tools.clone(), templates.clone());
-        let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query() {
+        /* let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query() {
             OriginalSqlCollector::new(self.query_tools.clone()).collect(&optimized_plan)?
         } else {
             HashMap::new()
-        };
+        }; */
 
         let physical_plan = physical_plan_builder.build(
             optimized_plan,
-            original_sql_pre_aggregations,
+            HashMap::new(), //original_sql_pre_aggregations,
             self.request.is_total_query(),
         )?;
 
@@ -147,7 +147,8 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         &self,
         plan: Rc<Query>,
     ) -> Result<(Rc<Query>, Vec<Rc<PreAggregation>>), CubeError> {
-        let result = if !self.request.is_pre_aggregation_query() {
+        Ok((plan.clone(), Vec::new()))
+        /* let result = if !self.request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
                 self.query_tools.clone(),
                 self.cubestore_support_multistage,
@@ -168,6 +169,6 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         } else {
             (plan.clone(), Vec::new())
         };
-        Ok(result)
+        Ok(result) */
     }
 }

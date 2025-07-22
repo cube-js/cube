@@ -1,7 +1,6 @@
 use super::pretty_print::*;
-use super::Cube;
-use super::SimpleQuery;
-use crate::planner::sql_evaluator::{MemberSymbol, SqlCall};
+use super::*;
+use crate::planner::sql_evaluator::SqlCall;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -15,31 +14,6 @@ impl PrettyPrint for CubeJoinItem {
         result.println(&format!("CubeJoinItem: "), state);
         let details_state = state.new_level();
         self.cube.pretty_print(result, &details_state);
-    }
-}
-
-#[derive(Clone)]
-pub struct SubqueryDimensionJoinItem {
-    pub subquery: Rc<SimpleQuery>,
-    pub dimension: Rc<MemberSymbol>,
-    pub primary_keys_dimensions: Vec<Rc<MemberSymbol>>,
-}
-
-impl PrettyPrint for SubqueryDimensionJoinItem {
-    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println(
-            &format!(
-                "SubqueryDimensionJoinItem for dimension `{}`: ",
-                self.dimension.full_name()
-            ),
-            state,
-        );
-        result.println("subquery:", state);
-        result.println("primary_keys_dimensions:", state);
-        let state = state.new_level();
-        for dim in self.primary_keys_dimensions.iter() {
-            result.println(&format!("- {}", dim.full_name()), &state);
-        }
     }
 }
 
@@ -60,6 +34,7 @@ impl PrettyPrint for LogicalJoinItem {
 pub struct LogicalJoin {
     pub root: Rc<Cube>,
     pub joins: Vec<LogicalJoinItem>,
+    pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
 }
 
 impl PrettyPrint for LogicalJoin {
@@ -73,6 +48,13 @@ impl PrettyPrint for LogicalJoin {
         let state = state.new_level();
         for join in self.joins.iter() {
             join.pretty_print(result, &state);
+        }
+        if !self.dimension_subqueries.is_empty() {
+            result.println("dimension_subqueries:", &state);
+            let details_state = state.new_level();
+            for subquery in self.dimension_subqueries.iter() {
+                subquery.pretty_print(result, &details_state);
+            }
         }
     }
 }
