@@ -29,9 +29,9 @@ impl SimpleQueryPlanner {
             .rendered_as_multiplied_measures
             .clone();
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimension_symbols())
-            .set_measures(self.query_properties.measure_symbols())
-            .set_time_dimensions(self.query_properties.time_dimension_symbols())
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_measures(self.query_properties.measures().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_multiplied_measures(multiplied_measures)
             .into_rc();
         let logical_filter = Rc::new(LogicalFilter {
@@ -58,7 +58,7 @@ impl SimpleQueryPlanner {
     pub fn source_and_subquery_dimensions(&self) -> Result<Rc<LogicalJoin>, CubeError> {
         let join = self.query_properties.simple_query_join()?;
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
-            &self.query_properties.all_member_symbols(false),
+            &self.query_properties.all_members(false),
             &self.join_planner,
             &join,
         )?;

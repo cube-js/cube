@@ -103,8 +103,8 @@ impl MultipliedMeasuresQueryPlanner {
                 .map(|m| m.clone())
                 .collect_vec();
             let schema = LogicalSchema::default()
-                .set_time_dimensions(self.query_properties.time_dimension_symbols())
-                .set_dimensions(self.query_properties.dimension_symbols())
+                .set_time_dimensions(self.query_properties.time_dimensions().clone())
+                .set_dimensions(self.query_properties.dimensions().clone())
                 .set_measures(all_measures)
                 .set_multiplied_measures(
                     full_key_aggregate_measures
@@ -150,8 +150,8 @@ impl MultipliedMeasuresQueryPlanner {
             self.key_query(&primary_keys_dimensions, key_join.clone(), key_cube_name)?;
 
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimension_symbols())
-            .set_time_dimensions(self.query_properties.time_dimension_symbols())
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures.clone())
             .set_multiplied_measures(
                 self.full_key_aggregate_measures
@@ -272,8 +272,8 @@ impl MultipliedMeasuresQueryPlanner {
             .make_join_logical_plan(join, subquery_dimension_queries.clone())?;
 
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimension_symbols())
-            .set_time_dimensions(self.query_properties.time_dimension_symbols())
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures.clone())
             .set_multiplied_measures(
                 self.full_key_aggregate_measures
@@ -337,8 +337,8 @@ impl MultipliedMeasuresQueryPlanner {
         });
 
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimension_symbols())
-            .set_time_dimensions(self.query_properties.time_dimension_symbols())
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
 
         let keys_query = KeysSubQuery {

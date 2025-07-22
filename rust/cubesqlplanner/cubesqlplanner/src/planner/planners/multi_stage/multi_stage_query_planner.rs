@@ -289,8 +289,8 @@ impl MultiStageQueryPlanner {
                     .iter()
                     .map(|d| d.as_time_dimension())
                     .collect::<Result<Vec<_>, _>>()?;
-                for dim in self.query_properties.dimension_symbols() {
-                    let dim = dim.resolve_reference_chain();
+                for dim in self.query_properties.dimensions() {
+                    let dim = dim.clone().resolve_reference_chain();
                     if let Ok(time_dimension) = dim.as_time_dimension() {
                         time_dimensions.push(time_dimension);
                     }
