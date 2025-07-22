@@ -42,8 +42,8 @@ impl MultiStageQueryPlanner {
             .query_properties
             .all_members(false)
             .into_iter()
-            .filter_map(|memb: Rc<dyn BaseMember>| -> Option<Result<_, CubeError>> {
-                match has_multi_stage_members(&memb.member_evaluator(), false) {
+            .filter_map(|memb| -> Option<Result<_, CubeError>> {
+                match has_multi_stage_members(&memb, false) {
                     Ok(true) => Some(Ok(memb)),
                     Ok(false) => None,
                     Err(e) => Some(Err(e)),
@@ -66,11 +66,8 @@ impl MultiStageQueryPlanner {
         let top_level_ctes = multi_stage_members
             .into_iter()
             .map(|memb| -> Result<_, CubeError> {
-                let description = self.make_queries_descriptions(
-                    memb.member_evaluator().clone(),
-                    state.clone(),
-                    &mut descriptions,
-                )?;
+                let description =
+                    self.make_queries_descriptions(memb.clone(), state.clone(), &mut descriptions)?;
                 let result = (
                     description.alias().clone(),
                     vec![description.member_node().clone()],
@@ -208,13 +205,7 @@ impl MultiStageQueryPlanner {
             let (multi_stage_member, is_ungrupped) =
                 self.create_multi_stage_inode_member(member.clone())?;
 
-            let dimensions_to_add = multi_stage_member
-                .add_group_by_symbols()
-                .iter()
-                .map(|symbol| {
-                    BaseDimension::try_new_required(symbol.clone(), self.query_tools.clone())
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+            let dimensions_to_add = multi_stage_member.add_group_by_symbols();
 
             let new_state = if !dimensions_to_add.is_empty()
                 || multi_stage_member.time_shift().is_some()
@@ -222,7 +213,7 @@ impl MultiStageQueryPlanner {
             {
                 let mut new_state = state.clone_state();
                 if !dimensions_to_add.is_empty() {
-                    new_state.add_dimensions(dimensions_to_add);
+                    new_state.add_dimensions(dimensions_to_add.clone());
                 }
                 if let Some(time_shift) = multi_stage_member.time_shift() {
                     new_state.add_time_shifts(time_shift.clone())?;
@@ -301,14 +292,15 @@ impl MultiStageQueryPlanner {
 
                 let ungrouped = measure.is_rolling_window() && !measure.is_addictive();
 
-                let mut time_dimensions = self.query_properties.time_dimensions().clone();
+                let mut time_dimensions = self
+                    .query_properties
+                    .time_dimensions()
+                    .iter()
+                    .map(|d| d.as_time_dimension())
+                    .collect::<Result<Vec<_>, _>>()?;
                 for dim in self.query_properties.dimension_symbols() {
                     let dim = dim.resolve_reference_chain();
-                    if let Ok(time_dimension_symbol) = dim.as_time_dimension() {
-                        let time_dimension = BaseTimeDimension::try_new_from_td_symbol(
-                            self.query_tools.clone(),
-                            time_dimension_symbol,
-                        )?;
+                    if let Ok(time_dimension) = dim.as_time_dimension() {
                         time_dimensions.push(time_dimension);
                     }
                 }
@@ -324,7 +316,7 @@ impl MultiStageQueryPlanner {
                 }
                 let uniq_time_dimensions = time_dimensions
                     .iter()
-                    .unique_by(|a| (a.cube_name(), a.name(), a.get_date_range()))
+                    .unique_by(|a| (a.cube_name(), a.name(), a.date_range_vec()))
                     .collect_vec();
                 if uniq_time_dimensions.len() != 1 {
                     return Err(CubeError::internal(
@@ -335,6 +327,7 @@ impl MultiStageQueryPlanner {
 
                 let time_dimension =
                     GranularityHelper::find_dimension_with_min_granularity(&time_dimensions)?;
+                let time_dimension = MemberSymbol::new_time_dimension(time_dimension);
 
                 let (base_rolling_state, base_time_dimension) = self.make_rolling_base_state(
                     time_dimension.clone(),

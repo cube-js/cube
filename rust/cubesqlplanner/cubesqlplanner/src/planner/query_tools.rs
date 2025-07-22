@@ -52,15 +52,6 @@ impl QueryToolsCachedData {
         }
     }
 
-    pub fn join_hints_for_base_member_vec<T: BaseMember>(
-        &mut self,
-        vec: &Vec<Rc<T>>,
-    ) -> Result<Vec<Rc<Vec<JoinHintItem>>>, CubeError> {
-        vec.iter()
-            .map(|b| self.join_hints_for_member(&b.member_evaluator()))
-            .collect::<Result<Vec<_>, _>>()
-    }
-
     pub fn join_hints_for_member_symbol_vec(
         &mut self,
         vec: &Vec<Rc<MemberSymbol>>,

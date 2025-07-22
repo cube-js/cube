@@ -51,8 +51,21 @@ impl TimeDimensionSymbol {
         &self.granularity
     }
 
+    pub fn has_granularity(&self) -> bool {
+        self.granularity.is_some()
+    }
+
     pub fn granularity_obj(&self) -> &Option<Granularity> {
         &self.granularity_obj
+    }
+
+    pub fn resolved_granularity(&self) -> Result<Option<String>, CubeError> {
+        let res = if let Some(granularity_obj) = &self.granularity_obj {
+            Some(granularity_obj.resolved_granularity()?)
+        } else {
+            None
+        };
+        Ok(res)
     }
 
     pub fn full_name(&self) -> String {
