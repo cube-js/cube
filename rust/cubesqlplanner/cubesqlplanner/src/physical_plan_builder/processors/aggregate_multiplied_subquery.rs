@@ -1,16 +1,13 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{
-    AggregateMultipliedSubquery, AggregateMultipliedSubquerySouce, SimpleQuery, SimpleQuerySource,
+    AggregateMultipliedSubquery, AggregateMultipliedSubquerySouce,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
-    Expr, Filter, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName,
-    QueryPlan, Select, SelectBuilder,
+    Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select, SelectBuilder,
 };
-use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::ReferencesBuilder;
-use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{BaseMember, MemberSymbolRef};
+use crate::planner::BaseMember;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;

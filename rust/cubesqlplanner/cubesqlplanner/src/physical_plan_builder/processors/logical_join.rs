@@ -1,9 +1,7 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{CubeJoinItem, LogicalJoin, LogicalJoinItem, SimpleQuery};
+use crate::logical_plan::{CubeJoinItem, LogicalJoin, LogicalJoinItem};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{From, JoinBuilder, JoinCondition, QueryPlan, Select};
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::plan::{From, JoinBuilder, JoinCondition};
 use crate::planner::SqlJoinCondition;
 use cubenativeutils::CubeError;
 use std::rc::Rc;

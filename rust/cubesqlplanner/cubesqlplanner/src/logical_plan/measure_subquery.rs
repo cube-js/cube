@@ -1,5 +1,4 @@
 use super::*;
-use crate::planner::sql_evaluator::MemberSymbol;
 use std::rc::Rc;
 
 pub struct MeasureSubquery {
