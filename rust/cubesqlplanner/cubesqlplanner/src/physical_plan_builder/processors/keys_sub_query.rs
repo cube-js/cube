@@ -3,6 +3,7 @@ use crate::logical_plan::{KeysSubQuery, SimpleQuery, SimpleQuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{Expr, Filter, MemberExpression, QueryPlan, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseMember, MemberSymbolRef};
 use cubenativeutils::CubeError;
@@ -34,18 +35,20 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         let mut context = context.clone();
         context.alias_prefix = alias_prefix;
 
-        let source = self.builder.process_node(
-            keys_subquery.source.as_ref(),
-            &context,
-            /* &keys_subquery.dimension_subqueries,
-            &mut render_references, !!! TODO */
-        )?;
+        let source = self
+            .builder
+            .process_node(keys_subquery.source.as_ref(), &context)?;
 
+        let references_builder = ReferencesBuilder::new(source.clone());
         let mut select_builder = SelectBuilder::new(source);
+        self.builder.resolve_subquery_dimensions_references(
+            &keys_subquery.source.dimension_subqueries,
+            &references_builder,
+            &mut render_references,
+        )?;
         for member in keys_subquery
-            .dimensions
-            .iter()
-            .chain(keys_subquery.time_dimensions.iter())
+            .schema
+            .all_dimensions()
             .chain(keys_subquery.primary_keys_dimensions.iter())
         {
             let member_ref: Rc<dyn BaseMember> =

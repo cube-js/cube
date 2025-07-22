@@ -1,11 +1,14 @@
-use super::super::{LogicalNodeProcessor, ProcessableNode};
 use super::super::context::PushDownBuilderContext;
-use crate::logical_plan::MultiStageMeasureCalculation;
+use super::super::{LogicalNodeProcessor, ProcessableNode};
+use crate::logical_plan::{MultiStageCalculationWindowFunction, MultiStageMeasureCalculation};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::QueryPlan;
+use crate::plan::{Expr, MemberExpression, QueryPlan, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MultiStageMeasureCalculationProcessor<'a> {
@@ -22,14 +25,93 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
 
     fn process(
         &self,
-        logical_plan: &MultiStageMeasureCalculation,
+        measure_calculation: &MultiStageMeasureCalculation,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        todo!()
+        let query_tools = self.builder.query_tools();
+        let from = self
+            .builder
+            .process_node(measure_calculation.source.as_ref(), context)?;
+        let references_builder = ReferencesBuilder::new(from.clone());
+        let mut render_references = HashMap::new();
+
+        let mut select_builder = SelectBuilder::new(from.clone());
+        let all_dimensions = measure_calculation
+            .schema
+            .all_dimensions()
+            .cloned()
+            .collect_vec();
+
+        for member in measure_calculation.schema.all_dimensions() {
+            references_builder.resolve_references_for_member(
+                member.clone(),
+                &None,
+                &mut render_references,
+            )?;
+            let member_ref = member.clone().as_base_member(query_tools.clone())?;
+            select_builder.add_projection_member(&member_ref, None);
+        }
+
+        for measure in measure_calculation.schema.measures.iter() {
+            references_builder.resolve_references_for_member(
+                measure.clone(),
+                &None,
+                &mut render_references,
+            )?;
+            let alias = references_builder.resolve_alias_for_member(&measure.full_name(), &None);
+            select_builder.add_projection_member(
+                &measure.clone().as_base_member(query_tools.clone())?,
+                alias,
+            );
+        }
+
+        if !measure_calculation.is_ungrouped {
+            let group_by = all_dimensions
+                .iter()
+                .map(|dim| -> Result<_, CubeError> {
+                    let member_ref = dim.clone().as_base_member(query_tools.clone())?;
+                    Ok(Expr::Member(MemberExpression::new(member_ref.clone())))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            select_builder.set_group_by(group_by);
+            select_builder.set_order_by(
+                self.builder
+                    .make_order_by(&measure_calculation.schema, &measure_calculation.order_by)?,
+            );
+        }
+
+        let mut context_factory = context.make_sql_nodes_factory();
+        let partition_by = measure_calculation
+            .partition_by
+            .iter()
+            .map(|dim| -> Result<_, CubeError> {
+                if let Some(reference) =
+                    references_builder.find_reference_for_member(&dim.full_name(), &None)
+                {
+                    Ok(format!("{}", reference))
+                } else {
+                    Err(CubeError::internal(format!(
+                        "Alias not found for partition_by dimension {}",
+                        dim.full_name()
+                    )))
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        match &measure_calculation.window_function_to_use {
+            MultiStageCalculationWindowFunction::Rank => {
+                context_factory.set_multi_stage_rank(partition_by)
+            }
+            MultiStageCalculationWindowFunction::Window => {
+                context_factory.set_multi_stage_window(partition_by)
+            }
+            MultiStageCalculationWindowFunction::None => {}
+        }
+        context_factory.set_render_references(render_references);
+        let select = Rc::new(select_builder.build(context_factory));
+        Ok(QueryPlan::Select(select))
     }
 }
 
 impl ProcessableNode for MultiStageMeasureCalculation {
     type ProcessorType<'a> = MultiStageMeasureCalculationProcessor<'a>;
 }
-
