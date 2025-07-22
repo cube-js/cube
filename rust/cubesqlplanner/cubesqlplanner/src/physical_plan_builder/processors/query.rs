@@ -149,7 +149,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .make_order_by(&logical_plan.schema, &logical_plan.modifers.order_by)?,
         );
 
-        let res = Rc::new(select_builder.build(context_factory));
+        let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)
     }
 }

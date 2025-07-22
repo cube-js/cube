@@ -165,7 +165,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         }
 
         context_factory.set_render_references(render_references);
-        let select = Rc::new(select_builder.build(context_factory));
+        let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(QueryPlan::Select(select))
     }
 }

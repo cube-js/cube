@@ -1,10 +1,9 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{
-    AggregateMultipliedSubquery, AggregateMultipliedSubquerySouce,
-};
+use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySouce};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
-    Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select, SelectBuilder,
+    Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select,
+    SelectBuilder,
 };
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::BaseMember;
@@ -178,7 +177,9 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 .multiplied_measures
                 .clone(),
         );
-        Ok(Rc::new(select_builder.build(context_factory)))
+        Ok(Rc::new(
+            select_builder.build(query_tools.clone(), context_factory),
+        ))
     }
 }
 

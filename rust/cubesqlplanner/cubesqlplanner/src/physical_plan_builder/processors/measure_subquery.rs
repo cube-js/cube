@@ -22,7 +22,7 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
         measure_subquery: &MeasureSubquery,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let _query_tools = self.builder.query_tools();
+        let query_tools = self.builder.query_tools();
         let mut render_references = HashMap::new();
         let from = self
             .builder
@@ -47,17 +47,17 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
         )?;
         for dim in measure_subquery.schema.dimensions.iter() {
             select_builder
-                .add_projection_member(&dim.clone().as_base_member(_query_tools.clone())?, None);
+                .add_projection_member(&dim.clone().as_base_member(query_tools.clone())?, None);
         }
         for meas in measure_subquery.schema.measures.iter() {
             select_builder
-                .add_projection_member(&meas.clone().as_base_member(_query_tools.clone())?, None);
+                .add_projection_member(&meas.clone().as_base_member(query_tools.clone())?, None);
         }
 
         context_factory.set_ungrouped_measure(true);
         context_factory.set_render_references(render_references);
 
-        let select = Rc::new(select_builder.build(context_factory));
+        let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(select)
     }
 }

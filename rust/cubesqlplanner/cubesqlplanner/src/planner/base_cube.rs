@@ -43,12 +43,7 @@ impl BaseCube {
         context: Rc<VisitorContext>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let cube_sql = evaluate_with_context(
-            &self.member_evaluator,
-            self.query_tools.clone(),
-            context,
-            templates,
-        )?;
+        let cube_sql = evaluate_with_context(&self.member_evaluator, context, templates)?;
         Ok(cube_sql)
     }
 
