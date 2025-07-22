@@ -149,6 +149,13 @@ impl DimensionSymbol {
         &self.definition.static_data().dimension_type
     }
 
+    pub fn propagate_filters_to_sub_query(&self) -> bool {
+        self.definition
+            .static_data()
+            .propagate_filters_to_sub_query
+            .unwrap_or(false)
+    }
+
     pub fn is_reference(&self) -> bool {
         self.is_reference
     }
