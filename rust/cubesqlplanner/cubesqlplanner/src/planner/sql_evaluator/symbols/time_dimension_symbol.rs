@@ -68,6 +68,32 @@ impl TimeDimensionSymbol {
         Ok(res)
     }
 
+    pub fn change_granularity(
+        &self,
+        query_tools: Rc<QueryTools>,
+        new_granularity: Option<String>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
+        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
+        let new_granularity_obj = GranularityHelper::make_granularity_obj(
+            query_tools.cube_evaluator().clone(),
+            &mut evaluator_compiler,
+            query_tools.timezone(),
+            &&self.base_symbol.cube_name(),
+            &self.base_symbol.name(),
+            new_granularity.clone(),
+        )?;
+        let date_range_tuple = self.date_range.clone();
+        let result = TimeDimensionSymbol::new(
+            self.base_symbol.clone(),
+            new_granularity.clone(),
+            new_granularity_obj.clone(),
+            date_range_tuple,
+        );
+        Ok(result)
+    }
+
     pub fn full_name(&self) -> String {
         self.full_name.clone()
     }

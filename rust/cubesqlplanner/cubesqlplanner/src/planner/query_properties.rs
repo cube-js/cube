@@ -168,7 +168,7 @@ impl QueryProperties {
         {
             time_dimensions
                 .iter()
-                .map(|d| {
+                .map(|d| -> Result<Rc<MemberSymbol>, CubeError> {
                     let base_symbol =
                         evaluator_compiler.add_dimension_evaluator(d.dimension.clone())?;
                     let granularity_obj = GranularityHelper::make_granularity_obj(
@@ -494,8 +494,8 @@ impl QueryProperties {
 
     pub fn compute_join_multi_fact_groups_with_measures(
         &self,
-        measures: &Vec<Rc<BaseMeasure>>,
-    ) -> Result<Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>, CubeError> {
+        measures: &Vec<Rc<MemberSymbol>>,
+    ) -> Result<Vec<(Rc<dyn JoinDefinition>, Vec<Rc<MemberSymbol>>)>, CubeError> {
         Self::compute_join_multi_fact_groups(
             self.query_join_hints.clone(),
             self.query_tools.clone(),
@@ -825,7 +825,12 @@ impl QueryProperties {
                             .rendered_as_multiplied_measures
                             .insert(item.measure.full_name());
                     }
-                    if item.multiplied && !item.measure.can_be_used_as_additive_in_multplied() {
+                    if item.multiplied
+                        && !item
+                            .measure
+                            .as_measure()?
+                            .can_used_as_addictive_in_multplied()
+                    {
                         result
                             .multiplied_measures
                             .push(MultipliedMeasure::new(item.measure.clone(), item.cube_name));

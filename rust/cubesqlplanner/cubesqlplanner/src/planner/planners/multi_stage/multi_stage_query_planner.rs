@@ -405,7 +405,7 @@ impl MultiStageQueryPlanner {
 
     fn add_time_series_get_range_query(
         &self,
-        time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
@@ -420,7 +420,7 @@ impl MultiStageQueryPlanner {
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeriesGetRange(
                         time_dimension.clone(),
                     )),
-                    time_dimension.member_evaluator(),
+                    time_dimension.clone(),
                     true,
                     false,
                 ),
@@ -436,7 +436,7 @@ impl MultiStageQueryPlanner {
 
     fn add_time_series(
         &self,
-        time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
@@ -445,7 +445,11 @@ impl MultiStageQueryPlanner {
         {
             description.clone()
         } else {
-            let get_range_query_description = if time_dimension.get_date_range().is_some() {
+            let get_range_query_description = if time_dimension
+                .as_time_dimension()?
+                .date_range_vec()
+                .is_some()
+            {
                 None
             } else {
                 Some(self.add_time_series_get_range_query(
@@ -462,7 +466,7 @@ impl MultiStageQueryPlanner {
                             date_range_cte: get_range_query_description.map(|d| d.alias().clone()),
                         },
                     ))),
-                    time_dimension.member_evaluator(),
+                    time_dimension.clone(),
                     true,
                     false,
                 ),
@@ -523,11 +527,12 @@ impl MultiStageQueryPlanner {
 
     fn make_rolling_base_state(
         &self,
-        time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
         rolling_window: &RollingWindow,
         state: Rc<MultiStageAppliedState>,
-    ) -> Result<(Rc<MultiStageAppliedState>, Rc<BaseTimeDimension>), CubeError> {
-        let time_dimension_base_name = time_dimension.base_dimension().full_name();
+    ) -> Result<(Rc<MultiStageAppliedState>, Rc<MemberSymbol>), CubeError> {
+        let time_dimension_symbol = time_dimension.as_time_dimension()?;
+        let time_dimension_base_name = time_dimension_symbol.base_symbol().full_name();
         let mut new_state = state.clone_state();
         let trailing_granularity =
             GranularityHelper::granularity_from_interval(&rolling_window.trailing);
@@ -537,10 +542,12 @@ impl MultiStageQueryPlanner {
             GranularityHelper::min_granularity(&trailing_granularity, &leading_granularity)?;
         let result_granularity = GranularityHelper::min_granularity(
             &window_granularity,
-            &time_dimension.resolved_granularity()?,
+            &time_dimension_symbol.resolved_granularity()?,
         )?;
 
-        let new_time_dimension = time_dimension.change_granularity(result_granularity.clone())?;
+        let new_time_dimension_symbol = time_dimension_symbol
+            .change_granularity(self.query_tools.clone(), result_granularity.clone())?;
+        let new_time_dimension = MemberSymbol::new_time_dimension(new_time_dimension_symbol);
         //We keep only one time_dimension in the leaf query because, even if time_dimension values have different granularity, in the leaf query we need to group by the lowest granularity.
         new_state.set_time_dimensions(vec![new_time_dimension.clone()]);
 
@@ -549,7 +556,7 @@ impl MultiStageQueryPlanner {
             .clone()
             .into_iter()
             .filter(|d| {
-                d.member_evaluator()
+                d.clone()
                     .resolve_reference_chain()
                     .as_time_dimension()
                     .is_err()

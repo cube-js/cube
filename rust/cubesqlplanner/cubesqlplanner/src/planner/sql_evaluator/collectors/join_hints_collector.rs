@@ -84,11 +84,11 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, 
 }
 
 pub fn collect_join_hints_for_measures(
-    measures: &Vec<Rc<BaseMeasure>>,
+    measures: &Vec<Rc<MemberSymbol>>,
 ) -> Result<Vec<JoinHintItem>, CubeError> {
     let mut visitor = JoinHintsCollector::new();
     for meas in measures.iter() {
-        visitor.apply(&meas.member_evaluator(), &())?;
+        visitor.apply(&meas, &())?;
     }
     let res = visitor.extract_result();
     Ok(res)
