@@ -1,13 +1,8 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{ResolvedMultipliedMeasures, SimpleQuery, SimpleQuerySource};
+use crate::logical_plan::ResolvedMultipliedMeasures;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Expr, Filter, MemberExpression, QueryPlan, Select, SelectBuilder, SingleSource};
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{BaseMember, MemberSymbolRef};
+use crate::plan::SingleSource;
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
-use std::rc::Rc;
 
 pub struct ResolvedMultipliedMeasuresProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,

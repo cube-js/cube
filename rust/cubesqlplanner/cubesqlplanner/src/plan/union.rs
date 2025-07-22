@@ -1,7 +1,7 @@
 use super::{QueryPlan, Schema};
 use crate::{
     plan::Select,
-    planner::{sql_templates::PlanSqlTemplates, VisitorContext},
+    planner::sql_templates::PlanSqlTemplates,
 };
 use cubenativeutils::CubeError;
 use std::rc::Rc;

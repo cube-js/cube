@@ -1,21 +1,16 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{
-    pretty_print, pretty_print_rc, FullKeyAggregate, ResolvedMultipliedMeasures, SimpleQuery,
-    SimpleQuerySource,
+    pretty_print, FullKeyAggregate, ResolvedMultipliedMeasures,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
-    Expr, Filter, From, FromSource, JoinBuilder, JoinCondition, MemberExpression,
-    QualifiedColumnName, QueryPlan, Select, SelectBuilder, SingleAliasedSource, Union,
+    Expr, From, FromSource, JoinBuilder, JoinCondition,
+    QualifiedColumnName, SelectBuilder, SingleAliasedSource, Union,
 };
-use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::{MemberSymbol, ReferencesBuilder};
-use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{BaseMember, MemberSymbolRef};
+use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::planner::BaseMember;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 trait FullKeyAggregateStrategy {

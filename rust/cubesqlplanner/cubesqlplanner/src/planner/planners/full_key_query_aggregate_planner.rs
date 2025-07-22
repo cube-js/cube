@@ -1,8 +1,6 @@
 use crate::logical_plan::*;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct FullKeyAggregateQueryPlanner {

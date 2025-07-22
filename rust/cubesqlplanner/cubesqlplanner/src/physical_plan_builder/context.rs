@@ -1,6 +1,5 @@
 use cubenativeutils::CubeError;
 
-use crate::plan::schema::QualifiedColumnName;
 use crate::plan::Schema;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
