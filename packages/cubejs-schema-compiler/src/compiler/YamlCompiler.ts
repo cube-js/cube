@@ -16,6 +16,7 @@ import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
+import { CubeJoinsResolver } from './CubeJoinsResolver';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -34,6 +35,7 @@ export class YamlCompiler {
     private readonly cubeDictionary: CubeDictionary,
     private readonly nativeInstance: NativeInstance,
     private readonly viewCompiler: CubeSymbols,
+    private readonly cubeJoinsResolver: CubeJoinsResolver,
   ) {
   }
 
@@ -301,7 +303,8 @@ export class YamlCompiler {
 
     resolveSymbol = resolveSymbol || (n => this.viewCompiler.resolveSymbol(cubeName, n) ||
       this.cubeSymbols.resolveSymbol(cubeName, n) ||
-      this.cubeSymbols.isCurrentCube(n));
+      this.cubeSymbols.isCurrentCube(n) ||
+      this.cubeJoinsResolver.resolveSymbol(cubeName, n));
 
     const traverseObj = {
       Program: (babelPath) => {

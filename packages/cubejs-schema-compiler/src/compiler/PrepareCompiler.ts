@@ -57,7 +57,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
-  const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler);
+  const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, nativeInstance, viewCompiler, cubeJoinsResolver);
 
   const compiledScriptCache = options.compiledScriptCache || new LRUCache<string, vm.Script>({ max: 250 });
 
