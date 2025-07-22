@@ -2568,8 +2568,8 @@ checksum = "348108ab3fba42ec82ff6e9564fc4ca0247bdccdc68dd8af9764bbc79c3c8ffb"
 
 [[package]]
 name = "librocksdb-sys"
-version = "0.10.0+7.9.2"
-source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#a481e9d86791f90cef015e93bee0866cfb372cde"
+version = "0.10.0+7.10.2"
+source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#d1869c008df7ad8a959c1e2eecd9ba4164ed7d8b"
 dependencies = [
  "bindgen",
  "bzip2-sys",
@@ -4352,7 +4352,7 @@ dependencies = [
 [[package]]
 name = "rocksdb"
 version = "0.20.1"
-source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#a481e9d86791f90cef015e93bee0866cfb372cde"
+source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#d1869c008df7ad8a959c1e2eecd9ba4164ed7d8b"
 dependencies = [
  "libc",
  "librocksdb-sys",
@@ -5567,7 +5567,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "rand 0.8.4",
  "static_assertions",
 ]
