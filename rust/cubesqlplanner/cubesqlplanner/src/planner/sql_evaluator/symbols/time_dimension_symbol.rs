@@ -11,6 +11,7 @@ use std::rc::Rc;
 pub struct TimeDimensionSymbol {
     base_symbol: Rc<MemberSymbol>,
     full_name: String,
+    alias: String,
     granularity: Option<String>,
     granularity_obj: Option<Granularity>,
     date_range: Option<(String, String)>,
@@ -30,8 +31,10 @@ impl TimeDimensionSymbol {
             "day".to_string()
         };
         let full_name = format!("{}_{}", base_symbol.full_name(), name_suffix);
+        let alias = format!("{}_{}", base_symbol.alias(), name_suffix);
         Rc::new(Self {
             base_symbol,
+            alias,
             granularity,
             granularity_obj,
             full_name,
@@ -58,6 +61,10 @@ impl TimeDimensionSymbol {
 
     pub fn alias_suffix(&self) -> String {
         self.alias_suffix.clone()
+    }
+
+    pub fn alias(&self) -> String {
+        self.alias.clone()
     }
 
     pub fn owned_by_cube(&self) -> bool {

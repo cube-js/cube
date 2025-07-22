@@ -88,6 +88,18 @@ impl MemberSymbol {
             Self::MemberExpression(e) => e.full_name().clone(),
         }
     }
+
+    pub fn alias(&self) -> String {
+        match self {
+            Self::Dimension(d) => d.alias(),
+            Self::TimeDimension(d) => d.alias(),
+            Self::Measure(m) => m.alias(),
+            Self::CubeName(c) => c.alias(),
+            Self::CubeTable(c) => c.alias(),
+            Self::MemberExpression(e) => e.alias(),
+        }
+    }
+
     pub fn name(&self) -> String {
         match self {
             Self::Dimension(d) => d.name().clone(),

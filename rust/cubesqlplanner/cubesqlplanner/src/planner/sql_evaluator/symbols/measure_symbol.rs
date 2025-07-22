@@ -64,6 +64,7 @@ pub enum MeasureTimeShifts {
 pub struct MeasureSymbol {
     cube_name: String,
     name: String,
+    alias: String,
     owned_by_cube: bool,
     measure_type: String,
     rolling_window: Option<RollingWindow>,
@@ -86,6 +87,7 @@ impl MeasureSymbol {
     pub fn new(
         cube_name: String,
         name: String,
+        alias: String,
         member_sql: Option<Rc<SqlCall>>,
         is_reference: bool,
         is_view: bool,
@@ -106,6 +108,7 @@ impl MeasureSymbol {
         Rc::new(Self {
             cube_name,
             name,
+            alias,
             member_sql,
             is_reference,
             is_view,
@@ -135,6 +138,7 @@ impl MeasureSymbol {
             Rc::new(Self {
                 cube_name: self.cube_name.clone(),
                 name: self.name.clone(),
+                alias: self.alias.clone(),
                 owned_by_cube: self.owned_by_cube,
                 measure_type,
                 rolling_window: None,
@@ -217,6 +221,7 @@ impl MeasureSymbol {
         Ok(Rc::new(Self {
             cube_name: self.cube_name.clone(),
             name: self.name.clone(),
+            alias: self.alias.clone(),
             owned_by_cube: self.owned_by_cube,
             measure_type: result_measure_type,
             rolling_window: self.rolling_window.clone(),
@@ -238,6 +243,10 @@ impl MeasureSymbol {
 
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.cube_name, self.name)
+    }
+
+    pub fn alias(&self) -> String {
+        self.alias.clone()
     }
 
     pub fn is_splitted_source(&self) -> bool {
@@ -686,6 +695,8 @@ impl SymbolFactory for MeasureSymbolFactory {
         let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
+        let alias =
+            PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
 
         let is_view = cube.static_data().is_view.unwrap_or(false);
 
@@ -705,6 +716,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
             cube_name,
             name,
+            alias,
             sql,
             is_reference,
             is_view,

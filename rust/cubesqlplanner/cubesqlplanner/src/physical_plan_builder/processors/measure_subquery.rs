@@ -46,12 +46,10 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
             &mut render_references,
         )?;
         for dim in measure_subquery.schema.dimensions.iter() {
-            select_builder
-                .add_projection_member(&dim.clone().as_base_member(query_tools.clone())?, None);
+            select_builder.add_projection_member(dim, None);
         }
         for meas in measure_subquery.schema.measures.iter() {
-            select_builder
-                .add_projection_member(&meas.clone().as_base_member(query_tools.clone())?, None);
+            select_builder.add_projection_member(meas, None);
         }
 
         context_factory.set_ungrouped_measure(true);

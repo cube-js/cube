@@ -46,8 +46,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
                 &None,
                 &mut render_references,
             )?;
-            let member_ref = member.clone().as_base_member(query_tools.clone())?;
-            select_builder.add_projection_member(&member_ref, None);
+            select_builder.add_projection_member(&member, None);
         }
 
         for measure in measure_calculation.schema.measures.iter() {
@@ -57,18 +56,14 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
                 &mut render_references,
             )?;
             let alias = references_builder.resolve_alias_for_member(&measure.full_name(), &None);
-            select_builder.add_projection_member(
-                &measure.clone().as_base_member(query_tools.clone())?,
-                alias,
-            );
+            select_builder.add_projection_member(measure, alias);
         }
 
         if !measure_calculation.is_ungrouped {
             let group_by = all_dimensions
                 .iter()
                 .map(|dim| -> Result<_, CubeError> {
-                    let member_ref = dim.clone().as_base_member(query_tools.clone())?;
-                    Ok(Expr::Member(MemberExpression::new(member_ref.clone())))
+                    Ok(Expr::Member(MemberExpression::new(dim.clone())))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             select_builder.set_group_by(group_by);

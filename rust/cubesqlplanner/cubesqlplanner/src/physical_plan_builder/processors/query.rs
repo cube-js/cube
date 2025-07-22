@@ -90,24 +90,22 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 &None,
                 &mut render_references,
             )?;
-            let member_ref = member.clone().as_base_member(query_tools.clone())?;
-            select_builder.add_projection_member(&member_ref, None);
+            select_builder.add_projection_member(member, None);
         }
 
         for (measure, exists) in self
             .builder
             .measures_for_query(&logical_plan.schema.measures, &context)
         {
-            let member_ref = measure.clone().as_base_member(query_tools.clone())?;
             if exists {
                 references_builder.resolve_references_for_member(
                     measure.clone(),
                     &None,
                     &mut render_references,
                 )?;
-                select_builder.add_projection_member(&member_ref, None);
+                select_builder.add_projection_member(&measure, None);
             } else {
-                select_builder.add_null_projection(&member_ref, None);
+                select_builder.add_null_projection(&measure, None);
             }
         }
 
@@ -123,9 +121,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                     .schema
                     .all_dimensions()
                     .map(|symbol| -> Result<_, CubeError> {
-                        Ok(Expr::Member(MemberExpression::new(
-                            symbol.clone().as_base_member(query_tools.clone())?,
-                        )))
+                        Ok(Expr::Member(MemberExpression::new(symbol.clone())))
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 select_builder.set_group_by(group_by);
