@@ -34,8 +34,8 @@ impl FullKeyAggregateQueryPlanner {
         };
 
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimension_symbols())
-            .set_time_dimensions(self.query_properties.time_dimension_symbols())
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures)
             .into_rc();
         Ok(Rc::new(FullKeyAggregate {
@@ -62,9 +62,9 @@ impl FullKeyAggregateQueryPlanner {
             .rendered_as_multiplied_measures
             .clone();
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimension_symbols())
-            .set_time_dimensions(self.query_properties.time_dimension_symbols())
-            .set_measures(self.query_properties.measure_symbols())
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_measures(self.query_properties.measures().clone())
             .set_multiplied_measures(multiplied_measures)
             .into_rc();
 

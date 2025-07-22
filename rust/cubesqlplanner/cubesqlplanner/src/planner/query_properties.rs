@@ -620,18 +620,6 @@ impl QueryProperties {
         &self.dimensions
     }
 
-    pub fn dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
-        self.dimensions.clone()
-    }
-
-    pub fn time_dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
-        self.time_dimensions.clone()
-    }
-
-    pub fn measure_symbols(&self) -> Vec<Rc<MemberSymbol>> {
-        self.measures().clone()
-    }
-
     pub fn time_dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
         &self.time_dimensions
     }
@@ -714,9 +702,6 @@ impl QueryProperties {
                 .chain(measures)
                 .collect_vec()
         }
-    }
-    pub fn all_member_symbols(&self, exclude_time_dimensions: bool) -> Vec<Rc<MemberSymbol>> {
-        self.all_members(exclude_time_dimensions)
     }
 
     pub fn get_member_symbols(
