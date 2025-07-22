@@ -1,6 +1,6 @@
 use crate::plan::{Expr, MemberExpression, OrderBy};
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::{BaseMember, OrderByItem, QueryProperties};
+use crate::planner::{OrderByItem, QueryProperties};
 use std::rc::Rc;
 
 pub struct OrderPlanner {

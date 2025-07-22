@@ -1,5 +1,4 @@
 use crate::planner::sql_evaluator::{MeasureTimeShifts, MemberSymbol};
-use crate::planner::BaseTimeDimension;
 use std::rc::Rc;
 
 #[derive(Clone)]

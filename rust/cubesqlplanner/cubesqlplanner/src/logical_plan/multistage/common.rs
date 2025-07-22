@@ -1,7 +1,6 @@
 use crate::logical_plan::pretty_print::*;
 use crate::planner::planners::multi_stage::MultiStageAppliedState;
 
-use crate::planner::BaseMember;
 use itertools::Itertools;
 
 impl PrettyPrint for MultiStageAppliedState {

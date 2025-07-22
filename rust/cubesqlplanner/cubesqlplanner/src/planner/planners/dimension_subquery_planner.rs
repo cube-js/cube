@@ -7,7 +7,6 @@ use crate::planner::sql_evaluator::{
     MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
 };
 use crate::planner::QueryProperties;
-use crate::planner::{BaseDimension, BaseMeasure, BaseMember};
 use cubenativeutils::CubeError;
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;

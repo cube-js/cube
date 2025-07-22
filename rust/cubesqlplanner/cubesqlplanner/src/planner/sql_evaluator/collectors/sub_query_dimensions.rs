@@ -2,7 +2,6 @@ use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::planners::JoinPlanner;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{DimensionSymbol, MemberSymbol, TraversalVisitor};
-use crate::planner::{BaseDimension, BaseMember};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;

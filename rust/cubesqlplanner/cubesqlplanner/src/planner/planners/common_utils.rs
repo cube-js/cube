@@ -1,6 +1,6 @@
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::{BaseCube, BaseDimension};
+use crate::planner::BaseCube;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

@@ -9,9 +9,8 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::BaseMember;
+use crate::planner::GranularityHelper;
 use crate::planner::QueryProperties;
-use crate::planner::{BaseDimension, BaseMeasure, BaseTimeDimension, GranularityHelper};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -106,9 +105,7 @@ impl MultiStageQueryPlanner {
         &self,
         base_member: Rc<MemberSymbol>,
     ) -> Result<(MultiStageInodeMember, bool), CubeError> {
-        let inode = if let Some(measure) =
-            BaseMeasure::try_new(base_member.clone(), self.query_tools.clone())?
-        {
+        let inode = if let Ok(measure) = base_member.as_measure() {
             let member_type = if measure.measure_type() == "rank" {
                 MultiStageInodeMemberType::Rank
             } else if !measure.is_calculated() {
@@ -117,22 +114,16 @@ impl MultiStageQueryPlanner {
                 MultiStageInodeMemberType::Calculate
             };
 
-            let time_shift = measure.time_shift();
+            let time_shift = measure.time_shift().clone();
 
             let is_ungrupped = match &member_type {
                 MultiStageInodeMemberType::Rank | MultiStageInodeMemberType::Calculate => true,
                 _ => self.query_properties.ungrouped(),
             };
-            let (reduce_by, add_group_by, group_by) =
-                if let Ok(measure_symbol) = measure.member_evaluator().as_measure() {
-                    (
-                        measure_symbol.reduce_by().clone().unwrap_or_default(),
-                        measure_symbol.add_group_by().clone().unwrap_or_default(),
-                        measure_symbol.group_by().clone(),
-                    )
-                } else {
-                    (vec![], vec![], None)
-                };
+
+            let reduce_by = measure.reduce_by().clone().unwrap_or_default();
+            let add_group_by = measure.add_group_by().clone().unwrap_or_default();
+            let group_by = measure.group_by().clone();
             (
                 MultiStageInodeMember::new(
                     member_type,

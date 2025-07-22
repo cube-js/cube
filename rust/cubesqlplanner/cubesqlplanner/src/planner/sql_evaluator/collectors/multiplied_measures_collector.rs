@@ -1,7 +1,6 @@
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
-use crate::planner::BaseMeasure;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
