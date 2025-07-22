@@ -47,6 +47,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     protected readonly cubeSymbols: TranspilerSymbolResolver,
     protected readonly cubeDictionary: TranspilerCubeResolver,
     protected readonly viewCompiler: TranspilerSymbolResolver,
+    protected readonly cubeJoinsResolver: TranspilerSymbolResolver,
   ) {
   }
 
@@ -96,7 +97,8 @@ export class CubePropContextTranspiler implements TranspilerInterface {
   protected sqlAndReferencesFieldVisitor(cubeName): TraverseObject {
     const resolveSymbol = n => this.viewCompiler.resolveSymbol(cubeName, n) ||
       this.cubeSymbols.resolveSymbol(cubeName, n) ||
-      this.cubeSymbols.isCurrentCube(n);
+      this.cubeSymbols.isCurrentCube(n) ||
+      this.cubeJoinsResolver.resolveSymbol(cubeName, n);
 
     return {
       ObjectProperty: (path) => {
