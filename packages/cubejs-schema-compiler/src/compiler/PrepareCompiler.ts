@@ -24,6 +24,7 @@ import { CompilerCache } from './CompilerCache';
 import { YamlCompiler } from './YamlCompiler';
 import { ViewCompilationGate } from './ViewCompilationGate';
 import type { ErrorReporter } from './ErrorReporter';
+import { CubeJoinsResolver } from './CubeJoinsResolver';
 
 export type PrepareCompilerOptions = {
   nativeInstance?: NativeInstance,
@@ -46,6 +47,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const nativeInstance = options.nativeInstance || new NativeInstance();
   const cubeDictionary = new CubeDictionary();
   const cubeSymbols = new CubeSymbols();
+  const cubeJoinsResolver = new CubeJoinsResolver();
   const viewCompiler = new CubeSymbols(true);
   const viewCompilationGate = new ViewCompilationGate();
   const cubeValidator = new CubeValidator(cubeSymbols);
@@ -62,7 +64,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const transpilers: TranspilerInterface[] = [
     new ValidationTranspiler(),
     new ImportExportTranspiler(),
-    new CubePropContextTranspiler(cubeSymbols, cubeDictionary, viewCompiler),
+    new CubePropContextTranspiler(cubeSymbols, cubeDictionary, viewCompiler, cubeJoinsResolver),
   ];
 
   if (!options.allowJsDuplicatePropsInSchema) {
@@ -73,7 +75,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
 
   const compiler = new DataSchemaCompiler(repo, Object.assign({}, {
     cubeNameCompilers: [cubeDictionary],
-    preTranspileCubeCompilers: [cubeSymbols, cubeValidator],
+    preTranspileCubeCompilers: [cubeSymbols, cubeValidator, cubeJoinsResolver],
     transpilers,
     viewCompilationGate,
     compiledScriptCache,
@@ -84,6 +86,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     compilerCache,
     cubeDictionary,
     cubeSymbols,
+    cubeJoinsResolver,
     extensions: {
       Funnels,
       RefreshKeys,

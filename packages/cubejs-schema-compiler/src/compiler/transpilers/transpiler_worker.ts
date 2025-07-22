@@ -10,6 +10,7 @@ import { CubePropContextTranspiler } from './CubePropContextTranspiler';
 import { ErrorReporter } from '../ErrorReporter';
 import { LightweightSymbolResolver } from './LightweightSymbolResolver';
 import { LightweightNodeCubeDictionary } from './LightweightNodeCubeDictionary';
+import { LightweightJoinResolver } from './LightweightJoinResolver';
 
 type TransferContent = {
   fileName: string;
@@ -17,22 +18,25 @@ type TransferContent = {
   transpilers: string[];
   cubeNames: string[];
   cubeSymbols: Record<string, Record<string, boolean>>;
+  cubeJoins: Record<string, Record<string, boolean>>;
 };
 
 const cubeDictionary = new LightweightNodeCubeDictionary();
 const cubeSymbols = new LightweightSymbolResolver();
+const cubeJoinsResolver = new LightweightJoinResolver();
 const errorsReport = new ErrorReporter(null, []);
 
 const transpilers = {
   ValidationTranspiler: new ValidationTranspiler(),
   ImportExportTranspiler: new ImportExportTranspiler(),
   CubeCheckDuplicatePropTranspiler: new CubeCheckDuplicatePropTranspiler(),
-  CubePropContextTranspiler: new CubePropContextTranspiler(cubeSymbols, cubeDictionary, cubeSymbols),
+  CubePropContextTranspiler: new CubePropContextTranspiler(cubeSymbols, cubeDictionary, cubeSymbols, cubeJoinsResolver),
 };
 
 const transpile = (data: TransferContent) => {
   cubeDictionary.setCubeNames(data.cubeNames);
   cubeSymbols.setSymbols(data.cubeSymbols);
+  cubeJoinsResolver.setJoinAliases(data.cubeJoins);
 
   const ast = parse(
     data.content,

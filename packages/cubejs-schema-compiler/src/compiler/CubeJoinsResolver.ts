@@ -9,7 +9,7 @@ export class CubeJoinsResolver extends CubeSymbols implements CompilerInterface 
   // key: cubeName with joins defined
   // 1st level value: join alias
   // 2nd level value: join definition
-  private cubeJoinAliases: Record<string, Record<string, JoinDefinition>>;
+  public cubeJoinAliases: Record<string, Record<string, JoinDefinition>>;
 
   // key: cubeName with joins defined
   // 1st level value: target cube name
@@ -27,7 +27,7 @@ export class CubeJoinsResolver extends CubeSymbols implements CompilerInterface 
     super.compile(cubes, errorReporter);
 
     this.cubeList.forEach(cube => {
-      if (!cube.joins) {
+      if (!cube.joins?.length) {
         return;
       }
 
