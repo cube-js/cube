@@ -2539,7 +2539,11 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       filters: [],
       order: [{
         id: 'visitor_checkins.id'
-      }],
+      },
+      {
+        id: 'visitor_checkins.created_at'
+      }
+      ],
       ungrouped: true
     });
 

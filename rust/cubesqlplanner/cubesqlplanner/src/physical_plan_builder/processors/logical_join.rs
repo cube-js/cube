@@ -25,8 +25,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
         let root = logical_join.root.cube.clone();
-        if logical_join.joins.is_empty() {
-            //&& dimension_subqueries.is_empty() {
+        if logical_join.joins.is_empty() && logical_join.dimension_subqueries.is_empty() {
             Ok(From::new_from_cube(
                 root.clone(),
                 Some(root.default_alias_with_prefix(&context.alias_prefix)),
@@ -36,18 +35,18 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 root.clone(),
                 Some(root.default_alias_with_prefix(&context.alias_prefix)),
             );
-            /* for dimension_subquery in dimension_subqueries //TODO move dimension_subquery to
-             * LogicalJoin mode
+
+            for dimension_subquery in logical_join
+                .dimension_subqueries //TODO move dimension_subquery to
                 .iter()
                 .filter(|d| &d.subquery_dimension.cube_name() == root.name())
             {
-                self.add_subquery_join(
+                self.builder.add_subquery_join(
                     dimension_subquery.clone(),
                     &mut join_builder,
-                    render_references,
                     context,
                 )?;
-            } */
+            }
             for join in logical_join.joins.iter() {
                 match join {
                     LogicalJoinItem::CubeJoinItem(CubeJoinItem { cube, on_sql }) => {
@@ -59,17 +58,17 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                                 on_sql.clone(),
                             )?),
                         );
-                        /* for dimension_subquery in dimension_subqueries
+                        for dimension_subquery in logical_join
+                            .dimension_subqueries
                             .iter()
                             .filter(|d| &d.subquery_dimension.cube_name() == cube.cube.name())
                         {
-                            self.add_subquery_join(
+                            self.builder.add_subquery_join(
                                 dimension_subquery.clone(),
                                 &mut join_builder,
-                                render_references,
                                 context,
                             )?;
-                        } */
+                        }
                     }
                 }
             }

@@ -29,18 +29,17 @@ impl FullKeyAggregateQueryPlanner {
                     resolve_multiplied_measures.clone(),
                 )
             });
-        let mut measures = if let Some(multiplied_source) = &resolved_multiplied_source {
+        let measures = if let Some(multiplied_source) = &resolved_multiplied_source {
             multiplied_source.schema().measures.clone()
         } else {
             Vec::new()
         };
 
-        let schema = Rc::new(LogicalSchema {
-            dimensions: self.query_properties.dimension_symbols(),
-            time_dimensions: self.query_properties.time_dimension_symbols(),
-            measures,
-            multiplied_measures: HashSet::new(),
-        });
+        let schema = LogicalSchema::default()
+            .set_dimensions(self.query_properties.dimension_symbols())
+            .set_time_dimensions(self.query_properties.time_dimension_symbols())
+            .set_measures(measures)
+            .into_rc();
         Ok(Rc::new(FullKeyAggregate {
             multiplied_measures_resolver: resolved_multiplied_source,
             multi_stage_subquery_refs,
@@ -64,12 +63,13 @@ impl FullKeyAggregateQueryPlanner {
             .full_key_aggregate_measures()?
             .rendered_as_multiplied_measures
             .clone();
-        let schema = Rc::new(LogicalSchema {
-            dimensions: self.query_properties.dimension_symbols(),
-            measures: self.query_properties.measure_symbols(),
-            time_dimensions: self.query_properties.time_dimension_symbols(),
-            multiplied_measures,
-        });
+        let schema = LogicalSchema::default()
+            .set_dimensions(self.query_properties.dimension_symbols())
+            .set_time_dimensions(self.query_properties.time_dimension_symbols())
+            .set_measures(self.query_properties.measure_symbols())
+            .set_multiplied_measures(multiplied_measures)
+            .into_rc();
+
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
             time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
@@ -79,7 +79,6 @@ impl FullKeyAggregateQueryPlanner {
         let result = Query {
             schema,
             multistage_members: all_multistage_members,
-            dimension_subqueries: vec![],
             filter: logical_filter,
             modifers: Rc::new(LogicalQueryModifiers {
                 offset: self.query_properties.offset(),

@@ -1,7 +1,7 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{Query, QuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Expr, Filter, MemberExpression, QueryPlan, Select, SelectBuilder};
+use crate::plan::{Cte, Expr, Filter, MemberExpression, QueryPlan, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
@@ -40,11 +40,32 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let query_tools = self.builder.query_tools();
         let mut context_factory = context.make_sql_nodes_factory();
         let mut render_references = HashMap::new();
+        let mut context = context.clone();
+        let mut ctes = vec![];
+
+        for multi_stage_member in logical_plan.multistage_members.iter() {
+            let query = self
+                .builder
+                .process_node(&multi_stage_member.member_type, &context)?;
+            let alias = multi_stage_member.name.clone();
+            context.add_multi_stage_schema(alias.clone(), query.schema());
+            ctes.push(Rc::new(Cte::new(Rc::new(query), alias)));
+        }
+
         let from = match &logical_plan.source {
-            QuerySource::LogicalJoin(join) => self.builder.process_node(join.as_ref(), context)?,
+            QuerySource::LogicalJoin(join) => {
+                let from = self.builder.process_node(join.as_ref(), &context)?;
+                let references_builder = ReferencesBuilder::new(from.clone());
+                self.builder.resolve_subquery_dimensions_references(
+                    &join.dimension_subqueries,
+                    &references_builder,
+                    &mut render_references,
+                )?;
+                from
+            }
             QuerySource::FullKeyAggregate(full_key_aggregate) => self
                 .builder
-                .process_node(full_key_aggregate.as_ref(), context)?,
+                .process_node(full_key_aggregate.as_ref(), &context)?,
             QuerySource::PreAggregation(pre_aggregation) => {
                 todo!()
                 /* let res = self.process_pre_aggregation(
@@ -64,6 +85,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let references_builder = ReferencesBuilder::new(from.clone());
 
         let mut select_builder = SelectBuilder::new(from);
+        select_builder.set_ctes(ctes);
         context_factory.set_ungrouped(logical_plan.modifers.ungrouped);
 
         for member in logical_plan.schema.all_dimensions() {
@@ -78,7 +100,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         for (measure, exists) in self
             .builder
-            .extend_measures(&logical_plan.schema.measures, &context)
+            .measures_for_query(&logical_plan.schema.measures, &context)
         {
             let member_ref = measure.clone().as_base_member(query_tools.clone())?;
             if exists {

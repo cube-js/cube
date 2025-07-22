@@ -121,11 +121,14 @@ impl PhysicalPlanBuilder {
         self.process_node(logical_plan.as_ref(), context)
     }
 
-    pub(super) fn extend_measures(
+    pub(super) fn measures_for_query(
         &self,
         node_measures: &Vec<Rc<MemberSymbol>>,
         context: &PushDownBuilderContext,
     ) -> Vec<(Rc<MemberSymbol>, bool)> {
+        if context.dimensions_query {
+            return vec![];
+        }
         if let Some(required_measures) = &context.required_measures {
             required_measures
                 .iter()
@@ -854,14 +857,15 @@ impl PhysicalPlanBuilder {
         }
     } */
 
-    fn add_subquery_join(
+    pub(super) fn add_subquery_join(
         &self,
         dimension_subquery: Rc<DimensionSubQuery>,
         join_builder: &mut JoinBuilder,
-        render_references: &mut HashMap<String, QualifiedColumnName>,
-        context: &PhysicalPlanBuilderContext,
+        context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
-        /* let sub_query = self.build_impl(dimension_subquery.query.clone(), context)?;
+        let mut context = context.clone();
+        context.dimensions_query = false;
+        let sub_query = self.process_node(dimension_subquery.query.as_ref(), &context)?;
         let dim_name = dimension_subquery.subquery_dimension.name();
         let cube_name = dimension_subquery.subquery_dimension.cube_name();
         let primary_keys_dimensions = &dimension_subquery.primary_keys_dimensions;
@@ -880,28 +884,36 @@ impl PhysicalPlanBuilder {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        if let Some(dim_ref) = sub_query.schema().resolve_member_reference(
-            &dimension_subquery
-                .measure_for_subquery_dimension
-                .full_name(),
-        ) {
-            let qualified_column_name =
-                QualifiedColumnName::new(Some(sub_query_alias.clone()), dim_ref);
-            render_references.insert(
-                dimension_subquery.subquery_dimension.full_name(),
-                qualified_column_name,
-            );
-        } else {
-            return Err(CubeError::internal(format!(
-                "Can't find source for subquery dimension {}",
-                dim_name
-            )));
-        }
         join_builder.left_join_subselect(
             sub_query,
             sub_query_alias,
             JoinCondition::new_dimension_join(conditions, false),
-        ); */
+        );
+        Ok(())
+    }
+
+    pub(super) fn resolve_subquery_dimensions_references(
+        &self,
+        dimension_subqueries: &Vec<Rc<DimensionSubQuery>>,
+        references_builder: &ReferencesBuilder,
+        render_references: &mut HashMap<String, QualifiedColumnName>,
+    ) -> Result<(), CubeError> {
+        for dimension_subquery in dimension_subqueries.iter() {
+            if let Some(dim_ref) = references_builder.find_reference_for_member(
+                &dimension_subquery
+                    .measure_for_subquery_dimension
+                    .full_name(),
+                &None,
+            ) {
+                render_references
+                    .insert(dimension_subquery.subquery_dimension.full_name(), dim_ref);
+            } else {
+                return Err(CubeError::internal(format!(
+                    "Can't find source for subquery dimension {}",
+                    dimension_subquery.subquery_dimension.full_name()
+                )));
+            }
+        }
         Ok(())
     }
 

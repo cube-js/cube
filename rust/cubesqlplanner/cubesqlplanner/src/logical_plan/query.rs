@@ -22,7 +22,6 @@ impl PrettyPrint for QuerySource {
 pub struct Query {
     pub multistage_members: Vec<Rc<LogicalMultiStageMember>>,
     pub schema: Rc<LogicalSchema>,
-    pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     pub filter: Rc<LogicalFilter>,
     pub modifers: Rc<LogicalQueryModifiers>,
     pub source: QuerySource,
@@ -42,12 +41,6 @@ impl PrettyPrint for Query {
 
         result.println("schema:", &state);
         self.schema.pretty_print(result, &details_state);
-        if !self.dimension_subqueries.is_empty() {
-            result.println("dimension_subqueries:", &state);
-            for subquery in self.dimension_subqueries.iter() {
-                subquery.pretty_print(result, &details_state);
-            }
-        }
         result.println("filters:", &state);
         self.filter.pretty_print(result, &details_state);
         self.modifers.pretty_print(result, &state);

@@ -75,23 +75,23 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     Some(pk_cube_alias.clone()),
                     JoinCondition::new_dimension_join(conditions, false),
                 );
-                /* for dimension_subquery in aggregate_multiplied_subquery.dimension_subqueries.iter()
+                for dimension_subquery in aggregate_multiplied_subquery.dimension_subqueries.iter()
                 {
-                    self.add_subquery_join(
+                    self.builder.add_subquery_join(
                         dimension_subquery.clone(),
                         &mut join_builder,
-                        &mut render_references,
                         context,
                     )?;
-                } */
+                }
             }
             AggregateMultipliedSubquerySouce::MeasureSubquery(measure_subquery) => {
-                todo!()
-                /* let subquery = self.process_measure_subquery(&measure_subquery, context)?;
+                let subquery = self
+                    .builder
+                    .process_node(measure_subquery.as_ref(), context)?;
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {
-                        let dim_ref = dim.clone().as_base_member(self.query_tools.clone())?;
+                        let dim_ref = dim.clone().as_base_member(query_tools.clone())?;
                         let alias_in_keys_query =
                             keys_query.schema().resolve_member_alias(&dim_ref);
                         let keys_query_ref = Expr::Reference(QualifiedColumnName::new(
@@ -114,7 +114,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                         QualifiedColumnName::new(
                             Some(pk_cube_alias.clone()),
                             subquery.schema().resolve_member_alias(
-                                &meas.clone().as_base_member(self.query_tools.clone())?,
+                                &meas.clone().as_base_member(query_tools.clone())?,
                             ),
                         ),
                     );
@@ -126,7 +126,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     subquery,
                     pk_cube_alias.clone(),
                     JoinCondition::new_dimension_join(conditions, false),
-                ); */
+                );
             }
         }
 
@@ -134,6 +134,13 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from.clone());
         let mut group_by = Vec::new();
+
+        self.builder.resolve_subquery_dimensions_references(
+            &aggregate_multiplied_subquery.dimension_subqueries,
+            &references_builder,
+            &mut render_references,
+        )?;
+
         for member in aggregate_multiplied_subquery.schema.all_dimensions() {
             references_builder.resolve_references_for_member(
                 member.clone(),
@@ -147,7 +154,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         }
         for (measure, exists) in self
             .builder
-            .extend_measures(&aggregate_multiplied_subquery.schema.measures, &context)
+            .measures_for_query(&aggregate_multiplied_subquery.schema.measures, &context)
         {
             let member_ref = measure.clone().as_base_member(query_tools.clone())?;
             if exists {

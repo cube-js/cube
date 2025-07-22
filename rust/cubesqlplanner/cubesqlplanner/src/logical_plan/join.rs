@@ -1,5 +1,5 @@
 use super::pretty_print::*;
-use super::Cube;
+use super::*;
 use crate::planner::sql_evaluator::SqlCall;
 use std::rc::Rc;
 
@@ -34,6 +34,7 @@ impl PrettyPrint for LogicalJoinItem {
 pub struct LogicalJoin {
     pub root: Rc<Cube>,
     pub joins: Vec<LogicalJoinItem>,
+    pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
 }
 
 impl PrettyPrint for LogicalJoin {
@@ -47,6 +48,13 @@ impl PrettyPrint for LogicalJoin {
         let state = state.new_level();
         for join in self.joins.iter() {
             join.pretty_print(result, &state);
+        }
+        if !self.dimension_subqueries.is_empty() {
+            result.println("dimension_subqueries:", &state);
+            let details_state = state.new_level();
+            for subquery in self.dimension_subqueries.iter() {
+                subquery.pretty_print(result, &details_state);
+            }
         }
     }
 }

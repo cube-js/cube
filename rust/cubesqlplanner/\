@@ -5,8 +5,8 @@ use crate::logical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
-    Expr, Filter, From, FromSource, JoinBuilder, JoinCondition, MemberExpression,
-    QualifiedColumnName, QueryPlan, Select, SelectBuilder, SingleAliasedSource, Union,
+    Expr, Filter, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName,
+    QueryPlan, Select, SelectBuilder, Union,
 };
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
@@ -83,30 +83,7 @@ impl<'a> FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'a> {
                 ResolvedMultipliedMeasures::PreAggregation(simple_query) => todo!(),
             }
         }
-        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs.iter() {
-            let multi_stage_schema = context.get_multi_stage_schema(&multi_stage_ref.name)?;
-            let multi_stage_source = SingleAliasedSource::new_from_table_reference(
-                multi_stage_ref.name.clone(),
-                multi_stage_schema.clone(),
-                None,
-            );
-            let mut keys_select_builder =
-                SelectBuilder::new(From::new(FromSource::Single(multi_stage_source.clone())));
-            for dim in full_key_aggregate.schema.all_dimensions() {
-                let member_ref = dim.clone().as_base_member(query_tools.clone())?;
-                let alias = multi_stage_schema.resolve_member_alias(&member_ref);
-                let reference = QualifiedColumnName::new(None, alias);
-                keys_select_builder.add_projection_member_reference(&member_ref, reference);
-            }
-            let sql_context = SqlNodesFactory::new();
-            keys_select_builder.set_distinct();
-            let keys_select = Rc::new(keys_select_builder.build(sql_context.clone()));
-            keys_queries.push(keys_select);
-
-            let data_select_builder =
-                SelectBuilder::new(From::new(FromSource::Single(multi_stage_source)));
-            let data_select = Rc::new(data_select_builder.build(sql_context));
-            data_queries.push(data_select);
+        for cte_souce in full_key_aggregate.cte_sources.iter() {
         }
         if data_queries.is_empty() {
             return Err(CubeError::internal(format!(
@@ -231,22 +208,6 @@ impl<'a> FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'a> {
                 ResolvedMultipliedMeasures::PreAggregation(simple_query) => todo!(),
             }
         }
-
-        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs.iter() {
-            let multi_stage_schema = context.get_multi_stage_schema(&multi_stage_ref.name)?;
-            let multi_stage_source = SingleAliasedSource::new_from_table_reference(
-                multi_stage_ref.name.clone(),
-                multi_stage_schema.clone(),
-                None,
-            );
-            let sql_context = SqlNodesFactory::new();
-
-            let data_select_builder =
-                SelectBuilder::new(From::new(FromSource::Single(multi_stage_source)));
-            let data_select = Rc::new(data_select_builder.build(sql_context));
-            data_queries.push(data_select);
-        }
-
         if data_queries.is_empty() {
             return Err(CubeError::internal(format!(
                 "FullKeyAggregate should have at least one source: {}",
@@ -314,13 +275,12 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
         full_key_aggregate: &FullKeyAggregate,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        /* let strategy: Rc<dyn FullKeyAggregateStrategy> =
-        if full_key_aggregate.schema.has_dimensions() {
-            KeysFullKeyAggregateStrategy::new(self.builder)
-        } else {
-            InnerJoinFullKeyAggregateStrategy::new(self.builder)
-        }; */
-        let strategy = InnerJoinFullKeyAggregateStrategy::new(self.builder);
+        let strategy: Rc<dyn FullKeyAggregateStrategy> =
+            if full_key_aggregate.schema.has_dimensions() {
+                KeysFullKeyAggregateStrategy::new(self.builder)
+            } else {
+                InnerJoinFullKeyAggregateStrategy::new(self.builder)
+            };
         strategy.process(full_key_aggregate, context)
     }
 }
