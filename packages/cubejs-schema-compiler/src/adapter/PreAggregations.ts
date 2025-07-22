@@ -1404,7 +1404,7 @@ export class PreAggregations {
     if (tables.length === 1) {
       return tables[0].tableName;
     }
-    const union = tables.map(table => `SELECT ${table.columns.join(', ')} FROM ${table.tableName} as ${table.tableName}_pre_agg`).join(' UNION ALL ');
+    const union = tables.map(table => `SELECT ${table.columns.join(', ')} FROM ${table.tableName}`).join(' UNION ALL ');
     return `(${union})`;
   }
 

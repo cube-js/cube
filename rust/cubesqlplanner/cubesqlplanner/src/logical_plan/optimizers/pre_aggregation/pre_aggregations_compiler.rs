@@ -193,7 +193,7 @@ impl PreAggregationsCompiler {
         } else {
             Vec::new()
         };
-        if rollups.len() == 0 {
+        if rollups.is_empty() {
             return Err(CubeError::user(format!(
                 "rollupLambda '{}.{}' should reference at least one rollup",
                 name.cube_name, name.name

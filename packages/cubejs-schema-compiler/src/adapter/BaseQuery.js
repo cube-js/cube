@@ -336,12 +336,13 @@ export class BaseQuery {
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
-    this.canUseNativeSqlPlannerPreAggregation = true;
-    /* if (this.useNativeSqlPlanner && !this.neverUseSqlPlannerPreaggregation()) {
+    this.canUseNativeSqlPlannerPreAggregation = getEnv('nativeSqlPlannerPreAggregations');
+    this.canUseNativeSqlPlannerPreAggregation = getEnv('nativeSqlPlannerPreAggregations');
+    if (this.useNativeSqlPlanner && !this.canUseNativeSqlPlannerPreAggregation && !this.neverUseSqlPlannerPreaggregation()) {
       const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
 
       this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0;
-    } */
+    }
     this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
@@ -830,7 +831,6 @@ export class BaseQuery {
           return this.newQueryWithoutNative().buildSqlAndParams(exportAnnotatedSql);
         }
       }
-      console.log("!!!!! RRRRR");
 
       return this.buildSqlAndParamsRust(exportAnnotatedSql);
     }
@@ -906,8 +906,6 @@ export class BaseQuery {
     if (preAggregation) {
       this.preAggregations.preAggregationForQuery = preAggregation;
     }
-    console.log("!!! pags", preAggregation);
-    console.log("!!! query", query);
     return [query, paramsArray];
   }
 

@@ -11,6 +11,7 @@ use std::rc::Rc;
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
     driver_tools: Rc<dyn DriverTools>,
+    external: bool,
 }
 pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
     name: "UnderscoreUpper",
@@ -41,16 +42,21 @@ pub const UPPER_UPPER_BOUND: Boundary = Boundary {
 };
 
 impl PlanSqlTemplates {
-    pub fn try_new(driver_tools: Rc<dyn DriverTools>) -> Result<Self, CubeError> {
+    pub fn try_new(driver_tools: Rc<dyn DriverTools>, external: bool) -> Result<Self, CubeError> {
         let render = driver_tools.sql_templates()?;
         Ok(Self {
             render,
             driver_tools,
+            external,
         })
     }
 
     pub fn convert_tz(&self, field: String) -> Result<String, CubeError> {
         self.driver_tools.convert_tz(field)
+    }
+
+    pub fn is_external(&self) -> bool {
+        self.external
     }
 
     pub fn time_grouped_column(

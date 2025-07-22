@@ -299,10 +299,10 @@ impl PhysicalPlanBuilder {
     ) -> Result<SingleAliasedSource, CubeError> {
         match source {
             PreAggregationSource::Single(table) => self.make_pre_aggregation_table_source(table),
-            PreAggregationSource::Union(union) => Err(CubeError::user(format!(
+            PreAggregationSource::Union(_) => Err(CubeError::user(format!(
                 "Lambda rollups not allowed inside join rollups"
             ))),
-            PreAggregationSource::Join(join) => {
+            PreAggregationSource::Join(_) => {
                 Err(CubeError::user(format!("Nested rollup joins not allowed")))
             }
         }
@@ -325,6 +325,12 @@ impl PhysicalPlanBuilder {
             let mut select_builder = SelectBuilder::new(from);
             for dim in pre_aggregation.dimensions.iter() {
                 let member_ref = dim.clone().as_base_member(self.query_tools.clone())?;
+                let name_in_table = BaseMemberHelper::default_alias(
+                    &item.cube_name,
+                    &dim.name(),
+                    &None,
+                    self.query_tools.clone(),
+                )?;
                 let alias = BaseMemberHelper::default_alias(
                     &dim.cube_name(),
                     &dim.name(),
@@ -333,12 +339,18 @@ impl PhysicalPlanBuilder {
                 )?;
                 select_builder.add_projection_reference_member(
                     &member_ref,
-                    QualifiedColumnName::new(None, alias.clone()),
-                    None,
+                    QualifiedColumnName::new(None, name_in_table),
+                    Some(alias),
                 );
             }
             for (dim, granularity) in pre_aggregation.time_dimensions.iter() {
                 let member_ref = dim.clone().as_base_member(self.query_tools.clone())?;
+                let name_in_table = BaseMemberHelper::default_alias(
+                    &item.cube_name,
+                    &dim.name(),
+                    granularity,
+                    self.query_tools.clone(),
+                )?;
                 let alias = BaseMemberHelper::default_alias(
                     &dim.cube_name(),
                     &dim.name(),
@@ -347,12 +359,18 @@ impl PhysicalPlanBuilder {
                 )?;
                 select_builder.add_projection_reference_member(
                     &member_ref,
-                    QualifiedColumnName::new(None, alias.clone()),
-                    None,
+                    QualifiedColumnName::new(None, name_in_table.clone()),
+                    Some(alias),
                 );
             }
             for meas in pre_aggregation.measures.iter() {
                 let member_ref = meas.clone().as_base_member(self.query_tools.clone())?;
+                let name_in_table = BaseMemberHelper::default_alias(
+                    &item.cube_name,
+                    &meas.name(),
+                    &meas.alias_suffix(),
+                    self.query_tools.clone(),
+                )?;
                 let alias = BaseMemberHelper::default_alias(
                     &meas.cube_name(),
                     &meas.name(),
@@ -361,8 +379,8 @@ impl PhysicalPlanBuilder {
                 )?;
                 select_builder.add_projection_reference_member(
                     &member_ref,
-                    QualifiedColumnName::new(None, alias.clone()),
-                    None,
+                    QualifiedColumnName::new(None, name_in_table.clone()),
+                    Some(alias),
                 );
             }
             let context = SqlNodesFactory::new();

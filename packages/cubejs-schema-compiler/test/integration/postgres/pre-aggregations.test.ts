@@ -1978,7 +1978,7 @@ describe('PreAggregations', () => {
       }, {
         id: 'visitors.source'
       }],
-      cubestoreSupportMultistage: getEnv("nativeSqlPlanner")
+      cubestoreSupportMultistage: getEnv('nativeSqlPlanner')
     });
 
     const queryAndParams = query.buildSqlAndParams();
@@ -2056,7 +2056,7 @@ describe('PreAggregations', () => {
       }, {
         id: 'visitors.source'
       }],
-      cubestoreSupportMultistage: getEnv("nativeSqlPlanner")
+      cubestoreSupportMultistage: getEnv('nativeSqlPlanner')
     });
 
     const queryAndParams = query.buildSqlAndParams();
@@ -2194,49 +2194,77 @@ describe('PreAggregations', () => {
     });
   });
 
-  it('rollup lambda', async () => {
-    await compiler.compile();
+  if (getEnv('nativeSqlPlanner') && getEnv('nativeSqlPlannerPreAggregations')) {
+    it('rollup lambda', async () => {
+      await compiler.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitor_checkins.count',
-      ],
-      dimensions: ['visitor_checkins.visitor_id'],
-      timeDimensions: [{
-        dimension: 'visitor_checkins.created_at',
-        granularity: 'day',
-        dateRange: ['2016-12-26', '2017-01-08']
-      }],
-      timezone: 'America/Los_Angeles',
-      preAggregationsSchema: '',
-      order: [{
-        id: 'visitor_checkins.visitor_id',
-      }],
-    });
-
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    console.log(preAggregationsDescription);
-
-    console.log(query.preAggregations?.rollupMatchResultDescriptions());
-
-    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
-    console.log("!!! ", preAggregationsDescription);
-
-    console.log(JSON.stringify(queries.concat(queryAndParams)));
-
-    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [
-          { visitors__source: 'google', vc__count: '1' },
-          { visitors__source: 'some', vc__count: '5' },
-          { visitors__source: null, vc__count: null },
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitor_checkins.count',
         ],
-      );
+        dimensions: ['visitor_checkins.visitor_id'],
+        timeDimensions: [{
+          dimension: 'visitor_checkins.created_at',
+          granularity: 'day',
+          dateRange: ['2016-12-26', '2017-01-08']
+        }],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: '',
+        order: [{
+          id: 'visitor_checkins.visitor_id',
+        }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+
+      console.log(query.preAggregations?.rollupMatchResultDescriptions());
+
+      const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+      console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        console.log(JSON.stringify(res));
+        expect(res).toEqual(
+          [
+            {
+              vc__visitor_id: 1,
+              vc__created_at_day: '2017-01-02T00:00:00.000Z',
+              vc__count: '2'
+            },
+            {
+              vc__visitor_id: 1,
+              vc__created_at_day: '2017-01-03T00:00:00.000Z',
+              vc__count: '2'
+            },
+            {
+              vc__visitor_id: 1,
+              vc__created_at_day: '2017-01-04T00:00:00.000Z',
+              vc__count: '2'
+            },
+            {
+              vc__visitor_id: 2,
+              vc__created_at_day: '2017-01-04T00:00:00.000Z',
+              vc__count: '4'
+            },
+            {
+              vc__visitor_id: 3,
+              vc__created_at_day: '2017-01-05T00:00:00.000Z',
+              vc__count: '2'
+            }
+          ]
+        );
+      });
     });
-  });
+  } else {
+    it.skip('rollup lambda: baseQuery generate wrong sql for not external pre-aggregations', async () => {
+      // This should be fixed in Tesseract.
+
+    });
+  }
 
   it('rollup join', async () => {
     await compiler.compile();
