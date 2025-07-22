@@ -116,9 +116,10 @@ export type PreAggregationDefinitionRollup = BasePreAggregationDefinition & {
 export type PreAggregationDefinition = PreAggregationDefinitionRollup;
 
 export type JoinDefinition = {
-  name: string,
-  relationship: string,
-  sql: (...args: any[]) => string,
+  name: string;
+  relationship: string;
+  sql: (...args: any[]) => string;
+  alias?: string;
 };
 
 export type Filter =
