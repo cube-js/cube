@@ -123,7 +123,7 @@ has to the database.
 ## `CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`
 
 How many pre-aggregations the refresh worker will build in parallel for each
-application id as determined by the [`context_to_app_id`](#context_to_app_id)
+application id as determined by the [`context_to_app_id`][ref-context-to-app-id]
 configuration option.
 
 Note that this parameter doesn't override the overall refresh worker concurrency,
@@ -579,7 +579,7 @@ The mount path to use for a [Databricks DBFS mount][databricks-docs-dbfs].
 ## `CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN`
 
 An ARN of an AWS IAM role with permission to write to the configured bucket (see
-[`CUBEJS_DB_EXPORT_BUCKET`](#cubejs-db-export-bucket)).
+`CUBEJS_DB_EXPORT_BUCKET`).
 
 <InfoBox>
 
@@ -895,7 +895,7 @@ If `true`, enables [development mode](/product/configuration#development-mode).
 ## `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`
 
 If `true`, it enables dropping pre-aggregations that Refresh Worker doesn't
-touch within [`CUBEJS_TOUCH_PRE_AGG_TIMEOUT`](#cubejs-touch-pre-agg-timeout).
+touch within `CUBEJS_TOUCH_PRE_AGG_TIMEOUT`.
 Pre-aggregations are touched whenever they are rebuilt or a Refresh Worker
 checks its freshness. The first drop will be initiated when the Refresh Worker
 is able to check freshness for every `scheduledRefresh: true` pre-aggregation.
@@ -1000,7 +1000,7 @@ option](/product/configuration/reference/config#jwt).
 ## `CUBEJS_JWT_KEY`
 
 The secret key used to sign and verify JWTs. Similar to
-[`CUBEJS_API_SECRET`](#cubejs-api-secret).
+`CUBEJS_API_SECRET`.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1054,15 +1054,16 @@ connections on.
 If `true`, this instance of Cube will build pre-aggregations, even if it is an
 API instance.
 
-| Possible Values | Default in Development | Default in Production                                           |
-| --------------- | ---------------------- | --------------------------------------------------------------- |
-| `true`, `false` | `true`                 | `false` <sup>[\*](#cubejs-pre-aggregations-builder-notes)</sup> |
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `false`               |
 
-### Notes
+<InfoBox>
 
-If Cube is configured to act as a refresh worker instance using
-[`CUBEJS_REFRESH_WORKER`](#cubejs-refresh-worker), then
-`CUBEJS_PRE_AGGREGATIONS_BUILDER` will be `true`.
+If Cube is configured to act as a refresh worker instance using `CUBEJS_REFRESH_WORKER`,
+then `CUBEJS_PRE_AGGREGATIONS_BUILDER` will be `true`.
+
+</InfoBox>
 
 ## `CUBEJS_PRE_AGGREGATIONS_SCHEMA`
 
@@ -1354,7 +1355,7 @@ If the refresh worker’s throughput isn’t sufficient and the Cube Refresh Wor
 
 The number of seconds without a touch before pre-aggregation is considered
 orphaned and marked for removal. Please see
-[`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`](#cubejs-drop-pre-agg-without-touch) to
+`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` to
 learn more.
 
 | Possible Values | Default in Development | Default in Production |
@@ -1495,7 +1496,7 @@ The address/port pair for Cube Store's HTTP interface.
 ## `CUBESTORE_HTTP_PORT`
 
 The port for Cube Store to listen to HTTP connections on. Ignored when
-[`CUBESTORE_HTTP_BIND_ADDR`](#cubestore-http-bind-addr) is set.
+`CUBESTORE_HTTP_BIND_ADDR` is set.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -1798,3 +1799,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-multi-stage-calculations]: /product/data-modeling/concepts/multi-stage-calculations
 [ref-folders]: /product/data-modeling/reference/view#folders
 [ref-dataviz-tools]: /product/configuration/visualization-tools
+[ref-context-to-app-id]: /product/configuration/reference/config#context_to_app_id
