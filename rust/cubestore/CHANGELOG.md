@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.41](https://github.com/cube-js/cube/compare/v1.3.40...v1.3.41) (2025-07-22)
+
+### Features
+
+- **cubestore:** Upgrade rocksdb to 7.10.2 from 7.9.2 ([#9802](https://github.com/cube-js/cube/issues/9802)) ([585bb1e](https://github.com/cube-js/cube/commit/585bb1e2c4992b13e1919623a6fcf38ed00d96af))
+
 ## [1.3.40](https://github.com/cube-js/cube/compare/v1.3.39...v1.3.40) (2025-07-20)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
