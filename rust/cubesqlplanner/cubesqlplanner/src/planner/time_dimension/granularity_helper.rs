@@ -1,5 +1,4 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::logical_plan::Cube;
 use crate::planner::sql_evaluator::Compiler;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::Granularity;

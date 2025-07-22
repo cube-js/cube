@@ -61,7 +61,6 @@ impl SimpleQueryPlanner {
             &self.query_properties.all_member_symbols(false),
             &self.join_planner,
             &join,
-            self.query_tools.clone(),
         )?;
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
             &subquery_dimensions,

@@ -9,7 +9,6 @@ use std::rc::Rc;
 
 pub struct BaseSegment {
     full_name: String,
-    query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
     cube_name: String,
     name: String,
@@ -41,7 +40,6 @@ impl BaseSegment {
 
         Ok(Rc::new(Self {
             full_name,
-            query_tools,
             member_evaluator,
             cube_name,
             name,

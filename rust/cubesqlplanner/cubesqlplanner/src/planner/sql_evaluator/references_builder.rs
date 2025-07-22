@@ -1,5 +1,5 @@
 use crate::plan::{
-    Filter, FilterItem, From, Join, QualifiedColumnName, SingleAliasedSource, SingleSource, Union,
+    Filter, FilterItem, From, Join, QualifiedColumnName, SingleAliasedSource, SingleSource,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -249,15 +249,6 @@ impl ReferencesBuilder {
             SingleSource::TableReference(_, schema) => schema.resolve_member_reference(member_name),
         };
         column_name.map(|col| QualifiedColumnName::new(Some(source.alias.clone()), col))
-    }
-
-    fn find_reference_column_for_member_in_union(
-        &self,
-        union: &Union,
-        member_name: &String,
-    ) -> Option<QualifiedColumnName> {
-        let column_name = union.schema().resolve_member_reference(member_name);
-        column_name.map(|col| QualifiedColumnName::new(None, col))
     }
 
     fn find_reference_column_for_member_in_join(

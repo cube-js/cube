@@ -21,13 +21,12 @@ impl<'a> LogicalNodeProcessor<'a, ResolvedMultipliedMeasures>
         resolved_multiplied_measures: &ResolvedMultipliedMeasures,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let query_tools = self.builder.query_tools();
         match resolved_multiplied_measures {
             ResolvedMultipliedMeasures::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
                 self.builder
                     .process_node(resolve_multiplied_measures.as_ref(), context)
             }
-            ResolvedMultipliedMeasures::PreAggregation(pre_aggregation_query) => {
+            ResolvedMultipliedMeasures::PreAggregation(_pre_aggregation_query) => {
                 todo!()
                 /* let pre_aggregation_query =
                     self.build_simple_query(pre_aggregation_query, context)?;

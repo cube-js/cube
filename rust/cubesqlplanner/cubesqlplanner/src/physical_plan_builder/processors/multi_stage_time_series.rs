@@ -19,7 +19,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
     fn process(
         &self,
         time_series: &MultiStageTimeSeries,
-        context: &PushDownBuilderContext,
+        _context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let (query_tools, plan_sql_templates) = self.builder.qtools_and_templates();
         let time_dimension = time_series.time_dimension.clone();

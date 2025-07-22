@@ -11,7 +11,7 @@ pub struct QueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
 
-impl<'a> QueryProcessor<'a> {
+impl QueryProcessor<'_> {
     fn is_over_full_aggregated_source(&self, logical_plan: &Query) -> bool {
         match logical_plan.source {
             QuerySource::FullKeyAggregate(_) => true,
@@ -61,7 +61,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             QuerySource::FullKeyAggregate(full_key_aggregate) => self
                 .builder
                 .process_node(full_key_aggregate.as_ref(), &context)?,
-            QuerySource::PreAggregation(pre_aggregation) => {
+            QuerySource::PreAggregation(_pre_aggregation) => {
                 todo!()
                 /* let res = self.process_pre_aggregation(
                     pre_aggregation,

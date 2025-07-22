@@ -1,6 +1,5 @@
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::planners::JoinPlanner;
-use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{DimensionSymbol, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -65,16 +64,14 @@ pub fn collect_sub_query_dimensions_from_members(
     members: &Vec<Rc<MemberSymbol>>,
     join_planner: &JoinPlanner,
     join: &Rc<dyn JoinDefinition>,
-    query_tools: Rc<QueryTools>,
 ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-    collect_sub_query_dimensions_from_symbols(&members, join_planner, join, query_tools)
+    collect_sub_query_dimensions_from_symbols(&members, join_planner, join)
 }
 
 pub fn collect_sub_query_dimensions_from_symbols(
     members: &Vec<Rc<MemberSymbol>>,
     join_planner: &JoinPlanner,
     join: &Rc<dyn JoinDefinition>,
-    query_tools: Rc<QueryTools>,
 ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
     let mut visitor = SubQueryDimensionsCollector::new();
     for member in members.iter() {

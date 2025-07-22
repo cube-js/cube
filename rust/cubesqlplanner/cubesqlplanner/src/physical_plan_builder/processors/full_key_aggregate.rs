@@ -28,7 +28,7 @@ impl<'a> KeysFullKeyAggregateStrategy<'a> {
     }
 }
 
-impl<'a> FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'a> {
+impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
     fn process(
         &self,
         full_key_aggregate: &FullKeyAggregate,
@@ -72,7 +72,7 @@ impl<'a> FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'a> {
                         data_queries.push(query);
                     }
                 }
-                ResolvedMultipliedMeasures::PreAggregation(simple_query) => todo!(),
+                ResolvedMultipliedMeasures::PreAggregation(_simple_query) => todo!(),
             }
         }
         for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs.iter() {
@@ -184,7 +184,7 @@ impl<'a> InnerJoinFullKeyAggregateStrategy<'a> {
     }
 }
 
-impl<'a> FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'a> {
+impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
     fn process(
         &self,
         full_key_aggregate: &FullKeyAggregate,
@@ -217,7 +217,7 @@ impl<'a> FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'a> {
                         data_queries.push(query);
                     }
                 }
-                ResolvedMultipliedMeasures::PreAggregation(simple_query) => todo!(),
+                ResolvedMultipliedMeasures::PreAggregation(_simple_query) => todo!(),
             }
         }
 
