@@ -12,9 +12,9 @@ use super::sql_evaluator::MemberSymbol;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::options_member::OptionsMember;
-use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
+use crate::plan::{Filter, FilterItem};
 use crate::planner::sql_evaluator::collectors::{
-    collect_multiplied_measures, has_cumulative_members, has_multi_stage_members,
+    collect_multiplied_measures, has_multi_stage_members,
 };
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -152,7 +152,6 @@ impl QueryProperties {
                             member_expression.static_data().definition.clone(),
                             query_tools.base_tools().clone(),
                         )?;
-                        let full_name = member_expression_symbol.full_name();
                         Ok(MemberSymbol::new_member_expression(
                             member_expression_symbol,
                         ))
@@ -818,7 +817,7 @@ impl QueryProperties {
                     .expect("No join groups returned for single measure multi-fact join group")
                     .0
                     .clone();
-                for item in collect_multiplied_measures(self.query_tools.clone(), m, join)? {
+                for item in collect_multiplied_measures(m, join)? {
                     if item.multiplied {
                         result
                             .rendered_as_multiplied_measures

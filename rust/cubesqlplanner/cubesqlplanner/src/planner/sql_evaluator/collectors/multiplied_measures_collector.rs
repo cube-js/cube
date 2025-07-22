@@ -1,5 +1,4 @@
 use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
@@ -67,20 +66,14 @@ pub struct MeasureResult {
 }
 
 pub struct MultipliedMeasuresCollector {
-    query_tools: Rc<QueryTools>,
     composite_measures: HashSet<String>,
     colllected_measures: Vec<MeasureResult>,
     join: Rc<dyn JoinDefinition>,
 }
 
 impl MultipliedMeasuresCollector {
-    pub fn new(
-        query_tools: Rc<QueryTools>,
-        composite_measures: HashSet<String>,
-        join: Rc<dyn JoinDefinition>,
-    ) -> Self {
+    pub fn new(composite_measures: HashSet<String>, join: Rc<dyn JoinDefinition>) -> Self {
         Self {
-            query_tools,
             composite_measures,
             join,
             colllected_measures: vec![],
@@ -134,7 +127,6 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
 }
 
 pub fn collect_multiplied_measures(
-    query_tools: Rc<QueryTools>,
     node: &Rc<MemberSymbol>,
     join: Rc<dyn JoinDefinition>,
 ) -> Result<Vec<MeasureResult>, CubeError> {
@@ -174,8 +166,7 @@ pub fn collect_multiplied_measures(
     let mut composite_collector = CompositeMeasuresCollector::new();
     composite_collector.apply(node, &CompositeMeasureCollectorState::new(None))?;
     let composite_measures = composite_collector.extract_result();
-    let mut visitor =
-        MultipliedMeasuresCollector::new(query_tools.clone(), composite_measures, join.clone());
+    let mut visitor = MultipliedMeasuresCollector::new(composite_measures, join.clone());
     visitor.apply(node, &())?;
     let result = visitor.extract_result();
     Ok(result)

@@ -21,7 +21,6 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         logical_join: &LogicalJoin,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let query_tools = self.builder.query_tools();
         let root = logical_join.root.cube.clone();
         if logical_join.joins.is_empty() && logical_join.dimension_subqueries.is_empty() {
             Ok(From::new_from_cube(
@@ -52,7 +51,6 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                             cube.cube.clone(),
                             Some(cube.cube.default_alias_with_prefix(&context.alias_prefix)),
                             JoinCondition::new_base_join(SqlJoinCondition::try_new(
-                                query_tools.clone(),
                                 on_sql.clone(),
                             )?),
                         );

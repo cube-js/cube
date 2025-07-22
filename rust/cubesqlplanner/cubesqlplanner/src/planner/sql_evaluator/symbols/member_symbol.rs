@@ -4,7 +4,6 @@ use super::{
     CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol,
     TimeDimensionSymbol,
 };
-use crate::planner::query_tools::QueryTools;
 use std::fmt::Debug;
 use std::rc::Rc;
 

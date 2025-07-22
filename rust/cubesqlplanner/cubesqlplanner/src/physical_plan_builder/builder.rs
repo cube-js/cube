@@ -33,10 +33,6 @@ impl PhysicalPlanBuilder {
         &self.query_tools
     }
 
-    pub(super) fn plan_sql_templates(&self) -> &PlanSqlTemplates {
-        &self.plan_sql_templates
-    }
-
     pub(super) fn qtools_and_templates(&self) -> (&Rc<QueryTools>, &PlanSqlTemplates) {
         (&self.query_tools, &self.plan_sql_templates)
     }
@@ -101,12 +97,7 @@ impl PhysicalPlanBuilder {
         if let Some(required_measures) = &context.required_measures {
             required_measures
                 .iter()
-                .map(|member| {
-                    (
-                        member.clone(),
-                        node_measures.iter().find(|m| m == &member).is_some(),
-                    )
-                })
+                .map(|member| (member.clone(), node_measures.iter().any(|m| m == member)))
                 .collect_vec()
         } else {
             node_measures

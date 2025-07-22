@@ -134,12 +134,8 @@ impl MultipliedMeasuresQueryPlanner {
         measures: &Vec<Rc<MemberSymbol>>,
         key_join: Rc<dyn JoinDefinition>,
     ) -> Result<Rc<AggregateMultipliedSubquery>, CubeError> {
-        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
-            &measures,
-            &self.join_planner,
-            &key_join,
-            self.query_tools.clone(),
-        )?;
+        let subquery_dimensions =
+            collect_sub_query_dimensions_from_symbols(&measures, &self.join_planner, &key_join)?;
 
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
             &subquery_dimensions,
@@ -228,12 +224,8 @@ impl MultipliedMeasuresQueryPlanner {
         measures: &Vec<Rc<MemberSymbol>>,
         primary_keys_dimensions: &Vec<Rc<MemberSymbol>>,
     ) -> Result<Rc<MeasureSubquery>, CubeError> {
-        let subquery_dimensions = collect_sub_query_dimensions_from_members(
-            &measures,
-            &self.join_planner,
-            &key_join,
-            self.query_tools.clone(),
-        )?;
+        let subquery_dimensions =
+            collect_sub_query_dimensions_from_members(&measures, &self.join_planner, &key_join)?;
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
             &subquery_dimensions,
             self.query_tools.clone(),
@@ -264,12 +256,8 @@ impl MultipliedMeasuresQueryPlanner {
             .query_properties
             .get_member_symbols(true, true, false, true, &measures);
 
-        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
-            &all_symbols,
-            &self.join_planner,
-            &join,
-            self.query_tools.clone(),
-        )?;
+        let subquery_dimensions =
+            collect_sub_query_dimensions_from_symbols(&all_symbols, &self.join_planner, &join)?;
 
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
             &subquery_dimensions,
@@ -326,12 +314,8 @@ impl MultipliedMeasuresQueryPlanner {
             self.query_properties
                 .get_member_symbols(true, true, false, true, &dimensions);
 
-        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
-            &all_symbols,
-            &self.join_planner,
-            &key_join,
-            self.query_tools.clone(),
-        )?;
+        let subquery_dimensions =
+            collect_sub_query_dimensions_from_symbols(&all_symbols, &self.join_planner, &key_join)?;
 
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
             &subquery_dimensions,
