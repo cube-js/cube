@@ -33,6 +33,6 @@ impl BaseJoinCondition for SqlJoinCondition {
         context: Rc<VisitorContext>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        evaluate_sql_call_with_context(&self.sql_call, self.query_tools.clone(), context, templates)
+        evaluate_sql_call_with_context(&self.sql_call, context, templates)
     }
 }

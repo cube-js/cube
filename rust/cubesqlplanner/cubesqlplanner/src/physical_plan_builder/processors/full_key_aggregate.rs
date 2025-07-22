@@ -1,11 +1,9 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{
-    pretty_print, FullKeyAggregate, ResolvedMultipliedMeasures,
-};
+use crate::logical_plan::{pretty_print, FullKeyAggregate, ResolvedMultipliedMeasures};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
-    Expr, From, FromSource, JoinBuilder, JoinCondition,
-    QualifiedColumnName, SelectBuilder, SingleAliasedSource, Union,
+    Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, SelectBuilder,
+    SingleAliasedSource, Union,
 };
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
@@ -95,12 +93,13 @@ impl<'a> FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'a> {
             }
             let sql_context = SqlNodesFactory::new();
             keys_select_builder.set_distinct();
-            let keys_select = Rc::new(keys_select_builder.build(sql_context.clone()));
+            let keys_select =
+                Rc::new(keys_select_builder.build(query_tools.clone(), sql_context.clone()));
             keys_queries.push(keys_select);
 
             let data_select_builder =
                 SelectBuilder::new(From::new(FromSource::Single(multi_stage_source)));
-            let data_select = Rc::new(data_select_builder.build(sql_context));
+            let data_select = Rc::new(data_select_builder.build(query_tools.clone(), sql_context));
             data_queries.push(data_select);
         }
         if data_queries.is_empty() {
@@ -138,7 +137,7 @@ impl<'a> FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'a> {
         keys_select_builder.set_distinct();
 
         let sql_context = SqlNodesFactory::new();
-        let keys_select = Rc::new(keys_select_builder.build(sql_context));
+        let keys_select = Rc::new(keys_select_builder.build(query_tools.clone(), sql_context));
 
         let keys_alias = "fk_aggregate_keys".to_string();
 
@@ -238,7 +237,7 @@ impl<'a> FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'a> {
 
             let data_select_builder =
                 SelectBuilder::new(From::new(FromSource::Single(multi_stage_source)));
-            let data_select = Rc::new(data_select_builder.build(sql_context));
+            let data_select = Rc::new(data_select_builder.build(query_tools.clone(), sql_context));
             data_queries.push(data_select);
         }
 

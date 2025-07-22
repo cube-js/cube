@@ -4,6 +4,7 @@ use crate::plan::{
 };
 
 use crate::plan::expression::FunctionExpression;
+use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::{BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
@@ -299,7 +300,7 @@ impl SelectBuilder {
         schema
     }
 
-    pub fn build(self, mut nodes_factory: SqlNodesFactory) -> Select {
+    pub fn build(self, query_tools: Rc<QueryTools>, mut nodes_factory: SqlNodesFactory) -> Select {
         let cube_references = Self::make_cube_references(self.from.clone());
         nodes_factory.set_cube_name_references(cube_references);
         let schema = if self.projection_columns.is_empty() {
@@ -314,7 +315,11 @@ impl SelectBuilder {
             group_by: self.group_by,
             having: self.having,
             order_by: self.order_by,
-            context: Rc::new(VisitorContext::new(&nodes_factory, self.filter)),
+            context: Rc::new(VisitorContext::new(
+                query_tools,
+                &nodes_factory,
+                self.filter,
+            )),
             ctes: self.ctes,
             is_distinct: self.is_distinct,
             limit: self.limit,

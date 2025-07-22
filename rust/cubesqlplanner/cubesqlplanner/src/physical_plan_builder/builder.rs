@@ -78,7 +78,9 @@ impl PhysicalPlanBuilder {
         let mut select_builder = SelectBuilder::new(from);
         select_builder.add_count_all(TOTAL_COUNT.to_string());
         let context_factory = context.make_sql_nodes_factory()?;
-        Ok(Rc::new(select_builder.build(context_factory)))
+        Ok(Rc::new(
+            select_builder.build(self.query_tools.clone(), context_factory),
+        ))
     }
 
     fn build_impl(

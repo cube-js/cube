@@ -26,12 +26,7 @@ impl BaseMember for BaseTimeDimension {
         context: Rc<VisitorContext>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        evaluate_with_context(
-            &self.member_evaluator,
-            self.query_tools.clone(),
-            context,
-            templates,
-        )
+        evaluate_with_context(&self.member_evaluator, context, templates)
     }
 
     fn alias_name(&self) -> String {

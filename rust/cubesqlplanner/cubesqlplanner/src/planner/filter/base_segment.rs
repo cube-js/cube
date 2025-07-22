@@ -52,12 +52,7 @@ impl BaseSegment {
         context: Rc<VisitorContext>,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        evaluate_with_context(
-            &self.member_evaluator,
-            self.query_tools.clone(),
-            context,
-            plan_templates,
-        )
+        evaluate_with_context(&self.member_evaluator, context, plan_templates)
     }
 
     pub fn full_name(&self) -> String {
