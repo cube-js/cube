@@ -22,20 +22,29 @@ impl PrettyPrint for PreAggregation {
         let state = state.new_level();
         result.println(&format!("name: {}", self.name), &state);
         result.println(&format!("cube_name: {}", self.cube_name), &state);
-        result.println(&format!("source:"), &state);
+        /* result.println(&format!("source:"), &state);
         match self.source.as_ref() {
-            PreAggregationSource::Table(table) => {
-                let state = state.new_level();
-                result.println(
-                    &format!("table: {}.{}", table.cube_name, table.name),
-                    &state,
-                );
-            }
+            PreAggregationSource::Single(table) => match table {
+                PreAggregationUnit::Table(table) => {
+                    let state = state.new_level();
+                    result.println(
+                        &format!("table: {}.{}", table.cube_name, table.name),
+                        &state,
+                    );
+                }
+                PreAggregationUnit::Union(union) => {
+                    result.println("Union:", &state);
+                    let state = state.new_level();
+                    for item in union.items.iter() {
+                        result.println(&format!("-{}.{}", item.cube_name, item.name), &state);
+                    }
+                }
+            },
             PreAggregationSource::Join(_) => {
                 let state = state.new_level();
                 result.println(&format!("rollup join"), &state);
             }
-        }
+        } */
         result.println(&format!("external: {}", self.external), &state);
         result.println(
             &format!(

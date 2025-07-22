@@ -278,6 +278,50 @@ describe('PreAggregations', () => {
       }
     })
 
+    cube('visitor_checkins2', {
+      sql: \`
+      select * from visitor_checkins
+      \`,
+
+      sqlAlias: 'vc2',
+
+      measures: {
+        count: {
+          type: 'count'
+        }
+      },
+
+      dimensions: {
+        id: {
+          type: 'number',
+          sql: 'id',
+          primaryKey: true
+        },
+        visitor_id: {
+          type: 'number',
+          sql: 'visitor_id'
+        },
+        source: {
+          type: 'string',
+          sql: 'source'
+        },
+        created_at: {
+          type: 'time',
+          sql: 'created_at'
+        }
+      },
+      preAggregations: {
+        forLambdaS: {
+          type: 'rollup',
+          measureReferences: [count],
+          dimensionReferences: [visitor_id],
+          timeDimensionReference: created_at,
+          partitionGranularity: 'day',
+          granularity: 'day'
+        },
+      }
+    })
+
 
     cube('visitor_checkins', {
       sql: \`
@@ -316,6 +360,10 @@ describe('PreAggregations', () => {
         main: {
           type: 'originalSql'
         },
+        lambda: {
+          type: 'rollupLambda',
+          rollups: [visitor_checkins.forLambda, visitor_checkins2.forLambdaS],
+        },
         forJoin: {
           type: 'rollup',
           measureReferences: [count],
@@ -326,6 +374,14 @@ describe('PreAggregations', () => {
           measureReferences: [count],
           dimensionReferences: [visitors.source],
           rollupReferences: [visitor_checkins.forJoin, visitors.forJoin],
+        },
+        forLambda: {
+          type: 'rollup',
+          measureReferences: [count],
+          dimensionReferences: [visitor_id],
+          timeDimensionReference: created_at,
+          partitionGranularity: 'day',
+          granularity: 'day'
         },
         joinedPartitioned: {
           type: 'rollupJoin',
@@ -2134,6 +2190,50 @@ describe('PreAggregations', () => {
             visitors__checkins_total: '1'
           }
         ]
+      );
+    });
+  });
+
+  it('rollup lambda', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.count',
+      ],
+      dimensions: ['visitor_checkins.visitor_id'],
+      timeDimensions: [{
+        dimension: 'visitor_checkins.created_at',
+        granularity: 'day',
+        dateRange: ['2016-12-26', '2017-01-08']
+      }],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+      order: [{
+        id: 'visitor_checkins.visitor_id',
+      }],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+
+    console.log(query.preAggregations?.rollupMatchResultDescriptions());
+
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+    console.log("!!! ", preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [
+          { visitors__source: 'google', vc__count: '1' },
+          { visitors__source: 'some', vc__count: '5' },
+          { visitors__source: null, vc__count: null },
+        ],
       );
     });
   });
