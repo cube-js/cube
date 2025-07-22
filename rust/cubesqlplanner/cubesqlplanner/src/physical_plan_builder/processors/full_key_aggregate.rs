@@ -7,7 +7,6 @@ use crate::plan::{
 };
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
-use crate::planner::BaseMember;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

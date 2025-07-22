@@ -6,7 +6,6 @@ use crate::plan::{
     SelectBuilder,
 };
 use crate::planner::sql_evaluator::ReferencesBuilder;
-use crate::planner::BaseMember;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;

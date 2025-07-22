@@ -1,5 +1,5 @@
 use super::sql_evaluator::{Compiler, MemberSymbol};
-use super::{BaseMember, ParamsAllocator};
+use super::ParamsAllocator;
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;

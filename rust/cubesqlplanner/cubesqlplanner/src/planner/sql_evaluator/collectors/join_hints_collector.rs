@@ -1,6 +1,5 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
-use crate::planner::BaseMeasure;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;

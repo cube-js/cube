@@ -8,7 +8,6 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{BaseMember, MemberSymbolRef};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;

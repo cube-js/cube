@@ -7,9 +7,7 @@ use crate::planner::sql_evaluator::collectors::{
     collect_sub_query_dimensions_from_members, collect_sub_query_dimensions_from_symbols,
 };
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::{
-    BaseMeasure, BaseMember, BaseMemberHelper, FullKeyAggregateMeasures, QueryProperties,
-};
+use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
