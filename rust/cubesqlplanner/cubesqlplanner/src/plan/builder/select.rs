@@ -6,6 +6,7 @@ use crate::plan::{
 use crate::plan::expression::FunctionExpression;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::{BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -58,11 +59,11 @@ impl SelectBuilder {
         }
     }
 
-    pub fn add_projection_member(&mut self, member: &Rc<dyn BaseMember>, alias: Option<String>) {
+    pub fn add_projection_member(&mut self, member: &Rc<MemberSymbol>, alias: Option<String>) {
         let alias = if let Some(alias) = alias {
             alias
         } else {
-            member.alias_name()
+            member.alias()
         };
 
         let expr = Expr::Member(MemberExpression::new(member.clone()));
@@ -78,7 +79,7 @@ impl SelectBuilder {
 
     pub fn add_projection_member_reference(
         &mut self,
-        member: &Rc<dyn BaseMember>,
+        member: &Rc<MemberSymbol>,
         reference: QualifiedColumnName,
     ) {
         let alias = reference.name().clone();
@@ -96,7 +97,7 @@ impl SelectBuilder {
 
     pub fn add_projection_group_any_member(
         &mut self,
-        member: &Rc<dyn BaseMember>,
+        member: &Rc<MemberSymbol>,
         reference: QualifiedColumnName,
     ) {
         let alias = reference.name().clone();
@@ -112,11 +113,11 @@ impl SelectBuilder {
             .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
     }
 
-    pub fn add_null_projection(&mut self, member: &Rc<dyn BaseMember>, alias: Option<String>) {
+    pub fn add_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: Option<String>) {
         let alias = if let Some(alias) = alias {
             alias
         } else {
-            member.alias_name()
+            member.alias()
         };
 
         let aliased_expr = AliasedExpr {
@@ -145,7 +146,7 @@ impl SelectBuilder {
     pub fn add_projection_function_expression(
         &mut self,
         function: &str,
-        args: Vec<Rc<dyn BaseMember>>,
+        args: Vec<Rc<MemberSymbol>>,
         alias: String,
     ) {
         let expr = Expr::Function(FunctionExpression {
@@ -188,14 +189,14 @@ impl SelectBuilder {
     }
     pub fn add_projection_coalesce_member(
         &mut self,
-        member: &Rc<dyn BaseMember>,
+        member: &Rc<MemberSymbol>,
         references: Vec<QualifiedColumnName>,
         alias: Option<String>,
     ) -> Result<(), CubeError> {
         let alias = if let Some(alias) = alias {
             alias
         } else {
-            member.alias_name()
+            member.alias()
         };
 
         let expr = if references.len() > 1 {

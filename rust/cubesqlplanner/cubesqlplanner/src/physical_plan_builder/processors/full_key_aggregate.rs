@@ -86,10 +86,9 @@ impl<'a> FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'a> {
             let mut keys_select_builder =
                 SelectBuilder::new(From::new(FromSource::Single(multi_stage_source.clone())));
             for dim in full_key_aggregate.schema.all_dimensions() {
-                let member_ref = dim.clone().as_base_member(query_tools.clone())?;
-                let alias = multi_stage_schema.resolve_member_alias(&member_ref);
+                let alias = multi_stage_schema.resolve_member_alias(dim);
                 let reference = QualifiedColumnName::new(None, alias);
-                keys_select_builder.add_projection_member_reference(&member_ref, reference);
+                keys_select_builder.add_projection_member_reference(dim, reference);
             }
             let sql_context = SqlNodesFactory::new();
             keys_select_builder.set_distinct();
@@ -131,8 +130,7 @@ impl<'a> FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'a> {
                 )));
             }
             let reference = QualifiedColumnName::new(None, alias.unwrap());
-            let member_ref = member.clone().as_base_member(query_tools.clone())?;
-            keys_select_builder.add_projection_member_reference(&member_ref, reference);
+            keys_select_builder.add_projection_member_reference(member, reference);
         }
         keys_select_builder.set_distinct();
 
@@ -150,14 +148,12 @@ impl<'a> FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'a> {
                 .schema
                 .all_dimensions()
                 .map(|dim| -> Result<_, CubeError> {
-                    let member_ref = dim.clone().as_base_member(query_tools.clone())?;
-                    let alias_in_keys_query =
-                        keys_select.schema().resolve_member_alias(&member_ref);
+                    let alias_in_keys_query = keys_select.schema().resolve_member_alias(dim);
                     let keys_query_ref = Expr::Reference(QualifiedColumnName::new(
                         Some(keys_alias.clone()),
                         alias_in_keys_query,
                     ));
-                    let alias_in_data_query = query.schema().resolve_member_alias(&member_ref);
+                    let alias_in_data_query = query.schema().resolve_member_alias(dim);
                     let data_query_ref = Expr::Reference(QualifiedColumnName::new(
                         Some(query_alias.clone()),
                         alias_in_data_query,
@@ -264,14 +260,12 @@ impl<'a> FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'a> {
                 .schema
                 .all_dimensions()
                 .map(|dim| -> Result<_, CubeError> {
-                    let member_ref = dim.clone().as_base_member(query_tools.clone())?;
-                    let alias_in_prev_query =
-                        data_queries[i].schema().resolve_member_alias(&member_ref);
+                    let alias_in_prev_query = data_queries[i].schema().resolve_member_alias(dim);
                     let prev_query_ref = Expr::Reference(QualifiedColumnName::new(
                         Some(prev_alias.clone()),
                         alias_in_prev_query,
                     ));
-                    let alias_in_data_query = query.schema().resolve_member_alias(&member_ref);
+                    let alias_in_data_query = query.schema().resolve_member_alias(dim);
                     let data_query_ref = Expr::Reference(QualifiedColumnName::new(
                         Some(query_alias.clone()),
                         alias_in_data_query,

@@ -54,14 +54,12 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {
-                        let member_ref = dim.clone().as_base_member(query_tools.clone())?;
-                        let alias_in_keys_query =
-                            keys_query.schema().resolve_member_alias(&member_ref);
+                        let alias_in_keys_query = keys_query.schema().resolve_member_alias(dim);
                         let keys_query_ref = Expr::Reference(QualifiedColumnName::new(
                             Some(keys_query_alias.clone()),
                             alias_in_keys_query,
                         ));
-                        let pk_cube_expr = Expr::Member(MemberExpression::new(member_ref.clone()));
+                        let pk_cube_expr = Expr::Member(MemberExpression::new(dim.clone()));
                         Ok(vec![(keys_query_ref, pk_cube_expr)])
                     })
                     .collect::<Result<Vec<_>, _>>()?;
@@ -87,15 +85,12 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {
-                        let dim_ref = dim.clone().as_base_member(query_tools.clone())?;
-                        let alias_in_keys_query =
-                            keys_query.schema().resolve_member_alias(&dim_ref);
+                        let alias_in_keys_query = keys_query.schema().resolve_member_alias(dim);
                         let keys_query_ref = Expr::Reference(QualifiedColumnName::new(
                             Some(keys_query_alias.clone()),
                             alias_in_keys_query,
                         ));
-                        let alias_in_measure_subquery =
-                            subquery.schema().resolve_member_alias(&dim_ref);
+                        let alias_in_measure_subquery = subquery.schema().resolve_member_alias(dim);
                         let measure_subquery_ref = Expr::Reference(QualifiedColumnName::new(
                             Some(pk_cube_alias.clone()),
                             alias_in_measure_subquery,
@@ -109,9 +104,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                         meas.full_name(),
                         QualifiedColumnName::new(
                             Some(pk_cube_alias.clone()),
-                            subquery.schema().resolve_member_alias(
-                                &meas.clone().as_base_member(query_tools.clone())?,
-                            ),
+                            subquery.schema().resolve_member_alias(meas),
                         ),
                     );
                 }
@@ -144,15 +137,13 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 &mut render_references,
             )?;
             let alias = references_builder.resolve_alias_for_member(&member.full_name(), &None);
-            let member_ref = member.clone().as_base_member(query_tools.clone())?;
-            group_by.push(Expr::Member(MemberExpression::new(member_ref.clone())));
-            select_builder.add_projection_member(&member_ref, alias);
+            group_by.push(Expr::Member(MemberExpression::new(member.clone())));
+            select_builder.add_projection_member(&member, alias);
         }
         for (measure, exists) in self
             .builder
             .measures_for_query(&aggregate_multiplied_subquery.schema.measures, &context)
         {
-            let member_ref = measure.clone().as_base_member(query_tools.clone())?;
             if exists {
                 if matches!(
                     aggregate_multiplied_subquery.source.as_ref(),
@@ -164,9 +155,9 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                         &mut render_references,
                     )?;
                 }
-                select_builder.add_projection_member(&member_ref, None);
+                select_builder.add_projection_member(&measure, None);
             } else {
-                select_builder.add_null_projection(&member_ref, None);
+                select_builder.add_null_projection(&measure, None);
             }
         }
         select_builder.set_group_by(group_by);

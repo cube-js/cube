@@ -49,10 +49,8 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
             .all_dimensions()
             .chain(keys_subquery.primary_keys_dimensions.iter())
         {
-            let member_ref: Rc<dyn BaseMember> =
-                MemberSymbolRef::try_new(member.clone(), query_tools.clone())?;
-            let alias = member_ref.alias_name();
-            select_builder.add_projection_member(&member_ref, Some(alias.clone()));
+            let alias = member.alias();
+            select_builder.add_projection_member(member, Some(alias));
         }
 
         select_builder.set_distinct();

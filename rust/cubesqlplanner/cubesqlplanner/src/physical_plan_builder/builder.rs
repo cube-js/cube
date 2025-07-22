@@ -843,14 +843,13 @@ impl PhysicalPlanBuilder {
         let conditions = primary_keys_dimensions
             .iter()
             .map(|dim| -> Result<_, CubeError> {
-                let dim = dim.clone().as_base_member(self.query_tools.clone())?;
                 let alias_in_sub_query = sub_query.schema().resolve_member_alias(&dim);
                 let sub_query_ref = Expr::Reference(QualifiedColumnName::new(
                     Some(sub_query_alias.clone()),
                     alias_in_sub_query.clone(),
                 ));
 
-                Ok(vec![(sub_query_ref, Expr::new_member(dim))])
+                Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))])
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -1116,10 +1115,8 @@ impl PhysicalPlanBuilder {
         let mut result = Vec::new();
         for o in order_by.iter() {
             for position in logical_schema.find_member_positions(&o.name()) {
-                let member_ref: Rc<dyn BaseMember> =
-                    MemberSymbolRef::try_new(o.member_symbol(), self.query_tools.clone())?;
                 result.push(OrderBy::new(
-                    Expr::Member(MemberExpression::new(member_ref)),
+                    Expr::Member(MemberExpression::new(o.member_symbol())),
                     position + 1,
                     o.desc(),
                 ));

@@ -31,10 +31,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageGetDateRange> for MultiStageGetDateR
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from);
         let mut context_factory = context.make_sql_nodes_factory()?;
-        let args = vec![get_date_range
-            .time_dimension
-            .clone()
-            .as_base_member(query_tools.clone())?];
+        let args = vec![get_date_range.time_dimension.clone()];
         select_builder.add_projection_function_expression(
             "MAX",
             args.clone(),

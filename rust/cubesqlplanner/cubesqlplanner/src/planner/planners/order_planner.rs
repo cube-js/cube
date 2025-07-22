@@ -1,4 +1,5 @@
 use crate::plan::{Expr, MemberExpression, OrderBy};
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::{BaseMember, OrderByItem, QueryProperties};
 use std::rc::Rc;
 
@@ -20,7 +21,7 @@ impl OrderPlanner {
 
     pub fn custom_order(
         order_by: &Vec<OrderByItem>,
-        members: &Vec<Rc<dyn BaseMember>>,
+        members: &Vec<Rc<MemberSymbol>>,
     ) -> Vec<OrderBy> {
         let mut result = Vec::new();
         for itm in order_by.iter() {

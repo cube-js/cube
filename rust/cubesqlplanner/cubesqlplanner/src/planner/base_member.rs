@@ -36,19 +36,7 @@ impl MemberSymbolRef {
         member_evaluator: Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
     ) -> Result<Rc<dyn BaseMember>, CubeError> {
-        let default_alias = match member_evaluator.as_ref() {
-            &MemberSymbol::TimeDimension(_)
-            | &MemberSymbol::Dimension(_)
-            | &MemberSymbol::Measure(_) => BaseMemberHelper::default_alias(
-                &member_evaluator.cube_name(),
-                &member_evaluator.name(),
-                &member_evaluator.alias_suffix(),
-                query_tools.clone(),
-            )?,
-            MemberSymbol::MemberExpression(_)
-            | MemberSymbol::CubeName(_)
-            | MemberSymbol::CubeTable(_) => query_tools.alias_name(&member_evaluator.name()),
-        };
+        let default_alias = member_evaluator.alias();
         let cube_name = member_evaluator.cube_name();
         let name = member_evaluator.name();
         Ok(Rc::new(Self {

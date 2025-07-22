@@ -37,12 +37,8 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
 
         let measure_input_schema = context.get_multi_stage_schema(&measure_input_ref)?;
 
-        let base_time_dimension_alias = measure_input_schema.resolve_member_alias(
-            &rolling_window
-                .time_dimension_in_measure_input
-                .clone()
-                .as_base_member(query_tools.clone())?,
-        );
+        let base_time_dimension_alias = measure_input_schema
+            .resolve_member_alias(&rolling_window.time_dimension_in_measure_input);
 
         let root_alias = format!("time_series");
         let measure_input_alias = format!("rolling_source");
@@ -119,8 +115,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             context_factory.add_dimensions_with_ignored_timezone(dim.full_name());
             let alias = references_builder
                 .resolve_alias_for_member(&dim.full_name(), &Some(measure_input_alias.clone()));
-            select_builder
-                .add_projection_member(&dim.clone().as_base_member(query_tools.clone())?, alias);
+            select_builder.add_projection_member(dim, alias);
         }
 
         for dim in rolling_window.schema.dimensions.iter() {
@@ -131,19 +126,17 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             )?;
             let alias = references_builder
                 .resolve_alias_for_member(&dim.full_name(), &Some(measure_input_alias.clone()));
-            select_builder
-                .add_projection_member(&dim.clone().as_base_member(query_tools.clone())?, alias);
+            select_builder.add_projection_member(dim, alias);
         }
 
         for measure in rolling_window.schema.measures.iter() {
-            let measure_ref = measure.clone().as_base_member(query_tools.clone())?;
-            let name_in_base_query = measure_input_schema.resolve_member_alias(&measure_ref);
+            let name_in_base_query = measure_input_schema.resolve_member_alias(measure);
             context_factory.add_ungrouped_measure_reference(
                 measure.full_name(),
                 QualifiedColumnName::new(Some(measure_input_alias.clone()), name_in_base_query),
             );
 
-            select_builder.add_projection_member(&measure_ref, None);
+            select_builder.add_projection_member(&measure, None);
         }
 
         if !rolling_window.is_ungrouped {
@@ -151,8 +144,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
                 .schema
                 .all_dimensions()
                 .map(|dim| -> Result<_, CubeError> {
-                    let member_ref = dim.clone().as_base_member(query_tools.clone())?;
-                    Ok(Expr::Member(MemberExpression::new(member_ref.clone())))
+                    Ok(Expr::Member(MemberExpression::new(dim.clone())))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             select_builder.set_group_by(group_by);
