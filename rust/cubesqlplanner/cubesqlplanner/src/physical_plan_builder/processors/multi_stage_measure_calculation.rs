@@ -80,7 +80,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
             );
         }
 
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let partition_by = measure_calculation
             .partition_by
             .iter()

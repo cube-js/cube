@@ -93,7 +93,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             on,
         );
 
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         context_factory.set_rolling_window(true);
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());

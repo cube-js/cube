@@ -28,7 +28,7 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
             .builder
             .process_node(measure_subquery.source.as_ref(), context)?;
 
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from);
 
