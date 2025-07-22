@@ -1058,10 +1058,10 @@ export class CubeSymbols implements CompilerInterface {
   }
 
   protected filterGroupFunctionDep() {
-    return (...filterParamArgs) => '';
+    return (..._filterParamArgs) => '';
   }
 
-  public resolveSymbol(cubeName, name: string) {
+  public resolveSymbol(cubeName: string | null, name: string) {
     const { sqlResolveFn, contextSymbols, collectJoinHints, depsResolveFn, currResolveIndexFn } = this.resolveSymbolsCallContext || {};
     if (name === 'USER_CONTEXT') {
       throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
@@ -1075,20 +1075,24 @@ export class CubeSymbols implements CompilerInterface {
       return symbol;
     }
 
+    if (this.isCurrentCube(name) && !cubeName) {
+      return null;
+    }
+
     // In proxied subProperty flow `name` will be set to parent dimension|measure name,
     // so there will be no cube = this.symbols[cubeName : name] found, but potentially
     // during cube definition evaluation some other deeper subProperty may be requested.
     // To distinguish such cases we pass the right now requested property name to
     // cubeReferenceProxy, so later if subProperty is requested we'll have all the required
     // information to construct the response.
-    let cube = this.symbols[this.isCurrentCube(name) ? cubeName : name];
+    let cube = this.symbols[this.isCurrentCube(name) ? cubeName! : name];
     if (sqlResolveFn) {
       if (cube) {
         cube = this.cubeReferenceProxy(
           this.isCurrentCube(name) ? cubeName : name,
           collectJoinHints ? [] : undefined
         );
-      } else if (this.symbols[cubeName]?.[name]) {
+      } else if (cubeName && this.symbols[cubeName]?.[name]) {
         cube = this.cubeReferenceProxy(
           cubeName,
           collectJoinHints ? [] : undefined,
@@ -1101,12 +1105,12 @@ export class CubeSymbols implements CompilerInterface {
         const parentIndex = currResolveIndexFn();
         cube = this.cubeDependenciesProxy(parentIndex, newCubeName);
         return cube;
-      } else if (this.symbols[cubeName]?.[name] && this.symbols[cubeName][name].type === 'time') {
+      } else if (cubeName && this.symbols[cubeName]?.[name] && this.symbols[cubeName][name].type === 'time') {
         const parentIndex = currResolveIndexFn();
         return this.timeDimDependenciesProxy(parentIndex);
       }
     }
-    return cube || this.symbols[cubeName]?.[name];
+    return cube || (cubeName && this.symbols[cubeName]?.[name]);
   }
 
   protected cubeReferenceProxy(cubeName, joinHints?: any[], refProperty?: any) {
