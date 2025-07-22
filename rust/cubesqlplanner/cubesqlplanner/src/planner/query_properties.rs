@@ -732,10 +732,10 @@ impl QueryProperties {
             members.extend(self.time_dimensions.iter().cloned());
         }
         if include_dimensions {
-            members.extend(self.time_dimensions.iter().cloned());
+            members.extend(self.dimensions.iter().cloned());
         }
         if include_measures {
-            members.extend(self.time_dimensions.iter().cloned());
+            members.extend(self.measures.iter().cloned());
         }
         if include_filters {
             self.fill_all_filter_symbols(&mut members);
