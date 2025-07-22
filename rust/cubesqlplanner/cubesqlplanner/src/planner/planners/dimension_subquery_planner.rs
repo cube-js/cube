@@ -1,5 +1,5 @@
 use super::{CommonUtils, QueryPlanner};
-use crate::logical_plan::DimensionSubQuery;
+use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
 use crate::plan::{FilterItem, QualifiedColumnName};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions;
@@ -131,6 +131,7 @@ impl DimensionSubqueryPlanner {
             subquery_dimension,
             measure_for_subquery_dimension: measure,
         });
+        pretty_print_rc(&result);
         Ok(result)
     }
 
