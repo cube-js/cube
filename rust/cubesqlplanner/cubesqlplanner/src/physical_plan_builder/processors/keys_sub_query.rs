@@ -59,7 +59,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
 
         select_builder.set_distinct();
         select_builder.set_filter(keys_subquery.filter.all_filters());
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         context_factory.set_render_references(render_references);
         let res = Rc::new(select_builder.build(context_factory));
         Ok(res)

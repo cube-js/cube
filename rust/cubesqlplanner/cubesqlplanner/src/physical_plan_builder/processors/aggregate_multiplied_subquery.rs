@@ -44,7 +44,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let mut join_builder =
             JoinBuilder::new_from_subselect(keys_query.clone(), keys_query_alias.clone());
 
-        let mut context_factory = context.make_sql_nodes_factory();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let primary_keys_dimensions = &aggregate_multiplied_subquery
             .keys_subquery
             .primary_keys_dimensions;

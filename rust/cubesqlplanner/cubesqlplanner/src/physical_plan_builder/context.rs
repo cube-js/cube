@@ -21,13 +21,20 @@ pub(super) struct PushDownBuilderContext {
 }
 
 impl PushDownBuilderContext {
-    pub fn make_sql_nodes_factory(&self) -> SqlNodesFactory {
+    pub fn make_sql_nodes_factory(&self) -> Result<SqlNodesFactory, CubeError> {
         let mut factory = SqlNodesFactory::new();
-        factory.set_time_shifts(self.time_shifts.clone());
+
+        let (time_shifts, calendar_time_shifts) = self.time_shifts.extract_time_shifts()?;
+        let common_time_shifts = TimeShiftState {
+            dimensions_shifts: time_shifts,
+        };
+
+        factory.set_time_shifts(common_time_shifts);
+        factory.set_calendar_time_shifts(calendar_time_shifts);
         factory.set_count_approx_as_state(self.render_measure_as_state);
         factory.set_ungrouped_measure(self.render_measure_for_ungrouped);
         factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
-        factory
+        Ok(factory)
     }
 
     pub fn add_multi_stage_schema(&mut self, name: String, schema: Rc<Schema>) {
