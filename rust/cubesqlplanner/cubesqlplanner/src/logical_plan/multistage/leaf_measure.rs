@@ -62,7 +62,7 @@ impl LogicalNode for MultiStageLeafMeasure {
 
     fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
         let query = inputs.unpack();
-        
+
         Ok(Rc::new(Self {
             measure: self.measure.clone(),
             render_measure_as_state: self.render_measure_as_state,
@@ -72,7 +72,7 @@ impl LogicalNode for MultiStageLeafMeasure {
         }))
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "MultiStageLeafMeasure"
     }
 
@@ -80,7 +80,7 @@ impl LogicalNode for MultiStageLeafMeasure {
         if let PlanNode::MultiStageLeafMeasure(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "MultiStageLeafMeasure"))
         }
     }
 }

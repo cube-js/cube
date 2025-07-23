@@ -55,14 +55,14 @@ impl LogicalNode for ResolveMultipliedMeasures {
         }))
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "ResolveMultipliedMeasures"
     }
     fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
         if let PlanNode::ResolveMultipliedMeasures(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "ResolveMultipliedMeasures"))
         }
     }
 }
@@ -100,7 +100,7 @@ impl NodeInputs for ResolveMultipliedMeasuresInput {
                 .chain(self.aggregate_multiplied_subqueries.iter()),
         )
     }
-    
+
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
         Box::new(
             self.regular_measure_subqueries

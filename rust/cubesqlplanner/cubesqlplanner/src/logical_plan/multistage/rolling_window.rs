@@ -127,7 +127,7 @@ impl LogicalNode for MultiStageRollingWindow {
         Ok(self)
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "MultiStageRollingWindow"
     }
 
@@ -135,7 +135,7 @@ impl LogicalNode for MultiStageRollingWindow {
         if let PlanNode::MultiStageRollingWindow(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "MultiStageRollingWindow"))
         }
     }
 }

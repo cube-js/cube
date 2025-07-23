@@ -18,7 +18,7 @@ impl NodeInputs for EmptyNodeInput {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
         Box::new(std::iter::empty())
     }
-    
+
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
         Box::new(std::iter::empty())
     }
@@ -42,7 +42,7 @@ impl NodeInputs for SingleNodeInput {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
         Box::new(std::iter::once(&self.item))
     }
-    
+
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
         Box::new(std::iter::once(&mut self.item))
     }
@@ -70,7 +70,7 @@ impl NodeInputs for OptionNodeInput {
             Box::new(std::iter::empty())
         }
     }
-    
+
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
         if let Some(item) = &mut self.item {
             Box::new(std::iter::once(item))
@@ -98,7 +98,7 @@ impl NodeInputs for VecNodeInput {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
         Box::new(self.items.iter())
     }
-    
+
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
         Box::new(self.items.iter_mut())
     }
@@ -115,7 +115,7 @@ pub trait LogicalNode {
 
     fn as_plan_node(self: &Rc<Self>) -> PlanNode;
 
-    fn node_name() -> &'static str;
+    fn node_name(&self) -> &'static str;
 }
 
 pub enum PlanNode {
@@ -140,22 +140,22 @@ pub enum PlanNode {
 impl PlanNode {
     pub fn node_name(&self) -> &'static str {
         match self {
-            PlanNode::Query(_) => Query::node_name(),
-            PlanNode::LogicalJoin(_) => LogicalJoin::node_name(),
-            PlanNode::FullKeyAggregate(_) => FullKeyAggregate::node_name(),
-            PlanNode::PreAggregation(_) => PreAggregation::node_name(),
-            PlanNode::ResolveMultipliedMeasures(_) => ResolveMultipliedMeasures::node_name(),
-            PlanNode::AggregateMultipliedSubquery(_) => AggregateMultipliedSubquery::node_name(),
-            PlanNode::Cube(_) => Cube::node_name(),
-            PlanNode::MeasureSubquery(_) => MeasureSubquery::node_name(),
-            PlanNode::DimensionSubQuery(_) => DimensionSubQuery::node_name(),
-            PlanNode::KeysSubQuery(_) => KeysSubQuery::node_name(),
-            PlanNode::MultiStageGetDateRange(_) => MultiStageGetDateRange::node_name(),
-            PlanNode::MultiStageLeafMeasure(_) => MultiStageLeafMeasure::node_name(),
-            PlanNode::MultiStageMeasureCalculation(_) => MultiStageMeasureCalculation::node_name(),
-            PlanNode::MultiStageTimeSeries(_) => MultiStageTimeSeries::node_name(),
-            PlanNode::MultiStageRollingWindow(_) => MultiStageRollingWindow::node_name(),
-            PlanNode::LogicalMultiStageMember(_) => LogicalMultiStageMember::node_name(),
+            PlanNode::Query(node) => node.node_name(),
+            PlanNode::LogicalJoin(node) => node.node_name(),
+            PlanNode::FullKeyAggregate(node) => node.node_name(),
+            PlanNode::PreAggregation(node) => node.node_name(),
+            PlanNode::ResolveMultipliedMeasures(node) => node.node_name(),
+            PlanNode::AggregateMultipliedSubquery(node) => node.node_name(),
+            PlanNode::Cube(node) => node.node_name(),
+            PlanNode::MeasureSubquery(node) => node.node_name(),
+            PlanNode::DimensionSubQuery(node) => node.node_name(),
+            PlanNode::KeysSubQuery(node) => node.node_name(),
+            PlanNode::MultiStageGetDateRange(node) => node.node_name(),
+            PlanNode::MultiStageLeafMeasure(node) => node.node_name(),
+            PlanNode::MultiStageMeasureCalculation(node) => node.node_name(),
+            PlanNode::MultiStageTimeSeries(node) => node.node_name(),
+            PlanNode::MultiStageRollingWindow(node) => node.node_name(),
+            PlanNode::LogicalMultiStageMember(node) => node.node_name(),
         }
     }
 
@@ -164,18 +164,19 @@ impl PlanNode {
     }
 }
 
-pub(super) fn cast_error<T: LogicalNode>(plan_node: &PlanNode) -> CubeError {
+pub(super) fn cast_error(plan_node: &PlanNode, target_type: &str) -> CubeError {
     CubeError::internal(format!(
         "Can't cast {} PlanNode into {}",
         plan_node.node_name(),
-        T::node_name(),
+        target_type,
     ))
 }
 
-pub(super) fn check_inputs_len<T: LogicalNode>(
+pub(super) fn check_inputs_len(
     input_name: &str,
     inputs: &Vec<PlanNode>,
     expected: usize,
+    node_type: &str,
 ) -> Result<(), CubeError> {
     if inputs.len() == expected {
         Ok(())
@@ -183,7 +184,7 @@ pub(super) fn check_inputs_len<T: LogicalNode>(
         Err(CubeError::internal(format!(
             "For input {} for node {} expected {} inputs but received {}",
             input_name,
-            T::node_name(),
+            node_type,
             expected,
             inputs.len()
         )))

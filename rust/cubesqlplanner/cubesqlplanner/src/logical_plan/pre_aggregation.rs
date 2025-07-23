@@ -31,14 +31,14 @@ impl LogicalNode for PreAggregation {
         Ok(self)
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "PreAggregation"
     }
     fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
         if let PlanNode::PreAggregation(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "PreAggregation"))
         }
     }
 }

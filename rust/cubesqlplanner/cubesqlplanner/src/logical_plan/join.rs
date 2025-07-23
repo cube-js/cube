@@ -59,12 +59,13 @@ impl LogicalNode for LogicalJoin {
             dimension_subqueries,
         } = inputs;
 
-        check_inputs_len::<Self>("joins", &joins, self.joins.len())?;
+        check_inputs_len("joins", &joins, self.joins.len(), self.node_name())?;
 
-        check_inputs_len::<Self>(
+        check_inputs_len(
             "dimension_subqueries",
             &dimension_subqueries,
             self.dimension_subqueries.len(),
+            self.node_name(),
         )?;
 
         let joins = self
@@ -91,14 +92,14 @@ impl LogicalNode for LogicalJoin {
         Ok(Rc::new(result))
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "LogicalJoin"
     }
     fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
         if let PlanNode::LogicalJoin(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "LogicalJoin"))
         }
     }
 }
@@ -117,7 +118,7 @@ impl NodeInputs for LogicalJoinInput {
                 .chain(self.dimension_subqueries.iter()),
         )
     }
-    
+
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
         Box::new(
             std::iter::once(&mut self.root)

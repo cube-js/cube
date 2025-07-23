@@ -73,14 +73,14 @@ impl LogicalNode for AggregateMultipliedSubquery {
         Ok(Rc::new(result))
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "AggregateMultipliedSubquery"
     }
     fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
         if let PlanNode::AggregateMultipliedSubquery(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "AggregateMultipliedSubquery"))
         }
     }
 }
@@ -99,7 +99,7 @@ impl NodeInputs for AggregateMultipliedSubqueryInput {
                 .chain(self.dimension_subqueries.iter()),
         )
     }
-    
+
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
         Box::new(
             std::iter::once(&mut self.keys_subquery)

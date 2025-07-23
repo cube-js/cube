@@ -28,7 +28,7 @@ impl LogicalNode for MultiStageGetDateRange {
         }))
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "MultiStageGetDateRange"
     }
 
@@ -36,7 +36,7 @@ impl LogicalNode for MultiStageGetDateRange {
         if let PlanNode::MultiStageGetDateRange(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "MultiStageGetDateRange"))
         }
     }
 }

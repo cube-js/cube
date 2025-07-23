@@ -20,7 +20,7 @@ impl MultiStageMemberLogicalType {
             Self::RollingWindow(item) => item.as_plan_node(),
         }
     }
-    
+
     fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError> {
         Ok(match self {
             Self::LeafMeasure(_) => Self::LeafMeasure(plan_node.into_logical_node()?),
@@ -62,14 +62,14 @@ impl LogicalNode for LogicalMultiStageMember {
 
     fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
         let input = inputs.unpack();
-        
+
         Ok(Rc::new(Self {
             name: self.name.clone(),
             member_type: self.member_type.with_plan_node(input)?,
         }))
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "LogicalMultiStageMember"
     }
 
@@ -77,7 +77,7 @@ impl LogicalNode for LogicalMultiStageMember {
         if let PlanNode::LogicalMultiStageMember(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "LogicalMultiStageMember"))
         }
     }
 }

@@ -39,14 +39,14 @@ impl LogicalNode for KeysSubQuery {
         Ok(Rc::new(res))
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "KeysSubQuery"
     }
     fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
         if let PlanNode::KeysSubQuery(query) = plan_node {
             Ok(query)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "KeysSubQuery"))
         }
     }
 }
@@ -60,7 +60,7 @@ impl NodeInputs for KeysSubQueryInputs {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
         Box::new(std::iter::once(&self.pk_cube).chain(std::iter::once(&self.source)))
     }
-    
+
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
         Box::new(std::iter::once(&mut self.pk_cube).chain(std::iter::once(&mut self.source)))
     }

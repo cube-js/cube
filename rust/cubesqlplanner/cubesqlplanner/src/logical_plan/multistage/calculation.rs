@@ -123,7 +123,7 @@ impl LogicalNode for MultiStageMeasureCalculation {
         }))
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "MultiStageMeasureCalculation"
     }
 
@@ -131,7 +131,7 @@ impl LogicalNode for MultiStageMeasureCalculation {
         if let PlanNode::MultiStageMeasureCalculation(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "MultiStageMeasureCalculation"))
         }
     }
 }

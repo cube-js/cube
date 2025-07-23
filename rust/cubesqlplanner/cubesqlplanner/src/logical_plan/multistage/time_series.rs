@@ -49,7 +49,7 @@ impl LogicalNode for MultiStageTimeSeries {
         Ok(self)
     }
 
-    fn node_name() -> &'static str {
+    fn node_name(&self) -> &'static str {
         "MultiStageTimeSeries"
     }
 
@@ -57,7 +57,7 @@ impl LogicalNode for MultiStageTimeSeries {
         if let PlanNode::MultiStageTimeSeries(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error::<Self>(&plan_node))
+            Err(cast_error(&plan_node, "MultiStageTimeSeries"))
         }
     }
 }
