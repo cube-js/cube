@@ -11,40 +11,28 @@ pub struct ResolveMultipliedMeasures {
 }
 
 impl LogicalNode for ResolveMultipliedMeasures {
-    type InputsType = ResolveMultipliedMeasuresInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::ResolveMultipliedMeasures(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        let regular_measure_subqueries = self
-            .regular_measure_subqueries
-            .iter()
-            .map(|i| i.as_plan_node())
-            .collect_vec();
-        let aggregate_multiplied_subqueries = self
-            .aggregate_multiplied_subqueries
-            .iter()
-            .map(|i| i.as_plan_node())
-            .collect_vec();
-        ResolveMultipliedMeasuresInput::new(
-            regular_measure_subqueries,
-            aggregate_multiplied_subqueries,
-        )
+    fn inputs(&self) -> Vec<PlanNode> {
+        ResolveMultipliedMeasuresInputPacker::pack(self)
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let (regular_measure_subqueries, aggregate_multiplied_subqueries) = inputs.unpack();
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        let ResolveMultipliedMeasuresInputUnPacker {
+            regular_measure_subqueries,
+            aggregate_multiplied_subqueries,
+        } = ResolveMultipliedMeasuresInputUnPacker::new(&self, &inputs)?;
 
         let regular_measure_subqueries = regular_measure_subqueries
             .into_iter()
-            .map(|i| Query::try_from_plan_node(i))
+            .map(|i| Query::try_from_plan_node(i.clone()))
             .collect::<Result<_, CubeError>>()?;
 
         let aggregate_multiplied_subqueries = aggregate_multiplied_subqueries
             .into_iter()
-            .map(|i| AggregateMultipliedSubquery::try_from_plan_node(i))
+            .map(|i| AggregateMultipliedSubquery::try_from_plan_node(i.clone()))
             .collect::<Result<_, CubeError>>()?;
 
         Ok(Rc::new(Self {
@@ -67,46 +55,38 @@ impl LogicalNode for ResolveMultipliedMeasures {
     }
 }
 
-pub struct ResolveMultipliedMeasuresInput {
-    regular_measure_subqueries: Vec<PlanNode>,
-    aggregate_multiplied_subqueries: Vec<PlanNode>,
-}
+pub struct ResolveMultipliedMeasuresInputPacker;
 
-impl ResolveMultipliedMeasuresInput {
-    pub fn new(
-        regular_measure_subqueries: Vec<PlanNode>,
-        aggregate_multiplied_subqueries: Vec<PlanNode>,
-    ) -> Self {
-        Self {
-            regular_measure_subqueries,
-            aggregate_multiplied_subqueries,
-        }
-    }
-
-    pub fn unpack(self) -> (Vec<PlanNode>, Vec<PlanNode>) {
-        let Self {
-            regular_measure_subqueries,
-            aggregate_multiplied_subqueries,
-        } = self;
-        (regular_measure_subqueries, aggregate_multiplied_subqueries)
+impl ResolveMultipliedMeasuresInputPacker {
+    pub fn pack(resolve: &ResolveMultipliedMeasures) -> Vec<PlanNode> {
+        let mut result = vec![];
+        result.extend(resolve.regular_measure_subqueries.iter().map(|i| i.as_plan_node()));
+        result.extend(resolve.aggregate_multiplied_subqueries.iter().map(|i| i.as_plan_node()));
+        result
     }
 }
 
-impl NodeInputs for ResolveMultipliedMeasuresInput {
-    fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
-        Box::new(
-            self.regular_measure_subqueries
-                .iter()
-                .chain(self.aggregate_multiplied_subqueries.iter()),
-        )
-    }
+pub struct ResolveMultipliedMeasuresInputUnPacker<'a> {
+    regular_measure_subqueries: &'a [PlanNode],
+    aggregate_multiplied_subqueries: &'a [PlanNode],
+}
 
-    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
-        Box::new(
-            self.regular_measure_subqueries
-                .iter_mut()
-                .chain(self.aggregate_multiplied_subqueries.iter_mut()),
-        )
+impl<'a> ResolveMultipliedMeasuresInputUnPacker<'a> {
+    pub fn new(resolve: &ResolveMultipliedMeasures, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
+        check_inputs_len(&inputs, Self::inputs_len(resolve), resolve.node_name())?;
+        
+        let regular_end = resolve.regular_measure_subqueries.len();
+        let regular_measure_subqueries = &inputs[0..regular_end];
+        let aggregate_multiplied_subqueries = &inputs[regular_end..];
+        
+        Ok(Self {
+            regular_measure_subqueries,
+            aggregate_multiplied_subqueries,
+        })
+    }
+    
+    fn inputs_len(resolve: &ResolveMultipliedMeasures) -> usize {
+        resolve.regular_measure_subqueries.len() + resolve.aggregate_multiplied_subqueries.len()
     }
 }
 

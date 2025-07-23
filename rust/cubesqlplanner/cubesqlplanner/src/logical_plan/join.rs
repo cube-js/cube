@@ -27,46 +27,20 @@ pub struct LogicalJoin {
 }
 
 impl LogicalNode for LogicalJoin {
-    type InputsType = LogicalJoinInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::LogicalJoin(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        let root = self.root.as_plan_node();
-        let joins = self
-            .joins
-            .iter()
-            .map(|itm| itm.cube.as_plan_node())
-            .collect_vec();
-        let dimension_subqueries = self
-            .dimension_subqueries
-            .iter()
-            .map(|itm| itm.as_plan_node())
-            .collect_vec();
-        LogicalJoinInput {
-            root,
-            joins,
-            dimension_subqueries,
-        }
+    fn inputs(&self) -> Vec<PlanNode> {
+        LogicalJoinInputPacker::pack(self)
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let LogicalJoinInput {
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        let LogicalJoinInputUnPacker {
             root,
             joins,
             dimension_subqueries,
-        } = inputs;
-
-        check_inputs_len("joins", &joins, self.joins.len(), self.node_name())?;
-
-        check_inputs_len(
-            "dimension_subqueries",
-            &dimension_subqueries,
-            self.dimension_subqueries.len(),
-            self.node_name(),
-        )?;
+        } = LogicalJoinInputUnPacker::new(&self, &inputs)?;
 
         let joins = self
             .joins
@@ -74,18 +48,18 @@ impl LogicalNode for LogicalJoin {
             .zip(joins.into_iter())
             .map(|(self_item, item)| -> Result<_, CubeError> {
                 Ok(LogicalJoinItem {
-                    cube: item.into_logical_node()?,
+                    cube: item.clone().into_logical_node()?,
                     on_sql: self_item.on_sql.clone(),
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
         let result = Self {
-            root: root.into_logical_node()?,
+            root: root.clone().into_logical_node()?,
             joins,
             dimension_subqueries: dimension_subqueries
                 .into_iter()
-                .map(|itm| itm.into_logical_node())
+                .map(|itm| itm.clone().into_logical_node())
                 .collect::<Result<Vec<_>, _>>()?,
         };
 
@@ -104,27 +78,43 @@ impl LogicalNode for LogicalJoin {
     }
 }
 
-pub struct LogicalJoinInput {
-    pub root: PlanNode,
-    pub joins: Vec<PlanNode>,
-    pub dimension_subqueries: Vec<PlanNode>,
+pub struct LogicalJoinInputPacker;
+
+impl LogicalJoinInputPacker {
+    pub fn pack(join: &LogicalJoin) -> Vec<PlanNode> {
+        let mut result = vec![];
+        result.push(join.root.as_plan_node());
+        result.extend(join.joins.iter().map(|item| item.cube.as_plan_node()));
+        result.extend(join.dimension_subqueries.iter().map(|item| item.as_plan_node()));
+        result
+    }
 }
 
-impl NodeInputs for LogicalJoinInput {
-    fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
-        Box::new(
-            std::iter::once(&self.root)
-                .chain(self.joins.iter())
-                .chain(self.dimension_subqueries.iter()),
-        )
-    }
+pub struct LogicalJoinInputUnPacker<'a> {
+    root: &'a PlanNode,
+    joins: &'a [PlanNode],
+    dimension_subqueries: &'a [PlanNode],
+}
 
-    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
-        Box::new(
-            std::iter::once(&mut self.root)
-                .chain(self.joins.iter_mut())
-                .chain(self.dimension_subqueries.iter_mut()),
-        )
+impl<'a> LogicalJoinInputUnPacker<'a> {
+    pub fn new(join: &LogicalJoin, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
+        check_inputs_len(&inputs, Self::inputs_len(join), join.node_name())?;
+        
+        let root = &inputs[0];
+        let joins_start = 1;
+        let joins_end = joins_start + join.joins.len();
+        let joins = &inputs[joins_start..joins_end];
+        let dimension_subqueries = &inputs[joins_end..];
+        
+        Ok(Self {
+            root,
+            joins,
+            dimension_subqueries,
+        })
+    }
+    
+    fn inputs_len(join: &LogicalJoin) -> usize {
+        1 + join.joins.len() + join.dimension_subqueries.len()
     }
 }
 

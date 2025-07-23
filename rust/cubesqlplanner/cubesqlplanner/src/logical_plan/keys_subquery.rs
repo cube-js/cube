@@ -13,28 +13,25 @@ pub struct KeysSubQuery {
 }
 
 impl LogicalNode for KeysSubQuery {
-    type InputsType = KeysSubQueryInputs;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::KeysSubQuery(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        KeysSubQueryInputs {
-            pk_cube: self.pk_cube.as_plan_node(),
-            source: self.source.as_plan_node(),
-        }
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![self.pk_cube.as_plan_node(), self.source.as_plan_node()]
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let KeysSubQueryInputs { pk_cube, source } = inputs;
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 2, self.node_name())?;
+        let pk_cube = &inputs[0];
+        let source = &inputs[1];
 
         let res = Self {
-            pk_cube: pk_cube.into_logical_node()?,
+            pk_cube: pk_cube.clone().into_logical_node()?,
             schema: self.schema.clone(),
             primary_keys_dimensions: self.primary_keys_dimensions.clone(),
             filter: self.filter.clone(),
-            source: source.into_logical_node()?,
+            source: source.clone().into_logical_node()?,
         };
         Ok(Rc::new(res))
     }
@@ -51,20 +48,6 @@ impl LogicalNode for KeysSubQuery {
     }
 }
 
-pub struct KeysSubQueryInputs {
-    pub pk_cube: PlanNode,
-    pub source: PlanNode,
-}
-
-impl NodeInputs for KeysSubQueryInputs {
-    fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
-        Box::new(std::iter::once(&self.pk_cube).chain(std::iter::once(&self.source)))
-    }
-
-    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
-        Box::new(std::iter::once(&mut self.pk_cube).chain(std::iter::once(&mut self.source)))
-    }
-}
 
 impl PrettyPrint for KeysSubQuery {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {

@@ -32,41 +32,28 @@ pub struct AggregateMultipliedSubquery {
 }
 
 impl LogicalNode for AggregateMultipliedSubquery {
-    type InputsType = AggregateMultipliedSubqueryInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::AggregateMultipliedSubquery(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        let keys_subquery = self.keys_subquery.as_plan_node();
-        let source = self.source.as_plan_node();
-        let dimension_subqueries = self
-            .dimension_subqueries
-            .iter()
-            .map(|itm| itm.as_plan_node())
-            .collect_vec();
-        AggregateMultipliedSubqueryInput {
-            keys_subquery,
-            source,
-            dimension_subqueries,
-        }
+    fn inputs(&self) -> Vec<PlanNode> {
+        AggregateMultipliedSubqueryInputPacker::pack(self)
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let AggregateMultipliedSubqueryInput {
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        let AggregateMultipliedSubqueryInputUnPacker {
             keys_subquery,
             source,
             dimension_subqueries,
-        } = inputs;
+        } = AggregateMultipliedSubqueryInputUnPacker::new(&self, &inputs)?;
 
         let result = Self {
             schema: self.schema.clone(),
-            keys_subquery: keys_subquery.into_logical_node()?,
-            source: self.source.with_plan_node(source)?,
+            keys_subquery: keys_subquery.clone().into_logical_node()?,
+            source: self.source.with_plan_node(source.clone())?,
             dimension_subqueries: dimension_subqueries
                 .into_iter()
-                .map(|itm| itm.into_logical_node())
+                .map(|itm| itm.clone().into_logical_node())
                 .collect::<Result<Vec<_>, _>>()?,
         };
 
@@ -85,27 +72,41 @@ impl LogicalNode for AggregateMultipliedSubquery {
     }
 }
 
-pub struct AggregateMultipliedSubqueryInput {
-    pub keys_subquery: PlanNode,
-    pub source: PlanNode,
-    pub dimension_subqueries: Vec<PlanNode>,
+pub struct AggregateMultipliedSubqueryInputPacker;
+
+impl AggregateMultipliedSubqueryInputPacker {
+    pub fn pack(aggregate: &AggregateMultipliedSubquery) -> Vec<PlanNode> {
+        let mut result = vec![];
+        result.push(aggregate.keys_subquery.as_plan_node());
+        result.push(aggregate.source.as_plan_node());
+        result.extend(aggregate.dimension_subqueries.iter().map(|itm| itm.as_plan_node()));
+        result
+    }
 }
 
-impl NodeInputs for AggregateMultipliedSubqueryInput {
-    fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
-        Box::new(
-            std::iter::once(&self.keys_subquery)
-                .chain(std::iter::once(&self.source))
-                .chain(self.dimension_subqueries.iter()),
-        )
-    }
+pub struct AggregateMultipliedSubqueryInputUnPacker<'a> {
+    keys_subquery: &'a PlanNode,
+    source: &'a PlanNode,
+    dimension_subqueries: &'a [PlanNode],
+}
 
-    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
-        Box::new(
-            std::iter::once(&mut self.keys_subquery)
-                .chain(std::iter::once(&mut self.source))
-                .chain(self.dimension_subqueries.iter_mut()),
-        )
+impl<'a> AggregateMultipliedSubqueryInputUnPacker<'a> {
+    pub fn new(aggregate: &AggregateMultipliedSubquery, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
+        check_inputs_len(&inputs, Self::inputs_len(aggregate), aggregate.node_name())?;
+        
+        let keys_subquery = &inputs[0];
+        let source = &inputs[1];
+        let dimension_subqueries = &inputs[2..];
+        
+        Ok(Self {
+            keys_subquery,
+            source,
+            dimension_subqueries,
+        })
+    }
+    
+    fn inputs_len(aggregate: &AggregateMultipliedSubquery) -> usize {
+        2 + aggregate.dimension_subqueries.len()
     }
 }
 
