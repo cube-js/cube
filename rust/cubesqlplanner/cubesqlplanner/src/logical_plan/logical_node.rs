@@ -85,3 +85,56 @@ pub(super) fn check_inputs_len(
         )))
     }
 }
+
+// Macro for applying a block to all enum variants
+macro_rules! match_plan_node {
+    ($self:expr, $node:ident => $block:block) => {
+        match $self {
+            PlanNode::Query($node) => $block,
+            PlanNode::LogicalJoin($node) => $block,
+            PlanNode::FullKeyAggregate($node) => $block,
+            PlanNode::PreAggregation($node) => $block,
+            PlanNode::ResolveMultipliedMeasures($node) => $block,
+            PlanNode::AggregateMultipliedSubquery($node) => $block,
+            PlanNode::Cube($node) => $block,
+            PlanNode::MeasureSubquery($node) => $block,
+            PlanNode::DimensionSubQuery($node) => $block,
+            PlanNode::KeysSubQuery($node) => $block,
+            PlanNode::MultiStageGetDateRange($node) => $block,
+            PlanNode::MultiStageLeafMeasure($node) => $block,
+            PlanNode::MultiStageMeasureCalculation($node) => $block,
+            PlanNode::MultiStageTimeSeries($node) => $block,
+            PlanNode::MultiStageRollingWindow($node) => $block,
+            PlanNode::LogicalMultiStageMember($node) => $block,
+        }
+    };
+}
+
+impl LogicalNode for PlanNode {
+    fn inputs(&self) -> Vec<PlanNode> {
+        match_plan_node!(self, node => {
+            node.inputs()
+        })
+    }
+
+    fn node_name(&self) -> &'static str {
+        match_plan_node!(self, node => {
+            node.node_name()
+        })
+    }
+
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        let result = match_plan_node!(self.as_ref(), node => {
+            node.clone().with_inputs(inputs)?.as_plan_node()
+        });
+        Ok(Rc::new(result))
+    }
+
+    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
+        Ok(Rc::new(plan_node))
+    }
+
+    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
+        (**self).clone()
+    }
+}
