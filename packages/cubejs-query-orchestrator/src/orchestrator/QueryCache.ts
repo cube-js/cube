@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import { LRUCache } from 'lru-cache';
 import { pipeline } from 'stream';
-import {asyncDebounce, getEnv, MaybeCancelablePromise, streamToArray} from '@cubejs-backend/shared';
+import { asyncDebounce, getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   BaseDriver,
