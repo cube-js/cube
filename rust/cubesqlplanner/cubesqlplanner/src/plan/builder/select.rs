@@ -110,6 +110,28 @@ impl SelectBuilder {
         self.result_schema
             .add_column(SchemaColumn::new(alias.clone(), None));
     }
+    pub fn add_projection_reference_member(
+        &mut self,
+        member: &Rc<dyn BaseMember>,
+        reference: QualifiedColumnName,
+        alias: Option<String>,
+    ) {
+        let alias = if let Some(alias) = alias {
+            alias
+        } else {
+            reference.name().clone()
+        };
+
+        let expr = Expr::Reference(reference);
+        let aliased_expr = AliasedExpr {
+            expr,
+            alias: alias.clone(),
+        };
+
+        self.projection_columns.push(aliased_expr);
+        self.result_schema
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+    }
     pub fn add_projection_coalesce_member(
         &mut self,
         member: &Rc<dyn BaseMember>,
