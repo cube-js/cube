@@ -104,17 +104,18 @@ export class PreAggregations {
    * It returns full pre-aggregation object (with keyQueries, previewSql, loadSql, and so on.
    */
   public preAggregationsDescription(): FullPreAggregationDescription[] {
-    const preAggregations = [this.preAggregationsDescriptionLocal()].concat(
-      this.query.subQueryDimensions.map(d => this.query.subQueryDescription(d).subQuery)
-        .map(q => q.preAggregations.preAggregationsDescription())
-    );
+    return [];
+    // const preAggregations = [this.preAggregationsDescriptionLocal()].concat(
+    //   this.query.subQueryDimensions.map(d => this.query.subQueryDescription(d).subQuery)
+    //     .map(q => q.preAggregations.preAggregationsDescription())
+    // );
 
-    return R.pipe(
-      R.unnest as (list: any[][]) => any[],
-      R.uniqBy(desc => desc.tableName)
-    )(
-      preAggregations
-    );
+    // return R.pipe(
+    //   R.unnest as (list: any[][]) => any[],
+    //   R.uniqBy(desc => desc.tableName)
+    // )(
+    //   preAggregations
+    // );
   }
 
   private preAggregationsDescriptionLocal(): FullPreAggregationDescription[] {
@@ -407,9 +408,9 @@ export class PreAggregations {
     const collectLeafMeasures = query.collectLeafMeasures.bind(query);
     const dimensionsList = query.dimensions.map(dim => dim.expressionPath());
     const segmentsList = query.segments.map(s => s.expressionPath());
-    const ownedDimensions = PreAggregations.ownedMembers(query, flattenDimensionMembers);
+    const ownedDimensions = []; // PreAggregations.ownedMembers(query, flattenDimensionMembers);
     const ownedTimeDimensions = query.timeDimensions.map(td => {
-      const owned = PreAggregations.ownedMembers(query, [td]);
+      const owned = []; // PreAggregations.ownedMembers(query, [td]);
       let { dimension } = td;
       // TODO If there's more than one owned time dimension for the given input time dimension then it's some
       // TODO kind of calculation which isn't supported yet
@@ -1172,16 +1173,18 @@ export class PreAggregations {
   }
 
   public rollupMatchResultDescriptions() {
-    return this.rollupMatchResults().map(p => ({
-      name: this.query.cubeEvaluator.pathFromArray([p.cube, p.preAggregationName]),
-      tableName: this.preAggregationTableName(p.cube, p.preAggregationName, p.preAggregation),
-      references: p.references,
-      canUsePreAggregation: p.canUsePreAggregation
-    }));
+    return [];
+    // return this.rollupMatchResults().map(p => ({
+    //   name: this.query.cubeEvaluator.pathFromArray([p.cube, p.preAggregationName]),
+    //   tableName: this.preAggregationTableName(p.cube, p.preAggregationName, p.preAggregation),
+    //   references: p.references,
+    //   canUsePreAggregation: p.canUsePreAggregation
+    // }));
   }
 
   public canUseTransformedQuery(): TransformedQuery {
-    return PreAggregations.transformQueryToCanUseForm(this.query);
+    return undefined;
+    // return PreAggregations.transformQueryToCanUseForm(this.query);
   }
 
   public static hasCumulativeMeasures(query: BaseQuery): boolean {

@@ -368,7 +368,7 @@ export class BaseQuery {
     } catch (e) {
       if (this.useNativeSqlPlanner) {
         // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
-        // But we need this join for a fallback when using pre-aggregations. So we’ll try to obtain the join but ignore any errors (which may occur if the query is a multi-fact one).
+        // But we need this join for a fallback when using pre-aggregations. So we'll try to obtain the join but ignore any errors (which may occur if the query is a multi-fact one).
       } else {
         throw e;
       }
@@ -702,19 +702,26 @@ export class BaseQuery {
    * @returns {string}
    */
   buildParamAnnotatedSql() {
+    const timer = (name, fn) => {
+      const start = new Date().getTime();
+      const res = fn();
+      console.log(`[buildParamAnnotatedSql] ${name} took: ${new Date().getTime() - start}ms`);
+      return res;
+    };
+
     let sql;
     let preAggForQuery;
     // TODO Most probably should be called later than here but avoids errors during pre-aggregation match for now
     if (this.from) {
-      return this.simpleQuery();
+      return timer('simpleQuery', () => this.simpleQuery());
     }
-    if (!this.options.preAggregationQuery) {
-      preAggForQuery =
-        this.preAggregations.findPreAggregationForQuery();
-      if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
-        preAggForQuery = undefined;
-      }
-    }
+    // console.log('preAggregationQuery result: ', this.options.preAggregationQuery);
+    // if (!this.options.preAggregationQuery) {
+    //   preAggForQuery = timer('findPreAggregationForQuery', () => this.preAggregations.findPreAggregationForQuery());
+    //   if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
+    //     preAggForQuery = undefined;
+    //   }
+    // }
     if (preAggForQuery) {
       const {
         multipliedMeasures,
@@ -722,27 +729,27 @@ export class BaseQuery {
         cumulativeMeasures,
         withQueries,
         multiStageMembers,
-      } = this.fullKeyQueryAggregateMeasures();
+      } = timer('fullKeyQueryAggregateMeasures', () => this.fullKeyQueryAggregateMeasures());
 
       if (cumulativeMeasures.length === 0) {
-        sql = this.preAggregations.rollupPreAggregation(
+        sql = timer('rollupPreAggregation', () => this.preAggregations.rollupPreAggregation(
           preAggForQuery,
           this.measures,
           true,
-        );
+        ));
       } else {
-        sql = this.regularAndTimeSeriesRollupQuery(
+        sql = timer('regularAndTimeSeriesRollupQuery', () => this.regularAndTimeSeriesRollupQuery(
           regularMeasures,
           multipliedMeasures,
           cumulativeMeasures,
           preAggForQuery,
-        );
+        ));
       }
     } else {
-      sql = this.fullKeyQueryAggregate();
+      sql = timer('fullKeyQueryAggregate', () => this.fullKeyQueryAggregate());
     }
     return this.options.totalQuery
-      ? this.countAllQuery(sql)
+      ? timer('countAllQuery', () => this.countAllQuery(sql))
       : sql;
   }
 
@@ -844,11 +851,20 @@ export class BaseQuery {
       this,
       () => this.cacheValue(
         ['buildSqlAndParams', exportAnnotatedSql],
-        () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql(),
-          exportAnnotatedSql,
-          this.shouldReuseParams
-        ),
+        () => {
+          const start = new Date().getTime();
+          const annotatedSql = this.buildParamAnnotatedSql();
+          console.log(`buildParamAnnotatedSql took: ${new Date().getTime() - start}ms`);
+
+          const result = this.paramAllocator.buildSqlAndParams(
+            annotatedSql,
+            exportAnnotatedSql,
+            this.shouldReuseParams
+          );
+          console.log(`paramAllocator.buildSqlAndParams took: ${new Date().getTime() - start}ms`);
+
+          return result;
+        },
         { cache: this.queryCache }
       )
     );
@@ -986,7 +1002,8 @@ export class BaseQuery {
    * @returns {Record<string, Array<string>>}
    */
   buildLambdaQuery() {
-    const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
+    // const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
+    const preAggForQuery = undefined;
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
       const lambdaPreAgg = preAggForQuery.referencedPreAggregations[preAggForQuery.referencedPreAggregations.length - 1];
@@ -3396,7 +3413,7 @@ export class BaseQuery {
   }
 
   collectAllMemberNames() {
-    return R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames'));
+    return []; // R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames'));
   }
 
   collectMultipliedMeasures(context) {
@@ -3853,14 +3870,15 @@ export class BaseQuery {
   }
 
   cacheKeyQueries(transformFn) { // TODO collect sub queries
-    if (!this.safeEvaluateSymbolContext().preAggregationQuery) {
-      const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
-      if (preAggregationForQuery) {
-        return [];
-      }
-    }
+    return [];
+    // if (!this.safeEvaluateSymbolContext().preAggregationQuery) {
+    //   const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
+    //   if (preAggregationForQuery) {
+    //     return [];
+    //   }
+    // }
 
-    return this.refreshKeysByCubes(this.allCubeNames, transformFn);
+    // return this.refreshKeysByCubes(this.allCubeNames, transformFn);
   }
 
   refreshKeysByCubes(cubes, transformFn) {
