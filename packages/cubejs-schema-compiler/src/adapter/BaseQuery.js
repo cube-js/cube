@@ -154,99 +154,6 @@ export class BaseQuery {
     this.initFromOptions();
   }
 
-  extractDimensionsAndMeasures(filters = []) {
-    if (!filters) {
-      return [];
-    }
-    let allFilters = [];
-    filters.forEach(f => {
-      if (f.and) {
-        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.and));
-      } else if (f.or) {
-        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.or));
-      } else if (!f.member && !f.dimension) {
-        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
-      } else if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
-        allFilters.push({ measure: f.member || f.dimension });
-      } else {
-        allFilters.push({ dimension: f.member || f.dimension });
-      }
-    });
-
-    return allFilters;
-  }
-
-  keepFilters(filters = [], fn) {
-    return filters.map(f => {
-      if (f.and) {
-        return { and: this.keepFilters(f.and, fn) };
-      } else if (f.or) {
-        return { or: this.keepFilters(f.or, fn) };
-      } else if (!f.member && !f.dimension) {
-        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
-      } else {
-        return fn(f.member || f.dimension || f.measure) ? f : null;
-      }
-    }).filter(f => !!f);
-  }
-
-  extractFiltersAsTree(filters = []) {
-    if (!filters) {
-      return [];
-    }
-
-    return filters.map(f => {
-      if (f.and || f.or) {
-        let operator = 'or';
-        if (f.and) {
-          operator = 'and';
-        }
-        const data = this.extractDimensionsAndMeasures(f[operator]);
-        const dimension = data.filter(e => !!e.dimension).map(e => e.dimension);
-        const measure = data.filter(e => !!e.measure).map(e => e.measure);
-        if (dimension.length && !measure.length) {
-          return {
-            values: this.extractFiltersAsTree(f[operator]),
-            operator,
-            dimensionGroup: true,
-            measure: null,
-          };
-        }
-        if (!dimension.length && measure.length) {
-          return {
-            values: this.extractFiltersAsTree(f[operator]),
-            operator,
-            dimension: null,
-            measureGroup: true,
-          };
-        }
-        if (!dimension.length && !measure.length) {
-          return {
-            values: [],
-            operator,
-          };
-        }
-        throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`);
-      }
-
-      if (!f.member && !f.dimension) {
-        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
-      }
-
-      if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
-        return Object.assign({}, f, {
-          dimension: null,
-          measure: f.member || f.dimension
-        });
-      }
-
-      return Object.assign({}, f, {
-        measure: null,
-        dimension: f.member || f.dimension
-      });
-    });
-  }
-
   /**
    * @protected
    */
@@ -353,6 +260,116 @@ export class BaseQuery {
     this.order = this.options.order ?? this.defaultOrder();
 
     this.initUngrouped();
+  }
+
+  initUngrouped() {
+    this.ungrouped = this.options.ungrouped;
+    if (this.ungrouped) {
+      if (!this.options.allowUngroupedWithoutPrimaryKey && this.join) {
+        const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
+        const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
+        const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
+        if (missingPrimaryKeys.length) {
+          throw new UserError(`Ungrouped query requires primary keys to be present in dimensions: ${missingPrimaryKeys.map(k => `'${k}'`).join(', ')}. Pass allowUngroupedWithoutPrimaryKey option to disable this check.`);
+        }
+      }
+      if (this.measureFilters.length) {
+        throw new UserError('Measure filters aren\'t allowed in ungrouped query');
+      }
+    }
+  }
+
+  extractDimensionsAndMeasures(filters = []) {
+    if (!filters) {
+      return [];
+    }
+    let allFilters = [];
+    filters.forEach(f => {
+      if (f.and) {
+        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.and));
+      } else if (f.or) {
+        allFilters = allFilters.concat(this.extractDimensionsAndMeasures(f.or));
+      } else if (!f.member && !f.dimension) {
+        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
+      } else if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
+        allFilters.push({ measure: f.member || f.dimension });
+      } else {
+        allFilters.push({ dimension: f.member || f.dimension });
+      }
+    });
+
+    return allFilters;
+  }
+
+  keepFilters(filters = [], fn) {
+    return filters.map(f => {
+      if (f.and) {
+        return { and: this.keepFilters(f.and, fn) };
+      } else if (f.or) {
+        return { or: this.keepFilters(f.or, fn) };
+      } else if (!f.member && !f.dimension) {
+        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
+      } else {
+        return fn(f.member || f.dimension || f.measure) ? f : null;
+      }
+    }).filter(f => !!f);
+  }
+
+  extractFiltersAsTree(filters = []) {
+    if (!filters) {
+      return [];
+    }
+
+    return filters.map(f => {
+      if (f.and || f.or) {
+        let operator = 'or';
+        if (f.and) {
+          operator = 'and';
+        }
+        const data = this.extractDimensionsAndMeasures(f[operator]);
+        const dimension = data.filter(e => !!e.dimension).map(e => e.dimension);
+        const measure = data.filter(e => !!e.measure).map(e => e.measure);
+        if (dimension.length && !measure.length) {
+          return {
+            values: this.extractFiltersAsTree(f[operator]),
+            operator,
+            dimensionGroup: true,
+            measure: null,
+          };
+        }
+        if (!dimension.length && measure.length) {
+          return {
+            values: this.extractFiltersAsTree(f[operator]),
+            operator,
+            dimension: null,
+            measureGroup: true,
+          };
+        }
+        if (!dimension.length && !measure.length) {
+          return {
+            values: [],
+            operator,
+          };
+        }
+        throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`);
+      }
+
+      if (!f.member && !f.dimension) {
+        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
+      }
+
+      if (this.cubeEvaluator.isMeasure(f.member || f.dimension)) {
+        return Object.assign({}, f, {
+          dimension: null,
+          measure: f.member || f.dimension
+        });
+      }
+
+      return Object.assign({}, f, {
+        measure: null,
+        dimension: f.member || f.dimension
+      });
+    });
   }
 
   // Temporary workaround to avoid checking for multistage in CubeStoreQuery, since that could lead to errors when HLL functions are present in the query.
@@ -523,23 +540,6 @@ export class BaseQuery {
           .map(m => [m.unescapedAliasName(), `${m.dimension}.${m.granularity}`])
       )
     );
-  }
-
-  initUngrouped() {
-    this.ungrouped = this.options.ungrouped;
-    if (this.ungrouped) {
-      if (!this.options.allowUngroupedWithoutPrimaryKey && this.join) {
-        const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
-        const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
-        const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
-        if (missingPrimaryKeys.length) {
-          throw new UserError(`Ungrouped query requires primary keys to be present in dimensions: ${missingPrimaryKeys.map(k => `'${k}'`).join(', ')}. Pass allowUngroupedWithoutPrimaryKey option to disable this check.`);
-        }
-      }
-      if (this.measureFilters.length) {
-        throw new UserError('Measure filters aren\'t allowed in ungrouped query');
-      }
-    }
   }
 
   get subQueryDimensions() {
