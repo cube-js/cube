@@ -3066,16 +3066,26 @@ export class BaseQuery {
     return sql;
   }
 
+  /**
+   * @param {string} sql
+   * @returns {string}
+   */
   wrapSegmentForDimensionSelect(sql) {
     return sql;
   }
 
+  /**
+   * @param {string} cubeName
+   */
   pushCubeNameForCollectionIfNecessary(cubeName) {
     if ((this.evaluateSymbolContext || {}).cubeNames && cubeName) {
       this.evaluateSymbolContext.cubeNames.push(cubeName);
     }
   }
 
+  /**
+   * @param {string|Array<string>} joinHints
+   */
   pushJoinHints(joinHints) {
     if (this.safeEvaluateSymbolContext().joinHints && joinHints) {
       if (Array.isArray(joinHints) && joinHints.length === 1) {
@@ -3085,6 +3095,10 @@ export class BaseQuery {
     }
   }
 
+  /**
+   * @param {string} cubeName
+   * @param {string} name
+   */
   pushMemberNameForCollectionIfNecessary(cubeName, name) {
     const pathFromArray = this.cubeEvaluator.pathFromArray([cubeName, name]);
     if (!this.cubeEvaluator.getCubeDefinition(cubeName).isView) {
