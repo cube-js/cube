@@ -99,18 +99,17 @@ impl PrettyPrint for MultiStageMeasureCalculation {
 }
 
 impl LogicalNode for MultiStageMeasureCalculation {
-    type InputsType = SingleNodeInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::MultiStageMeasureCalculation(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        SingleNodeInput::new(self.source.as_plan_node())
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![self.source.as_plan_node()]
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let source = inputs.unpack();
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 1, self.node_name())?;
+        let source = &inputs[0];
 
         Ok(Rc::new(Self {
             schema: self.schema.clone(),
@@ -119,7 +118,7 @@ impl LogicalNode for MultiStageMeasureCalculation {
             partition_by: self.partition_by.clone(),
             window_function_to_use: self.window_function_to_use.clone(),
             order_by: self.order_by.clone(),
-            source: source.into_logical_node()?,
+            source: source.clone().into_logical_node()?,
         }))
     }
 

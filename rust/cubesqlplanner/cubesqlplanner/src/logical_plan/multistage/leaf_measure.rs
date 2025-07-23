@@ -50,25 +50,24 @@ impl PrettyPrint for MultiStageLeafMeasure {
 }
 
 impl LogicalNode for MultiStageLeafMeasure {
-    type InputsType = SingleNodeInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::MultiStageLeafMeasure(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        SingleNodeInput::new(self.query.as_plan_node())
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![self.query.as_plan_node()]
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let query = inputs.unpack();
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 1, self.node_name())?;
+        let query = &inputs[0];
 
         Ok(Rc::new(Self {
             measure: self.measure.clone(),
             render_measure_as_state: self.render_measure_as_state,
             render_measure_for_ungrouped: self.render_measure_for_ungrouped,
             time_shifts: self.time_shifts.clone(),
-            query: query.into_logical_node()?,
+            query: query.clone().into_logical_node()?,
         }))
     }
 

@@ -9,22 +9,21 @@ pub struct MultiStageGetDateRange {
 }
 
 impl LogicalNode for MultiStageGetDateRange {
-    type InputsType = SingleNodeInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::MultiStageGetDateRange(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        SingleNodeInput::new(self.source.as_plan_node())
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![self.source.as_plan_node()]
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let source = inputs.unpack();
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 1, self.node_name())?;
+        let source = &inputs[0];
 
         Ok(Rc::new(Self {
             time_dimension: self.time_dimension.clone(),
-            source: source.into_logical_node()?,
+            source: source.clone().into_logical_node()?,
         }))
     }
 

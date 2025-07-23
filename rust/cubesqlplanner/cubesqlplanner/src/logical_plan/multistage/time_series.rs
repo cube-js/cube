@@ -35,17 +35,16 @@ impl PrettyPrint for MultiStageTimeSeries {
 }
 
 impl LogicalNode for MultiStageTimeSeries {
-    type InputsType = EmptyNodeInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::MultiStageTimeSeries(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        EmptyNodeInput::new()
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![] // MultiStageTimeSeries has no inputs
     }
 
-    fn with_inputs(self: Rc<Self>, _inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 0, self.node_name())?;
         Ok(self)
     }
 

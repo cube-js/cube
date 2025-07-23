@@ -17,17 +17,16 @@ pub struct PreAggregation {
 }
 
 impl LogicalNode for PreAggregation {
-    type InputsType = EmptyNodeInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::PreAggregation(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        EmptyNodeInput::new()
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![] // PreAggregation has no inputs
     }
 
-    fn with_inputs(self: Rc<Self>, _inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 0, self.node_name())?;
         Ok(self)
     }
 

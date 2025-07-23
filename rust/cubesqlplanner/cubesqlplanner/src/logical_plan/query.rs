@@ -86,7 +86,7 @@ impl LogicalNode for Query {
     }
 }
 
-pub struct QueryInputPacker {}
+pub struct QueryInputPacker;
 
 impl QueryInputPacker {
     pub fn pack(query: &Query) -> Vec<PlanNode> {

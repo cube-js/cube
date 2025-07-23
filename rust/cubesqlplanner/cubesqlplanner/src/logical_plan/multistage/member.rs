@@ -50,18 +50,17 @@ pub struct LogicalMultiStageMember {
 }
 
 impl LogicalNode for LogicalMultiStageMember {
-    type InputsType = SingleNodeInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::LogicalMultiStageMember(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        SingleNodeInput::new(self.member_type.as_plan_node())
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![self.member_type.as_plan_node()]
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let input = inputs.unpack();
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 1, self.node_name())?;
+        let input = inputs[0].clone();
 
         Ok(Rc::new(Self {
             name: self.name.clone(),
