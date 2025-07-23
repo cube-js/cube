@@ -94,7 +94,7 @@ export class YamlCompiler {
       return;
     }
 
-    const yamlObj = YAML.load(file.content);
+    const yamlObj: any = YAML.load(file.content);
     if (!yamlObj) {
       return;
     }
