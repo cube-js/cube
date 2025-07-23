@@ -1,5 +1,6 @@
 use super::*;
 use crate::planner::sql_evaluator::MemberSymbol;
+use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
@@ -13,6 +14,33 @@ pub struct PreAggregation {
     pub granularity: Option<String>,
     pub source: Rc<PreAggregationSource>,
     pub cube_name: String,
+}
+
+impl LogicalNode for PreAggregation {
+    type InputsType = EmptyNodeInput;
+
+    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
+        PlanNode::PreAggregation(self.clone())
+    }
+
+    fn inputs(&self) -> Self::InputsType {
+        EmptyNodeInput::new()
+    }
+
+    fn with_inputs(self: Rc<Self>, _inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
+        Ok(self)
+    }
+
+    fn node_name() -> &'static str {
+        "PreAggregation"
+    }
+    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
+        if let PlanNode::PreAggregation(item) = plan_node {
+            Ok(item)
+        } else {
+            Err(cast_error::<Self>(&plan_node))
+        }
+    }
 }
 
 impl PrettyPrint for PreAggregation {

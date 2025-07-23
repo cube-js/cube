@@ -6,6 +6,19 @@ pub trait NodeInputs {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_>;
 }
 
+pub struct EmptyNodeInput {}
+impl EmptyNodeInput {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl NodeInputs for EmptyNodeInput {
+    fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
+        Box::new(std::iter::empty())
+    }
+}
+
 pub struct SingleNodeInput {
     item: PlanNode,
 }
@@ -15,8 +28,8 @@ impl SingleNodeInput {
         Self { item }
     }
 
-    pub fn item(&self) -> &PlanNode {
-        &self.item
+    pub fn unpack(self) -> PlanNode {
+        self.item
     }
 }
 
@@ -31,12 +44,12 @@ pub struct OptionNodeInput {
 }
 
 impl OptionNodeInput {
-    pub fn new<T: LogicalNode>(item: Option<PlanNode>) -> Self {
+    pub fn new(item: Option<PlanNode>) -> Self {
         Self { item }
     }
 
-    pub fn item(&self) -> &Option<PlanNode> {
-        &self.item
+    pub fn unpack(self) -> Option<PlanNode> {
+        self.item
     }
 }
 
@@ -59,8 +72,8 @@ impl VecNodeInput {
         Self { items }
     }
 
-    pub fn items(&self) -> &Vec<PlanNode> {
-        &self.items
+    pub fn unpack(self) -> Vec<PlanNode> {
+        self.items
     }
 }
 
@@ -89,6 +102,12 @@ pub enum PlanNode {
     LogicalJoin(Rc<LogicalJoin>),
     FullKeyAggregate(Rc<FullKeyAggregate>),
     PreAggregation(Rc<PreAggregation>),
+    ResolveMultipliedMeasures(Rc<ResolveMultipliedMeasures>),
+    AggregateMultipliedSubquery(Rc<AggregateMultipliedSubquery>),
+    Cube(Rc<Cube>),
+    MeasureSubquery(Rc<MeasureSubquery>),
+    DimensionSubQuery(Rc<DimensionSubQuery>),
+    KeysSubQuery(Rc<KeysSubQuery>),
 }
 
 impl PlanNode {
@@ -98,7 +117,17 @@ impl PlanNode {
             PlanNode::LogicalJoin(_) => LogicalJoin::node_name(),
             PlanNode::FullKeyAggregate(_) => FullKeyAggregate::node_name(),
             PlanNode::PreAggregation(_) => PreAggregation::node_name(),
+            PlanNode::ResolveMultipliedMeasures(_) => ResolveMultipliedMeasures::node_name(),
+            PlanNode::AggregateMultipliedSubquery(_) => AggregateMultipliedSubquery::node_name(),
+            PlanNode::Cube(_) => Cube::node_name(),
+            PlanNode::MeasureSubquery(_) => MeasureSubquery::node_name(),
+            PlanNode::DimensionSubQuery(_) => DimensionSubQuery::node_name(),
+            PlanNode::KeysSubQuery(_) => KeysSubQuery::node_name(),
         }
+    }
+
+    pub fn into_logical_node<T: LogicalNode>(self) -> Result<Rc<T>, CubeError> {
+        T::try_from_plan_node(self)
     }
 }
 
@@ -108,4 +137,22 @@ pub(super) fn cast_error<T: LogicalNode>(plan_node: &PlanNode) -> CubeError {
         plan_node.node_name(),
         T::node_name(),
     ))
+}
+
+pub(super) fn check_inputs_len<T: LogicalNode>(
+    input_name: &str,
+    inputs: &Vec<PlanNode>,
+    expected: usize,
+) -> Result<(), CubeError> {
+    if inputs.len() == expected {
+        Ok(())
+    } else {
+        Err(CubeError::internal(format!(
+            "For input {} for node {} expected {} inputs but received {}",
+            input_name,
+            T::node_name(),
+            expected,
+            inputs.len()
+        )))
+    }
 }

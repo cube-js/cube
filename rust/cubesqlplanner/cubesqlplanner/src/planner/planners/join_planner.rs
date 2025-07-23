@@ -64,7 +64,7 @@ impl JoinPlanner {
                 .cube_from_path(join_definition.static_data().original_to.clone())?;
             let cube = Cube::new(cube_definition);
             let on_sql = self.compile_join_condition(join_definition.clone())?;
-            joins.push(LogicalJoinItem::CubeJoinItem(CubeJoinItem { cube, on_sql }));
+            joins.push(LogicalJoinItem { cube, on_sql });
         }
 
         Ok(Rc::new(LogicalJoin {

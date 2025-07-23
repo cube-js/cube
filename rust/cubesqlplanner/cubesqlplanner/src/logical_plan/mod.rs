@@ -13,7 +13,6 @@ pub mod optimizers;
 mod pre_aggregation;
 pub mod pretty_print;
 mod query;
-mod regular_measures_query;
 mod resolve_multiplied_measures;
 mod schema;
 
@@ -32,6 +31,5 @@ pub use optimizers::*;
 pub use pre_aggregation::*;
 pub use pretty_print::*;
 pub use query::*;
-pub use regular_measures_query::*;
 pub use resolve_multiplied_measures::*;
 pub use schema::*;

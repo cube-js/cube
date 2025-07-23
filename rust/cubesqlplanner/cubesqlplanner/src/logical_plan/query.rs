@@ -8,6 +8,24 @@ pub enum QuerySource {
     FullKeyAggregate(Rc<FullKeyAggregate>),
     PreAggregation(Rc<PreAggregation>),
 }
+
+impl QuerySource {
+    fn as_plan_node(&self) -> PlanNode {
+        match self {
+            Self::LogicalJoin(item) => item.as_plan_node(),
+            Self::FullKeyAggregate(item) => item.as_plan_node(),
+            Self::PreAggregation(item) => item.as_plan_node(),
+        }
+    }
+    fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError> {
+        Ok(match self {
+            Self::LogicalJoin(_) => Self::LogicalJoin(plan_node.into_logical_node()?),
+            Self::FullKeyAggregate(_) => Self::FullKeyAggregate(plan_node.into_logical_node()?),
+            Self::PreAggregation(_) => Self::PreAggregation(plan_node.into_logical_node()?),
+        })
+    }
+}
+
 impl PrettyPrint for QuerySource {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         match self {
@@ -36,36 +54,17 @@ impl LogicalNode for Query {
     }
 
     fn inputs(&self) -> Self::InputsType {
-        let plan_node = match &self.source {
-            QuerySource::LogicalJoin(join) => SingleNodeInput::new(join.as_plan_node()),
-            QuerySource::FullKeyAggregate(full_key) => {
-                SingleNodeInput::new(full_key.as_plan_node())
-            }
-            QuerySource::PreAggregation(pre_aggregation) => {
-                SingleNodeInput::new(pre_aggregation.as_plan_node())
-            }
-        };
-        plan_node
+        SingleNodeInput::new(self.source.as_plan_node())
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let source = match inputs.item() {
-            PlanNode::LogicalJoin(item) => QuerySource::LogicalJoin(item.clone()),
-            PlanNode::FullKeyAggregate(item) => QuerySource::FullKeyAggregate(item.clone()),
-            PlanNode::PreAggregation(item) => QuerySource::PreAggregation(item.clone()),
-            _ => {
-                return Err(CubeError::internal(format!(
-                    "{} is incorrect input for Query node",
-                    inputs.item().node_name()
-                )))
-            }
-        };
-        Ok(Rc::new(Query {
+        let input = inputs.unpack();
+        Ok(Rc::new(Self {
             multistage_members: self.multistage_members.clone(),
             schema: self.schema.clone(),
             filter: self.filter.clone(),
             modifers: self.modifers.clone(),
-            source,
+            source: self.source.with_plan_node(self.source.as_plan_node())?,
         }))
     }
 
