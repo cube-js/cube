@@ -105,11 +105,9 @@ impl NodeInputs for VecNodeInput {
 }
 
 pub trait LogicalNode {
-    type InputsType: NodeInputs;
+    fn inputs(&self) -> Vec<PlanNode>;
 
-    fn inputs(&self) -> Self::InputsType;
-
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError>;
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError>;
 
     fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError>;
 
@@ -118,6 +116,7 @@ pub trait LogicalNode {
     fn node_name(&self) -> &'static str;
 }
 
+#[derive(Clone)]
 pub enum PlanNode {
     Query(Rc<Query>),
     LogicalJoin(Rc<LogicalJoin>),
@@ -173,7 +172,6 @@ pub(super) fn cast_error(plan_node: &PlanNode, target_type: &str) -> CubeError {
 }
 
 pub(super) fn check_inputs_len(
-    input_name: &str,
     inputs: &Vec<PlanNode>,
     expected: usize,
     node_type: &str,
@@ -182,8 +180,7 @@ pub(super) fn check_inputs_len(
         Ok(())
     } else {
         Err(CubeError::internal(format!(
-            "For input {} for node {} expected {} inputs but received {}",
-            input_name,
+            "For node {} expected {} inputs but received {}",
             node_type,
             expected,
             inputs.len()

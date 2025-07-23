@@ -1,5 +1,6 @@
 use super::*;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -47,48 +48,29 @@ pub struct Query {
 }
 
 impl LogicalNode for Query {
-    type InputsType = QueryInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::Query(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        let source = self.source.as_plan_node();
-        let multistage_members = self
-            .multistage_members
-            .iter()
-            .map(|member| member.as_plan_node())
-            .collect();
-
-        QueryInput {
-            source,
-            multistage_members,
-        }
+    fn inputs(&self) -> Vec<PlanNode> {
+        QueryInputPacker::pack(self)
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let QueryInput {
-            source,
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        let QueryInputUnPacker {
             multistage_members,
-        } = inputs;
-
-        check_inputs_len(
-            "multistage_members",
-            &multistage_members,
-            self.multistage_members.len(),
-            self.node_name(),
-        )?;
+            source,
+        } = QueryInputUnPacker::new(&self, &inputs)?;
 
         Ok(Rc::new(Self {
             multistage_members: multistage_members
                 .into_iter()
-                .map(|member| member.into_logical_node())
+                .map(|member| member.clone().into_logical_node())
                 .collect::<Result<Vec<_>, _>>()?,
             schema: self.schema.clone(),
             filter: self.filter.clone(),
             modifers: self.modifers.clone(),
-            source: self.source.with_plan_node(source)?,
+            source: self.source.with_plan_node(source.clone())?,
         }))
     }
 
@@ -104,18 +86,38 @@ impl LogicalNode for Query {
     }
 }
 
-pub struct QueryInput {
-    pub source: PlanNode,
-    pub multistage_members: Vec<PlanNode>,
+pub struct QueryInputPacker {}
+
+impl QueryInputPacker {
+    pub fn pack(query: &Query) -> Vec<PlanNode> {
+        let mut result = vec![];
+        result.extend(
+            query
+                .multistage_members
+                .iter()
+                .map(|member| member.as_plan_node()),
+        );
+        result.push(query.source.as_plan_node());
+        result
+    }
+}
+pub struct QueryInputUnPacker<'a> {
+    multistage_members: &'a [PlanNode],
+    source: &'a PlanNode,
 }
 
-impl NodeInputs for QueryInput {
-    fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
-        Box::new(std::iter::once(&self.source).chain(self.multistage_members.iter()))
+impl<'a> QueryInputUnPacker<'a> {
+    pub fn new(query: &Query, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
+        check_inputs_len(&inputs, Self::inputs_len(query), query.node_name())?;
+        let multistage_members = &inputs[0..query.multistage_members.len()];
+        let source = &inputs[query.multistage_members.len()];
+        Ok(Self {
+            multistage_members,
+            source,
+        })
     }
-
-    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
-        Box::new(std::iter::once(&mut self.source).chain(self.multistage_members.iter_mut()))
+    fn inputs_len(query: &Query) -> usize {
+        query.multistage_members.len() + 1
     }
 }
 
