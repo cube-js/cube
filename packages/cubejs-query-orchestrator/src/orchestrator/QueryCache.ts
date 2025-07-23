@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import { LRUCache } from 'lru-cache';
 import { pipeline } from 'stream';
-import { getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
+import { asyncDebounce, getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   BaseDriver,
@@ -33,6 +33,12 @@ export type QueryWithParams = [
   params: string[],
   options?: QueryOptions
 ];
+
+export type LoadRefreshKeyOptions = {
+  requestId?: string;
+  skipRefreshKeyWaitForRenew?: boolean;
+  dataSource: string
+};
 
 export type Query = {
   requestId?: string;
@@ -771,31 +777,30 @@ export class QueryCache {
   public loadRefreshKeys(
     cacheKeyQueries: QueryWithParams[],
     expireSecs: number,
-    options: {
-      requestId?: string;
-      skipRefreshKeyWaitForRenew?: boolean;
-      dataSource: string
-    }
+    options: LoadRefreshKeyOptions
   ) {
-    return cacheKeyQueries.map((q) => {
-      const [query, values, queryOptions]: QueryWithParams = Array.isArray(q) ? q : [q, [], {}];
-      return this.cacheQueryResult(
-        query,
-        values,
-        [query, values],
-        expireSecs,
-        {
-          renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
-          renewalKey: q,
-          waitForRenew: !options.skipRefreshKeyWaitForRenew,
-          requestId: options.requestId,
-          dataSource: options.dataSource,
-          useInMemory: true,
-          external: queryOptions?.external,
-        },
-      );
-    });
+    return cacheKeyQueries.map((q) => this.loadRefreshKey(q, expireSecs, options));
   }
+
+  public loadRefreshKey = asyncDebounce(async (q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) => {
+    const [query, values, queryOptions]: QueryWithParams = Array.isArray(q) ? q : [q, [], {}];
+
+    return this.cacheQueryResult(
+      query,
+      values,
+      [query, values],
+      expireSecs,
+      {
+        renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
+        renewalKey: q,
+        waitForRenew: !options.skipRefreshKeyWaitForRenew,
+        requestId: options.requestId,
+        dataSource: options.dataSource,
+        useInMemory: true,
+        external: queryOptions?.external,
+      },
+    );
+  });
 
   public withLock = <T = any>(
     key: string,

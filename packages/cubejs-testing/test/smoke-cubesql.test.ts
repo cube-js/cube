@@ -156,7 +156,7 @@ describe('SQL API', () => {
           Authorization: token,
         },
         body: JSON.stringify({
-          query: `SELECT orderDate FROM ECommerce LIMIT 0;`,
+          query: 'SELECT orderDate FROM ECommerce LIMIT 0;',
         }),
       });
 
