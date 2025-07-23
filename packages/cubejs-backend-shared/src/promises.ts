@@ -265,7 +265,7 @@ export const retryWithTimeout = <T>(
   );
 
 /**
- * High order function that makes to debounce multi async calls to single call at one time
+ * Debunks multiple asynchronous calls at once.
  */
 export const asyncDebounce = <Ret, Arguments>(
   fn: (...args: Arguments[]) => Promise<Ret>,
