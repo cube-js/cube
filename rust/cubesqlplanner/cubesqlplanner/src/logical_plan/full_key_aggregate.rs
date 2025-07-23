@@ -58,46 +58,39 @@ pub struct FullKeyAggregate {
 }
 
 impl LogicalNode for FullKeyAggregate {
-    type InputsType = OptionNodeInput;
-
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::FullKeyAggregate(self.clone())
     }
 
-    fn inputs(&self) -> Self::InputsType {
-        let plan_node = self
-            .multiplied_measures_resolver
-            .as_ref()
-            .map(|resolver| match resolver {
+    fn inputs(&self) -> Vec<PlanNode> {
+        if let Some(resolver) = &self.multiplied_measures_resolver {
+            vec![match resolver {
                 ResolvedMultipliedMeasures::ResolveMultipliedMeasures(item) => item.as_plan_node(),
                 ResolvedMultipliedMeasures::PreAggregation(item) => item.as_plan_node(),
-            });
-        OptionNodeInput::new(plan_node)
+            }]
+        } else {
+            vec![]
+        }
     }
 
-    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let input = inputs.unpack();
-        let multiplied_measures_resolver = if self.multiplied_measures_resolver.is_none()
-            && input.is_none()
-        {
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        let multiplied_measures_resolver = if self.multiplied_measures_resolver.is_none() {
+            check_inputs_len(&inputs, 0, self.node_name())?;
             None
-        } else if let (Some(self_source), Some(input_source)) =
-            (&self.multiplied_measures_resolver, input)
-        {
-            Some(match self_source {
+        } else {
+            check_inputs_len(&inputs, 1, self.node_name())?;
+            let input_source = &inputs[0];
+            
+            Some(match self.multiplied_measures_resolver.as_ref().unwrap() {
                 ResolvedMultipliedMeasures::ResolveMultipliedMeasures(_) => {
                     ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
-                        input_source.into_logical_node()?,
+                        input_source.clone().into_logical_node()?,
                     )
                 }
                 ResolvedMultipliedMeasures::PreAggregation(_) => {
-                    ResolvedMultipliedMeasures::PreAggregation(input_source.into_logical_node()?)
+                    ResolvedMultipliedMeasures::PreAggregation(input_source.clone().into_logical_node()?)
                 }
             })
-        } else {
-            return Err(CubeError::internal(format!(
-                "Wrong inputs for FullKeyAggregate node"
-            )));
         };
 
         Ok(Rc::new(Self {
