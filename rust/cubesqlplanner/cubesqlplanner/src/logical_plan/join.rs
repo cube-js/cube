@@ -4,29 +4,16 @@ use crate::planner::sql_evaluator::SqlCall;
 use std::rc::Rc;
 
 #[derive(Clone)]
-pub struct CubeJoinItem {
+pub struct LogicalJoinItem {
     pub cube: Rc<Cube>,
     pub on_sql: Rc<SqlCall>,
 }
 
-impl PrettyPrint for CubeJoinItem {
+impl PrettyPrint for LogicalJoinItem {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println(&format!("CubeJoinItem: "), state);
         let details_state = state.new_level();
         self.cube.pretty_print(result, &details_state);
-    }
-}
-
-#[derive(Clone)]
-pub enum LogicalJoinItem {
-    CubeJoinItem(CubeJoinItem),
-}
-
-impl PrettyPrint for LogicalJoinItem {
-    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        match self {
-            LogicalJoinItem::CubeJoinItem(item) => item.pretty_print(result, state),
-        }
     }
 }
 
@@ -36,6 +23,7 @@ pub struct LogicalJoin {
     pub joins: Vec<LogicalJoinItem>,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
 }
+
 
 impl PrettyPrint for LogicalJoin {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {

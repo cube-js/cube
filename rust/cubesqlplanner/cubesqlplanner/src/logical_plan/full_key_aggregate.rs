@@ -21,7 +21,7 @@ impl PrettyPrint for MultiStageSubqueryRef {
 #[derive(Clone)]
 pub enum ResolvedMultipliedMeasures {
     ResolveMultipliedMeasures(Rc<ResolveMultipliedMeasures>),
-    PreAggregation(Rc<SimpleQuery>),
+    PreAggregation(Rc<Query>),
 }
 
 impl ResolvedMultipliedMeasures {
@@ -54,6 +54,59 @@ pub struct FullKeyAggregate {
     pub use_full_join_and_coalesce: bool,
     pub multiplied_measures_resolver: Option<ResolvedMultipliedMeasures>,
     pub multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
+}
+
+impl LogicalNode for FullKeyAggregate {
+    type InputsType = OptionNodeInput;
+
+    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
+        PlanNode::LogicalJoin(self.clone())
+    }
+
+    fn inputs(&self) -> Self::InputsType {
+        let plan_node = match &self.source {
+            QuerySource::LogicalJoin(join) => SingleNodeInput::new(join.as_plan_node()),
+            QuerySource::FullKeyAggregate(full_key) => {
+                SingleNodeInput::new(full_key.as_plan_node())
+            }
+            QuerySource::PreAggregation(pre_aggregation) => {
+                SingleNodeInput::new(pre_aggregation.as_plan_node())
+            }
+        };
+        plan_node
+    }
+
+    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
+        let source = match inputs.item() {
+            PlanNode::LogicalJoin(item) => QuerySource::LogicalJoin(item.clone()),
+            PlanNode::FullKeyAggregate(item) => QuerySource::FullKeyAggregate(item.clone()),
+            PlanNode::PreAggregation(item) => QuerySource::PreAggregation(item.clone()),
+            _ => {
+                return Err(CubeError::internal(format!(
+                    "{} is incorrect input for Query node",
+                    inputs.item().node_name()
+                )))
+            }
+        };
+        Ok(Rc::new(Query {
+            multistage_members: self.multistage_members.clone(),
+            schema: self.schema.clone(),
+            filter: self.filter.clone(),
+            modifers: self.modifers.clone(),
+            source,
+        }))
+    }
+
+    fn node_name() -> &'static str {
+        "Query"
+    }
+    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
+        if let PlanNode::Query(query) = plan_node {
+            Ok(query)
+        } else {
+            Err(cast_error::<Self>(&plan_node))
+        }
+    }
 }
 
 impl PrettyPrint for FullKeyAggregate {

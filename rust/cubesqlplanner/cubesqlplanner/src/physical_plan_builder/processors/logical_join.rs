@@ -45,27 +45,25 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 )?;
             }
             for join in logical_join.joins.iter() {
-                match join {
-                    LogicalJoinItem::CubeJoinItem(CubeJoinItem { cube, on_sql }) => {
-                        join_builder.left_join_cube(
-                            cube.cube.clone(),
-                            Some(cube.cube.default_alias_with_prefix(&context.alias_prefix)),
-                            JoinCondition::new_base_join(SqlJoinCondition::try_new(
-                                on_sql.clone(),
-                            )?),
-                        );
-                        for dimension_subquery in logical_join
-                            .dimension_subqueries
-                            .iter()
-                            .filter(|d| &d.subquery_dimension.cube_name() == cube.cube.name())
-                        {
-                            self.builder.add_subquery_join(
-                                dimension_subquery.clone(),
-                                &mut join_builder,
-                                context,
-                            )?;
-                        }
-                    }
+                join_builder.left_join_cube(
+                    join.cube.cube.clone(),
+                    Some(
+                        join.cube
+                            .cube
+                            .default_alias_with_prefix(&context.alias_prefix),
+                    ),
+                    JoinCondition::new_base_join(SqlJoinCondition::try_new(join.on_sql.clone())?),
+                );
+                for dimension_subquery in logical_join
+                    .dimension_subqueries
+                    .iter()
+                    .filter(|d| &d.subquery_dimension.cube_name() == join.cube.cube.name())
+                {
+                    self.builder.add_subquery_join(
+                        dimension_subquery.clone(),
+                        &mut join_builder,
+                        context,
+                    )?;
                 }
             }
             Ok(From::new_from_join(join_builder.build()))
