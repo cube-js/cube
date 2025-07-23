@@ -163,7 +163,7 @@ impl QueryTools {
 
     pub fn plan_sql_templates(&self, external: bool) -> Result<PlanSqlTemplates, CubeError> {
         let driver_tools = self.base_tools.driver_tools(external)?;
-        PlanSqlTemplates::try_new(driver_tools)
+        PlanSqlTemplates::try_new(driver_tools, external)
     }
 
     pub fn base_tools(&self) -> &Rc<dyn BaseTools> {

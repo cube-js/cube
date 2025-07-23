@@ -4,8 +4,8 @@ use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct PreAggregationJoinItem {
-    pub from: PreAggregationTable,
-    pub to: PreAggregationTable,
+    pub from: Rc<PreAggregationSource>,
+    pub to: Rc<PreAggregationSource>,
     pub from_members: Vec<Rc<MemberSymbol>>,
     pub to_members: Vec<Rc<MemberSymbol>>,
     pub on_sql: Rc<SqlCall>,
@@ -13,8 +13,13 @@ pub struct PreAggregationJoinItem {
 
 #[derive(Clone)]
 pub struct PreAggregationJoin {
-    pub root: PreAggregationTable,
+    pub root: Rc<PreAggregationSource>,
     pub items: Vec<PreAggregationJoinItem>,
+}
+
+#[derive(Clone)]
+pub struct PreAggregationUnion {
+    pub items: Vec<Rc<PreAggregationTable>>,
 }
 
 #[derive(Clone)]
@@ -26,8 +31,9 @@ pub struct PreAggregationTable {
 
 #[derive(Clone)]
 pub enum PreAggregationSource {
-    Table(PreAggregationTable),
+    Single(PreAggregationTable),
     Join(PreAggregationJoin),
+    Union(PreAggregationUnion),
 }
 
 #[derive(Clone)]
