@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.41](https://github.com/cube-js/cube/compare/v1.3.40...v1.3.41) (2025-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/questdb-driver
+
 ## [1.3.40](https://github.com/cube-js/cube/compare/v1.3.39...v1.3.40) (2025-07-20)
 
 **Note:** Version bump only for package @cubejs-backend/questdb-driver
