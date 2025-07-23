@@ -108,6 +108,11 @@ pub enum PlanNode {
     MeasureSubquery(Rc<MeasureSubquery>),
     DimensionSubQuery(Rc<DimensionSubQuery>),
     KeysSubQuery(Rc<KeysSubQuery>),
+    MultiStageGetDateRange(Rc<MultiStageGetDateRange>),
+    MultiStageLeafMeasure(Rc<MultiStageLeafMeasure>),
+    MultiStageMeasureCalculation(Rc<MultiStageMeasureCalculation>),
+    MultiStageTimeSeries(Rc<MultiStageTimeSeries>),
+    MultiStageRollingWindow(Rc<MultiStageRollingWindow>),
 }
 
 impl PlanNode {
@@ -123,6 +128,11 @@ impl PlanNode {
             PlanNode::MeasureSubquery(_) => MeasureSubquery::node_name(),
             PlanNode::DimensionSubQuery(_) => DimensionSubQuery::node_name(),
             PlanNode::KeysSubQuery(_) => KeysSubQuery::node_name(),
+            PlanNode::MultiStageGetDateRange(_) => MultiStageGetDateRange::node_name(),
+            PlanNode::MultiStageLeafMeasure(_) => MultiStageLeafMeasure::node_name(),
+            PlanNode::MultiStageMeasureCalculation(_) => MultiStageMeasureCalculation::node_name(),
+            PlanNode::MultiStageTimeSeries(_) => MultiStageTimeSeries::node_name(),
+            PlanNode::MultiStageRollingWindow(_) => MultiStageRollingWindow::node_name(),
         }
     }
 

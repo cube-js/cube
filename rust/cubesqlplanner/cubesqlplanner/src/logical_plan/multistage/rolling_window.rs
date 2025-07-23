@@ -2,6 +2,7 @@ use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::Granularity;
+use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct MultiStageRegularRollingWindow {
@@ -108,5 +109,33 @@ impl PrettyPrint for MultiStageRollingWindow {
             ),
             &state,
         );
+    }
+}
+
+impl LogicalNode for MultiStageRollingWindow {
+    type InputsType = EmptyNodeInput;
+
+    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
+        PlanNode::MultiStageRollingWindow(self.clone())
+    }
+
+    fn inputs(&self) -> Self::InputsType {
+        EmptyNodeInput::new()
+    }
+
+    fn with_inputs(self: Rc<Self>, _inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
+        Ok(self)
+    }
+
+    fn node_name() -> &'static str {
+        "MultiStageRollingWindow"
+    }
+
+    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
+        if let PlanNode::MultiStageRollingWindow(item) = plan_node {
+            Ok(item)
+        } else {
+            Err(cast_error::<Self>(&plan_node))
+        }
     }
 }

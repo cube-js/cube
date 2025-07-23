@@ -82,7 +82,6 @@ impl MultiStageMemberQueryPlanner {
 
         let result = MultiStageGetDateRange {
             time_dimension: time_dimension.clone(),
-            dimension_subqueries: source.dimension_subqueries.clone(),
             source,
         };
         let member = LogicalMultiStageMember {
