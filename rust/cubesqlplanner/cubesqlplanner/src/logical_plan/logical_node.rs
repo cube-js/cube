@@ -113,6 +113,7 @@ pub enum PlanNode {
     MultiStageMeasureCalculation(Rc<MultiStageMeasureCalculation>),
     MultiStageTimeSeries(Rc<MultiStageTimeSeries>),
     MultiStageRollingWindow(Rc<MultiStageRollingWindow>),
+    LogicalMultiStageMember(Rc<LogicalMultiStageMember>),
 }
 
 impl PlanNode {
@@ -133,6 +134,7 @@ impl PlanNode {
             PlanNode::MultiStageMeasureCalculation(_) => MultiStageMeasureCalculation::node_name(),
             PlanNode::MultiStageTimeSeries(_) => MultiStageTimeSeries::node_name(),
             PlanNode::MultiStageRollingWindow(_) => MultiStageRollingWindow::node_name(),
+            PlanNode::LogicalMultiStageMember(_) => LogicalMultiStageMember::node_name(),
         }
     }
 

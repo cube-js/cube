@@ -47,24 +47,47 @@ pub struct Query {
 }
 
 impl LogicalNode for Query {
-    type InputsType = SingleNodeInput;
+    type InputsType = QueryInput;
 
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::Query(self.clone())
     }
 
     fn inputs(&self) -> Self::InputsType {
-        SingleNodeInput::new(self.source.as_plan_node())
+        let source = self.source.as_plan_node();
+        let multistage_members = self
+            .multistage_members
+            .iter()
+            .map(|member| member.as_plan_node())
+            .collect();
+        
+        QueryInput {
+            source,
+            multistage_members,
+        }
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
-        let input = inputs.unpack();
+        let QueryInput {
+            source,
+            multistage_members,
+        } = inputs;
+
+        check_inputs_len::<Self>(
+            "multistage_members",
+            &multistage_members,
+            self.multistage_members.len(),
+        )?;
+
         Ok(Rc::new(Self {
-            multistage_members: self.multistage_members.clone(),
+            multistage_members: multistage_members
+                .into_iter()
+                .map(|member| member.into_logical_node())
+                .collect::<Result<Vec<_>, _>>()?,
             schema: self.schema.clone(),
             filter: self.filter.clone(),
             modifers: self.modifers.clone(),
-            source: self.source.with_plan_node(self.source.as_plan_node())?,
+            source: self.source.with_plan_node(source)?,
         }))
     }
 
@@ -77,6 +100,20 @@ impl LogicalNode for Query {
         } else {
             Err(cast_error::<Self>(&plan_node))
         }
+    }
+}
+
+pub struct QueryInput {
+    pub source: PlanNode,
+    pub multistage_members: Vec<PlanNode>,
+}
+
+impl NodeInputs for QueryInput {
+    fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
+        Box::new(
+            std::iter::once(&self.source)
+                .chain(self.multistage_members.iter())
+        )
     }
 }
 

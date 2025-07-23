@@ -15,6 +15,7 @@ pub mod pretty_print;
 mod query;
 mod resolve_multiplied_measures;
 mod schema;
+pub mod visitor;
 
 pub use aggregate_multiplied_subquery::*;
 pub use cube::*;

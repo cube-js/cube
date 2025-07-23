@@ -86,7 +86,7 @@ impl MultiStageMemberQueryPlanner {
         };
         let member = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::GetDateRange(result),
+            member_type: MultiStageMemberLogicalType::GetDateRange(Rc::new(result)),
         };
 
         Ok(Rc::new(member))
@@ -104,7 +104,7 @@ impl MultiStageMemberQueryPlanner {
         };
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::TimeSeries(result),
+            member_type: MultiStageMemberLogicalType::TimeSeries(Rc::new(result)),
         }))
     }
 
@@ -176,7 +176,7 @@ impl MultiStageMemberQueryPlanner {
         };
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::RollingWindow(result),
+            member_type: MultiStageMemberLogicalType::RollingWindow(Rc::new(result)),
         }))
     }
 
@@ -248,7 +248,7 @@ impl MultiStageMemberQueryPlanner {
 
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::MeasureCalculation(result),
+            member_type: MultiStageMemberLogicalType::MeasureCalculation(Rc::new(result)),
         };
         Ok(Rc::new(result))
     }
@@ -292,7 +292,7 @@ impl MultiStageMemberQueryPlanner {
         };
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(leaf_measure_plan),
+            member_type: MultiStageMemberLogicalType::LeafMeasure(Rc::new(leaf_measure_plan)),
         };
         Ok(Rc::new(result))
     }

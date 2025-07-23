@@ -1,11 +1,35 @@
 use crate::logical_plan::*;
+use cubenativeutils::CubeError;
+use std::rc::Rc;
 
 pub enum MultiStageMemberLogicalType {
-    LeafMeasure(MultiStageLeafMeasure),
-    MeasureCalculation(MultiStageMeasureCalculation),
-    GetDateRange(MultiStageGetDateRange),
-    TimeSeries(MultiStageTimeSeries),
-    RollingWindow(MultiStageRollingWindow),
+    LeafMeasure(Rc<MultiStageLeafMeasure>),
+    MeasureCalculation(Rc<MultiStageMeasureCalculation>),
+    GetDateRange(Rc<MultiStageGetDateRange>),
+    TimeSeries(Rc<MultiStageTimeSeries>),
+    RollingWindow(Rc<MultiStageRollingWindow>),
+}
+
+impl MultiStageMemberLogicalType {
+    fn as_plan_node(&self) -> PlanNode {
+        match self {
+            Self::LeafMeasure(item) => item.as_plan_node(),
+            Self::MeasureCalculation(item) => item.as_plan_node(),
+            Self::GetDateRange(item) => item.as_plan_node(),
+            Self::TimeSeries(item) => item.as_plan_node(),
+            Self::RollingWindow(item) => item.as_plan_node(),
+        }
+    }
+    
+    fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError> {
+        Ok(match self {
+            Self::LeafMeasure(_) => Self::LeafMeasure(plan_node.into_logical_node()?),
+            Self::MeasureCalculation(_) => Self::MeasureCalculation(plan_node.into_logical_node()?),
+            Self::GetDateRange(_) => Self::GetDateRange(plan_node.into_logical_node()?),
+            Self::TimeSeries(_) => Self::TimeSeries(plan_node.into_logical_node()?),
+            Self::RollingWindow(_) => Self::RollingWindow(plan_node.into_logical_node()?),
+        })
+    }
 }
 
 impl PrettyPrint for MultiStageMemberLogicalType {
@@ -23,6 +47,39 @@ impl PrettyPrint for MultiStageMemberLogicalType {
 pub struct LogicalMultiStageMember {
     pub name: String,
     pub member_type: MultiStageMemberLogicalType,
+}
+
+impl LogicalNode for LogicalMultiStageMember {
+    type InputsType = SingleNodeInput;
+
+    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
+        PlanNode::LogicalMultiStageMember(self.clone())
+    }
+
+    fn inputs(&self) -> Self::InputsType {
+        SingleNodeInput::new(self.member_type.as_plan_node())
+    }
+
+    fn with_inputs(self: Rc<Self>, inputs: Self::InputsType) -> Result<Rc<Self>, CubeError> {
+        let input = inputs.unpack();
+        
+        Ok(Rc::new(Self {
+            name: self.name.clone(),
+            member_type: self.member_type.with_plan_node(input)?,
+        }))
+    }
+
+    fn node_name() -> &'static str {
+        "LogicalMultiStageMember"
+    }
+
+    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
+        if let PlanNode::LogicalMultiStageMember(item) = plan_node {
+            Ok(item)
+        } else {
+            Err(cast_error::<Self>(&plan_node))
+        }
+    }
 }
 
 impl PrettyPrint for LogicalMultiStageMember {

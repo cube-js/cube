@@ -1,6 +1,6 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
-use crate::logical_plan::MultiStageMemberLogicalType;
+use crate::logical_plan::{LogicalNode, MultiStageMemberLogicalType};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::QueryPlan;
 use cubenativeutils::CubeError;
@@ -24,19 +24,19 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMemberLogicalType>
     ) -> Result<Self::PhysycalNode, CubeError> {
         match multi_stage_member {
             MultiStageMemberLogicalType::LeafMeasure(measure) => {
-                self.builder.process_node(measure, context)
+                self.builder.process_node(measure.as_ref(), context)
             }
             MultiStageMemberLogicalType::MeasureCalculation(calculation) => {
-                self.builder.process_node(calculation, context)
+                self.builder.process_node(calculation.as_ref(), context)
             }
             MultiStageMemberLogicalType::GetDateRange(get_date_range) => {
-                self.builder.process_node(get_date_range, context)
+                self.builder.process_node(get_date_range.as_ref(), context)
             }
             MultiStageMemberLogicalType::TimeSeries(time_series) => {
-                self.builder.process_node(time_series, context)
+                self.builder.process_node(time_series.as_ref(), context)
             }
             MultiStageMemberLogicalType::RollingWindow(rolling_window) => {
-                self.builder.process_node(rolling_window, context)
+                self.builder.process_node(rolling_window.as_ref(), context)
             }
         }
     }
