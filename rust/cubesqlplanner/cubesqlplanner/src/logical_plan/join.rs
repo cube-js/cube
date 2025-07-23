@@ -117,6 +117,14 @@ impl NodeInputs for LogicalJoinInput {
                 .chain(self.dimension_subqueries.iter()),
         )
     }
+    
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
+        Box::new(
+            std::iter::once(&mut self.root)
+                .chain(self.joins.iter_mut())
+                .chain(self.dimension_subqueries.iter_mut()),
+        )
+    }
 }
 
 impl PrettyPrint for LogicalJoin {

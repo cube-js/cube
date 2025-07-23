@@ -99,6 +99,14 @@ impl NodeInputs for AggregateMultipliedSubqueryInput {
                 .chain(self.dimension_subqueries.iter()),
         )
     }
+    
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
+        Box::new(
+            std::iter::once(&mut self.keys_subquery)
+                .chain(std::iter::once(&mut self.source))
+                .chain(self.dimension_subqueries.iter_mut()),
+        )
+    }
 }
 
 impl PrettyPrint for AggregateMultipliedSubquery {

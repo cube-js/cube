@@ -115,6 +115,13 @@ impl NodeInputs for QueryInput {
                 .chain(self.multistage_members.iter())
         )
     }
+    
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
+        Box::new(
+            std::iter::once(&mut self.source)
+                .chain(self.multistage_members.iter_mut())
+        )
+    }
 }
 
 impl PrettyPrint for Query {

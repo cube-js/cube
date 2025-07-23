@@ -60,6 +60,10 @@ impl NodeInputs for KeysSubQueryInputs {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
         Box::new(std::iter::once(&self.pk_cube).chain(std::iter::once(&self.source)))
     }
+    
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
+        Box::new(std::iter::once(&mut self.pk_cube).chain(std::iter::once(&mut self.source)))
+    }
 }
 
 impl PrettyPrint for KeysSubQuery {

@@ -100,6 +100,14 @@ impl NodeInputs for ResolveMultipliedMeasuresInput {
                 .chain(self.aggregate_multiplied_subqueries.iter()),
         )
     }
+    
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
+        Box::new(
+            self.regular_measure_subqueries
+                .iter_mut()
+                .chain(self.aggregate_multiplied_subqueries.iter_mut()),
+        )
+    }
 }
 
 impl PrettyPrint for ResolveMultipliedMeasures {

@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 pub trait NodeInputs {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_>;
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_>;
 }
 
 pub struct EmptyNodeInput {}
@@ -15,6 +16,10 @@ impl EmptyNodeInput {
 
 impl NodeInputs for EmptyNodeInput {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
+        Box::new(std::iter::empty())
+    }
+    
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
         Box::new(std::iter::empty())
     }
 }
@@ -36,6 +41,10 @@ impl SingleNodeInput {
 impl NodeInputs for SingleNodeInput {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
         Box::new(std::iter::once(&self.item))
+    }
+    
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
+        Box::new(std::iter::once(&mut self.item))
     }
 }
 
@@ -61,6 +70,14 @@ impl NodeInputs for OptionNodeInput {
             Box::new(std::iter::empty())
         }
     }
+    
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
+        if let Some(item) = &mut self.item {
+            Box::new(std::iter::once(item))
+        } else {
+            Box::new(std::iter::empty())
+        }
+    }
 }
 
 pub struct VecNodeInput {
@@ -80,6 +97,10 @@ impl VecNodeInput {
 impl NodeInputs for VecNodeInput {
     fn iter(&self) -> Box<dyn Iterator<Item = &PlanNode> + '_> {
         Box::new(self.items.iter())
+    }
+    
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut PlanNode> + '_> {
+        Box::new(self.items.iter_mut())
     }
 }
 
