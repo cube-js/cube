@@ -8325,12 +8325,13 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
         ]
     );
 }
-async fn assert_limit_pushdown(
+
+async fn assert_limit_pushdown_using_search_string(
     service: &Box<dyn SqlClient>,
     query: &str,
     expected_index: Option<&str>,
     is_limit_expected: bool,
-    is_tail_limit: bool,
+    search_string: &str,
 ) -> Result<Vec<Row>, String> {
     let res = service
         .exec_query(&format!("EXPLAIN ANALYZE {}", query))
@@ -8347,11 +8348,7 @@ async fn assert_limit_pushdown(
                     ));
                 }
             }
-            let expected_limit = if is_tail_limit {
-                "TailLimit"
-            } else {
-                "GlobalLimit"
-            };
+            let expected_limit = search_string;
             if is_limit_expected {
                 if s.find(expected_limit).is_none() {
                     return Err(format!("{} expected but not found", expected_limit));
@@ -8367,6 +8364,27 @@ async fn assert_limit_pushdown(
 
     let res = service.exec_query(query).await.unwrap();
     Ok(res.get_rows().clone())
+}
+
+async fn assert_limit_pushdown(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    expected_index: Option<&str>,
+    is_limit_expected: bool,
+    is_tail_limit: bool,
+) -> Result<Vec<Row>, String> {
+    assert_limit_pushdown_using_search_string(
+        service,
+        query,
+        expected_index,
+        is_limit_expected,
+        if is_tail_limit {
+            "TailLimit"
+        } else {
+            "GlobalLimit"
+        },
+    )
+    .await
 }
 
 async fn cache_incr(service: Box<dyn SqlClient>) {
@@ -9393,7 +9411,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a aaa, b bbbb, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9404,39 +9422,46 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
                 ORDER BY 2 LIMIT 4",
         Some("ind1"),
         true,
-        false,
+        "Sort, fetch: 4",
     )
     .await
     .unwrap();
 
-    assert_eq!(
-        res,
-        vec![
-            Row::new(vec![
-                TableValue::Int(12),
-                TableValue::Int(20),
-                TableValue::Int(4)
-            ]),
-            Row::new(vec![
-                TableValue::Int(12),
-                TableValue::Int(25),
-                TableValue::Int(5)
-            ]),
-            Row::new(vec![
-                TableValue::Int(12),
-                TableValue::Int(25),
-                TableValue::Int(6)
-            ]),
-            Row::new(vec![
-                TableValue::Int(12),
-                TableValue::Int(30),
-                TableValue::Int(7)
-            ]),
-        ]
-    );
+    let mut expected = vec![
+        Row::new(vec![
+            TableValue::Int(12),
+            TableValue::Int(20),
+            TableValue::Int(4),
+        ]),
+        Row::new(vec![
+            TableValue::Int(12),
+            TableValue::Int(25),
+            TableValue::Int(5),
+        ]),
+        Row::new(vec![
+            TableValue::Int(12),
+            TableValue::Int(25),
+            TableValue::Int(6),
+        ]),
+        Row::new(vec![
+            TableValue::Int(12),
+            TableValue::Int(30),
+            TableValue::Int(7),
+        ]),
+    ];
+    if res != expected {
+        // Given the query, there are two valid orderings -- (12, 25, 5) and (12, 25, 6) can be swapped.
+
+        let mut values1 = expected[1].values().clone();
+        let mut values2 = expected[2].values().clone();
+        std::mem::swap(&mut values1[2], &mut values2[2]);
+        expected[1] = Row::new(values1);
+        expected[2] = Row::new(values2);
+        assert_eq!(res, expected);
+    }
 
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9446,7 +9471,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
                 ORDER BY 3 LIMIT 3",
         Some("ind2"),
         true,
-        false,
+        "Sort, fetch: 3",
     )
     .await
     .unwrap();
@@ -9473,7 +9498,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     );
     //
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9483,7 +9508,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
                 ORDER BY 3 DESC LIMIT 3",
         Some("ind2"),
         true,
-        true,
+        "Sort, fetch: 3",
     )
     .await
     .unwrap();
@@ -9510,7 +9535,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     );
     //
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a, b FROM (SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9520,7 +9545,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
                 ORDER BY 1, 2 LIMIT 3) x",
         Some("ind1"),
         true,
-        false,
+        "Sort, fetch: 3",
     )
     .await
     .unwrap();
@@ -9546,7 +9571,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
         ]
     );
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a, b FROM (SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9556,7 +9581,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
                 ORDER BY 1, 2 LIMIT 2 OFFSET 1) x",
         Some("ind1"),
         true,
-        false,
+        "Sort, fetch: 3",
     )
     .await
     .unwrap();
@@ -9577,7 +9602,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
         ]
     );
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9588,7 +9613,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
                 ORDER BY 1 LIMIT 3",
         Some("ind1"),
         true,
-        false,
+        "Sort, fetch: 3",
     )
     .await
     .unwrap();
@@ -9609,7 +9634,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
         ]
     );
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9620,7 +9645,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
                 ORDER BY 1, 3 LIMIT 3",
         Some("ind1"),
         true,
-        false,
+        "Sort, fetch: 3",
     )
     .await
     .unwrap();
@@ -9683,7 +9708,7 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a aaa, b bbbb, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9694,7 +9719,7 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
                 ORDER BY 2 desc LIMIT 4",
         Some("ind1"),
         true,
-        true,
+        "Sort, fetch: 4",
     )
     .await
     .unwrap();
@@ -9726,7 +9751,7 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
     );
 
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a aaa, b bbbb, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9736,7 +9761,7 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
                 ORDER BY 1 desc, 2 desc LIMIT 3",
         Some("ind1"),
         true,
-        true,
+        "Sort, fetch: 3",
     )
     .await
     .unwrap();
@@ -9836,7 +9861,7 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9847,7 +9872,7 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
                 ORDER BY 2 LIMIT 4",
         Some("ind1"),
         true,
-        false,
+        "Sort, fetch: 4",
     )
     .await
     .unwrap();
@@ -9874,7 +9899,7 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
     );
 
     // ====================================
-    let res = assert_limit_pushdown(
+    let res = assert_limit_pushdown_using_search_string(
         &service,
         "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1
@@ -9883,8 +9908,8 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
                 ) as `tb`
                 ORDER BY 3 LIMIT 3",
         Some("ind1"),
-        false,
-        false,
+        true,
+        "Sort, fetch: 3",
     )
     .await
     .unwrap();

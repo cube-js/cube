@@ -1597,20 +1597,38 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
         LogicalPlan::Extension { .. } => return Ok(p),
         // These nodes collect results from multiple partitions, return unchanged.
         LogicalPlan::Aggregate { .. }
-        | LogicalPlan::Sort { .. }
-        | LogicalPlan::Limit { .. }
-        | LogicalPlan::Repartition { .. } => return Ok(p),
+        | LogicalPlan::Repartition { .. }
+        | LogicalPlan::Limit { .. } => return Ok(p),
+        // Collects results but let's push sort,fetch underneath the input.
+        LogicalPlan::Sort(Sort { expr, input, fetch }) => {
+            let Some(send) = try_extract_cluster_send(input) else {
+                return Ok(p);
+            };
+            let Some(fetch) = fetch else {
+                return Ok(p);
+            };
+            let id = send.id;
+            snapshots = send.snapshots.clone();
+            let under_sort = LogicalPlan::Sort(Sort {
+                expr: expr.clone(),
+                input: send.input.clone(),
+                fetch: Some(*fetch),
+            });
+            // We discard limit_and_reverse, because we add a Sort node into the plan right here.
+            let limit_and_reverse = None;
+            let new_send =
+                ClusterSendNode::new(id, Arc::new(under_sort), snapshots, limit_and_reverse);
+            *input = Arc::new(new_send.into_plan());
+            return Ok(p);
+        }
         // We can always pull cluster send for these nodes.
         LogicalPlan::Projection(Projection { input, .. })
         | LogicalPlan::Filter(Filter { input, .. })
         | LogicalPlan::SubqueryAlias(SubqueryAlias { input, .. })
         | LogicalPlan::Unnest(Unnest { input, .. }) => {
-            let send;
-            if let Some(s) = try_extract_cluster_send(input) {
-                send = s;
-            } else {
+            let Some(send) = try_extract_cluster_send(input) else {
                 return Ok(p);
-            }
+            };
             let id = send.id;
             snapshots = send.snapshots.clone();
             let limit = send.limit_and_reverse.clone();
