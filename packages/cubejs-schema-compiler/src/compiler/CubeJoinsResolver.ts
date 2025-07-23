@@ -16,8 +16,8 @@ export class CubeJoinsResolver extends CubeSymbols implements CompilerInterface 
   // 2nd level value: join definition
   private cubeJoinTargets: Record<string, Record<string, JoinDefinition>>;
 
-  public constructor() {
-    super(false); // It seems that we don't need to evaluate views
+  public constructor(evaluateViews = false) {
+    super(evaluateViews);
     this.cubeJoins = {};
     this.cubeJoinAliases = {};
     this.cubeJoinTargets = {};
@@ -54,5 +54,20 @@ export class CubeJoinsResolver extends CubeSymbols implements CompilerInterface 
         }
       });
     });
+  }
+
+  public resolveSymbol(cubeName: string | null, name: string) {
+    if (this.isCurrentCube(name) && !cubeName) {
+      return null;
+    }
+
+    if (cubeName && this.cubeJoinAliases[cubeName]?.[name]) {
+      // TODO: Write a full implementation
+      // Some kind of proxy like in symbols
+
+      return super.resolveSymbol(cubeName, this.cubeJoinAliases[cubeName]?.[name].name);
+    }
+
+    return super.resolveSymbol(cubeName, name);
   }
 }

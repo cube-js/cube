@@ -17,6 +17,7 @@ import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
+import { CubeJoinsResolver } from './CubeJoinsResolver';
 
 export type SegmentDefinition = {
   type: string;
@@ -157,7 +158,7 @@ export interface EvaluatedCube {
   accessPolicy?: AccessPolicyDefinition[];
 }
 
-export class CubeEvaluator extends CubeSymbols implements CompilerInterface {
+export class CubeEvaluator extends CubeJoinsResolver implements CompilerInterface {
   public evaluatedCubes: Record<string, EvaluatedCube> = {};
 
   public primaryKeys: Record<string, string[]> = {};
