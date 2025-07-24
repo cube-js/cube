@@ -2,6 +2,7 @@ export * from './BaseQueueDriver';
 export * from './ContinueWaitError';
 export * from './LocalCacheDriver';
 export * from './LocalQueueDriver';
+export * from './LocalQueueDriverConnection';
 export * from './PreAggregations';
 export * from './PreAggregationPartitionRangeLoader';
 export * from './PreAggregationLoader';
