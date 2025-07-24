@@ -715,6 +715,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       FILE_FORMAT: '(' +
         'TYPE = CSV, ' +
         'COMPRESSION = GZIP, ' +
+        'DATE_FORMAT = \'YYYY-MM-DD\', ' +
+        'TIMESTAMP_FORMAT = \'YYYY-MM-DD"T"HH24:MI:SS.FF3TZH:TZM\', ' +
         'FIELD_OPTIONALLY_ENCLOSED_BY = \'"\'' +
         ')',
     };

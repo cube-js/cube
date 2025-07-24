@@ -6,6 +6,7 @@ use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::logical_plan::PreAggregationJoin;
 use crate::logical_plan::PreAggregationJoinItem;
 use crate::logical_plan::PreAggregationTable;
+use crate::logical_plan::PreAggregationUnion;
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
 use crate::planner::query_tools::QueryTools;
@@ -103,6 +104,11 @@ impl PreAggregationsCompiler {
         };
 
         let static_data = description.static_data();
+
+        if static_data.pre_aggregation_type == "rollupLambda" {
+            return self.build_lambda(name, &description);
+        }
+
         let measures = if let Some(refs) = description.measure_references()? {
             Self::symbols_from_ref(
                 self.query_tools.clone(),
@@ -151,7 +157,7 @@ impl PreAggregationsCompiler {
         let source = if static_data.pre_aggregation_type == "rollupJoin" {
             PreAggregationSource::Join(self.build_join_source(&measures, &dimensions, &rollups)?)
         } else {
-            PreAggregationSource::Table(PreAggregationTable {
+            PreAggregationSource::Single(PreAggregationTable {
                 cube_name: name.cube_name.clone(),
                 name: name.name.clone(),
                 alias: static_data.sql_alias.clone(),
@@ -171,6 +177,108 @@ impl PreAggregationsCompiler {
         });
         self.compiled_cache.insert(name.clone(), res.clone());
         Ok(res)
+    }
+
+    fn build_lambda(
+        &mut self,
+        name: &PreAggregationFullName,
+        description: &Rc<dyn PreAggregationDescription>,
+    ) -> Result<Rc<CompiledPreAggregation>, CubeError> {
+        let rollups = if let Some(refs) = description.rollup_references()? {
+            let r = self
+                .query_tools
+                .cube_evaluator()
+                .evaluate_rollup_references(name.cube_name.clone(), refs)?;
+            r
+        } else {
+            Vec::new()
+        };
+        if rollups.is_empty() {
+            return Err(CubeError::user(format!(
+                "rollupLambda '{}.{}' should reference at least one rollup",
+                name.cube_name, name.name
+            )));
+        }
+
+        let pre_aggrs_for_lambda = rollups
+            .iter()
+            .map(|item| -> Result<_, CubeError> {
+                self.compile_pre_aggregation(&PreAggregationFullName::from_string(item)?)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut sources = vec![];
+        for (i, rollup) in pre_aggrs_for_lambda.clone().iter().enumerate() {
+            match rollup.source.as_ref() {
+                PreAggregationSource::Single(table) => {
+                    sources.push(Rc::new(table.clone()));
+                }
+                _ => {
+                    return Err(CubeError::user(format!("Rollup lambda can't be nested")));
+                }
+            }
+            if i > 1 {
+                Self::match_symbols(&rollup.measures, &pre_aggrs_for_lambda[0].measures)?;
+                Self::match_symbols(&rollup.dimensions, &pre_aggrs_for_lambda[0].dimensions)?;
+                Self::match_time_dimensions(
+                    &rollup.time_dimensions,
+                    &pre_aggrs_for_lambda[0].time_dimensions,
+                )?;
+            }
+        }
+
+        let measures = pre_aggrs_for_lambda[0].measures.clone();
+        let dimensions = pre_aggrs_for_lambda[0].dimensions.clone();
+        let time_dimensions = pre_aggrs_for_lambda[0].time_dimensions.clone();
+        let allow_non_strict_date_range_match = description
+            .static_data()
+            .allow_non_strict_date_range_match
+            .unwrap_or(false);
+        let granularity = pre_aggrs_for_lambda[0].granularity.clone();
+        let source = PreAggregationSource::Union(PreAggregationUnion { items: sources });
+
+        let static_data = description.static_data();
+        let res = Rc::new(CompiledPreAggregation {
+            name: static_data.name.clone(),
+            cube_name: name.cube_name.clone(),
+            source: Rc::new(source),
+            granularity,
+            external: static_data.external,
+            measures,
+            dimensions,
+            time_dimensions,
+            allow_non_strict_date_range_match,
+        });
+        self.compiled_cache.insert(name.clone(), res.clone());
+        Ok(res)
+    }
+
+    fn match_symbols(
+        a: &Vec<Rc<MemberSymbol>>,
+        b: &Vec<Rc<MemberSymbol>>,
+    ) -> Result<(), CubeError> {
+        if !a.iter().zip(b.iter()).all(|(a, b)| a.name() == b.name()) {
+            return Err(CubeError::user(format!(
+                "Names for pre-aggregation symbols in lambda pre-aggragation don't match"
+            )));
+        }
+        Ok(())
+    }
+
+    fn match_time_dimensions(
+        a: &Vec<(Rc<MemberSymbol>, Option<String>)>,
+        b: &Vec<(Rc<MemberSymbol>, Option<String>)>,
+    ) -> Result<(), CubeError> {
+        if !a
+            .iter()
+            .zip(b.iter())
+            .all(|(a, b)| a.0.name() == b.0.name() && a.1 == b.1)
+        {
+            return Err(CubeError::user(format!(
+                "Names for pre-aggregation symbols in lambda pre-aggragation don't match"
+            )));
+        }
+        Ok(())
     }
 
     fn build_join_source(
@@ -249,21 +357,9 @@ impl PreAggregationsCompiler {
         let to_pre_aggr =
             self.find_pre_aggregation_for_join(pre_aggrs_for_join, &join_item.to_members)?;
 
-        let from_table = match from_pre_aggr.source.as_ref() {
-            PreAggregationSource::Table(t) => t.clone(),
-            PreAggregationSource::Join(_) => {
-                return Err(CubeError::user(format!("Rollup join can't be nested")));
-            }
-        };
-        let to_table = match to_pre_aggr.source.as_ref() {
-            PreAggregationSource::Table(t) => t.clone(),
-            PreAggregationSource::Join(_) => {
-                return Err(CubeError::user(format!("Rollup join can't be nested")));
-            }
-        };
         let res = PreAggregationJoinItem {
-            from: from_table,
-            to: to_table,
+            from: from_pre_aggr.source.clone(),
+            to: to_pre_aggr.source.clone(),
             from_members: join_item.from_members.clone(),
             to_members: join_item.to_members.clone(),
             on_sql: join_item.on_sql.clone(),
