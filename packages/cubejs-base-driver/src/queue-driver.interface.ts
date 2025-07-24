@@ -52,7 +52,6 @@ export interface QueueDriverOptions {
   continueWaitTimeout: number,
   orphanedTimeout: number,
   heartBeatTimeout: number,
-  getQueueEventsBus?: any,
   processUid?: string;
 }
 
