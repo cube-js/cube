@@ -297,7 +297,6 @@ export class OrchestratorApi {
     return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
   }
 
-
   public async updateRefreshEndReached() {
     return this.orchestrator.updateRefreshEndReached();
   }
