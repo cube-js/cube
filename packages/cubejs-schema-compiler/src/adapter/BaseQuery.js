@@ -223,7 +223,11 @@ export class BaseQuery {
     /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
-        const join = this.joinGraph.buildJoin(this.collectJoinHints(true));
+        const { joinHints, joinAliases } = this.collectJoinHints(true);
+
+        // TODO: Use joinAliases for join hints building
+
+        const join = this.joinGraph.buildJoin(joinHints);
         if (!join) {
           return undefined;
         }
@@ -440,9 +444,16 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
-      const [rootOfJoin, ...allMembersJoinHints] = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
-      const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
-      let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(this.join));
+      let { joinHints, joinAliases } = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      const [rootOfJoin, ...allMembersJoinHints] = joinHints;
+
+      ({ joinHints, joinAliases } = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery()));
+      const customSubQueryJoinHints = joinHints;
+
+      ({ joinHints, joinAliases } = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(this.join)));
+      let joinMembersJoinHints = joinHints;
+
+      // TODO: Use joinAliases for join hints building
 
       // One cube may join the other cube via transitive joined cubes,
       // members from which are referenced in the join `on` clauses.
@@ -501,7 +512,12 @@ export class BaseQuery {
 
       while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoins, newJoin) && cnt < 10000) {
         prevJoins = newJoin;
-        joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
+
+        ({ joinHints, joinAliases } = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin)));
+        joinMembersJoinHints = joinHints;
+
+        // TODO: Use joinAliases for join hints building
+
         if (!isOrderPreserved(prevJoinMembersJoinHints, joinMembersJoinHints)) {
           throw new UserError(`Can not construct joins for the query, potential loop detected: ${prevJoinMembersJoinHints.join('->')} vs ${joinMembersJoinHints.join('->')}`);
         }
@@ -2392,7 +2408,8 @@ export class BaseQuery {
     );
 
     if (shouldBuildJoinForMeasureSelect) {
-      const joinHints = this.collectJoinHintsFromMembers(measures);
+      const { joinHints, joinAliases } = this.collectJoinHintsFromMembers(measures);
+      // TODO: Use joinAliases for join hints building
       const measuresJoin = this.joinGraph.buildJoin(joinHints);
       if (measuresJoin.multiplicationFactor[keyCubeName]) {
         throw new UserError(
@@ -2473,10 +2490,14 @@ export class BaseQuery {
 
       const cubes = this.collectFrom(nonViewMembers, this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
       // Not using `collectJoinHintsFromMembers([measure])` because it would collect too many join hints from view
+      const { joinHints: collectedJoinHints, joinAliases } = this.collectJoinHintsFromMembers(nonViewMembers);
       const joinHints = [
         measure.joinHint,
-        ...this.collectJoinHintsFromMembers(nonViewMembers),
+        ...collectedJoinHints,
       ];
+
+      // TODO: Use joinAliases for join hints building
+
       if (R.any(cubeName => keyCubeName !== cubeName, cubes)) {
         const measuresJoin = this.joinGraph.buildJoin(joinHints);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
@@ -2657,10 +2678,23 @@ export class BaseQuery {
   }
 
   collectJoinHintsFromMembers(members) {
-    return [
-      ...members.map(m => m.joinHint).filter(h => h?.length > 0),
-      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers'),
-    ];
+    const {
+      joinHints: collectedJoinHints,
+      joinAliases: collectedJoinAliases,
+    } = this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers')
+      .reduce((acc, { joinHints, joinAliases }) => {
+        joinHints.forEach(item => acc.joinHints.add(item));
+        acc.joinAliases.push(...joinAliases);
+        return acc;
+      }, { joinHints: new Set(), joinAliases: [] });
+
+    return {
+      joinHints: [
+        ...members.map(m => m.joinHint).filter(h => h?.length > 0),
+        ...Array.from(collectedJoinHints),
+      ],
+      joinAliases: collectedJoinAliases,
+    };
   }
 
   /**
@@ -3385,12 +3419,15 @@ export class BaseQuery {
   }
 
   collectJoinHintsFor(fn) {
-    const context = { joinHints: [] };
+    const context = { joinHints: [], joinAliases: [] };
     this.evaluateSymbolSqlWithContext(
       fn,
       context
     );
-    return context.joinHints;
+    return {
+      joinHints: context.joinHints,
+      joinAliases: context.joinAliases,
+    };
   }
 
   /**
