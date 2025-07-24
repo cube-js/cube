@@ -18,7 +18,9 @@ impl LogicalNodeVisitor for CubeNamesCollector {
     }
 }
 
-pub fn collect_cube_names<T: LogicalNode>(node: &Rc<T>) -> Result<Vec<String>, CubeError> {
+pub fn collect_cube_names_from_node<T: LogicalNode>(
+    node: &Rc<T>,
+) -> Result<Vec<String>, CubeError> {
     let mut collector = CubeNamesCollector {
         cube_names: HashSet::new(),
     };

@@ -2,8 +2,45 @@ use crate::logical_plan::{LogicalNode, PlanNode};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+pub struct NodeRewriteResult {
+    rewritten: Option<PlanNode>,
+    stop: bool,
+}
+
+impl NodeRewriteResult {
+    pub fn rewritten(rewrited: PlanNode) -> Self {
+        Self {
+            rewritten: Some(rewrited),
+            stop: true,
+        }
+    }
+
+    pub fn stop() -> Self {
+        Self {
+            rewritten: None,
+            stop: true,
+        }
+    }
+
+    pub fn pass() -> Self {
+        Self {
+            rewritten: None,
+            stop: false,
+        }
+    }
+}
+
 pub trait LogicalNodeRewriter {
-    fn process_node(&mut self, node: &PlanNode) -> Result<Option<PlanNode>, CubeError>;
+    fn process_node(&mut self, node: &PlanNode) -> Result<NodeRewriteResult, CubeError>;
+}
+
+impl<F> LogicalNodeRewriter for F
+where
+    F: FnMut(&PlanNode) -> Result<NodeRewriteResult, CubeError>,
+{
+    fn process_node(&mut self, node: &PlanNode) -> Result<NodeRewriteResult, CubeError> {
+        self(node)
+    }
 }
 
 pub struct LogicalPlanRewriter {}
@@ -15,11 +52,11 @@ impl LogicalPlanRewriter {
 
     pub fn rewrite_top_down<T: LogicalNodeRewriter, N: LogicalNode>(
         &self,
-        node_visitor: &mut T,
         node: Rc<N>,
+        node_visitor: &mut T,
     ) -> Result<Rc<N>, CubeError> {
         let res = if let Some(rewrited) =
-            self.rewrite_top_down_impl(node_visitor, node.as_plan_node())?
+            self.rewrite_top_down_impl(node.as_plan_node(), node_visitor)?
         {
             rewrited.into_logical_node()?
         } else {
@@ -30,16 +67,20 @@ impl LogicalPlanRewriter {
 
     fn rewrite_top_down_impl<T: LogicalNodeRewriter>(
         &self,
-        node_visitor: &mut T,
         node: PlanNode,
+        node_visitor: &mut T,
     ) -> Result<Option<PlanNode>, CubeError> {
-        if let Some(rewrited) = node_visitor.process_node(&node)? {
-            return Ok(Some(rewrited));
+        let NodeRewriteResult { stop, rewritten } = node_visitor.process_node(&node)?;
+        if let Some(rewritten) = rewritten {
+            return Ok(Some(rewritten));
+        }
+        if stop {
+            return Ok(None);
         }
         let mut has_changes = false;
         let mut inputs = node.inputs();
         for input in inputs.iter_mut() {
-            if let Some(rewrited) = self.rewrite_top_down_impl(node_visitor, input.clone())? {
+            if let Some(rewrited) = self.rewrite_top_down_impl(input.clone(), node_visitor)? {
                 *input = rewrited;
                 has_changes = true;
             }
