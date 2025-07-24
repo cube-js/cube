@@ -8,25 +8,6 @@ use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum MatchState {
-    Partial,
-    Full,
-    NotMatched,
-}
-
-impl MatchState {
-    pub fn combine(&self, other: &MatchState) -> MatchState {
-        if matches!(self, MatchState::NotMatched) || matches!(other, MatchState::NotMatched) {
-            return MatchState::NotMatched;
-        }
-        if matches!(self, MatchState::Partial) || matches!(other, MatchState::Partial) {
-            return MatchState::Partial;
-        }
-        MatchState::Full
-    }
-}
-
 pub struct PreAggregationOptimizer {
     query_tools: Rc<QueryTools>,
     allow_multi_stage: bool,

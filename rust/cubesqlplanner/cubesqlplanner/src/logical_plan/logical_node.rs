@@ -34,30 +34,52 @@ pub enum PlanNode {
     LogicalMultiStageMember(Rc<LogicalMultiStageMember>),
 }
 
-impl PlanNode {
-    pub fn node_name(&self) -> &'static str {
-        match self {
-            PlanNode::Query(node) => node.node_name(),
-            PlanNode::LogicalJoin(node) => node.node_name(),
-            PlanNode::FullKeyAggregate(node) => node.node_name(),
-            PlanNode::PreAggregation(node) => node.node_name(),
-            PlanNode::ResolveMultipliedMeasures(node) => node.node_name(),
-            PlanNode::AggregateMultipliedSubquery(node) => node.node_name(),
-            PlanNode::Cube(node) => node.node_name(),
-            PlanNode::MeasureSubquery(node) => node.node_name(),
-            PlanNode::DimensionSubQuery(node) => node.node_name(),
-            PlanNode::KeysSubQuery(node) => node.node_name(),
-            PlanNode::MultiStageGetDateRange(node) => node.node_name(),
-            PlanNode::MultiStageLeafMeasure(node) => node.node_name(),
-            PlanNode::MultiStageMeasureCalculation(node) => node.node_name(),
-            PlanNode::MultiStageTimeSeries(node) => node.node_name(),
-            PlanNode::MultiStageRollingWindow(node) => node.node_name(),
-            PlanNode::LogicalMultiStageMember(node) => node.node_name(),
+// Macro for applying a block to all enum variants
+macro_rules! match_plan_node {
+    ($self:expr, $node:ident => $block:block) => {
+        match $self {
+            PlanNode::Query($node) => $block,
+            PlanNode::LogicalJoin($node) => $block,
+            PlanNode::FullKeyAggregate($node) => $block,
+            PlanNode::PreAggregation($node) => $block,
+            PlanNode::ResolveMultipliedMeasures($node) => $block,
+            PlanNode::AggregateMultipliedSubquery($node) => $block,
+            PlanNode::Cube($node) => $block,
+            PlanNode::MeasureSubquery($node) => $block,
+            PlanNode::DimensionSubQuery($node) => $block,
+            PlanNode::KeysSubQuery($node) => $block,
+            PlanNode::MultiStageGetDateRange($node) => $block,
+            PlanNode::MultiStageLeafMeasure($node) => $block,
+            PlanNode::MultiStageMeasureCalculation($node) => $block,
+            PlanNode::MultiStageTimeSeries($node) => $block,
+            PlanNode::MultiStageRollingWindow($node) => $block,
+            PlanNode::LogicalMultiStageMember($node) => $block,
         }
-    }
+    };
+}
 
+impl PlanNode {
     pub fn into_logical_node<T: LogicalNode>(self) -> Result<Rc<T>, CubeError> {
         T::try_from_plan_node(self)
+    }
+
+    pub fn inputs(&self) -> Vec<PlanNode> {
+        match_plan_node!(self, node => {
+            node.inputs()
+        })
+    }
+
+    pub fn node_name(&self) -> &'static str {
+        match_plan_node!(self, node => {
+            node.node_name()
+        })
+    }
+
+    pub fn with_inputs(self, inputs: Vec<PlanNode>) -> Result<Self, CubeError> {
+        let result = match_plan_node!(self, node => {
+            node.with_inputs(inputs)?.as_plan_node()
+        });
+        Ok(result)
     }
 }
 
@@ -83,58 +105,5 @@ pub(super) fn check_inputs_len(
             expected,
             inputs.len()
         )))
-    }
-}
-
-// Macro for applying a block to all enum variants
-macro_rules! match_plan_node {
-    ($self:expr, $node:ident => $block:block) => {
-        match $self {
-            PlanNode::Query($node) => $block,
-            PlanNode::LogicalJoin($node) => $block,
-            PlanNode::FullKeyAggregate($node) => $block,
-            PlanNode::PreAggregation($node) => $block,
-            PlanNode::ResolveMultipliedMeasures($node) => $block,
-            PlanNode::AggregateMultipliedSubquery($node) => $block,
-            PlanNode::Cube($node) => $block,
-            PlanNode::MeasureSubquery($node) => $block,
-            PlanNode::DimensionSubQuery($node) => $block,
-            PlanNode::KeysSubQuery($node) => $block,
-            PlanNode::MultiStageGetDateRange($node) => $block,
-            PlanNode::MultiStageLeafMeasure($node) => $block,
-            PlanNode::MultiStageMeasureCalculation($node) => $block,
-            PlanNode::MultiStageTimeSeries($node) => $block,
-            PlanNode::MultiStageRollingWindow($node) => $block,
-            PlanNode::LogicalMultiStageMember($node) => $block,
-        }
-    };
-}
-
-impl LogicalNode for PlanNode {
-    fn inputs(&self) -> Vec<PlanNode> {
-        match_plan_node!(self, node => {
-            node.inputs()
-        })
-    }
-
-    fn node_name(&self) -> &'static str {
-        match_plan_node!(self, node => {
-            node.node_name()
-        })
-    }
-
-    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        let result = match_plan_node!(self.as_ref(), node => {
-            node.clone().with_inputs(inputs)?.as_plan_node()
-        });
-        Ok(Rc::new(result))
-    }
-
-    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
-        Ok(Rc::new(plan_node))
-    }
-
-    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
-        (**self).clone()
     }
 }

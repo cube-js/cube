@@ -167,7 +167,7 @@ impl SelectBuilder {
     }
     pub fn add_projection_reference_member(
         &mut self,
-        member: &Rc<dyn BaseMember>,
+        member: &Rc<MemberSymbol>,
         reference: QualifiedColumnName,
         alias: Option<String>,
     ) {
