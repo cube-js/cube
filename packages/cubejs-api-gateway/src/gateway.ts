@@ -2067,21 +2067,6 @@ class ApiGateway {
     }
   }
 
-  public async subscribeQueueEvents({ context, signedWithPlaygroundAuthSecret, connectionId, res }) {
-    if (this.enforceSecurityChecks && !signedWithPlaygroundAuthSecret) {
-      throw new CubejsHandlerError(
-        403,
-        'Forbidden',
-        'Only for signed with playground auth secret'
-      );
-    }
-    return (await this.getAdapterApi(context)).subscribeQueueEvents(connectionId, res);
-  }
-
-  public async unSubscribeQueueEvents({ context, connectionId }) {
-    return (await this.getAdapterApi(context)).unSubscribeQueueEvents(connectionId);
-  }
-
   public async subscribe({
     query, context, res, subscribe, subscriptionState, queryType, apiType
   }) {

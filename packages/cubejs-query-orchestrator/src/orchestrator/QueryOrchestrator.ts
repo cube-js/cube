@@ -6,7 +6,6 @@ import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 import { QueryStream } from './QueryStream';
 
 export type CacheAndQueryDriverType = 'memory' | 'cubestore' | /** removed, used for exception */ 'redis';
@@ -54,8 +53,6 @@ export class QueryOrchestrator {
   protected readonly preAggregations: PreAggregations;
 
   protected readonly rollupOnlyMode: boolean;
-
-  private queueEventsBus: LocalQueueEventsBus;
 
   protected readonly cacheAndQueueDriver: string;
 
@@ -116,19 +113,8 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        getQueueEventsBus:
-          getEnv('preAggregationsQueueEventsBus') &&
-          this.getQueueEventsBus.bind(this)
       }
     );
-  }
-
-  private getQueueEventsBus() {
-    if (!this.queueEventsBus) {
-      this.queueEventsBus = new LocalQueueEventsBus();
-    }
-
-    return this.queueEventsBus;
   }
 
   /**
@@ -436,14 +422,6 @@ export class QueryOrchestrator {
 
   public async cancelPreAggregationQueriesFromQueue(queryKeys: string[], dataSource = 'default') {
     return this.preAggregations.cancelQueriesFromQueue(queryKeys, dataSource);
-  }
-
-  public async subscribeQueueEvents(id: string, callback) {
-    return this.getQueueEventsBus().subscribe(id, callback);
-  }
-
-  public async unSubscribeQueueEvents(id: string) {
-    return this.getQueueEventsBus().unsubscribe(id);
   }
 
   public async updateRefreshEndReached() {

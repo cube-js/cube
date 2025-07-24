@@ -24,3 +24,4 @@ rust/cubesql/profile.json
 .cubestore
 .env
 .vimspector.json
+.claude/settings.local.json

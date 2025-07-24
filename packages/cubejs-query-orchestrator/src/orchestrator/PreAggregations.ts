@@ -260,8 +260,6 @@ export class PreAggregations {
 
   private readonly queue: Record<string, QueryQueue> = {};
 
-  private readonly getQueueEventsBus: any;
-
   private readonly touchCache: LRUCache<string, true>;
 
   public constructor(
@@ -279,7 +277,6 @@ export class PreAggregations {
     this.dropPreAggregationsWithoutTouch = options.dropPreAggregationsWithoutTouch || getEnv('dropPreAggregationsWithoutTouch');
     this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
     this.externalRefresh = options.externalRefresh;
-    this.getQueueEventsBus = options.getQueueEventsBus;
     this.touchCache = new LRUCache({
       max: getEnv('touchPreAggregationCacheMaxCount'),
       ttl: getEnv('touchPreAggregationCacheMaxAge') * 1000,
@@ -634,7 +631,6 @@ export class PreAggregations {
             // Centralized continueWaitTimeout that can be overridden in queueOptions
             continueWaitTimeout: this.options.continueWaitTimeout,
             ...queueOptions,
-            getQueueEventsBus: this.getQueueEventsBus,
           }
         );
       }
@@ -672,7 +668,6 @@ export class PreAggregations {
           return loadCache.fetchTables(preAggregation);
         },
         {
-          getQueueEventsBus: this.getQueueEventsBus,
           concurrency: 4,
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,

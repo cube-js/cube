@@ -123,7 +123,6 @@ export class QueryQueue {
       heartBeatTimeout: this.heartBeatInterval * 4,
       redisPool: options.redisPool,
       cubeStoreDriverFactory: options.cubeStoreDriverFactory,
-      getQueueEventsBus: options.getQueueEventsBus,
       processUid: this.processUid,
     };
 
