@@ -12,7 +12,6 @@ const methodParams: Record<string, string[]> = {
   meta: [],
   subscribe: ['query', 'queryType'],
   unsubscribe: [],
-  'subscribe.queue.events': []
 };
 
 const calcMessageLength = (message: unknown) => Buffer.byteLength(
@@ -149,8 +148,6 @@ export class SubscriptionServer {
   }
 
   public async disconnect(connectionId: string) {
-    const authContext = await this.subscriptionStore.getAuthContext(connectionId);
-    await this.apiGateway.unSubscribeQueueEvents({ context: authContext, connectionId });
     await this.subscriptionStore.cleanupSubscriptions(connectionId);
   }
 

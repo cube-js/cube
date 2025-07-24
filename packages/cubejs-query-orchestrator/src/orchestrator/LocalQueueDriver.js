@@ -21,7 +21,6 @@ export class LocalQueueDriverConnection {
     this.heartBeat = driver.heartBeat;
     this.processingCounter = driver.processingCounter;
     this.processingLocks = driver.processingLocks;
-    this.getQueueEventsBus = options.getQueueEventsBus;
   }
 
   async getQueriesToCancel() {
@@ -169,15 +168,6 @@ export class LocalQueueDriverConnection {
       queueId: options.queueId,
     };
 
-    if (this.getQueueEventsBus) {
-      this.getQueueEventsBus().emit({
-        event: 'addedToQueue',
-        redisQueuePrefix: this.redisQueuePrefix,
-        queryKey: this.redisHash(queryKey),
-        payload: queryQueueObj
-      });
-    }
-
     return [
       added,
       queryQueueObj.queueId,
@@ -209,15 +199,6 @@ export class LocalQueueDriverConnection {
   async cancelQuery(queryKey) {
     const [query] = await this.getQueryAndRemove(queryKey);
 
-    if (this.getQueueEventsBus) {
-      this.getQueueEventsBus().emit({
-        event: 'cancelQuery',
-        redisQueuePrefix: this.redisQueuePrefix,
-        queryKey: this.redisHash(queryKey),
-        payload: query
-      });
-    }
-
     return query;
   }
 
@@ -235,15 +216,6 @@ export class LocalQueueDriverConnection {
     delete this.processingLocks[key];
     promise.resolved = true;
     promise.resolve(executionResult);
-
-    if (this.getQueueEventsBus) {
-      this.getQueueEventsBus().emit({
-        event: 'setResultAndRemoveQuery',
-        redisQueuePrefix: this.redisQueuePrefix,
-        queryKey: this.redisHash(queryKey),
-        payload: executionResult
-      });
-    }
 
     return true;
   }
@@ -302,15 +274,6 @@ export class LocalQueueDriverConnection {
     }
 
     this.heartBeat[key] = { key, order: new Date().getTime() };
-
-    if (this.getQueueEventsBus) {
-      this.getQueueEventsBus().emit({
-        event: 'retrievedForProcessing',
-        redisQueuePrefix: this.redisQueuePrefix,
-        queryKey: this.redisHash(queryKey),
-        payload: this.queryDef[key]
-      });
-    }
 
     return [
       added,
