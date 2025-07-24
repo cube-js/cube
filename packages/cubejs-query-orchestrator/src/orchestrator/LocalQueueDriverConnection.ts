@@ -21,7 +21,7 @@ import {
 
 export interface QueueItem {
   order: number;
-  key: any;
+  key: QueryKeyHash;
   queueId: QueueId;
 }
 
@@ -29,7 +29,7 @@ export interface QueryDefObject {
   queueId: QueueId;
   queryHandler: string;
   query: any;
-  queryKey: any;
+  queryKey: QueryKey;
   stageQueryKey: string;
   priority: number;
   requestId: string;
@@ -143,7 +143,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return null;
   }
 
-  protected queueArray(queueObj: Record<string, QueueItem>, orderFilterLessThan?: number): string[] {
+  protected queueArray(queueObj: Record<QueryKeyHash, QueueItem>, orderFilterLessThan?: number): string[] {
     return R.pipe(
       R.values,
       R.filter(orderFilterLessThan ? (q: QueueItem) => q.order < orderFilterLessThan : R.identity),
@@ -152,7 +152,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     )(queueObj);
   }
 
-  protected queueArrayAsTuple(queueObj: Record<string, QueueItem>, orderFilterLessThan?: number): QueryKeysTuple[] {
+  protected queueArrayAsTuple(queueObj: Record<QueryKeyHash, QueueItem>, orderFilterLessThan?: number): QueryKeysTuple[] {
     return R.pipe(
       R.values,
       R.filter(orderFilterLessThan ? (q: QueueItem) => q.order < orderFilterLessThan : R.identity),
