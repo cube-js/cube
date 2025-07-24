@@ -807,7 +807,7 @@ export class QueryQueue {
               queryProcessHeartbeat = Date.now();
             }
 
-            return queueConnection.updateHeartBeat(queryKeyHashed);
+            return queueConnection.updateHeartBeat(queryKeyHashed, queueId);
           },
           this.heartBeatInterval * 1000
         );
