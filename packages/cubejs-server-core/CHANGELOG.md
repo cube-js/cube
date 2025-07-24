@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.43](https://github.com/cube-js/cube/compare/v1.3.42...v1.3.43) (2025-07-24)
+
+### Bug Fixes
+
+- **server-core:** Fix getCompilersInstances to not return compiler promise ([#9814](https://github.com/cube-js/cube/issues/9814)) ([5622a73](https://github.com/cube-js/cube/commit/5622a732c6e6a25f9bda35a68e2faf61a3ae04e3))
+
 ## [1.3.42](https://github.com/cube-js/cube/compare/v1.3.41...v1.3.42) (2025-07-23)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
