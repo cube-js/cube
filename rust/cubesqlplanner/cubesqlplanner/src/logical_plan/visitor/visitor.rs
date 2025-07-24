@@ -1,25 +1,36 @@
-use cubenativeutils::CubeError;
-
 use crate::logical_plan::{LogicalNode, PlanNode};
+use cubenativeutils::CubeError;
+use std::rc::Rc;
+
 pub trait LogicalNodeVisitor {
     fn process_node(&mut self, node: &PlanNode) -> Result<(), CubeError>;
 }
 
-pub struct LogicalPlanVisitor<'a, T: LogicalNodeVisitor> {
-    node_visitor: &'a mut T,
+pub struct LogicalPlanVisitor {}
+
+impl LogicalPlanVisitor {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn visit<T: LogicalNodeVisitor, N: LogicalNode>(
+        &self,
+        node_visitor: &mut T,
+        node: &Rc<N>,
+    ) -> Result<(), CubeError> {
+        self.visit_impl(node_visitor, &node.as_plan_node())
+    }
+
+    fn visit_impl<T: LogicalNodeVisitor>(
+        &self,
+        node_visitor: &mut T,
+        node: &PlanNode,
+    ) -> Result<(), CubeError> {
+        node_visitor.process_node(&node)?;
+        for input in node.inputs() {
+            self.visit_impl(node_visitor, &input)?;
+        }
+
+        Ok(())
+    }
 }
-
-impl<'a, T: LogicalNodeVisitor> LogicalPlanVisitor<'a, T> {
-    pub fn new(node_visitor: &'a mut T) -> Self {
-        Self { node_visitor }
-    }
-
-    pub fn visit<N: LogicalNode>(&self, node: &Rc<N>) -> Result<(), CubeError> {
-        self.visit_impl(node.as_plan_node())
-    }
-
-    fn visit_impl(&self, node: &PlanNode) -> Result<(), CubeError> {
-        self.node_visitor.process_node(&node)?;
-    }
-}
-
