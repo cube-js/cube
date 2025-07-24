@@ -96,14 +96,10 @@ export class CompilerApi {
   }
 
   /**
-   * Returns the compilers instances without model compilation,
+   * Creates the compilers instances without model compilation,
    * because it could fail and no compilers will be returned.
    */
-  getCompilersInstances() {
-    if (this.compilers) {
-      return this.compilers;
-    }
-
+  createCompilerInstances() {
     return prepareCompiler(this.repository, {
       allowNodeRequire: this.allowNodeRequire,
       compileContext: this.compileContext,
