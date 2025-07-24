@@ -174,16 +174,15 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     };
 
     const key = this.redisHash(queryKey);
-    const keyStr = key as string;
 
-    if (!this.state.queryDef[keyStr]) {
-      this.state.queryDef[keyStr] = queryQueueObj;
+    if (!this.state.queryDef[key]) {
+      this.state.queryDef[key] = queryQueueObj;
     }
 
     let added = 0;
 
-    if (!this.state.toProcess[keyStr] && !this.state.active[keyStr]) {
-      this.state.toProcess[keyStr] = {
+    if (!this.state.toProcess[key] && !this.state.active[key]) {
+      this.state.toProcess[key] = {
         order: keyScore,
         queueId: options.queueId,
         key
@@ -192,7 +191,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       added = 1;
     }
 
-    this.state.recent[keyStr] = {
+    this.state.recent[key] = {
       order: orphanedTime,
       key,
       queueId: options.queueId,
