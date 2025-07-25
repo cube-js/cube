@@ -61,7 +61,7 @@ export class JoinGraph implements CompilerInterface {
     this.graph = null;
   }
 
-  public compile(cubes: unknown, errorReporter: ErrorReporter): void {
+  public compile(_cubes: unknown, errorReporter: ErrorReporter): void {
     this.edges = R.compose<
         Array<CubeDefinition>,
         Array<CubeDefinition>,
@@ -157,17 +157,6 @@ export class JoinGraph implements CompilerInterface {
 
         return [`${cube.name}-${join.name}`, joinEdge] as [string, JoinEdge];
       });
-  }
-
-  protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {
-    if (!cube.joins) {
-      return {};
-    }
-
-    return cube.joins.reduce((acc, join) => {
-      acc[join.name] = 1;
-      return acc;
-    }, {} as Record<string, 1>);
   }
 
   public buildJoin(cubesToJoin: JoinHints): FinishedJoinTree | null {
