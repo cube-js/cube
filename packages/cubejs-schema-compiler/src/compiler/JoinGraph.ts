@@ -10,8 +10,6 @@ import { CompilerInterface } from './PrepareCompiler';
 
 type JoinEdge = {
   join: JoinDefinition,
-  from: string,
-  to: string,
   originalFrom: string,
   originalTo: string,
 };
@@ -86,8 +84,8 @@ export class JoinGraph implements CompilerInterface {
     >(
       // This requires @types/ramda@0.29 or newer
       // @ts-ignore
-      R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.to, 1]))),
-      R.groupBy((join: JoinEdge) => join.from),
+      R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.originalTo, 1]))),
+      R.groupBy((join: JoinEdge) => join.originalFrom),
       R.map(v => v[1]),
       R.toPairs
     // @ts-ignore
@@ -96,12 +94,12 @@ export class JoinGraph implements CompilerInterface {
     // @ts-ignore
     this.undirectedNodes = R.compose(
       // @ts-ignore
-      R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.from, 1]))),
+      R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.originalFrom, 1]))),
       // @ts-ignore
-      R.groupBy(join => join.to),
+      R.groupBy(join => join.originalTo),
       R.unnest,
       // @ts-ignore
-      R.map(v => [v[1], { from: v[1].to, to: v[1].from }]),
+      R.map(v => [v[1], { originalFrom: v[1].originalTo, originalTo: v[1].originalFrom }]),
       R.toPairs
     // @ts-ignore
     )(this.edges);
@@ -149,8 +147,6 @@ export class JoinGraph implements CompilerInterface {
       .map(join => {
         const joinEdge: JoinEdge = {
           join,
-          from: cube.name,
-          to: join.name,
           originalFrom: cube.name,
           originalTo: join.name
         };
@@ -295,9 +291,9 @@ export class JoinGraph implements CompilerInterface {
       }
       visited[currentCube] = true;
       function nextNode(nextJoin: JoinEdge): string {
-        return nextJoin.from === currentCube ? nextJoin.to : nextJoin.from;
+        return nextJoin.originalFrom === currentCube ? nextJoin.originalTo : nextJoin.originalFrom;
       }
-      const nextJoins = joins.filter(j => j.from === currentCube || j.to === currentCube);
+      const nextJoins = joins.filter(j => j.originalFrom === currentCube || j.originalTo === currentCube);
       if (nextJoins.find(
         nextJoin => self.checkIfCubeMultiplied(currentCube, nextJoin) && !visited[nextNode(nextJoin)]
       )) {
@@ -311,8 +307,8 @@ export class JoinGraph implements CompilerInterface {
   }
 
   protected checkIfCubeMultiplied(cube: string, join: JoinEdge): boolean {
-    return join.from === cube && join.join.relationship === 'hasMany' ||
-      join.to === cube && join.join.relationship === 'belongsTo';
+    return join.originalFrom === cube && join.join.relationship === 'hasMany' ||
+      join.originalTo === cube && join.join.relationship === 'belongsTo';
   }
 
   protected joinsByPath(path: string[]): JoinEdge[] {
