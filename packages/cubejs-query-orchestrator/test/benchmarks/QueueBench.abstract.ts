@@ -181,7 +181,9 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
             // eslint-disable-next-line no-bitwise
             payload: 'a'.repeat(benchSettings.queuePayloadSize)
           }, 1, {
-
+            stageQueryKey: 1,
+            requestId: 'request-id',
+            spanId: 'span-id'
           });
 
           counters.queueResolved++;

@@ -38,10 +38,11 @@ export interface AddToQueueQuery {
 }
 
 export interface AddToQueueOptions {
-  stageQueryKey: string,
+  queueId?: QueueId,
+  stageQueryKey?: any,
   requestId: string,
+  spanId?: string,
   orphanedTimeout?: number,
-  queueId: QueueId,
 }
 
 export interface QueueDriverOptions {

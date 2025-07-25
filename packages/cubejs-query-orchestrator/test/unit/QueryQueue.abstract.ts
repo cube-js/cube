@@ -178,7 +178,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     });
 
     test('stage reporting', async () => {
-      const resultPromise = queue.executeInQueue('delay', '1', { delay: 200, result: '1' }, 0, { stageQueryKey: '1' });
+      const resultPromise = queue.executeInQueue('delay', '1', { delay: 200, result: '1' }, 0, {
+        stageQueryKey: '1',
+        requestId: 'request-id',
+        spanId: 'span-id'
+      });
       await delayFn(null, 50);
       expect((await queue.getQueryStage('1')).stage).toBe('Executing query');
       await resultPromise;
@@ -186,9 +190,17 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     });
 
     test('priority stage reporting', async () => {
-      const resultPromise1 = queue.executeInQueue('delay', '31', { delay: 200, result: '1' }, 20, { stageQueryKey: '12' });
+      const resultPromise1 = queue.executeInQueue('delay', '31', { delay: 200, result: '1' }, 20, {
+        stageQueryKey: '12',
+        requestId: 'request-id',
+        spanId: 'span-id'
+      });
       await delayFn(null, 50);
-      const resultPromise2 = queue.executeInQueue('delay', '32', { delay: 200, result: '1' }, 10, { stageQueryKey: '12' });
+      const resultPromise2 = queue.executeInQueue('delay', '32', { delay: 200, result: '1' }, 10, {
+        stageQueryKey: '12',
+        requestId: 'request-id',
+        spanId: 'span-id'
+      });
       await delayFn(null, 50);
 
       expect((await queue.getQueryStage('12', 10)).stage).toBe('#1 in queue');
@@ -275,7 +287,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
         let orphanedTimeout = 2;
         await connection.addToQueue(keyScore, ['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
-          queueId: 1,
           stageQueryKey: '1',
           requestId: '1',
           orphanedTimeout,
@@ -286,7 +297,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         orphanedTimeout = 60;
 
         await connection.addToQueue(keyScore, ['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
-          queueId: 2,
           stageQueryKey: '2',
           requestId: '2',
           orphanedTimeout,
@@ -423,11 +433,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       await queue.reconcileQueue();
 
       await redisClient.addToQueue(
-        keyScore, 'activated1', time, 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1', queueId: 1 }
+        keyScore, 'activated1', time, 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1' }
       );
 
       await redisClient.addToQueue(
-        keyScore + 100, 'activated2', time + 100, 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1', queueId: 2 }
+        keyScore + 100, 'activated2', time + 100, 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1' }
       );
 
       const processingId1 = await redisClient.getNextProcessingId();

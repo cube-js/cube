@@ -6,7 +6,7 @@ import {
   QueryKeyHash,
   QueueId,
   QueryDef,
-  QueryStageStateResponse
+  QueryStageStateResponse, AddToQueueOptions
 } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
@@ -22,6 +22,10 @@ export type QueryHandlersMap = Record<string, QueryHandlerFn>;
 
 export type SendProcessMessageFn = (queryKeyHash: QueryKeyHash, queueId: QueueId | null) => Promise<void> | void;
 export type SendCancelMessageFn = (query: QueryDef, queueId: QueueId | null) => Promise<void> | void;
+
+export type ExecuteInQueueOptions = Omit<AddToQueueOptions, 'queueId'> & {
+  spanId?: string
+};
 
 export type QueryQueueOptions = {
   cacheAndQueueDriver: string;
@@ -176,9 +180,12 @@ export class QueryQueue {
     queryKey: QueryKey,
     query: QueryDef,
     priority?: number,
-    options?: any,
+    executeOptions?: ExecuteInQueueOptions,
   ) {
-    options.queueId = this.generateQueueId();
+    const options: AddToQueueOptions = {
+      queueId: this.generateQueueId(),
+      ...executeOptions,
+    };
 
     if (this.skipQueue) {
       const queryDef = {
@@ -236,6 +243,7 @@ export class QueryQueue {
       const keyScore = time + (10000 - priority) * 1E14;
 
       options.orphanedTimeout = query.orphanedTimeout;
+
       const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
       const orphanedTime = time + (orphanedTimeout * 1000);
 
