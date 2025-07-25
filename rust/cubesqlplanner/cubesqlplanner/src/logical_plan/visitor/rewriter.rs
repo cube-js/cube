@@ -34,14 +34,6 @@ pub trait LogicalNodeRewriter {
     fn process_node(&mut self, node: &PlanNode) -> Result<NodeRewriteResult, CubeError>;
 }
 
-impl<F> LogicalNodeRewriter for F
-where
-    F: FnMut(&PlanNode) -> Result<NodeRewriteResult, CubeError>,
-{
-    fn process_node(&mut self, node: &PlanNode) -> Result<NodeRewriteResult, CubeError> {
-        self(node)
-    }
-}
 
 pub struct LogicalPlanRewriter {}
 
@@ -63,6 +55,29 @@ impl LogicalPlanRewriter {
             node
         };
         Ok(res)
+    }
+
+    pub fn rewrite_top_down_with<F, N: LogicalNode>(
+        &self,
+        node: Rc<N>,
+        f: F,
+    ) -> Result<Rc<N>, CubeError>
+    where
+        F: FnMut(&PlanNode) -> Result<NodeRewriteResult, CubeError>,
+    {
+        struct FnWrapper<F>(F);
+        
+        impl<F> LogicalNodeRewriter for FnWrapper<F>
+        where
+            F: FnMut(&PlanNode) -> Result<NodeRewriteResult, CubeError>,
+        {
+            fn process_node(&mut self, node: &PlanNode) -> Result<NodeRewriteResult, CubeError> {
+                (self.0)(node)
+            }
+        }
+        
+        let mut wrapper = FnWrapper(f);
+        self.rewrite_top_down(node, &mut wrapper)
     }
 
     fn rewrite_top_down_impl<T: LogicalNodeRewriter>(

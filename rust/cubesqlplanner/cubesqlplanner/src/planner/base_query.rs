@@ -5,6 +5,7 @@ use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::pre_aggregation_obj::NativePreAggregationObj;
 //use crate::logical_plan::optimizers::*;
 use crate::logical_plan::PreAggregation;
+use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::Query;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
@@ -147,8 +148,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         &self,
         plan: Rc<Query>,
     ) -> Result<(Rc<Query>, Vec<Rc<PreAggregation>>), CubeError> {
-        Ok((plan.clone(), Vec::new()))
-        /* let result = if !self.request.is_pre_aggregation_query() {
+        let result = if !self.request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
                 self.query_tools.clone(),
                 self.cubestore_support_multistage,
@@ -169,6 +169,6 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         } else {
             (plan.clone(), Vec::new())
         };
-        Ok(result) */
+        Ok(result)
     }
 }

@@ -80,7 +80,7 @@ impl PreAggregationOptimizer {
     ) -> Result<Option<Rc<Query>>, CubeError> {
         let rewriter = LogicalPlanRewriter::new();
         for multi_stage in &query.multistage_members {
-            let rewritten = rewriter.rewrite_top_down(multi_stage.clone(), &mut |&plan_node| {
+            let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
                 Ok(NodeRewriteResult::stop())
             })?;
         }
