@@ -12,7 +12,7 @@ import {
   DriverInterface, QueryKey,
 } from '@cubejs-backend/base-driver';
 
-import {QueryQueue, QueryQueueOptions} from './QueryQueue';
+import { QueryQueue, QueryQueueOptions } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';

@@ -4,7 +4,7 @@ import type { QueryKey, QueueDriverInterface } from '@cubejs-backend/base-driver
 import { pausePromise } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
-import {QueryQueue, QueryQueueOptions} from '../../src';
+import { QueryQueue, QueryQueueOptions } from '../../src';
 import { processUidRE } from '../../src/orchestrator/utils';
 
 export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {

@@ -1,8 +1,8 @@
-import { CubeStoreDriver, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 import crypto from 'crypto';
-import { createPromiseLock, pausePromise } from '@cubejs-backend/shared';
+import { createPromiseLock, MethodName, pausePromise } from '@cubejs-backend/shared';
 import { QueueDriverConnectionInterface, QueueDriverInterface, } from '@cubejs-backend/base-driver';
-import {LocalQueueDriver, QueryQueue, QueryQueueOptions} from '../../src';
+import { LocalQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
 
 export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
   beforeAll?: () => Promise<void>,
@@ -10,8 +10,8 @@ export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver
 };
 
 function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInterface, counters: any): QueueDriverConnectionInterface {
-  function wrapAsyncMethod(methodName: string): any {
-    return async function (...args) {
+  function wrapAsyncMethod<M extends MethodName<QueueDriverConnectionInterface>>(methodName: M): any {
+    return async (...args: Parameters<QueueDriverConnectionInterface[M]>) => {
       if (!(methodName in counters.methods)) {
         counters.methods[methodName] = {
           started: 1,
@@ -21,7 +21,7 @@ function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInt
         counters.methods[methodName].started++;
       }
 
-      const result = await connection[methodName](...args);
+      const result = await (connection[methodName] as any)(...args);
       counters.methods[methodName].finished++;
 
       return result;
@@ -122,6 +122,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
         },
         cancelHandlers: {
           query: async (_query) => {
+            console.error('Cancel handler was called for query');
           },
         },
         continueWaitTimeout: 60 * 2,

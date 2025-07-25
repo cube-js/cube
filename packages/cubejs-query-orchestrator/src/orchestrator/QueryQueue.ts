@@ -6,9 +6,9 @@ import {
   QueryKeyHash,
   QueueId,
   QueryDef,
-  QueryStageStateResponse, QueueDriverOptions, QueryKeysTuple
+  QueryStageStateResponse
 } from '@cubejs-backend/base-driver';
-import { CubeStoreDriver, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -20,11 +20,14 @@ export type QueryHandlerFn = (query: QueryDef, cancelHandler: CancelHandlerFn) =
 export type StreamHandlerFn = (query: QueryDef, stream: QueryStream) => Promise<unknown>;
 export type QueryHandlersMap = Record<string, QueryHandlerFn>;
 
+export type SendProcessMessageFn = (queryKeyHash: QueryKeyHash, queueId: QueueId | null) => Promise<void> | void;
+export type SendCancelMessageFn = (query: QueryDef, queueId: QueueId | null) => Promise<void> | void;
+
 export type QueryQueueOptions = {
   cacheAndQueueDriver: string;
   logger: (message, event) => void;
-  sendCancelMessageFn?: (query, queueId) => Promise<void>;
-  sendProcessMessageFn?: (queryKey, queryId) => Promise<void>;
+  sendCancelMessageFn?: SendCancelMessageFn;
+  sendProcessMessageFn?: SendProcessMessageFn;
   cancelHandlers: Record<string, CancelHandlerFn>;
   queryHandlers: QueryHandlersMap;
   streamHandler?: StreamHandlerFn;
@@ -69,9 +72,9 @@ export class QueryQueue {
 
   protected heartBeatInterval: number;
 
-  protected readonly sendProcessMessageFn: any;
+  protected readonly sendProcessMessageFn: SendProcessMessageFn;
 
-  protected readonly sendCancelMessageFn: any;
+  protected readonly sendCancelMessageFn: SendCancelMessageFn;
 
   protected readonly queryHandlers: QueryHandlersMap;
 
@@ -485,7 +488,8 @@ export class QueryQueue {
           preAggregation: query.query?.preAggregation,
           addedToQueueTime: query.addedToQueueTime,
         });
-        await this.sendCancelMessageFn(query);
+
+        await this.sendCancelMessageFn(query, queueId);
       }
 
       return true;
@@ -501,7 +505,7 @@ export class QueryQueue {
    * @private
    * @returns {Promise<void>}
    */
-  async reconcileQueueImpl() {
+  protected async reconcileQueueImpl() {
     const queueConnection = await this.queueDriver.createConnection();
     try {
       const toCancel = await queueConnection.getQueriesToCancel();
