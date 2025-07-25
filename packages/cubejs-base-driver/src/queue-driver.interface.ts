@@ -1,14 +1,12 @@
 export type QueryDef = unknown;
 // Primary key of Queue item
 export type QueueId = string | number | bigint;
-// This was used as lock for Redis, deprecated.
-export type ProcessingId = string | number;
+// This was used as a lock for Redis, deprecated.
+export type ProcessingId = string | number | bigint;
 export type QueryKey = (string | [string, any[]]) & {
   persistent?: true,
 };
-export interface QueryKeyHash extends String {
-  __type: 'QueryKeyHash'
-}
+export type QueryKeyHash = string & { __type: 'QueryKeyHash' };
 
 export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId | null /** Supported by new Cube Store and Memory */];
 export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess: QueryKeysTuple[]];
@@ -16,7 +14,7 @@ export type AddToQueueResponse = [added: number, queueId: QueueId | null, queueS
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
 export type RetrieveForProcessingSuccess = [
   added: unknown,
-  // QueueId is required for Cube Store, other providers doesn't support it
+  // QueueId is required for Cube Store, other providers don't support it
   queueId: QueueId | null,
   active: QueryKeyHash[],
   pending: number,
@@ -25,7 +23,7 @@ export type RetrieveForProcessingSuccess = [
 ];
 export type RetrieveForProcessingFail = [
   added: unknown,
-  // QueueId is required for Cube Store, other providers doesn't support it
+  // QueueId is required for Cube Store, other providers don't support it
   queueId: QueueId | null,
   active: QueryKeyHash[],
   pending: number,
@@ -52,7 +50,6 @@ export interface QueueDriverOptions {
   continueWaitTimeout: number,
   orphanedTimeout: number,
   heartBeatTimeout: number,
-  getQueueEventsBus?: any,
   processUid?: string;
 }
 
@@ -67,25 +64,25 @@ export interface QueueDriverConnectionInterface {
    * @param keyScore Redis specific thing
    * @param queryKey
    * @param orphanedTime
-   * @param queryHandler Our queue allow to use different handlers. For example query, cvsQuery, etc.
+   * @param queryHandler Our queue allows using different handlers. For example, query, cvsQuery, etc.
    * @param query
    * @param priority
    * @param options
    */
   addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
-  // Return query keys which was sorted by priority and time
+  // Return query keys that were sorted by priority and time
   getToProcessQueries(): Promise<QueryKeysTuple[]>;
   getActiveQueries(): Promise<QueryKeysTuple[]>;
   getQueryDef(hash: QueryKeyHash, queueId: QueueId | null): Promise<QueryDef | null>;
-  // Queries which was added to queue, but was not processed and not needed
+  // Queries that were added to queue, but was not processed and not needed
   getOrphanedQueries(): Promise<QueryKeysTuple[]>;
-  // Queries which was not completed with old heartbeat
+  // Queries that were not completed with old heartbeat
   getStalledQueries(): Promise<QueryKeysTuple[]>;
   getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse>;
   updateHeartBeat(hash: QueryKeyHash, queueId: QueueId | null): Promise<void>;
   getNextProcessingId(): Promise<ProcessingId>;
   // Trying to acquire a lock for processing a queue item, this method can return null when
-  // multiple nodes tries to process the same query
+  // multiple nodes try to process the same query
   retrieveForProcessing(hash: QueryKeyHash, processingId: ProcessingId): Promise<RetrieveForProcessingResponse>;
   freeProcessingLock(hash: QueryKeyHash, processingId: ProcessingId, activated: unknown): Promise<void>;
   optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, processingId: ProcessingId, queueId: QueueId | null): Promise<boolean>;

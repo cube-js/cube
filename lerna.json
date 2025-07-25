@@ -1,5 +1,5 @@
 {
-  "version": "1.3.42",
+  "version": "1.3.43",
   "npmClient": "yarn",
   "command": {
     "bootstrap": {

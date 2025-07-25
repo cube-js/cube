@@ -123,7 +123,6 @@ export class QueryQueue {
       heartBeatTimeout: this.heartBeatInterval * 4,
       redisPool: options.redisPool,
       cubeStoreDriverFactory: options.cubeStoreDriverFactory,
-      getQueueEventsBus: options.getQueueEventsBus,
       processUid: this.processUid,
     };
 
@@ -808,7 +807,7 @@ export class QueryQueue {
               queryProcessHeartbeat = Date.now();
             }
 
-            return queueConnection.updateHeartBeat(queryKeyHashed);
+            return queueConnection.updateHeartBeat(queryKeyHashed, queueId);
           },
           this.heartBeatInterval * 1000
         );
