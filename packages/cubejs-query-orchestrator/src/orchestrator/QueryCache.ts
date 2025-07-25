@@ -10,6 +10,7 @@ import {
   CacheDriverInterface,
   TableStructure,
   DriverInterface, QueryKey,
+  QuerySchemasResult,
 } from '@cubejs-backend/base-driver';
 
 import { QueryQueue, QueryQueueOptions } from './QueryQueue';
@@ -583,6 +584,11 @@ export class QueryCache {
           }
           return result;
         },
+        getSchemas: async (req) => {
+          const client = await clientFactory();
+          queue.logger('Getting datasource schemas', { dataSource: req.dataSource, requestId: req.requestId });
+          return client.getSchemas();
+        },
       },
       streamHandler: async (req, target) => {
         queue.logger('Streaming SQL', { ...req });
@@ -1007,5 +1013,174 @@ export class QueryCache {
 
   public async testConnection() {
     return this.cacheDriver.testConnection();
+  }
+
+  /**
+   * Queries datasource schema with caching and queue support.
+   * Returns list of schemas available in the datasource.
+   */
+  public async queryDataSourceSchema(
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<QuerySchemasResult[]> {
+    const {
+      requestId,
+      forceRefresh = false,
+      renewalThreshold = 24 * 60 * 60, // 24 hours default
+      expiration = 7 * 24 * 60 * 60, // 7 days default
+    } = options;
+
+    const cacheKey: CacheKey = ['DATASOURCE_SCHEMA', dataSource];
+    const spanId = crypto.randomBytes(16).toString('hex');
+
+    const fetchSchema = async () => {
+      const queue = await this.getQueue(dataSource);
+
+      return queue.executeInQueue('getSchemas', cacheKey, {
+        requestId,
+        dataSource,
+      }, 10, {
+        stageQueryKey: cacheKey,
+        requestId,
+        spanId,
+      });
+    };
+
+    if (forceRefresh) {
+      this.logger('Force refresh datasource schema', {
+        dataSource,
+        requestId,
+        spanId
+      });
+      const result = await fetchSchema();
+
+      // Cache the fresh result
+      const cacheValue = {
+        time: (new Date()).getTime(),
+        result,
+        renewalKey: `schema_${dataSource}_${Date.now()}`
+      };
+
+      const redisKey = this.queryRedisKey(cacheKey);
+      await this.cacheDriver.set(redisKey, cacheValue, expiration);
+
+      this.logger('Cached fresh datasource schema', {
+        dataSource,
+        requestId,
+        spanId
+      });
+
+      return result;
+    }
+
+    // Try to get from cache first
+    const redisKey = this.queryRedisKey(cacheKey);
+    const cachedResult = await this.cacheDriver.get(redisKey);
+
+    if (cachedResult) {
+      const renewedAgo = (new Date()).getTime() - cachedResult.time;
+
+      this.logger('Found cached datasource schema', {
+        dataSource,
+        time: cachedResult.time,
+        renewedAgo,
+        renewalThreshold: renewalThreshold * 1000,
+        requestId,
+        spanId
+      });
+
+      // Check if we need to refresh
+      if (renewedAgo > renewalThreshold * 1000) {
+        this.logger('Datasource schema cache expired, fetching fresh data', {
+          dataSource,
+          renewedAgo,
+          renewalThreshold: renewalThreshold * 1000,
+          requestId,
+          spanId
+        });
+
+        try {
+          const freshResult = await fetchSchema();
+
+          // Update cache with fresh data
+          const cacheValue = {
+            time: (new Date()).getTime(),
+            result: freshResult,
+            renewalKey: `schema_${dataSource}_${Date.now()}`
+          };
+
+          await this.cacheDriver.set(redisKey, cacheValue, expiration);
+
+          this.logger('Updated datasource schema cache', {
+            dataSource,
+            requestId,
+            spanId
+          });
+
+          return freshResult;
+        } catch (error) {
+          this.logger('Failed to refresh datasource schema, using cached data', {
+            dataSource,
+            error: (error as Error).stack || error,
+            requestId,
+            spanId
+          });
+
+          // Return cached data if refresh fails
+          return cachedResult.result;
+        }
+      }
+
+      // Return cached data if still fresh
+      this.logger('Using cached datasource schema', {
+        dataSource,
+        requestId,
+        spanId
+      });
+      return cachedResult.result;
+    }
+
+    // No cache found, fetch fresh data
+    this.logger('No cached datasource schema found, fetching fresh data', {
+      dataSource,
+      requestId,
+      spanId
+    });
+
+    const result = await fetchSchema();
+
+    // Cache the result
+    const cacheValue = {
+      time: (new Date()).getTime(),
+      result,
+      renewalKey: `schema_${dataSource}_${Date.now()}`
+    };
+
+    await this.cacheDriver.set(redisKey, cacheValue, expiration);
+
+    this.logger('Cached new datasource schema', {
+      dataSource,
+      requestId,
+      spanId
+    });
+
+    return result;
+  }
+
+  /**
+   * Clears the cached datasource schema for a specific datasource.
+   */
+  public async clearDataSourceSchemaCache(dataSource: string = 'default') {
+    const cacheKey: CacheKey = ['DATASOURCE_SCHEMA', dataSource];
+    const redisKey = this.queryRedisKey(cacheKey);
+
+    await this.cacheDriver.remove(redisKey);
+
+    this.logger('Cleared datasource schema cache', { dataSource });
   }
 }
