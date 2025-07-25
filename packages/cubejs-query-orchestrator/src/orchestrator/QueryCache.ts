@@ -1042,57 +1042,39 @@ export class QueryCache {
     return this.cacheDriver.testConnection();
   }
 
-  /**
-   * Creates a compact, deterministic hash for arrays of schemas, tables, or columns.
-   * This avoids performance issues with JSON.stringify on large arrays.
-   */
   private createMetadataHash(items: any[]): string {
     if (!items || items.length === 0) {
       return 'empty';
     }
 
-    // Sort items to ensure deterministic hashing regardless of input order
     const sortedKeys = items
       .map(item => {
         if (item.schema_name && item.table_name) {
-          // For tables: "schema.table"
           return `${item.schema_name}.${item.table_name}`;
         } else if (item.schema_name && item.column_name) {
-          // For columns: "schema.table.column"
           return `${item.schema_name}.${item.table_name}.${item.column_name}`;
         } else if (item.schema_name) {
-          // For schemas: just the schema name
           return item.schema_name;
         }
-        return JSON.stringify(item); // fallback for unknown structures
+        return JSON.stringify(item);
       })
-      .sort(); // Sort for deterministic results
+      .sort();
 
-    // Create a short hash using Node.js crypto
     return crypto
       .createHash('sha256')
       .update(sortedKeys.join('|'))
       .digest('hex')
-      .substring(0, 16); // Use first 16 chars for shorter keys
+      .substring(0, 16);
   }
 
-  /**
-   * Creates a metadata query string for use with cacheQueryResult.
-   * This allows metadata operations to leverage the existing caching infrastructure.
-   * Uses hash-based parameters for efficiency but keeps original params for execution.
-   */
   private createMetadataQuery(operation: string, params: Record<string, any>): QueryWithParams {
     return [
       `METADATA:${operation}`,
-      [JSON.stringify(params)], // Keep original params for execution, cache key uses hash
-      { external: false, renewalThreshold: 24 * 60 * 60 } // 24 hours default
+      [JSON.stringify(params)],
+      { external: false, renewalThreshold: 24 * 60 * 60 }
     ];
   }
 
-  /**
-   * Generic method for caching datasource metadata using existing cacheQueryResult infrastructure.
-   * This leverages renewal keys, in-memory caching, background renewal, and observability.
-   */
   private async queryDataSourceMetadata<T>(
     operation: string,
     params: Record<string, any>,
@@ -1107,11 +1089,10 @@ export class QueryCache {
     const {
       requestId,
       forceRefresh = false,
-      renewalThreshold = 24 * 60 * 60, // 24 hours default
-      expiration = 7 * 24 * 60 * 60, // 7 days default
+      renewalThreshold = 24 * 60 * 60,
+      expiration = 7 * 24 * 60 * 60,
     } = options;
 
-    // Create a compact hash for the cache key
     let paramsHash = 'empty';
     if (params.schemas) {
       paramsHash = this.createMetadataHash(params.schemas);
@@ -1119,23 +1100,19 @@ export class QueryCache {
       paramsHash = this.createMetadataHash(params.tables);
     }
 
-    // Create a query-like structure for metadata operations with original params
     const metadataQuery = this.createMetadataQuery(operation, params);
-    // Use hash in cache key for efficiency
     const cacheKey: CacheKey = [`METADATA:${operation}`, paramsHash, dataSource];
 
-    // For metadata operations, we use a simpler renewal approach
-    // Time-based renewal key that changes every renewal period
     const renewalKey = forceRefresh ? undefined : [
       `METADATA_RENEWAL:${operation}`,
       paramsHash,
       dataSource,
-      Math.floor(Date.now() / (renewalThreshold * 1000)) // Time bucket for renewal
+      Math.floor(Date.now() / (renewalThreshold * 1000))
     ];
 
     return this.cacheQueryResult(
       metadataQuery,
-      [], // No SQL parameters for metadata queries
+      [],
       cacheKey,
       expiration,
       {
@@ -1150,10 +1127,6 @@ export class QueryCache {
     );
   }
 
-  /**
-   * Queries datasource schema with caching and queue support.
-   * Returns list of schemas available in the datasource.
-   */
   public async queryDataSourceSchema(
     dataSource: string = 'default',
     options: {
@@ -1171,10 +1144,6 @@ export class QueryCache {
     );
   }
 
-  /**
-   * Queries tables for specific schemas with caching and queue support.
-   * Returns list of tables for the given schemas.
-   */
   public async queryTablesForSchemas(
     schemas: QuerySchemasResult[],
     dataSource: string = 'default',
@@ -1193,10 +1162,6 @@ export class QueryCache {
     );
   }
 
-  /**
-   * Queries columns for specific tables with caching and queue support.
-   * Returns list of columns for the given tables.
-   */
   public async queryColumnsForTables(
     tables: QueryTablesResult[],
     dataSource: string = 'default',
@@ -1215,9 +1180,6 @@ export class QueryCache {
     );
   }
 
-  /**
-   * Clears the cached datasource schema for a specific datasource.
-   */
   public async clearDataSourceSchemaCache(dataSource: string = 'default') {
     const cacheKey: CacheKey = ['METADATA:GET_SCHEMAS', 'empty', dataSource];
     const redisKey = this.queryRedisKey(cacheKey);
@@ -1225,9 +1187,6 @@ export class QueryCache {
     this.logger('Cleared datasource schema cache', { dataSource });
   }
 
-  /**
-   * Clears the cached tables for specific schemas.
-   */
   public async clearTablesForSchemasCache(
     schemas: QuerySchemasResult[],
     dataSource: string = 'default'
@@ -1243,9 +1202,6 @@ export class QueryCache {
     });
   }
 
-  /**
-   * Clears the cached columns for specific tables.
-   */
   public async clearColumnsForTablesCache(
     tables: QueryTablesResult[],
     dataSource: string = 'default'
