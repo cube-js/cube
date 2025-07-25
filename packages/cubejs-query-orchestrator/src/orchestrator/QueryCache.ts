@@ -596,11 +596,6 @@ export class QueryCache {
                   requestId: req.requestId
                 });
                 return client.getColumnsForSpecificTables(params.tables);
-              case 'GET_SCHEMAS_RENEWAL':
-              case 'GET_TABLES_FOR_SCHEMAS_RENEWAL':
-              case 'GET_COLUMNS_FOR_TABLES_RENEWAL':
-                // Renewal key queries - just return a timestamp
-                return { timestamp: Date.now() };
               default:
                 throw new Error(`Unknown metadata operation: ${operation}`);
             }
@@ -1048,13 +1043,48 @@ export class QueryCache {
   }
 
   /**
+   * Creates a compact, deterministic hash for arrays of schemas, tables, or columns.
+   * This avoids performance issues with JSON.stringify on large arrays.
+   */
+  private createMetadataHash(items: any[]): string {
+    if (!items || items.length === 0) {
+      return 'empty';
+    }
+
+    // Sort items to ensure deterministic hashing regardless of input order
+    const sortedKeys = items
+      .map(item => {
+        if (item.schema_name && item.table_name) {
+          // For tables: "schema.table"
+          return `${item.schema_name}.${item.table_name}`;
+        } else if (item.schema_name && item.column_name) {
+          // For columns: "schema.table.column"
+          return `${item.schema_name}.${item.table_name}.${item.column_name}`;
+        } else if (item.schema_name) {
+          // For schemas: just the schema name
+          return item.schema_name;
+        }
+        return JSON.stringify(item); // fallback for unknown structures
+      })
+      .sort(); // Sort for deterministic results
+
+    // Create a short hash using Node.js crypto
+    return crypto
+      .createHash('sha256')
+      .update(sortedKeys.join('|'))
+      .digest('hex')
+      .substring(0, 16); // Use first 16 chars for shorter keys
+  }
+
+  /**
    * Creates a metadata query string for use with cacheQueryResult.
    * This allows metadata operations to leverage the existing caching infrastructure.
+   * Uses hash-based parameters for efficiency but keeps original params for execution.
    */
-  private createMetadataQuery(operation: string, params: Record<string, any> = {}): QueryWithParams {
+  private createMetadataQuery(operation: string, params: Record<string, any>): QueryWithParams {
     return [
       `METADATA:${operation}`,
-      [JSON.stringify(params)],
+      [JSON.stringify(params)], // Keep original params for execution, cache key uses hash
       { external: false, renewalThreshold: 24 * 60 * 60 } // 24 hours default
     ];
   }
@@ -1081,21 +1111,36 @@ export class QueryCache {
       expiration = 7 * 24 * 60 * 60, // 7 days default
     } = options;
 
-    // Create a query-like structure for metadata operations
-    const metadataQuery = this.createMetadataQuery(operation, params);
-    const cacheKey: CacheKey = [`METADATA:${operation}`, JSON.stringify(params), dataSource];
+    // Create a compact hash for the cache key
+    let paramsHash = 'empty';
+    if (params.schemas) {
+      paramsHash = this.createMetadataHash(params.schemas);
+    } else if (params.tables) {
+      paramsHash = this.createMetadataHash(params.tables);
+    }
 
-    // Create renewal key query for cache invalidation
-    const renewalKeyQuery = this.createMetadataQuery(`${operation}_RENEWAL`, { dataSource, timestamp: Date.now() });
+    // Create a query-like structure for metadata operations with original params
+    const metadataQuery = this.createMetadataQuery(operation, params);
+    // Use hash in cache key for efficiency
+    const cacheKey: CacheKey = [`METADATA:${operation}`, paramsHash, dataSource];
+
+    // For metadata operations, we use a simpler renewal approach
+    // Time-based renewal key that changes every renewal period
+    const renewalKey = forceRefresh ? undefined : [
+      `METADATA_RENEWAL:${operation}`,
+      paramsHash,
+      dataSource,
+      Math.floor(Date.now() / (renewalThreshold * 1000)) // Time bucket for renewal
+    ];
 
     return this.cacheQueryResult(
       metadataQuery,
-      [],
+      [], // No SQL parameters for metadata queries
       cacheKey,
       expiration,
       {
         renewalThreshold,
-        renewalKey: forceRefresh ? undefined : renewalKeyQuery,
+        renewalKey,
         forceNoCache: forceRefresh,
         requestId,
         dataSource,
@@ -1174,7 +1219,7 @@ export class QueryCache {
    * Clears the cached datasource schema for a specific datasource.
    */
   public async clearDataSourceSchemaCache(dataSource: string = 'default') {
-    const cacheKey: CacheKey = ['METADATA:GET_SCHEMAS', JSON.stringify({}), dataSource];
+    const cacheKey: CacheKey = ['METADATA:GET_SCHEMAS', 'empty', dataSource];
     const redisKey = this.queryRedisKey(cacheKey);
     await this.cacheDriver.remove(redisKey);
     this.logger('Cleared datasource schema cache', { dataSource });
@@ -1187,10 +1232,15 @@ export class QueryCache {
     schemas: QuerySchemasResult[],
     dataSource: string = 'default'
   ) {
-    const cacheKey: CacheKey = ['METADATA:GET_TABLES_FOR_SCHEMAS', JSON.stringify({ schemas }), dataSource];
+    const paramsHash = this.createMetadataHash(schemas);
+    const cacheKey: CacheKey = ['METADATA:GET_TABLES_FOR_SCHEMAS', paramsHash, dataSource];
     const redisKey = this.queryRedisKey(cacheKey);
     await this.cacheDriver.remove(redisKey);
-    this.logger('Cleared tables for schemas cache', { dataSource, schemas: schemas.map(s => s.schema_name) });
+    this.logger('Cleared tables for schemas cache', {
+      dataSource,
+      schemaCount: schemas.length,
+      cacheHash: paramsHash
+    });
   }
 
   /**
@@ -1200,9 +1250,14 @@ export class QueryCache {
     tables: QueryTablesResult[],
     dataSource: string = 'default'
   ) {
-    const cacheKey: CacheKey = ['METADATA:GET_COLUMNS_FOR_TABLES', JSON.stringify({ tables }), dataSource];
+    const paramsHash = this.createMetadataHash(tables);
+    const cacheKey: CacheKey = ['METADATA:GET_COLUMNS_FOR_TABLES', paramsHash, dataSource];
     const redisKey = this.queryRedisKey(cacheKey);
     await this.cacheDriver.remove(redisKey);
-    this.logger('Cleared columns for tables cache', { dataSource, tables: tables.map(t => `${t.schema_name}.${t.table_name}`) });
+    this.logger('Cleared columns for tables cache', {
+      dataSource,
+      tableCount: tables.length,
+      cacheHash: paramsHash
+    });
   }
 }
