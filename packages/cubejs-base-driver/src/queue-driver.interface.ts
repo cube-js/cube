@@ -38,6 +38,7 @@ export interface AddToQueueQuery {
 }
 
 export interface AddToQueueOptions {
+  // It's an ugly workaround for skip queue tasks
   queueId?: QueueId,
   stageQueryKey?: any,
   requestId: string,

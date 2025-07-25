@@ -6,7 +6,8 @@ import {
   QueryKeyHash,
   QueueId,
   QueryDef,
-  QueryStageStateResponse, AddToQueueOptions
+  QueryStageStateResponse,
+  AddToQueueOptions
 } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
