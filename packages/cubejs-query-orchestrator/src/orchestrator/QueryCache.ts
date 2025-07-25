@@ -23,6 +23,12 @@ import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggreg
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
+enum MetadataOperation {
+  GET_SCHEMAS = 'GET_SCHEMAS',
+  GET_TABLES_FOR_SCHEMAS = 'GET_TABLES_FOR_SCHEMAS',
+  GET_COLUMNS_FOR_TABLES = 'GET_COLUMNS_FOR_TABLES'
+}
+
 type QueryOptions = {
   external?: boolean;
   renewalThreshold?: number;
@@ -579,17 +585,17 @@ export class QueryCache {
             const params = req.values && req.values[0] ? JSON.parse(req.values[0]) : {};
 
             switch (operation) {
-              case 'GET_SCHEMAS':
+              case MetadataOperation.GET_SCHEMAS:
                 queue.logger('Getting datasource schemas', { dataSource: req.dataSource, requestId: req.requestId });
                 return client.getSchemas();
-              case 'GET_TABLES_FOR_SCHEMAS':
+              case MetadataOperation.GET_TABLES_FOR_SCHEMAS:
                 queue.logger('Getting tables for schemas', {
                   dataSource: req.dataSource,
                   schemaCount: params.schemas?.length || 0,
                   requestId: req.requestId
                 });
                 return client.getTablesForSpecificSchemas(params.schemas);
-              case 'GET_COLUMNS_FOR_TABLES':
+              case MetadataOperation.GET_COLUMNS_FOR_TABLES:
                 queue.logger('Getting columns for tables', {
                   dataSource: req.dataSource,
                   tableCount: params.tables?.length || 0,
@@ -1042,27 +1048,47 @@ export class QueryCache {
     return this.cacheDriver.testConnection();
   }
 
-  private createMetadataHash(items: any[]): string {
-    if (!items || items.length === 0) {
+  private createMetadataHash(operation: MetadataOperation, params: Record<string, any>): string {
+    if (!params || Object.keys(params).length === 0) {
       return 'empty';
     }
 
-    const sortedKeys = items
-      .map(item => {
-        if (item.schema_name && item.table_name) {
-          return `${item.schema_name}.${item.table_name}`;
-        } else if (item.schema_name && item.column_name) {
-          return `${item.schema_name}.${item.table_name}.${item.column_name}`;
-        } else if (item.schema_name) {
-          return item.schema_name;
+    // Create deterministic hash based on operation type and params
+    const hashData: string[] = [];
+
+    switch (operation) {
+      case MetadataOperation.GET_SCHEMAS:
+        // For schemas, we don't have any params to hash
+        return 'all_schemas';
+
+      case MetadataOperation.GET_TABLES_FOR_SCHEMAS:
+        if (params.schemas && Array.isArray(params.schemas)) {
+          hashData.push(...params.schemas.map(schema => schema.schema_name).sort());
         }
-        return JSON.stringify(item);
-      })
-      .sort();
+        break;
+
+      case MetadataOperation.GET_COLUMNS_FOR_TABLES:
+        if (params.tables && Array.isArray(params.tables)) {
+          hashData.push(...params.tables.map(table => `${table.schema_name}.${table.table_name}`).sort());
+        }
+        break;
+
+      default:
+        // Fallback to JSON serialization for unknown operations
+        return crypto
+          .createHash('sha256')
+          .update(JSON.stringify(params))
+          .digest('hex')
+          .substring(0, 16);
+    }
+
+    if (hashData.length === 0) {
+      return 'empty';
+    }
 
     return crypto
       .createHash('sha256')
-      .update(sortedKeys.join('|'))
+      .update(hashData.join('|'))
       .digest('hex')
       .substring(0, 16);
   }
@@ -1076,7 +1102,7 @@ export class QueryCache {
   }
 
   private async queryDataSourceMetadata<T>(
-    operation: string,
+    operation: MetadataOperation,
     params: Record<string, any>,
     dataSource: string = 'default',
     options: {
@@ -1093,12 +1119,7 @@ export class QueryCache {
       expiration = 7 * 24 * 60 * 60,
     } = options;
 
-    let paramsHash = 'empty';
-    if (params.schemas) {
-      paramsHash = this.createMetadataHash(params.schemas);
-    } else if (params.tables) {
-      paramsHash = this.createMetadataHash(params.tables);
-    }
+    const paramsHash = this.createMetadataHash(operation, params);
 
     const metadataQuery = this.createMetadataQuery(operation, params);
     const cacheKey: CacheKey = [`METADATA:${operation}`, paramsHash, dataSource];
@@ -1137,7 +1158,7 @@ export class QueryCache {
     } = {}
   ): Promise<QuerySchemasResult[]> {
     return this.queryDataSourceMetadata<QuerySchemasResult[]>(
-      'GET_SCHEMAS',
+      MetadataOperation.GET_SCHEMAS,
       {},
       dataSource,
       options
@@ -1155,7 +1176,7 @@ export class QueryCache {
     } = {}
   ): Promise<QueryTablesResult[]> {
     return this.queryDataSourceMetadata<QueryTablesResult[]>(
-      'GET_TABLES_FOR_SCHEMAS',
+      MetadataOperation.GET_TABLES_FOR_SCHEMAS,
       { schemas },
       dataSource,
       options
@@ -1173,7 +1194,7 @@ export class QueryCache {
     } = {}
   ): Promise<QueryColumnsResult[]> {
     return this.queryDataSourceMetadata<QueryColumnsResult[]>(
-      'GET_COLUMNS_FOR_TABLES',
+      MetadataOperation.GET_COLUMNS_FOR_TABLES,
       { tables },
       dataSource,
       options
@@ -1181,7 +1202,7 @@ export class QueryCache {
   }
 
   public async clearDataSourceSchemaCache(dataSource: string = 'default') {
-    const cacheKey: CacheKey = ['METADATA:GET_SCHEMAS', 'empty', dataSource];
+    const cacheKey: CacheKey = [`METADATA:${MetadataOperation.GET_SCHEMAS}`, 'empty', dataSource];
     const redisKey = this.queryRedisKey(cacheKey);
     await this.cacheDriver.remove(redisKey);
     this.logger('Cleared datasource schema cache', { dataSource });
@@ -1191,8 +1212,8 @@ export class QueryCache {
     schemas: QuerySchemasResult[],
     dataSource: string = 'default'
   ) {
-    const paramsHash = this.createMetadataHash(schemas);
-    const cacheKey: CacheKey = ['METADATA:GET_TABLES_FOR_SCHEMAS', paramsHash, dataSource];
+    const paramsHash = this.createMetadataHash(MetadataOperation.GET_TABLES_FOR_SCHEMAS, { schemas });
+    const cacheKey: CacheKey = [`METADATA:${MetadataOperation.GET_TABLES_FOR_SCHEMAS}`, paramsHash, dataSource];
     const redisKey = this.queryRedisKey(cacheKey);
     await this.cacheDriver.remove(redisKey);
     this.logger('Cleared tables for schemas cache', {
@@ -1206,8 +1227,8 @@ export class QueryCache {
     tables: QueryTablesResult[],
     dataSource: string = 'default'
   ) {
-    const paramsHash = this.createMetadataHash(tables);
-    const cacheKey: CacheKey = ['METADATA:GET_COLUMNS_FOR_TABLES', paramsHash, dataSource];
+    const paramsHash = this.createMetadataHash(MetadataOperation.GET_COLUMNS_FOR_TABLES, { tables });
+    const cacheKey: CacheKey = [`METADATA:${MetadataOperation.GET_COLUMNS_FOR_TABLES}`, paramsHash, dataSource];
     const redisKey = this.queryRedisKey(cacheKey);
     await this.cacheDriver.remove(redisKey);
     this.logger('Cleared columns for tables cache', {
