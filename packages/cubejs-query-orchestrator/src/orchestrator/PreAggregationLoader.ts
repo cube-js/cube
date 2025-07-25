@@ -418,7 +418,8 @@ export class PreAggregationLoader {
     const queue = await this.preAggregations.getQueue(this.preAggregation.dataSource);
     return queue.executeInQueue(
       'query',
-      this.preAggregationQueryKey(invalidationKeys),
+      // TODO: Sync types
+      this.preAggregationQueryKey(invalidationKeys) as any,
       {
         preAggregation: this.preAggregation,
         preAggregationsTablesToTempTables: this.preAggregationsTablesToTempTables,

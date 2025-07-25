@@ -1,21 +1,30 @@
 import { Readable } from 'stream';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import type { QueryKey } from '@cubejs-backend/base-driver';
+import type { QueryKey, QueueDriverInterface } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
-import { QueryQueue } from '../../src';
+import {QueryQueue, QueryQueueOptions} from '../../src';
 import { processUidRE } from '../../src/orchestrator/utils';
 
-export type QueryQueueTestOptions = {
-  cacheAndQueueDriver?: string,
-  redisPool?: any,
-  cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
+export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
   beforeAll?: () => Promise<void>,
   afterAll?: () => Promise<void>,
 };
 
-export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}) => {
+class QueryQueueExtended extends QueryQueue {
+  declare public queueDriver: QueueDriverInterface;
+
+  public reconcileQueue = super.reconcileQueue;
+
+  public processQuery = super.processQuery;
+
+  public processCancel = super.processCancel;
+
+  public redisHash = super.redisHash;
+}
+
+export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => {
   describe(`QueryQueue${name}`, () => {
     jest.setTimeout(10 * 1000);
 
@@ -30,7 +39,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
 
     const tenantPrefix = crypto.randomBytes(6).toString('hex');
 
-    const queue = new QueryQueue(`${tenantPrefix}#test_query_queue`, {
+    const queue = new QueryQueueExtended(`${tenantPrefix}#test_query_queue`, {
       queryHandlers: {
         foo: async (query) => `${query[0]} bar`,
         delay: async (query, setCancelHandler) => {
@@ -39,21 +48,21 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           await setCancelHandler(result);
           return delayFn(result, query.delay);
         },
-        stream: async (query, stream) => {
-          streamCount++;
+      },
+      streamHandler: async (query, stream) => {
+        streamCount++;
 
-          // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
-          // while EventListener doesnt start to listen for started stream event
-          await pausePromise(250);
+        // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
+        // while EventListener doesnt start to listen for started stream event
+        await pausePromise(250);
 
-          return new Promise((resolve, reject) => {
-            const readable = Readable.from([]);
-            readable.once('end', () => resolve(null));
-            readable.once('close', () => resolve(null));
-            readable.once('error', (err) => reject(err));
-            readable.pipe(stream);
-          });
-        },
+        return new Promise((resolve, reject) => {
+          const readable = Readable.from([]);
+          readable.once('end', () => resolve(null));
+          readable.once('close', () => resolve(null));
+          readable.once('error', (err) => reject(err));
+          readable.pipe(stream);
+        });
       },
       sendProcessMessageFn: async (queryKeyHashed, queueId) => {
         processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed, queueId));
@@ -62,7 +71,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
         processCancelPromises.push(queue.processCancel.bind(queue)(query));
       },
       cancelHandlers: {
-        delay: (query) => {
+        delay: async (query) => {
           console.log(`cancel call: ${JSON.stringify(query)}`);
           cancelledQuery = query.queryKey;
         }
@@ -100,10 +109,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       // TODO: find out why awaitProcessing doesnt work
       await pausePromise(1 * 1000);
 
-      if (options.redisPool) {
-        await options.redisPool.cleanup();
-      }
-
       if (options.afterAll) {
         await options.afterAll();
       }
@@ -116,7 +121,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     }
 
     test('gutter', async () => {
-      const query = ['select * from'];
+      const query: QueryKey = ['select * from', []];
       const result = await queue.executeInQueue('foo', query, query);
       expect(result).toBe('select * from bar');
     });
@@ -139,7 +144,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('timeout - continue wait', async () => {
-      const query = ['select * from 2'];
+      const query: QueryKey = ['select * from 2', []];
       let errorString = '';
 
       for (let i = 0; i < 5; i++) {
@@ -160,7 +165,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('timeout', async () => {
-      const query = ['select * from 3'];
+      const query: QueryKey = ['select * from 3', []];
 
       // executionTimeout is 2s, 5s is enough
       await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });

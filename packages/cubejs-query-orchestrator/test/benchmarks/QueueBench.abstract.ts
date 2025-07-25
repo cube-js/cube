@@ -2,12 +2,9 @@ import { CubeStoreDriver, CubeStoreQueueDriver } from '@cubejs-backend/cubestore
 import crypto from 'crypto';
 import { createPromiseLock, pausePromise } from '@cubejs-backend/shared';
 import { QueueDriverConnectionInterface, QueueDriverInterface, } from '@cubejs-backend/base-driver';
-import { LocalQueueDriver, QueryQueue } from '../../src';
+import {LocalQueueDriver, QueryQueue, QueryQueueOptions} from '../../src';
 
-export type QueryQueueTestOptions = {
-  cacheAndQueueDriver?: string,
-  redisPool?: any,
-  cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
+export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
   beforeAll?: () => Promise<void>,
   afterAll?: () => Promise<void>,
 };
@@ -67,7 +64,7 @@ function patchQueueDriverForTrack(driver: QueueDriverInterface, counters: any): 
   };
 }
 
-export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions = {}) {
+export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions) {
   (async () => {
     if (options.beforeAll) {
       await options.beforeAll();
@@ -118,6 +115,13 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
             return {
               payload: 'a'.repeat(benchSettings.queueResponseSize),
             };
+          },
+          stream: async (_query, _stream) => {
+            throw new Error('streaming handler is not supported for testing');
+          }
+        },
+        cancelHandlers: {
+          query: async (_query) => {
           },
         },
         continueWaitTimeout: 60 * 2,
