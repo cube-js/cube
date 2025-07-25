@@ -585,14 +585,14 @@ export class QueryCache {
               case 'GET_TABLES_FOR_SCHEMAS':
                 queue.logger('Getting tables for schemas', {
                   dataSource: req.dataSource,
-                  schemas: params.schemas?.map(s => s.schema_name),
+                  schemaCount: params.schemas?.length || 0,
                   requestId: req.requestId
                 });
                 return client.getTablesForSpecificSchemas(params.schemas);
               case 'GET_COLUMNS_FOR_TABLES':
                 queue.logger('Getting columns for tables', {
                   dataSource: req.dataSource,
-                  tables: params.tables?.map(t => `${t.schema_name}.${t.table_name}`),
+                  tableCount: params.tables?.length || 0,
                   requestId: req.requestId
                 });
                 return client.getColumnsForSpecificTables(params.tables);
