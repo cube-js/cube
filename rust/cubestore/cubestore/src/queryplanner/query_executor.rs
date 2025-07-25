@@ -1104,7 +1104,7 @@ impl ClusterSendExec {
         ps
     }
 
-    fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(u64, RowRange)> {
+    fn issue_filters(ps: &[IdRow<Partition>]) -> Vec<(IdRow<Partition>, RowRange)> {
         if ps.is_empty() {
             return Vec::new();
         }
@@ -1114,7 +1114,7 @@ impl ClusterSendExec {
         if multi_id.is_none() {
             return ps
                 .iter()
-                .map(|p| (p.get_id(), RowRange::default()))
+                .map(|p| (p.clone(), RowRange::default()))
                 .collect();
         }
         let filter = RowRange {
@@ -1129,7 +1129,7 @@ impl ClusterSendExec {
             } else {
                 filter.clone()
             };
-            r.push((p.get_id(), pf))
+            r.push((p.clone(), pf))
         }
         r
     }
@@ -1138,7 +1138,8 @@ impl ClusterSendExec {
         c: &dyn ConfigObj,
         logical: Vec<Vec<InlineCompoundPartition>>,
     ) -> Vec<(String, (Vec<(u64, RowRange)>, Vec<InlineTableId>))> {
-        let mut m: HashMap<_, (Vec<(u64, RowRange)>, Vec<InlineTableId>)> = HashMap::new();
+        let mut m: HashMap<_, (Vec<(IdRow<Partition>, RowRange)>, Vec<InlineTableId>)> =
+            HashMap::new();
         for ps in &logical {
             let inline_table_ids = ps
                 .iter()
@@ -1178,7 +1179,64 @@ impl ClusterSendExec {
 
         let mut r = m.into_iter().collect_vec();
         r.sort_unstable_by(|l, r| l.0.cmp(&r.0));
-        r
+        r.into_iter()
+            .map(|(worker, data)| {
+                let splitted = Self::split_worker_parititons(c, data);
+                splitted.into_iter().map(move |data| (worker.clone(), data))
+            })
+            .flatten()
+            .collect_vec()
+    }
+
+    fn split_worker_parititons(
+        c: &dyn ConfigObj,
+        partitions: (Vec<(IdRow<Partition>, RowRange)>, Vec<InlineTableId>),
+    ) -> Vec<(Vec<(u64, RowRange)>, Vec<InlineTableId>)> {
+        if !partitions.1.is_empty()
+            || partitions
+                .0
+                .iter()
+                .any(|(p, _)| p.get_row().multi_partition_id().is_some())
+        {
+            return vec![(
+                partitions
+                    .0
+                    .into_iter()
+                    .map(|(p, range)| (p.id, range))
+                    .collect_vec(),
+                partitions.1,
+            )];
+        }
+        let rows_split_threshold = c.partition_split_threshold() * c.cluster_send_split_threshold();
+        let file_size_split_threshold =
+            c.partition_size_split_threshold_bytes() * c.cluster_send_split_threshold();
+        let mut result = vec![];
+        let mut current_rows = 0;
+        let mut current_files_size = 0;
+        let mut current_chunk = vec![];
+        let (partitions, _) = partitions;
+        for (partition, range) in partitions {
+            let rows = partition.get_row().main_table_row_count();
+            let file_size = partition.get_row().file_size().unwrap_or_default();
+            if current_rows + rows > rows_split_threshold
+                || current_files_size + file_size > file_size_split_threshold
+            {
+                if !current_chunk.is_empty() {
+                    result.push((std::mem::take(&mut current_chunk), vec![]));
+                    current_rows = 0;
+                    current_files_size = 0;
+                }
+            }
+
+            current_rows += rows;
+            current_files_size += file_size;
+            current_chunk.push((partition.id, range));
+        }
+        if !current_chunk.is_empty() {
+            result.push((current_chunk, vec![]));
+        }
+
+        result
     }
 
     pub fn with_changed_schema(
