@@ -1053,12 +1053,10 @@ export class QueryCache {
       return 'empty';
     }
 
-    // Create deterministic hash based on operation type and params
     const hashData: string[] = [];
 
     switch (operation) {
       case MetadataOperation.GET_SCHEMAS:
-        // For schemas, we don't have any params to hash
         return 'all_schemas';
 
       case MetadataOperation.GET_TABLES_FOR_SCHEMAS:
@@ -1074,7 +1072,6 @@ export class QueryCache {
         break;
 
       default:
-        // Fallback to JSON serialization for unknown operations
         return crypto
           .createHash('sha256')
           .update(JSON.stringify(params))
