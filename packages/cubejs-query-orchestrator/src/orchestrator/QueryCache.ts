@@ -1127,7 +1127,7 @@ export class QueryCache {
     );
   }
 
-  public async queryDataSourceSchema(
+  public async queryDataSourceSchemas(
     dataSource: string = 'default',
     options: {
       requestId?: string;
