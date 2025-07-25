@@ -123,7 +123,7 @@ export class JoinGraph implements CompilerInterface {
     };
 
     const joinRequired =
-      (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
+      (v: string) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
 
     return cube.joins
       .filter(join => {
@@ -198,7 +198,7 @@ export class JoinGraph implements CompilerInterface {
     return this.builtJoins[key];
   }
 
-  protected cubeFromPath(cubePath) {
+  protected cubeFromPath(cubePath: JoinHint): string {
     if (Array.isArray(cubePath)) {
       return cubePath[cubePath.length - 1];
     }
