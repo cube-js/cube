@@ -75,16 +75,11 @@ export class JoinGraph implements CompilerInterface {
 
     // This requires @types/ramda@0.29 or newer
     // @ts-ignore
-    this.nodes = R.compose<
-        Record<string, JoinEdge>,
-        Array<[string, JoinEdge]>,
-        Array<JoinEdge>,
-        Record<string, Array<JoinEdge> | undefined>,
-        Record<string, Record<string, 1>>
-    >(
+    this.nodes = R.compose(
       // This requires @types/ramda@0.29 or newer
       // @ts-ignore
       R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.originalTo, 1]))),
+      // @ts-ignore
       R.groupBy((join: JoinEdge) => join.originalFrom),
       R.map(v => v[1]),
       R.toPairs
