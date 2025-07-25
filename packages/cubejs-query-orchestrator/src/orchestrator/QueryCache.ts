@@ -11,6 +11,8 @@ import {
   TableStructure,
   DriverInterface, QueryKey,
   QuerySchemasResult,
+  QueryTablesResult,
+  QueryColumnsResult,
 } from '@cubejs-backend/base-driver';
 
 import { QueryQueue, QueryQueueOptions } from './QueryQueue';
@@ -570,6 +572,41 @@ export class QueryCache {
       queryHandlers: {
         query: async (req, setCancelHandle) => {
           const client = await clientFactory();
+
+          // Handle metadata queries
+          if (req.query && typeof req.query === 'string' && req.query.startsWith('METADATA:')) {
+            const operation = req.query.replace('METADATA:', '');
+            const params = req.values && req.values[0] ? JSON.parse(req.values[0]) : {};
+
+            switch (operation) {
+              case 'GET_SCHEMAS':
+                queue.logger('Getting datasource schemas', { dataSource: req.dataSource, requestId: req.requestId });
+                return client.getSchemas();
+              case 'GET_TABLES_FOR_SCHEMAS':
+                queue.logger('Getting tables for schemas', {
+                  dataSource: req.dataSource,
+                  schemas: params.schemas?.map(s => s.schema_name),
+                  requestId: req.requestId
+                });
+                return client.getTablesForSpecificSchemas(params.schemas);
+              case 'GET_COLUMNS_FOR_TABLES':
+                queue.logger('Getting columns for tables', {
+                  dataSource: req.dataSource,
+                  tables: params.tables?.map(t => `${t.schema_name}.${t.table_name}`),
+                  requestId: req.requestId
+                });
+                return client.getColumnsForSpecificTables(params.tables);
+              case 'GET_SCHEMAS_RENEWAL':
+              case 'GET_TABLES_FOR_SCHEMAS_RENEWAL':
+              case 'GET_COLUMNS_FOR_TABLES_RENEWAL':
+                // Renewal key queries - just return a timestamp
+                return { timestamp: Date.now() };
+              default:
+                throw new Error(`Unknown metadata operation: ${operation}`);
+            }
+          }
+
+          // Handle regular SQL queries
           const resultPromise = executeFn(client, req);
           let handle;
           if (resultPromise.cancel) {
@@ -583,11 +620,6 @@ export class QueryCache {
             delete queue.handles[handle];
           }
           return result;
-        },
-        getSchemas: async (req) => {
-          const client = await clientFactory();
-          queue.logger('Getting datasource schemas', { dataSource: req.dataSource, requestId: req.requestId });
-          return client.getSchemas();
         },
       },
       streamHandler: async (req, target) => {
@@ -1016,6 +1048,64 @@ export class QueryCache {
   }
 
   /**
+   * Creates a metadata query string for use with cacheQueryResult.
+   * This allows metadata operations to leverage the existing caching infrastructure.
+   */
+  private createMetadataQuery(operation: string, params: Record<string, any> = {}): QueryWithParams {
+    return [
+      `METADATA:${operation}`,
+      [JSON.stringify(params)],
+      { external: false, renewalThreshold: 24 * 60 * 60 } // 24 hours default
+    ];
+  }
+
+  /**
+   * Generic method for caching datasource metadata using existing cacheQueryResult infrastructure.
+   * This leverages renewal keys, in-memory caching, background renewal, and observability.
+   */
+  private async queryDataSourceMetadata<T>(
+    operation: string,
+    params: Record<string, any>,
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<T> {
+    const {
+      requestId,
+      forceRefresh = false,
+      renewalThreshold = 24 * 60 * 60, // 24 hours default
+      expiration = 7 * 24 * 60 * 60, // 7 days default
+    } = options;
+
+    // Create a query-like structure for metadata operations
+    const metadataQuery = this.createMetadataQuery(operation, params);
+    const cacheKey: CacheKey = [`METADATA:${operation}`, JSON.stringify(params), dataSource];
+
+    // Create renewal key query for cache invalidation
+    const renewalKeyQuery = this.createMetadataQuery(`${operation}_RENEWAL`, { dataSource, timestamp: Date.now() });
+
+    return this.cacheQueryResult(
+      metadataQuery,
+      [],
+      cacheKey,
+      expiration,
+      {
+        renewalThreshold,
+        renewalKey: forceRefresh ? undefined : renewalKeyQuery,
+        forceNoCache: forceRefresh,
+        requestId,
+        dataSource,
+        useInMemory: true,
+        waitForRenew: true,
+      }
+    );
+  }
+
+  /**
    * Queries datasource schema with caching and queue support.
    * Returns list of schemas available in the datasource.
    */
@@ -1028,159 +1118,91 @@ export class QueryCache {
       expiration?: number;
     } = {}
   ): Promise<QuerySchemasResult[]> {
-    const {
-      requestId,
-      forceRefresh = false,
-      renewalThreshold = 24 * 60 * 60, // 24 hours default
-      expiration = 7 * 24 * 60 * 60, // 7 days default
-    } = options;
-
-    const cacheKey: CacheKey = ['DATASOURCE_SCHEMA', dataSource];
-    const spanId = crypto.randomBytes(16).toString('hex');
-
-    const fetchSchema = async () => {
-      const queue = await this.getQueue(dataSource);
-
-      return queue.executeInQueue('getSchemas', cacheKey, {
-        requestId,
-        dataSource,
-      }, 10, {
-        stageQueryKey: cacheKey,
-        requestId,
-        spanId,
-      });
-    };
-
-    if (forceRefresh) {
-      this.logger('Force refresh datasource schema', {
-        dataSource,
-        requestId,
-        spanId
-      });
-      const result = await fetchSchema();
-
-      // Cache the fresh result
-      const cacheValue = {
-        time: (new Date()).getTime(),
-        result,
-        renewalKey: `schema_${dataSource}_${Date.now()}`
-      };
-
-      const redisKey = this.queryRedisKey(cacheKey);
-      await this.cacheDriver.set(redisKey, cacheValue, expiration);
-
-      this.logger('Cached fresh datasource schema', {
-        dataSource,
-        requestId,
-        spanId
-      });
-
-      return result;
-    }
-
-    // Try to get from cache first
-    const redisKey = this.queryRedisKey(cacheKey);
-    const cachedResult = await this.cacheDriver.get(redisKey);
-
-    if (cachedResult) {
-      const renewedAgo = (new Date()).getTime() - cachedResult.time;
-
-      this.logger('Found cached datasource schema', {
-        dataSource,
-        time: cachedResult.time,
-        renewedAgo,
-        renewalThreshold: renewalThreshold * 1000,
-        requestId,
-        spanId
-      });
-
-      // Check if we need to refresh
-      if (renewedAgo > renewalThreshold * 1000) {
-        this.logger('Datasource schema cache expired, fetching fresh data', {
-          dataSource,
-          renewedAgo,
-          renewalThreshold: renewalThreshold * 1000,
-          requestId,
-          spanId
-        });
-
-        try {
-          const freshResult = await fetchSchema();
-
-          // Update cache with fresh data
-          const cacheValue = {
-            time: (new Date()).getTime(),
-            result: freshResult,
-            renewalKey: `schema_${dataSource}_${Date.now()}`
-          };
-
-          await this.cacheDriver.set(redisKey, cacheValue, expiration);
-
-          this.logger('Updated datasource schema cache', {
-            dataSource,
-            requestId,
-            spanId
-          });
-
-          return freshResult;
-        } catch (error) {
-          this.logger('Failed to refresh datasource schema, using cached data', {
-            dataSource,
-            error: (error as Error).stack || error,
-            requestId,
-            spanId
-          });
-
-          // Return cached data if refresh fails
-          return cachedResult.result;
-        }
-      }
-
-      // Return cached data if still fresh
-      this.logger('Using cached datasource schema', {
-        dataSource,
-        requestId,
-        spanId
-      });
-      return cachedResult.result;
-    }
-
-    // No cache found, fetch fresh data
-    this.logger('No cached datasource schema found, fetching fresh data', {
+    return this.queryDataSourceMetadata<QuerySchemasResult[]>(
+      'GET_SCHEMAS',
+      {},
       dataSource,
-      requestId,
-      spanId
-    });
+      options
+    );
+  }
 
-    const result = await fetchSchema();
-
-    // Cache the result
-    const cacheValue = {
-      time: (new Date()).getTime(),
-      result,
-      renewalKey: `schema_${dataSource}_${Date.now()}`
-    };
-
-    await this.cacheDriver.set(redisKey, cacheValue, expiration);
-
-    this.logger('Cached new datasource schema', {
+  /**
+   * Queries tables for specific schemas with caching and queue support.
+   * Returns list of tables for the given schemas.
+   */
+  public async queryTablesForSchemas(
+    schemas: QuerySchemasResult[],
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<QueryTablesResult[]> {
+    return this.queryDataSourceMetadata<QueryTablesResult[]>(
+      'GET_TABLES_FOR_SCHEMAS',
+      { schemas },
       dataSource,
-      requestId,
-      spanId
-    });
+      options
+    );
+  }
 
-    return result;
+  /**
+   * Queries columns for specific tables with caching and queue support.
+   * Returns list of columns for the given tables.
+   */
+  public async queryColumnsForTables(
+    tables: QueryTablesResult[],
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<QueryColumnsResult[]> {
+    return this.queryDataSourceMetadata<QueryColumnsResult[]>(
+      'GET_COLUMNS_FOR_TABLES',
+      { tables },
+      dataSource,
+      options
+    );
   }
 
   /**
    * Clears the cached datasource schema for a specific datasource.
    */
   public async clearDataSourceSchemaCache(dataSource: string = 'default') {
-    const cacheKey: CacheKey = ['DATASOURCE_SCHEMA', dataSource];
+    const cacheKey: CacheKey = ['METADATA:GET_SCHEMAS', JSON.stringify({}), dataSource];
     const redisKey = this.queryRedisKey(cacheKey);
-
     await this.cacheDriver.remove(redisKey);
-
     this.logger('Cleared datasource schema cache', { dataSource });
+  }
+
+  /**
+   * Clears the cached tables for specific schemas.
+   */
+  public async clearTablesForSchemasCache(
+    schemas: QuerySchemasResult[],
+    dataSource: string = 'default'
+  ) {
+    const cacheKey: CacheKey = ['METADATA:GET_TABLES_FOR_SCHEMAS', JSON.stringify({ schemas }), dataSource];
+    const redisKey = this.queryRedisKey(cacheKey);
+    await this.cacheDriver.remove(redisKey);
+    this.logger('Cleared tables for schemas cache', { dataSource, schemas: schemas.map(s => s.schema_name) });
+  }
+
+  /**
+   * Clears the cached columns for specific tables.
+   */
+  public async clearColumnsForTablesCache(
+    tables: QueryTablesResult[],
+    dataSource: string = 'default'
+  ) {
+    const cacheKey: CacheKey = ['METADATA:GET_COLUMNS_FOR_TABLES', JSON.stringify({ tables }), dataSource];
+    const redisKey = this.queryRedisKey(cacheKey);
+    await this.cacheDriver.remove(redisKey);
+    this.logger('Cleared columns for tables cache', { dataSource, tables: tables.map(t => `${t.schema_name}.${t.table_name}`) });
   }
 }
