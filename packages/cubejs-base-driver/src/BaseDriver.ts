@@ -810,10 +810,11 @@ export abstract class BaseDriver implements DriverInterface {
     bucketName: string,
     tableName: string
   ): Promise<string[]> {
-    const storage = new Storage({
-      credentials: gcsConfig.credentials,
-      projectId: gcsConfig.credentials.project_id
-    });
+    const storage = new Storage(
+      gcsConfig.credentials
+        ? { credentials: gcsConfig.credentials, projectId: gcsConfig.credentials.project_id }
+        : undefined
+    );
     const bucket = storage.bucket(bucketName);
     const [files] = await bucket.getFiles({ prefix: `${tableName}/` });
     if (files.length) {
