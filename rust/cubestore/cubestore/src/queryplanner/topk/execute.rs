@@ -1294,7 +1294,7 @@ mod tests {
         .unwrap();
         assert_eq!(r, vec![vec![0, 0]]);
 
-        // Ascending, null first.
+        // Ascending, nulls first.
         proto.change_order(vec![SortColumn {
             agg_index: 0,
             asc: true,
@@ -1315,7 +1315,7 @@ mod tests {
         .unwrap();
         assert_eq!(r, vec![vec![Some(2), None]]);
 
-        // Ascending, null last.
+        // Ascending, nulls last.
         proto.change_order(vec![SortColumn {
             agg_index: 0,
             asc: true,
