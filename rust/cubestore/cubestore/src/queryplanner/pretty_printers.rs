@@ -11,7 +11,7 @@ use datafusion::logical_expr::{
     Aggregate, EmptyRelation, Explain, Extension, FetchType, Filter, Join, Limit, LogicalPlan,
     Projection, Repartition, SkipType, Sort, TableScan, Union, Window,
 };
-use datafusion::physical_expr::{AcrossPartitions, ConstExpr};
+use datafusion::physical_expr::{AcrossPartitions, ConstExpr, LexOrdering};
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
@@ -479,12 +479,32 @@ pub fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
                     r += " desc";
                 }
                 if !c.nulls_first {
-                    r += " null last";
+                    r += " nulls last";
                 }
                 r
             })
             .join(", ")
     )
+}
+
+fn pp_append_sort_by(out: &mut String, ordering: &LexOrdering) {
+    let _ = write!(
+        out,
+        ", by: [{}]",
+        ordering
+            .iter()
+            .map(|e| {
+                let mut r = format!("{}", e.expr);
+                if e.options.descending {
+                    r += " desc";
+                }
+                if !e.options.nulls_first {
+                    r += " nulls last";
+                }
+                r
+            })
+            .join(", "),
+    );
 }
 
 fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, out: &mut String) {
@@ -588,23 +608,9 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
         } else if let Some(s) = a.downcast_ref::<SortExec>() {
             *out += "Sort";
+
             if o.show_sort_by {
-                *out += &format!(
-                    ", by: [{}]",
-                    s.expr()
-                        .iter()
-                        .map(|e| {
-                            let mut r = format!("{}", e.expr);
-                            if e.options.descending {
-                                r += " desc";
-                            }
-                            if !e.options.nulls_first {
-                                r += " nulls last";
-                            }
-                            r
-                        })
-                        .join(", ")
-                );
+                pp_append_sort_by(out, s.expr());
             }
             if let Some(fetch) = s.fetch() {
                 *out += &format!(", fetch: {}", fetch);
@@ -656,8 +662,9 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "CoalescePartitions";
         } else if let Some(s) = a.downcast_ref::<SortPreservingMergeExec>() {
             *out += "MergeSort";
-            // } else if let Some(_) = a.downcast_ref::<MergeReSortExec>() {
-            //     *out += "MergeResort";
+            if o.show_sort_by {
+                pp_append_sort_by(out, s.expr());
+            }
             if let Some(fetch) = s.fetch() {
                 *out += &format!(", fetch: {}", fetch);
             }

@@ -2229,7 +2229,7 @@ pub mod tests {
         assert_eq!(
             pretty_printers::pp_plan_ext(&plan, &with_sort_by),
             "Projection, [amount, customer]\
-           \n  ClusterAggregateTopK, limit: 10, sortBy: [2 desc null last]\
+           \n  ClusterAggregateTopK, limit: 10, sortBy: [2 desc nulls last]\
            \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
@@ -2243,7 +2243,7 @@ pub mod tests {
         assert_eq!(
             pretty_printers::pp_plan_ext(&plan, &with_sort_by),
             "Projection, [customer, amount]\
-           \n  ClusterAggregateTopK, limit: 10, sortBy: [2 null last]\
+           \n  ClusterAggregateTopK, limit: 10, sortBy: [2 nulls last]\
            \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
@@ -2261,7 +2261,7 @@ pub mod tests {
         assert_eq!(
             pretty_printers::pp_plan_ext(&plan, &verbose),
             "Projection, [customer, amount, min_amount, max_amount]\
-           \n  ClusterAggregateTopK, limit: 10, aggs: [sum(s.Orders.order_amount), min(s.Orders.order_amount), max(s.Orders.order_amount)], sortBy: [3 desc null last, 2 null last]\
+           \n  ClusterAggregateTopK, limit: 10, aggs: [sum(s.Orders.order_amount), min(s.Orders.order_amount), max(s.Orders.order_amount)], sortBy: [3 desc nulls last, 2 nulls last]\
            \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 

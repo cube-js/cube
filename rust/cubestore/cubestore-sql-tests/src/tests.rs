@@ -3475,13 +3475,13 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
         "Projection, [url, sum(Data.hits)@1:hits]\
-           \n  AggregateTopK, limit: 10, sortBy: [2 desc null last]\
+           \n  AggregateTopK, limit: 10, sortBy: [2 desc nulls last]\
            \n    ClusterSend, partitions: [[1, 2]], sort_order: [1]"
     );
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &verbose),
         "Projection, [url, sum(Data.hits)@1:hits]\
-           \n  AggregateTopK, limit: 10, sortBy: [2 desc null last]\
+           \n  AggregateTopK, limit: 10, sortBy: [2 desc nulls last]\
            \n    Worker, sort_order: [1]\
            \n      Sort, by: [sum(Data.hits)@1 desc nulls last], sort_order: [1]\
            \n        LinearSingleAggregate\
