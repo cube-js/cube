@@ -3,8 +3,11 @@ use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::AggregateTopKExec;
+use datafusion::config::ConfigOptions;
 use datafusion::error::DataFusionError;
 use datafusion::physical_expr::LexOrdering;
+use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
+use datafusion::physical_optimizer::PhysicalOptimizerRule as _;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::limit::GlobalLimitExec;
@@ -192,10 +195,13 @@ pub fn ensure_partition_merge_with_acceptable_parent(
     }
 }
 
-///Add `GlobalLimitExec` behind worker node if this node has `limit` property set
-///Should be executed after all optimizations which can move `Worker` node or change it input
+/// Add `GlobalLimitExec` behind worker node if this node has `limit` property set and applies DF
+/// `LimitPushdown` optimizer. Should be executed after all optimizations which can move `Worker`
+/// node or change its input.  `config` is ignored -- we pass it to DF's `LimitPushdown` optimizer,
+/// which also ignores it (as of DF 46.0.1).
 pub fn add_limit_to_workers(
     p: Arc<dyn ExecutionPlan>,
+    config: &ConfigOptions,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let limit_and_reverse;
     let input;
@@ -217,6 +223,7 @@ pub fn add_limit_to_workers(
         p.with_new_children(vec![limit])
     } else {
         let limit = Arc::new(GlobalLimitExec::new(input.clone(), 0, Some(limit)));
-        p.with_new_children(vec![limit])
+        let limit_optimized = LimitPushdown::new().optimize(limit, config)?;
+        p.with_new_children(vec![limit_optimized])
     }
 }
