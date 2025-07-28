@@ -15,6 +15,7 @@ import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalQueueDriver } from './LocalQueueDriver';
 import { QueryStream } from './QueryStream';
+import {CacheAndQueryDriverType} from "./QueryOrchestrator";
 
 export type CancelHandlerFn = (query: QueryDef) => Promise<void>;
 export type QueryHandlerFn = (query: QueryDef, cancelHandler: CancelHandlerFn) => Promise<unknown>;
@@ -29,7 +30,7 @@ export type ExecuteInQueueOptions = Omit<AddToQueueOptions, 'queueId'> & {
 };
 
 export type QueryQueueOptions = {
-  cacheAndQueueDriver: string;
+  cacheAndQueueDriver: CacheAndQueryDriverType;
   logger: (message, event) => void;
   sendCancelMessageFn?: SendCancelMessageFn;
   sendProcessMessageFn?: SendProcessMessageFn;

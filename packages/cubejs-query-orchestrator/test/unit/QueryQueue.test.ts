@@ -1,5 +1,5 @@
 import { QueryQueueTest } from './QueryQueue.abstract';
 
 QueryQueueTest('Local', {
-  cacheAndQueueDriver: 'local',
+  cacheAndQueueDriver: 'memory',
 });

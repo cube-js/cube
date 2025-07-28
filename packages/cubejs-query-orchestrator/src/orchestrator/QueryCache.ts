@@ -115,7 +115,7 @@ export interface QueryCacheOptions {
   }>;
   cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
   continueWaitTimeout?: number;
-  cacheAndQueueDriver?: CacheAndQueryDriverType;
+  cacheAndQueueDriver: CacheAndQueryDriverType;
   maxInMemoryCacheEntries?: number;
   skipExternalCacheAndQueue?: boolean;
 }
@@ -133,9 +133,9 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    public readonly options: QueryCacheOptions = {}
+    public readonly options: QueryCacheOptions
   ) {
-    switch (options.cacheAndQueueDriver || 'memory') {
+    switch (options.cacheAndQueueDriver) {
       case 'memory':
         this.cacheDriver = new LocalCacheDriver();
         break;
