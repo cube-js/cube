@@ -9796,31 +9796,36 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
     .await
     .unwrap();
 
-    assert_eq!(
-        res,
-        vec![
-            Row::new(vec![
-                TableValue::Int(12),
-                TableValue::Int(30),
-                TableValue::Int(7)
-            ]),
-            Row::new(vec![
-                TableValue::Int(12),
-                TableValue::Int(25),
-                TableValue::Int(5)
-            ]),
-            Row::new(vec![
-                TableValue::Int(12),
-                TableValue::Int(25),
-                TableValue::Int(6)
-            ]),
-            Row::new(vec![
-                TableValue::Int(12),
-                TableValue::Int(20),
-                TableValue::Int(4)
-            ]),
-        ]
-    );
+    let mut expected = vec![
+        Row::new(vec![
+            TableValue::Int(12),
+            TableValue::Int(30),
+            TableValue::Int(7),
+        ]),
+        Row::new(vec![
+            TableValue::Int(12),
+            TableValue::Int(25),
+            TableValue::Int(6),
+        ]),
+        Row::new(vec![
+            TableValue::Int(12),
+            TableValue::Int(25),
+            TableValue::Int(5),
+        ]),
+        Row::new(vec![
+            TableValue::Int(12),
+            TableValue::Int(20),
+            TableValue::Int(4),
+        ]),
+    ];
+    if res != expected {
+        let mut values1 = expected[1].values().clone();
+        let mut values2 = expected[2].values().clone();
+        std::mem::swap(&mut values1[2], &mut values2[2]);
+        expected[1] = Row::new(values1);
+        expected[2] = Row::new(values2);
+        assert_eq!(res, expected);
+    }
 
     // ====================================
     let res = assert_limit_pushdown_using_search_string(

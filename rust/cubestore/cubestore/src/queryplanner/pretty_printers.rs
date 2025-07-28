@@ -83,6 +83,24 @@ impl PPOptions {
         }
     }
 
+    #[allow(unused)]
+    /// Like [`Self::show_most`] but omits computed metadata.
+    pub fn show_nonmeta() -> PPOptions {
+        PPOptions {
+            show_filters: true,
+            show_sort_by: true,
+            show_aggregations: true,
+
+            traverse_past_clustersend: true,
+
+            show_schema: false,
+            show_output_hints: false,
+            show_check_memory_nodes: false,
+            show_partitions: false,
+            show_metrics: false,
+        }
+    }
+
     pub fn none() -> PPOptions {
         PPOptions::default()
     }
