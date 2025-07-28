@@ -1,10 +1,16 @@
 import * as stream from 'stream';
+import * as crypto from 'crypto';
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import {
+  QuerySchemasResult,
+  QueryTablesResult,
+  QueryColumnsResult,
+} from '@cubejs-backend/base-driver';
 
 import { QueryKey } from '@cubejs-backend/base-driver';
-import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable } from './QueryCache';
+import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable, CacheKey, QueryWithParams } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryStream } from './QueryStream';
@@ -15,6 +21,12 @@ export enum DriverType {
   External = 'external',
   Internal = 'internal',
   Cache = 'cache',
+}
+
+export enum MetadataOperationType {
+  GET_SCHEMAS = 'GET_SCHEMAS',
+  GET_TABLES_FOR_SCHEMAS = 'GET_TABLES_FOR_SCHEMAS',
+  GET_COLUMNS_FOR_TABLES = 'GET_COLUMNS_FOR_TABLES'
 }
 
 export interface QueryOrchestratorOptions {
@@ -427,5 +439,210 @@ export class QueryOrchestrator {
 
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
+  }
+
+  private createMetadataHash(operation: MetadataOperationType, params: Record<string, any>): string {
+    if (!params || Object.keys(params).length === 0) {
+      return 'empty';
+    }
+
+    const hashData: string[] = [];
+
+    switch (operation) {
+      case MetadataOperationType.GET_SCHEMAS:
+        return 'all_schemas';
+
+      case MetadataOperationType.GET_TABLES_FOR_SCHEMAS:
+        if (params.schemas && Array.isArray(params.schemas)) {
+          hashData.push(...params.schemas.map(schema => schema.schema_name).sort());
+        }
+        break;
+
+      case MetadataOperationType.GET_COLUMNS_FOR_TABLES:
+        if (params.tables && Array.isArray(params.tables)) {
+          hashData.push(...params.tables.map(table => `${table.schema_name}.${table.table_name}`).sort());
+        }
+        break;
+
+      default:
+        return crypto
+          .createHash('sha256')
+          .update(JSON.stringify(params))
+          .digest('hex')
+          .substring(0, 16);
+    }
+
+    if (hashData.length === 0) {
+      return 'empty';
+    }
+
+    return crypto
+      .createHash('sha256')
+      .update(hashData.join('|'))
+      .digest('hex')
+      .substring(0, 16);
+  }
+
+  private createMetadataQuery(operation: string, params: Record<string, any>): QueryWithParams {
+    return [
+      `METADATA:${operation}`,
+      [JSON.stringify(params)],
+      { external: false, renewalThreshold: 24 * 60 * 60 }
+    ];
+  }
+
+  private async queryDataSourceMetadata<T>(
+    operation: MetadataOperationType,
+    params: Record<string, any>,
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<T> {
+    const {
+      requestId,
+      forceRefresh = false,
+      renewalThreshold = 24 * 60 * 60,
+      expiration = 7 * 24 * 60 * 60,
+    } = options;
+
+    const paramsHash = this.createMetadataHash(operation, params);
+
+    const metadataQuery = this.createMetadataQuery(operation, params);
+    const cacheKey: CacheKey = [`METADATA:${operation}`, paramsHash, dataSource];
+
+    const renewalKey = forceRefresh ? undefined : [
+      `METADATA_RENEWAL:${operation}`,
+      paramsHash,
+      dataSource,
+      Math.floor(Date.now() / (renewalThreshold * 1000))
+    ];
+
+    return this.queryCache.cacheQueryResult(
+      metadataQuery,
+      [],
+      cacheKey,
+      expiration,
+      {
+        renewalThreshold,
+        renewalKey,
+        forceNoCache: forceRefresh,
+        requestId,
+        dataSource,
+        useInMemory: true,
+        waitForRenew: true,
+      }
+    );
+  }
+
+  /**
+   * Query the data source for available schemas.
+   */
+  public async queryDataSourceSchemas(
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<QuerySchemasResult[]> {
+    return this.queryDataSourceMetadata<QuerySchemasResult[]>(
+      MetadataOperationType.GET_SCHEMAS,
+      {},
+      dataSource,
+      options
+    );
+  }
+
+  /**
+   * Query the data source for tables within the specified schemas.
+   */
+  public async queryTablesForSchemas(
+    schemas: QuerySchemasResult[],
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<QueryTablesResult[]> {
+    return this.queryDataSourceMetadata<QueryTablesResult[]>(
+      MetadataOperationType.GET_TABLES_FOR_SCHEMAS,
+      { schemas },
+      dataSource,
+      options
+    );
+  }
+
+  /**
+   * Query the data source for columns within the specified tables.
+   */
+  public async queryColumnsForTables(
+    tables: QueryTablesResult[],
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<QueryColumnsResult[]> {
+    return this.queryDataSourceMetadata<QueryColumnsResult[]>(
+      MetadataOperationType.GET_COLUMNS_FOR_TABLES,
+      { tables },
+      dataSource,
+      options
+    );
+  }
+
+  /**
+   * Clear cached schema information for a data source.
+   */
+  public async clearDataSourceSchemaCache(dataSource: string = 'default'): Promise<void> {
+    const cacheKey: CacheKey = [`METADATA:${MetadataOperationType.GET_SCHEMAS}`, 'empty', dataSource];
+    const redisKey = this.queryCache.queryRedisKey(cacheKey);
+    await this.queryCache.getCacheDriver().remove(redisKey);
+    this.logger('Cleared datasource schema cache', { dataSource });
+  }
+
+  /**
+   * Clear cached table information for specific schemas.
+   */
+  public async clearTablesForSchemasCache(
+    schemas: QuerySchemasResult[],
+    dataSource: string = 'default'
+  ): Promise<void> {
+    const paramsHash = this.createMetadataHash(MetadataOperationType.GET_TABLES_FOR_SCHEMAS, { schemas });
+    const cacheKey: CacheKey = [`METADATA:${MetadataOperationType.GET_TABLES_FOR_SCHEMAS}`, paramsHash, dataSource];
+    const redisKey = this.queryCache.queryRedisKey(cacheKey);
+    await this.queryCache.getCacheDriver().remove(redisKey);
+    this.logger('Cleared tables for schemas cache', {
+      dataSource,
+      schemaCount: schemas.length,
+      cacheHash: paramsHash
+    });
+  }
+
+  /**
+   * Clear cached column information for specific tables.
+   */
+  public async clearColumnsForTablesCache(
+    tables: QueryTablesResult[],
+    dataSource: string = 'default'
+  ): Promise<void> {
+    const paramsHash = this.createMetadataHash(MetadataOperationType.GET_COLUMNS_FOR_TABLES, { tables });
+    const cacheKey: CacheKey = [`METADATA:${MetadataOperationType.GET_COLUMNS_FOR_TABLES}`, paramsHash, dataSource];
+    const redisKey = this.queryCache.queryRedisKey(cacheKey);
+    await this.queryCache.getCacheDriver().remove(redisKey);
+    this.logger('Cleared columns for tables cache', {
+      dataSource,
+      tableCount: tables.length,
+      cacheHash: paramsHash
+    });
   }
 }

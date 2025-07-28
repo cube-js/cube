@@ -30,7 +30,7 @@ export class OrchestratorApi {
     protected readonly logger,
     protected readonly options: OrchestratorApiOptions
   ) {
-    this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
+    this.continueWaitTimeout = this.options.MetadataOperationType || 5;
 
     this.orchestrator = new QueryOrchestrator(
       options.redisPrefix || 'STANDALONE',
