@@ -135,7 +135,7 @@ export class QueryCache {
     protected readonly logger: any,
     public readonly options: QueryCacheOptions
   ) {
-    switch (options.cacheAndQueueDriver) {
+    switch (options.cacheAndQueueDriver || 'memory') {
       case 'memory':
         this.cacheDriver = new LocalCacheDriver();
         break;

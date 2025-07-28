@@ -1,5 +1,4 @@
 import { Readable } from 'stream';
-import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import type { QueryKey, QueueDriverInterface } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import crypto from 'crypto';
