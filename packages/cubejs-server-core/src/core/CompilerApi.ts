@@ -5,25 +5,161 @@ import {
   queryClass,
   PreAggregations,
   QueryFactory,
-  prepareCompiler
+  prepareCompiler,
+  BaseQuery,
 } from '@cubejs-backend/schema-compiler';
 import { v4 as uuidv4, parse as uuidParse } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
+import { SchemaFileRepository } from '@cubejs-backend/shared';
+import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import {
+  DbTypeAsyncFn,
+  DatabaseType,
+  DialectFactoryFn,
+  DriverContext,
+  DialectContext,
+  RequestContext,
+  LoggerFn,
+} from './types';
+
+interface CompilerApiOptions {
+  dialectClass?: DialectFactoryFn;
+  logger?: LoggerFn;
+  preAggregationsSchema?: (context: RequestContext) => string | Promise<string>;
+  allowUngroupedWithoutPrimaryKey?: boolean;
+  convertTzForRawTimeDimension?: boolean;
+  schemaVersion?: () => string | object | Promise<string | object>;
+  contextToRoles?: (context: RequestContext) => string[] | Promise<string[]>;
+  compileContext?: any;
+  allowJsDuplicatePropsInSchema?: boolean;
+  sqlCache?: boolean;
+  standalone?: boolean;
+  compilerCacheSize?: number;
+  maxCompilerCacheKeepAlive?: number;
+  updateCompilerCacheKeepAlive?: boolean;
+  externalDialectClass?: typeof BaseQuery;
+  externalDbType?: DatabaseType;
+  allowNodeRequire?: boolean;
+  devServer?: boolean;
+  fastReload?: boolean;
+}
+
+interface CompilersResult {
+  compiler: any;
+  metaTransformer: any;
+  cubeEvaluator: any;
+  contextEvaluator: any;
+  joinGraph: any;
+  compilerCache: any;
+  headCommitId: string;
+  compilerId: string;
+}
+
+interface SqlGeneratorResult {
+  external: any;
+  sql: any;
+  lambdaQueries: any;
+  timeDimensionAlias?: string;
+  timeDimensionField?: string;
+  order: any;
+  cacheKeyQueries: any;
+  preAggregations: any;
+  dataSource: string;
+  aliasNameToMember: any;
+  rollupMatchResults?: any;
+  canUseTransformedQuery: any;
+  memberNames: string[];
+}
+
+interface ApplicablePolicy {
+  role: string;
+  conditions?: Array<{ if: any }>;
+  rowLevel?: {
+    filters?: any[];
+    allowAll?: boolean;
+  };
+  memberLevel?: {
+    includesMembers: string[];
+    excludesMembers: string[];
+  };
+}
+
+interface NestedFilter {
+  memberReference?: string;
+  member?: string;
+  operator?: string;
+  values?: any;
+  or?: NestedFilter[];
+  and?: NestedFilter[];
+}
+
+interface CubeConfig {
+  name: string;
+  measures?: Array<{ name: string; isVisible?: boolean; public?: boolean }>;
+  dimensions?: Array<{ name: string; isVisible?: boolean; public?: boolean }>;
+  segments?: Array<{ name: string; isVisible?: boolean; public?: boolean }>;
+  hierarchies?: Array<{ name: string; isVisible?: boolean; public?: boolean }>;
+}
+
+interface CubeWithConfig {
+  config: CubeConfig;
+}
 
 export class CompilerApi {
-  /**
-   * Class constructor.
-   * @param {SchemaFileRepository} repository
-   * @param {DbTypeAsyncFn} dbType
-   * @param {*} options
-   */
+  private repository: SchemaFileRepository;
 
-  constructor(repository, dbType, options) {
+  private dbType: DbTypeAsyncFn;
+
+  private dialectClass?: DialectFactoryFn;
+
+  public options: CompilerApiOptions;
+
+  private allowNodeRequire: boolean;
+
+  private logger?: LoggerFn;
+
+  private preAggregationsSchema?: (context: RequestContext) => string | Promise<string>;
+
+  private allowUngroupedWithoutPrimaryKey?: boolean;
+
+  private convertTzForRawTimeDimension?: boolean;
+
+  public schemaVersion?: () => string | object | Promise<string | object>;
+
+  private contextToRoles?: (context: RequestContext) => string[] | Promise<string[]>;
+
+  private compileContext?: any;
+
+  private allowJsDuplicatePropsInSchema?: boolean;
+
+  private sqlCache?: boolean;
+
+  private standalone?: boolean;
+
+  private nativeInstance: NativeInstance;
+
+  private compiledScriptCache: LRUCache<string, any>;
+
+  private compiledScriptCacheInterval?: NodeJS.Timeout;
+
+  private graphqlSchema?: any;
+
+  private compilers?: Promise<CompilersResult>;
+
+  private compilerVersion?: string;
+
+  private queryFactory?: QueryFactory;
+
+  public constructor(
+    repository: SchemaFileRepository,
+    dbType: DbTypeAsyncFn,
+    options: CompilerApiOptions = {}
+  ) {
     this.repository = repository;
     this.dbType = dbType;
     this.dialectClass = options.dialectClass;
-    this.options = options || {};
+    this.options = options;
     this.allowNodeRequire = options.allowNodeRequire == null ? true : options.allowNodeRequire;
     this.logger = this.options.logger;
     this.preAggregationsSchema = this.options.preAggregationsSchema;
@@ -42,7 +178,6 @@ export class CompilerApi {
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
     });
 
-    // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
       this.compiledScriptCacheInterval = setInterval(
         () => this.compiledScriptCache.purgeStale(),
@@ -51,25 +186,25 @@ export class CompilerApi {
     }
   }
 
-  dispose() {
+  public dispose(): void {
     if (this.compiledScriptCacheInterval) {
       clearInterval(this.compiledScriptCacheInterval);
     }
   }
 
-  setGraphQLSchema(schema) {
+  public setGraphQLSchema(schema: any): void {
     this.graphqlSchema = schema;
   }
 
-  getGraphQLSchema() {
+  public getGraphQLSchema(): any {
     return this.graphqlSchema;
   }
 
-  createNativeInstance() {
+  public createNativeInstance(): NativeInstance {
     return new NativeInstance();
   }
 
-  async getCompilers({ requestId } = {}) {
+  public async getCompilers({ requestId }: { requestId?: string } = {}): Promise<CompilersResult> {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
@@ -95,11 +230,7 @@ export class CompilerApi {
     return this.compilers;
   }
 
-  /**
-   * Creates the compilers instances without model compilation,
-   * because it could fail and no compilers will be returned.
-   */
-  createCompilerInstances() {
+  public createCompilerInstances(): CompilersResult {
     return prepareCompiler(this.repository, {
       allowNodeRequire: this.allowNodeRequire,
       compileContext: this.compileContext,
@@ -110,10 +241,10 @@ export class CompilerApi {
     });
   }
 
-  async compileSchema(compilerVersion, requestId) {
+  public async compileSchema(compilerVersion: string, requestId?: string): Promise<CompilersResult> {
     const startCompilingTime = new Date().getTime();
     try {
-      this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
+      this.logger?.(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,
         requestId
       });
@@ -128,15 +259,15 @@ export class CompilerApi {
       });
       this.queryFactory = await this.createQueryFactory(compilers);
 
-      this.logger('Compiling schema completed', {
+      this.logger?.('Compiling schema completed', {
         version: compilerVersion,
         requestId,
         duration: ((new Date()).getTime() - startCompilingTime),
       });
 
       return compilers;
-    } catch (e) {
-      this.logger('Compiling schema error', {
+    } catch (e: any) {
+      this.logger?.('Compiling schema error', {
         version: compilerVersion,
         requestId,
         duration: ((new Date()).getTime() - startCompilingTime),
@@ -146,7 +277,7 @@ export class CompilerApi {
     }
   }
 
-  async createQueryFactory(compilers) {
+  public async createQueryFactory(compilers: CompilersResult): Promise<QueryFactory> {
     const { cubeEvaluator } = compilers;
 
     const cubeToQueryClass = Object.fromEntries(
@@ -162,15 +293,15 @@ export class CompilerApi {
     return new QueryFactory(cubeToQueryClass);
   }
 
-  async getDbType(dataSource = 'default') {
-    return this.dbType({ dataSource, });
+  public async getDbType(dataSource: string = 'default'): Promise<DatabaseType> {
+    return this.dbType({ dataSource } as DriverContext);
   }
 
-  getDialectClass(dataSource = 'default', dbType) {
-    return this.dialectClass?.({ dataSource, dbType });
+  public getDialectClass(dataSource: string = 'default', dbType: DatabaseType): any {
+    return this.dialectClass?.({ dataSource, dbType } as DialectContext);
   }
 
-  async getSqlGenerator(query, dataSource) {
+  public async getSqlGenerator(query: any, dataSource?: string): Promise<{ sqlGenerator: any; compilers: CompilersResult }> {
     const dbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
     let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
@@ -179,14 +310,10 @@ export class CompilerApi {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
 
-    // sqlGenerator.dataSource can return undefined for query without members
-    // Queries like this are used by api-gateway to initialize SQL API
-    // At the same time, those queries should use concrete dataSource, so we should be good to go with it
     dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
     if (dataSource !== undefined) {
       const _dbType = await this.getDbType(dataSource);
       if (dataSource !== 'default' && dbType !== _dbType) {
-        // TODO consider more efficient way than instantiating query
         sqlGenerator = await this.createQueryByDataSource(
           compilers,
           query,
@@ -205,7 +332,10 @@ export class CompilerApi {
     return { sqlGenerator, compilers };
   }
 
-  async getSql(query, options = {}) {
+  public async getSql(
+    query: any,
+    options: { includeDebugInfo?: boolean; exportAnnotatedSql?: boolean; requestId?: string } = {}
+  ): Promise<SqlGeneratorResult> {
     const { includeDebugInfo, exportAnnotatedSql } = options;
     const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
 
@@ -227,8 +357,7 @@ export class CompilerApi {
     }));
 
     if (this.sqlCache) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { requestId, ...keyOptions } = query;
+      const { requestId: _requestId, ...keyOptions } = query;
       const key = { query: keyOptions, options };
       return compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
     } else {
@@ -236,18 +365,18 @@ export class CompilerApi {
     }
   }
 
-  async getRolesFromContext(context) {
+  public async getRolesFromContext(context: RequestContext): Promise<Set<string>> {
     if (!this.contextToRoles) {
       return new Set();
     }
     return new Set(await this.contextToRoles(context));
   }
 
-  userHasRole(userRoles, role) {
+  public userHasRole(userRoles: Set<string>, role: string): boolean {
     return userRoles.has(role) || role === '*';
   }
 
-  roleMeetsConditions(evaluatedConditions) {
+  public roleMeetsConditions(evaluatedConditions?: any[]): boolean {
     if (evaluatedConditions?.length) {
       return evaluatedConditions.reduce((a, b) => {
         if (typeof b !== 'boolean') {
@@ -259,24 +388,28 @@ export class CompilerApi {
     return true;
   }
 
-  async getCubesFromQuery(query, context) {
+  public async getCubesFromQuery(query: any, context: RequestContext): Promise<Set<string>> {
     const sql = await this.getSql(query, { requestId: context.requestId });
     return new Set(sql.memberNames.map(memberName => memberName.split('.')[0]));
   }
 
-  hashRequestContext(context) {
+  public hashRequestContext(context: any): string {
     if (!context.__hash) {
       context.__hash = crypto.createHash('md5').update(JSON.stringify(context)).digest('hex');
     }
     return context.__hash;
   }
 
-  async getApplicablePolicies(cube, context, compilers) {
+  public async getApplicablePolicies(
+    cube: any,
+    context: RequestContext,
+    compilers: CompilersResult
+  ): Promise<ApplicablePolicy[]> {
     const cache = compilers.compilerCache.getRbacCacheInstance();
     const cacheKey = `${cube.name}_${this.hashRequestContext(context)}`;
     if (!cache.has(cacheKey)) {
       const userRoles = await this.getRolesFromContext(context);
-      const policies = cube.accessPolicy.filter(policy => {
+      const policies = cube.accessPolicy.filter((policy: ApplicablePolicy) => {
         const evaluatedConditions = (policy.conditions || []).map(
           condition => compilers.cubeEvaluator.evaluateContextFunction(cube, condition.if, context)
         );
@@ -288,9 +421,14 @@ export class CompilerApi {
     return cache.get(cacheKey);
   }
 
-  evaluateNestedFilter(filter, cube, context, cubeEvaluator) {
-    const result = {
-    };
+  public evaluateNestedFilter(
+    filter: any,
+    cube: any,
+    context: RequestContext,
+    cubeEvaluator: any
+  ): NestedFilter {
+    const result: NestedFilter = {};
+    
     if (filter.memberReference) {
       const evaluatedValues = cubeEvaluator.evaluateContextFunction(
         cube,
@@ -302,25 +440,19 @@ export class CompilerApi {
       result.values = evaluatedValues;
     }
     if (filter.or) {
-      result.or = filter.or.map(f => this.evaluateNestedFilter(f, cube, context, cubeEvaluator));
+      result.or = filter.or.map((f: any) => this.evaluateNestedFilter(f, cube, context, cubeEvaluator));
     }
     if (filter.and) {
-      result.and = filter.and.map(f => this.evaluateNestedFilter(f, cube, context, cubeEvaluator));
+      result.and = filter.and.map((f: any) => this.evaluateNestedFilter(f, cube, context, cubeEvaluator));
     }
     return result;
   }
 
-  /**
-   * This method rewrites the query according to RBAC row level security policies.
-   *
-   * If RBAC is enabled, it looks at all the Cubes from the query with accessPolicy defined.
-   * It extracts all policies applicable to for the current user context (contextToRoles() + conditions).
-   * It then generates an rls filter by
-   * - combining all filters for the same role with AND
-   * - combining all filters for different roles with OR
-   * - combining cube and view filters with AND
-  */
-  async applyRowLevelSecurity(query, evaluatedQuery, context) {
+  public async applyRowLevelSecurity(
+    query: any,
+    evaluatedQuery: any,
+    context: RequestContext
+  ): Promise<{ query: any; denied: boolean }> {
     const compilers = await this.getCompilers({ requestId: context.requestId });
     const { cubeEvaluator } = compilers;
 
@@ -330,11 +462,9 @@ export class CompilerApi {
 
     const queryCubes = await this.getCubesFromQuery(evaluatedQuery, context);
 
-    // We collect Cube and View filters separately because they have to be
-    // applied in "two layers": first Cube filters, then View filters on top
-    const cubeFiltersPerCubePerRole = {};
-    const viewFiltersPerCubePerRole = {};
-    const hasAllowAllForCube = {};
+    const cubeFiltersPerCubePerRole: Record<string, Record<string, NestedFilter[]>> = {};
+    const viewFiltersPerCubePerRole: Record<string, Record<string, NestedFilter[]>> = {};
+    const hasAllowAllForCube: Record<string, boolean> = {};
 
     for (const cubeName of queryCubes) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
@@ -346,7 +476,7 @@ export class CompilerApi {
 
         for (const policy of userPolicies) {
           hasRoleWithAccess = true;
-          (policy?.rowLevel?.filters || []).forEach(filter => {
+          (policy?.rowLevel?.filters || []).forEach((filter: any) => {
             filtersMap[cubeName] = filtersMap[cubeName] || {};
             filtersMap[cubeName][policy.role] = filtersMap[cubeName][policy.role] || [];
             filtersMap[cubeName][policy.role].push(
@@ -355,22 +485,17 @@ export class CompilerApi {
           });
           if (!policy?.rowLevel || policy?.rowLevel?.allowAll) {
             hasAllowAllForCube[cubeName] = true;
-            // We don't have a way to add an "all alloed" filter like `WHERE 1 = 1` or something.
-            // Instead, we'll just mark that the user has "all" access to a given cube and remove
-            // all filters later
             break;
           }
         }
 
         if (!hasRoleWithAccess) {
-          // This is a hack that will make sure that the query returns no result
           query.segments = query.segments || [];
           query.segments.push({
             expression: () => '1 = 0',
             cubeName: cube.name,
             name: 'rlsAccessDenied',
           });
-          // If we hit this condition there's no need to evaluate the rest of the policy
           return { query, denied: true };
         }
       }
@@ -388,26 +513,27 @@ export class CompilerApi {
     return { query, denied: false };
   }
 
-  removeEmptyFilters(filter) {
+  public removeEmptyFilters(filter: any): any {
     if (filter?.and) {
-      const and = filter.and.map(f => this.removeEmptyFilters(f)).filter(f => f);
+      const and = filter.and.map((f: any) => this.removeEmptyFilters(f)).filter((f: any) => f);
       return and.length > 1 ? { and } : and.at(0) || null;
     }
     if (filter?.or) {
-      const or = filter.or.map(f => this.removeEmptyFilters(f)).filter(f => f);
+      const or = filter.or.map((f: any) => this.removeEmptyFilters(f)).filter((f: any) => f);
       return or.length > 1 ? { or } : or.at(0) || null;
     }
     return filter;
   }
 
-  buildFinalRlsFilter(cubeFiltersPerCubePerRole, viewFiltersPerCubePerRole, hasAllowAllForCube) {
-    // - delete all filters for cubes where the user has allowAll
-    // - combine the rest into per role maps
-    // - join all filters for the same role with AND
-    // - join all filters for different roles with OR
-    // - join cube and view filters with AND
-
-    const roleReducer = (filtersMap) => (acc, cubeName) => {
+  public buildFinalRlsFilter(
+    cubeFiltersPerCubePerRole: Record<string, Record<string, NestedFilter[]>>,
+    viewFiltersPerCubePerRole: Record<string, Record<string, NestedFilter[]>>,
+    hasAllowAllForCube: Record<string, boolean>
+  ): any {
+    const roleReducer = (filtersMap: Record<string, Record<string, NestedFilter[]>>) => (
+      acc: Record<string, NestedFilter[]>,
+      cubeName: string
+    ): Record<string, NestedFilter[]> => {
       if (!hasAllowAllForCube[cubeName]) {
         Object.keys(filtersMap[cubeName]).forEach(role => {
           acc[role] = (acc[role] || []).concat(filtersMap[cubeName][role]);
@@ -438,39 +564,48 @@ export class CompilerApi {
     });
   }
 
-  async compilerCacheFn(requestId, key, path) {
+  public async compilerCacheFn(
+    requestId: string,
+    key: any,
+    path: string[]
+  ): Promise<(subKey: string[], cacheFn: () => any) => any> {
     const compilers = await this.getCompilers({ requestId });
     if (this.sqlCache) {
-      return (subKey, cacheFn) => compilers.compilerCache.getQueryCache(key).cache(path.concat(subKey), cacheFn);
+      return (subKey: string[], cacheFn: () => any) => compilers.compilerCache.getQueryCache(key).cache(path.concat(subKey), cacheFn);
     } else {
-      return (subKey, cacheFn) => cacheFn();
+      return (subKey: string[], cacheFn: () => any) => cacheFn();
     }
   }
 
-  /**
-   *
-   * @param {unknown} filter
-   * @returns {Promise<Array<PreAggregationInfo>>}
-   */
-  async preAggregations(filter) {
+  public async preAggregations(filter: any): Promise<any[]> {
     const { cubeEvaluator } = await this.getCompilers();
     return cubeEvaluator.preAggregations(filter);
   }
 
-  async scheduledPreAggregations() {
+  public async scheduledPreAggregations(): Promise<any[]> {
     const { cubeEvaluator } = await this.getCompilers();
     return cubeEvaluator.scheduledPreAggregations();
   }
 
-  async createQueryByDataSource(compilers, query, dataSource, dbType) {
+  public async createQueryByDataSource(
+    compilers: CompilersResult,
+    query: any,
+    dataSource?: string,
+    dbType?: DatabaseType
+  ): Promise<any> {
     if (!dbType) {
-      dbType = await this.getDbType(dataSource);
+      dbType = await this.getDbType(dataSource || 'default');
     }
 
-    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
+    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource || 'default', dbType), query);
   }
 
-  createQuery(compilers, dbType, dialectClass, query) {
+  public createQuery(
+    compilers: CompilersResult,
+    dbType: DatabaseType,
+    dialectClass: any,
+    query: any
+  ): any {
     return createQuery(
       compilers,
       dbType,
@@ -487,12 +622,12 @@ export class CompilerApi {
     );
   }
 
-  /**
-   * if RBAC is enabled, this method is used to patch isVisible property of cube members
-   * based on access policies.
-  */
-  async patchVisibilityByAccessPolicy(compilers, context, cubes) {
-    const isMemberVisibleInContext = {};
+  public async patchVisibilityByAccessPolicy(
+    compilers: CompilersResult,
+    context: RequestContext,
+    cubes: CubeWithConfig[]
+  ): Promise<{ cubes: CubeWithConfig[]; visibilityMaskHash: string | null }> {
+    const isMemberVisibleInContext: Record<string, boolean> = {};
     const { cubeEvaluator } = compilers;
 
     if (!cubeEvaluator.isRbacEnabled()) {
@@ -504,7 +639,7 @@ export class CompilerApi {
       if (cubeEvaluator.isRbacEnabledForCube(evaluatedCube)) {
         const applicablePolicies = await this.getApplicablePolicies(evaluatedCube, context, compilers);
 
-        const computeMemberVisibility = (item) => {
+        const computeMemberVisibility = (item: { name: string }): boolean => {
           for (const policy of applicablePolicies) {
             if (policy.memberLevel) {
               if (policy.memberLevel.includesMembers.includes(item.name) &&
@@ -512,37 +647,36 @@ export class CompilerApi {
                 return true;
               }
             } else {
-              // If there's no memberLevel policy, we assume that all members are visible
               return true;
             }
           }
           return false;
         };
 
-        for (const dimension of cube.config.dimensions) {
+        for (const dimension of cube.config.dimensions || []) {
           isMemberVisibleInContext[dimension.name] = computeMemberVisibility(dimension);
         }
 
-        for (const measure of cube.config.measures) {
+        for (const measure of cube.config.measures || []) {
           isMemberVisibleInContext[measure.name] = computeMemberVisibility(measure);
         }
 
-        for (const segment of cube.config.segments) {
+        for (const segment of cube.config.segments || []) {
           isMemberVisibleInContext[segment.name] = computeMemberVisibility(segment);
         }
 
-        for (const hierarchy of cube.config.hierarchies) {
+        for (const hierarchy of cube.config.hierarchies || []) {
           isMemberVisibleInContext[hierarchy.name] = computeMemberVisibility(hierarchy);
         }
       }
     }
 
-    const visibilityPatcherForCube = (cube) => {
+    const visibilityPatcherForCube = (cube: CubeWithConfig) => {
       const evaluatedCube = cubeEvaluator.cubeFromPath(cube.config.name);
       if (!cubeEvaluator.isRbacEnabledForCube(evaluatedCube)) {
-        return (item) => item;
+        return (item: any) => item;
       }
-      return (item) => ({
+      return (item: any) => ({
         ...item,
         isVisible: item.isVisible && isMemberVisibleInContext[item.name],
         public: item.public && isMemberVisibleInContext[item.name]
@@ -550,8 +684,6 @@ export class CompilerApi {
     };
 
     const visibiliyMask = JSON.stringify(isMemberVisibleInContext, Object.keys(isMemberVisibleInContext).sort());
-    // This hash will be returned along the modified meta config and can be used
-    // to distinguish between different "schema versions" after DAP visibility is applied
     const visibilityMaskHash = crypto.createHash('sha256').update(visibiliyMask).digest('hex');
 
     return {
@@ -569,14 +701,22 @@ export class CompilerApi {
     };
   }
 
-  mixInVisibilityMaskHash(compilerId, visibilityMaskHash) {
+  public mixInVisibilityMaskHash(compilerId: string, visibilityMaskHash: string): string {
     const uuidBytes = uuidParse(compilerId);
     const hashBytes = Buffer.from(visibilityMaskHash, 'hex');
-    return uuidv4({ random: crypto.createHash('sha256').update(uuidBytes).update(hashBytes).digest()
-      .subarray(0, 16) });
+    return uuidv4({
+      random: crypto.createHash('sha256')
+        .update(uuidBytes)
+        .update(hashBytes)
+        .digest()
+        .subarray(0, 16) as Uint8Array
+    });
   }
 
-  async metaConfig(requestContext, options = {}) {
+  public async metaConfig(
+    requestContext: RequestContext,
+    options: { includeCompilerId?: boolean; requestId?: string } = {}
+  ): Promise<any> {
     const { includeCompilerId, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
     const { cubes } = compilers.metaTransformer;
@@ -588,17 +728,18 @@ export class CompilerApi {
     if (includeCompilerId) {
       return {
         cubes: patchedCubes,
-        // This compilerId is primarily used by the cubejs-backend-native or caching purposes.
-        // By default it doesn't account for member visibility changes introduced above by DAP.
-        // Here we're modifying the originila compilerId in a way that it's distinct for
-        // distinct schema versions while still being a valid UUID.
-        compilerId: visibilityMaskHash ? this.mixInVisibilityMaskHash(compilers.compilerId, visibilityMaskHash) : compilers.compilerId,
+        compilerId: visibilityMaskHash ?
+          this.mixInVisibilityMaskHash(compilers.compilerId, visibilityMaskHash) :
+          compilers.compilerId,
       };
     }
     return patchedCubes;
   }
 
-  async metaConfigExtended(requestContext, options) {
+  public async metaConfigExtended(
+    requestContext: RequestContext,
+    options: { requestId?: string }
+  ): Promise<{ metaConfig: CubeWithConfig[]; cubeDefinitions: any }> {
     const compilers = await this.getCompilers(options);
     const { cubes: patchedCubes } = await this.patchVisibilityByAccessPolicy(
       compilers,
@@ -611,11 +752,11 @@ export class CompilerApi {
     };
   }
 
-  async compilerId(options = {}) {
+  public async compilerId(options: { requestId?: string } = {}): Promise<string> {
     return (await this.getCompilers(options)).compilerId;
   }
 
-  async cubeNameToDataSource(query) {
+  public async cubeNameToDataSource(query: { requestId?: string }): Promise<Record<string, string>> {
     const { cubeEvaluator } = await this.getCompilers({ requestId: query.requestId });
     return cubeEvaluator
       .cubeNames()
@@ -624,7 +765,7 @@ export class CompilerApi {
       ).reduce((a, b) => ({ ...a, ...b }), {});
   }
 
-  async memberToDataSource(query) {
+  public async memberToDataSource(query: { requestId?: string }): Promise<Record<string, string>> {
     const { cubeEvaluator } = await this.getCompilers({ requestId: query.requestId });
 
     const entries = cubeEvaluator
@@ -633,7 +774,7 @@ export class CompilerApi {
         const cubeDef = cubeEvaluator.cubeFromPath(cube);
         if (cubeDef.isView) {
           const viewName = cubeDef.name;
-          return cubeDef.includedMembers.map(included => {
+          return cubeDef.includedMembers.map((included: any) => {
             const memberName = `${viewName}.${included.name}`;
             const refCubeDef = cubeEvaluator.cubeFromPath(included.memberPath);
             const dataSource = refCubeDef.dataSource ?? 'default';
@@ -652,14 +793,17 @@ export class CompilerApi {
     return Object.fromEntries(entries);
   }
 
-  async dataSources(orchestratorApi, query) {
+  public async dataSources(
+    orchestratorApi: { driverFactory: (dataSource: string) => Promise<BaseDriver> },
+    query?: { requestId?: string }
+  ): Promise<{ dataSources: Array<{ dataSource: string; dbType: DatabaseType }> }> {
     const cubeNameToDataSource = await this.cubeNameToDataSource(query || { requestId: `datasources-${uuidv4()}` });
 
     let dataSources = Object.keys(cubeNameToDataSource).map(c => cubeNameToDataSource[c]);
 
     dataSources = [...new Set(dataSources)];
 
-    dataSources = await Promise.all(
+    const dataSourcesWithTypes = await Promise.all(
       dataSources.map(async (dataSource) => {
         try {
           await orchestratorApi.driverFactory(dataSource);
@@ -672,11 +816,11 @@ export class CompilerApi {
     );
 
     return {
-      dataSources: dataSources.filter((source) => source),
+      dataSources: dataSourcesWithTypes.filter((source): source is { dataSource: string; dbType: DatabaseType } => source !== null),
     };
   }
 
-  canUsePreAggregationForTransformedQuery(transformedQuery, refs) {
+  public canUsePreAggregationForTransformedQuery(transformedQuery: any, refs: any): any {
     return PreAggregations.canUsePreAggregationForTransformedQueryFn(transformedQuery, refs);
   }
 }
