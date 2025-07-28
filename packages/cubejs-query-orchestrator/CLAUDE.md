@@ -26,7 +26,7 @@ yarn test
 # Run only unit tests
 yarn unit
 
-# Run only integration tests  
+# Run only integration tests
 yarn integration
 
 # Run CubeStore integration tests specifically
@@ -46,8 +46,8 @@ yarn lint:fix
 The Query Orchestrator consists of several interconnected components:
 
 1. **QueryOrchestrator** (`src/orchestrator/QueryOrchestrator.ts`): Main orchestration class that coordinates query execution and manages drivers
-2. **QueryCache** (`src/orchestrator/QueryCache.ts`): Handles query result caching with configurable cache drivers  
-3. **QueryQueue** (`src/orchestrator/QueryQueue.js`): Manages query queuing and background processing
+2. **QueryCache** (`src/orchestrator/QueryCache.ts`): Handles query result caching with configurable cache drivers
+3. **QueryQueue** (`src/orchestrator/QueryQueue.ts`): Manages query queuing and background processing
 4. **PreAggregations** (`src/orchestrator/PreAggregations.ts`): Manages pre-aggregation building and loading
 5. **DriverFactory** (`src/orchestrator/DriverFactory.ts`): Creates and manages database driver instances
 
@@ -55,7 +55,7 @@ The Query Orchestrator consists of several interconnected components:
 
 The orchestrator supports multiple backend drivers:
 - **Memory**: In-memory caching and queuing (development)
-- **CubeStore**: Distributed storage engine (production) 
+- **CubeStore**: Distributed storage engine (production)
 - **Redis**: External Redis-based caching (legacy, being phased out)
 
 Driver selection logic in `QueryOrchestrator.ts:detectQueueAndCacheDriver()`:
