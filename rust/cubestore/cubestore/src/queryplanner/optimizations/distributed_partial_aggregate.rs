@@ -3,17 +3,23 @@ use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::AggregateTopKExec;
+use datafusion::common::tree_node::{Transformed, TreeNode};
+use datafusion::common::{internal_datafusion_err, HashMap};
 use datafusion::config::ConfigOptions;
 use datafusion::error::DataFusionError;
-use datafusion::physical_expr::LexOrdering;
+use datafusion::physical_expr::{LexOrdering, LexRequirement, PhysicalSortRequirement};
 use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
 use datafusion::physical_optimizer::PhysicalOptimizerRule as _;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::limit::GlobalLimitExec;
+use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::union::UnionExec;
-use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanProperties};
+use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanProperties, PhysicalExpr};
+use itertools::Itertools as _;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 /// Transforms from:
@@ -226,4 +232,206 @@ pub fn add_limit_to_workers(
         let limit_optimized = LimitPushdown::new().optimize(limit, config)?;
         p.with_new_children(vec![limit_optimized])
     }
+}
+
+/// Because we disable `EnforceDistribution`, and because we add `SortPreservingMergeExec` in
+/// `ensure_partition_merge_with_acceptable_parent` so that Sorted ("inplace") aggregates work
+/// properly (which reduces memory usage), we in some cases have unnecessary
+/// `SortPreservingMergeExec` nodes underneath a `Sort` node with a different ordering.  Or,
+/// perhaps, we added a `GlobalLimitExec` by `add_limit_to_workers` and we can push down the limit
+/// into a _matching_ `SortPreservingMergeExec` node.
+///
+/// A minor complication: There may be projection nodes in between that rename things.
+pub fn replace_suboptimal_merge_sorts(
+    p: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    if let Some(sort) = p.as_any().downcast_ref::<SortExec>() {
+        if sort.preserve_partitioning() {
+            // Let's not handle this.
+            return Ok(p);
+        }
+        let required_ordering = p
+            .output_ordering()
+            .cloned()
+            .map(LexRequirement::from)
+            .unwrap_or_default();
+        let new_input =
+            replace_suboptimal_merge_sorts_helper(&required_ordering, sort.fetch(), sort.input())?;
+        p.with_new_children(vec![new_input])
+    } else {
+        Ok(p)
+    }
+}
+
+/// Replaces SortPreservingMergeExec in the subtree with either a CoalescePartitions (if it doesn't
+/// match the ordering) or, if it does match the sort ordering, pushes down fetch information if
+/// appropriate.
+fn replace_suboptimal_merge_sorts_helper(
+    required_ordering: &LexRequirement,
+    fetch: Option<usize>,
+    node: &Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+    let node_any = node.as_any();
+    if let Some(spm) = node_any.downcast_ref::<SortPreservingMergeExec>() {
+        // A SortPreservingMergeExec that sort_exprs is a prefix of, is an acceptable ordering.  But
+        // if there is no sort_exprs at all, we just use CoalescePartitions.
+        if !required_ordering.is_empty() {
+            let spm_req = LexRequirement::from(
+                spm.properties()
+                    .output_ordering()
+                    .cloned()
+                    .unwrap_or(LexOrdering::default()),
+            );
+            if !required_ordering.is_empty()
+                && spm
+                    .properties()
+                    .eq_properties
+                    .requirements_compatible(required_ordering, &spm_req)
+            {
+                // Okay, we have a matching SortPreservingMergeExec node!
+
+                let mut new_fetch: Option<usize> = fetch;
+                let new_spm = if let Some(fetch) = fetch {
+                    if let Some(spm_fetch) = spm.fetch() {
+                        if fetch < spm_fetch {
+                            Arc::new(spm.clone().with_fetch(Some(fetch)))
+                        } else {
+                            // spm fetch is tighter.
+                            new_fetch = Some(spm_fetch);
+                            node.clone()
+                        }
+                    } else {
+                        Arc::new(spm.clone().with_fetch(Some(fetch)))
+                    }
+                } else {
+                    node.clone()
+                };
+
+                // Pass down spm's ordering, not sort_exprs, because we didn't touch spm besides the fetch..
+
+                let new_input = replace_suboptimal_merge_sorts_helper(
+                    &spm_req,
+                    new_fetch,
+                    new_spm
+                        .children()
+                        .first()
+                        .ok_or(internal_datafusion_err!("no child"))?,
+                )?;
+
+                return new_spm.with_new_children(vec![new_input]);
+            }
+        }
+        // sort_exprs is _not_ a prefix of spm.expr()
+        // Aside: if spm.expr() is a prefix of sort_exprs, maybe SortExec could take advantage.
+
+        // So it's not an acceptable ordering.  Create a CoalescePartitions, and remove other nested SortPreservingMergeExecs.
+        let new_input = replace_suboptimal_merge_sorts_helper(
+            &LexRequirement::new(vec![]),
+            fetch,
+            spm.input(),
+        )?;
+
+        return Ok(Arc::new(CoalescePartitionsExec::new(new_input)));
+    } else if let Some(proj) = node_any.downcast_ref::<ProjectionExec>() {
+        // TODO: Note that ProjectionExec has a TODO comment in DF's EnforceSorting optimizer (in sort_pushdown.rs).
+        if let Some(new_sort_exprs) =
+            sort_exprs_underneath_projection(required_ordering, proj.expr())?
+        {
+            let new_input =
+                replace_suboptimal_merge_sorts_helper(&new_sort_exprs, fetch, proj.input())?;
+            node.clone().with_new_children(vec![new_input])
+        } else {
+            Ok(node.clone())
+        }
+    } else if let Some(u) = node_any.downcast_ref::<UnionExec>() {
+        let new_children: Result<Vec<_>, DataFusionError> = u
+            .inputs()
+            .iter()
+            .map(|child| replace_suboptimal_merge_sorts_helper(required_ordering, fetch, child))
+            .collect::<Result<Vec<_>, DataFusionError>>();
+        let new_children = new_children?;
+        Ok(Arc::new(UnionExec::new(new_children)))
+    } else {
+        Ok(node.clone())
+    }
+}
+
+fn sort_exprs_underneath_projection(
+    sort_exprs: &LexRequirement,
+    proj_expr: &[(Arc<dyn PhysicalExpr>, String)],
+) -> Result<Option<LexRequirement>, DataFusionError> {
+    let mut sort_expr_columns = HashSet::<usize>::new();
+    for expr in sort_exprs.iter() {
+        record_columns_used(&mut sort_expr_columns, expr.expr.as_ref());
+    }
+
+    // sorted() just for determinism
+    let sort_expr_columns: Vec<usize> = sort_expr_columns.into_iter().sorted().collect();
+    let mut replacement_map =
+        HashMap::<usize, datafusion::physical_plan::expressions::Column>::with_capacity(
+            sort_expr_columns.len(),
+        );
+
+    for index in sort_expr_columns {
+        let proj_lookup = proj_expr.get(index).ok_or_else(|| {
+            DataFusionError::Internal(
+                "proj_expr lookup in sort_exprs_underneath_projection failed".to_owned(),
+            )
+        })?;
+        let Some(column_expr) = proj_lookup
+            .0
+            .as_any()
+            .downcast_ref::<datafusion::physical_plan::expressions::Column>()
+        else {
+            return Ok(None);
+        };
+        replacement_map.insert(index, column_expr.clone());
+    }
+
+    // Now replace the columns in the sort_exprs with our different ones.
+    let mut new_sort_exprs = Vec::with_capacity(sort_exprs.len());
+    for e in sort_exprs.iter() {
+        let transformed = replace_columns(&replacement_map, &e.expr)?;
+        new_sort_exprs.push(PhysicalSortRequirement {
+            expr: transformed,
+            options: e.options,
+        });
+    }
+
+    Ok(Some(LexRequirement::new(new_sort_exprs)))
+}
+
+fn record_columns_used(set: &mut HashSet<usize>, expr: &dyn PhysicalExpr) {
+    if let Some(column) = expr
+        .as_any()
+        .downcast_ref::<datafusion::physical_plan::expressions::Column>()
+    {
+        set.insert(column.index());
+    } else {
+        for child in expr.children() {
+            record_columns_used(set, child.as_ref());
+        }
+    }
+}
+
+fn replace_columns(
+    replacement_map: &HashMap<usize, datafusion::physical_plan::expressions::Column>,
+    expr: &Arc<dyn PhysicalExpr>,
+) -> Result<Arc<dyn PhysicalExpr>, DataFusionError> {
+    Ok(
+        TreeNode::transform(expr.clone(), |node: Arc<dyn PhysicalExpr>| {
+            if let Some(column) = node
+                .as_any()
+                .downcast_ref::<datafusion::physical_plan::expressions::Column>()
+            {
+                let replacement = replacement_map.get(&column.index()).ok_or_else(|| {
+                    DataFusionError::Internal("replace_columns has bad replacement_map".to_owned())
+                })?;
+                Ok(Transformed::yes(Arc::new(replacement.clone())))
+            } else {
+                Ok(Transformed::no(node))
+            }
+        })?
+        .data,
+    )
 }

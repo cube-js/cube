@@ -8,8 +8,10 @@ use super::serialized_plan::PreSerializedPlan;
 use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::queryplanner::optimizations::distributed_partial_aggregate::{
     add_limit_to_workers, ensure_partition_merge, push_aggregate_to_workers,
+    replace_suboptimal_merge_sorts,
 };
 use crate::queryplanner::planning::CubeExtensionPlanner;
+use crate::queryplanner::pretty_printers::{pp_phys_plan_ext, PPOptions};
 use crate::queryplanner::rolling::RollingWindowPlanner;
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::util::memory::MemoryHandler;
@@ -142,6 +144,7 @@ fn pre_optimize_physical_plan(
     Ok(p)
 }
 
+// These really could just be physical plan optimizers appended to the DF list.
 fn finalize_physical_plan(
     p: Arc<dyn ExecutionPlan>,
     memory_handler: Arc<dyn MemoryHandler>,
@@ -149,11 +152,28 @@ fn finalize_physical_plan(
     config: &ConfigOptions,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p = rewrite_physical_plan(p, &mut |p| add_check_memory_exec(p, memory_handler.clone()))?;
+    log::trace!(
+        "Rewrote physical plan by add_check_memory_exec:\n{}",
+        pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
+    );
     let p = if let Some(data_loaded_size) = data_loaded_size {
         rewrite_physical_plan(p, &mut |p| add_trace_data_loaded_exec(p, &data_loaded_size))?
     } else {
         p
     };
+    log::trace!(
+        "Rewrote physical plan by add_trace_data_loaded_exec:\n{}",
+        pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
+    );
     let p = rewrite_physical_plan(p, &mut |p| add_limit_to_workers(p, config))?;
+    log::trace!(
+        "Rewrote physical plan by add_limit_to_workers:\n{}",
+        pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
+    );
+    let p = rewrite_physical_plan(p, &mut |p| replace_suboptimal_merge_sorts(p))?;
+    log::trace!(
+        "Rewrote physical plan by replace_suboptimal_merge_sorts:\n{}",
+        pp_phys_plan_ext(p.as_ref(), &PPOptions::show_nonmeta())
+    );
     Ok(p)
 }
