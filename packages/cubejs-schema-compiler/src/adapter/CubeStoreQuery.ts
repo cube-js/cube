@@ -32,7 +32,6 @@ type RollingWindow = {
 };
 
 export class CubeStoreQuery extends BaseQuery {
-
   public newFilter(filter) {
     return new CubeStoreFilter(this, filter);
   }
