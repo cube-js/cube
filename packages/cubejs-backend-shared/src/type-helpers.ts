@@ -1,5 +1,5 @@
 /**
- * This module export only type helpers for using it across Cube.js project
+ * This module exports only type helpers for using it across the Cube project
  */
 
 export type ResolveAwait<T> = T extends {
@@ -16,3 +16,6 @@ export type Required<T, K extends keyof T> = {
 };
 
 export type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
+
+// <M extends Method<Class/Interface, M>>
+export type MethodName<T> = { [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never }[keyof T];

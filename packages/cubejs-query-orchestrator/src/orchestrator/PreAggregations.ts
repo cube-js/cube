@@ -376,10 +376,9 @@ export class PreAggregations {
     tables = tables.filter(row => `${schema}.${row.table_name}` === table);
 
     // fetching query result
-    const { queueDriver } = this.queue[dataSource];
-    const conn = await queueDriver.createConnection();
+    const conn = await this.queue[dataSource].getQueueDriver().createConnection();
     const result = await conn.getResult(key);
-    queueDriver.release(conn);
+    this.queue[dataSource].getQueueDriver().release(conn);
 
     // calculating status
     let status: string;

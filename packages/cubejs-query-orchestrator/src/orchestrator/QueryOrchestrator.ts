@@ -3,6 +3,7 @@ import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
+import { QueryKey } from '@cubejs-backend/base-driver';
 import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
@@ -306,7 +307,7 @@ export class QueryOrchestrator {
 
     if (pendingPreAggregationIndex === -1) {
       const qcQueue = await this.queryCache.getQueue(queryBody.dataSource);
-      return qcQueue.getQueryStage(QueryCache.queryCacheKey(queryBody));
+      return qcQueue.getQueryStage(QueryCache.queryCacheKey(queryBody) as QueryKey);
     }
 
     const preAggregation = queryBody.preAggregations[pendingPreAggregationIndex];

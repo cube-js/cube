@@ -9,10 +9,10 @@ import {
   InlineTables,
   CacheDriverInterface,
   TableStructure,
-  DriverInterface,
+  DriverInterface, QueryKey,
 } from '@cubejs-backend/base-driver';
 
-import { QueryQueue } from './QueryQueue';
+import { QueryQueue, QueryQueueOptions } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
@@ -115,7 +115,7 @@ export interface QueryCacheOptions {
   }>;
   cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
   continueWaitTimeout?: number;
-  cacheAndQueueDriver?: CacheAndQueryDriverType;
+  cacheAndQueueDriver: CacheAndQueryDriverType;
   maxInMemoryCacheEntries?: number;
   skipExternalCacheAndQueue?: boolean;
 }
@@ -133,7 +133,7 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    public readonly options: QueryCacheOptions = {}
+    public readonly options: QueryCacheOptions
   ) {
     switch (options.cacheAndQueueDriver || 'memory') {
       case 'memory':
@@ -455,9 +455,9 @@ export class QueryCache {
     };
 
     if (!persistent) {
-      return queue.executeInQueue('query', cacheKey, _query, priority, opt);
+      return queue.executeInQueue('query', cacheKey as QueryKey, _query, priority, opt);
     } else {
-      return queue.executeInQueue('stream', cacheKey, {
+      return queue.executeInQueue('stream', cacheKey as QueryKey, {
         ..._query,
         aliasNameToMember,
       }, priority, opt);
@@ -563,7 +563,7 @@ export class QueryCache {
     redisPrefix: string,
     clientFactory: DriverFactory,
     executeFn: (client: BaseDriver, req: any) => any,
-    options: Record<string, any> = {}
+    options: Omit<QueryQueueOptions, 'queryHandlers' | 'cancelHandlers'>
   ): QueryQueue {
     const queue: any = new QueryQueue(redisPrefix, {
       queryHandlers: {
@@ -583,57 +583,57 @@ export class QueryCache {
           }
           return result;
         },
-        stream: async (req, target) => {
-          queue.logger('Streaming SQL', { ...req });
-          await (new Promise((resolve, reject) => {
-            let logged = false;
-            Promise
-              .all([clientFactory()])
-              .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark') }))
-              .then((source) => {
-                const cleanup = async (error) => {
-                  if (source.release) {
-                    const toRelease = source.release;
-                    delete source.release;
-                    await toRelease();
+      },
+      streamHandler: async (req, target) => {
+        queue.logger('Streaming SQL', { ...req });
+        await (new Promise((resolve, reject) => {
+          let logged = false;
+          Promise
+            .all([clientFactory()])
+            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark') }))
+            .then((source) => {
+              const cleanup = async (error) => {
+                if (source.release) {
+                  const toRelease = source.release;
+                  delete source.release;
+                  await toRelease();
+                }
+                if (error && !target.destroyed) {
+                  target.destroy(error);
+                }
+                if (!logged && target.destroyed) {
+                  logged = true;
+                  if (error) {
+                    queue.logger('Streaming done with error', {
+                      query: req.query,
+                      query_values: req.values,
+                      error,
+                    });
+                    reject(error);
+                  } else {
+                    queue.logger('Streaming successfully completed', {
+                      requestId: req.requestId,
+                    });
+                    resolve(req.requestId);
                   }
-                  if (error && !target.destroyed) {
-                    target.destroy(error);
-                  }
-                  if (!logged && target.destroyed) {
-                    logged = true;
-                    if (error) {
-                      queue.logger('Streaming done with error', {
-                        query: req.query,
-                        query_values: req.values,
-                        error,
-                      });
-                      reject(error);
-                    } else {
-                      queue.logger('Streaming successfully completed', {
-                        requestId: req.requestId,
-                      });
-                      resolve(req.requestId);
-                    }
-                  }
-                };
+                }
+              };
 
-                source.rowStream.once('end', () => cleanup(undefined));
-                source.rowStream.once('error', cleanup);
-                source.rowStream.once('close', () => cleanup(undefined));
+              source.rowStream.once('end', () => cleanup(undefined));
+              source.rowStream.once('error', cleanup);
+              source.rowStream.once('close', () => cleanup(undefined));
 
-                target.once('end', () => cleanup(undefined));
-                target.once('error', cleanup);
-                target.once('close', () => cleanup(undefined));
+              target.once('end', () => cleanup(undefined));
+              target.once('error', cleanup);
+              target.once('close', () => cleanup(undefined));
 
-                source.rowStream.pipe(target);
-              })
-              .catch((reason) => {
-                target.emit('error', reason);
-                resolve(reason);
-              });
-          }));
-        },
+              source.rowStream.pipe(target);
+            })
+            .catch((reason) => {
+              target.emit('error', reason);
+              resolve(reason);
+            });
+        }));
       },
       cancelHandlers: {
         query: async (req) => {

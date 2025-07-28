@@ -166,6 +166,7 @@ describe('PreAggregations', () => {
     };
 
     jest.resetModules();
+
     const { QueryCache } = require('../../src/orchestrator/QueryCache');
     queryCache = new QueryCache(
       'TEST',
@@ -173,6 +174,7 @@ describe('PreAggregations', () => {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {},
       {
+        cacheAndQueueDriver: 'memory',
         queueOptions: () => ({
           executionTimeout: 1,
           concurrency: 2,

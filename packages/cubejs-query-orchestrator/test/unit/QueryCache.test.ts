@@ -1,3 +1,5 @@
 import { QueryCacheTest } from './QueryCache.abstract';
 
-QueryCacheTest('Local');
+QueryCacheTest('Local', {
+  cacheAndQueueDriver: 'memory',
+});
