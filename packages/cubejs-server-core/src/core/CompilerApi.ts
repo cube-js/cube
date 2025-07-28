@@ -6,7 +6,7 @@ import {
   PreAggregations,
   QueryFactory,
   prepareCompiler,
-  BaseQuery,
+  BaseQuery, PrepareCompilerOptions,
 } from '@cubejs-backend/schema-compiler';
 import { v4 as uuidv4, parse as uuidParse } from 'uuid';
 import { LRUCache } from 'lru-cache';
@@ -23,16 +23,15 @@ import {
   LoggerFn,
 } from './types';
 
-interface CompilerApiOptions {
+export type CompilerApiOptions = PrepareCompilerOptions & {
   dialectClass?: DialectFactoryFn;
   logger?: LoggerFn;
   preAggregationsSchema?: (context: RequestContext) => string | Promise<string>;
   allowUngroupedWithoutPrimaryKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
-  schemaVersion?: () => string | object | Promise<string | object>;
+  schemaVersion?: () => string | Promise<string>;
   contextToRoles?: (context: RequestContext) => string[] | Promise<string[]>;
   compileContext?: any;
-  allowJsDuplicatePropsInSchema?: boolean;
   sqlCache?: boolean;
   standalone?: boolean;
   compilerCacheSize?: number;
@@ -40,10 +39,9 @@ interface CompilerApiOptions {
   updateCompilerCacheKeepAlive?: boolean;
   externalDialectClass?: typeof BaseQuery;
   externalDbType?: DatabaseType;
-  allowNodeRequire?: boolean;
   devServer?: boolean;
   fastReload?: boolean;
-}
+};
 
 interface CompilersResult {
   compiler: any;
@@ -107,53 +105,47 @@ interface CubeWithConfig {
 }
 
 export class CompilerApi {
-  private repository: SchemaFileRepository;
+  protected dialectClass?: DialectFactoryFn;
 
-  private dbType: DbTypeAsyncFn;
+  protected options: CompilerApiOptions;
 
-  private dialectClass?: DialectFactoryFn;
+  protected allowNodeRequire: boolean;
 
-  public options: CompilerApiOptions;
+  protected logger?: LoggerFn;
 
-  private allowNodeRequire: boolean;
+  protected preAggregationsSchema?: (context: RequestContext) => string | Promise<string>;
 
-  private logger?: LoggerFn;
+  protected allowUngroupedWithoutPrimaryKey?: boolean;
 
-  private preAggregationsSchema?: (context: RequestContext) => string | Promise<string>;
+  protected convertTzForRawTimeDimension?: boolean;
 
-  private allowUngroupedWithoutPrimaryKey?: boolean;
+  protected schemaVersion?: () => string | Promise<string>;
 
-  private convertTzForRawTimeDimension?: boolean;
+  protected contextToRoles?: (context: RequestContext) => string[] | Promise<string[]>;
 
-  public schemaVersion?: () => string | object | Promise<string | object>;
+  protected allowJsDuplicatePropsInSchema?: boolean;
 
-  private contextToRoles?: (context: RequestContext) => string[] | Promise<string[]>;
+  protected sqlCache?: boolean;
 
-  private compileContext?: any;
+  protected standalone?: boolean;
 
-  private allowJsDuplicatePropsInSchema?: boolean;
+  protected nativeInstance: NativeInstance;
 
-  private sqlCache?: boolean;
+  protected compiledScriptCache: LRUCache<string, any>;
 
-  private standalone?: boolean;
+  protected compiledScriptCacheInterval?: NodeJS.Timeout;
 
-  private nativeInstance: NativeInstance;
+  protected graphqlSchema?: any;
 
-  private compiledScriptCache: LRUCache<string, any>;
+  protected compilers?: Promise<CompilersResult>;
 
-  private compiledScriptCacheInterval?: NodeJS.Timeout;
+  protected compilerVersion?: string;
 
-  private graphqlSchema?: any;
-
-  private compilers?: Promise<CompilersResult>;
-
-  private compilerVersion?: string;
-
-  private queryFactory?: QueryFactory;
+  protected queryFactory?: QueryFactory;
 
   public constructor(
-    repository: SchemaFileRepository,
-    dbType: DbTypeAsyncFn,
+    protected readonly repository: SchemaFileRepository,
+    protected readonly dbType: DbTypeAsyncFn,
     options: CompilerApiOptions = {}
   ) {
     this.repository = repository;
@@ -167,7 +159,6 @@ export class CompilerApi {
     this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
     this.schemaVersion = this.options.schemaVersion;
     this.contextToRoles = this.options.contextToRoles;
-    this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
     this.standalone = options.standalone;
@@ -198,6 +189,14 @@ export class CompilerApi {
 
   public getGraphQLSchema(): any {
     return this.graphqlSchema;
+  }
+
+  public setSchemaVersion(schemaVersion: () => string | Promise<string>) {
+    this.schemaVersion = schemaVersion;
+  }
+
+  public getOptions(): CompilerApiOptions {
+    return this.options;
   }
 
   public createNativeInstance(): NativeInstance {
@@ -233,7 +232,7 @@ export class CompilerApi {
   public createCompilerInstances(): CompilersResult {
     return prepareCompiler(this.repository, {
       allowNodeRequire: this.allowNodeRequire,
-      compileContext: this.compileContext,
+      compileContext: this.options.compileContext,
       allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
       standalone: this.standalone,
       nativeInstance: this.nativeInstance,
@@ -251,7 +250,7 @@ export class CompilerApi {
 
       const compilers = await compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
-        compileContext: this.compileContext,
+        compileContext: this.options.compileContext,
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
         standalone: this.standalone,
         nativeInstance: this.nativeInstance,
@@ -428,7 +427,7 @@ export class CompilerApi {
     cubeEvaluator: any
   ): NestedFilter {
     const result: NestedFilter = {};
-    
+
     if (filter.memberReference) {
       const evaluatedValues = cubeEvaluator.evaluateContextFunction(
         cube,
@@ -704,12 +703,13 @@ export class CompilerApi {
   public mixInVisibilityMaskHash(compilerId: string, visibilityMaskHash: string): string {
     const uuidBytes = uuidParse(compilerId);
     const hashBytes = Buffer.from(visibilityMaskHash, 'hex');
+
     return uuidv4({
       random: crypto.createHash('sha256')
-        .update(uuidBytes)
+        .update(uuidBytes as any)
         .update(hashBytes)
         .digest()
-        .subarray(0, 16) as Uint8Array
+        .subarray(0, 16)
     });
   }
 

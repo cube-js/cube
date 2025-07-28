@@ -548,7 +548,8 @@ export class CubejsServerCore {
       this.compilerCache.set(appId, compilerApi);
     }
 
-    compilerApi.schemaVersion = currentSchemaVersion;
+    compilerApi.setSchemaVersion(currentSchemaVersion);
+
     return compilerApi;
   }
 
