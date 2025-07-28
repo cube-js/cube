@@ -15,7 +15,7 @@ import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalQueueDriver } from './LocalQueueDriver';
 import { QueryStream } from './QueryStream';
-import {CacheAndQueryDriverType} from "./QueryOrchestrator";
+import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
 export type CancelHandlerFn = (query: QueryDef) => Promise<void>;
 export type QueryHandlerFn = (query: QueryDef, cancelHandler: CancelHandlerFn) => Promise<unknown>;
