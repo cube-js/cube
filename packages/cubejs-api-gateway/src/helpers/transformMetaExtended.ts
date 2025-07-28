@@ -4,7 +4,7 @@ function stringifyMemberSql(sql?: () => string) {
   }
 
   const sqlStr = sql.toString();
-  return sqlStr.substring(sqlStr.indexOf('=>') + 3);
+  return sqlStr.substring(sqlStr.indexOf('=>') + 2).trim();
 }
 
 type MemberPath = {
