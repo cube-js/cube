@@ -287,6 +287,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
         let orphanedTimeout = 2;
         await connection.addToQueue(keyScore, ['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          queueId: 1,
           stageQueryKey: '1',
           requestId: '1',
           orphanedTimeout,
@@ -297,6 +298,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         orphanedTimeout = 60;
 
         await connection.addToQueue(keyScore, ['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          queueId: 2,
           stageQueryKey: '2',
           requestId: '2',
           orphanedTimeout,
@@ -307,8 +309,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         expect(await connection.getOrphanedQueries()).toEqual([
           [
             connection.redisHash(['1', []]),
-            // Redis doesnt support queueId, it will return Null
-            name.includes('Redis') ? null : expect.any(Number)
+            expect.any(Number)
           ]
         ]);
       } finally {

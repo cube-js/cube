@@ -66,7 +66,7 @@ export interface QueueDriverConnectionInterface {
    * @param keyScore Redis specific thing
    * @param queryKey
    * @param orphanedTime
-   * @param queryHandler Our queue allow to use different handlers. For example query, cvsQuery, etc.
+   * @param queryHandler Our queue allows using different handlers. For example, query, cvsQuery, etc.
    * @param query
    * @param priority
    * @param options
