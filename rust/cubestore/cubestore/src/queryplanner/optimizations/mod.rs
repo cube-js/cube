@@ -93,12 +93,13 @@ impl QueryPlanner for CubeQueryPlanner {
         ])
         .create_physical_plan(logical_plan, ctx_state)
         .await?;
-        // TODO: assert there is only a single ClusterSendExec in the plan.  Update: This is no longer true.
-        finalize_physical_plan(
+        let result = finalize_physical_plan(
             p,
             self.memory_handler.clone(),
             self.data_loaded_size.clone(),
-        )
+            ctx_state.config().options(),
+        );
+        result
     }
 }
 
@@ -145,6 +146,7 @@ fn finalize_physical_plan(
     p: Arc<dyn ExecutionPlan>,
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,
+    config: &ConfigOptions,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let p = rewrite_physical_plan(p, &mut |p| add_check_memory_exec(p, memory_handler.clone()))?;
     let p = if let Some(data_loaded_size) = data_loaded_size {
@@ -152,5 +154,6 @@ fn finalize_physical_plan(
     } else {
         p
     };
-    rewrite_physical_plan(p, &mut |p| add_limit_to_workers(p))
+    let p = rewrite_physical_plan(p, &mut |p| add_limit_to_workers(p, config))?;
+    Ok(p)
 }

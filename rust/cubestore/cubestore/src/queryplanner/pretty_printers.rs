@@ -23,6 +23,7 @@ use datafusion_datasource::file_scan_config::FileScanConfig;
 use datafusion_datasource::memory::MemorySourceConfig;
 use datafusion_datasource::source::DataSourceExec;
 use itertools::{repeat_n, Itertools};
+use std::fmt::Write;
 use std::sync::Arc;
 
 use crate::queryplanner::check_memory::CheckMemoryExec;
