@@ -24,6 +24,23 @@ class MockDriver {
 
   query(query) {
     this.executedQueries.push(query);
+
+    // Handle metadata operations
+    if (Array.isArray(query) && query[0] && query[0].startsWith('METADATA:')) {
+      const operationType = query[0];
+      if (operationType === 'METADATA:GET_SCHEMAS') {
+        return this.getSchemas();
+      } else if (operationType === 'METADATA:GET_TABLES_FOR_SCHEMAS') {
+        const params = JSON.parse(query[1][0]);
+        return this.getTablesForSpecificSchemas(params.schemas);
+      } else if (operationType === 'METADATA:GET_COLUMNS_FOR_TABLES') {
+        const params = JSON.parse(query[1][0]);
+        return this.getColumnsForSpecificTables(params.tables);
+      }
+      return Promise.resolve([]);
+    }
+
+    // Handle regular SQL queries
     let promise = Promise.resolve([query]);
     if (query.match('orders_too_big')) {
       promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 3000)));
@@ -1768,5 +1785,406 @@ describe('QueryOrchestrator', () => {
       await mockDriver.delay(200);
     }
     // expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
+  });
+
+  describe('Data Source Metadata Methods', () => {
+    let metadataOrchestrator;
+    let metadataMockDriver;
+
+    beforeEach(() => {
+      metadataMockDriver = new MockDriver();
+
+      // Mock metadata methods
+      metadataMockDriver.getSchemas = jest.fn().mockResolvedValue([
+        { schema_name: 'public' },
+        { schema_name: 'analytics' },
+        { schema_name: 'staging' }
+      ]);
+
+      metadataMockDriver.getTablesForSpecificSchemas = jest.fn().mockImplementation((schemas) => {
+        const tables = [];
+        schemas.forEach(schema => {
+          if (schema.schema_name === 'public') {
+            tables.push(
+              { schema_name: 'public', table_name: 'users' },
+              { schema_name: 'public', table_name: 'orders' },
+              { schema_name: 'public', table_name: 'products' }
+            );
+          } else if (schema.schema_name === 'analytics') {
+            tables.push(
+              { schema_name: 'analytics', table_name: 'user_metrics' },
+              { schema_name: 'analytics', table_name: 'sales_summary' }
+            );
+          }
+        });
+        return Promise.resolve(tables);
+      });
+
+      metadataMockDriver.getColumnsForSpecificTables = jest.fn().mockImplementation((tables) => {
+        const columns = [];
+        tables.forEach(table => {
+          if (table.table_name === 'users') {
+            columns.push(
+              {
+                schema_name: 'public',
+                table_name: 'users',
+                column_name: 'id',
+                data_type: 'integer',
+                attributes: ['PRIMARY_KEY']
+              },
+              {
+                schema_name: 'public',
+                table_name: 'users',
+                column_name: 'name',
+                data_type: 'varchar',
+                attributes: []
+              },
+              {
+                schema_name: 'public',
+                table_name: 'users',
+                column_name: 'email',
+                data_type: 'varchar',
+                attributes: ['UNIQUE']
+              }
+            );
+          } else if (table.table_name === 'orders') {
+            columns.push(
+              {
+                schema_name: 'public',
+                table_name: 'orders',
+                column_name: 'id',
+                data_type: 'integer',
+                attributes: ['PRIMARY_KEY']
+              },
+              {
+                schema_name: 'public',
+                table_name: 'orders',
+                column_name: 'user_id',
+                data_type: 'integer',
+                attributes: [],
+                foreign_keys: [{ target_table: 'users', target_column: 'id' }]
+              },
+              {
+                schema_name: 'public',
+                table_name: 'orders',
+                column_name: 'total',
+                data_type: 'decimal',
+                attributes: []
+              }
+            );
+          }
+        });
+        return Promise.resolve(columns);
+      });
+
+      const driverFactory = () => metadataMockDriver;
+
+      metadataOrchestrator = new QueryOrchestrator(
+        'ORCHESTRATOR_TEST_METADATA',
+        driverFactory,
+        console.log,
+        {
+          cacheAndQueueDriver: 'memory',
+          continueWaitTimeout: 5,
+          queryCacheOptions: {
+            queueOptions: () => ({
+              concurrency: 2,
+              processUid: 'metadata_test',
+            }),
+          },
+          preAggregationsOptions: {
+            queueOptions: () => ({
+              concurrency: 2,
+              processUid: 'metadata_test',
+            }),
+          },
+        }
+      );
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      // Clear in-memory cache to ensure test isolation
+      if (metadataOrchestrator && metadataOrchestrator.queryCache && metadataOrchestrator.queryCache.memoryCache) {
+        metadataOrchestrator.queryCache.memoryCache.clear();
+      }
+      // Clear the cache driver store as well to ensure complete isolation
+      if (metadataOrchestrator && metadataOrchestrator.queryCache && metadataOrchestrator.queryCache.getCacheDriver()) {
+        const cacheDriver = metadataOrchestrator.queryCache.getCacheDriver();
+        if (cacheDriver.store) {
+          Object.keys(cacheDriver.store).forEach(key => delete cacheDriver.store[key]);
+        }
+      }
+    });
+
+    afterEach(async () => {
+      await metadataOrchestrator.cleanup();
+    });
+
+    describe('queryDataSourceSchemas', () => {
+      test('should query and cache schemas for default datasource', async () => {
+        const result = await metadataOrchestrator.queryDataSourceSchemas();
+
+        expect(result).toEqual([
+          { schema_name: 'public' },
+          { schema_name: 'analytics' },
+          { schema_name: 'staging' }
+        ]);
+      });
+
+      test('should query schemas for specific datasource', async () => {
+        const result = await metadataOrchestrator.queryDataSourceSchemas('custom');
+
+        expect(result).toEqual([
+          { schema_name: 'public' },
+          { schema_name: 'analytics' },
+          { schema_name: 'staging' }
+        ]);
+      });
+
+      test('should use cache on second call', async () => {
+        // First call
+        await metadataOrchestrator.queryDataSourceSchemas();
+        // Second call should use cache
+        const result = await metadataOrchestrator.queryDataSourceSchemas();
+
+        expect(result).toEqual([
+          { schema_name: 'public' },
+          { schema_name: 'analytics' },
+          { schema_name: 'staging' }
+        ]);
+      });
+
+      test('should force refresh when requested', async () => {
+        // First call
+        await metadataOrchestrator.queryDataSourceSchemas();
+        // Second call with forceRefresh
+        const result = await metadataOrchestrator.queryDataSourceSchemas('default', { forceRefresh: true });
+
+        expect(result).toEqual([
+          { schema_name: 'public' },
+          { schema_name: 'analytics' },
+          { schema_name: 'staging' }
+        ]);
+      });
+
+      test('should pass requestId option', async () => {
+        const requestId = 'test-request-123';
+        await metadataOrchestrator.queryDataSourceSchemas('default', { requestId });
+
+        expect(metadataMockDriver.getSchemas).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('queryTablesForSchemas', () => {
+      test('should query tables for given schemas', async () => {
+        const schemas = [
+          { schema_name: 'public' },
+          { schema_name: 'analytics' }
+        ];
+
+        const result = await metadataOrchestrator.queryTablesForSchemas(schemas);
+
+        expect(result).toEqual([
+          { schema_name: 'public', table_name: 'users' },
+          { schema_name: 'public', table_name: 'orders' },
+          { schema_name: 'public', table_name: 'products' },
+          { schema_name: 'analytics', table_name: 'user_metrics' },
+          { schema_name: 'analytics', table_name: 'sales_summary' }
+        ]);
+        expect(metadataMockDriver.getTablesForSpecificSchemas).toHaveBeenCalledWith(schemas);
+      });
+
+      test('should cache results based on schema list', async () => {
+        const schemas = [{ schema_name: 'public' }];
+
+        // First call
+        await metadataOrchestrator.queryTablesForSchemas(schemas);
+        // Second call should use cache
+        const result = await metadataOrchestrator.queryTablesForSchemas(schemas);
+
+        expect(result).toEqual([
+          { schema_name: 'public', table_name: 'users' },
+          { schema_name: 'public', table_name: 'orders' },
+          { schema_name: 'public', table_name: 'products' }
+        ]);
+        expect(metadataMockDriver.getTablesForSpecificSchemas).toHaveBeenCalledTimes(1);
+      });
+
+      test('should handle empty schema list', async () => {
+        const result = await metadataOrchestrator.queryTablesForSchemas([]);
+
+        expect(result).toEqual([]);
+        expect(metadataMockDriver.getTablesForSpecificSchemas).toHaveBeenCalledWith([]);
+      });
+
+      test('should force refresh when requested', async () => {
+        const schemas = [{ schema_name: 'public' }];
+
+        await metadataOrchestrator.queryTablesForSchemas(schemas);
+        await metadataOrchestrator.queryTablesForSchemas(schemas, 'default', { forceRefresh: true });
+
+        expect(metadataMockDriver.getTablesForSpecificSchemas).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe('queryColumnsForTables', () => {
+      test('should query columns for given tables', async () => {
+        const tables = [
+          { schema_name: 'public', table_name: 'users' },
+          { schema_name: 'public', table_name: 'orders' }
+        ];
+
+        const result = await metadataOrchestrator.queryColumnsForTables(tables);
+
+        expect(result).toEqual([
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'id',
+            data_type: 'integer',
+            attributes: ['PRIMARY_KEY']
+          },
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'name',
+            data_type: 'varchar',
+            attributes: []
+          },
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'email',
+            data_type: 'varchar',
+            attributes: ['UNIQUE']
+          },
+          {
+            schema_name: 'public',
+            table_name: 'orders',
+            column_name: 'id',
+            data_type: 'integer',
+            attributes: ['PRIMARY_KEY']
+          },
+          {
+            schema_name: 'public',
+            table_name: 'orders',
+            column_name: 'user_id',
+            data_type: 'integer',
+            attributes: [],
+            foreign_keys: [{ target_table: 'users', target_column: 'id' }]
+          },
+          {
+            schema_name: 'public',
+            table_name: 'orders',
+            column_name: 'total',
+            data_type: 'decimal',
+            attributes: []
+          }
+        ]);
+        expect(metadataMockDriver.getColumnsForSpecificTables).toHaveBeenCalledWith(tables);
+      });
+
+      test('should cache results based on table list', async () => {
+        const tables = [{ schema_name: 'public', table_name: 'users' }];
+
+        // First call
+        await metadataOrchestrator.queryColumnsForTables(tables);
+        // Second call should use cache
+        const result = await metadataOrchestrator.queryColumnsForTables(tables);
+
+        expect(result).toEqual([
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'id',
+            data_type: 'integer',
+            attributes: ['PRIMARY_KEY']
+          },
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'name',
+            data_type: 'varchar',
+            attributes: []
+          },
+          {
+            schema_name: 'public',
+            table_name: 'users',
+            column_name: 'email',
+            data_type: 'varchar',
+            attributes: ['UNIQUE']
+          }
+        ]);
+        expect(metadataMockDriver.getColumnsForSpecificTables).toHaveBeenCalledTimes(1);
+      });
+
+      test('should handle empty table list', async () => {
+        const result = await metadataOrchestrator.queryColumnsForTables([]);
+
+        expect(result).toEqual([]);
+        expect(metadataMockDriver.getColumnsForSpecificTables).toHaveBeenCalledWith([]);
+      });
+
+      test('should force refresh when requested', async () => {
+        const tables = [{ schema_name: 'public', table_name: 'users' }];
+
+        await metadataOrchestrator.queryColumnsForTables(tables);
+        await metadataOrchestrator.queryColumnsForTables(tables, 'default', { forceRefresh: true });
+
+        expect(metadataMockDriver.getColumnsForSpecificTables).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe('Integration Tests', () => {
+      test('should handle full metadata workflow', async () => {
+        // Query schemas
+        const schemas = await metadataOrchestrator.queryDataSourceSchemas();
+        expect(schemas).toHaveLength(3);
+
+        // Query tables for specific schemas
+        const publicSchema = schemas.filter(s => s.schema_name === 'public');
+        const tables = await metadataOrchestrator.queryTablesForSchemas(publicSchema);
+        expect(tables).toHaveLength(3);
+
+        // Query columns for specific tables
+        const userTable = tables.filter(t => t.table_name === 'users');
+        const columns = await metadataOrchestrator.queryColumnsForTables(userTable);
+        expect(columns).toHaveLength(3);
+        expect(columns[0].column_name).toBe('id');
+        expect(columns[0].data_type).toBe('integer');
+        expect(columns[0].attributes).toContain('PRIMARY_KEY');
+      });
+
+      test('should handle concurrent metadata requests', async () => {
+        const schemas = [{ schema_name: 'public' }];
+
+        // Make concurrent requests
+        const promises = [
+          metadataOrchestrator.queryDataSourceSchemas(),
+          metadataOrchestrator.queryDataSourceSchemas(),
+          metadataOrchestrator.queryTablesForSchemas(schemas),
+          metadataOrchestrator.queryTablesForSchemas(schemas)
+        ];
+
+        const results = await Promise.all(promises);
+
+        // All requests should return the same data
+        expect(results[0]).toEqual(results[1]);
+        expect(results[2]).toEqual(results[3]);
+      });
+
+      test('should handle error scenarios gracefully', async () => {
+        // Mock driver error
+        metadataMockDriver.getSchemas.mockRejectedValueOnce(new Error('Database connection failed'));
+
+        await expect(metadataOrchestrator.queryDataSourceSchemas('default', { forceRefresh: true })).rejects.toThrow('Database connection failed');
+
+        // Should retry on next call
+        metadataMockDriver.getSchemas.mockResolvedValueOnce([{ schema_name: 'recovered' }]);
+        const result = await metadataOrchestrator.queryDataSourceSchemas('default', { forceRefresh: true });
+        expect(result).toEqual([{ schema_name: 'recovered' }]);
+      });
+    });
   });
 });
