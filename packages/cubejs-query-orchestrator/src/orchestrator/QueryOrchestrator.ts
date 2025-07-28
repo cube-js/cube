@@ -7,9 +7,8 @@ import {
   QuerySchemasResult,
   QueryTablesResult,
   QueryColumnsResult,
-} from '@cubejs-backend/base-driver';
+  QueryKey } from '@cubejs-backend/base-driver';
 
-import { QueryKey } from '@cubejs-backend/base-driver';
 import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable, CacheKey, QueryWithParams } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
