@@ -59,6 +59,7 @@ struct PgCatalogTypeBuilder {
     typdefaultbin: StringBuilder,
     typdefault: StringBuilder,
     typacl: StringBuilder,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogTypeBuilder {
@@ -100,6 +101,7 @@ impl PgCatalogTypeBuilder {
             typdefaultbin: StringBuilder::new(capacity),
             typdefault: StringBuilder::new(capacity),
             typacl: StringBuilder::new(capacity),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
@@ -137,6 +139,7 @@ impl PgCatalogTypeBuilder {
         self.typdefaultbin.append_null().unwrap();
         self.typdefault.append_null().unwrap();
         self.typacl.append_null().unwrap();
+        self.xmin.append_value(1).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -173,6 +176,7 @@ impl PgCatalogTypeBuilder {
             Arc::new(self.typdefaultbin.finish()),
             Arc::new(self.typdefault.finish()),
             Arc::new(self.typacl.finish()),
+            Arc::new(self.xmin.finish()),
         ];
 
         columns
@@ -297,6 +301,7 @@ impl TableProvider for PgCatalogTypeProvider {
             Field::new("typdefaultbin", DataType::Utf8, true),
             Field::new("typdefault", DataType::Utf8, true),
             Field::new("typacl", DataType::Utf8, true),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 

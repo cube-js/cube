@@ -1327,3 +1327,67 @@ async fn test_age() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_age_xid() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "age_xid",
+        execute_query(
+            r#"SELECT AGE(0::xid) AS age;"#.to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_txid_current() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "txid_current",
+        execute_query(
+            r#"SELECT txid_current();"#.to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_pg_is_in_recovery() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "pg_is_in_recovery",
+        execute_query(
+            r#"SELECT pg_is_in_recovery();"#.to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_pg_tablespace_location() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "pg_tablespace_location",
+        execute_query(
+            r#"SELECT pg_tablespace_location(18000::xid) AS pg_tablespace_location;"#.to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}

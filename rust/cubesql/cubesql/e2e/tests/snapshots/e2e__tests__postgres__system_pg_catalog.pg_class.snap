@@ -1,6 +1,5 @@
 ---
 source: cubesql/e2e/tests/postgres.rs
-assertion_line: 316
 expression: "self.print_query_result(res, true, false).await"
 ---
 oid type: 23 (int4)
@@ -36,4 +35,5 @@ relminmxid type: 23 (int4)
 relacl type: 25 (text)
 reloptions type: 25 (text)
 relpartbound type: 25 (text)
+xmin type: 23 (int4)
 relhasoids type: 16 (bool)

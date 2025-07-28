@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT *\n            FROM pg_language\n            ORDER BY oid\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-----+----------+----------+---------+--------------+---------------+-----------+--------------+--------+------+
+| oid | lanname  | lanowner | lanispl | lanpltrusted | lanplcallfoid | laninline | lanvalidator | lanacl | xmin |
++-----+----------+----------+---------+--------------+---------------+-----------+--------------+--------+------+
+| 12  | internal | 10       | false   | false        | 0             | 0         | 2246         | NULL   | 1    |
+| 13  | c        | 10       | false   | false        | 0             | 0         | 2247         | NULL   | 1    |
+| 14  | sql      | 10       | false   | true         | 0             | 0         | 2248         | NULL   | 1    |
++-----+----------+----------+---------+--------------+---------------+-----------+--------------+--------+------+
