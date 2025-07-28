@@ -144,6 +144,10 @@ export class QueryQueue {
     return this.queueDriver;
   }
 
+  public getConcurrency(): number {
+    return this.concurrency;
+  }
+
   /**
    * Returns stream object which will be used to pipe data from data source.
    */
