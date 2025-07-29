@@ -652,6 +652,13 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Max number of elements
    */
+  usedPreAggregationCacheMaxCount: (): number => get('CUBEJS_USED_PRE_AGG_CACHE_MAX_COUNT')
+    .default(8192)
+    .asInt(),
+
+  /**
+   * Max number of elements
+   */
   touchPreAggregationCacheMaxCount: (): number => get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_COUNT')
     .default(8192)
     .asInt(),

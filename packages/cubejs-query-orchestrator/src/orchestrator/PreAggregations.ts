@@ -242,11 +242,11 @@ type PreAggregationQueryBody = QueryBody & {
 };
 
 export class PreAggregations {
-  public options: PreAggregationsOptions;
+  public readonly options: PreAggregationsOptions;
 
-  public externalDriverFactory: DriverFactory;
+  public readonly externalDriverFactory: DriverFactory;
 
-  public structureVersionPersistTime: any;
+  public readonly structureVersionPersistTime: any;
 
   private readonly touchTablePersistTime: number;
 
@@ -259,6 +259,8 @@ export class PreAggregations {
   private readonly loadCacheQueue: Record<string, QueryQueue> = {};
 
   private readonly queue: Record<string, QueryQueue> = {};
+
+  private readonly usedCache: LRUCache<string, true>;
 
   private readonly touchCache: LRUCache<string, true>;
 
@@ -277,6 +279,25 @@ export class PreAggregations {
     this.dropPreAggregationsWithoutTouch = options.dropPreAggregationsWithoutTouch || getEnv('dropPreAggregationsWithoutTouch');
     this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
     this.externalRefresh = options.externalRefresh;
+
+    /**
+     * Comment for both caches: used and touch:
+     *
+     * Memory usage: By default, it defines max as 8096 keys,
+     * let's assume that avg key size is 64 symbols, it's around 100 bytes
+     * with V8's internal stuff:
+     *
+     * 100 x 8096 = 809 bytes, max 1Mb in memory.
+     *
+     * However, this is a theoretical limit. In practice, even a couple of thousand
+     * is a very large number
+     */
+    this.usedCache = new LRUCache({
+      max: getEnv('usedPreAggregationCacheMaxCount'),
+      ttl: Math.round(this.usedTablePersistTime / 2) * 1000,
+      allowStale: false,
+      updateAgeOnGet: false
+    });
     this.touchCache = new LRUCache({
       max: getEnv('touchPreAggregationCacheMaxCount'),
       ttl: getEnv('touchPreAggregationCacheMaxAge') * 1000,
@@ -301,11 +322,23 @@ export class PreAggregations {
   }
 
   public async addTableUsed(tableName: string): Promise<void> {
-    await this.queryCache.getCacheDriver().set(
-      this.tablesUsedRedisKey(tableName),
-      true,
-      this.usedTablePersistTime
-    );
+    if (this.usedCache.has(tableName)) {
+      return;
+    }
+
+    try {
+      this.usedCache.set(tableName, true);
+
+      await this.queryCache.getCacheDriver().set(
+        this.tablesUsedRedisKey(tableName),
+        true,
+        this.usedTablePersistTime
+      );
+    } catch (e: unknown) {
+      this.usedCache.delete(tableName);
+
+      throw e;
+    }
   }
 
   public async tablesUsed() {

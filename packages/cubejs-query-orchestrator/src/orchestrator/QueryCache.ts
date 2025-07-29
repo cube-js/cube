@@ -130,7 +130,7 @@ export class QueryCache {
   protected memoryCache: LRUCache<string, CacheEntry>;
 
   public constructor(
-    protected readonly redisPrefix: string,
+    protected readonly cachePrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
     public readonly options: QueryCacheOptions
@@ -165,11 +165,7 @@ export class QueryCache {
   }
 
   public getKey(catalog: string, key: string): string {
-    if (this.cacheDriver instanceof CubeStoreCacheDriver) {
-      return `${this.redisPrefix}#${catalog}:${key}`;
-    } else {
-      return `${catalog}_${this.redisPrefix}_${key}`;
-    }
+    return `${this.cachePrefix}#${catalog}:${key}`;
   }
 
   /**
@@ -469,7 +465,7 @@ export class QueryCache {
       const queueOptions = await this.options.queueOptions(dataSource);
       if (!this.queue[dataSource]) {
         this.queue[dataSource] = QueryCache.createQueue(
-          `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
+          `SQL_QUERY_${this.cachePrefix}_${dataSource}`,
           () => this.driverFactory(dataSource),
           (client, req) => {
             this.logger('Executing SQL', { ...req });
@@ -537,7 +533,7 @@ export class QueryCache {
   public getExternalQueue() {
     if (!this.externalQueue) {
       this.externalQueue = QueryCache.createQueue(
-        `SQL_QUERY_EXT_${this.redisPrefix}`,
+        `SQL_QUERY_EXT_${this.cachePrefix}`,
         this.options.externalDriverFactory,
         (client, q) => {
           this.logger('Executing SQL', {
