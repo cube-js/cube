@@ -25,16 +25,14 @@ class MockDriver {
   query(query) {
     this.executedQueries.push(query);
 
-    // Handle metadata operations
-    if (Array.isArray(query) && query[0] && query[0].startsWith('METADATA:')) {
-      const operationType = query[0];
-      if (operationType === 'METADATA:GET_SCHEMAS') {
+    // Handle metadata operations using the new approach
+    if (query && typeof query === 'object' && query.type === 'metadata') {
+      const { operation, params = {} } = query;
+      if (operation === 'GET_SCHEMAS') {
         return this.getSchemas();
-      } else if (operationType === 'METADATA:GET_TABLES_FOR_SCHEMAS') {
-        const params = JSON.parse(query[1][0]);
+      } else if (operation === 'GET_TABLES_FOR_SCHEMAS') {
         return this.getTablesForSpecificSchemas(params.schemas);
-      } else if (operationType === 'METADATA:GET_COLUMNS_FOR_TABLES') {
-        const params = JSON.parse(query[1][0]);
+      } else if (operation === 'GET_COLUMNS_FOR_TABLES') {
         return this.getColumnsForSpecificTables(params.tables);
       }
       return Promise.resolve([]);

@@ -9,7 +9,7 @@ import {
   QueryColumnsResult,
   QueryKey } from '@cubejs-backend/base-driver';
 
-import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable, CacheKey, QueryWithParams } from './QueryCache';
+import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryStream } from './QueryStream';
@@ -482,12 +482,13 @@ export class QueryOrchestrator {
       .substring(0, 16);
   }
 
-  private createMetadataQuery(operation: string, params: Record<string, any>): QueryWithParams {
-    return [
-      `METADATA:${operation}`,
-      [JSON.stringify(params)],
-      { external: false, renewalThreshold: 24 * 60 * 60 }
-    ];
+  private createMetadataRequest(operation: string, params: Record<string, any>) {
+    return {
+      operation,
+      params,
+      external: false,
+      type: 'metadata'
+    };
   }
 
   private async queryDataSourceMetadata<T>(
@@ -503,36 +504,30 @@ export class QueryOrchestrator {
   ): Promise<T> {
     const {
       requestId,
-      forceRefresh = false,
-      renewalThreshold = 24 * 60 * 60,
-      expiration = 7 * 24 * 60 * 60,
     } = options;
 
     const paramsHash = this.createMetadataHash(operation, params);
 
-    const metadataQuery = this.createMetadataQuery(operation, params);
-    const cacheKey: CacheKey = [`METADATA:${operation}`, paramsHash, dataSource];
+    const metadataRequest = this.createMetadataRequest(operation, params);
+    // Create a unique string key for this metadata request
+    const cacheKey = `METADATA:${operation}:${paramsHash}:${dataSource}`;
 
-    const renewalKey = forceRefresh ? undefined : [
-      `METADATA_RENEWAL:${operation}`,
-      paramsHash,
-      dataSource,
-      Math.floor(Date.now() / (renewalThreshold * 1000))
-    ];
+    // Get queue for the given datasource
+    const queue = await this.queryCache.getQueue(dataSource);
 
-    return this.queryCache.cacheQueryResult(
-      metadataQuery,
-      [],
+    // Execute metadata request through the queue
+    return queue.executeInQueue(
+      'metadata',
       cacheKey,
-      expiration,
       {
-        renewalThreshold,
-        renewalKey,
-        forceNoCache: forceRefresh,
-        requestId,
+        ...metadataRequest,
         dataSource,
-        useInMemory: true,
-        waitForRenew: true,
+        requestId
+      },
+      10, // priority
+      {
+        stageQueryKey: cacheKey,
+        requestId
       }
     );
   }
