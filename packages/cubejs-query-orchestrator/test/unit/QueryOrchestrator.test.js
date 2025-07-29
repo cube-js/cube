@@ -25,7 +25,23 @@ class MockDriver {
   query(query) {
     this.executedQueries.push(query);
 
-    // Handle metadata operations using the new approach
+    // Handle metadata operations - check if query is an array with metadata operation
+    if (Array.isArray(query) && query.length > 0 && typeof query[0] === 'string') {
+      const operation = query[0];
+      if (operation === 'METADATA:GET_SCHEMAS') {
+        return this.getSchemas();
+      } else if (operation === 'METADATA:GET_TABLES_FOR_SCHEMAS') {
+        // Parse parameters from the query array
+        const params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
+        return this.getTablesForSpecificSchemas(params.schemas || []);
+      } else if (operation === 'METADATA:GET_COLUMNS_FOR_TABLES') {
+        // Parse parameters from the query array
+        const params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
+        return this.getColumnsForSpecificTables(params.tables || []);
+      }
+    }
+
+    // Handle metadata operations using the new approach (legacy format)
     if (query && typeof query === 'object' && query.type === 'metadata') {
       const { operation, params = {} } = query;
       if (operation === 'GET_SCHEMAS') {
@@ -38,7 +54,11 @@ class MockDriver {
       return Promise.resolve([]);
     }
 
-    // Handle regular SQL queries
+    // Handle regular SQL queries - ensure query is a string
+    if (typeof query !== 'string') {
+      return Promise.resolve([]);
+    }
+
     let promise = Promise.resolve([query]);
     if (query.match('orders_too_big')) {
       promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 3000)));

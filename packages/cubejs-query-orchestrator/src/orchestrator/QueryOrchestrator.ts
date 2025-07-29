@@ -8,7 +8,7 @@ import {
   QueryColumnsResult,
   QueryKey } from '@cubejs-backend/base-driver';
 
-import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable } from './QueryCache';
+import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable, QueryWithParams, CacheKey } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryStream } from './QueryStream';
@@ -439,6 +439,14 @@ export class QueryOrchestrator {
     return this.preAggregations.updateRefreshEndReached();
   }
 
+  private createMetadataQuery(operation: string, params: Record<string, any>): QueryWithParams {
+    return [
+      `METADATA:${operation}`,
+      [JSON.stringify(params)],
+      { external: false, renewalThreshold: 24 * 60 * 60 }
+    ];
+  }
+
   private async queryDataSourceMetadata<T>(
     operation: MetadataOperationType,
     params: Record<string, any>,
@@ -452,74 +460,35 @@ export class QueryOrchestrator {
   ): Promise<T> {
     const {
       requestId,
-      forceRefresh,
-      expiration
+      forceRefresh = false,
+      renewalThreshold = 24 * 60 * 60,
+      expiration = 7 * 24 * 60 * 60,
     } = options;
 
-    // Create a unique cache key for this metadata request
-    const cacheKey = `METADATA:${operation}:${dataSource}:${JSON.stringify(params)}`;
-    const cacheDriver = this.queryCache.getCacheDriver();
-    
-    // Check cache first (unless forceRefresh is true)
-    if (!forceRefresh) {
-      try {
-        const cachedResult = await cacheDriver.get(cacheKey);
-        if (cachedResult && cachedResult.result) {
-          this.logger('Found cached metadata result', { cacheKey, operation, dataSource });
-          return cachedResult.result;
-        }
-      } catch (e) {
-        this.logger('Error reading from cache', { cacheKey, error: e instanceof Error ? e.message : String(e) });
-      }
-    }
+    const metadataQuery = this.createMetadataQuery(operation, params);
+    const cacheKey: CacheKey = [`METADATA:${operation}`, metadataQuery, dataSource];
 
-    // If not in cache or forceRefresh, execute through queue
-    const metadataRequest = {
-      operation,
-      params,
-      external: false,
-      type: 'metadata'
-    };
+    const renewalKey = forceRefresh ? undefined : [
+      `METADATA_RENEWAL:${operation}`,
+      dataSource,
+      Math.floor(Date.now() / (renewalThreshold * 1000))
+    ];
 
-    // Create unique queue key for forceRefresh to avoid conflicts
-    const queueKey = forceRefresh
-      ? `${cacheKey}:${new Date().getTime()}`
-      : cacheKey;
-
-    // Get queue for the given datasource
-    const queue = await this.queryCache.getQueue(dataSource);
-
-    // Execute metadata request through the queue
-    const result = await queue.executeInQueue(
-      'metadata',
-      queueKey,
+    return this.queryCache.cacheQueryResult(
+      metadataQuery,
+      [],
+      cacheKey,
+      expiration,
       {
-        ...metadataRequest,
+        renewalThreshold,
+        renewalKey,
+        forceNoCache: forceRefresh,
+        requestId,
         dataSource,
-        requestId
-      },
-      10, // priority
-      {
-        stageQueryKey: queueKey,
-        requestId
+        useInMemory: true,
+        waitForRenew: true,
       }
     );
-
-    // Store result in cache driver (unless forceRefresh)
-    if (!forceRefresh && result) {
-      try {
-        const cacheValue = {
-          time: new Date().getTime(),
-          result
-        };
-        await cacheDriver.set(cacheKey, cacheValue, expiration || (24 * 60 * 60)); // Default 24 hours
-        this.logger('Stored metadata result in cache', { cacheKey, operation, dataSource });
-      } catch (e) {
-        this.logger('Error storing in cache', { cacheKey, error: e instanceof Error ? e.message : String(e) });
-      }
-    }
-
-    return result;
   }
 
   /**
