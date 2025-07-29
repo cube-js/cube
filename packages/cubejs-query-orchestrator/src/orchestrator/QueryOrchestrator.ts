@@ -1,5 +1,4 @@
 import * as stream from 'stream';
-import * as crypto from 'crypto';
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
@@ -440,57 +439,6 @@ export class QueryOrchestrator {
     return this.preAggregations.updateRefreshEndReached();
   }
 
-  private createMetadataHash(operation: MetadataOperationType, params: Record<string, any>): string {
-    if (!params || Object.keys(params).length === 0) {
-      return 'empty';
-    }
-
-    const hashData: string[] = [];
-
-    switch (operation) {
-      case MetadataOperationType.GET_SCHEMAS:
-        return 'all_schemas';
-
-      case MetadataOperationType.GET_TABLES_FOR_SCHEMAS:
-        if (params.schemas && Array.isArray(params.schemas)) {
-          hashData.push(...params.schemas.map(schema => schema.schema_name).sort());
-        }
-        break;
-
-      case MetadataOperationType.GET_COLUMNS_FOR_TABLES:
-        if (params.tables && Array.isArray(params.tables)) {
-          hashData.push(...params.tables.map(table => `${table.schema_name}.${table.table_name}`).sort());
-        }
-        break;
-
-      default:
-        return crypto
-          .createHash('sha256')
-          .update(JSON.stringify(params))
-          .digest('hex')
-          .substring(0, 16);
-    }
-
-    if (hashData.length === 0) {
-      return 'empty';
-    }
-
-    return crypto
-      .createHash('sha256')
-      .update(hashData.join('|'))
-      .digest('hex')
-      .substring(0, 16);
-  }
-
-  private createMetadataRequest(operation: string, params: Record<string, any>) {
-    return {
-      operation,
-      params,
-      external: false,
-      type: 'metadata'
-    };
-  }
-
   private async queryDataSourceMetadata<T>(
     operation: MetadataOperationType,
     params: Record<string, any>,
@@ -504,21 +452,47 @@ export class QueryOrchestrator {
   ): Promise<T> {
     const {
       requestId,
+      forceRefresh,
+      expiration
     } = options;
 
-    const paramsHash = this.createMetadataHash(operation, params);
+    // Create a unique cache key for this metadata request
+    const cacheKey = `METADATA:${operation}:${dataSource}:${JSON.stringify(params)}`;
+    const cacheDriver = this.queryCache.getCacheDriver();
+    
+    // Check cache first (unless forceRefresh is true)
+    if (!forceRefresh) {
+      try {
+        const cachedResult = await cacheDriver.get(cacheKey);
+        if (cachedResult && cachedResult.result) {
+          this.logger('Found cached metadata result', { cacheKey, operation, dataSource });
+          return cachedResult.result;
+        }
+      } catch (e) {
+        this.logger('Error reading from cache', { cacheKey, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
 
-    const metadataRequest = this.createMetadataRequest(operation, params);
-    // Create a unique string key for this metadata request
-    const cacheKey = `METADATA:${operation}:${paramsHash}:${dataSource}`;
+    // If not in cache or forceRefresh, execute through queue
+    const metadataRequest = {
+      operation,
+      params,
+      external: false,
+      type: 'metadata'
+    };
+
+    // Create unique queue key for forceRefresh to avoid conflicts
+    const queueKey = forceRefresh
+      ? `${cacheKey}:${new Date().getTime()}`
+      : cacheKey;
 
     // Get queue for the given datasource
     const queue = await this.queryCache.getQueue(dataSource);
 
     // Execute metadata request through the queue
-    return queue.executeInQueue(
+    const result = await queue.executeInQueue(
       'metadata',
-      cacheKey,
+      queueKey,
       {
         ...metadataRequest,
         dataSource,
@@ -526,10 +500,26 @@ export class QueryOrchestrator {
       },
       10, // priority
       {
-        stageQueryKey: cacheKey,
+        stageQueryKey: queueKey,
         requestId
       }
     );
+
+    // Store result in cache driver (unless forceRefresh)
+    if (!forceRefresh && result) {
+      try {
+        const cacheValue = {
+          time: new Date().getTime(),
+          result
+        };
+        await cacheDriver.set(cacheKey, cacheValue, expiration || (24 * 60 * 60)); // Default 24 hours
+        this.logger('Stored metadata result in cache', { cacheKey, operation, dataSource });
+      } catch (e) {
+        this.logger('Error storing in cache', { cacheKey, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+
+    return result;
   }
 
   /**

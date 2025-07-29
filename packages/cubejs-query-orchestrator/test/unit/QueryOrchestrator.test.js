@@ -1996,17 +1996,30 @@ describe('QueryOrchestrator', () => {
       test('should cache results based on schema list', async () => {
         const schemas = [{ schema_name: 'public' }];
 
-        // First call
+        // First call - will execute and store in cache
         await metadataOrchestrator.queryTablesForSchemas(schemas);
+
+        // Add a delay to ensure the first query has completed and cached its result
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Clear the mock calls
+        metadataMockDriver.getTablesForSpecificSchemas.mockClear();
+
+        // Create equivalent but different object instance
+        // Our hash function should handle this correctly
+        const schemas2 = [{ schema_name: 'public' }];
+
         // Second call should use cache
-        const result = await metadataOrchestrator.queryTablesForSchemas(schemas);
+        const result = await metadataOrchestrator.queryTablesForSchemas(schemas2);
 
         expect(result).toEqual([
           { schema_name: 'public', table_name: 'users' },
           { schema_name: 'public', table_name: 'orders' },
           { schema_name: 'public', table_name: 'products' }
         ]);
-        expect(metadataMockDriver.getTablesForSpecificSchemas).toHaveBeenCalledTimes(1);
+
+        // Verify driver wasn't called again
+        expect(metadataMockDriver.getTablesForSpecificSchemas).not.toHaveBeenCalled();
       });
 
       test('should handle empty schema list', async () => {
@@ -2086,10 +2099,21 @@ describe('QueryOrchestrator', () => {
       test('should cache results based on table list', async () => {
         const tables = [{ schema_name: 'public', table_name: 'users' }];
 
-        // First call
+        // First call - will execute and store in cache
         await metadataOrchestrator.queryColumnsForTables(tables);
+
+        // Add a delay to ensure the first query has completed and cached its result
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Clear the mock calls
+        metadataMockDriver.getColumnsForSpecificTables.mockClear();
+
+        // Create equivalent but different object instance
+        // Our hash function should handle this correctly
+        const tables2 = [{ schema_name: 'public', table_name: 'users' }];
+
         // Second call should use cache
-        const result = await metadataOrchestrator.queryColumnsForTables(tables);
+        const result = await metadataOrchestrator.queryColumnsForTables(tables2);
 
         expect(result).toEqual([
           {
@@ -2114,7 +2138,9 @@ describe('QueryOrchestrator', () => {
             attributes: ['UNIQUE']
           }
         ]);
-        expect(metadataMockDriver.getColumnsForSpecificTables).toHaveBeenCalledTimes(1);
+
+        // Verify driver wasn't called again
+        expect(metadataMockDriver.getColumnsForSpecificTables).not.toHaveBeenCalled();
       });
 
       test('should handle empty table list', async () => {
