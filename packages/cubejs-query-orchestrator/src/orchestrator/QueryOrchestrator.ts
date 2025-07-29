@@ -467,7 +467,9 @@ export class QueryOrchestrator {
     } = options;
 
     const metadataQuery = this.createMetadataQuery(operation, params);
-    const cacheKey: CacheKey = [metadataQuery, dataSource, syncJobId];
+    const cacheKey: CacheKey = syncJobId
+      ? [metadataQuery, dataSource, syncJobId]
+      : [metadataQuery, dataSource];
 
     return this.queryCache.cacheQueryResult(
       metadataQuery,
