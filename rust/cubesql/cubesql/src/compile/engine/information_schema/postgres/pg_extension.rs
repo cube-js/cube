@@ -23,6 +23,7 @@ struct PgCatalogExtensionBuilder {
     extversion: StringBuilder,
     extconfig: ListBuilder<UInt32Builder>,
     extcondition: ListBuilder<StringBuilder>,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogExtensionBuilder {
@@ -38,6 +39,7 @@ impl PgCatalogExtensionBuilder {
             extversion: StringBuilder::new(capacity),
             extconfig: ListBuilder::new(UInt32Builder::new(capacity)),
             extcondition: ListBuilder::new(StringBuilder::new(capacity)),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
@@ -51,6 +53,7 @@ impl PgCatalogExtensionBuilder {
             Arc::new(self.extversion.finish()),
             Arc::new(self.extconfig.finish()),
             Arc::new(self.extcondition.finish()),
+            Arc::new(self.xmin.finish()),
         ];
 
         columns
@@ -99,6 +102,7 @@ impl TableProvider for PgCatalogExtensionProvider {
                 DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 

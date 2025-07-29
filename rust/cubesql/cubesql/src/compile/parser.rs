@@ -242,6 +242,9 @@ pub fn parse_sql_to_statements(
             .to_string()
     };
 
+    // DataGrip CTID workaround
+    let query = query.replace("SELECT t.*, CTID\nFROM ", "SELECT t.*, NULL AS ctid\nFROM ");
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }

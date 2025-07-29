@@ -18,6 +18,7 @@ struct PgCatalogAmBuilder {
     amname: StringBuilder,
     amhandler: StringBuilder,
     amtype: StringBuilder,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogAmBuilder {
@@ -29,6 +30,7 @@ impl PgCatalogAmBuilder {
             amname: StringBuilder::new(capacity),
             amhandler: StringBuilder::new(capacity),
             amtype: StringBuilder::new(capacity),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
@@ -38,6 +40,7 @@ impl PgCatalogAmBuilder {
             Arc::new(self.amname.finish()),
             Arc::new(self.amhandler.finish()),
             Arc::new(self.amtype.finish()),
+            Arc::new(self.xmin.finish()),
         ];
 
         columns
@@ -74,6 +77,7 @@ impl TableProvider for PgCatalogAmProvider {
             Field::new("amname", DataType::Utf8, false),
             Field::new("amhandler", DataType::Utf8, false),
             Field::new("amtype", DataType::Utf8, false),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 

@@ -46,6 +46,7 @@ struct PgCatalogAttributeBuilder {
     attoptions: StringBuilder,
     attfdwoptions: StringBuilder,
     attmissingval: StringBuilder,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogAttributeBuilder {
@@ -79,6 +80,7 @@ impl PgCatalogAttributeBuilder {
             attoptions: StringBuilder::new(capacity),
             attfdwoptions: StringBuilder::new(capacity),
             attmissingval: StringBuilder::new(capacity),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
@@ -121,6 +123,7 @@ impl PgCatalogAttributeBuilder {
         self.attoptions.append_null().unwrap();
         self.attfdwoptions.append_null().unwrap();
         self.attmissingval.append_null().unwrap();
+        self.xmin.append_value(1).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -151,6 +154,7 @@ impl PgCatalogAttributeBuilder {
             Arc::new(self.attoptions.finish()),
             Arc::new(self.attfdwoptions.finish()),
             Arc::new(self.attmissingval.finish()),
+            Arc::new(self.xmin.finish()),
         ];
 
         columns
@@ -224,6 +228,7 @@ impl TableProvider for PgCatalogAttributeProvider {
             Field::new("attoptions", DataType::Utf8, true),
             Field::new("attfdwoptions", DataType::Utf8, true),
             Field::new("attmissingval", DataType::Utf8, true),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 
