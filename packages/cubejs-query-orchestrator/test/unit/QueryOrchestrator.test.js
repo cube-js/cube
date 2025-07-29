@@ -41,19 +41,6 @@ class MockDriver {
       }
     }
 
-    // Handle metadata operations using the new approach (legacy format)
-    if (query && typeof query === 'object' && query.type === 'metadata') {
-      const { operation, params = {} } = query;
-      if (operation === 'GET_SCHEMAS') {
-        return this.getSchemas();
-      } else if (operation === 'GET_TABLES_FOR_SCHEMAS') {
-        return this.getTablesForSpecificSchemas(params.schemas);
-      } else if (operation === 'GET_COLUMNS_FOR_TABLES') {
-        return this.getColumnsForSpecificTables(params.tables);
-      }
-      return Promise.resolve([]);
-    }
-
     // Handle regular SQL queries - ensure query is a string
     if (typeof query !== 'string') {
       return Promise.resolve([]);
