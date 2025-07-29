@@ -927,9 +927,6 @@ export class QueryCache {
     }
 
     if (!res) {
-      console.log('cacheDriver.get', {
-        redisKey
-      });
       res = await this.cacheDriver.get(redisKey);
     }
 
