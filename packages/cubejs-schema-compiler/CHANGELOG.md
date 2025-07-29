@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.45](https://github.com/cube-js/cube/compare/v1.3.44...v1.3.45) (2025-07-29)
+
+### Features
+
+- **clickhouse-driver:** Upgrade @clickhouse/client from 1.7.0 to 1.12.0 ([#9829](https://github.com/cube-js/cube/issues/9829)) ([80c281f](https://github.com/cube-js/cube/commit/80c281f330b16fd27a7b61d9ff030ce4fcf92b13))
+
 ## [1.3.44](https://github.com/cube-js/cube/compare/v1.3.43...v1.3.44) (2025-07-28)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

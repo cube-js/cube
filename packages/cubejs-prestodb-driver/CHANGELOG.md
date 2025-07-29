@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.45](https://github.com/cube-js/cube/compare/v1.3.44...v1.3.45) (2025-07-29)
+
+### Bug Fixes
+
+- **prestodb/trino-driver:** Specify correct timeouts for query execution ([#9827](https://github.com/cube-js/cube/issues/9827)) ([394eb84](https://github.com/cube-js/cube/commit/394eb84910160e86e4634df6bcc78c7ac803803b))
+
 ## [1.3.44](https://github.com/cube-js/cube/compare/v1.3.43...v1.3.44) (2025-07-28)
 
 **Note:** Version bump only for package @cubejs-backend/prestodb-driver
