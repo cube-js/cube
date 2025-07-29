@@ -596,7 +596,7 @@ export class QueryCache {
         },
         query: async (req, setCancelHandle) => {
           const client = await clientFactory();
-          
+
           const resultPromise = executeFn(client, req);
           let handle;
           if (resultPromise.cancel) {

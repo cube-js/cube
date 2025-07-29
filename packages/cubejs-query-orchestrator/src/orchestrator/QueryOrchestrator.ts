@@ -442,6 +442,8 @@ export class QueryOrchestrator {
   private createMetadataQuery(operation: string, params: Record<string, any>): QueryWithParams {
     return [
       `METADATA:${operation}`,
+      // TODO: Metadata queries need object params like [{ schema, table }]
+      // but QueryWithParams expects string[]. This forces JSON.stringify workaround.
       [JSON.stringify(params)],
       { external: false, renewalThreshold: 24 * 60 * 60 }
     ];
