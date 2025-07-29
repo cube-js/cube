@@ -715,6 +715,11 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
 
                         *expr = *cast_expr.clone();
                     }
+                    "xid" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::UnsignedInt(None);
+                    }
                     "int2" => {
                         self.visit_expr(&mut *cast_expr)?;
 
@@ -767,17 +772,22 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                             })
                         }
                     }
+                    "\"char\"" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::Text;
+                    }
                     // TODO:
                     _ => (),
                 },
                 ast::DataType::Regclass => match &**cast_expr {
                     Expr::Value(val) => {
                         let str_val = self.parse_value_to_str(&val);
-                        if str_val.is_none() {
+                        let Some(str_val) = str_val else {
                             return Ok(());
-                        }
+                        };
+                        let str_val = str_val.strip_prefix("pg_catalog.").unwrap_or(&str_val);
 
-                        let str_val = str_val.unwrap();
                         for typ in PgType::get_all() {
                             if typ.typname == str_val {
                                 *expr = Expr::Value(Value::Number(typ.typrelid.to_string(), false));

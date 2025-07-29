@@ -11,11 +11,12 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Date32Array, Float64Array, Float64Builder, GenericStringArray, Int32Builder,
-            Int64Array, Int64Builder, IntervalDayTimeBuilder, IntervalMonthDayNanoArray, ListArray,
-            ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
-            StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
-            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder, UInt64Builder,
+            Date32Array, Float64Array, Float64Builder, GenericStringArray, Int32Array,
+            Int32Builder, Int64Array, Int64Builder, IntervalDayTimeBuilder,
+            IntervalMonthDayNanoArray, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
+            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
+            TimestampMillisecondArray, TimestampNanosecondArray, TimestampNanosecondBuilder,
+            TimestampSecondArray, UInt32Builder, UInt64Builder,
         },
         compute::{cast, concat},
         datatypes::{
@@ -1875,6 +1876,44 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             }
                             PgTypeId::ARRAYINT8MULTIRANGE => {
                                 format!("int8multirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGAM => {
+                                format!("pg_am{}[]", typemod_str())
+                            }
+                            PgTypeId::PGAM => {
+                                format!("pg_am{}", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGLANGUAGE => {
+                                format!("pg_language{}[]", typemod_str())
+                            }
+                            PgTypeId::PGLANGUAGE => {
+                                format!("pg_language{}", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGEVENTTRIGGER => {
+                                format!("pg_event_trigger{}[]", typemod_str())
+                            }
+                            PgTypeId::PGEVENTTRIGGER => {
+                                format!("pg_event_trigger{}", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGCAST => {
+                                format!("pg_cast{}[]", typemod_str())
+                            }
+                            PgTypeId::PGCAST => format!("pg_cast{}", typemod_str()),
+                            PgTypeId::ARRAYPGEXTENSION => {
+                                format!("pg_extension{}[]", typemod_str())
+                            }
+                            PgTypeId::PGEXTENSION => format!("pg_extension{}", typemod_str()),
+                            PgTypeId::ARRAYPGFOREIGNDATAWRAPPER => {
+                                format!("pg_foreign_data_wrapper{}[]", typemod_str())
+                            }
+                            PgTypeId::PGFOREIGNDATAWRAPPER => {
+                                format!("pg_foreign_data_wrapper{}", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGFOREIGNSERVER => {
+                                format!("pg_foreign_server{}[]", typemod_str())
+                            }
+                            PgTypeId::PGFOREIGNSERVER => {
+                                format!("pg_foreign_server{}", typemod_str())
                             }
                             PgTypeId::ARRAYPGCONSTRAINT => {
                                 format!("pg_constraint{}[]", typemod_str())
@@ -3758,6 +3797,18 @@ pub fn create_pg_get_indexdef_udf() -> ScalarUDF {
 pub fn create_age_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| match args.len() {
         1 => {
+            // Special handling for `AGE(xid)`
+            if args[0].data_type() == &DataType::UInt32 {
+                let xids = downcast_primitive_arg!(args[0], "xid", OidType);
+
+                let result = xids
+                    .iter()
+                    .map(|xid| xid.map(|_| i32::MAX))
+                    .collect::<Int32Array>();
+
+                return Ok(Arc::new(result) as ArrayRef);
+            }
+
             let older_dates =
                 downcast_primitive_arg!(args[0], "older_date", TimestampNanosecondType);
             let current_date = Utc::now().date_naive().and_time(NaiveTime::default());
@@ -3806,8 +3857,13 @@ pub fn create_age_udf() -> ScalarUDF {
         )),
     });
 
-    let return_type: ReturnTypeFunction =
-        Arc::new(move |_| Ok(Arc::new(DataType::Interval(IntervalUnit::MonthDayNano))));
+    let return_type: ReturnTypeFunction = Arc::new(move |dt| {
+        // Special handling for `AGE(xid)` which returns Int32
+        if dt.len() == 1 && dt[0] == DataType::UInt32 {
+            return Ok(Arc::new(DataType::Int32));
+        }
+        Ok(Arc::new(DataType::Interval(IntervalUnit::MonthDayNano)))
+    });
 
     ScalarUDF::new(
         "age",
@@ -3818,6 +3874,7 @@ pub fn create_age_udf() -> ScalarUDF {
                     DataType::Timestamp(TimeUnit::Nanosecond, None),
                     DataType::Timestamp(TimeUnit::Nanosecond, None),
                 ]),
+                TypeSignature::Exact(vec![DataType::UInt32]),
             ],
             // NOTE: volatility should be `Stable` but we have no access
             // to `query_execution_start_time`
@@ -4047,6 +4104,85 @@ pub fn create_pg_relation_size_udf() -> ScalarUDF {
             ],
             Volatility::Immutable,
         ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_postmaster_start_time_udf() -> ScalarUDF {
+    let fun_registration_nanos = Utc::now()
+        .timestamp_nanos_opt()
+        .expect("Unable to get current time as nanoseconds");
+
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = TimestampNanosecondBuilder::new(1);
+        builder.append_value(fun_registration_nanos).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+
+    ScalarUDF::new(
+        "pg_postmaster_start_time",
+        &Signature::exact(vec![], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_txid_current_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = Int64Builder::new(1);
+        builder.append_value(1).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "txid_current",
+        &Signature::exact(vec![], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_is_in_recovery_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = BooleanBuilder::new(1);
+        builder.append_value(false).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "pg_is_in_recovery",
+        &Signature::exact(vec![], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_tablespace_location_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let oids = downcast_primitive_arg!(args[0], "oid", OidType);
+        let result = oids.iter().map(|_| Some("")).collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_tablespace_location",
+        &Signature::exact(vec![DataType::UInt32], Volatility::Stable),
         &return_type,
         &fun,
     )
@@ -4806,13 +4942,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     );
     register_fun_stub!(
         udf,
-        "pg_is_in_recovery",
-        argc = 0,
-        rettyp = Boolean,
-        vol = Volatile
-    );
-    register_fun_stub!(
-        udf,
         "pg_is_wal_replay_paused",
         argc = 0,
         rettyp = Boolean,
@@ -4872,13 +5001,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         "pg_partition_root",
         tsig = [Regclass],
         rettyp = Regclass,
-        vol = Stable
-    );
-    register_fun_stub!(
-        udf,
-        "pg_postmaster_start_time",
-        argc = 0,
-        rettyp = TimestampTz,
         vol = Stable
     );
     register_fun_stub!(
@@ -5009,13 +5131,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         tsig = [Regclass],
         rettyp = Int64,
         vol = Volatile
-    );
-    register_fun_stub!(
-        udf,
-        "pg_tablespace_location",
-        tsig = [Oid],
-        rettyp = Utf8,
-        vol = Stable
     );
     register_fun_stub!(
         udf,
@@ -5202,7 +5317,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         vol = Stable
     );
     register_fun_stub!(udf, "trim_scale", tsig = [Float64], rettyp = Float64);
-    register_fun_stub!(udf, "txid_current", argc = 0, rettyp = Int64, vol = Stable);
     register_fun_stub!(
         udf,
         "txid_current_if_assigned",

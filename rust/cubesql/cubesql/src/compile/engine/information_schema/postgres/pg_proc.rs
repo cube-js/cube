@@ -65,6 +65,7 @@ struct PgCatalogProcBuilder {
     prosqlbody: StringBuilder,
     proconfig: StringBuilder,
     proacl: StringBuilder,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogProcBuilder {
@@ -102,6 +103,7 @@ impl PgCatalogProcBuilder {
             prosqlbody: StringBuilder::new(capacity),
             proconfig: StringBuilder::new(capacity),
             proacl: StringBuilder::new(capacity),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
@@ -150,6 +152,7 @@ impl PgCatalogProcBuilder {
         self.prosqlbody.append_null().unwrap();
         self.proconfig.append_null().unwrap();
         self.proacl.append_null().unwrap();
+        self.xmin.append_value(1).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -184,6 +187,7 @@ impl PgCatalogProcBuilder {
             Arc::new(self.prosqlbody.finish()),
             Arc::new(self.proconfig.finish()),
             Arc::new(self.proacl.finish()),
+            Arc::new(self.xmin.finish()),
         ];
 
         columns
@@ -793,6 +797,7 @@ impl TableProvider for PgCatalogProcProvider {
             Field::new("prosqlbody", DataType::Utf8, true),
             Field::new("proconfig", DataType::Utf8, true),
             Field::new("proacl", DataType::Utf8, true),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 
