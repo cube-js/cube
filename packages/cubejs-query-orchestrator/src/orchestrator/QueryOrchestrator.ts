@@ -462,7 +462,7 @@ export class QueryOrchestrator {
   ): Promise<T> {
     const {
       requestId,
-      syncJobId = '',
+      syncJobId,
       expiration = 30 * 24 * 60 * 60,
     } = options;
 
