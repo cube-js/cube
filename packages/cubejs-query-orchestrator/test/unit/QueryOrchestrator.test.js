@@ -32,11 +32,21 @@ class MockDriver {
         return this.getSchemas();
       } else if (operation === 'METADATA:GET_TABLES_FOR_SCHEMAS') {
         // Parse parameters from the query array
-        const params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
+        let params = {};
+        try {
+          params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
+        } catch (error) {
+          console.warn('Failed to parse JSON parameters for METADATA:GET_TABLES_FOR_SCHEMAS:', error);
+        }
         return this.getTablesForSpecificSchemas(params.schemas || []);
       } else if (operation === 'METADATA:GET_COLUMNS_FOR_TABLES') {
         // Parse parameters from the query array
-        const params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
+        let params = {};
+        try {
+          params = query[1] && query[1].length > 0 ? JSON.parse(query[1][0]) : {};
+        } catch (error) {
+          console.warn('Failed to parse JSON parameters for METADATA:GET_COLUMNS_FOR_TABLES:', error);
+        }
         return this.getColumnsForSpecificTables(params.tables || []);
       }
     }
