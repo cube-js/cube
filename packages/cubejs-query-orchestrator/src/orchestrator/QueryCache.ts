@@ -18,7 +18,7 @@ import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
-import { CacheAndQueryDriverType } from './QueryOrchestrator';
+import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 type QueryOptions = {
   external?: boolean;
@@ -563,8 +563,36 @@ export class QueryCache {
   ): QueryQueue {
     const queue: any = new QueryQueue(redisPrefix, {
       queryHandlers: {
+        metadata: async (req, _setCancelHandle) => {
+          const client = await clientFactory();
+          const { operation } = req;
+          const params = req.params || {};
+
+          switch (operation) {
+            case MetadataOperationType.GET_SCHEMAS:
+              queue.logger('Getting datasource schemas', { dataSource: req.dataSource, requestId: req.requestId });
+              return client.getSchemas();
+            case MetadataOperationType.GET_TABLES_FOR_SCHEMAS:
+              queue.logger('Getting tables for schemas', {
+                dataSource: req.dataSource,
+                schemaCount: params.schemas?.length || 0,
+                requestId: req.requestId
+              });
+              return client.getTablesForSpecificSchemas(params.schemas);
+            case MetadataOperationType.GET_COLUMNS_FOR_TABLES:
+              queue.logger('Getting columns for tables', {
+                dataSource: req.dataSource,
+                tableCount: params.tables?.length || 0,
+                requestId: req.requestId
+              });
+              return client.getColumnsForSpecificTables(params.tables);
+            default:
+              throw new Error(`Unknown metadata operation: ${operation}`);
+          }
+        },
         query: async (req, setCancelHandle) => {
           const client = await clientFactory();
+
           const resultPromise = executeFn(client, req);
           let handle;
           if (resultPromise.cancel) {
@@ -632,6 +660,12 @@ export class QueryCache {
         }));
       },
       cancelHandlers: {
+        metadata: async (req) => {
+          if (req.cancelHandler && queue.handles[req.cancelHandler]) {
+            await queue.handles[req.cancelHandler].cancel();
+            delete queue.handles[req.cancelHandler];
+          }
+        },
         query: async (req) => {
           if (req.cancelHandler && queue.handles[req.cancelHandler]) {
             await queue.handles[req.cancelHandler].cancel();
