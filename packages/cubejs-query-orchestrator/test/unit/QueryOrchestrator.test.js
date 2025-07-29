@@ -1905,15 +1905,13 @@ describe('QueryOrchestrator', () => {
           },
         }
       );
-    });
 
-    beforeEach(() => {
       jest.clearAllMocks();
-      // Clear in-memory cache to ensure test isolation
+
       if (metadataOrchestrator && metadataOrchestrator.queryCache && metadataOrchestrator.queryCache.memoryCache) {
         metadataOrchestrator.queryCache.memoryCache.clear();
       }
-      // Clear the cache driver store as well to ensure complete isolation
+
       if (metadataOrchestrator && metadataOrchestrator.queryCache && metadataOrchestrator.queryCache.getCacheDriver()) {
         const cacheDriver = metadataOrchestrator.queryCache.getCacheDriver();
         if (cacheDriver.store) {

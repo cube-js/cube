@@ -466,7 +466,7 @@ export class QueryOrchestrator {
     } = options;
 
     const metadataQuery = this.createMetadataQuery(operation, params);
-    const cacheKey: CacheKey = [`METADATA:${operation}`, metadataQuery, dataSource];
+    const cacheKey: CacheKey = [metadataQuery, dataSource];
 
     const renewalKey = forceRefresh ? undefined : [
       `METADATA_RENEWAL:${operation}`,
