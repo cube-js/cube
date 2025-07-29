@@ -27,7 +27,7 @@
     "integration:clickhouse": "jest dist/test"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.7.0",
+    "@clickhouse/client": "^1.12.0",
     "@cubejs-backend/base-driver": "1.3.44",
     "@cubejs-backend/shared": "1.3.44",
     "moment": "^2.24.0",
