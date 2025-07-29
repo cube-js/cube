@@ -116,7 +116,7 @@ export class YamlCompiler {
     }
   }
 
-  private transpileAndPrepareJsFile(file, methodFn, cubeObj, errorsReport: ErrorReporter) {
+  private transpileAndPrepareJsFile(file: FileContent, methodFn: ('cube' | 'view'), cubeObj, errorsReport: ErrorReporter): FileContent {
     const yamlAst = this.transformYamlCubeObj(cubeObj, errorsReport);
 
     const cubeOrViewCall = t.callExpression(t.identifier(methodFn), [t.stringLiteral(cubeObj.name), yamlAst]);
@@ -135,7 +135,13 @@ export class YamlCompiler {
     cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
     cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
-    cubeObj.joins = this.yamlArrayToObj(cubeObj.joins || [], 'join', errorsReport);
+
+    cubeObj.joins = cubeObj.joins || []; // For edge cases where joins are not defined/null
+    if (!Array.isArray(cubeObj.joins)) {
+      errorsReport.error('joins must be defined as array');
+      cubeObj.joins = [];
+    }
+
     cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
 
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
