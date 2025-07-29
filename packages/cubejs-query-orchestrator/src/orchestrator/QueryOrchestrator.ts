@@ -2,9 +2,14 @@ import * as stream from 'stream';
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import {
+  QuerySchemasResult,
+  QueryTablesResult,
+  QueryColumnsResult,
+  QueryKey
+} from '@cubejs-backend/base-driver';
 
-import { QueryKey } from '@cubejs-backend/base-driver';
-import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable } from './QueryCache';
+import { QueryCache, QueryBody, TempTable, PreAggTableToTempTable, QueryWithParams, CacheKey } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryStream } from './QueryStream';
@@ -15,6 +20,12 @@ export enum DriverType {
   External = 'external',
   Internal = 'internal',
   Cache = 'cache',
+}
+
+export enum MetadataOperationType {
+  GET_SCHEMAS = 'GET_SCHEMAS',
+  GET_TABLES_FOR_SCHEMAS = 'GET_TABLES_FOR_SCHEMAS',
+  GET_COLUMNS_FOR_TABLES = 'GET_COLUMNS_FOR_TABLES'
 }
 
 export interface QueryOrchestratorOptions {
@@ -427,5 +438,121 @@ export class QueryOrchestrator {
 
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
+  }
+
+  private createMetadataQuery(operation: string, params: Record<string, any>): QueryWithParams {
+    return [
+      `METADATA:${operation}`,
+      // TODO (@MikeNitsenko): Metadata queries need object params like [{ schema, table }]
+      // but QueryWithParams expects string[]. This forces JSON.stringify workaround.
+      [JSON.stringify(params)],
+      { external: false, renewalThreshold: 24 * 60 * 60 }
+    ];
+  }
+
+  private async queryDataSourceMetadata<T>(
+    operation: MetadataOperationType,
+    params: Record<string, any>,
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<T> {
+    const {
+      requestId,
+      forceRefresh = false,
+      renewalThreshold = 24 * 60 * 60,
+      expiration = 7 * 24 * 60 * 60,
+    } = options;
+
+    const metadataQuery = this.createMetadataQuery(operation, params);
+    const cacheKey: CacheKey = [metadataQuery, dataSource];
+
+    const renewalKey = forceRefresh ? undefined : [
+      `METADATA_RENEWAL:${operation}`,
+      dataSource,
+      Math.floor(Date.now() / (renewalThreshold * 1000))
+    ];
+
+    return this.queryCache.cacheQueryResult(
+      metadataQuery,
+      [],
+      cacheKey,
+      expiration,
+      {
+        renewalThreshold,
+        renewalKey,
+        forceNoCache: forceRefresh,
+        requestId,
+        dataSource,
+        useInMemory: true,
+        waitForRenew: true,
+      }
+    );
+  }
+
+  /**
+   * Query the data source for available schemas.
+   */
+  public async queryDataSourceSchemas(
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<QuerySchemasResult[]> {
+    return this.queryDataSourceMetadata<QuerySchemasResult[]>(
+      MetadataOperationType.GET_SCHEMAS,
+      {},
+      dataSource,
+      options
+    );
+  }
+
+  /**
+   * Query the data source for tables within the specified schemas.
+   */
+  public async queryTablesForSchemas(
+    schemas: QuerySchemasResult[],
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<QueryTablesResult[]> {
+    return this.queryDataSourceMetadata<QueryTablesResult[]>(
+      MetadataOperationType.GET_TABLES_FOR_SCHEMAS,
+      { schemas },
+      dataSource,
+      options
+    );
+  }
+
+  /**
+   * Query the data source for columns within the specified tables.
+   */
+  public async queryColumnsForTables(
+    tables: QueryTablesResult[],
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      forceRefresh?: boolean;
+      renewalThreshold?: number;
+      expiration?: number;
+    } = {}
+  ): Promise<QueryColumnsResult[]> {
+    return this.queryDataSourceMetadata<QueryColumnsResult[]>(
+      MetadataOperationType.GET_COLUMNS_FOR_TABLES,
+      { tables },
+      dataSource,
+      options
+    );
   }
 }
