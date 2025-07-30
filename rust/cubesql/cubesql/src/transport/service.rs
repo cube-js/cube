@@ -880,6 +880,24 @@ impl SqlTemplates {
         )
     }
 
+    pub fn between_expr(
+        &self,
+        expr: String,
+        negated: bool,
+        low: String,
+        high: String,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/between",
+            context! {
+                expr => expr,
+                negated => negated,
+                low => low,
+                high => high
+            },
+        )
+    }
+
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
         self.render_template("params/param", context! { param_index => param_index })
     }
