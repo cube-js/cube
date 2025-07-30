@@ -5,7 +5,9 @@ use std::process::{Child, ExitStatus};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::app_metrics;
 use crate::util::cancellation_token_guard::CancellationGuard;
+use crate::util::metrics;
 use deadqueue::unlimited;
 use futures::future::join_all;
 use ipc_channel::ipc;
@@ -266,6 +268,13 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                     Ok((res, a, r)) => {
                         if sender.send(Ok(res)).is_err() {
                             error!("Error during worker message processing: Send Error");
+                            app_metrics::WORKER_POOL_ERROR.add_with_tags(
+                                1,
+                                Some(&vec![
+                                    metrics::format_tag("subprocess_type", &P::process_type()),
+                                    metrics::format_tag("error_type", "send"),
+                                ]),
+                            );
                         }
                         args_channel = Some((a, r));
                     }
@@ -304,6 +313,22 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
     > {
         args_tx.send(message)?;
         let (res, res_rx) = cube_ext::spawn_blocking(move || (res_rx.recv(), res_rx)).await?;
+
+        if let Err(ipc_err) = res {
+            app_metrics::WORKER_POOL_ERROR.add_with_tags(
+                1,
+                Some(&vec![
+                    metrics::format_tag("subprocess_type", &P::process_type()),
+                    metrics::format_tag("error_type", "receive"),
+                ]),
+            );
+            return Err(CubeError::internal(format!(
+                "Failed to receive response from subprocess {}: {}",
+                P::process_titile(),
+                ipc_err
+            )));
+        }
+
         Ok((res??, args_tx, res_rx))
     }
 
@@ -546,6 +571,10 @@ mod tests {
         fn process_titile() -> String {
             "--sel-worker".to_string()
         }
+
+        fn process_type() -> String {
+            "sel-worker".to_string()
+        }
     }
 
     type Transport = DefaultServicesTransport<DefaultServicesServerProcessor>;
@@ -757,6 +786,10 @@ mod tests {
 
         fn process_titile() -> String {
             "--sel-worker".to_string()
+        }
+
+        fn process_type() -> String {
+            "sel-worker".to_string()
         }
     }
 
