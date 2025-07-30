@@ -446,7 +446,7 @@ export class QueryOrchestrator {
       // TODO (@MikeNitsenko): Metadata queries need object params like [{ schema, table }]
       // but QueryWithParams expects string[]. This forces JSON.stringify workaround.
       [JSON.stringify(params)],
-      { external: false, renewalThreshold: 24 * 60 * 60 }
+      { external: false }
     ];
   }
 
@@ -456,26 +456,20 @@ export class QueryOrchestrator {
     dataSource: string = 'default',
     options: {
       requestId?: string;
-      forceRefresh?: boolean;
-      renewalThreshold?: number;
+      syncJobId?: string;
       expiration?: number;
     } = {}
   ): Promise<T> {
     const {
       requestId,
-      forceRefresh = false,
-      renewalThreshold = 24 * 60 * 60,
-      expiration = 7 * 24 * 60 * 60,
+      syncJobId,
+      expiration = 30 * 24 * 60 * 60,
     } = options;
 
     const metadataQuery = this.createMetadataQuery(operation, params);
-    const cacheKey: CacheKey = [metadataQuery, dataSource];
-
-    const renewalKey = forceRefresh ? undefined : [
-      `METADATA_RENEWAL:${operation}`,
-      dataSource,
-      Math.floor(Date.now() / (renewalThreshold * 1000))
-    ];
+    const cacheKey: CacheKey = syncJobId
+      ? [metadataQuery, dataSource, syncJobId]
+      : [metadataQuery, dataSource];
 
     return this.queryCache.cacheQueryResult(
       metadataQuery,
@@ -483,13 +477,10 @@ export class QueryOrchestrator {
       cacheKey,
       expiration,
       {
-        renewalThreshold,
-        renewalKey,
-        forceNoCache: forceRefresh,
         requestId,
         dataSource,
+        forceNoCache: !syncJobId,
         useInMemory: true,
-        waitForRenew: true,
       }
     );
   }
@@ -501,8 +492,7 @@ export class QueryOrchestrator {
     dataSource: string = 'default',
     options: {
       requestId?: string;
-      forceRefresh?: boolean;
-      renewalThreshold?: number;
+      syncJobId?: string;
       expiration?: number;
     } = {}
   ): Promise<QuerySchemasResult[]> {
@@ -522,8 +512,7 @@ export class QueryOrchestrator {
     dataSource: string = 'default',
     options: {
       requestId?: string;
-      forceRefresh?: boolean;
-      renewalThreshold?: number;
+      syncJobId?: string;
       expiration?: number;
     } = {}
   ): Promise<QueryTablesResult[]> {
@@ -543,8 +532,7 @@ export class QueryOrchestrator {
     dataSource: string = 'default',
     options: {
       requestId?: string;
-      forceRefresh?: boolean;
-      renewalThreshold?: number;
+      syncJobId?: string;
       expiration?: number;
     } = {}
   ): Promise<QueryColumnsResult[]> {
