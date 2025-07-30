@@ -13,7 +13,7 @@ Cube is a semantic layer for building data applications. This is a monorepo cont
 
 ## Development Commands
 
-**Note: This project uses Yarn as the package manager.**
+**Note: This project uses Yarn as the package manager. Node.js v22.15.0 is recommended.**
 
 ### Core Build Commands
 ```bash

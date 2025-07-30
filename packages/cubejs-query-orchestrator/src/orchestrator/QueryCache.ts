@@ -132,6 +132,17 @@ type CacheEntry = {
   renewalKey: string;
 };
 
+type CheckCacheOptions = {
+  renewalKey: string;
+  renewalThreshold: number;
+  expiration: number;
+  options: CacheQueryResultOptions;
+  spanId: string;
+  cacheKey: CacheKey;
+  primaryQuery: boolean;
+  renewCycle: boolean;
+};
+
 export interface QueryCacheOptions {
   refreshKeyRenewalThreshold?: number;
   externalQueueOptions?: any;
@@ -857,6 +868,66 @@ export class QueryCache {
     callback: () => MaybeCancelablePromise<T>,
   ) => this.cacheDriver.withLock(`lock:${key}`, callback, ttl, true);
 
+  protected async checkInCache(
+    redisKey: string,
+    opts: CheckCacheOptions
+  ): Promise<any> {
+    // First check in-memory cache if enabled
+    if (opts.options.useInMemory) {
+      const inMemoryResult = this.checkInMemoryCache(redisKey, opts);
+
+      if (inMemoryResult) {
+        return inMemoryResult;
+      }
+    }
+
+    // If not found in memory, check cache driver
+    return this.cacheDriver.get(redisKey);
+  }
+
+  protected checkInMemoryCache(
+    redisKey: string,
+    opts: CheckCacheOptions
+  ): any {
+    const inMemoryCacheDisablePeriod = 5 * 60 * 1000;
+
+    const inMemoryValue = this.memoryCache.get(redisKey);
+    if (!inMemoryValue) {
+      return null;
+    }
+
+    const renewedAgo = (new Date()).getTime() - inMemoryValue.time;
+
+    if (
+      opts.renewalKey && (
+        !opts.renewalThreshold ||
+        !inMemoryValue.time ||
+        // Do not cache in memory in last 5 minutes of expiry.
+        // Most likely it'll cause race condition of refreshing data with different refreshKey values.
+        renewedAgo + inMemoryCacheDisablePeriod > opts.renewalThreshold * 1000 ||
+        inMemoryValue.renewalKey !== opts.renewalKey
+      ) || renewedAgo > opts.expiration * 1000 || renewedAgo > inMemoryCacheDisablePeriod
+    ) {
+      this.memoryCache.delete(redisKey);
+      return null;
+    }
+
+    this.logger('Found in memory cache entry', {
+      cacheKey: opts.cacheKey,
+      time: inMemoryValue.time,
+      renewedAgo,
+      renewalKey: inMemoryValue.renewalKey,
+      newRenewalKey: opts.renewalKey,
+      renewalThreshold: opts.renewalThreshold,
+      requestId: opts.options.requestId,
+      spanId: opts.spanId,
+      primaryQuery: opts.primaryQuery,
+      renewCycle: opts.renewCycle
+    });
+
+    return inMemoryValue;
+  }
+
   public async cacheQueryResult(
     query: string | QueryWithParams,
     values: string[],
@@ -928,56 +999,27 @@ export class QueryCache {
       return fetchNew();
     }
 
-    let res;
-
-    const inMemoryCacheDisablePeriod = 5 * 60 * 1000;
-
-    if (options.useInMemory) {
-      const inMemoryValue = this.memoryCache.get(redisKey);
-      if (inMemoryValue) {
-        const renewedAgo = (new Date()).getTime() - inMemoryValue.time;
-
-        if (
-          renewalKey && (
-            !renewalThreshold ||
-            !inMemoryValue.time ||
-            // Do not cache in memory in last 5 minutes of expiry.
-            // Most likely it'll cause race condition of refreshing data with different refreshKey values.
-            renewedAgo + inMemoryCacheDisablePeriod > renewalThreshold * 1000 ||
-            inMemoryValue.renewalKey !== renewalKey
-          ) || renewedAgo > expiration * 1000 || renewedAgo > inMemoryCacheDisablePeriod
-        ) {
-          this.memoryCache.delete(redisKey);
-        } else {
-          this.logger('Found in memory cache entry', {
-            cacheKey,
-            time: inMemoryValue.time,
-            renewedAgo,
-            renewalKey: inMemoryValue.renewalKey,
-            newRenewalKey: renewalKey,
-            renewalThreshold,
-            requestId: options.requestId,
-            spanId,
-            primaryQuery,
-            renewCycle
-          });
-          res = inMemoryValue;
-        }
+    const cachedResult = await this.checkInCache(
+      redisKey,
+      {
+        renewalKey,
+        renewalThreshold,
+        expiration,
+        options,
+        spanId,
+        cacheKey,
+        primaryQuery,
+        renewCycle
       }
-    }
+    );
 
-    if (!res) {
-      res = await this.cacheDriver.get(redisKey);
-    }
-
-    if (res) {
-      const parsedResult = res;
-      const renewedAgo = (new Date()).getTime() - parsedResult.time;
+    if (cachedResult) {
+      const renewedAgo = (new Date()).getTime() - cachedResult.time;
       this.logger('Found cache entry', {
         cacheKey,
-        time: parsedResult.time,
+        time: cachedResult.time,
         renewedAgo,
-        renewalKey: parsedResult.renewalKey,
+        renewalKey: cachedResult.renewalKey,
         newRenewalKey: renewalKey,
         renewalThreshold,
         requestId: options.requestId,
@@ -988,9 +1030,9 @@ export class QueryCache {
       if (
         renewalKey && (
           !renewalThreshold ||
-          !parsedResult.time ||
+          !cachedResult.time ||
           renewedAgo > renewalThreshold * 1000 ||
-          parsedResult.renewalKey !== renewalKey
+          cachedResult.renewalKey !== renewalKey
         )
       ) {
         if (options.waitForRenew) {
@@ -1008,11 +1050,12 @@ export class QueryCache {
 
       this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
 
+      const inMemoryCacheDisablePeriod = 5 * 60 * 1000;
       if (options.useInMemory && renewedAgo + inMemoryCacheDisablePeriod <= renewalThreshold * 1000) {
-        this.memoryCache.set(redisKey, parsedResult);
+        this.memoryCache.set(redisKey, cachedResult);
       }
 
-      return parsedResult.result;
+      return cachedResult.result;
     } else {
       this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       return fetchNew();
