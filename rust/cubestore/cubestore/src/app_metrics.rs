@@ -7,7 +7,7 @@ use crate::util::metrics::{Counter, Gauge, Histogram};
 /// The number of process startups.
 pub static STARTUPS: Counter = metrics::counter("cs.startup");
 
-/// Errots on reciving from subprocesses.
+/// Errors in IPC.
 pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
 
 /// Incoming SQL queries that do data reads.
