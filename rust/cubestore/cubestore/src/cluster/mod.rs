@@ -363,6 +363,10 @@ impl WorkerProcessing for WorkerProcessor {
             .ok()
             .unwrap_or("--sel-worker".to_string())
     }
+
+    fn process_type() -> String {
+        "sel-worker".to_string()
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
