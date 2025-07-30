@@ -884,7 +884,7 @@ export class QueryCache {
 
     if (opts.useInMemory) {
       this.memoryCache.set(redisKey, cachedResult, {
-        ttl: opts.renewalThreshold
+        ttl: opts.renewalThreshold * 1000
       });
     }
 
