@@ -8,7 +8,7 @@ use crate::util::metrics::{Counter, Gauge, Histogram};
 pub static STARTUPS: Counter = metrics::counter("cs.startup");
 
 /// Errots on reciving from subprocesses.
-pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.recive_error");
+pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
 
 /// Incoming SQL queries that do data reads.
 pub static DATA_QUERIES: Counter = metrics::counter("cs.sql.query.data");
