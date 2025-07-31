@@ -436,6 +436,7 @@ impl QueryEngine for SqlQueryEngine {
                 "PostgreSQL 14.2 on x86_64-cubesql".to_string(),
             ));
             ctx.register_udf(create_db_udf("current_database".to_string(), state.clone()));
+            ctx.register_udf(create_db_udf("current_catalog".to_string(), state.clone()));
             ctx.register_udf(create_db_udf("current_schema".to_string(), state.clone()));
             ctx.register_udf(create_current_user_udf(
                 state.clone(),
