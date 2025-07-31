@@ -2018,7 +2018,47 @@ impl WrappedSelectNode {
                 Ok((resulting_sql, sql_query))
             }
             // Expr::GetIndexedField { .. } => {}
-            // Expr::Between { .. } => {}
+            Expr::Between {
+                expr,
+                negated,
+                low,
+                high,
+            } => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries,
+                )
+                .await?;
+                let (low, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *low,
+                    push_to_cube_context,
+                    subqueries,
+                )
+                .await?;
+                let (high, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *high,
+                    push_to_cube_context,
+                    subqueries,
+                )
+                .await?;
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .between_expr(expr, negated, low, high)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for between expr: {}",
+                            e
+                        ))
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
             Expr::Case {
                 expr,
                 when_then_expr,
