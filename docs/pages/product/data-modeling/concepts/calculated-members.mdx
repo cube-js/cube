@@ -17,6 +17,8 @@ into formulas that involve simpler measures. Also, calculated measures [can
 help][ref-decomposition-recipe] to use [non-additive][ref-non-additive] measures with
 pre-aggregations.
 
+### Members of the same cube
+
 In the following example, the `completed_ratio` measure is calculated as a division of
 `completed_count` by total `count`. Note that the result is also multiplied by `1.0`
 since [integer division in SQL][link-postgres-division] would otherwise produce an
@@ -88,6 +90,149 @@ FROM (
   SELECT 2 AS id, 'completed'  AS status UNION ALL
   SELECT 3 AS id, 'completed'  AS status
 ) AS "orders"
+```
+
+### Members of other cubes
+
+If you have `first_cube` that is [joined][ref-joins] to `second_cube`, you can define a
+calculated measure that references measures from both `first_cube` and `second_cube`.
+When you query for this calculated measure, Cube will transparently generate SQL with
+necessary joins.
+
+In the following example, the `orders.purchases_to_users_ratio` measure references the
+`purchases` measure from the `orders` cube and the `count` measure from the `users` cube:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT 1 AS id, 11 AS user_id, 'processing' AS status UNION ALL
+    SELECT 2 AS id, 11 AS user_id, 'completed'  AS status UNION ALL
+    SELECT 3 AS id, 11 AS user_id, 'completed'  AS status
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  measures: {
+    purchases: {
+      type: `count`,
+      filters: [{
+        sql: `${CUBE}.status = 'completed'`
+      }]
+    }
+  }
+})
+
+cube(`users`, {
+  sql: `
+    SELECT 11 AS id, 'Alice' AS name UNION ALL
+    SELECT 12 AS id, 'Bob'   AS name UNION ALL
+    SELECT 13 AS id, 'Eve'   AS name
+  `,
+
+  joins: {
+    orders: {
+      sql: `${CUBE}.id = ${orders}.user_id`,
+      relationship: `one_to_many`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    },
+
+    purchases_to_users_ratio: {
+      sql: `100.0 * ${orders.purchases} / ${CUBE.count}`,
+      type: `number`,
+      format: `percent`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, 11 AS user_id, 'processing' AS status UNION ALL
+      SELECT 2 AS id, 11 AS user_id, 'completed'  AS status UNION ALL
+      SELECT 3 AS id, 11 AS user_id, 'completed'  AS status
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: purchases
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+
+  - name: users
+    sql: >
+      SELECT 11 AS id, 'Alice' AS name UNION ALL
+      SELECT 12 AS id, 'Bob'   AS name UNION ALL
+      SELECT 13 AS id, 'Eve'   AS name
+
+    joins:
+      - name: orders
+        sql: "{CUBE}.id = {orders}.user_id"
+        relationship: one_to_many
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+
+      - name: purchases_to_users_ratio
+        sql: "1.0 * {orders.purchases} / {CUBE.count}"
+        type: number
+```
+
+</CodeTabs>
+
+If you query for `users.purchases_to_users_ratio`, Cube will generate the following SQL:
+
+```sql
+SELECT
+  1.0 * COUNT(
+    CASE
+      WHEN ("orders".status = 'completed') THEN "orders".id
+    END
+  ) / COUNT(DISTINCT "users".id) "users__purchases_to_users_ratio"
+FROM (
+  SELECT 11 AS id, 'Alice' AS name UNION ALL
+  SELECT 12 AS id, 'Bob'   AS name UNION ALL
+  SELECT 13 AS id, 'Eve'   AS name
+) AS "users"
+LEFT JOIN (
+  SELECT 1 AS id, 11 AS user_id, 'processing' AS status UNION ALL
+  SELECT 2 AS id, 11 AS user_id, 'completed'  AS status UNION ALL
+  SELECT 3 AS id, 11 AS user_id, 'completed'  AS status
+) AS "orders" ON "users".id = "orders".user_id
 ```
 
 ## Proxy dimensions
