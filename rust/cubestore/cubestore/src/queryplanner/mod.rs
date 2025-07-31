@@ -300,7 +300,7 @@ impl QueryPlannerImpl {
         state_builder
     }
 
-    const EXECUTION_BATCH_SIZE: usize = 4096;
+    const EXECUTION_BATCH_SIZE: usize = 1024;
 
     pub fn make_execution_context(mut config: SessionConfig) -> SessionContext {
         // The config parameter is from metadata_cache_factory (which we need to rename) but doesn't
