@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.46](https://github.com/cube-js/cube/compare/v1.3.45...v1.3.46) (2025-07-31)
+
+### Bug Fixes
+
+- **clickhouse-driver:** Parse Error: Header overflow due to X-ClickHouse-Progress ([#9842](https://github.com/cube-js/cube/issues/9842)) ([e7db3fe](https://github.com/cube-js/cube/commit/e7db3fe369824e6960cb59ec48f77fed2eddcbd2))
+
 ## [1.3.45](https://github.com/cube-js/cube/compare/v1.3.44...v1.3.45) (2025-07-29)
 
 ### Features

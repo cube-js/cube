@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.46](https://github.com/cube-js/cube/compare/v1.3.45...v1.3.46) (2025-07-31)
+
+### Features
+
+- **cubesql:** Add support for `current_catalog` function for postgresql protocol ([#9839](https://github.com/cube-js/cube/issues/9839)) ([95dc46e](https://github.com/cube-js/cube/commit/95dc46e08735ae0319048ef4bcd52cb4226d26f5))
+
 ## [1.3.45](https://github.com/cube-js/cube/compare/v1.3.44...v1.3.45) (2025-07-29)
 
 ### Features
