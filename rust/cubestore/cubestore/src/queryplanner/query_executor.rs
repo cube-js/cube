@@ -481,11 +481,12 @@ impl QueryExecutorImpl {
         let mut config = self
             .metadata_cache_factory
             .make_session_config()
-            .with_batch_size(4096)
+            .with_batch_size(QueryPlannerImpl::EXECUTION_BATCH_SIZE)
             // TODO upgrade DF if less than 2 then there will be no MergeJoin. Decide on repartitioning.
             .with_target_partitions(2)
             .with_prefer_existing_sort(true)
             .with_round_robin_repartition(false);
+        config.options_mut().execution.parquet.split_row_group_reads = true;
         config.options_mut().optimizer.prefer_hash_join = false;
         // Redundant with the commented CoalesceBatches::new() line in `Self::optimizer_rules`
         config.options_mut().execution.coalesce_batches = false;
@@ -706,8 +707,11 @@ impl CubeTable {
                     .get(remote_path.as_str())
                     .expect(format!("Missing remote path {}", remote_path).as_str());
 
+                let mut options = TableParquetOptions::new();
+                options.global = state.config_options().execution.parquet.clone();
+
                 let parquet_source = ParquetSource::new(
-                    TableParquetOptions::default(),
+                    options,
                     get_reader_options_customizer(state.config()),
                 )
                 .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
@@ -786,8 +790,10 @@ impl CubeTable {
                         .get(&remote_path)
                         .expect(format!("Missing remote path {}", remote_path).as_str());
 
+                    let mut options = TableParquetOptions::new();
+                    options.global = state.config_options().execution.parquet.clone();
                     let parquet_source = ParquetSource::new(
-                        TableParquetOptions::default(),
+                        options,
                         get_reader_options_customizer(state.config()),
                     )
                     .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
