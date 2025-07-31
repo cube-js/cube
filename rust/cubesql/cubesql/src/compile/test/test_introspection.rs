@@ -842,7 +842,8 @@ async fn datagrip_introspection() -> Result<(), CubeError> {
     insta::assert_snapshot!(
         "datagrip_introspection",
         execute_query(
-            "select current_database(), current_schema(), current_user;".to_string(),
+            "select current_database(), current_catalog, current_schema(), current_user;"
+                .to_string(),
             DatabaseProtocol::PostgreSQL
         )
         .await?

@@ -4346,13 +4346,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     register_fun_stub!(udf, "cosh", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "cot", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "cotd", tsig = [Float64], rettyp = Float64);
-    register_fun_stub!(
-        udf,
-        "current_catalog",
-        argc = 0,
-        rettyp = Utf8,
-        vol = Stable
-    );
     register_fun_stub!(udf, "current_query", argc = 0, rettyp = Utf8, vol = Stable);
     register_fun_stub!(udf, "current_role", argc = 0, rettyp = Utf8, vol = Stable);
     register_fun_stub!(
