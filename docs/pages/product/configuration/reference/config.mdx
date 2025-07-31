@@ -1256,6 +1256,61 @@ module.exports = {
 Check [this recipe](/product/auth/recipes/sql-api-ldap) for an example of
 using `check_sql_auth` to authenticate requests to the SQL API with LDAP.
 
+You can also check for the protocol and the authentication method as follows. This can
+be useful for handling the [NTLM][ref-ntlm] authentication in the [DAX API][ref-dax-api]
+and the [MDX API][ref-mdx-api]:
+
+<CodeTabs>
+
+```python
+from cube import config
+import os
+
+@config('check_sql_auth')
+def check_sql_auth(req: dict, user_name: str, password: str) -> dict:
+  # Handle NTLM authentication:
+  # - for Power BI `runas` command
+  # - for Power BI gateway
+  if req['protocol'] == 'xmla' and req['method'] == 'ntlm':
+    if (user_name == os.environ.get('CUBEJS_SQL_USER')):
+      return {
+        'password': os.environ.get('CUBEJS_SQL_PASSWORD'),
+        'securityContext': {}
+      }
+    
+    return {
+      'password': os.environ.get('CUBEJS_SQL_PASSWORD'),
+      'securityContext': {}
+    }
+
+  raise Exception('Access denied')
+```
+
+```javascript
+module.exports = {
+  checkSqlAuth: (req, user_name, password) => {
+    // handle ntlm auth scenarios (PBI "runas" command + PBI gateway auth)
+    if (req.protocol === 'xmla' && req.method === 'ntlm') {
+      if (user_name === process.env.CUBEJS_SQL_USER) {
+        return {
+          password: process.env.CUBEJS_SQL_PASSWORD,
+          securityContext: {}
+        }
+      }
+      
+      return {
+        password: process.env.CUBEJS_SQL_PASSWORD,
+        securityContext: {}
+      }
+    }
+
+    throw new Error('Access denied')
+  }
+}
+```
+
+</CodeTabs>
+
 ### `can_switch_sql_user`
 
 Used in the [SQL API][ref-sql-api]. Default implementation depends on
@@ -1485,3 +1540,6 @@ If not defined, Cube will lookup for environment variable
 [ref-auth-integration]: /product/auth#authentication-integration
 [ref-ldap-roles-mapping]: /product/workspace/sso#user-roles-mapping
 [ref-ldap-integration]: /product/workspace/sso#ldap-integration
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-ntlm]: /product/auth/methods/ntlm
