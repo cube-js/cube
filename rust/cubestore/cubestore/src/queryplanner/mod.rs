@@ -300,6 +300,8 @@ impl QueryPlannerImpl {
         state_builder
     }
 
+    const EXECUTION_BATCH_SIZE: usize = 4096;
+
     pub fn make_execution_context(mut config: SessionConfig) -> SessionContext {
         // The config parameter is from metadata_cache_factory (which we need to rename) but doesn't
         // include all necessary configs.
@@ -307,6 +309,8 @@ impl QueryPlannerImpl {
             .options_mut()
             .execution
             .dont_parallelize_sort_preserving_merge_exec_inputs = true;
+        config.options_mut().execution.batch_size = Self::EXECUTION_BATCH_SIZE;
+        config.options_mut().execution.parquet.split_row_group_reads = true;
 
         // TODO upgrade DF: build SessionContexts consistently
         let state = Self::minimal_session_state_from_final_config(config)
