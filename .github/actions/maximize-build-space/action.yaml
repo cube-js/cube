@@ -1,0 +1,30 @@
+name: 'Maximize Build Space'
+description: 'Free up disk space on GitHub Actions runners'
+runs:
+  using: "composite"
+  steps:
+    - name: Display disk space before cleanup
+      shell: bash
+      run: |
+        echo "Disk space before cleanup:"
+        df -h
+    - name: Remove unnecessary packages
+      shell: bash
+      run: |
+        sudo apt-get remove -y 'php.*'
+        sudo apt-get remove -y '^mongodb-.*'
+        sudo apt-get remove -y '^mysql-.*'
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+    - name: Remove large directories
+      shell: bash
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+    - name: Display disk space after cleanup
+      shell: bash
+      run: |
+        echo "Disk space after cleanup:"
+        df -h
