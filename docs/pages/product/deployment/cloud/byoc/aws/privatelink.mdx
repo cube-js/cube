@@ -66,6 +66,15 @@ To enable proper hostname resolution, create a private Route 53 hosted zone:
    - **Domain name**: `<byoc-region>.cubecloudapp.dev`
    - **Type**: Private hosted zone
    - **VPCs**: Associate with your target VPC(s)
+
+<InfoBox>
+
+The `<byoc-region>` placeholder in the domain name should be replaced with the exact region identifier provided by Cube Cloud support. This is **not** the standard AWS region name (like `us-east-1`), but rather a Cube Cloud-specific identifier that uniquely identifies your BYOC infrastructure provisioning.
+
+For example, if Cube Cloud provides you with a region identifier like `aws-us-east-1-t-12345-prod`, you would use that exact string in place of `<byoc-region>`.
+
+</InfoBox>
+
 4. Create the following DNS records in the zone:
 
    | Record Name | Type | Value |
@@ -73,6 +82,8 @@ To enable proper hostname resolution, create a private Route 53 hosted zone:
    | `*.<byoc-region>.cubecloudapp.dev` | A | Alias to HTTP VPC endpoint |
    | `*.sql.<byoc-region>.cubecloudapp.dev` | A | Alias to SQL VPC endpoint |
    | `sql.<byoc-region>.cubecloudapp.dev` | A | Alias to SQL VPC endpoint |
+
+   **Note**: Each BYOC infrastructure provisioning will have a different region identifier. If you provision additional regions in the future, each will require its own private zone with the corresponding region-specific identifier.
 
 ### Step 4: Verify connectivity
 
