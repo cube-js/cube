@@ -1,9 +1,46 @@
 variable "CROSS_VERSION" {
-  default = "01082024"
+  // dmY
+  default = "31072025"
 }
 
 variable "LLVM_VERSION" {
   default = "18"
+}
+
+variable "PYTHON_VERSIONS" {
+  default = [
+    # TODO: Enable after release.
+    # {
+    #   python_version = "3.14.0"
+    #   python_version_sufix = "rc1"
+    #   python_release = "3.14"
+    # },
+    {
+      python_version = "3.13.5"
+      python_version_sufix = ""
+      python_release = "3.13"
+    },
+    {
+      python_version = "3.12.4"
+      python_version_sufix = ""
+      python_release = "3.12"
+    },
+    {
+      python_version = "3.11.3"
+      python_version_sufix = ""
+      python_release = "3.11"
+    },
+    {
+      python_version = "3.10.11"
+      python_version_sufix = ""
+      python_release = "3.10"
+    },
+    {
+      python_version = "3.9.18"
+      python_version_sufix = ""
+      python_release = "3.9"
+    }
+  ]
 }
 
 target "aarch64-unknown-linux-gnu" {
@@ -24,29 +61,13 @@ target "aarch64-unknown-linux-gnu-python" {
   dockerfile = "aarch64-unknown-linux-gnu-python.Dockerfile"
   name = "aarch64-unknown-linux-gnu-python-${replace(item.python_release, ".", "-")}"
   matrix = {
-    item = [
-      {
-        python_version = "3.12.4"
-        python_release = "3.12"
-      },
-      {
-        python_version = "3.11.3"
-        python_release = "3.11"
-      },
-      {
-        python_version = "3.10.11"
-        python_release = "3.10"
-      },
-      {
-        python_version = "3.9.18"
-        python_release = "3.9"
-      }
-    ]
+    item = PYTHON_VERSIONS
   }
   args = {
     CROSS_VERSION = CROSS_VERSION
     PYTHON_VERSION = item.python_version
-    PYTHON_RELEASE = item.python_release
+    PYTHON_RELEASE = item.python_release,
+    PYTHON_VERSION_SUFFIX = item.python_version_sufix
   }
   tags = ["cubejs/rust-cross:aarch64-unknown-linux-gnu-${CROSS_VERSION}-python-${item.python_release}"]
   platforms = ["linux/amd64"]
@@ -80,29 +101,13 @@ target "x86_64-unknown-linux-gnu-python" {
   dockerfile = "x86_64-unknown-linux-gnu-python.Dockerfile"
   name = "x86_64-unknown-linux-gnu-python-${replace(item.python_release, ".", "-")}"
   matrix = {
-    item = [
-      {
-        python_version = "3.12.4"
-        python_release = "3.12"
-      },
-      {
-        python_version = "3.11.3"
-        python_release = "3.11"
-      },
-      {
-        python_version = "3.10.11"
-        python_release = "3.10"
-      },
-      {
-        python_version = "3.9.18"
-        python_release = "3.9"
-      }
-    ]
+    item = PYTHON_VERSIONS
   }
   args = {
     CROSS_VERSION = CROSS_VERSION
     PYTHON_VERSION = item.python_version
     PYTHON_RELEASE = item.python_release
+    PYTHON_VERSION_SUFFIX = item.python_version_sufix
   }
   tags = ["cubejs/rust-cross:x86_64-unknown-linux-gnu-${CROSS_VERSION}-python-${item.python_release}"]
   platforms = ["linux/amd64"]
