@@ -8,6 +8,7 @@ ARG PYTHON_RELEASE
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python${PYTHON_RELEASE} \
     && rm -rf /var/lib/apt/lists/*;
 
+# --enable-optimizations is disabled, because it's not supported with CROSS
 RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX}.tgz -O - | tar -xz \
     && cd Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX} \
     && touch config.site-aarch64 \
@@ -16,7 +17,6 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
     && echo "ac_cv_file__dev_ptc=no" >> config.site-aarch64 \
     && CONFIG_SITE=config.site-aarch64 ./configure  \
       --enable-shared \
-      --enable-optimizations \
       --disable-ipv6 \
       --prefix=/usr/aarch64-linux-gnu \
       --build=aarch64-unknown-linux-gnu \

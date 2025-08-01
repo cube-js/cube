@@ -9,12 +9,11 @@ variable "LLVM_VERSION" {
 
 variable "PYTHON_VERSIONS" {
   default = [
-    # TODO: Enable after release.
-    # {
-    #   python_version = "3.14.0"
-    #   python_version_sufix = "rc1"
-    #   python_release = "3.14"
-    # },
+    {
+      python_version = "3.14.0"
+      python_version_sufix = "rc1"
+      python_release = "3.14"
+    },
     {
       python_version = "3.13.5"
       python_version_sufix = ""
