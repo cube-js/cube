@@ -3,6 +3,7 @@ import cronParser from 'cron-parser';
 
 import type { CubeSymbols, CubeDefinition } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
 
 /* *****************************
  * ATTENTION:
@@ -802,14 +803,26 @@ const baseSchema = {
   shown: Joi.boolean().strict(),
   public: Joi.boolean().strict(),
   meta: Joi.any(),
-  joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
-    sql: Joi.func().required(),
-    relationship: Joi.any().valid(
-      'belongsTo', 'belongs_to', 'many_to_one', 'manyToOne',
-      'hasMany', 'has_many', 'one_to_many', 'oneToMany',
-      'hasOne', 'has_one', 'one_to_one', 'oneToOne'
-    ).required()
-  })),
+  joins: Joi.alternatives([
+    Joi.object().pattern(identifierRegex, Joi.object().keys({
+      sql: Joi.func().required(),
+      relationship: Joi.any().valid(
+        'belongsTo', 'belongs_to', 'many_to_one', 'manyToOne',
+        'hasMany', 'has_many', 'one_to_many', 'oneToMany',
+        'hasOne', 'has_one', 'one_to_one', 'oneToOne'
+      ).required()
+    })),
+    Joi.array().items(Joi.object().keys({
+      name: identifier.required(),
+      sql: Joi.func().required(),
+      relationship: Joi.any().valid(
+        'belongsTo', 'belongs_to', 'many_to_one', 'manyToOne',
+        'hasMany', 'has_many', 'one_to_many', 'oneToMany',
+        'hasOne', 'has_one', 'one_to_one', 'oneToOne'
+      ).required(),
+      alias: identifier,
+    }))
+  ]),
   measures: MeasuresSchema,
   dimensions: DimensionsSchema,
   segments: SegmentsSchema,
@@ -928,7 +941,7 @@ export function functionFieldsPatterns(): string[] {
   return Array.from(functionPatterns);
 }
 
-export class CubeValidator {
+export class CubeValidator implements CompilerInterface {
   protected readonly validCubes: Map<string, boolean> = new Map();
 
   public constructor(
@@ -936,7 +949,7 @@ export class CubeValidator {
   ) {
   }
 
-  public compile(cubes, errorReporter: ErrorReporter) {
+  public compile(_cubes, errorReporter: ErrorReporter) {
     return this.cubeSymbols.cubeList.map(
       (v) => this.validate(this.cubeSymbols.getCubeDefinition(v.name), errorReporter.inContext(`${v.name} cube`))
     );

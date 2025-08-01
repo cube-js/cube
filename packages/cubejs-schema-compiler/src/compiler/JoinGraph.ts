@@ -6,6 +6,7 @@ import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator, MeasureDefinition } from './CubeEvaluator';
 import type { CubeDefinition, JoinDefinition } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
+import { CompilerInterface } from './PrepareCompiler';
 
 type JoinEdge = {
   join: JoinDefinition,
@@ -30,7 +31,7 @@ export type JoinHint = string | string[];
 
 export type JoinHints = JoinHint[];
 
-export class JoinGraph {
+export class JoinGraph implements CompilerInterface {
   private readonly cubeValidator: CubeValidator;
 
   private readonly cubeEvaluator: CubeEvaluator;
@@ -60,7 +61,7 @@ export class JoinGraph {
     this.graph = null;
   }
 
-  public compile(cubes: unknown, errorReporter: ErrorReporter): void {
+  public compile(_cubes: unknown, errorReporter: ErrorReporter): void {
     this.edges = R.compose<
         Array<CubeDefinition>,
         Array<CubeDefinition>,
@@ -76,16 +77,11 @@ export class JoinGraph {
 
     // This requires @types/ramda@0.29 or newer
     // @ts-ignore
-    this.nodes = R.compose<
-        Record<string, JoinEdge>,
-        Array<[string, JoinEdge]>,
-        Array<JoinEdge>,
-        Record<string, Array<JoinEdge> | undefined>,
-        Record<string, Record<string, 1>>
-    >(
+    this.nodes = R.compose(
       // This requires @types/ramda@0.29 or newer
       // @ts-ignore
       R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.to, 1]))),
+      // @ts-ignore
       R.groupBy((join: JoinEdge) => join.from),
       R.map(v => v[1]),
       R.toPairs
@@ -109,70 +105,53 @@ export class JoinGraph {
   }
 
   protected buildJoinEdges(cube: CubeDefinition, errorReporter: ErrorReporter): Array<[string, JoinEdge]> {
-    // @ts-ignore
-    return R.compose(
-      // @ts-ignore
-      R.filter(R.identity),
-      R.map((join: [string, JoinEdge]) => {
-        const multipliedMeasures: ((m: Record<string, MeasureDefinition>) => MeasureDefinition[]) = R.compose(
-          R.filter<MeasureDefinition>(
-            (m: MeasureDefinition): boolean => m.sql && this.cubeEvaluator.funcArguments(m.sql).length === 0 && m.sql() === 'count(*)' ||
-            ['sum', 'avg', 'count', 'number'].indexOf(m.type) !== -1
-          ),
-          R.values as (input: Record<string, MeasureDefinition>) => MeasureDefinition[]
-        );
-        const joinRequired =
-          (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
-        if (
-          !this.cubeEvaluator.primaryKeys[join[1].from].length &&
-          multipliedMeasures(this.cubeEvaluator.measuresForCube(join[1].from)).length > 0
-        ) {
-          errorReporter.error(joinRequired(join[1].from));
-          return null;
-        }
-        if (!this.cubeEvaluator.primaryKeys[join[1].to].length &&
-          multipliedMeasures(this.cubeEvaluator.measuresForCube(join[1].to)).length > 0) {
-          errorReporter.error(joinRequired(join[1].to));
-          return null;
-        }
-        return join;
-      }),
-      R.unnest,
-      R.map((join: [string, JoinDefinition]): [[string, JoinEdge]] => [
-        [`${cube.name}-${join[0]}`, {
-          join: join[1],
-          from: cube.name,
-          to: join[0],
-          originalFrom: cube.name,
-          originalTo: join[0]
-        }]
-      ]),
-      // @ts-ignore
-      R.filter(R.identity),
-      R.map((join: [string, JoinDefinition]) => {
-        if (!this.cubeEvaluator.cubeExists(join[0])) {
-          errorReporter.error(`Cube ${join[0]} doesn't exist`);
-          return undefined;
-        }
-        return join;
-      }),
-      // @ts-ignore
-      R.toPairs
-    // @ts-ignore
-    )(cube.joins || {});
-  }
+    if (!cube.joins) {
+      return [];
+    }
 
-  protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {
-    return R.compose<
-      Record<string, JoinDefinition>,
-      Array<[string, JoinDefinition]>,
-      Array<[string, 1]>,
-      Record<string, 1>
-    >(
-      R.fromPairs,
-      R.map(v => [v[0], 1]),
-      R.toPairs
-    )(cube.joins || {});
+    const getMultipliedMeasures = (cubeName: string): MeasureDefinition[] => {
+      const measures = this.cubeEvaluator.measuresForCube(cubeName);
+      return Object.values(measures).filter((m: MeasureDefinition) => (m.sql &&
+          this.cubeEvaluator.funcArguments(m.sql).length === 0 &&
+          m.sql() === 'count(*)') ||
+        ['sum', 'avg', 'count', 'number'].includes(m.type));
+    };
+
+    const joinRequired =
+      (v: string) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
+
+    return cube.joins
+      .filter(join => {
+        if (!this.cubeEvaluator.cubeExists(join.name)) {
+          errorReporter.error(`Cube ${join.name} doesn't exist`);
+          return false;
+        }
+
+        const fromMultipliedMeasures = getMultipliedMeasures(cube.name);
+        if (!this.cubeEvaluator.primaryKeys[cube.name].length && fromMultipliedMeasures.length > 0) {
+          errorReporter.error(joinRequired(cube.name));
+          return false;
+        }
+
+        const toMultipliedMeasures = getMultipliedMeasures(join.name);
+        if (!this.cubeEvaluator.primaryKeys[join.name].length && toMultipliedMeasures.length > 0) {
+          errorReporter.error(joinRequired(join.name));
+          return false;
+        }
+
+        return true;
+      })
+      .map(join => {
+        const joinEdge: JoinEdge = {
+          join,
+          from: cube.name,
+          to: join.name,
+          originalFrom: cube.name,
+          originalTo: join.name
+        };
+
+        return [`${cube.name}-${join.name}`, joinEdge] as [string, JoinEdge];
+      });
   }
 
   public buildJoin(cubesToJoin: JoinHints): FinishedJoinTree | null {
@@ -214,7 +193,7 @@ export class JoinGraph {
     return this.builtJoins[key];
   }
 
-  protected cubeFromPath(cubePath) {
+  protected cubeFromPath(cubePath: JoinHint): string {
     if (Array.isArray(cubePath)) {
       return cubePath[cubePath.length - 1];
     }

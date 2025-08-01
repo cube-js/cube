@@ -22,6 +22,7 @@ import { CompilerInterface } from './PrepareCompiler';
 import { YamlCompiler } from './YamlCompiler';
 import { CubeDictionary } from './CubeDictionary';
 import { CompilerCache } from './CompilerCache';
+import { CubeJoinsResolver } from './CubeJoinsResolver';
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
@@ -53,6 +54,7 @@ export type DataSchemaCompilerOptions = {
   cubeFactory: Function;
   cubeDictionary: CubeDictionary;
   cubeSymbols: CubeSymbols;
+  cubeJoinsResolver: CubeJoinsResolver;
   cubeCompilers?: CompilerInterface[];
   contextCompilers?: CompilerInterface[];
   transpilers?: TranspilerInterface[];
@@ -72,6 +74,7 @@ export type DataSchemaCompilerOptions = {
 export type TranspileOptions = {
   cubeNames?: string[];
   cubeSymbols?: Record<string, Record<string, boolean>>;
+  cubeJoins?: Record<string, Record<string, boolean>>;
   contextSymbols?: Record<string, string>;
   transpilerNames?: string[];
   compilerId?: string;
@@ -107,6 +110,8 @@ export class DataSchemaCompiler {
   private readonly cubeDictionary: CubeDictionary;
 
   private readonly cubeSymbols: CubeSymbols;
+
+  private readonly cubeJoinsResolver: CubeJoinsResolver;
 
   // Actually should be something like
   // createCube(cubeDefinition: CubeDefinition): CubeDefinitionExtended
@@ -157,6 +162,7 @@ export class DataSchemaCompiler {
     this.extensions = options.extensions || {};
     this.cubeDictionary = options.cubeDictionary;
     this.cubeSymbols = options.cubeSymbols;
+    this.cubeJoinsResolver = options.cubeJoinsResolver;
     this.cubeFactory = options.cubeFactory;
     this.filesToCompile = options.filesToCompile || [];
     this.omitErrors = options.omitErrors || false;
@@ -232,6 +238,7 @@ export class DataSchemaCompiler {
     const transpile = async (stage: CompileStage) => {
       let cubeNames: string[] = [];
       let cubeSymbols: Record<string, Record<string, boolean>> = {};
+      let cubeJoins: Record<string, Record<string, boolean>> = {};
       let transpilerNames: string[] = [];
       let results;
 
@@ -252,6 +259,14 @@ export class DataSchemaCompiler {
               )],
             ),
         );
+        cubeJoins = Object.fromEntries(
+          Object.entries(this.cubeJoinsResolver.cubeJoinAliases as Record<string, Record<string, any>>)
+            .map(
+              ([key, value]: [string, Record<string, any>]) => [key, Object.fromEntries(
+                Object.keys(value).map((k) => [k, true]),
+              )],
+            ),
+        );
 
         // Transpilers are the same for all files within phase.
         transpilerNames = this.transpilers.map(t => t.constructor.name);
@@ -264,7 +279,7 @@ export class DataSchemaCompiler {
           content: ';',
         };
 
-        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
+        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, cubeJoins, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
 
         const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js'))
           .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
@@ -291,7 +306,7 @@ export class DataSchemaCompiler {
 
         results = (await Promise.all([...nonJsFilesTasks, ...JsFilesTasks])).flat();
       } else if (transpilationWorkerThreads) {
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, cubeJoins, transpilerNames })));
       } else {
         results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, {})));
       }
@@ -405,7 +420,7 @@ export class DataSchemaCompiler {
     });
   }
 
-  private async transpileJsFile(file: FileContent, errorsReport: ErrorReporter, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions) {
+  private async transpileJsFile(file: FileContent, errorsReport: ErrorReporter, { cubeNames, cubeSymbols, cubeJoins, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions) {
     try {
       if (getEnv('transpilationNative')) {
         const reqData = {
@@ -417,6 +432,7 @@ export class DataSchemaCompiler {
             metaData: {
               cubeNames,
               cubeSymbols: cubeSymbols || {},
+              cubeJoins: cubeJoins || {},
               contextSymbols: contextSymbols || {},
               stage: stage || 0 as CompileStage,
             },
@@ -437,6 +453,7 @@ export class DataSchemaCompiler {
           transpilers: transpilerNames,
           cubeNames,
           cubeSymbols,
+          cubeJoins,
         };
 
         const res = await this.workerPool!.exec('transpile', [data]);

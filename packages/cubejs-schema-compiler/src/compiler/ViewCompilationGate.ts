@@ -1,4 +1,6 @@
-export class ViewCompilationGate {
+import { CompilerInterface } from './PrepareCompiler';
+
+export class ViewCompilationGate implements CompilerInterface {
   private shouldCompile: any;
 
   public constructor() {
@@ -6,10 +8,10 @@ export class ViewCompilationGate {
   }
 
   public compile(cubes: any[]) {
-    // When developing Data Access Policies feature, we've came across a
+    // When developing Data Access Policies feature, we've come across a
     // limitation that Cube members can't be referenced in access policies defined on Views,
     // because views aren't (yet) compiled at the time of access policy evaluation.
-    // To workaround this limitation and additional compilation pass is necessary,
+    // To work around this limitation additional compilation pass is necessary,
     // however it comes with a significant performance penalty.
     // This gate check whether the data model contains views with access policies,
     // and only then allows the additional compilation pass.

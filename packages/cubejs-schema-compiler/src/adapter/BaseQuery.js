@@ -22,7 +22,6 @@ import {
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
   timeSeriesFromCustomInterval,
-  parseSqlInterval,
   findMinGranularityDimension
 } from '@cubejs-backend/shared';
 
@@ -155,6 +154,135 @@ export class BaseQuery {
     this.initFromOptions();
   }
 
+  /**
+   * @protected
+   */
+  initFromOptions() {
+    this.contextSymbols = {
+      securityContext: {},
+      ...this.options.contextSymbols,
+    };
+    this.compilerCache = this.compilers.compiler.compilerCache;
+    this.queryCache = this.compilerCache.getQueryCache({
+      measures: this.options.measures,
+      dimensions: this.options.dimensions,
+      timeDimensions: this.options.timeDimensions,
+      filters: this.options.filters,
+      segments: this.options.segments,
+      order: this.options.order,
+      contextSymbols: this.options.contextSymbols,
+      timezone: this.options.timezone,
+      limit: this.options.limit,
+      offset: this.options.offset,
+      rowLimit: this.options.rowLimit,
+      preAggregationsSchema: this.options.preAggregationsSchema,
+      className: this.constructor.name,
+      externalClassName: this.options.externalQueryClass?.name,
+      preAggregationQuery: this.options.preAggregationQuery,
+      disableExternalPreAggregations: this.options.disableExternalPreAggregations,
+      useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
+      cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
+      historyQueries: this.options.historyQueries, // TODO too heavy for key
+      ungrouped: this.options.ungrouped,
+      memberToAlias: this.options.memberToAlias,
+      expressionParams: this.options.expressionParams,
+      convertTzForRawTimeDimension: this.options.convertTzForRawTimeDimension,
+      from: this.options.from,
+      multiStageQuery: this.options.multiStageQuery,
+      multiStageDimensions: this.options.multiStageDimensions,
+      multiStageTimeDimensions: this.options.multiStageTimeDimensions,
+      subqueryJoins: this.options.subqueryJoins,
+      joinHints: this.options.joinHints,
+    });
+    this.from = this.options.from;
+    this.multiStageQuery = this.options.multiStageQuery;
+    this.timezone = this.options.timezone;
+    this.rowLimit = this.options.rowLimit;
+    this.offset = this.options.offset;
+    /** @type {import('./PreAggregations').PreAggregations} */
+    this.preAggregations = this.newPreAggregations();
+    /** @type {import('./BaseMeasure').BaseMeasure[]} */
+    this.measures = (this.options.measures || []).map(this.newMeasure.bind(this));
+    /** @type {import('./BaseDimension').BaseDimension[]} */
+    this.dimensions = (this.options.dimensions || []).map(this.newDimension.bind(this));
+    /** @type {import('./BaseDimension').BaseDimension[]} */
+    this.multiStageDimensions = (this.options.multiStageDimensions || []).map(this.newDimension.bind(this));
+    /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
+    this.multiStageTimeDimensions = (this.options.multiStageTimeDimensions || []).map(this.newTimeDimension.bind(this));
+    /** @type {import('./BaseSegment').BaseSegment[]} */
+    this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
+
+    const filters = this.extractFiltersAsTree(this.options.filters || []);
+
+    // measure_filter (the one extracted from filters parameter on measure and
+    // used in drill-downs) should go to WHERE instead of HAVING
+    /** @type {(BaseFilter|BaseGroupFilter)[]} */
+    this.filters = filters.filter(f => f.dimensionGroup || f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
+    /** @type {(BaseFilter|BaseGroupFilter)[]} */
+    this.measureFilters = filters.filter(f => (f.measureGroup || f.measure) && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
+    /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
+    this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
+      if (!dimension.dimension) {
+        const { joinHints, joinAliases } = this.collectJoinHints(true);
+
+        // TODO: Use joinAliases for join hints building
+
+        const join = this.joinGraph.buildJoin(joinHints);
+        if (!join) {
+          return undefined;
+        }
+
+        // eslint-disable-next-line prefer-destructuring
+        dimension.dimension = this.cubeEvaluator.timeDimensionPathsForCube(join.root)[0];
+        if (!dimension.dimension) {
+          return undefined;
+        }
+      }
+      return dimension;
+    }).filter(R.identity).map(this.newTimeDimension.bind(this));
+    this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
+    /**
+     * @type {Array<{sql: string, on: {expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}>}
+     */
+    this.customSubQueryJoins = this.options.subqueryJoins ?? [];
+    this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
+    this.canUseNativeSqlPlannerPreAggregation = getEnv('nativeSqlPlannerPreAggregations');
+    if (this.useNativeSqlPlanner && !this.canUseNativeSqlPlannerPreAggregation && !this.neverUseSqlPlannerPreaggregation()) {
+      const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
+
+      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0;
+    }
+    this.queryLevelJoinHints = this.options.joinHints ?? [];
+    this.prebuildJoin();
+
+    this.cubeAliasPrefix = this.options.cubeAliasPrefix;
+    this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
+    this.externalQueryClass = this.options.externalQueryClass;
+
+    // Set the default order only when options.order is not provided at all
+    // if options.order is set (empty array [] or with data) - use it as is
+    this.order = this.options.order ?? this.defaultOrder();
+
+    this.initUngrouped();
+  }
+
+  initUngrouped() {
+    this.ungrouped = this.options.ungrouped;
+    if (this.ungrouped) {
+      if (!this.options.allowUngroupedWithoutPrimaryKey && this.join) {
+        const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
+        const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
+        const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
+        if (missingPrimaryKeys.length) {
+          throw new UserError(`Ungrouped query requires primary keys to be present in dimensions: ${missingPrimaryKeys.map(k => `'${k}'`).join(', ')}. Pass allowUngroupedWithoutPrimaryKey option to disable this check.`);
+        }
+      }
+      if (this.measureFilters.length) {
+        throw new UserError('Measure filters aren\'t allowed in ungrouped query');
+      }
+    }
+  }
+
   extractDimensionsAndMeasures(filters = []) {
     if (!filters) {
       return [];
@@ -248,114 +376,6 @@ export class BaseQuery {
     });
   }
 
-  /**
-   * @protected
-   */
-  initFromOptions() {
-    this.contextSymbols = {
-      securityContext: {},
-      ...this.options.contextSymbols,
-    };
-    this.compilerCache = this.compilers.compiler.compilerCache;
-    this.queryCache = this.compilerCache.getQueryCache({
-      measures: this.options.measures,
-      dimensions: this.options.dimensions,
-      timeDimensions: this.options.timeDimensions,
-      filters: this.options.filters,
-      segments: this.options.segments,
-      order: this.options.order,
-      contextSymbols: this.options.contextSymbols,
-      timezone: this.options.timezone,
-      limit: this.options.limit,
-      offset: this.options.offset,
-      rowLimit: this.options.rowLimit,
-      preAggregationsSchema: this.options.preAggregationsSchema,
-      className: this.constructor.name,
-      externalClassName: this.options.externalQueryClass?.name,
-      preAggregationQuery: this.options.preAggregationQuery,
-      disableExternalPreAggregations: this.options.disableExternalPreAggregations,
-      useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
-      cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
-      historyQueries: this.options.historyQueries, // TODO too heavy for key
-      ungrouped: this.options.ungrouped,
-      memberToAlias: this.options.memberToAlias,
-      expressionParams: this.options.expressionParams,
-      convertTzForRawTimeDimension: this.options.convertTzForRawTimeDimension,
-      from: this.options.from,
-      multiStageQuery: this.options.multiStageQuery,
-      multiStageDimensions: this.options.multiStageDimensions,
-      multiStageTimeDimensions: this.options.multiStageTimeDimensions,
-      subqueryJoins: this.options.subqueryJoins,
-      joinHints: this.options.joinHints,
-    });
-    this.from = this.options.from;
-    this.multiStageQuery = this.options.multiStageQuery;
-    this.timezone = this.options.timezone;
-    this.rowLimit = this.options.rowLimit;
-    this.offset = this.options.offset;
-    /** @type {import('./PreAggregations').PreAggregations} */
-    this.preAggregations = this.newPreAggregations();
-    /** @type {import('./BaseMeasure').BaseMeasure[]} */
-    this.measures = (this.options.measures || []).map(this.newMeasure.bind(this));
-    /** @type {import('./BaseDimension').BaseDimension[]} */
-    this.dimensions = (this.options.dimensions || []).map(this.newDimension.bind(this));
-    /** @type {import('./BaseDimension').BaseDimension[]} */
-    this.multiStageDimensions = (this.options.multiStageDimensions || []).map(this.newDimension.bind(this));
-    /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
-    this.multiStageTimeDimensions = (this.options.multiStageTimeDimensions || []).map(this.newTimeDimension.bind(this));
-    /** @type {import('./BaseSegment').BaseSegment[]} */
-    this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
-
-    const filters = this.extractFiltersAsTree(this.options.filters || []);
-
-    // measure_filter (the one extracted from filters parameter on measure and
-    // used in drill-downs) should go to WHERE instead of HAVING
-    /** @type {(BaseFilter|BaseGroupFilter)[]} */
-    this.filters = filters.filter(f => f.dimensionGroup || f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
-    /** @type {(BaseFilter|BaseGroupFilter)[]} */
-    this.measureFilters = filters.filter(f => (f.measureGroup || f.measure) && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
-    /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
-    this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
-      if (!dimension.dimension) {
-        const join = this.joinGraph.buildJoin(this.collectJoinHints(true));
-        if (!join) {
-          return undefined;
-        }
-
-        // eslint-disable-next-line prefer-destructuring
-        dimension.dimension = this.cubeEvaluator.timeDimensionPathsForCube(join.root)[0];
-        if (!dimension.dimension) {
-          return undefined;
-        }
-      }
-      return dimension;
-    }).filter(R.identity).map(this.newTimeDimension.bind(this));
-    this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
-    /**
-     * @type {Array<{sql: string, on: {expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}>}
-     */
-    this.customSubQueryJoins = this.options.subqueryJoins ?? [];
-    this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
-    this.canUseNativeSqlPlannerPreAggregation = getEnv('nativeSqlPlannerPreAggregations');
-    if (this.useNativeSqlPlanner && !this.canUseNativeSqlPlannerPreAggregation && !this.neverUseSqlPlannerPreaggregation()) {
-      const fullAggregateMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
-
-      this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0;
-    }
-    this.queryLevelJoinHints = this.options.joinHints ?? [];
-    this.prebuildJoin();
-
-    this.cubeAliasPrefix = this.options.cubeAliasPrefix;
-    this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
-    this.externalQueryClass = this.options.externalQueryClass;
-
-    // Set the default order only when options.order is not provided at all
-    // if options.order is set (empty array [] or with data) - use it as is
-    this.order = this.options.order ?? this.defaultOrder();
-
-    this.initUngrouped();
-  }
-
   // Temporary workaround to avoid checking for multistage in CubeStoreQuery, since that could lead to errors when HLL functions are present in the query.
   neverUseSqlPlannerPreaggregation() {
     return false;
@@ -424,9 +444,16 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
-      const [rootOfJoin, ...allMembersJoinHints] = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
-      const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
-      let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(this.join));
+      let { joinHints, joinAliases } = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      const [rootOfJoin, ...allMembersJoinHints] = joinHints;
+
+      ({ joinHints, joinAliases } = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery()));
+      const customSubQueryJoinHints = joinHints;
+
+      ({ joinHints, joinAliases } = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(this.join)));
+      let joinMembersJoinHints = joinHints;
+
+      // TODO: Use joinAliases for join hints building
 
       // One cube may join the other cube via transitive joined cubes,
       // members from which are referenced in the join `on` clauses.
@@ -485,7 +512,12 @@ export class BaseQuery {
 
       while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoins, newJoin) && cnt < 10000) {
         prevJoins = newJoin;
-        joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
+
+        ({ joinHints, joinAliases } = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin)));
+        joinMembersJoinHints = joinHints;
+
+        // TODO: Use joinAliases for join hints building
+
         if (!isOrderPreserved(prevJoinMembersJoinHints, joinMembersJoinHints)) {
           throw new UserError(`Can not construct joins for the query, potential loop detected: ${prevJoinMembersJoinHints.join('->')} vs ${joinMembersJoinHints.join('->')}`);
         }
@@ -524,23 +556,6 @@ export class BaseQuery {
           .map(m => [m.unescapedAliasName(), `${m.dimension}.${m.granularity}`])
       )
     );
-  }
-
-  initUngrouped() {
-    this.ungrouped = this.options.ungrouped;
-    if (this.ungrouped) {
-      if (!this.options.allowUngroupedWithoutPrimaryKey && this.join) {
-        const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
-        const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
-        const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
-        if (missingPrimaryKeys.length) {
-          throw new UserError(`Ungrouped query requires primary keys to be present in dimensions: ${missingPrimaryKeys.map(k => `'${k}'`).join(', ')}. Pass allowUngroupedWithoutPrimaryKey option to disable this check.`);
-        }
-      }
-      if (this.measureFilters.length) {
-        throw new UserError('Measure filters aren\'t allowed in ungrouped query');
-      }
-    }
   }
 
   get subQueryDimensions() {
@@ -2393,7 +2408,8 @@ export class BaseQuery {
     );
 
     if (shouldBuildJoinForMeasureSelect) {
-      const joinHints = this.collectJoinHintsFromMembers(measures);
+      const { joinHints, joinAliases } = this.collectJoinHintsFromMembers(measures);
+      // TODO: Use joinAliases for join hints building
       const measuresJoin = this.joinGraph.buildJoin(joinHints);
       if (measuresJoin.multiplicationFactor[keyCubeName]) {
         throw new UserError(
@@ -2474,10 +2490,14 @@ export class BaseQuery {
 
       const cubes = this.collectFrom(nonViewMembers, this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
       // Not using `collectJoinHintsFromMembers([measure])` because it would collect too many join hints from view
+      const { joinHints: collectedJoinHints, joinAliases } = this.collectJoinHintsFromMembers(nonViewMembers);
       const joinHints = [
         measure.joinHint,
-        ...this.collectJoinHintsFromMembers(nonViewMembers),
+        ...collectedJoinHints,
       ];
+
+      // TODO: Use joinAliases for join hints building
+
       if (R.any(cubeName => keyCubeName !== cubeName, cubes)) {
         const measuresJoin = this.joinGraph.buildJoin(joinHints);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
@@ -2658,10 +2678,23 @@ export class BaseQuery {
   }
 
   collectJoinHintsFromMembers(members) {
-    return [
-      ...members.map(m => m.joinHint).filter(h => h?.length > 0),
-      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers'),
-    ];
+    const {
+      joinHints: collectedJoinHints,
+      joinAliases: collectedJoinAliases,
+    } = this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers')
+      .reduce((acc, { joinHints, joinAliases }) => {
+        joinHints.forEach(item => acc.joinHints.add(item));
+        acc.joinAliases.push(...joinAliases);
+        return acc;
+      }, { joinHints: new Set(), joinAliases: [] });
+
+    return {
+      joinHints: [
+        ...members.map(m => m.joinHint).filter(h => h?.length > 0),
+        ...Array.from(collectedJoinHints),
+      ],
+      joinAliases: collectedJoinAliases,
+    };
   }
 
   /**
@@ -3067,16 +3100,26 @@ export class BaseQuery {
     return sql;
   }
 
+  /**
+   * @param {string} sql
+   * @returns {string}
+   */
   wrapSegmentForDimensionSelect(sql) {
     return sql;
   }
 
+  /**
+   * @param {string} cubeName
+   */
   pushCubeNameForCollectionIfNecessary(cubeName) {
     if ((this.evaluateSymbolContext || {}).cubeNames && cubeName) {
       this.evaluateSymbolContext.cubeNames.push(cubeName);
     }
   }
 
+  /**
+   * @param {string|Array<string>} joinHints
+   */
   pushJoinHints(joinHints) {
     if (this.safeEvaluateSymbolContext().joinHints && joinHints) {
       if (Array.isArray(joinHints) && joinHints.length === 1) {
@@ -3086,6 +3129,10 @@ export class BaseQuery {
     }
   }
 
+  /**
+   * @param {string} cubeName
+   * @param {string} name
+   */
   pushMemberNameForCollectionIfNecessary(cubeName, name) {
     const pathFromArray = this.cubeEvaluator.pathFromArray([cubeName, name]);
     if (!this.cubeEvaluator.getCubeDefinition(cubeName).isView) {
@@ -3372,12 +3419,15 @@ export class BaseQuery {
   }
 
   collectJoinHintsFor(fn) {
-    const context = { joinHints: [] };
+    const context = { joinHints: [], joinAliases: [] };
     this.evaluateSymbolSqlWithContext(
       fn,
       context
     );
-    return context.joinHints;
+    return {
+      joinHints: context.joinHints,
+      joinAliases: context.joinAliases,
+    };
   }
 
   /**
