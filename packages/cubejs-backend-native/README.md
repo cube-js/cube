@@ -21,7 +21,7 @@ If Cube cannot detect a `libpython` library or your system is not supported, it 
 
 ### With python
 
-Supported python versions: `3.12`, `3.11`, `3.10`, `3.9`.
+Supported python versions: `3.13`, `3.12`, `3.11`, `3.10`, `3.9`.
 
 |          | `linux-gnu` | `linux-musl` | `darwin` | `win32` |
 |----------|:-----------:|:------------:|:--------:|:-------:|
