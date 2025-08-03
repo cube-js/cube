@@ -1,6 +1,7 @@
 mod aggregate;
 mod aggregate_function;
 mod alias;
+mod between_expr;
 mod binary_expr;
 mod case;
 mod cast;
@@ -90,6 +91,7 @@ impl RewriteRules for WrapperRules {
         self.not_expr_rules(&mut rules);
         self.distinct_rules(&mut rules);
         self.like_expr_rules(&mut rules);
+        self.between_expr_rules(&mut rules);
 
         rules
     }
