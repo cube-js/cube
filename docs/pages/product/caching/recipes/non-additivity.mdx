@@ -165,8 +165,7 @@ cube(`users`, {
 
 ### Decomposing into a formula with additive measures
 
-Non-additive `avg` measures can be rewritten as
-[calculated measures](/product/data-modeling/reference/measures#calculated-measures)
+Non-additive `avg` measures can be rewritten as [calculated measures][ref-calculated-measures]
 that reference additive measures only. Then, this additive measures can be used
 in pre-aggregations. Please note, however, that you shouldn't include `avg_age`
 measure in your pre-aggregation as it renders it non-additive.
@@ -246,3 +245,4 @@ queried data, in the console.
 
 
 [ref-percentile-recipe]: /product/data-modeling/recipes/percentiles
+[ref-calculated-measures]: /product/data-modeling/concepts/calculated-members#calculated-measures

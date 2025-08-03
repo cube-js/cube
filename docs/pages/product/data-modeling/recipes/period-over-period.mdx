@@ -10,26 +10,26 @@ revenue, etc.
 
 In Cube, calculating a period-over-period metric involves the following
 steps:
-- Define a couple of [`rolling_window` measures][ref-rolling-window] with
-different windows, i.e., one for _this period_ and the other for the
-_previous period_.
+- Define a [multi-stage measure][ref-multi-stage] for the _current period_.
+- Define a [time-shift measure][link-time-shift] that references the current
+period measure and shifts it to the _previous period_.
 - Define a [calculated measure][ref-calculated-measure] that references
-these `rolling_window` measures and uses them in a calculation, e.g.,
-divides or subtracts them.
+these measures and uses them in a calculation, e.g., divides or subtracts them.
 
 <WarningBox>
 
-Tesseract, the [next-generation data modeling engine][link-tesseract],
-provides a more efficient way to calculate [period-over-period changes][link-period-over-period].
-Tesseract is currently in preview. Use the `CUBEJS_TESSERACT_SQL_PLANNER`
-environment variable to enable it.
+Multi-stage calculations are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. Tesseract is currently in preview. Use the
+`CUBEJS_TESSERACT_SQL_PLANNER` environment variable to enable it.
 
 </WarningBox>
 
 The following data model allows to calculate a month-over-month change of
-some value. `current_month_sum` and `previous_month_sum` measures define
-two rolling windows and the `month_over_month_ratio` measure divides
-their values:
+some value. `current_month_sum` is the base measure, `previous_month_sum` 
+is a time-shift measure that shifts the current month data to the previous 
+month, and the `month_over_month_ratio` measure divides their values:
+
+<CodeTabs>
 
 ```yaml
 cubes:
@@ -53,21 +53,67 @@ cubes:
       - name: current_month_sum
         sql: value
         type: sum
-        rolling_window:
-          trailing: 1 month
-          offset: end
 
       - name: previous_month_sum
-        sql: value
-        type: sum
-        rolling_window:
-          trailing: 1 month
-          offset: start
+        multi_stage: true
+        sql: "{current_month_sum}"
+        type: number
+        time_shift:
+          - interval: 1 month
+            type: prior
 
       - name: month_over_month_ratio
-        sql: "{current_month_sum} / {previous_month_sum}"
+        multi_stage: true
+        sql: "{current_month_sum} / NULLIF({previous_month_sum}, 0)"
         type: number
 ```
+
+```javascript
+cube(`month_over_month`, {
+  sql: `
+    SELECT 1 AS value, '2024-01-01'::TIMESTAMP AS date UNION ALL
+    SELECT 2 AS value, '2024-01-01'::TIMESTAMP AS date UNION ALL
+    SELECT 3 AS value, '2024-02-01'::TIMESTAMP AS date UNION ALL
+    SELECT 4 AS value, '2024-02-01'::TIMESTAMP AS date UNION ALL
+    SELECT 5 AS value, '2024-03-01'::TIMESTAMP AS date UNION ALL
+    SELECT 6 AS value, '2024-03-01'::TIMESTAMP AS date UNION ALL
+    SELECT 7 AS value, '2024-04-01'::TIMESTAMP AS date UNION ALL
+    SELECT 8 AS value, '2024-04-01'::TIMESTAMP AS date
+  `,
+
+  dimensions: {
+    date: {
+      sql: `date`,
+      type: `time`
+    }
+  },
+
+  measures: {
+    current_month_sum: {
+      sql: `value`,
+      type: `sum`
+    },
+
+    previous_month_sum: {
+      multi_stage: true,
+      sql: `${current_month_sum}`,
+      type: `number`,
+      time_shift: [{
+        interval: `1 month`,
+        type: `prior`
+      }]
+    },
+
+    month_over_month_ratio: {
+      multi_stage: true,
+      sql: `${current_month_sum} / NULLIF(${previous_month_sum}, 0)`,
+      type: `number`
+    }
+  }
+})
+```
+
+</CodeTabs>
 
 ## Result
 
@@ -81,23 +127,24 @@ that matches the period, i.e., `month` for month-over-month calculations:
     {
       "dimension": "month_over_month.date",
       "granularity": "month",
-      "dateRange": "this year"
+      "dateRange": ["2024-01-01", "2025-01-01"]
     }
   ],
   "measures": [
     "month_over_month.current_month_sum",
     "month_over_month.previous_month_sum",
-    "month_over_month.change"
+    "month_over_month.month_over_month_ratio"
   ]
 }
 ```
 
 Here's the result:
 
-<Screenshot src="https://ucarecdn.com/50c9165a-f15d-491f-86b4-d44009b05576/"/>
+<Screenshot src="https://lgo0ecceic.ucarecd.net/2f97cb29-903c-41ff-99e3-295535d2844f/"/>
 
-[ref-rolling-window]: /product/data-modeling/reference/measures#rolling_window
+
+[ref-multi-stage]: /product/data-modeling/concepts/multi-stage-calculations
 [ref-calculated-measure]: /product/data-modeling/overview#4-using-calculated-measures
 [ref-time-dimension-granularity]: /product/apis-integrations/rest-api/query-format#time-dimensions-format
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
-[link-period-over-period]: /product/data-modeling/concepts/multi-stage-calculations#prior-date
+[link-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift
