@@ -11,8 +11,9 @@ use chrono::{
     prelude::*,
 };
 use chrono_tz::Tz;
+use std::io::Error;
 use std::{
-    fmt::{self, Debug, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     io,
 };
 
@@ -70,27 +71,26 @@ impl Debug for TimestampValue {
     }
 }
 
-impl ToString for TimestampValue {
-    fn to_string(&self) -> String {
-        Utc.timestamp_nanos(self.unix_nano)
-            .format_with_items(
-                [
-                    Item::Numeric(Year, Zero),
-                    Item::Literal("-"),
-                    Item::Numeric(Month, Zero),
-                    Item::Literal("-"),
-                    Item::Numeric(Day, Zero),
-                    Item::Literal("T"),
-                    Item::Numeric(Hour, Zero),
-                    Item::Literal(":"),
-                    Item::Numeric(Minute, Zero),
-                    Item::Literal(":"),
-                    Item::Numeric(Second, Zero),
-                    Item::Fixed(Fixed::Nanosecond3),
-                ]
-                .iter(),
-            )
-            .to_string()
+impl Display for TimestampValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let formatted = Utc.timestamp_nanos(self.unix_nano).format_with_items(
+            [
+                Item::Numeric(Year, Zero),
+                Item::Literal("-"),
+                Item::Numeric(Month, Zero),
+                Item::Literal("-"),
+                Item::Numeric(Day, Zero),
+                Item::Literal("T"),
+                Item::Numeric(Hour, Zero),
+                Item::Literal(":"),
+                Item::Numeric(Minute, Zero),
+                Item::Literal(":"),
+                Item::Numeric(Second, Zero),
+                Item::Fixed(Fixed::Nanosecond3),
+            ]
+            .iter(),
+        );
+        write!(f, "{}", formatted)
     }
 }
 
@@ -108,8 +108,14 @@ impl ToProtocolValue for TimestampValue {
             None => self.to_naive_datetime(),
             Some(_) => self.to_fixed_datetime()?.naive_utc(),
         };
-        let ts_str = ndt.format("%Y-%m-%d %H:%M:%S%.6f").to_string();
-        ts_str.to_text(buf)
+
+        // 2022-04-25 15:36:49.39705+00
+        let as_str = ndt.format("%Y-%m-%d %H:%M:%S%.6f").to_string();
+
+        match self.tz_ref() {
+            None => as_str.to_text(buf),
+            Some(_) => (as_str + "+00").to_text(buf),
+        }
     }
 
     fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
@@ -117,10 +123,14 @@ impl ToProtocolValue for TimestampValue {
             None => self.to_naive_datetime(),
             Some(_) => self.to_fixed_datetime()?.naive_utc(),
         };
+
         let n = ndt
             .signed_duration_since(pg_base_date_epoch())
             .num_microseconds()
-            .unwrap();
+            .ok_or(Error::new(
+                io::ErrorKind::Other,
+                "Unable to extract number of seconds from timestamp",
+            ))?;
 
         buf.put_i32(8);
         buf.put_i64(n);

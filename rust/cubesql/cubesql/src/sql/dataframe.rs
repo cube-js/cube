@@ -11,9 +11,6 @@ use datafusion::arrow::{
     datatypes::{DataType, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
 };
-// Type aliases for compatibility - actual implementations are in pg-srv
-pub type IntervalValue = pg_srv::IntervalValue;
-pub type TimestampValue = pg_srv::TimestampValue;
 use rust_decimal::prelude::*;
 use serde::{Serialize, Serializer};
 use std::fmt::Debug;
@@ -77,6 +74,10 @@ impl Row {
         self.values.push(val);
     }
 }
+
+// Type aliases for compatibility - actual implementations are in pg-srv
+pub type IntervalValue = pg_srv::IntervalValue;
+pub type TimestampValue = pg_srv::TimestampValue;
 
 #[derive(Debug)]
 pub enum TableValue {
