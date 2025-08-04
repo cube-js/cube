@@ -172,7 +172,7 @@ mod tests {
             "1 day 01:01:01.000001".to_string()
         );
         assert_eq!(
-            IntervalValue::new(0, 0, -1, 1, 1, 1).as_iso_str(),
+            IntervalValue::new(0, 0, -1, -1, -1, -1).as_iso_str(),
             "-01:01:01.000001".to_string()
         );
         assert_eq!(
