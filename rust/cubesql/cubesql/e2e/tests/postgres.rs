@@ -92,7 +92,7 @@ impl PostgresIntegrationTestSuite {
         )
         .await;
 
-        AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client, port }))
+        AsyncTestConstructorResult::Success(Box::new(PostgresIntegrationTestSuite { client, port }))
     }
 
     async fn create_client(config: tokio_postgres::Config) -> Client {

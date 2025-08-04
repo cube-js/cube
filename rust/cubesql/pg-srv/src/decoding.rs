@@ -127,6 +127,7 @@ mod tests {
     use crate::*;
 
     use crate::protocol::Format;
+    use crate::values::timestamp::TimestampValue;
     use bytes::BytesMut;
 
     fn assert_test_decode<T: ToProtocolValue + FromProtocolValue + std::cmp::PartialEq>(
@@ -155,6 +156,9 @@ mod tests {
         assert_test_decode(std::f64::consts::PI, Format::Text)?;
         assert_test_decode(-std::f64::consts::E, Format::Text)?;
         assert_test_decode(0.0_f64, Format::Text)?;
+        assert_test_decode(TimestampValue::new(1650890322000000000, None), Format::Text)?;
+        assert_test_decode(TimestampValue::new(0, None), Format::Text)?;
+        assert_test_decode(TimestampValue::new(1234567890123456000, None), Format::Text)?;
 
         Ok(())
     }
@@ -169,6 +173,15 @@ mod tests {
         assert_test_decode(std::f64::consts::PI, Format::Binary)?;
         assert_test_decode(-std::f64::consts::E, Format::Binary)?;
         assert_test_decode(0.0_f64, Format::Binary)?;
+        assert_test_decode(
+            TimestampValue::new(1650890322000000000, None),
+            Format::Binary,
+        )?;
+        assert_test_decode(TimestampValue::new(0, None), Format::Binary)?;
+        assert_test_decode(
+            TimestampValue::new(1234567890123456000, None),
+            Format::Binary,
+        )?;
 
         Ok(())
     }
