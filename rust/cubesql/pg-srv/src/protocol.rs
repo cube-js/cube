@@ -1330,10 +1330,6 @@ mod tests {
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(body.parameter_formats, vec![Format::Binary]);
-
-                let values =
-                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?;
-
                 assert_eq!(
                     body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?,
                     vec![BindValue::Float64(3.14)]
