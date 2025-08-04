@@ -26,7 +26,7 @@ pub struct TimestampValue {
 impl TimestampValue {
     pub fn new(mut unix_nano: i64, tz: Option<String>) -> TimestampValue {
         // This is a hack to workaround a mismatch between on-disk and in-memory representations.
-        // We use millisecond precision on-disk.
+        // We use microsecond precision on-disk.
         unix_nano -= unix_nano % 1000;
         TimestampValue { unix_nano, tz }
     }
