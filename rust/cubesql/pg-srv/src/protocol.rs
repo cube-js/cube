@@ -783,6 +783,9 @@ impl Bind {
                     PgTypeId::INT8 => {
                         BindValue::Int64(i64::from_protocol(raw_value, param_format)?)
                     }
+                    PgTypeId::FLOAT8 => {
+                        BindValue::Float64(f64::from_protocol(raw_value, param_format)?)
+                    }
                     _ => {
                         return Err(ErrorResponse::error(
                             ErrorCode::FeatureNotSupported,
@@ -1271,6 +1274,69 @@ mod tests {
                     body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::TEXT]))
                         .unwrap(),
                     vec![BindValue::String("test".to_string())]
+                );
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_parse_bind_float64() -> Result<(), ProtocolError> {
+        // Test text format float64
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 19 00 73 30 00 00 01 00 00 00 01 00   B.....s0........
+            00 00 04 33 2e 31 34 00 00 00 00                  ...3.14....
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(
+                    body,
+                    Bind {
+                        portal: "".to_string(),
+                        statement: "s0".to_string(),
+                        parameter_formats: vec![Format::Text],
+                        parameter_values: vec![Some(vec![51, 46, 49, 52])], // "3.14"
+                        result_formats: vec![]
+                    },
+                );
+
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?,
+                    vec![BindValue::Float64(3.14)]
+                );
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        // Test binary format float64
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 1e 00 73 30 00 00 01 00 01 00 01 00   B.....s0........
+            00 00 08 40 09 1e b8 51 eb 85 1f 00 00 00 00      ...@...Q.......
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(body.parameter_formats, vec![Format::Binary]);
+
+                let values =
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?;
+
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?,
+                    vec![BindValue::Float64(3.14)]
                 );
             }
             _ => panic!("Wrong message, must be Bind"),
