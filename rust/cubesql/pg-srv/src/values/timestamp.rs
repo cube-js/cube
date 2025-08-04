@@ -154,10 +154,10 @@ impl FromProtocolValue for TimestampValue {
         })?;
 
         // Parse timestamp string in format "YYYY-MM-DD HH:MM:SS[.fff]"
-        let parsed_datetime = chrono::NaiveDateTime::parse_from_str(as_str, "%Y-%m-%d %H:%M:%S")
-            .or_else(|_| chrono::NaiveDateTime::parse_from_str(as_str, "%Y-%m-%d %H:%M:%S%.f"))
-            .or_else(|_| chrono::NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S"))
-            .or_else(|_| chrono::NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S%.f"))
+        let parsed_datetime = NaiveDateTime::parse_from_str(as_str, "%Y-%m-%d %H:%M:%S")
+            .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%d %H:%M:%S%.f"))
+            .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S"))
+            .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S%.f"))
             .map_err(|err| ProtocolError::ErrorResponse {
                 source: ErrorResponse::error(
                     ErrorCode::ProtocolViolation,
