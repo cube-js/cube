@@ -100,7 +100,7 @@ impl Display for TimestampValue {
 }
 
 // POSTGRES_EPOCH_JDATE
-// https://github.com/postgres/postgres/blob/REL_14_4/src/include/datatype/timestamp.h#L162
+// https://github.com/postgres/postgres/blob/REL_14_4/src/include/datatype/timestamp.h#L163
 fn pg_base_date_epoch() -> NaiveDateTime {
     NaiveDate::from_ymd_opt(2000, 1, 1)
         .unwrap()
