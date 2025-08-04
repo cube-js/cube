@@ -1287,8 +1287,8 @@ mod tests {
         // Test text format float64
         let buffer = parse_hex_dump(
             r#"
-            42 00 00 00 19 00 73 30 00 00 01 00 00 00 01 00   B.....s0........
-            00 00 04 33 2e 31 34 00 00 00 00                  ...3.14....
+            42 00 00 00 1a 00 73 30 00 00 01 00 00 00 01 00   B.....s0........
+            00 00 05 32 36 2e 31 31 00 00 00 00               ...26.11....
             "#
             .to_string(),
         );
@@ -1303,14 +1303,14 @@ mod tests {
                         portal: "".to_string(),
                         statement: "s0".to_string(),
                         parameter_formats: vec![Format::Text],
-                        parameter_values: vec![Some(vec![51, 46, 49, 52])], // "3.14"
+                        parameter_values: vec![Some(vec![50, 54, 46, 49, 49])], // "26.11"
                         result_formats: vec![]
                     },
                 );
 
                 assert_eq!(
                     body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?,
-                    vec![BindValue::Float64(3.14)]
+                    vec![BindValue::Float64(26.11)]
                 );
             }
             _ => panic!("Wrong message, must be Bind"),
@@ -1320,7 +1320,7 @@ mod tests {
         let buffer = parse_hex_dump(
             r#"
             42 00 00 00 1e 00 73 30 00 00 01 00 01 00 01 00   B.....s0........
-            00 00 08 40 09 1e b8 51 eb 85 1f 00 00 00 00      ...@...Q.......
+            00 00 08 40 3a 1c 28 f5 c2 8f 5c 00 00 00 00      ...@:.(....\...
             "#
             .to_string(),
         );
@@ -1332,7 +1332,7 @@ mod tests {
                 assert_eq!(body.parameter_formats, vec![Format::Binary]);
                 assert_eq!(
                     body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?,
-                    vec![BindValue::Float64(3.14)]
+                    vec![BindValue::Float64(26.11)]
                 );
             }
             _ => panic!("Wrong message, must be Bind"),
