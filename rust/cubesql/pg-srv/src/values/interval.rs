@@ -36,10 +36,10 @@ impl IntervalValue {
     }
 
     pub fn extract_years_month(&self) -> (i32, i32) {
-        let years = (self.months as f64 / 12_f64).floor();
-        let month = self.months as f64 - (years * 12_f64);
+        let years = self.months / 12;
+        let month = self.months % 12;
 
-        (years as i32, month as i32)
+        (years, month)
     }
 
     pub fn as_iso_str(&self) -> String {
