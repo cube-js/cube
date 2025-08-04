@@ -16,6 +16,8 @@ use async_trait::async_trait;
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
+#[cfg(feature = "with-chrono")]
+use crate::TimestampValue;
 use crate::{buffer, BindValue, FromProtocolValue, PgType, PgTypeId, ProtocolError};
 
 const DEFAULT_CAPACITY: usize = 64;
@@ -786,6 +788,11 @@ impl Bind {
                     PgTypeId::FLOAT8 => {
                         BindValue::Float64(f64::from_protocol(raw_value, param_format)?)
                     }
+                    #[cfg(feature = "with-chrono")]
+                    PgTypeId::TIMESTAMP => BindValue::Timestamp(TimestampValue::from_protocol(
+                        raw_value,
+                        param_format,
+                    )?),
                     _ => {
                         return Err(ErrorResponse::error(
                             ErrorCode::FeatureNotSupported,
