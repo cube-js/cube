@@ -364,6 +364,7 @@ export type BaseCubeMember = {
   isVisible?: boolean;
   public?: boolean;
   meta?: any;
+  aliasMember?: string;
 };
 
 export type TCubeMeasure = BaseCubeMember & {

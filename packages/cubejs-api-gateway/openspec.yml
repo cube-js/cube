@@ -163,6 +163,9 @@ components:
           type: "string"
         meta:
           type: "object"
+        aliasMember:
+          description: "When measure is defined in View, it keeps the original path: Cube.measure"
+          type: "string"
     V1CubeMetaFolder:
       type: "object"
       required:

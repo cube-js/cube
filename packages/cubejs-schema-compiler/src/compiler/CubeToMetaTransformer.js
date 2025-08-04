@@ -223,6 +223,7 @@ export class CubeToMetaTransformer {
         measures: drillMembersArray.filter((member) => this.cubeEvaluator.isMeasure(member)),
         dimensions: drillMembersArray.filter((member) => this.cubeEvaluator.isDimension(member)),
       },
+      aliasMember: nameToMetric[1].aliasMember,
       meta: nameToMetric[1].meta
     };
   }
