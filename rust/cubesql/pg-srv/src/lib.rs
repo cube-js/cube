@@ -7,6 +7,7 @@ mod encoding;
 
 pub mod buffer;
 pub mod extended;
+pub mod interval;
 pub mod pg_type;
 pub mod protocol;
 
@@ -14,6 +15,7 @@ pub use buffer::*;
 pub use decoding::*;
 pub use encoding::*;
 pub use extended::*;
+pub use interval::*;
 pub use pg_type::*;
 
 use std::{backtrace::Backtrace, fmt::Formatter};
