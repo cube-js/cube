@@ -66,6 +66,14 @@ impl IntervalValue {
             }
         }
 
+        if self.days != 0 {
+            if self.days == 1 {
+                res.push_str(&format!("{:#?} day ", self.days));
+            } else {
+                res.push_str(&format!("{:#?} days ", self.days));
+            }
+        }
+
         if self.hours != 0 || self.mins != 0 || self.secs != 0 || self.usecs != 0 {
             if self.hours < 0 || self.mins < 0 || self.secs < 0 || self.usecs < 0 {
                 res.push('-')
