@@ -424,8 +424,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58549f1842da3080ce63002102d5bc954c7bc843d4f47818e642abdc36253552"
 dependencies = [
  "chrono",
- "chrono-tz-build",
+ "chrono-tz-build 0.0.2",
  "phf 0.10.1",
+]
+
+[[package]]
+name = "chrono-tz"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d59ae0466b83e838b81a54256c39d5d7c20b9d7daa10510a242d9b75abd5936e"
+dependencies = [
+ "chrono",
+ "chrono-tz-build 0.2.1",
+ "phf 0.11.1",
 ]
 
 [[package]]
@@ -436,7 +447,18 @@ checksum = "db058d493fb2f65f41861bfed7e3fe6335264a9f0f92710cab5bdf01fef09069"
 dependencies = [
  "parse-zoneinfo",
  "phf 0.10.1",
- "phf_codegen",
+ "phf_codegen 0.10.0",
+]
+
+[[package]]
+name = "chrono-tz-build"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "433e39f13c9a060046954e0592a8d0a4bcb1040125cbf91cb8ee58964cfb350f"
+dependencies = [
+ "parse-zoneinfo",
+ "phf 0.11.1",
+ "phf_codegen 0.11.3",
 ]
 
 [[package]]
@@ -761,7 +783,7 @@ dependencies = [
  "bitflags 1.3.2",
  "bytes",
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.6.1",
  "comfy-table 7.1.0",
  "criterion",
  "cubeclient",
@@ -2263,6 +2285,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
+ "chrono-tz 0.8.6",
  "hex",
  "log",
  "thiserror 2.0.11",
@@ -2304,8 +2327,18 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fb1c3a8bc4dd4e5cfce29b44ffc14bedd2ee294559a294e2a4d4c9e9a6a13cd"
 dependencies = [
- "phf_generator",
+ "phf_generator 0.10.0",
  "phf_shared 0.10.0",
+]
+
+[[package]]
+name = "phf_codegen"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aef8048c789fa5e851558d709946d6d79a8ff88c0440c587967f8e94bfb1216a"
+dependencies = [
+ "phf_generator 0.11.1",
+ "phf_shared 0.11.1",
 ]
 
 [[package]]
@@ -2315,6 +2348,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d5285893bb5eb82e6aaf5d59ee909a06a16737a8970984dd7746ba9283498d6"
 dependencies = [
  "phf_shared 0.10.0",
+ "rand",
+]
+
+[[package]]
+name = "phf_generator"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1181c94580fa345f50f19d738aaa39c0ed30a600d95cb2d3e23f94266f14fbf"
+dependencies = [
+ "phf_shared 0.11.1",
  "rand",
 ]
 
