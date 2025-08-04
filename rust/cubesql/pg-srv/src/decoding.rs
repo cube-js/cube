@@ -102,6 +102,26 @@ impl FromProtocolValue for bool {
     }
 }
 
+impl FromProtocolValue for f64 {
+    fn from_text(raw: &[u8]) -> Result<Self, ProtocolError> {
+        let as_str = std::str::from_utf8(raw).map_err(|err| ProtocolError::ErrorResponse {
+            source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+            backtrace: Backtrace::capture(),
+        })?;
+
+        as_str
+            .parse::<f64>()
+            .map_err(|err| ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+                backtrace: Backtrace::capture(),
+            })
+    }
+
+    fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError> {
+        Ok(BigEndian::read_f64(raw))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -132,6 +152,9 @@ mod tests {
         assert_test_decode(false, Format::Text)?;
         assert_test_decode(1_i64, Format::Text)?;
         assert_test_decode(100_i64, Format::Text)?;
+        assert_test_decode(std::f64::consts::PI, Format::Text)?;
+        assert_test_decode(-std::f64::consts::E, Format::Text)?;
+        assert_test_decode(0.0_f64, Format::Text)?;
 
         Ok(())
     }
@@ -143,6 +166,9 @@ mod tests {
         assert_test_decode(false, Format::Binary)?;
         assert_test_decode(1_i64, Format::Binary)?;
         assert_test_decode(100_i64, Format::Binary)?;
+        assert_test_decode(std::f64::consts::PI, Format::Binary)?;
+        assert_test_decode(-std::f64::consts::E, Format::Binary)?;
+        assert_test_decode(0.0_f64, Format::Binary)?;
 
         Ok(())
     }
