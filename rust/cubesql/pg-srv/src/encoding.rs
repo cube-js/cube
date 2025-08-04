@@ -146,7 +146,6 @@ impl ToProtocolValue for NaiveDate {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -182,5 +181,4 @@ mod tests {
 
         Ok(())
     }
-
 }
