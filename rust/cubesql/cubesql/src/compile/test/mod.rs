@@ -252,7 +252,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 r#type: "number".to_string(),
                 agg_type: Some("number".to_string()),
                 meta: None,
-                    alias_member: None,
+                alias_member: None,
             }],
             segments: vec![],
             joins: None,
@@ -294,7 +294,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("count".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.maxPrice".to_string(),
@@ -304,7 +304,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("max".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.minPrice".to_string(),
@@ -314,7 +314,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("min".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.avgPrice".to_string(),
@@ -324,7 +324,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("avg".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.countDistinct".to_string(),
@@ -334,7 +334,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("countDistinct".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                     ]
                     .into_iter(),
@@ -421,7 +421,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("count".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.maxPrice".to_string(),
@@ -431,7 +431,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("max".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.minPrice".to_string(),
@@ -441,7 +441,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("min".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.avgPrice".to_string(),
@@ -451,7 +451,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("avg".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.countDistinct".to_string(),
@@ -461,7 +461,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             r#type: "number".to_string(),
                             agg_type: Some("countDistinct".to_string()),
                             meta: None,
-                    alias_member: None,
+                            alias_member: None,
                         },
                     ]
                     .into_iter(),
@@ -492,7 +492,7 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
             r#type: "string".to_string(),
             agg_type: Some("string".to_string()),
             meta: None,
-                    alias_member: None,
+            alias_member: None,
         }],
         segments: vec![],
         joins: None,
@@ -519,7 +519,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 r#type: "number".to_string(),
                 agg_type: Some("sum".to_string()),
                 meta: None,
-                    alias_member: None,
+                alias_member: None,
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_foo".to_string(),
@@ -529,7 +529,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 r#type: "number".to_string(),
                 agg_type: Some("avg".to_string()),
                 meta: None,
-                    alias_member: None,
+                alias_member: None,
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_bar".to_string(),
@@ -539,7 +539,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 r#type: "number".to_string(),
                 agg_type: Some("count".to_string()),
                 meta: None,
-                    alias_member: None,
+                alias_member: None,
             },
         ],
         segments: vec![],
