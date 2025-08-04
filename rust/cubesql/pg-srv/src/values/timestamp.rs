@@ -153,12 +153,12 @@ impl FromProtocolValue for TimestampValue {
             backtrace: Backtrace::capture(),
         })?;
 
-        // Parse timestamp string in format "YYYY-MM-DD HH:MM:SS[.fff]"
+        // Parse timestamp string in format "YYYY-MM-DD HH:MM:SS[.fff]", but PostgreSQL supports
+        // more formats, so let's align this with parse_date_str function from cubesql crate.
         let parsed_datetime = NaiveDateTime::parse_from_str(as_str, "%Y-%m-%d %H:%M:%S")
             .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%d %H:%M:%S%.f"))
             .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S"))
             .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S%.f"))
-            // PostgreSQL supports more formats aligned with parse_date_str
             .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S%.fZ"))
             .or_else(|_| {
                 NaiveDate::parse_from_str(as_str, "%Y-%m-%d").map(|date| {
