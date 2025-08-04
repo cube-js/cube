@@ -23,7 +23,6 @@ pub struct V1CubeMetaMeasure {
     pub description: Option<String>,
     #[serde(rename = "type")]
     pub r#type: String,
-    /// When measure is defined in View, it keeps the original path: Cube.measure
     #[serde(rename = "aliasMember", skip_serializing_if = "Option::is_none")]
     pub alias_member: Option<String>,
     #[serde(rename = "aggType", skip_serializing_if = "Option::is_none")]
