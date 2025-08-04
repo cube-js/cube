@@ -205,7 +205,7 @@ impl FromProtocolValue for TimestampValue {
         let unix_nano = pg_base_date_epoch()
             .and_utc()
             .timestamp_nanos_opt()
-            .unwrap()
+            .expect("Unable to get timestamp nanos for pg_base_date_epoch")
             + (pg_microseconds * 1_000);
 
         Ok(TimestampValue::new(unix_nano, None))
