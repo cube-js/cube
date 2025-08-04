@@ -350,10 +350,6 @@ export type TCubeMember = {
   isVisible?: boolean;
   public?: boolean;
   meta?: any;
-  /**
-   * When member is defined in View, it keeps the original path: Cube.member
-   */
-  aliasMember?: string;
 };
 
 export type BaseCubeMember = {
