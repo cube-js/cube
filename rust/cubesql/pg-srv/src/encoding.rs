@@ -4,10 +4,7 @@ use crate::{protocol::Format, ProtocolError};
 use bytes::{BufMut, BytesMut};
 #[cfg(feature = "with-chrono")]
 use chrono::{NaiveDate, NaiveDateTime};
-use std::{
-    fmt::{Display, Formatter},
-    io::{Error, ErrorKind},
-};
+use std::io::{Error, ErrorKind};
 
 /// This trait explains how to encode values to the protocol format
 pub trait ToProtocolValue: std::fmt::Debug {
@@ -149,146 +146,6 @@ impl ToProtocolValue for NaiveDate {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct IntervalValue {
-    pub months: i32,
-    pub days: i32,
-    pub hours: i32,
-    pub mins: i32,
-    pub secs: i32,
-    pub usecs: i32,
-}
-
-impl IntervalValue {
-    pub fn new(months: i32, days: i32, hours: i32, mins: i32, secs: i32, usecs: i32) -> Self {
-        Self {
-            months,
-            days,
-            hours,
-            mins,
-            secs,
-            usecs,
-        }
-    }
-
-    pub fn is_zeroed(&self) -> bool {
-        self.months == 0
-            && self.days == 0
-            && self.hours == 0
-            && self.mins == 0
-            && self.secs == 0
-            && self.usecs == 0
-    }
-
-    pub fn extract_years_month(&self) -> (i32, i32) {
-        let years = (self.months as f64 / 12_f64).floor();
-        let month = self.months as f64 - (years * 12_f64);
-
-        (years as i32, month as i32)
-    }
-
-    pub fn as_iso_str(&self) -> String {
-        if self.is_zeroed() {
-            return "00:00:00".to_owned();
-        }
-
-        let mut res = "".to_owned();
-        let (years, months) = self.extract_years_month();
-
-        if years != 0 {
-            if years == 1 {
-                res.push_str(&format!("{:#?} year ", years))
-            } else {
-                res.push_str(&format!("{:#?} years ", years))
-            }
-        }
-
-        if months != 0 {
-            if months == 1 {
-                res.push_str(&format!("{:#?} mon ", months));
-            } else {
-                res.push_str(&format!("{:#?} mons ", months));
-            }
-        }
-
-        if self.hours != 0 || self.mins != 0 || self.secs != 0 || self.usecs != 0 {
-            if self.hours < 0 || self.mins < 0 || self.secs < 0 || self.usecs < 0 {
-                res.push('-')
-            };
-
-            res.push_str(&format!(
-                "{:02}:{:02}:{:02}",
-                self.hours.abs(),
-                self.mins.abs(),
-                self.secs.abs()
-            ));
-
-            if self.usecs != 0 {
-                res.push_str(&format!(".{:06}", self.usecs.abs()))
-            }
-        }
-
-        res.trim().to_string()
-    }
-
-    pub fn as_postgresql_str(&self) -> String {
-        let (years, months) = self.extract_years_month();
-
-        // We manually format sign for the case where self.secs == 0, self.usecs < 0.
-        // We follow assumptions about consistency of hours/mins/secs/usecs signs as in
-        // as_iso_str here.
-        format!(
-            "{} years {} mons {} days {} hours {} mins {}{}.{} secs",
-            years,
-            months,
-            self.days,
-            self.hours,
-            self.mins,
-            if self.secs < 0 || self.usecs < 0 {
-                "-"
-            } else {
-                ""
-            },
-            self.secs.abs(),
-            if self.usecs == 0 {
-                "00".to_string()
-            } else {
-                format!("{:06}", self.usecs.abs())
-            }
-        )
-    }
-}
-
-impl Display for IntervalValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // TODO lift formatter higher, to as_postgresql_str
-        // https://github.com/postgres/postgres/blob/REL_14_4/src/interfaces/ecpg/pgtypeslib/interval.c#L763
-        f.write_str(&self.as_postgresql_str())
-    }
-}
-
-impl ToProtocolValue for IntervalValue {
-    // https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/timestamp.c#L958
-    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
-        self.to_string().to_text(buf)
-    }
-
-    // https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/timestamp.c#L1005
-    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
-        let usecs = self.hours as i64 * 60 * 60 * 1_000_000
-            + self.mins as i64 * 60 * 1_000_000
-            + self.secs as i64 * 1_000_000
-            + self.usecs as i64;
-
-        buf.put_i32(16);
-        buf.put_i64(usecs);
-        buf.put_i32(self.days);
-        buf.put_i32(self.months);
-
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -306,6 +163,36 @@ mod tests {
         assert_text_encode(true, &[0, 0, 0, 1, 116]);
         assert_text_encode(false, &[0, 0, 0, 1, 102]);
         assert_text_encode("str".to_string(), &[0, 0, 0, 3, 115, 116, 114]);
+        assert_text_encode(
+            IntervalValue::new(0, 0, 0, 0, 0, 0),
+            &[
+                0, 0, 0, 46, 48, 32, 121, 101, 97, 114, 115, 32, 48, 32, 109, 111, 110, 115, 32,
+                48, 32, 100, 97, 121, 115, 32, 48, 32, 104, 111, 117, 114, 115, 32, 48, 32, 109,
+                105, 110, 115, 32, 48, 46, 48, 48, 32, 115, 101, 99, 115,
+            ],
+        );
+        assert_text_encode(
+            IntervalValue::new(1, 2, 3, 4, 5, 6),
+            &[
+                0, 0, 0, 50, 48, 32, 121, 101, 97, 114, 115, 32, 49, 32, 109, 111, 110, 115, 32,
+                50, 32, 100, 97, 121, 115, 32, 51, 32, 104, 111, 117, 114, 115, 32, 52, 32, 109,
+                105, 110, 115, 32, 53, 46, 48, 48, 48, 48, 48, 54, 32, 115, 101, 99, 115,
+            ],
+        );
+        assert_text_encode(
+            TimestampValue::new(0, None),
+            &[
+                0, 0, 0, 26, 49, 57, 55, 48, 45, 48, 49, 45, 48, 49, 32, 48, 48, 58, 48, 48, 58,
+                48, 48, 46, 48, 48, 48, 48, 48, 48,
+            ],
+        );
+        assert_text_encode(
+            TimestampValue::new(1650890322000000000, None),
+            &[
+                0, 0, 0, 26, 50, 48, 50, 50, 45, 48, 52, 45, 50, 53, 32, 49, 50, 58, 51, 56, 58,
+                52, 50, 46, 48, 48, 48, 48, 48, 48,
+            ],
+        );
 
         Ok(())
     }
@@ -321,61 +208,23 @@ mod tests {
     fn test_binary_encoders() -> Result<(), ProtocolError> {
         assert_bind_encode(true, &[0, 0, 0, 1, 1]);
         assert_bind_encode(false, &[0, 0, 0, 1, 0]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_interval_to_iso() -> Result<(), ProtocolError> {
-        assert_eq!(
-            IntervalValue::new(1, 0, 0, 0, 0, 0).as_iso_str(),
-            "1 mon".to_string()
+        assert_bind_encode(
+            IntervalValue::new(0, 0, 0, 0, 0, 0),
+            &[0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         );
-        assert_eq!(
-            IntervalValue::new(14, 0, 0, 0, 0, 0).as_iso_str(),
-            "1 year 2 mons".to_string()
+        assert_bind_encode(
+            IntervalValue::new(1, 2, 3, 4, 5, 6),
+            &[
+                0, 0, 0, 16, 0, 0, 0, 2, 146, 85, 83, 70, 0, 0, 0, 2, 0, 0, 0, 1,
+            ],
         );
-        assert_eq!(
-            IntervalValue::new(0, 1, 1, 1, 1, 1).as_iso_str(),
-            "01:01:01.000001".to_string()
+        assert_bind_encode(
+            TimestampValue::new(0, None),
+            &[0, 0, 0, 8, 255, 252, 162, 254, 196, 200, 32, 0],
         );
-        assert_eq!(
-            IntervalValue::new(0, 0, -1, 1, 1, 1).as_iso_str(),
-            "-01:01:01.000001".to_string()
-        );
-        assert_eq!(
-            IntervalValue::new(0, 0, 0, 0, 0, 0).as_iso_str(),
-            "00:00:00".to_string()
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_interval_to_postgres() -> Result<(), ProtocolError> {
-        assert_eq!(
-            IntervalValue::new(0, 0, 0, 0, 0, 0).to_string(),
-            "0 years 0 mons 0 days 0 hours 0 mins 0.00 secs".to_string()
-        );
-
-        assert_eq!(
-            IntervalValue::new(0, 0, 0, 0, 1, 23).to_string(),
-            "0 years 0 mons 0 days 0 hours 0 mins 1.000023 secs".to_string()
-        );
-
-        assert_eq!(
-            IntervalValue::new(0, 0, 0, 0, -1, -23).to_string(),
-            "0 years 0 mons 0 days 0 hours 0 mins -1.000023 secs".to_string()
-        );
-
-        assert_eq!(
-            IntervalValue::new(0, 0, 0, 0, -1, 0).to_string(),
-            "0 years 0 mons 0 days 0 hours 0 mins -1.00 secs".to_string()
-        );
-
-        assert_eq!(
-            IntervalValue::new(0, 0, -14, -5, -1, 0).to_string(),
-            "0 years 0 mons 0 days -14 hours -5 mins -1.00 secs".to_string()
+        assert_bind_encode(
+            TimestampValue::new(1650890322000000000, None),
+            &[0, 0, 0, 8, 0, 2, 128, 120, 159, 252, 216, 128],
         );
 
         Ok(())
