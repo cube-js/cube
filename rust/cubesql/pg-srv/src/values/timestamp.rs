@@ -158,6 +158,14 @@ impl FromProtocolValue for TimestampValue {
             .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%d %H:%M:%S%.f"))
             .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S"))
             .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S%.f"))
+            // PostgreSQL supports more formats aligned with parse_date_str
+            .or_else(|_| NaiveDateTime::parse_from_str(as_str, "%Y-%m-%dT%H:%M:%S%.fZ"))
+            .or_else(|_| {
+                NaiveDate::parse_from_str(as_str, "%Y-%m-%d").map(|date| {
+                    date.and_hms_opt(0, 0, 0)
+                        .expect("Unable to set time to 00:00:00")
+                })
+            })
             .map_err(|err| ProtocolError::ErrorResponse {
                 source: ErrorResponse::error(
                     ErrorCode::ProtocolViolation,
