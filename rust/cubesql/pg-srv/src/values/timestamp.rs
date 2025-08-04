@@ -184,7 +184,7 @@ impl FromProtocolValue for TimestampValue {
         Ok(TimestampValue::new(unix_nano, None))
     }
 
-    // https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/timestamp.c#234
+    // https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/timestamp.c#L234
     fn from_binary(raw: &[u8]) -> Result<Self, ProtocolError> {
         if raw.len() != 8 {
             return Err(ProtocolError::ErrorResponse {
