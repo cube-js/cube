@@ -17223,4 +17223,48 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_athena_concat_numbers() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || 1 || '-01' AS DATE) AS "ca_1",
+                COALESCE(sum("ta_1"."sumPrice"), 0) AS "ca_2"
+                FROM "ovr"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+                WHERE ((
+                    EXTRACT(DAY FROM "ta_1"."order_date") <= EXTRACT(DAY FROM CURRENT_DATE)
+                    AND EXTRACT(MONTH FROM "ta_1"."order_date") = EXTRACT(MONTH FROM CURRENT_DATE)
+                ))
+                GROUP BY "ca_1"
+                ORDER BY "ca_1" ASC NULLS LAST
+                LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "expressions/binary".to_string(),
+                "'{% if op == \'||\' %}CAST({{ left }} AS VARCHAR) || \
+                    CAST({{ right }} AS VARCHAR)\
+                    {% else %}{{ left }} {{ op }} {{ right }}{% endif %}'"
+                    .to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("CAST(1 AS VARCHAR)"));
+    }
 }
