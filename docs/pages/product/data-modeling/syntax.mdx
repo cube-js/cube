@@ -433,6 +433,203 @@ removes the ambiguity and keeps data model code maintainable as it grows.
 However, always referring to the current cube by its name leads to code
 repetition and violates the DRY principle. See below how to solve that.
 
+### `{cube1.cube2.member}`
+
+You can also qualify member names with more than one cube name, separated by a dot, to
+provide a [join path][ref-join-paths] and remove the ambiguity of join resolution. Join
+paths can be used in [calculated members][ref-calculated-members], [views][ref-views],
+and [pre-aggregation][ref-preaggs] definitions.
+
+In the following example, four cubes are joined together, forming a [_diamond
+subgraph_][ref-diamond-subgraphs] in the join tree: `a` joins to `b` and `c`, and both
+`b` and `c` join to `d`. As you can see, join paths in the `d_via_b` and `d_via_c`
+dimensions of `a` are then used to specify which intermediate cube to use when resolving
+the dimension from `d`.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: a
+    sql: >
+      SELECT 1 AS id UNION ALL
+      SELECT 2 AS id UNION ALL
+      SELECT 3 AS id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: d_via_b
+        sql: "{b.d.id}"
+        type: number
+
+      - name: d_via_c
+        sql: "{c.d.id}"
+        type: number
+
+    joins:
+      - name: b
+        sql: "{a.id} = {b.id}"
+        relationship: one_to_one
+
+      - name: c
+        sql: "{a.id} = {c.id}"
+        relationship: one_to_one
+
+  - name: b
+    sql: >
+      SELECT 1 AS id UNION ALL
+      SELECT 2 AS id UNION ALL
+      SELECT 3 AS id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    joins:
+      - name: d
+        sql: "{b.id} = {d.id}"
+        relationship: one_to_one
+
+  - name: c
+    sql: >
+      SELECT 1 AS id UNION ALL
+      SELECT 2 AS id UNION ALL
+      SELECT 3 AS id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    joins:
+      - name: d
+        sql: "{c.id} = {d.id}"
+        relationship: one_to_one
+
+  - name: d
+    sql: >
+      SELECT 1 AS id UNION ALL
+      SELECT 2 AS id UNION ALL
+      SELECT 3 AS id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+```
+
+```javascript
+cube(`a`, {
+  sql: `
+    SELECT 1 AS id UNION ALL
+    SELECT 2 AS id UNION ALL
+    SELECT 3 AS id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    d_via_b: {
+      sql: `${b.d.id}`,
+      type: `number`
+    },
+
+    d_via_c: {
+      sql: `${c.d.id}`,
+      type: `number`
+    }
+  },
+
+  joins: {
+    b: {
+      sql: `${a.id} = ${b.id}`,
+      relationship: `one_to_one`
+    },
+
+    c: {
+      sql: `${a.id} = ${c.id}`,
+      relationship: `one_to_one`
+    }
+  }
+})
+
+cube(`b`, {
+  sql: `
+    SELECT 1 AS id UNION ALL
+    SELECT 2 AS id UNION ALL
+    SELECT 3 AS id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  joins: {
+    d: {
+      sql: `${b.id} = ${d.id}`,
+      relationship: `one_to_one`
+    }
+  }
+})
+
+cube(`c`, {
+  sql: `
+    SELECT 1 AS id UNION ALL
+    SELECT 2 AS id UNION ALL
+    SELECT 3 AS id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  joins: {
+    d: {
+      sql: `${c.id} = ${d.id}`,
+      relationship: `one_to_one`
+    }
+  }
+})
+
+cube(`d`, {
+  sql: `
+    SELECT 1 AS id UNION ALL
+    SELECT 2 AS id UNION ALL
+    SELECT 3 AS id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  }
+})
+```
+
+</CodeTabs>
+
 ### `{CUBE}` variable
 
 You can use a handy `{CUBE}` [context variable][ref-context-variables]
@@ -799,3 +996,8 @@ string values in time dimensions.
 [ref-dax-api-date-hierarchies]: /product/apis-integrations/dax-api#date-hierarchies
 [ref-time-dimension]: /product/data-modeling/concepts#time-dimensions
 [ref-recipe-string-time-dimensions]: /product/data-modeling/recipes/string-time-dimensions
+[ref-views]: /product/data-modeling/concepts#views
+[ref-preaggs]: /product/data-modeling/concepts#pre-aggregations
+[ref-join-paths]: /product/data-modeling/concepts/working-with-joins#join-paths
+[ref-calculated-members]: /product/data-modeling/concepts/calculated-members
+[ref-diamond-subgraphs]: /product/data-modeling/concepts/working-with-joins#diamond-subgraphs
