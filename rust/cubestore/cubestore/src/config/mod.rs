@@ -400,7 +400,7 @@ pub trait ConfigObj: DIService {
 
     fn long_term_job_runners_count(&self) -> usize;
 
-    fn bind_address(&self) -> &Option<String>;
+    fn mysql_bind_address(&self) -> &Option<String>;
 
     fn status_bind_address(&self) -> &Option<String>;
 
@@ -576,7 +576,7 @@ pub struct ConfigObjImpl {
     pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
     pub long_term_job_runners_count: usize,
-    pub bind_address: Option<String>,
+    pub mysql_bind_address: Option<String>,
     pub status_bind_address: Option<String>,
     pub http_bind_address: Option<String>,
     pub query_timeout: u64,
@@ -734,8 +734,8 @@ impl ConfigObj for ConfigObjImpl {
         self.long_term_job_runners_count
     }
 
-    fn bind_address(&self) -> &Option<String> {
-        &self.bind_address
+    fn mysql_bind_address(&self) -> &Option<String> {
+        &self.mysql_bind_address
     }
 
     fn status_bind_address(&self) -> &Option<String> {
@@ -1329,7 +1329,7 @@ impl Config {
                     Some(2 * 60 * 60),
                     None,
                 ),
-                bind_address: Some(
+                mysql_bind_address: Some(
                     env::var("CUBESTORE_BIND_ADDR")
                         .ok()
                         .unwrap_or(format!("0.0.0.0:{}", env_parse("CUBESTORE_PORT", 3306))),
@@ -1621,7 +1621,7 @@ impl Config {
                 select_worker_idle_timeout: 600,
                 job_runners_count: 4,
                 long_term_job_runners_count: 8,
-                bind_address: None,
+                mysql_bind_address: None,
                 status_bind_address: None,
                 http_bind_address: None,
                 query_timeout,
@@ -1842,11 +1842,6 @@ impl Config {
     }
 
     pub async fn configure_remote_fs(&self) {
-        let config_obj_to_register = self.config_obj.clone();
-        self.injector
-            .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
-            .await;
-
         match &self.config_obj.store_provider {
             FileStoreProvider::Filesystem { remote_dir } => {
                 let remote_dir = remote_dir.clone();
@@ -2320,7 +2315,7 @@ impl Config {
             })
             .await;
 
-        if self.config_obj.bind_address().is_some() {
+        if let Some(mysql_bind_address) = self.config_obj.mysql_bind_address().clone() {
             self.injector
                 .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
                     Arc::new(SqlAuthDefaultImpl)
@@ -2330,23 +2325,20 @@ impl Config {
             self.injector
                 .register_typed::<MySqlServer, _, _, _>(async move |i| {
                     MySqlServer::new(
-                        i.get_service_typed::<dyn ConfigObj>()
-                            .await
-                            .bind_address()
-                            .as_ref()
-                            .unwrap()
-                            .to_string(),
+                        mysql_bind_address,
                         i.get_service_typed().await,
                         i.get_service_typed().await,
                     )
                 })
                 .await;
+        }
 
+        if let Some(http_bind_address) = self.config_obj.http_bind_address().clone() {
             self.injector
                 .register_typed::<HttpServer, _, _, _>(async move |i| {
                     let config = i.get_service_typed::<dyn ConfigObj>().await;
                     HttpServer::new(
-                        config.http_bind_address().as_ref().unwrap().to_string(),
+                        http_bind_address,
                         i.get_service_typed().await,
                         i.get_service_typed().await,
                         Duration::from_secs(config.check_ws_orphaned_messages_interval_secs()),
@@ -2370,6 +2362,11 @@ impl Config {
     }
 
     pub async fn configure_injector(&self) {
+        let config_obj_to_register = self.config_obj.clone();
+        self.injector
+            .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
+            .await;
+
         self.configure_remote_fs().await;
         self.configure_cache_store().await;
         self.configure_meta_store().await;
