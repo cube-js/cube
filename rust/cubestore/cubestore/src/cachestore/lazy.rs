@@ -24,7 +24,7 @@ pub enum LazyRocksCacheStoreState {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         listeners: Vec<tokio::sync::broadcast::Sender<MetaStoreEvent>>,
-        init_flag: Sender<bool>,
+        _init_flag: Sender<bool>,
     },
     Closed {},
     Initialized {
@@ -72,7 +72,7 @@ impl LazyRocksCacheStore {
                 metastore_fs,
                 config,
                 listeners,
-                init_flag,
+                _init_flag: init_flag,
             }),
         }))
     }
@@ -101,7 +101,7 @@ impl LazyRocksCacheStore {
                 config,
                 listeners,
                 // receiver will be closed on drop
-                init_flag: _,
+                _init_flag: _,
             } => {
                 let store =
                     RocksCacheStore::load_from_remote(&path, metastore_fs.clone(), config.clone())

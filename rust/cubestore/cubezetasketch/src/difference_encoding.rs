@@ -29,7 +29,7 @@ pub struct DifferenceEncoder<'l> {
 }
 
 impl DifferenceEncoder<'_> {
-    pub fn new(buf: &mut Vec<u8>) -> DifferenceEncoder {
+    pub fn new(buf: &mut Vec<u8>) -> DifferenceEncoder<'_> {
         return DifferenceEncoder { buf, last: 0 };
     }
 
@@ -88,7 +88,7 @@ pub struct DifferenceDecoder<'l> {
 }
 
 impl DifferenceDecoder<'_> {
-    pub fn new(data: &[u8]) -> DifferenceDecoder {
+    pub fn new(data: &[u8]) -> DifferenceDecoder<'_> {
         return DifferenceDecoder { data, last: 0 };
     }
 }

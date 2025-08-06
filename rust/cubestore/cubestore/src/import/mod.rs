@@ -323,7 +323,7 @@ impl<'a> CsvLineParser<'a> {
         }
     }
 
-    fn next_value(&mut self) -> Result<MaybeOwnedStr, CubeError> {
+    fn next_value(&mut self) -> Result<MaybeOwnedStr<'_>, CubeError> {
         Ok(
             if let Some(b'"') = self.remaining.as_bytes().iter().nth(0) {
                 let mut closing_index = None;
