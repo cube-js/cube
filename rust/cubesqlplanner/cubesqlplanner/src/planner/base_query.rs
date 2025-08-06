@@ -3,6 +3,7 @@ use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::pre_aggregation_obj::NativePreAggregationObj;
+use crate::logical_plan::OriginalSqlCollector;
 //use crate::logical_plan::optimizers::*;
 use crate::logical_plan::PreAggregation;
 use crate::logical_plan::PreAggregationOptimizer;
@@ -104,15 +105,15 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
         let physical_plan_builder =
             PhysicalPlanBuilder::new(self.query_tools.clone(), templates.clone());
-        /* let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query() {
+        let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query() {
             OriginalSqlCollector::new(self.query_tools.clone()).collect(&optimized_plan)?
         } else {
             HashMap::new()
-        }; */
+        };
 
         let physical_plan = physical_plan_builder.build(
             optimized_plan,
-            HashMap::new(), //original_sql_pre_aggregations,
+            original_sql_pre_aggregations,
             self.request.is_total_query(),
         )?;
 
