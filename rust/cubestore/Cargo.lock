@@ -1268,7 +1268,6 @@ dependencies = [
  "simple_logger",
  "smallvec",
  "sqlparser",
- "tarpc",
  "tempfile",
  "tokio",
  "tokio-stream",
@@ -2185,12 +2184,6 @@ checksum = "6cb51c9a029ddc91b07a787f1d86b53ccfa49b0e86688c946ebe8d3555685dd7"
 dependencies = [
  "libm",
 ]
-
-[[package]]
-name = "humantime"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
@@ -5041,35 +5034,6 @@ dependencies = [
  "filetime",
  "libc",
  "xattr",
-]
-
-[[package]]
-name = "tarpc"
-version = "0.24.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e325774dd5b35d979e9f4db2b0f0d7d85dc2ff2b676a3150af56c09eafc14b07"
-dependencies = [
- "anyhow",
- "fnv",
- "futures",
- "humantime",
- "log",
- "pin-project",
- "rand 0.7.3",
- "static_assertions",
- "tarpc-plugins",
- "tokio",
-]
-
-[[package]]
-name = "tarpc-plugins"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3240378a22b1195734e085ba71d1d4188d50f034aea82635acc430b7005afb5"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.107",
 ]
 
 [[package]]

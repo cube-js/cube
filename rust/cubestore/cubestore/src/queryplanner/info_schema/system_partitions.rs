@@ -42,43 +42,32 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
     fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
         vec![
             Box::new(|partitions| {
-                Arc::new(UInt64Array::from(
-                    partitions
-                        .iter()
-                        .map(|row| row.get_id())
-                        .collect::<Vec<_>>(),
+                Arc::new(UInt64Array::from_iter_values(
+                    partitions.iter().map(|row| row.get_id()),
                 ))
             }),
             Box::new(|partitions| {
-                Arc::new(StringArray::from(
-                    partitions
-                        .iter()
-                        .map(|row| partition_file_name(row.get_id(), row.get_row().suffix()))
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter_values(partitions.iter().map(
+                    |row| partition_file_name(row.get_id(), row.get_row().suffix()),
+                )))
+            }),
+            Box::new(|partitions| {
+                Arc::new(UInt64Array::from_iter_values(
+                    partitions.iter().map(|row| row.get_row().get_index_id()),
                 ))
             }),
             Box::new(|partitions| {
-                Arc::new(UInt64Array::from(
+                Arc::new(UInt64Array::from_iter(
                     partitions
                         .iter()
-                        .map(|row| row.get_row().get_index_id())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.get_row().parent_partition_id().clone()),
                 ))
             }),
             Box::new(|partitions| {
-                Arc::new(UInt64Array::from(
+                Arc::new(UInt64Array::from_iter(
                     partitions
                         .iter()
-                        .map(|row| row.get_row().parent_partition_id().clone())
-                        .collect::<Vec<_>>(),
-                ))
-            }),
-            Box::new(|partitions| {
-                Arc::new(UInt64Array::from(
-                    partitions
-                        .iter()
-                        .map(|row| row.get_row().multi_partition_id().clone())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.get_row().multi_partition_id().clone()),
                 ))
             }),
             Box::new(|partitions| {
@@ -91,11 +80,8 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                             .map(|x| format!("{:?}", x))
                     })
                     .collect::<Vec<_>>();
-                Arc::new(StringArray::from(
-                    min_array
-                        .iter()
-                        .map(|v| v.as_ref().map(|v| v.as_str()))
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter(
+                    min_array.iter().map(|v| v.as_deref()),
                 ))
             }),
             Box::new(|partitions| {
@@ -108,11 +94,8 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                             .map(|x| format!("{:?}", x))
                     })
                     .collect::<Vec<_>>();
-                Arc::new(StringArray::from(
-                    max_array
-                        .iter()
-                        .map(|v| v.as_ref().map(|v| v.as_str()))
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter(
+                    max_array.iter().map(|v| v.as_deref()),
                 ))
             }),
             Box::new(|partitions| {
@@ -120,11 +103,8 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                     .iter()
                     .map(|row| row.get_row().get_min().as_ref().map(|x| format!("{:?}", x)))
                     .collect::<Vec<_>>();
-                Arc::new(StringArray::from(
-                    min_array
-                        .iter()
-                        .map(|v| v.as_ref().map(|v| v.as_str()))
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter(
+                    min_array.iter().map(|v| v.as_deref()),
                 ))
             }),
             Box::new(|partitions| {
@@ -132,43 +112,32 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                     .iter()
                     .map(|row| row.get_row().get_max().as_ref().map(|x| format!("{:?}", x)))
                     .collect::<Vec<_>>();
-                Arc::new(StringArray::from(
-                    max_array
-                        .iter()
-                        .map(|v| v.as_ref().map(|v| v.as_str()))
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter(
+                    max_array.iter().map(|v| v.as_deref()),
                 ))
             }),
             Box::new(|partitions| {
-                Arc::new(BooleanArray::from(
-                    partitions
-                        .iter()
-                        .map(|row| row.get_row().is_active())
-                        .collect::<Vec<_>>(),
+                Arc::new(BooleanArray::from_iter(
+                    partitions.iter().map(|row| Some(row.get_row().is_active())),
                 ))
             }),
             Box::new(|partitions| {
-                Arc::new(BooleanArray::from(
+                Arc::new(BooleanArray::from_iter(
                     partitions
                         .iter()
-                        .map(|row| row.get_row().is_warmed_up())
-                        .collect::<Vec<_>>(),
+                        .map(|row| Some(row.get_row().is_warmed_up())),
                 ))
             }),
             Box::new(|partitions| {
-                Arc::new(UInt64Array::from(
+                Arc::new(UInt64Array::from_iter_values(
                     partitions
                         .iter()
-                        .map(|row| row.get_row().main_table_row_count())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.get_row().main_table_row_count()),
                 ))
             }),
             Box::new(|partitions| {
-                Arc::new(UInt64Array::from(
-                    partitions
-                        .iter()
-                        .map(|row| row.get_row().file_size())
-                        .collect::<Vec<_>>(),
+                Arc::new(UInt64Array::from_iter(
+                    partitions.iter().map(|row| row.get_row().file_size()),
                 ))
             }),
         ]

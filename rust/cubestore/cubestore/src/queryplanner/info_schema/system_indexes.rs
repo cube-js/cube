@@ -36,64 +36,49 @@ impl InfoSchemaTableDef for SystemIndexesTableDef {
     fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
         vec![
             Box::new(|indexes| {
-                Arc::new(UInt64Array::from(
-                    indexes.iter().map(|row| row.get_id()).collect::<Vec<_>>(),
+                Arc::new(UInt64Array::from_iter_values(
+                    indexes.iter().map(|row| row.get_id()),
                 ))
             }),
             Box::new(|indexes| {
-                Arc::new(UInt64Array::from(
-                    indexes
-                        .iter()
-                        .map(|row| row.get_row().table_id())
-                        .collect::<Vec<_>>(),
+                Arc::new(UInt64Array::from_iter_values(
+                    indexes.iter().map(|row| row.get_row().table_id()),
                 ))
             }),
             Box::new(|indexes| {
-                Arc::new(StringArray::from(
-                    indexes
-                        .iter()
-                        .map(|row| row.get_row().get_name().as_str())
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter_values(
+                    indexes.iter().map(|row| row.get_row().get_name()),
                 ))
             }),
             Box::new(|indexes| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     indexes
                         .iter()
-                        .map(|row| format!("{:?}", row.get_row().get_columns()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| format!("{:?}", row.get_row().get_columns())),
                 ))
             }),
             Box::new(|indexes| {
-                Arc::new(UInt64Array::from(
-                    indexes
-                        .iter()
-                        .map(|row| row.get_row().sort_key_size())
-                        .collect::<Vec<_>>(),
+                Arc::new(UInt64Array::from_iter_values(
+                    indexes.iter().map(|row| row.get_row().sort_key_size()),
                 ))
             }),
             Box::new(|indexes| {
-                Arc::new(UInt64Array::from(
+                Arc::new(UInt64Array::from_iter(
                     indexes
                         .iter()
-                        .map(|row| row.get_row().partition_split_key_size().clone())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.get_row().partition_split_key_size().clone()),
                 ))
             }),
             Box::new(|indexes| {
-                Arc::new(UInt64Array::from(
-                    indexes
-                        .iter()
-                        .map(|row| row.get_row().multi_index_id())
-                        .collect::<Vec<_>>(),
+                Arc::new(UInt64Array::from_iter(
+                    indexes.iter().map(|row| row.get_row().multi_index_id()),
                 ))
             }),
             Box::new(|indexes| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     indexes
                         .iter()
-                        .map(|row| format!("{:?}", row.get_row().get_type()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| format!("{:?}", row.get_row().get_type())),
                 ))
             }),
         ]

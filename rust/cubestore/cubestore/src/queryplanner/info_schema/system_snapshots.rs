@@ -35,24 +35,18 @@ impl InfoSchemaTableDef for SystemSnapshotsTableDef {
     fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
         vec![
             Box::new(|snapshots| {
-                Arc::new(StringArray::from(
-                    snapshots
-                        .iter()
-                        .map(|row| format!("{}", row.id))
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter_values(
+                    snapshots.iter().map(|row| format!("{}", row.id)),
                 ))
             }),
             Box::new(|snapshots| {
-                Arc::new(TimestampNanosecondArray::from(
-                    snapshots
-                        .iter()
-                        .map(|row| (row.id * 1000000) as i64)
-                        .collect::<Vec<_>>(),
+                Arc::new(TimestampNanosecondArray::from_iter_values(
+                    snapshots.iter().map(|row| (row.id * 1000000) as i64),
                 ))
             }),
             Box::new(|snapshots| {
-                Arc::new(BooleanArray::from(
-                    snapshots.iter().map(|row| row.current).collect::<Vec<_>>(),
+                Arc::new(BooleanArray::from_iter(
+                    snapshots.iter().map(|row| Some(row.current)),
                 ))
             }),
         ]
