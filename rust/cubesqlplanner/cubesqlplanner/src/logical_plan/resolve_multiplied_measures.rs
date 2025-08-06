@@ -1,6 +1,5 @@
 use super::*;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct ResolveMultipliedMeasures {
@@ -26,12 +25,12 @@ impl LogicalNode for ResolveMultipliedMeasures {
         } = ResolveMultipliedMeasuresInputUnPacker::new(&self, &inputs)?;
 
         let regular_measure_subqueries = regular_measure_subqueries
-            .into_iter()
+            .iter()
             .map(|i| Query::try_from_plan_node(i.clone()))
             .collect::<Result<_, CubeError>>()?;
 
         let aggregate_multiplied_subqueries = aggregate_multiplied_subqueries
-            .into_iter()
+            .iter()
             .map(|i| AggregateMultipliedSubquery::try_from_plan_node(i.clone()))
             .collect::<Result<_, CubeError>>()?;
 
@@ -60,8 +59,18 @@ pub struct ResolveMultipliedMeasuresInputPacker;
 impl ResolveMultipliedMeasuresInputPacker {
     pub fn pack(resolve: &ResolveMultipliedMeasures) -> Vec<PlanNode> {
         let mut result = vec![];
-        result.extend(resolve.regular_measure_subqueries.iter().map(|i| i.as_plan_node()));
-        result.extend(resolve.aggregate_multiplied_subqueries.iter().map(|i| i.as_plan_node()));
+        result.extend(
+            resolve
+                .regular_measure_subqueries
+                .iter()
+                .map(|i| i.as_plan_node()),
+        );
+        result.extend(
+            resolve
+                .aggregate_multiplied_subqueries
+                .iter()
+                .map(|i| i.as_plan_node()),
+        );
         result
     }
 }
@@ -72,19 +81,22 @@ pub struct ResolveMultipliedMeasuresInputUnPacker<'a> {
 }
 
 impl<'a> ResolveMultipliedMeasuresInputUnPacker<'a> {
-    pub fn new(resolve: &ResolveMultipliedMeasures, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
+    pub fn new(
+        resolve: &ResolveMultipliedMeasures,
+        inputs: &'a Vec<PlanNode>,
+    ) -> Result<Self, CubeError> {
         check_inputs_len(&inputs, Self::inputs_len(resolve), resolve.node_name())?;
-        
+
         let regular_end = resolve.regular_measure_subqueries.len();
         let regular_measure_subqueries = &inputs[0..regular_end];
         let aggregate_multiplied_subqueries = &inputs[regular_end..];
-        
+
         Ok(Self {
             regular_measure_subqueries,
             aggregate_multiplied_subqueries,
         })
     }
-    
+
     fn inputs_len(resolve: &ResolveMultipliedMeasures) -> usize {
         resolve.regular_measure_subqueries.len() + resolve.aggregate_multiplied_subqueries.len()
     }

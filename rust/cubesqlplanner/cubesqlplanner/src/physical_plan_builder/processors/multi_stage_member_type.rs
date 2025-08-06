@@ -1,6 +1,6 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
-use crate::logical_plan::{LogicalNode, MultiStageMemberLogicalType};
+use crate::logical_plan::MultiStageMemberLogicalType;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::QueryPlan;
 use cubenativeutils::CubeError;

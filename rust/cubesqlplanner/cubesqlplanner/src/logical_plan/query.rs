@@ -1,6 +1,5 @@
 use super::*;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -64,7 +63,7 @@ impl LogicalNode for Query {
 
         Ok(Rc::new(Self {
             multistage_members: multistage_members
-                .into_iter()
+                .iter()
                 .map(|member| member.clone().into_logical_node())
                 .collect::<Result<Vec<_>, _>>()?,
             schema: self.schema.clone(),

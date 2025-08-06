@@ -48,7 +48,6 @@ impl LogicalNode for KeysSubQuery {
     }
 }
 
-
 impl PrettyPrint for KeysSubQuery {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println("KeysSubQuery: ", state);

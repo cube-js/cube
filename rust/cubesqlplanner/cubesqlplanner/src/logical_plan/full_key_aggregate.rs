@@ -50,6 +50,7 @@ impl PrettyPrint for ResolvedMultipliedMeasures {
     }
 }
 
+#[derive(Clone)]
 pub struct FullKeyAggregate {
     pub schema: Rc<LogicalSchema>,
     pub use_full_join_and_coalesce: bool,
@@ -80,7 +81,7 @@ impl LogicalNode for FullKeyAggregate {
         } else {
             check_inputs_len(&inputs, 1, self.node_name())?;
             let input_source = &inputs[0];
-            
+
             Some(match self.multiplied_measures_resolver.as_ref().unwrap() {
                 ResolvedMultipliedMeasures::ResolveMultipliedMeasures(_) => {
                     ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
@@ -88,7 +89,9 @@ impl LogicalNode for FullKeyAggregate {
                     )
                 }
                 ResolvedMultipliedMeasures::PreAggregation(_) => {
-                    ResolvedMultipliedMeasures::PreAggregation(input_source.clone().into_logical_node()?)
+                    ResolvedMultipliedMeasures::PreAggregation(
+                        input_source.clone().into_logical_node()?,
+                    )
                 }
             })
         };

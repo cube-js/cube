@@ -1,7 +1,7 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{Query, QuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Cte, Expr, MemberExpression, QualifiedColumnName, Select, SelectBuilder};
+use crate::plan::{Cte, Expr, MemberExpression, Select, SelectBuilder};
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;

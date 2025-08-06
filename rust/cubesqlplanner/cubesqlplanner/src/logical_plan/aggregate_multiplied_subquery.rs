@@ -1,7 +1,6 @@
 use super::pretty_print::*;
 use super::*;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::rc::Rc;
 
 pub enum AggregateMultipliedSubquerySouce {
@@ -52,7 +51,7 @@ impl LogicalNode for AggregateMultipliedSubquery {
             keys_subquery: keys_subquery.clone().into_logical_node()?,
             source: self.source.with_plan_node(source.clone())?,
             dimension_subqueries: dimension_subqueries
-                .into_iter()
+                .iter()
                 .map(|itm| itm.clone().into_logical_node())
                 .collect::<Result<Vec<_>, _>>()?,
         };
@@ -79,7 +78,12 @@ impl AggregateMultipliedSubqueryInputPacker {
         let mut result = vec![];
         result.push(aggregate.keys_subquery.as_plan_node());
         result.push(aggregate.source.as_plan_node());
-        result.extend(aggregate.dimension_subqueries.iter().map(|itm| itm.as_plan_node()));
+        result.extend(
+            aggregate
+                .dimension_subqueries
+                .iter()
+                .map(|itm| itm.as_plan_node()),
+        );
         result
     }
 }
@@ -91,20 +95,23 @@ pub struct AggregateMultipliedSubqueryInputUnPacker<'a> {
 }
 
 impl<'a> AggregateMultipliedSubqueryInputUnPacker<'a> {
-    pub fn new(aggregate: &AggregateMultipliedSubquery, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
+    pub fn new(
+        aggregate: &AggregateMultipliedSubquery,
+        inputs: &'a Vec<PlanNode>,
+    ) -> Result<Self, CubeError> {
         check_inputs_len(&inputs, Self::inputs_len(aggregate), aggregate.node_name())?;
-        
+
         let keys_subquery = &inputs[0];
         let source = &inputs[1];
         let dimension_subqueries = &inputs[2..];
-        
+
         Ok(Self {
             keys_subquery,
             source,
             dimension_subqueries,
         })
     }
-    
+
     fn inputs_len(aggregate: &AggregateMultipliedSubquery) -> usize {
         2 + aggregate.dimension_subqueries.len()
     }

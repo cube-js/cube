@@ -33,4 +33,3 @@ impl PrettyPrint for LogicalQueryModifiers {
         }
     }
 }
-

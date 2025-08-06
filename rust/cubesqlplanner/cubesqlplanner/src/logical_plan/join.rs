@@ -2,7 +2,6 @@ use super::pretty_print::*;
 use super::*;
 use crate::planner::sql_evaluator::SqlCall;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -45,7 +44,7 @@ impl LogicalNode for LogicalJoin {
         let joins = self
             .joins
             .iter()
-            .zip(joins.into_iter())
+            .zip(joins.iter())
             .map(|(self_item, item)| -> Result<_, CubeError> {
                 Ok(LogicalJoinItem {
                     cube: item.clone().into_logical_node()?,
@@ -58,7 +57,7 @@ impl LogicalNode for LogicalJoin {
             root: root.clone().into_logical_node()?,
             joins,
             dimension_subqueries: dimension_subqueries
-                .into_iter()
+                .iter()
                 .map(|itm| itm.clone().into_logical_node())
                 .collect::<Result<Vec<_>, _>>()?,
         };
@@ -85,7 +84,11 @@ impl LogicalJoinInputPacker {
         let mut result = vec![];
         result.push(join.root.as_plan_node());
         result.extend(join.joins.iter().map(|item| item.cube.as_plan_node()));
-        result.extend(join.dimension_subqueries.iter().map(|item| item.as_plan_node()));
+        result.extend(
+            join.dimension_subqueries
+                .iter()
+                .map(|item| item.as_plan_node()),
+        );
         result
     }
 }
@@ -99,20 +102,20 @@ pub struct LogicalJoinInputUnPacker<'a> {
 impl<'a> LogicalJoinInputUnPacker<'a> {
     pub fn new(join: &LogicalJoin, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
         check_inputs_len(&inputs, Self::inputs_len(join), join.node_name())?;
-        
+
         let root = &inputs[0];
         let joins_start = 1;
         let joins_end = joins_start + join.joins.len();
         let joins = &inputs[joins_start..joins_end];
         let dimension_subqueries = &inputs[joins_end..];
-        
+
         Ok(Self {
             root,
             joins,
             dimension_subqueries,
         })
     }
-    
+
     fn inputs_len(join: &LogicalJoin) -> usize {
         1 + join.joins.len() + join.dimension_subqueries.len()
     }

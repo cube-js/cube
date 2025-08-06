@@ -301,13 +301,12 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
         full_key_aggregate: &FullKeyAggregate,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        /* let strategy: Rc<dyn FullKeyAggregateStrategy> =
-        if full_key_aggregate.schema.has_dimensions() {
-            KeysFullKeyAggregateStrategy::new(self.builder)
-        } else {
-            InnerJoinFullKeyAggregateStrategy::new(self.builder)
-        }; */
-        let strategy = InnerJoinFullKeyAggregateStrategy::new(self.builder);
+        let strategy: Rc<dyn FullKeyAggregateStrategy> =
+            if full_key_aggregate.schema.has_dimensions() {
+                KeysFullKeyAggregateStrategy::new(self.builder)
+            } else {
+                InnerJoinFullKeyAggregateStrategy::new(self.builder)
+            };
         strategy.process(full_key_aggregate, context)
     }
 }

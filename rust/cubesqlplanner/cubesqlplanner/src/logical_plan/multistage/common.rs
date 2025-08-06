@@ -1,7 +1,6 @@
 use crate::logical_plan::pretty_print::*;
 use crate::planner::planners::multi_stage::MultiStageAppliedState;
 
-
 impl PrettyPrint for MultiStageAppliedState {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         let details_state = state.new_level();
