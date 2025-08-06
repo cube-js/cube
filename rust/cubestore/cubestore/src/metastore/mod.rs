@@ -140,7 +140,7 @@ macro_rules! data_frame_from {
 }
 
 #[macro_export]
-macro_rules! base_rocks_secondary_index {
+macro_rules!  anbase_rocks_secondary_index {
     ($table: ty, $index: ty) => {
         impl crate::metastore::BaseRocksSecondaryIndex<$table> for $index {
             fn index_value(&self, row: &$table) -> Vec<u8> {

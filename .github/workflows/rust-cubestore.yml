@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly-2024-01-29]
+        rust: [nightly-2025-08-01]
     container:
       image: cubejs/rust-builder:bookworm-llvm-18
     env:
