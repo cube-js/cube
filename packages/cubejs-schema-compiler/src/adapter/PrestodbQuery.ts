@@ -136,6 +136,7 @@ export class PrestodbQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.functions.CURRENTDATE = 'CURRENT_DATE';
     delete templates.functions.PERCENTILECONT;
     templates.statements.select = '{% if ctes %} WITH \n' +
           '{{ ctes | join(\',\n\') }}\n' +
@@ -153,6 +154,10 @@ export class PrestodbQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.expressions.timestamp_literal = 'from_iso8601_timestamp(\'{{ value }}\')';
+    // Presto requires concat types to be VARCHAR
+    templates.expressions.binary = '{% if op == \'||\' %}' +
+      'CAST({{ left }} AS VARCHAR) || CAST({{ right }} AS VARCHAR)' +
+      '{% else %}{{ left }} {{ op }} {{ right }}{% endif %}';
     delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
     templates.types.float = 'REAL';
