@@ -18,7 +18,7 @@ use serde_derive::{Deserialize, Serialize};
 use smallvec::smallvec;
 use smallvec::SmallVec;
 use std::sync::Arc;
-
+use std::time::SystemTime;
 use super::udf_xirr::XirrAccumulator;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -159,7 +159,7 @@ impl CubeScalarUDF for Now {
     }
 
     fn descriptor(&self) -> ScalarUDF {
-        return ScalarUDF {
+        ScalarUDF {
             name: self.name().to_string(),
             signature: Self::signature(),
             return_type: Arc::new(|inputs| {
@@ -167,11 +167,29 @@ impl CubeScalarUDF for Now {
                 Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
             }),
             fun: Arc::new(|_| {
-                Err(DataFusionError::Internal(
-                    "NOW() was not optimized away".to_string(),
-                ))
+                let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return Err(DataFusionError::Internal(format!(
+                            "Failed to get current timestamp: {}",
+                            e
+                        )))
+                    }
+                };
+
+                let nanos = match i64::try_from(t.as_nanos()) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return Err(DataFusionError::Internal(format!(
+                            "Failed to convert timestamp to i64: {}",
+                            e
+                        )))
+                    }
+                };
+
+                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(nanos))))
             }),
-        };
+        }
     }
 }
 
@@ -191,7 +209,7 @@ impl CubeScalarUDF for UnixTimestamp {
     }
 
     fn descriptor(&self) -> ScalarUDF {
-        return ScalarUDF {
+        ScalarUDF {
             name: self.name().to_string(),
             signature: Self::signature(),
             return_type: Arc::new(|inputs| {
@@ -199,11 +217,29 @@ impl CubeScalarUDF for UnixTimestamp {
                 Ok(Arc::new(DataType::Int64))
             }),
             fun: Arc::new(|_| {
-                Err(DataFusionError::Internal(
-                    "UNIX_TIMESTAMP() was not optimized away".to_string(),
-                ))
+                let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return Err(DataFusionError::Internal(format!(
+                            "Failed to get current timestamp: {}",
+                            e
+                        )))
+                    }
+                };
+
+                let seconds = match i64::try_from(t.as_secs()) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return Err(DataFusionError::Internal(format!(
+                            "Failed to convert timestamp to i64: {}",
+                            e
+                        )))
+                    }
+                };
+
+                Ok(ColumnarValue::Scalar(ScalarValue::Int64(Some(seconds))))
             }),
-        };
+        }
     }
 }
 
