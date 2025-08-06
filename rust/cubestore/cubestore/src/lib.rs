@@ -1,10 +1,7 @@
 #![feature(test)]
-#![feature(async_closure)]
 #![feature(box_patterns)]
 #![feature(vec_into_raw_parts)]
 #![feature(hash_set_entry)]
-#![feature(is_sorted)]
-#![feature(result_flattening)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);
