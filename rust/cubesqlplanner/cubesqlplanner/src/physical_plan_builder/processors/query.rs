@@ -1,7 +1,7 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{Query, QuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Cte, Expr, MemberExpression, Select, SelectBuilder};
+use crate::plan::{Cte, Expr, MemberExpression, QualifiedColumnName, Select, SelectBuilder};
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -47,7 +47,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             ctes.push(Rc::new(Cte::new(Rc::new(query), alias)));
         }
 
-        let from = match &logical_plan.source {
+        let (from, is_pre_aggregation) = match &logical_plan.source {
             QuerySource::LogicalJoin(join) => {
                 let from = self.builder.process_node(join.as_ref(), &context)?;
                 let references_builder = ReferencesBuilder::new(from.clone());
@@ -56,24 +56,29 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                     &references_builder,
                     &mut render_references,
                 )?;
-                from
+                (from, false)
             }
-            QuerySource::FullKeyAggregate(full_key_aggregate) => self
-                .builder
-                .process_node(full_key_aggregate.as_ref(), &context)?,
-            QuerySource::PreAggregation(_pre_aggregation) => {
-                todo!()
-                /* let res = self.process_pre_aggregation(
-                    pre_aggregation,
-                    context,
-                    &mut measure_references,
-                    &mut dimensions_references,
-                )?;
+            QuerySource::FullKeyAggregate(full_key_aggregate) => {
+                let from = self
+                    .builder
+                    .process_node(full_key_aggregate.as_ref(), &context)?;
+                (from, false)
+            }
+            QuerySource::PreAggregation(pre_aggregation) => {
+                let res = self
+                    .builder
+                    .process_node(pre_aggregation.as_ref(), &context)?;
                 for member in logical_plan.schema.time_dimensions.iter() {
                     context_factory.add_dimensions_with_ignored_timezone(member.full_name());
                 }
                 context_factory.set_use_local_tz_in_date_range(true);
-                res */
+
+                let dimensions_references = pre_aggregation.all_dimensions_refererences();
+                let measure_references = pre_aggregation.all_measures_refererences();
+
+                context_factory.set_pre_aggregation_measures_references(measure_references);
+                context_factory.set_pre_aggregation_dimensions_references(dimensions_references);
+                (res, true)
             }
         };
 
@@ -134,7 +139,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         context_factory
             .set_rendered_as_multiplied_measures(logical_plan.schema.multiplied_measures.clone());
-        context_factory.set_render_references(render_references);
+        if !is_pre_aggregation {
+            context_factory.set_render_references(render_references);
+        }
         if logical_plan.modifers.ungrouped {
             context_factory.set_ungrouped(true);
         }
