@@ -1,6 +1,6 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::planner::sql_evaluator::Compiler;
-use crate::planner::BaseTimeDimension;
+use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::Granularity;
 use chrono::prelude::*;
 use chrono_tz::Tz;
@@ -49,28 +49,33 @@ impl GranularityHelper {
     }
 
     pub fn find_dimension_with_min_granularity(
-        dimensions: &Vec<Rc<BaseTimeDimension>>,
-    ) -> Result<Rc<BaseTimeDimension>, CubeError> {
+        dimensions: &Vec<Rc<TimeDimensionSymbol>>,
+    ) -> Result<Rc<TimeDimensionSymbol>, CubeError> {
         if dimensions.is_empty() {
             return Err(CubeError::internal(
                 "No dimensions provided for find_dimension_with_min_granularity".to_string(),
             ));
         }
         let first = Ok(dimensions[0].clone());
-        dimensions.iter().skip(1).fold(first, |acc, d| match acc {
-            Ok(min_dim) => {
-                let min_granularity = Self::min_granularity(
-                    &min_dim.resolved_granularity()?,
-                    &d.resolved_granularity()?,
-                )?;
-                if min_granularity == min_dim.get_granularity() {
-                    Ok(min_dim)
-                } else {
-                    Ok(d.clone())
+        dimensions
+            .iter()
+            .skip(1)
+            .fold(first, |acc, d| -> Result<_, CubeError> {
+                match acc {
+                    Ok(min_dim) => {
+                        let min_granularity = Self::min_granularity(
+                            &min_dim.resolved_granularity()?,
+                            &d.resolved_granularity()?,
+                        )?;
+                        if &min_granularity == min_dim.granularity() {
+                            Ok(min_dim)
+                        } else {
+                            Ok(d.clone())
+                        }
+                    }
+                    Err(e) => Err(e),
                 }
-            }
-            Err(e) => Err(e),
-        })
+            })
     }
 
     pub fn granularity_from_interval(interval: &Option<String>) -> Option<String> {

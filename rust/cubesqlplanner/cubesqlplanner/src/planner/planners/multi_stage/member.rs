@@ -1,10 +1,9 @@
 use crate::planner::sql_evaluator::{MeasureTimeShifts, MemberSymbol};
-use crate::planner::BaseTimeDimension;
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct TimeSeriesDescription {
-    pub time_dimension: Rc<BaseTimeDimension>,
+    pub time_dimension: Rc<MemberSymbol>,
     pub date_range_cte: Option<String>,
 }
 
@@ -12,7 +11,7 @@ pub struct TimeSeriesDescription {
 pub enum MultiStageLeafMemberType {
     Measure,
     TimeSeries(Rc<TimeSeriesDescription>),
-    TimeSeriesGetRange(Rc<BaseTimeDimension>),
+    TimeSeriesGetRange(Rc<MemberSymbol>),
 }
 
 #[derive(Clone)]
@@ -36,15 +35,15 @@ pub enum RollingWindowType {
 
 #[derive(Clone)]
 pub struct RollingWindowDescription {
-    pub time_dimension: Rc<BaseTimeDimension>,
-    pub base_time_dimension: Rc<BaseTimeDimension>,
+    pub time_dimension: Rc<MemberSymbol>,
+    pub base_time_dimension: Rc<MemberSymbol>,
     pub rolling_window: RollingWindowType,
 }
 
 impl RollingWindowDescription {
     pub fn new_regular(
-        time_dimension: Rc<BaseTimeDimension>,
-        base_time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
+        base_time_dimension: Rc<MemberSymbol>,
         trailing: Option<String>,
         leading: Option<String>,
         offset: String,
@@ -62,8 +61,8 @@ impl RollingWindowDescription {
     }
 
     pub fn new_to_date(
-        time_dimension: Rc<BaseTimeDimension>,
-        base_time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
+        base_time_dimension: Rc<MemberSymbol>,
         granularity: String,
     ) -> Self {
         Self {
@@ -74,8 +73,8 @@ impl RollingWindowDescription {
     }
 
     pub fn new_running_total(
-        time_dimension: Rc<BaseTimeDimension>,
-        base_time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
+        base_time_dimension: Rc<MemberSymbol>,
     ) -> Self {
         Self {
             time_dimension,

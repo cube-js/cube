@@ -1,5 +1,6 @@
 use super::PreAggregationsCompiler;
 use super::*;
+use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::plan::FilterItem;
 use crate::planner::query_tools::QueryTools;
@@ -7,25 +8,6 @@ use crate::planner::sql_evaluator::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum MatchState {
-    Partial,
-    Full,
-    NotMatched,
-}
-
-impl MatchState {
-    pub fn combine(&self, other: &MatchState) -> MatchState {
-        if matches!(self, MatchState::NotMatched) || matches!(other, MatchState::NotMatched) {
-            return MatchState::NotMatched;
-        }
-        if matches!(self, MatchState::Partial) || matches!(other, MatchState::Partial) {
-            return MatchState::Partial;
-        }
-        MatchState::Full
-    }
-}
 
 pub struct PreAggregationOptimizer {
     query_tools: Rc<QueryTools>,
@@ -43,9 +25,7 @@ impl PreAggregationOptimizer {
     }
 
     pub fn try_optimize(&mut self, plan: Rc<Query>) -> Result<Option<Rc<Query>>, CubeError> {
-        let mut cube_names_collector = CubeNamesCollector::new();
-        cube_names_collector.collect(&plan)?;
-        let cube_names = cube_names_collector.result();
+        let cube_names = collect_cube_names_from_node(&plan)?;
         let mut compiler = PreAggregationsCompiler::try_new(self.query_tools.clone(), &cube_names)?;
 
         let compiled_pre_aggregations = compiler.compile_all_pre_aggregations()?;
@@ -69,147 +49,135 @@ impl PreAggregationOptimizer {
         query: Rc<Query>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        match query.as_ref() {
-            Query::SimpleQuery(query) => self.try_rewrite_simple_query(query, pre_aggregation),
-            Query::FullKeyAggregateQuery(query) => {
-                self.try_rewrite_full_key_aggregate_query(query, pre_aggregation)
-            }
+        if query.multistage_members.is_empty() {
+            self.try_rewrite_simple_query(&query, pre_aggregation)
+        } else if !self.allow_multi_stage {
+            Ok(None)
+        } else {
+            self.try_rewrite_query_with_multistages(&query, pre_aggregation)
         }
     }
 
     fn try_rewrite_simple_query(
         &mut self,
-        query: &SimpleQuery,
+        query: &Rc<Query>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         if self.is_schema_and_filters_match(&query.schema, &query.filter, pre_aggregation)? {
-            let mut new_query = SimpleQuery::clone(&query);
-            new_query.source = SimpleQuerySource::PreAggregation(
-                self.make_pre_aggregation_source(pre_aggregation)?,
-            );
-            Ok(Some(Rc::new(Query::SimpleQuery(new_query))))
+            let mut new_query = query.as_ref().clone();
+            new_query.source =
+                QuerySource::PreAggregation(self.make_pre_aggregation_source(pre_aggregation)?);
+            Ok(Some(Rc::new(new_query)))
         } else {
             Ok(None)
         }
     }
 
-    fn try_rewrite_full_key_aggregate_query(
+    fn try_rewrite_query_with_multistages(
         &mut self,
-        query: &FullKeyAggregateQuery,
+        query: &Rc<Query>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<Option<Rc<Query>>, CubeError> {
-        if !self.allow_multi_stage && !query.multistage_members.is_empty() {
-            return Ok(None);
-        }
-        if self.allow_multi_stage && !query.multistage_members.is_empty() {
-            return self
-                .try_rewrite_full_key_aggregate_query_with_multi_stages(query, pre_aggregation);
+        let rewriter = LogicalPlanRewriter::new();
+        let mut has_unrewritten_leaf = false;
+
+        let mut rewritten_multistages = Vec::new();
+        for multi_stage in &query.multistage_members {
+            let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
+                let res = match plan_node {
+                    PlanNode::MultiStageLeafMeasure(multi_stage_leaf_measure) => {
+                        if let Some(rewritten) = self.try_rewrite_query(
+                            multi_stage_leaf_measure.query.clone(),
+                            pre_aggregation,
+                        )? {
+                            let new_leaf = Rc::new(MultiStageLeafMeasure {
+                                measure: multi_stage_leaf_measure.measure.clone(),
+                                render_measure_as_state: multi_stage_leaf_measure
+                                    .render_measure_as_state
+                                    .clone(),
+                                render_measure_for_ungrouped: multi_stage_leaf_measure
+                                    .render_measure_for_ungrouped
+                                    .clone(),
+                                time_shifts: multi_stage_leaf_measure.time_shifts.clone(),
+                                query: rewritten,
+                            });
+                            NodeRewriteResult::rewritten(new_leaf.as_plan_node())
+                        } else {
+                            has_unrewritten_leaf = true;
+                            NodeRewriteResult::stop()
+                        }
+                    }
+                    PlanNode::LogicalMultiStageMember(_) => NodeRewriteResult::pass(),
+                    _ => NodeRewriteResult::stop(),
+                };
+                Ok(res)
+            })?;
+            rewritten_multistages.push(rewritten);
         }
 
-        if self.is_schema_and_filters_match(&query.schema, &query.filter, pre_aggregation)? {
-            let source = SimpleQuerySource::PreAggregation(
-                self.make_pre_aggregation_source(pre_aggregation)?,
-            );
-            let new_query = SimpleQuery {
-                schema: query.schema.clone(),
-                dimension_subqueries: vec![],
-                filter: query.filter.clone(),
-                offset: query.offset,
-                limit: query.limit,
-                ungrouped: query.ungrouped,
-                order_by: query.order_by.clone(),
-                source,
-            };
-            Ok(Some(Rc::new(Query::SimpleQuery(new_query))))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn try_rewrite_full_key_aggregate_query_with_multi_stages(
-        &mut self,
-        query: &FullKeyAggregateQuery,
-        pre_aggregation: &Rc<CompiledPreAggregation>,
-    ) -> Result<Option<Rc<Query>>, CubeError> {
-        let used_multi_stage_symbols = self.collect_multi_stage_symbols(&query.source);
-        let mut multi_stages_queries = query.multistage_members.clone();
-        let mut rewrited_multistage = multi_stages_queries
-            .iter()
-            .map(|query| (query.name.clone(), false))
-            .collect::<HashMap<_, _>>();
-
-        for (_, multi_stage_name) in used_multi_stage_symbols.iter() {
-            self.try_rewrite_multistage(
-                multi_stage_name,
-                &mut multi_stages_queries,
-                &mut rewrited_multistage,
-                pre_aggregation,
-            )?;
-        }
-        let all_multi_stage_rewrited = rewrited_multistage.values().all(|v| *v);
-        if !all_multi_stage_rewrited {
+        if has_unrewritten_leaf {
             return Ok(None);
         }
 
-        let source = if let Some(resolver_multiplied_measures) =
-            &query.source.multiplied_measures_resolver
-        {
-            if let ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
-                resolver_multiplied_measures,
-            ) = resolver_multiplied_measures
+        let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = &query.source {
+            let fk_source = if let Some(resolver_multiplied_measures) =
+                &full_key_aggregate.multiplied_measures_resolver
             {
-                if self.is_schema_and_filters_match(
-                    &resolver_multiplied_measures.schema,
-                    &resolver_multiplied_measures.filter,
-                    &pre_aggregation,
-                )? {
-                    let pre_aggregation_source =
-                        self.make_pre_aggregation_source(pre_aggregation)?;
+                if let ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
+                    resolver_multiplied_measures,
+                ) = resolver_multiplied_measures
+                {
+                    if self.is_schema_and_filters_match(
+                        &resolver_multiplied_measures.schema,
+                        &resolver_multiplied_measures.filter,
+                        &pre_aggregation,
+                    )? {
+                        let pre_aggregation_source =
+                            self.make_pre_aggregation_source(pre_aggregation)?;
 
-                    let pre_aggregation_query = SimpleQuery {
-                        schema: resolver_multiplied_measures.schema.clone(),
-                        dimension_subqueries: vec![],
-                        filter: resolver_multiplied_measures.filter.clone(),
-                        offset: None,
-                        limit: None,
-                        ungrouped: false,
-                        order_by: vec![],
-                        source: SimpleQuerySource::PreAggregation(pre_aggregation_source),
-                    };
-                    Rc::new(FullKeyAggregate {
-                        join_dimensions: query.source.join_dimensions.clone(),
-                        use_full_join_and_coalesce: query.source.use_full_join_and_coalesce,
-                        multiplied_measures_resolver: Some(
-                            ResolvedMultipliedMeasures::PreAggregation(Rc::new(
-                                pre_aggregation_query,
-                            )),
-                        ),
-                        multi_stage_subquery_refs: query.source.multi_stage_subquery_refs.clone(),
-                    })
+                        let pre_aggregation_query = Query {
+                            schema: resolver_multiplied_measures.schema.clone(),
+                            filter: resolver_multiplied_measures.filter.clone(),
+                            modifers: Rc::new(LogicalQueryModifiers {
+                                offset: None,
+                                limit: None,
+                                ungrouped: false,
+                                order_by: vec![],
+                            }),
+                            source: QuerySource::PreAggregation(pre_aggregation_source),
+                            multistage_members: vec![],
+                        };
+                        Some(ResolvedMultipliedMeasures::PreAggregation(Rc::new(
+                            pre_aggregation_query,
+                        )))
+                    } else {
+                        return Ok(None);
+                    }
                 } else {
-                    return Ok(None);
+                    Some(resolver_multiplied_measures.clone())
                 }
             } else {
-                query.source.clone()
-            }
+                None
+            };
+            let mut result = full_key_aggregate.as_ref().clone();
+            result.multiplied_measures_resolver = fk_source;
+            QuerySource::FullKeyAggregate(Rc::new(result))
         } else {
             query.source.clone()
         };
 
-        let result = FullKeyAggregateQuery {
-            multistage_members: multi_stages_queries,
+        let result = Query {
+            multistage_members: rewritten_multistages,
             schema: query.schema.clone(),
             filter: query.filter.clone(),
-            offset: query.offset,
-            limit: query.limit,
-            ungrouped: query.ungrouped,
-            order_by: query.order_by.clone(),
+            modifers: query.modifers.clone(),
             source,
         };
-        Ok(Some(Rc::new(Query::FullKeyAggregateQuery(result))))
+
+        Ok(Some(Rc::new(result)))
     }
 
-    fn try_rewrite_multistage(
+    /* fn try_rewrite_multistage(
         &mut self,
         multi_stage_name: &String,
         multi_stage_queries: &mut Vec<Rc<LogicalMultiStageMember>>,
@@ -400,17 +368,12 @@ impl PreAggregationOptimizer {
             }
         }
         symbols
-    }
+    } */
 
     fn make_pre_aggregation_source(
         &mut self,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<Rc<PreAggregation>, CubeError> {
-        /* let pre_aggregation_obj = self.query_tools.base_tools().get_pre_aggregation_by_name(
-            pre_aggregation.cube_name.clone(),
-            pre_aggregation.name.clone(),
-        )?; */
-        //if let Some(table_name) = &pre_aggregation_obj.static_data().table_name {
         let schema = LogicalSchema {
             time_dimensions: vec![],
             dimensions: pre_aggregation
