@@ -133,7 +133,7 @@ The codebase uses a custom dependency injection system defined in `config/inject
 
 ## Important Notes
 
-- This is a Rust nightly project (see `rust-toolchain.toml`)
+- **Rust Nightly**: Uses nightly-2025-08-01 (see `rust-toolchain.toml`)
 - Uses custom forks of Arrow/DataFusion and sqlparser-rs for Cube-specific features
 - Distributed mode involves router and worker nodes communicating via RPC
 - Heavy use of async/await patterns with Tokio runtime

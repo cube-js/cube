@@ -1428,8 +1428,8 @@ impl RocksMetaStore {
         self.upload_loop
             .process(
                 self.clone(),
-                async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
-                async move |m, _| m.store.run_upload().await,
+                move |_| async move { Ok(Delay::new(Duration::from_secs(upload_interval)).await) },
+                move |m, _| async move { m.store.run_upload().await },
             )
             .await;
     }
