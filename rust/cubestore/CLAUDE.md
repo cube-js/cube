@@ -138,3 +138,16 @@ The codebase uses a custom dependency injection system defined in `config/inject
 - Distributed mode involves router and worker nodes communicating via RPC
 - Heavy use of async/await patterns with Tokio runtime
 - Parquet files are the primary storage format for data
+
+## Docker Configuration
+
+The project includes Docker configurations for building and deploying CubeStore:
+
+- **`builder.Dockerfile`**: Defines the base build image with Rust nightly-2025-08-01, LLVM 18, and build dependencies
+- **`Dockerfile`**: Production Dockerfile that uses `cubejs/rust-builder:bookworm-llvm-18` base image
+- **GitHub Actions**: CI/CD workflow in `.github/workflows/rust-cubestore.yml` uses the same Rust version
+
+When updating the Rust version, ensure all these files are kept in sync:
+1. `rust-toolchain.toml` - Primary source of truth
+2. `builder.Dockerfile` - Builder image definition
+3. `.github/workflows/rust-cubestore.yml` - CI configuration
