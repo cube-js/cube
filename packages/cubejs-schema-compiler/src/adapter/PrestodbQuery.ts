@@ -136,6 +136,7 @@ export class PrestodbQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.functions.DATEDIFF = 'DATE_DIFF(\'{{ date_part }}\', {{ args[1] }}, {{ args[2] }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     delete templates.functions.PERCENTILECONT;
     templates.statements.select = '{% if ctes %} WITH \n' +
