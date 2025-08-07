@@ -4,6 +4,7 @@ WORKDIR /build/cubestore
 
 COPY cubeshared /build/cubeshared
 
+COPY cubestore/rust-toolchain.toml .
 COPY cubestore/Cargo.toml .
 COPY cubestore/Cargo.lock .
 COPY cubestore/cuberockstore cuberockstore
