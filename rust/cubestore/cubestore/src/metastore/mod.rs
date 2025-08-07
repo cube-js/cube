@@ -4956,7 +4956,7 @@ mod tests {
 
     #[test]
     fn test_structures_size() {
-        assert_eq!(std::mem::size_of::<MetaStoreEvent>(), 680);
+        assert_eq!(std::mem::size_of::<MetaStoreEvent>(), 672);
     }
 
     #[tokio::test]
