@@ -2894,7 +2894,7 @@ dependencies = [
 [[package]]
 name = "msql-srv"
 version = "0.9.2"
-source = "git+https://github.com/cube-js/msql-srv#82bca052e6bd7facefe759a1971702cc9aac142e"
+source = "git+https://github.com/cube-js/msql-srv#b560de0db9c4dfc57ec511f88027d157785f3952"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -5520,8 +5520,8 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 1.0.0",
- "rand 0.6.5",
+ "cfg-if 0.1.10",
+ "rand 0.8.4",
  "static_assertions",
 ]
 
