@@ -618,7 +618,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-01-29
+          toolchain: nightly-2025-08-01
           target: ${{ matrix.target }}
           # override: true # this is by default on
           rustflags: ""
@@ -705,7 +705,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-01-29
+          toolchain: nightly-2025-08-01
           target: ${{ matrix.target }}
           # override: true # this is by default on
           rustflags: ""

@@ -61,7 +61,7 @@ macro_rules! rocks_table_new {
                 self.db.db
             }
 
-            fn snapshot(&self) -> &cuberockstore::rocksdb::Snapshot {
+            fn snapshot(&self) -> &cuberockstore::rocksdb::Snapshot<'_> {
                 self.db.snapshot
             }
 
@@ -69,7 +69,7 @@ macro_rules! rocks_table_new {
                 &self.db.mem_seq
             }
 
-            fn table_ref(&self) -> &crate::metastore::DbTableRef {
+            fn table_ref(&self) -> &crate::metastore::DbTableRef<'_> {
                 &self.db
             }
 
@@ -448,8 +448,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent;
     fn update_event(&self, old_row: IdRow<Self::T>, new_row: IdRow<Self::T>) -> MetaStoreEvent;
     fn db(&self) -> &DB;
-    fn table_ref(&self) -> &DbTableRef;
-    fn snapshot(&self) -> &Snapshot;
+    fn table_ref(&self) -> &DbTableRef<'_>;
+    fn snapshot(&self) -> &Snapshot<'_>;
     fn mem_seq(&self) -> &MemorySequence;
     fn index_id(index_num: IndexId) -> IndexId;
     fn table_id() -> TableId;
