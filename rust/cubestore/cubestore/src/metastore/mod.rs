@@ -1428,8 +1428,8 @@ impl RocksMetaStore {
         self.upload_loop
             .process(
                 self.clone(),
-                async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
-                async move |m, _| m.store.run_upload().await,
+                move |_| async move { Ok(Delay::new(Duration::from_secs(upload_interval)).await) },
+                move |m, _| async move { m.store.run_upload().await },
             )
             .await;
     }
@@ -4956,7 +4956,7 @@ mod tests {
 
     #[test]
     fn test_structures_size() {
-        assert_eq!(std::mem::size_of::<MetaStoreEvent>(), 680);
+        assert_eq!(std::mem::size_of::<MetaStoreEvent>(), 672);
     }
 
     #[tokio::test]

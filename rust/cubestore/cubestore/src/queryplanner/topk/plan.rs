@@ -207,7 +207,7 @@ fn extract_having(p: &Arc<LogicalPlan>) -> (Option<Expr>, &Arc<LogicalPlan>) {
     }
 }
 
-fn extract_projection_and_having(p: &LogicalPlan) -> Option<ColumnProjection> {
+fn extract_projection_and_having(p: &LogicalPlan) -> Option<ColumnProjection<'_>> {
     match p {
         LogicalPlan::Projection {
             expr,

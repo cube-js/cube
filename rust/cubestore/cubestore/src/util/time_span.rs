@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 /// The returned object will [log::warn] if it is alive longer than [timeout].
 /// Be cautious when interpreting results in async code, this function looks at wall time. So future
 /// that is not running will add to the time.
-pub fn warn_long(name: &str, timeout: Duration) -> ShortSpan {
+pub fn warn_long(name: &str, timeout: Duration) -> ShortSpan<'_> {
     ShortSpan {
         name,
         timeout,

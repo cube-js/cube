@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 #![feature(test)]
 
 pub use crate::benches::cubestore_benches;
