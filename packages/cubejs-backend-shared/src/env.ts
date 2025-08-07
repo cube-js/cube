@@ -1691,6 +1691,26 @@ const variables: Record<string, (...args: any) => any> = {
       return false;
     }
   },
+
+  snowflakeExecutionProcedure: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_EXECUTION_PROCEDURE', dataSource)
+    ]
+  ),
+
+  snowflakeInformationSchemaProcedure: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_INFORMATION_SCHEMA_PROCEDURE', dataSource)
+    ]
+  ),
   /** ****************************************************************
    * Presto Driver                                                   *
    ***************************************************************** */
