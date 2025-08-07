@@ -17267,4 +17267,51 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("CAST(1 AS VARCHAR)"));
     }
+
+    #[tokio::test]
+    async fn test_trino_datediff() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                KibanaSampleDataEcommerce.id,
+                KibanaSampleDataEcommerce.order_date,
+                KibanaSampleDataEcommerce.last_mod,
+                DATEDIFF(
+                    day,
+                    KibanaSampleDataEcommerce.order_date,
+                    KibanaSampleDataEcommerce.last_mod
+                ) as conv_date_diff,
+                COUNT(*)
+            FROM KibanaSampleDataEcommerce
+            WHERE (
+                KibanaSampleDataEcommerce.order_date > cast('2025-01-01T00:00:00.000' as timestamp)
+                    AND KibanaSampleDataEcommerce.order_date < cast('2025-01-01T23:59:59.999' as timestamp)
+                    AND KibanaSampleDataEcommerce.customer_gender = 'test'
+            )
+            GROUP BY 1, 2, 3, 4
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "functions/DATEDIFF".to_string(),
+                "DATE_DIFF('{{ date_part }}', {{ args[1] }}, {{ args[2] }})".to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("DATE_DIFF('day', "));
+    }
 }
