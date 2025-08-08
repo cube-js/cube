@@ -2,7 +2,7 @@ use itertools::Itertools;
 use log::trace;
 use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
-    BindValue, DateValue, PgType, PgTypeId, TimestampValue,
+    BindValue, PgType, PgTypeId,
 };
 use sqlparser::ast::{
     self, ArrayAgg, Expr, Function, FunctionArg, FunctionArgExpr, Ident, ObjectName, Value,
@@ -1076,6 +1076,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
 mod tests {
     use super::*;
     use crate::CubeError;
+    use pg_srv::{DateValue, TimestampValue};
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
     fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {

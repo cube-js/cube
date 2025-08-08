@@ -8,6 +8,6 @@ pub mod timestamp;
 
 pub use interval::*;
 
+pub use date::*;
 #[cfg(feature = "with-chrono")]
 pub use timestamp::*;
-pub use date::*;

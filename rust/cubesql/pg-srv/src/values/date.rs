@@ -97,15 +97,15 @@ mod tests {
     #[test]
     fn test_date_from_text() {
         let date_str = b"2025-08-08";
-        let result = NaiveDate::from_protocol(date_str, Format::Text).unwrap();
-        let expected = NaiveDate::from_ymd_opt(2025, 8, 8).unwrap();
+        let result = DateValue::from_protocol(date_str, Format::Text).unwrap();
+        let expected = DateValue::from_ymd_opt(2025, 8, 8).unwrap();
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_date_from_binary() {
         // Create a date and encode it
-        let date = NaiveDate::from_ymd_opt(2025, 8, 8).unwrap();
+        let date = DateValue::from_ymd_opt(2025, 8, 8).unwrap();
         let mut buf = BytesMut::new();
         date.to_binary(&mut buf).unwrap();
 
@@ -113,25 +113,25 @@ mod tests {
         let binary_data = &buf[4..];
 
         // Decode it back
-        let result = NaiveDate::from_protocol(binary_data, Format::Binary).unwrap();
+        let result = DateValue::from_protocol(binary_data, Format::Binary).unwrap();
         assert_eq!(result, date);
     }
 
     #[test]
     fn test_date_from_text_invalid() {
         let invalid_date = b"not-a-date";
-        let result = NaiveDate::from_protocol(invalid_date, Format::Text);
+        let result = DateValue::from_protocol(invalid_date, Format::Text);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_date_before_the_pg_epoch() {
         // Test date before epoch
-        let before_epoch = NaiveDate::from_ymd_opt(1999, 12, 31).unwrap();
+        let before_epoch = DateValue::from_ymd_opt(1999, 12, 31).unwrap();
         let mut buf = BytesMut::new();
         before_epoch.to_binary(&mut buf).unwrap();
         let binary_data = &buf[4..];
-        let result = NaiveDate::from_protocol(binary_data, Format::Binary).unwrap();
+        let result = DateValue::from_protocol(binary_data, Format::Binary).unwrap();
         assert_eq!(result, before_epoch);
     }
 }
