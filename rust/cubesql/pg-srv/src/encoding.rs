@@ -2,9 +2,6 @@
 
 use crate::{protocol::Format, ProtocolError};
 use bytes::{BufMut, BytesMut};
-#[cfg(feature = "with-chrono")]
-use chrono::{NaiveDate, NaiveDateTime};
-use std::io::{Error, ErrorKind};
 
 /// This trait explains how to encode values to the protocol format
 pub trait ToProtocolValue: std::fmt::Debug {
@@ -107,49 +104,12 @@ impl_primitive!(i64);
 impl_primitive!(f32);
 impl_primitive!(f64);
 
-// POSTGRES_EPOCH_JDATE
-#[cfg(feature = "with-chrono")]
-fn pg_base_date_epoch() -> NaiveDateTime {
-    NaiveDate::from_ymd_opt(2000, 1, 1)
-        .unwrap()
-        .and_hms_opt(0, 0, 0)
-        .unwrap()
-}
-
-#[cfg(feature = "with-chrono")]
-impl ToProtocolValue for NaiveDate {
-    // date_out - https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/date.c#L176
-    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
-        self.to_string().to_text(buf)
-    }
-
-    // date_send - https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/date.c#L223
-    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
-        let n = self
-            .signed_duration_since(pg_base_date_epoch().date())
-            .num_days();
-        if n > (i32::MAX as i64) {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!(
-                    "value too large to store in the binary format (i32), actual: {}",
-                    n
-                ),
-            )
-            .into());
-        }
-
-        buf.put_i32(4);
-        buf.put_i32(n as i32);
-
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::*;
     use bytes::BytesMut;
+    #[cfg(feature = "with-chrono")]
+    use chrono::NaiveDate;
 
     fn assert_text_encode<T: ToProtocolValue>(value: T, expected: &[u8]) {
         let mut buf = BytesMut::new();
@@ -179,20 +139,48 @@ mod tests {
                 105, 110, 115, 32, 53, 46, 48, 48, 48, 48, 48, 54, 32, 115, 101, 99, 115,
             ],
         );
-        assert_text_encode(
-            TimestampValue::new(0, None),
-            &[
-                0, 0, 0, 26, 49, 57, 55, 48, 45, 48, 49, 45, 48, 49, 32, 48, 48, 58, 48, 48, 58,
-                48, 48, 46, 48, 48, 48, 48, 48, 48,
-            ],
-        );
-        assert_text_encode(
-            TimestampValue::new(1650890322000000000, None),
-            &[
-                0, 0, 0, 26, 50, 48, 50, 50, 45, 48, 52, 45, 50, 53, 32, 49, 50, 58, 51, 56, 58,
-                52, 50, 46, 48, 48, 48, 48, 48, 48,
-            ],
-        );
+
+        #[cfg(feature = "with-chrono")]
+        {
+            // Test TimestampValue encoding
+            assert_text_encode(
+                TimestampValue::new(0, None),
+                &[
+                    0, 0, 0, 26, 49, 57, 55, 48, 45, 48, 49, 45, 48, 49, 32, 48, 48, 58, 48, 48,
+                    58, 48, 48, 46, 48, 48, 48, 48, 48, 48,
+                ],
+            );
+            assert_text_encode(
+                TimestampValue::new(1650890322000000000, None),
+                &[
+                    0, 0, 0, 26, 50, 48, 50, 50, 45, 48, 52, 45, 50, 53, 32, 49, 50, 58, 51, 56,
+                    58, 52, 50, 46, 48, 48, 48, 48, 48, 48,
+                ],
+            );
+
+            // Test NaiveDate encoding
+            assert_text_encode(
+                NaiveDate::from_ymd_opt(2025, 8, 8).unwrap(),
+                &[
+                    0, 0, 0, 10, // length: 10 bytes
+                    50, 48, 50, 53, 45, 48, 56, 45, 48, 56, // "2025-08-08"
+                ],
+            );
+            assert_text_encode(
+                NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(),
+                &[
+                    0, 0, 0, 10, // length: 10 bytes
+                    50, 48, 48, 48, 45, 48, 49, 45, 48, 49, // "2000-01-01"
+                ],
+            );
+            assert_text_encode(
+                NaiveDate::from_ymd_opt(1999, 12, 31).unwrap(),
+                &[
+                    0, 0, 0, 10, // length: 10 bytes
+                    49, 57, 57, 57, 45, 49, 50, 45, 51, 49, // "1999-12-31"
+                ],
+            );
+        }
 
         Ok(())
     }
@@ -218,14 +206,45 @@ mod tests {
                 0, 0, 0, 16, 0, 0, 0, 2, 146, 85, 83, 70, 0, 0, 0, 2, 0, 0, 0, 1,
             ],
         );
-        assert_bind_encode(
-            TimestampValue::new(0, None),
-            &[0, 0, 0, 8, 255, 252, 162, 254, 196, 200, 32, 0],
-        );
-        assert_bind_encode(
-            TimestampValue::new(1650890322000000000, None),
-            &[0, 0, 0, 8, 0, 2, 128, 120, 159, 252, 216, 128],
-        );
+
+        #[cfg(feature = "with-chrono")]
+        {
+            // Test TimestampValue binary encoding
+            assert_bind_encode(
+                TimestampValue::new(0, None),
+                &[0, 0, 0, 8, 255, 252, 162, 254, 196, 200, 32, 0],
+            );
+            assert_bind_encode(
+                TimestampValue::new(1650890322000000000, None),
+                &[0, 0, 0, 8, 0, 2, 128, 120, 159, 252, 216, 128],
+            );
+
+            // Test NaiveDate binary encoding
+            // PostgreSQL epoch is 2000-01-01, so this date should be 0 days
+            assert_bind_encode(
+                NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(),
+                &[
+                    0, 0, 0, 4, // length: 4 bytes
+                    0, 0, 0, 0, // 0 days from epoch
+                ],
+            );
+            // Date after epoch: 2025-08-08 is 9351 days after 2000-01-01
+            assert_bind_encode(
+                NaiveDate::from_ymd_opt(2025, 8, 8).unwrap(),
+                &[
+                    0, 0, 0, 4, // length: 4 bytes
+                    0, 0, 36, 135, // 9351 days from epoch (0x2487 in hex)
+                ],
+            );
+            // Date before epoch: 1999-12-31 is -1 day from 2000-01-01
+            assert_bind_encode(
+                NaiveDate::from_ymd_opt(1999, 12, 31).unwrap(),
+                &[
+                    0, 0, 0, 4, // length: 4 bytes
+                    255, 255, 255, 255, // -1 in two's complement
+                ],
+            );
+        }
 
         Ok(())
     }
