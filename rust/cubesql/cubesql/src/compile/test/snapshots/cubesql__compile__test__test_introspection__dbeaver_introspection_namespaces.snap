@@ -2,10 +2,10 @@
 source: cubesql/src/compile/test/test_introspection.rs
 expression: "execute_query(\"SELECT n.oid,n.*,d.description FROM pg_catalog.pg_namespace n\n                LEFT OUTER JOIN pg_catalog.pg_description d ON d.objoid=n.oid AND d.objsubid=0 AND d.classoid='pg_namespace'::regclass\n                ORDER BY nspname\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
-+-------+-------+--------------------+----------+--------+------+-------------+
-| _oid  | oid   | nspname            | nspowner | nspacl | xmin | description |
-+-------+-------+--------------------+----------+--------+------+-------------+
-| 13000 | 13000 | information_schema | 10       | NULL   | 1    | NULL        |
-| 11    | 11    | pg_catalog         | 10       | NULL   | 1    | NULL        |
-| 2200  | 2200  | public             | 10       | NULL   | 1    | NULL        |
-+-------+-------+--------------------+----------+--------+------+-------------+
++-------+--------+--------------------+----------+--------+------+-------------+
+| oid   | oid__1 | nspname            | nspowner | nspacl | xmin | description |
++-------+--------+--------------------+----------+--------+------+-------------+
+| 13000 | 13000  | information_schema | 10       | NULL   | 1    | NULL        |
+| 11    | 11     | pg_catalog         | 10       | NULL   | 1    | NULL        |
+| 2200  | 2200   | public             | 10       | NULL   | 1    | NULL        |
++-------+--------+--------------------+----------+--------+------+-------------+

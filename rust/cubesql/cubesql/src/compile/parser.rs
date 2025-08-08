@@ -62,20 +62,6 @@ pub fn parse_sql_to_statements(
 
     // DBeaver
     let query = query.replace(
-        "SELECT db.oid,db.* FROM pg_catalog.pg_database db",
-        "SELECT db.oid as _oid,db.* FROM pg_catalog.pg_database db",
-    );
-    let query = query.replace(
-        "SELECT t.oid,t.*,c.relkind",
-        "SELECT t.oid as _oid,t.*,c.relkind",
-    );
-    let query = query.replace(
-        "SELECT n.oid,n.*,d.description FROM",
-        "SELECT n.oid as _oid,n.*,d.description FROM",
-    );
-    let query = query.replace("SELECT c.oid,c.*,", "SELECT c.oid as _oid,c.*,");
-    let query = query.replace("SELECT a.oid,a.*,", "SELECT a.oid as _oid,a.*,");
-    let query = query.replace(
         "LEFT OUTER JOIN pg_depend dep on dep.refobjid = a.attrelid AND dep.deptype = 'i' and dep.refobjsubid = a.attnum and dep.classid = dep.refclassid",
         "LEFT OUTER JOIN pg_depend dep on dep.refobjid = a.attrelid AND dep.deptype = 'i' and dep.refobjsubid = a.attnum",
     );
@@ -187,12 +173,6 @@ pub fn parse_sql_to_statements(
         "WHERE quote_ident(table_schema) IN (current_user, current_schema())",
     );
 
-    // psqlODBC
-    let query = query.replace(
-        "select NULL, NULL, NULL",
-        "select NULL, NULL AS NULL2, NULL AS NULL3",
-    );
-
     // Work around an issue with lowercase table name when queried as uppercase,
     // an uncommon way of casting literals, and skip a few funcs along the way
     let query = query.replace(
@@ -210,12 +190,6 @@ pub fn parse_sql_to_statements(
     let query = query.replace(
         "c.relname AS PARTITION_NAME,",
         "c.relname AS partition_name,",
-    );
-
-    // Work around an issue with NULL, NULL, NULL in SELECT
-    let query = query.replace(
-        "p.proname AS PROCEDURE_NAME, NULL, NULL, NULL, ",
-        "p.proname AS PROCEDURE_NAME, NULL AS NULL, NULL AS NULL2, NULL AS NULL3, ",
     );
 
     // Quicksight workarounds
