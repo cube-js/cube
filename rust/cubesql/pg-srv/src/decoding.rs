@@ -129,6 +129,8 @@ mod tests {
     use crate::protocol::Format;
     use crate::values::timestamp::TimestampValue;
     use bytes::BytesMut;
+    #[cfg(feature = "with-chrono")]
+    use chrono::NaiveDate;
 
     fn assert_test_decode<T: ToProtocolValue + FromProtocolValue + std::cmp::PartialEq>(
         value: T,
@@ -160,6 +162,13 @@ mod tests {
         assert_test_decode(TimestampValue::new(0, None), Format::Text)?;
         assert_test_decode(TimestampValue::new(1234567890123456000, None), Format::Text)?;
 
+        #[cfg(feature = "with-chrono")]
+        {
+            assert_test_decode(NaiveDate::from_ymd_opt(2025, 8, 8).unwrap(), Format::Text)?;
+            assert_test_decode(NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(), Format::Text)?;
+            assert_test_decode(NaiveDate::from_ymd_opt(1999, 12, 31).unwrap(), Format::Text)?;
+        }
+
         Ok(())
     }
 
@@ -182,6 +191,16 @@ mod tests {
             TimestampValue::new(1234567890123456000, None),
             Format::Binary,
         )?;
+
+        #[cfg(feature = "with-chrono")]
+        {
+            assert_test_decode(NaiveDate::from_ymd_opt(2025, 8, 8).unwrap(), Format::Binary)?;
+            assert_test_decode(NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(), Format::Binary)?;
+            assert_test_decode(
+                NaiveDate::from_ymd_opt(1999, 12, 31).unwrap(),
+                Format::Binary,
+            )?;
+        }
 
         Ok(())
     }

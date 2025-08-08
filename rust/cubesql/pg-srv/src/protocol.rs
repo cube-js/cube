@@ -793,6 +793,10 @@ impl Bind {
                         raw_value,
                         param_format,
                     )?),
+                    #[cfg(feature = "with-chrono")]
+                    PgTypeId::DATE => {
+                        BindValue::Date(chrono::NaiveDate::from_protocol(raw_value, param_format)?)
+                    }
                     _ => {
                         return Err(ErrorResponse::error(
                             ErrorCode::FeatureNotSupported,
@@ -1340,6 +1344,60 @@ mod tests {
                 assert_eq!(
                     body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::FLOAT8]))?,
                     vec![BindValue::Float64(26.11)]
+                );
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "with-chrono")]
+    #[tokio::test]
+    async fn test_frontend_message_parse_bind_date() -> Result<(), ProtocolError> {
+        use chrono::NaiveDate;
+
+        // Test text format date "2025-08-08"
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 1e 00 73 30 00 00 01 00 00 00 01 00   B.....s0........
+            00 00 0a 32 30 32 35 2d 30 38 2d 30 38 00 00 00   ...2025-08-08...
+            00                                                 .
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::DATE]))?,
+                    vec![BindValue::Date(
+                        NaiveDate::from_ymd_opt(2025, 8, 8).unwrap()
+                    )]
+                );
+            }
+            _ => panic!("Wrong message, must be Bind"),
+        }
+
+        // Test binary format date (9351 days from 2000-01-01 for 2025-08-08)
+        let buffer = parse_hex_dump(
+            r#"
+            42 00 00 00 1a 00 73 30 00 00 01 00 01 00 01 00   B.....s0........
+            00 00 04 00 00 24 87 00 00 00 00                  .....$......
+            "#
+            .to_string(),
+        );
+        let mut cursor = Cursor::new(buffer);
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        match message {
+            FrontendMessage::Bind(body) => {
+                assert_eq!(body.parameter_formats, vec![Format::Binary]);
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::DATE]))?,
+                    vec![BindValue::Date(
+                        NaiveDate::from_ymd_opt(2025, 8, 8).unwrap()
+                    )]
                 );
             }
             _ => panic!("Wrong message, must be Bind"),
