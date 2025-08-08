@@ -627,6 +627,9 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsBinder {
                     BindValue::Timestamp(v) => {
                         *value = ast::Value::SingleQuotedString(v.to_string());
                     }
+                    BindValue::Date(v) => {
+                        *value = ast::Value::SingleQuotedString(v.to_string());
+                    }
                     BindValue::Null => {
                         *value = ast::Value::Null;
                     }
