@@ -794,10 +794,9 @@ impl Bind {
                         param_format,
                     )?),
                     #[cfg(feature = "with-chrono")]
-                    PgTypeId::DATE => BindValue::Date(chrono::NaiveDate::from_protocol(
-                        raw_value,
-                        param_format,
-                    )?),
+                    PgTypeId::DATE => {
+                        BindValue::Date(chrono::NaiveDate::from_protocol(raw_value, param_format)?)
+                    }
                     _ => {
                         return Err(ErrorResponse::error(
                             ErrorCode::FeatureNotSupported,
@@ -1357,7 +1356,7 @@ mod tests {
     #[tokio::test]
     async fn test_frontend_message_parse_bind_date() -> Result<(), ProtocolError> {
         use chrono::NaiveDate;
-        
+
         // Test text format date "2025-08-08"
         let buffer = parse_hex_dump(
             r#"
@@ -1373,12 +1372,14 @@ mod tests {
             FrontendMessage::Bind(body) => {
                 assert_eq!(
                     body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::DATE]))?,
-                    vec![BindValue::Date(NaiveDate::from_ymd_opt(2025, 8, 8).unwrap())]
+                    vec![BindValue::Date(
+                        NaiveDate::from_ymd_opt(2025, 8, 8).unwrap()
+                    )]
                 );
             }
             _ => panic!("Wrong message, must be Bind"),
         }
-        
+
         // Test binary format date (9351 days from 2000-01-01 for 2025-08-08)
         let buffer = parse_hex_dump(
             r#"
@@ -1394,12 +1395,14 @@ mod tests {
                 assert_eq!(body.parameter_formats, vec![Format::Binary]);
                 assert_eq!(
                     body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::DATE]))?,
-                    vec![BindValue::Date(NaiveDate::from_ymd_opt(2025, 8, 8).unwrap())]
+                    vec![BindValue::Date(
+                        NaiveDate::from_ymd_opt(2025, 8, 8).unwrap()
+                    )]
                 );
             }
             _ => panic!("Wrong message, must be Bind"),
         }
-        
+
         Ok(())
     }
 

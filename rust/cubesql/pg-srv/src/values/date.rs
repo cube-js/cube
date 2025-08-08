@@ -7,7 +7,9 @@ use chrono::NaiveDate;
 use std::backtrace::Backtrace;
 use std::io::{Error, ErrorKind};
 
-impl ToProtocolValue for NaiveDate {
+pub type DateValue = NaiveDate;
+
+impl ToProtocolValue for DateValue {
     // date_out - https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/date.c#L176
     fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
         self.to_string().to_text(buf)
@@ -36,7 +38,7 @@ impl ToProtocolValue for NaiveDate {
     }
 }
 
-impl FromProtocolValue for NaiveDate {
+impl FromProtocolValue for DateValue {
     // date_in - https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/date.c#L111
     fn from_text(raw: &[u8]) -> Result<Self, ProtocolError> {
         let as_str = std::str::from_utf8(raw).map_err(|err| ProtocolError::ErrorResponse {

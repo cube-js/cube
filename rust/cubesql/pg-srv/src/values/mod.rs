@@ -10,3 +10,4 @@ pub use interval::*;
 
 #[cfg(feature = "with-chrono")]
 pub use timestamp::*;
+pub use date::*;
