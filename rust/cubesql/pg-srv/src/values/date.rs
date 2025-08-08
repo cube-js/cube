@@ -37,7 +37,7 @@ impl ToProtocolValue for NaiveDate {
 }
 
 impl FromProtocolValue for NaiveDate {
-    // date_in - https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/date.c#L110
+    // date_in - https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/date.c#L111
     fn from_text(raw: &[u8]) -> Result<Self, ProtocolError> {
         let as_str = std::str::from_utf8(raw).map_err(|err| ProtocolError::ErrorResponse {
             source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
