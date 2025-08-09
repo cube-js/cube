@@ -26,7 +26,7 @@ async function onTokenPayloadChange(payload: Record<string, any>, token) {
     return token;
   }
 
-  const response = await fetch('/playground/token', {
+  const response = await fetch('playground/token', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',

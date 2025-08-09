@@ -63,7 +63,7 @@ class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
       });
     });
 
-    const res = await fetch('/playground/context');
+    const res = await fetch('playground/context');
     const context = await res.json();
 
     setTelemetry(context.telemetry);
@@ -112,7 +112,7 @@ class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
       <LivePreviewContextProvider
         disabled={!context?.livePreview}
       >
-        <Root styles={ROOT_STYLES}>
+        <Root publicUrl="." styles={ROOT_STYLES}>
           <GlobalStyles />
 
           <Header selectedKeys={[location.pathname]} />
