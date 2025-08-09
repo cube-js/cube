@@ -1,4 +1,4 @@
-FROM node:22.16.0-bookworm-slim AS builder
+FROM node:22.18.0-bookworm-slim AS builder
 
 WORKDIR /cube
 COPY . .
@@ -21,7 +21,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/duckdb/src \
     && yarn cache clean
 
-FROM node:22.16.0-bookworm-slim
+FROM node:22.18.0-bookworm-slim
 
 ARG IMAGE_VERSION=unknown
 
