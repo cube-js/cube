@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.48](https://github.com/cube-js/cube/compare/v1.3.47...v1.3.48) (2025-08-09)
+
+### Bug Fixes
+
+- access_policy is not applied for JS models ([#9865](https://github.com/cube-js/cube/issues/9865)) ([89c78ec](https://github.com/cube-js/cube/commit/89c78ec921d12e14aefa89193df544eadc221cfb))
+- **cubesql:** Allow repeated aliases (auto-realias) ([#9863](https://github.com/cube-js/cube/issues/9863)) ([0fb183a](https://github.com/cube-js/cube/commit/0fb183a8c63f180f92913d84fa6890aec4339fcc))
+- **cubesql:** Improve Trino SQL push down compatibility ([#9861](https://github.com/cube-js/cube/issues/9861)) ([9d5794e](https://github.com/cube-js/cube/commit/9d5794e9eb3610d722adc0a8ec5092140efdf0f1))
+- **cubesql:** Support concatenating non-strings in SQL push down for Athena/Presto ([#9853](https://github.com/cube-js/cube/issues/9853)) ([97e54e0](https://github.com/cube-js/cube/commit/97e54e01ad78a9483736d92339769332c9934e68))
+
+### Features
+
+- **cubesql:** Support date type for parameter binding ([#9864](https://github.com/cube-js/cube/issues/9864)) ([5246fa0](https://github.com/cube-js/cube/commit/5246fa0836a11f38a9cc86357674c203414085dd))
+- **cubestore:** Upgrade rust to nightly-2025-08-01 ([#9858](https://github.com/cube-js/cube/issues/9858)) ([54b1553](https://github.com/cube-js/cube/commit/54b1553e04e674a6bc342dfd6d757a0136d67425))
+
+### Performance Improvements
+
+- **cubestore:** Reduce allocations in info schema tables ([#9855](https://github.com/cube-js/cube/issues/9855)) ([3cc34ff](https://github.com/cube-js/cube/commit/3cc34ff9e11b5dc1fe94463f82d587f5db8a76ac))
+
 ## [1.3.47](https://github.com/cube-js/cube/compare/v1.3.46...v1.3.47) (2025-08-04)
 
 ### Features
