@@ -121,6 +121,8 @@ export interface CubeDefinition {
   pre_aggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
   joins?: Record<string, JoinDefinition>;
   accessPolicy?: any[];
+  // eslint-disable-next-line camelcase
+  access_policy?: any[];
   folders?: any[];
   includes?: any;
   excludes?: any;
@@ -346,7 +348,8 @@ export class CubeSymbols {
       get accessPolicy() {
         if (!accessPolicy) {
           const parentAcls = cubeDefinition.extends ? R.clone(super.accessPolicy) : [];
-          accessPolicy = [...(parentAcls || []), ...(cubeDefinition.accessPolicy || [])];
+          const localAccessPolicy = cubeDefinition.accessPolicy || cubeDefinition.access_policy;
+          accessPolicy = [...(parentAcls || []), ...(localAccessPolicy || [])];
         }
         // Schema validator expects accessPolicy to be not empty if defined
         if (accessPolicy.length) {
