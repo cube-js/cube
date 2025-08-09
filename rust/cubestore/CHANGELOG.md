@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.48](https://github.com/cube-js/cube/compare/v1.3.47...v1.3.48) (2025-08-09)
+
+### Features
+
+- **cubestore:** Upgrade rust to nightly-2025-08-01 ([#9858](https://github.com/cube-js/cube/issues/9858)) ([54b1553](https://github.com/cube-js/cube/commit/54b1553e04e674a6bc342dfd6d757a0136d67425))
+
+### Performance Improvements
+
+- **cubestore:** Reduce allocations in info schema tables ([#9855](https://github.com/cube-js/cube/issues/9855)) ([3cc34ff](https://github.com/cube-js/cube/commit/3cc34ff9e11b5dc1fe94463f82d587f5db8a76ac))
+
 ## [1.3.47](https://github.com/cube-js/cube/compare/v1.3.46...v1.3.47) (2025-08-04)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

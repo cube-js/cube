@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.48](https://github.com/cube-js/cube/compare/v1.3.47...v1.3.48) (2025-08-09)
+
+### Bug Fixes
+
+- access_policy is not applied for JS models ([#9865](https://github.com/cube-js/cube/issues/9865)) ([89c78ec](https://github.com/cube-js/cube/commit/89c78ec921d12e14aefa89193df544eadc221cfb))
+
 ## [1.3.47](https://github.com/cube-js/cube/compare/v1.3.46...v1.3.47) (2025-08-04)
 
 **Note:** Version bump only for package @cubejs-backend/testing
