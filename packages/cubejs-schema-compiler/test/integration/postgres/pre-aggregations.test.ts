@@ -2315,7 +2315,7 @@ describe('PreAggregations', () => {
     });
   });
 
-  if (true) { //getEnv('nativeSqlPlanner') && getEnv('nativeSqlPlannerPreAggregations')) {
+  if (true) { // getEnv('nativeSqlPlanner') && getEnv('nativeSqlPlannerPreAggregations')) {
     it('rollup lambda', async () => {
       await compiler.compile();
 
