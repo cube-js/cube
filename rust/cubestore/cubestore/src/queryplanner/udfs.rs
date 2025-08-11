@@ -1,3 +1,4 @@
+use super::udf_xirr::XirrAccumulator;
 use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
 use crate::queryplanner::hll::{Hll, HllUnion};
 use crate::queryplanner::udf_xirr::create_xirr_udaf;
@@ -19,7 +20,6 @@ use smallvec::smallvec;
 use smallvec::SmallVec;
 use std::sync::Arc;
 use std::time::SystemTime;
-use super::udf_xirr::XirrAccumulator;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeScalarUDFKind {
@@ -187,7 +187,9 @@ impl CubeScalarUDF for Now {
                     }
                 };
 
-                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(nanos))))
+                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                    Some(nanos),
+                )))
             }),
         }
     }
