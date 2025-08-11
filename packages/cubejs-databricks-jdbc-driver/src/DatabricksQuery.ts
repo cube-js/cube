@@ -179,14 +179,19 @@ export class DatabricksQuery extends BaseQuery {
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';
     templates.statements.time_series_select = 'SELECT date_from::timestamp AS `date_from`,\n' +
-          'date_to::timestamp AS `date_to` \n' +
-          'FROM(\n' +
-          '    VALUES ' +
-          '{% for time_item in seria  %}' +
-          '(\'{{ time_item | join(\'\\\', \\\'\') }}\')' +
-          '{% if not loop.last %}, {% endif %}' +
-          '{% endfor %}' +
-          ') AS dates (date_from, date_to)';
+      'date_to::timestamp AS `date_to` \n' +
+      'FROM(\n' +
+      '    VALUES ' +
+      '{% for time_item in seria  %}' +
+      '(\'{{ time_item | join(\'\\\', \\\'\') }}\')' +
+      '{% if not loop.last %}, {% endif %}' +
+      '{% endfor %}' +
+      ') AS dates (date_from, date_to)';
+    templates.statements.generated_time_series_select = 'SELECT d AS date_from,\n' +
+      '(d + INTERVAL {{ granularity }}) - INTERVAL 1 MILLISECOND AS date_to\n' +
+      '  FROM (SELECT explode(sequence(\n' +
+      '    from_utc_timestamp({{ start }}, \'UTC\'), from_utc_timestamp({{ end }}, \'UTC\'), INTERVAL {{ granularity }}\n' +
+      '  )) AS d)';
 
     // TODO: Databricks has `TIMESTAMP_NTZ` with logic similar to Pg's `TIMESTAMP`
     // but that requires Runtime 13.3+. Should this be enabled?
