@@ -157,8 +157,8 @@ export class PrestodbQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'from_iso8601_timestamp(\'{{ value }}\')';
     // Presto requires concat types to be VARCHAR
     templates.expressions.binary = '{% if op == \'||\' %}' +
-      'CAST({{ left }} AS VARCHAR) || CAST({{ right }} AS VARCHAR)' +
-      '{% else %}{{ left }} {{ op }} {{ right }}{% endif %}';
+      '(CAST({{ left }} AS VARCHAR) || CAST({{ right }} AS VARCHAR))' +
+      '{% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
     templates.types.float = 'REAL';
