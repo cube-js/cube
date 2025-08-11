@@ -262,7 +262,7 @@
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
 
-      "---- Different results comparing to baseQuery version. Need to investigate ----",
+    "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying ECommerce: dimensions",
     "querying ECommerce: dimensions + order",
     "querying ECommerce: dimensions + limit",

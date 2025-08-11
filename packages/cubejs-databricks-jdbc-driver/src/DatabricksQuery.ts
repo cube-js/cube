@@ -161,6 +161,10 @@ export class DatabricksQuery extends BaseQuery {
     return 120;
   }
 
+  public supportGeneratedSeriesForCustomTd() {
+    return true;
+  }
+
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
