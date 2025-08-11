@@ -16276,6 +16276,46 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range 1`] = `
+Array [
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "8",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "12",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "6",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-06-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "19",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "16",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": null,
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": null,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing 1`] = `
 Array [
   Object {
