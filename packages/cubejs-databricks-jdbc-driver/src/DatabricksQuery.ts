@@ -178,6 +178,16 @@ export class DatabricksQuery extends BaseQuery {
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';
+    templates.statements.time_series_select = 'SELECT date_from::timestamp AS `date_from`,\n' +
+          'date_to::timestamp AS `date_to` \n' +
+          'FROM(\n' +
+          '    VALUES ' +
+          '{% for time_item in seria  %}' +
+          '(\'{{ time_item | join(\'\\\', \\\'\') }}\')' +
+          '{% if not loop.last %}, {% endif %}' +
+          '{% endfor %}' +
+          ') AS dates (date_from, date_to)';
+
     // TODO: Databricks has `TIMESTAMP_NTZ` with logic similar to Pg's `TIMESTAMP`
     // but that requires Runtime 13.3+. Should this be enabled?
     // templates.types.timestamp = 'TIMESTAMP_NTZ';
