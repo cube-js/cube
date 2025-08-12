@@ -1600,7 +1600,8 @@ cubes:
           - name: category_created_at_index
             columns:
               - CUBE.category
-              - orders__created_at_day
+              # special syntax needed
+              - "{'orders__created_at_day'}"
     # ...
 ```
 
