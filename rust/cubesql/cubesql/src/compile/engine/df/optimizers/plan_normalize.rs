@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use datafusion::{
+    arrow::datatypes::DataType,
     error::{DataFusionError, Result},
     logical_expr::{BuiltinScalarFunction, Expr, GroupingSet, Like},
     logical_plan::{
@@ -10,28 +11,34 @@ use datafusion::{
             Limit, Partitioning, Projection, Repartition, Sort, Subquery, TableScan, TableUDFs,
             Union, Values, Window,
         },
-        union_with_alias, Column, DFSchema, LogicalPlan, LogicalPlanBuilder,
+        union_with_alias, Column, DFSchema, ExprSchemable, LogicalPlan, LogicalPlanBuilder,
+        Operator,
     },
     optimizer::optimizer::{OptimizerConfig, OptimizerRule},
     scalar::ScalarValue,
+    sql::planner::ContextProvider,
 };
 
-use crate::compile::rewrite::rules::utils::DatePartToken;
+use crate::compile::{engine::CubeContext, rewrite::rules::utils::DatePartToken};
 
 /// PlanNormalize optimizer rule walks through the query and applies transformations
 /// to normalize the logical plan structure and expressions.
 ///
-/// Currently this includes replacing literal granularities in `DatePart` and `DateTrunc` functions
-/// with their normalized equivalents.
-pub struct PlanNormalize {}
+/// Currently this includes replacing:
+/// - literal granularities in `DatePart` and `DateTrunc` functions
+///   with their normalized equivalents
+/// - replacing `DATE - DATE` expressions with `DATEDIFF` equivalent
+pub struct PlanNormalize<'a> {
+    cube_ctx: &'a CubeContext,
+}
 
-impl PlanNormalize {
-    pub fn new() -> Self {
-        Self {}
+impl<'a> PlanNormalize<'a> {
+    pub fn new(cube_ctx: &'a CubeContext) -> Self {
+        Self { cube_ctx }
     }
 }
 
-impl OptimizerRule for PlanNormalize {
+impl OptimizerRule for PlanNormalize<'_> {
     fn optimize(
         &self,
         plan: &LogicalPlan,
@@ -63,9 +70,12 @@ fn plan_normalize(
             alias,
         }) => {
             let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+            let schema = input.schema();
             let new_expr = expr
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             let alias = alias.clone();
 
@@ -93,8 +103,14 @@ fn plan_normalize(
 
         LogicalPlan::Filter(Filter { predicate, input }) => {
             let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
-            let predicate =
-                expr_normalize(optimizer, predicate, remapped_columns, optimizer_config)?;
+            let schema = input.schema();
+            let predicate = expr_normalize(
+                optimizer,
+                predicate,
+                schema,
+                remapped_columns,
+                optimizer_config,
+            )?;
 
             LogicalPlanBuilder::from(input).filter(predicate)?.build()
         }
@@ -105,9 +121,12 @@ fn plan_normalize(
             schema: _,
         }) => {
             let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+            let schema = input.schema();
             let new_window_expr = window_expr
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
 
             for (window_expr, new_window_expr) in window_expr.iter().zip(new_window_expr.iter()) {
@@ -132,13 +151,18 @@ fn plan_normalize(
             schema: _,
         }) => {
             let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+            let schema = input.schema();
             let new_group_expr = group_expr
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             let new_aggr_expr = aggr_expr
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
 
             *remapped_columns = HashMap::new();
@@ -167,11 +191,14 @@ fn plan_normalize(
         }
 
         LogicalPlan::Sort(Sort { expr, input }) => {
+            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+            let schema = input.schema();
             let expr = expr
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
-            let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
 
             LogicalPlanBuilder::from(input).sort(expr)?.build()
         }
@@ -262,13 +289,20 @@ fn plan_normalize(
             partitioning_scheme,
         }) => {
             let input = plan_normalize(optimizer, input, remapped_columns, optimizer_config)?;
+            let schema = input.schema();
             let partitioning_scheme = match partitioning_scheme {
                 Partitioning::RoundRobinBatch(n) => Partitioning::RoundRobinBatch(*n),
                 Partitioning::Hash(exprs, n) => {
                     let exprs = exprs
                         .iter()
                         .map(|expr| {
-                            expr_normalize(optimizer, expr, remapped_columns, optimizer_config)
+                            expr_normalize(
+                                optimizer,
+                                expr,
+                                schema,
+                                remapped_columns,
+                                optimizer_config,
+                            )
                         })
                         .collect::<Result<Vec<_>>>()?;
                     Partitioning::Hash(exprs, *n)
@@ -321,7 +355,15 @@ fn plan_normalize(
             let projected_schema = Arc::clone(projected_schema);
             let filters = filters
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(
+                        optimizer,
+                        expr,
+                        &projected_schema,
+                        remapped_columns,
+                        optimizer_config,
+                    )
+                })
                 .collect::<Result<Vec<_>>>()?;
             let fetch = *fetch;
 
@@ -391,13 +433,19 @@ fn plan_normalize(
 
         p @ LogicalPlan::DropTable(_) => Ok(p.clone()),
 
-        LogicalPlan::Values(Values { schema: _, values }) => {
+        LogicalPlan::Values(Values { schema, values }) => {
             let values = values
                 .iter()
                 .map(|row| {
                     row.iter()
                         .map(|expr| {
-                            expr_normalize(optimizer, expr, remapped_columns, optimizer_config)
+                            expr_normalize(
+                                optimizer,
+                                expr,
+                                schema,
+                                remapped_columns,
+                                optimizer_config,
+                            )
                         })
                         .collect::<Result<Vec<_>>>()
                 })
@@ -448,11 +496,14 @@ fn plan_normalize(
                 remapped_columns,
                 optimizer_config,
             )?);
+            let schema = input.schema();
             let new_expr = expr
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
-            let schema = build_table_udf_schema(&input, &new_expr)?;
+            let new_schema = build_table_udf_schema(&input, &new_expr)?;
 
             for (expr, new_expr) in expr.iter().zip(new_expr.iter()) {
                 let old_name = expr.name(&DFSchema::empty())?;
@@ -467,7 +518,7 @@ fn plan_normalize(
             Ok(LogicalPlan::TableUDFs(TableUDFs {
                 expr: new_expr,
                 input,
-                schema,
+                schema: new_schema,
             }))
         }
 
@@ -492,6 +543,7 @@ fn plan_normalize(
 fn expr_normalize(
     optimizer: &PlanNormalize,
     expr: &Expr,
+    schema: &DFSchema,
     remapped_columns: &HashMap<Column, Column>,
     optimizer_config: &OptimizerConfig,
 ) -> Result<Expr> {
@@ -500,6 +552,7 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -522,22 +575,15 @@ fn expr_normalize(
 
         e @ Expr::Literal(..) => Ok(e.clone()),
 
-        Expr::BinaryExpr { left, op, right } => {
-            let left = Box::new(expr_normalize(
-                optimizer,
-                left,
-                remapped_columns,
-                optimizer_config,
-            )?);
-            let op = *op;
-            let right = Box::new(expr_normalize(
-                optimizer,
-                right,
-                remapped_columns,
-                optimizer_config,
-            )?);
-            Ok(Expr::BinaryExpr { left, op, right })
-        }
+        Expr::BinaryExpr { left, op, right } => binary_expr_normalize(
+            optimizer,
+            left,
+            op,
+            right,
+            schema,
+            remapped_columns,
+            optimizer_config,
+        ),
 
         Expr::AnyExpr {
             left,
@@ -548,6 +594,7 @@ fn expr_normalize(
             let left = Box::new(expr_normalize(
                 optimizer,
                 left,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -555,6 +602,7 @@ fn expr_normalize(
             let right = Box::new(expr_normalize(
                 optimizer,
                 right,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -577,12 +625,14 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
             let pattern = Box::new(expr_normalize(
                 optimizer,
                 pattern,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -605,12 +655,14 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
             let pattern = Box::new(expr_normalize(
                 optimizer,
                 pattern,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -633,12 +685,14 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
             let pattern = Box::new(expr_normalize(
                 optimizer,
                 pattern,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -655,6 +709,7 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -665,6 +720,7 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -675,6 +731,7 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -685,6 +742,7 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -695,12 +753,14 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
             let key = Box::new(expr_normalize(
                 optimizer,
                 key,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -716,6 +776,7 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -723,12 +784,14 @@ fn expr_normalize(
             let low = Box::new(expr_normalize(
                 optimizer,
                 low,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
             let high = Box::new(expr_normalize(
                 optimizer,
                 high,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -751,6 +814,7 @@ fn expr_normalize(
                     Ok::<_, DataFusionError>(Box::new(expr_normalize(
                         optimizer,
                         e,
+                        schema,
                         remapped_columns,
                         optimizer_config,
                     )?))
@@ -763,12 +827,14 @@ fn expr_normalize(
                         Box::new(expr_normalize(
                             optimizer,
                             when,
+                            schema,
                             remapped_columns,
                             optimizer_config,
                         )?),
                         Box::new(expr_normalize(
                             optimizer,
                             then,
+                            schema,
                             remapped_columns,
                             optimizer_config,
                         )?),
@@ -781,6 +847,7 @@ fn expr_normalize(
                     Ok::<_, DataFusionError>(Box::new(expr_normalize(
                         optimizer,
                         e,
+                        schema,
                         remapped_columns,
                         optimizer_config,
                     )?))
@@ -797,6 +864,7 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -808,6 +876,7 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -823,6 +892,7 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -840,6 +910,7 @@ fn expr_normalize(
                 optimizer,
                 fun,
                 args,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?;
@@ -850,7 +921,9 @@ fn expr_normalize(
             let fun = Arc::clone(fun);
             let args = args
                 .iter()
-                .map(|arg| expr_normalize(optimizer, arg, remapped_columns, optimizer_config))
+                .map(|arg| {
+                    expr_normalize(optimizer, arg, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             Ok(Expr::ScalarUDF { fun, args })
         }
@@ -859,7 +932,9 @@ fn expr_normalize(
             let fun = Arc::clone(fun);
             let args = args
                 .iter()
-                .map(|arg| expr_normalize(optimizer, arg, remapped_columns, optimizer_config))
+                .map(|arg| {
+                    expr_normalize(optimizer, arg, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             Ok(Expr::TableUDF { fun, args })
         }
@@ -873,14 +948,18 @@ fn expr_normalize(
             let fun = fun.clone();
             let args = args
                 .iter()
-                .map(|arg| expr_normalize(optimizer, arg, remapped_columns, optimizer_config))
+                .map(|arg| {
+                    expr_normalize(optimizer, arg, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             let distinct = *distinct;
             let within_group = within_group
                 .as_ref()
                 .map(|expr| {
                     expr.iter()
-                        .map(|e| expr_normalize(optimizer, e, remapped_columns, optimizer_config))
+                        .map(|e| {
+                            expr_normalize(optimizer, e, schema, remapped_columns, optimizer_config)
+                        })
                         .collect::<Result<Vec<_>>>()
                 })
                 .transpose()?;
@@ -902,15 +981,21 @@ fn expr_normalize(
             let fun = fun.clone();
             let args = args
                 .iter()
-                .map(|arg| expr_normalize(optimizer, arg, remapped_columns, optimizer_config))
+                .map(|arg| {
+                    expr_normalize(optimizer, arg, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             let partition_by = partition_by
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             let order_by = order_by
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             let window_frame = *window_frame;
             Ok(Expr::WindowFunction {
@@ -926,7 +1011,9 @@ fn expr_normalize(
             let fun = Arc::clone(fun);
             let args = args
                 .iter()
-                .map(|arg| expr_normalize(optimizer, arg, remapped_columns, optimizer_config))
+                .map(|arg| {
+                    expr_normalize(optimizer, arg, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             Ok(Expr::AggregateUDF { fun, args })
         }
@@ -939,12 +1026,13 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
             let list = list
                 .iter()
-                .map(|e| expr_normalize(optimizer, e, remapped_columns, optimizer_config))
+                .map(|e| expr_normalize(optimizer, e, schema, remapped_columns, optimizer_config))
                 .collect::<Result<Vec<_>>>()?;
             let negated = *negated;
             Ok(Expr::InList {
@@ -962,12 +1050,14 @@ fn expr_normalize(
             let expr = Box::new(expr_normalize(
                 optimizer,
                 expr,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
             let subquery = Box::new(expr_normalize(
                 optimizer,
                 subquery,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?);
@@ -987,6 +1077,7 @@ fn expr_normalize(
             let grouping_set = grouping_set_normalize(
                 optimizer,
                 grouping_set,
+                schema,
                 remapped_columns,
                 optimizer_config,
             )?;
@@ -1015,13 +1106,14 @@ fn scalar_function_normalize(
     optimizer: &PlanNormalize,
     fun: &BuiltinScalarFunction,
     args: &[Expr],
+    schema: &DFSchema,
     remapped_columns: &HashMap<Column, Column>,
     optimizer_config: &OptimizerConfig,
 ) -> Result<(BuiltinScalarFunction, Vec<Expr>)> {
     let fun = fun.clone();
     let mut args = args
         .iter()
-        .map(|arg| expr_normalize(optimizer, arg, remapped_columns, optimizer_config))
+        .map(|arg| expr_normalize(optimizer, arg, schema, remapped_columns, optimizer_config))
         .collect::<Result<Vec<_>>>()?;
 
     // If the function is `DatePart` or `DateTrunc` and the first argument is a literal string,
@@ -1048,6 +1140,7 @@ fn scalar_function_normalize(
 fn grouping_set_normalize(
     optimizer: &PlanNormalize,
     grouping_set: &GroupingSet,
+    schema: &DFSchema,
     remapped_columns: &HashMap<Column, Column>,
     optimizer_config: &OptimizerConfig,
 ) -> Result<GroupingSet> {
@@ -1055,7 +1148,9 @@ fn grouping_set_normalize(
         GroupingSet::Rollup(exprs) => {
             let exprs = exprs
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             Ok(GroupingSet::Rollup(exprs))
         }
@@ -1063,7 +1158,9 @@ fn grouping_set_normalize(
         GroupingSet::Cube(exprs) => {
             let exprs = exprs
                 .iter()
-                .map(|expr| expr_normalize(optimizer, expr, remapped_columns, optimizer_config))
+                .map(|expr| {
+                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                })
                 .collect::<Result<Vec<_>>>()?;
             Ok(GroupingSet::Cube(exprs))
         }
@@ -1075,7 +1172,13 @@ fn grouping_set_normalize(
                     Ok(exprs
                         .iter()
                         .map(|expr| {
-                            expr_normalize(optimizer, expr, remapped_columns, optimizer_config)
+                            expr_normalize(
+                                optimizer,
+                                expr,
+                                schema,
+                                remapped_columns,
+                                optimizer_config,
+                            )
                         })
                         .collect::<Result<Vec<_>>>()?)
                 })
@@ -1083,4 +1186,60 @@ fn grouping_set_normalize(
             Ok(GroupingSet::GroupingSets(exprs))
         }
     }
+}
+
+/// Recursively normalizes binary expressions.
+/// Currently this includes replacing `DATE - DATE` expressions
+/// with respective `DATEDIFF` function calls.
+fn binary_expr_normalize(
+    optimizer: &PlanNormalize,
+    left: &Expr,
+    op: &Operator,
+    right: &Expr,
+    schema: &DFSchema,
+    remapped_columns: &HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<Expr> {
+    let left = Box::new(expr_normalize(
+        optimizer,
+        left,
+        schema,
+        remapped_columns,
+        optimizer_config,
+    )?);
+    let op = *op;
+    let right = Box::new(expr_normalize(
+        optimizer,
+        right,
+        schema,
+        remapped_columns,
+        optimizer_config,
+    )?);
+
+    // Check if the expression is `DATE - DATE` and replace it with `DATEDIFF` with same semantics.
+    // Rationale to do this in optimizer than rewrites is that while the expression
+    // can be rewritten to something else, a binary variation still exists and would be picked
+    // for SQL push down generation either way. This creates an issue in dialects
+    // other than Postgres that would return INTERVAL on `DATE - DATE` expression.
+    if left.get_type(schema)? == DataType::Date32
+        && op == Operator::Minus
+        && right.get_type(schema)? == DataType::Date32
+    {
+        let fun = optimizer
+            .cube_ctx
+            .get_function_meta("datediff")
+            .ok_or_else(|| {
+                DataFusionError::Internal(
+                    "Unable to find 'datediff' function in cube context".to_string(),
+                )
+            })?;
+        let args = vec![
+            Expr::Literal(ScalarValue::Utf8(Some("day".to_string()))),
+            *right,
+            *left,
+        ];
+        return Ok(Expr::ScalarUDF { fun, args });
+    }
+
+    Ok(Expr::BinaryExpr { left, op, right })
 }

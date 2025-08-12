@@ -409,6 +409,44 @@ impl RewriteRules for DateRules {
                     "?new_granularity",
                 ),
             ),
+            // AGE function seems to be a popular choice for this date arithmetic,
+            // but it is not supported in SQL push down by most dialects.
+            transforming_rewrite_with_root(
+                "thoughtspot-date-part-over-age-as-datediff-month",
+                binary_expr(
+                    binary_expr(
+                        self.fun_expr(
+                            "DatePart",
+                            vec![
+                                literal_string("year"),
+                                udf_expr("age", vec!["?newer_date", "?older_date"]),
+                            ],
+                        ),
+                        "*",
+                        literal_int(12),
+                    ),
+                    "+",
+                    self.fun_expr(
+                        "DatePart",
+                        vec![
+                            literal_string("month"),
+                            udf_expr("age", vec!["?newer_date", "?older_date"]),
+                        ],
+                    ),
+                ),
+                alias_expr(
+                    udf_expr(
+                        "datediff",
+                        vec![
+                            literal_string("month"),
+                            "?older_date".to_string(),
+                            "?newer_date".to_string(),
+                        ],
+                    ),
+                    "?alias",
+                ),
+                self.transform_root_alias("?alias"),
+            ),
         ]
     }
 }
