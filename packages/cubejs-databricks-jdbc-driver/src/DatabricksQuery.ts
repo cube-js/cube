@@ -161,6 +161,10 @@ export class DatabricksQuery extends BaseQuery {
     return 120;
   }
 
+  public supportGeneratedSeriesForCustomTd() {
+    return true;
+  }
+
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
@@ -178,6 +182,32 @@ export class DatabricksQuery extends BaseQuery {
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';
+    templates.statements.time_series_select = 'SELECT date_from::timestamp AS `date_from`,\n' +
+      'date_to::timestamp AS `date_to` \n' +
+      'FROM(\n' +
+      '    VALUES ' +
+      '{% for time_item in seria  %}' +
+      '(\'{{ time_item | join(\'\\\', \\\'\') }}\')' +
+      '{% if not loop.last %}, {% endif %}' +
+      '{% endfor %}' +
+      ') AS dates (date_from, date_to)';
+    templates.statements.generated_time_series_select = 'SELECT d AS date_from,\n' +
+      '(d + INTERVAL {{ granularity }}) - INTERVAL 1 MILLISECOND AS date_to\n' +
+      '  FROM (SELECT explode(sequence(\n' +
+      '    from_utc_timestamp({{ start }}, \'UTC\'), from_utc_timestamp({{ end }}, \'UTC\'), INTERVAL {{ granularity }}\n' +
+      '  )) AS d)';
+    templates.statements.generated_time_series_with_cte_range_source =
+    'SELECT d AS date_from,\n' +
+    '(d + INTERVAL {{ granularity }}) - INTERVAL 1 MILLISECOND AS date_to\n' +
+    'FROM {{ range_source }}\n' +
+    'LATERAL VIEW explode(\n' +
+    '    sequence(\n' +
+    '        CAST({{ min_name }} AS TIMESTAMP),\n' +
+    '        CAST({{ max_name }} AS TIMESTAMP),\n' +
+    '        INTERVAL {{ granularity }}\n' +
+    '    )\n' +
+    ') dates AS d';
+
     // TODO: Databricks has `TIMESTAMP_NTZ` with logic similar to Pg's `TIMESTAMP`
     // but that requires Runtime 13.3+. Should this be enabled?
     // templates.types.timestamp = 'TIMESTAMP_NTZ';
