@@ -63,7 +63,7 @@ async function testConnection(variables: Record<string, string>) {
 }
 
 async function saveConnection(variables: Record<string, string>) {
-  await fetch('/playground/env', {
+  await fetch('playground/env', {
     method: 'post',
     headers: {
       'Content-Type': 'application/json',
@@ -174,7 +174,7 @@ export function ConnectionWizardPage({ history }) {
       }
 
       {
-        const response = await fetch('/playground/driver', {
+        const response = await fetch('playground/driver', {
           method: 'post',
           headers: {
             'Content-Type': 'application/json',
