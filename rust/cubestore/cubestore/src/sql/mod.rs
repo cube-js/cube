@@ -461,9 +461,22 @@ impl SqlServiceImpl {
                 };
                 Ok(res)
             }
-            _ => Err(CubeError::user(
-                "Explain not supported for selects from system tables".to_string(),
-            )),
+            QueryPlan::Meta(logical_plan) => {
+                if !analyze {
+                    Ok(DataFrame::new(
+                        vec![Column::new(
+                            "logical plan".to_string(),
+                            ColumnType::String,
+                            0,
+                        )],
+                        vec![Row::new(vec![TableValue::String(pp_plan(&logical_plan))])],
+                    ))
+                } else {
+                    Err(CubeError::user(
+                        "EXPLAIN ANALYZE is not supported for selects from system tables".to_string(),
+                    ))
+                }
+            }
         }?;
         Ok(Arc::new(res))
     }
