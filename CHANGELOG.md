@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.50](https://github.com/cube-js/cube/compare/v1.3.49...v1.3.50) (2025-08-13)
+
+### Bug Fixes
+
+- **client-core:** Remove default value in table pivot ([#9869](https://github.com/cube-js/cube/issues/9869)) ([692c4ae](https://github.com/cube-js/cube/commit/692c4ae8ccd6ff1e1a26bddd5d8e65f81c4f3488))
+
+### Features
+
+- **cubestore:** Support EXPLAIN for meta queries ([#9876](https://github.com/cube-js/cube/issues/9876)) ([619eb90](https://github.com/cube-js/cube/commit/619eb901544ae08d0fbf5fccdcff546a06cac6cf))
+- **tesseract:** Support time series queries in Databricks ([#9871](https://github.com/cube-js/cube/issues/9871)) ([b238a29](https://github.com/cube-js/cube/commit/b238a29f0637054386a84a8d6f72cc63949eb7d0))
+
 ## [1.3.49](https://github.com/cube-js/cube/compare/v1.3.48...v1.3.49) (2025-08-12)
 
 ### Bug Fixes
