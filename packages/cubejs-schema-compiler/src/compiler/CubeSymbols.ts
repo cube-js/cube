@@ -100,8 +100,33 @@ export type PreAggregationDefinitionRollup = BasePreAggregationDefinition & {
 export type PreAggregationDefinition = PreAggregationDefinitionRollup;
 
 export type JoinDefinition = {
+  name: string,
   relationship: string,
   sql: (...args: any[]) => string,
+};
+
+export type Filter =
+  | {
+      member: string;
+      memberReference?: string;
+      [key: string]: any;
+    }
+  | {
+      and?: Filter[];
+      or?: Filter[];
+      [key: string]: any;
+    };
+
+export type AccessPolicyDefinition = {
+  rowLevel?: {
+    filters: Filter[];
+  };
+  memberLevel?: {
+    includes?: string | string[];
+    excludes?: string | string[];
+    includesMembers?: string[];
+    excludesMembers?: string[];
+  };
 };
 
 export interface CubeDefinition {
@@ -119,8 +144,8 @@ export interface CubeDefinition {
   preAggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
   // eslint-disable-next-line camelcase
   pre_aggregations?: Record<string, PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql>;
-  joins?: Record<string, JoinDefinition>;
-  accessPolicy?: any[];
+  joins?: JoinDefinition[];
+  accessPolicy?: AccessPolicyDefinition[];
   // eslint-disable-next-line camelcase
   access_policy?: any[];
   folders?: any[];
@@ -221,17 +246,17 @@ export class CubeSymbols {
   }
 
   public createCube(cubeDefinition: CubeDefinition): CubeDefinitionExtended {
-    let preAggregations: any;
-    let joins: any;
-    let measures: any;
-    let dimensions: any;
-    let segments: any;
-    let hierarchies: any;
-    let accessPolicy: any;
-    let folders: any;
-    let cubes: any;
+    let preAggregations: CubeDefinition['preAggregations'];
+    let joins: CubeDefinition['joins'];
+    let measures: CubeDefinition['measures'];
+    let dimensions: CubeDefinition['dimensions'];
+    let segments: CubeDefinition['segments'];
+    let hierarchies: CubeDefinition['hierarchies'];
+    let accessPolicy: CubeDefinition['accessPolicy'];
+    let folders: CubeDefinition['folders'];
+    let cubes: CubeDefinition['cubes'];
 
-    const cubeObject = Object.assign({
+    const cubeObject: CubeDefinitionExtended = Object.assign({
       allDefinitions(type: string) {
         if (cubeDefinition.extends) {
           return {
@@ -297,7 +322,8 @@ export class CubeSymbols {
 
       get joins() {
         if (!joins) {
-          joins = this.allDefinitions('joins');
+          const parentJoins = cubeDefinition.extends ? super.joins : [];
+          joins = [...parentJoins, ...(cubeDefinition.joins || [])];
         }
         return joins;
       },
@@ -383,9 +409,10 @@ export class CubeSymbols {
     return cubeObject;
   }
 
-  protected transform(cubeName: string, errorReporter: ErrorReporter, splitViews: SplitViews) {
+  protected transform(cubeName: string, errorReporter: ErrorReporter, splitViews: SplitViews): CubeSymbolsDefinition {
     const cube = this.getCubeDefinition(cubeName);
-    const duplicateNames = R.compose(
+    // @ts-ignore
+    const duplicateNames: string[] = R.compose(
       R.map((nameToDefinitions: any) => nameToDefinitions[0]),
       R.toPairs,
       R.filter((definitionsByName: any) => definitionsByName.length > 1),
@@ -397,9 +424,7 @@ export class CubeSymbols {
       // @ts-ignore
     )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]);
 
-    // @ts-ignore
     if (duplicateNames.length > 0) {
-      // @ts-ignore
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
 
@@ -427,23 +452,24 @@ export class CubeSymbols {
       ...cube.dimensions || {},
       ...cube.segments || {},
       ...cube.preAggregations || {}
-    };
+    } as CubeSymbolsDefinition;
   }
 
-  private camelCaseTypes(obj: Object | undefined) {
+  private camelCaseTypes(obj: Object | Array<any> | undefined) {
     if (!obj) {
       return;
     }
 
-    // eslint-disable-next-line no-restricted-syntax
-    for (const member of Object.values(obj)) {
+    const members = Array.isArray(obj) ? obj : Object.values(obj);
+
+    members.forEach(member => {
       if (member.type && member.type.indexOf('_') !== -1) {
         member.type = camelize(member.type, true);
       }
       if (member.relationship && member.relationship.indexOf('_') !== -1) {
         member.relationship = camelize(member.relationship, true);
       }
-    }
+    });
   }
 
   protected transformPreAggregations(preAggregations: Object) {
@@ -548,7 +574,7 @@ export class CubeSymbols {
         }
       }
 
-      const includeMembers = this.generateIncludeMembers(cubeIncludes, cube.name, type);
+      const includeMembers = this.generateIncludeMembers(cubeIncludes, type);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
 
       const existing = cube.includedMembers ?? [];
@@ -699,11 +725,7 @@ export class CubeSymbols {
           splitViewDef = splitViews[viewName];
         }
 
-        const includeMembers = this.generateIncludeMembers(
-          finalIncludes,
-          parentCube.name,
-          type
-        );
+        const includeMembers = this.generateIncludeMembers(finalIncludes, type);
         this.applyIncludeMembers(includeMembers, splitViewDef, type, errorReporter);
       } else {
         for (const member of finalIncludes) {
@@ -733,7 +755,7 @@ export class CubeSymbols {
     return this.symbols[cubeName]?.cubeObj()?.[type]?.[memberName];
   }
 
-  protected generateIncludeMembers(members: any[], cubeName: string, type: string) {
+  protected generateIncludeMembers(members: any[], type: string) {
     return members.map(memberRef => {
       const path = memberRef.member.split('.');
       const resolvedMember = this.getResolvedMember(type, path[path.length - 2], path[path.length - 1]);
@@ -870,9 +892,8 @@ export class CubeSymbols {
 
   /**
    * Split join path to member to join hint and member path: `A.B.C.D.E.dim` => `[A, B, C, D, E]` + `E.dim`
-   * @param path
    */
-  public static joinHintFromPath(path: string): { path: string, joinHint: Array<string> } {
+  public static joinHintFromPath(path: string): { path: string, joinHint: string[] } {
     const parts = path.split('.');
     if (parts.length > 2) {
       // Path contains join path
@@ -908,7 +929,7 @@ export class CubeSymbols {
     }
   }
 
-  protected withSymbolsCallContext(func, context) {
+  protected withSymbolsCallContext(func: Function, context) {
     const oldContext = this.resolveSymbolsCallContext;
     this.resolveSymbolsCallContext = context;
     try {
@@ -933,7 +954,7 @@ export class CubeSymbols {
     return this.funcArgumentsValues[funcDefinition];
   }
 
-  protected joinHints() {
+  protected joinHints(): string | string[] | undefined {
     const { joinHints } = this.resolveSymbolsCallContext || {};
     if (Array.isArray(joinHints)) {
       return R.uniq(joinHints);
@@ -1014,7 +1035,7 @@ export class CubeSymbols {
     return (...filterParamArgs) => '';
   }
 
-  public resolveSymbol(cubeName, name) {
+  public resolveSymbol(cubeName, name: string) {
     const { sqlResolveFn, contextSymbols, collectJoinHints, depsResolveFn, currResolveIndexFn } = this.resolveSymbolsCallContext || {};
     if (name === 'USER_CONTEXT') {
       throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');

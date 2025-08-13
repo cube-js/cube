@@ -100,6 +100,13 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
     return {
       ObjectProperty: (path) => {
+        if (path.node.key.type === 'Identifier' && path.node.key.name === 'joins' && t.isObjectExpression(path.node.value)) {
+          const fullPath = this.fullPath(path);
+          if (fullPath === 'joins') {
+            this.convertJoinsObjectToArray(path);
+          }
+        }
+
         if (path.node.key.type === 'Identifier' && transpiledFields.has(path.node.key.name)) {
           const fullPath = this.fullPath(path);
           // eslint-disable-next-line no-restricted-syntax
@@ -112,6 +119,39 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         }
       }
     };
+  }
+
+  protected convertJoinsObjectToArray(path: NodePath<t.ObjectProperty>) {
+    const valuePath = path.get('value');
+    if (!valuePath.isObjectExpression()) {
+      return;
+    }
+
+    const elements: t.ObjectExpression[] = [];
+
+    for (const prop of valuePath.get('properties')) {
+      if (!prop.isObjectProperty()) {
+        return;
+      }
+      const keyNode = prop.node.key;
+      const valueNode = prop.node.value;
+
+      if (
+        (t.isIdentifier(keyNode) || t.isStringLiteral(keyNode)) &&
+        t.isObjectExpression(valueNode)
+      ) {
+        const nameProp = t.objectProperty(
+          t.identifier('name'),
+          t.stringLiteral(t.isIdentifier(keyNode) ? keyNode.name : keyNode.value)
+        );
+
+        const newProps = [nameProp, ...valueNode.properties];
+        const objectExpr = t.objectExpression(newProps);
+        elements.push(objectExpr);
+      }
+    }
+
+    valuePath.replaceWith(t.arrayExpression(elements));
   }
 
   protected fullPath(path: NodePath<t.ObjectProperty>): string {
