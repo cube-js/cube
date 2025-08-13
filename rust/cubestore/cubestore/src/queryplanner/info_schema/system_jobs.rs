@@ -38,36 +38,32 @@ impl InfoSchemaTableDef for SystemJobsTableDef {
     fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
         vec![
             Box::new(|jobs| {
-                Arc::new(UInt64Array::from(
-                    jobs.iter().map(|row| row.get_id()).collect::<Vec<_>>(),
+                Arc::new(UInt64Array::from_iter_values(
+                    jobs.iter().map(|row| row.get_id()),
                 ))
             }),
             Box::new(|jobs| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     jobs.iter()
-                        .map(|row| format!("{:?}", row.get_row().row_reference()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| format!("{:?}", row.get_row().row_reference())),
                 ))
             }),
             Box::new(|jobs| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     jobs.iter()
-                        .map(|row| format!("{:?}", row.get_row().job_type()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| format!("{:?}", row.get_row().job_type())),
                 ))
             }),
             Box::new(|jobs| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     jobs.iter()
-                        .map(|row| format!("{:?}", row.get_row().status()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| format!("{:?}", row.get_row().status())),
                 ))
             }),
             Box::new(|jobs| {
-                Arc::new(TimestampNanosecondArray::from(
+                Arc::new(TimestampNanosecondArray::from_iter_values(
                     jobs.iter()
-                        .map(|row| row.get_row().last_heart_beat().timestamp_nanos())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.get_row().last_heart_beat().timestamp_nanos()),
                 ))
             }),
         ]

@@ -61,75 +61,60 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
     fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
         vec![
             Box::new(|tables| {
-                Arc::new(UInt64Array::from(
-                    tables
-                        .iter()
-                        .map(|row| row.table.get_id())
-                        .collect::<Vec<_>>(),
+                Arc::new(UInt64Array::from_iter_values(
+                    tables.iter().map(|row| row.table.get_id()),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(UInt64Array::from(
-                    tables
-                        .iter()
-                        .map(|row| row.table.get_row().get_schema_id())
-                        .collect::<Vec<_>>(),
+                Arc::new(UInt64Array::from_iter_values(
+                    tables.iter().map(|row| row.table.get_row().get_schema_id()),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from(
-                    tables
-                        .iter()
-                        .map(|row| row.schema.get_row().get_name().as_str())
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter_values(
+                    tables.iter().map(|row| row.schema.get_row().get_name()),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     tables
                         .iter()
-                        .map(|row| row.table.get_row().get_table_name().as_str())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.table.get_row().get_table_name()),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     tables
                         .iter()
-                        .map(|row| format!("{:?}", row.table.get_row().get_columns()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| format!("{:?}", row.table.get_row().get_columns())),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     tables
                         .iter()
-                        .map(|row| format!("{:?}", row.table.get_row().locations()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| format!("{:?}", row.table.get_row().locations())),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     tables
                         .iter()
-                        .map(|row| format!("{:?}", row.table.get_row().import_format()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| format!("{:?}", row.table.get_row().import_format())),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(BooleanArray::from(
+                Arc::new(BooleanArray::from_iter(
                     tables
                         .iter()
-                        .map(|row| *row.table.get_row().has_data())
-                        .collect::<Vec<_>>(),
+                        .map(|row| Some(*row.table.get_row().has_data())),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(BooleanArray::from(
+                Arc::new(BooleanArray::from_iter(
                     tables
                         .iter()
-                        .map(|row| row.table.get_row().is_ready())
-                        .collect::<Vec<_>>(),
+                        .map(|row| Some(row.table.get_row().is_ready())),
                 ))
             }),
             Box::new(|tables| {
@@ -143,21 +128,14 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                             .map(|v| format!("{:?}", v))
                     })
                     .collect::<Vec<_>>();
-                Arc::new(StringArray::from(
-                    unique_key_columns
-                        .iter()
-                        .map(|v| v.as_ref().map(|v| v.as_str()))
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter(
+                    unique_key_columns.iter().map(|v| v.as_deref()),
                 ))
             }),
             Box::new(|tables| {
-                let aggregates = tables
-                    .iter()
-                    .map(|row| format!("{:?}", row.table.get_row().aggregate_columns()))
-                    .collect::<Vec<_>>();
-                Arc::new(StringArray::from(
-                    aggregates.iter().map(|v| v.as_str()).collect::<Vec<_>>(),
-                ))
+                Arc::new(StringArray::from_iter_values(tables.iter().map(|row| {
+                    format!("{:?}", row.table.get_row().aggregate_columns())
+                })))
             }),
             Box::new(|tables| {
                 let seq_columns = tables
@@ -170,90 +148,67 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                             .map(|v| format!("{:?}", v))
                     })
                     .collect::<Vec<_>>();
-                Arc::new(StringArray::from(
-                    seq_columns
-                        .iter()
-                        .map(|v| v.as_ref().map(|v| v.as_str()))
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter(
+                    seq_columns.iter().map(|v| v.as_deref()),
                 ))
             }),
             Box::new(|tables| {
-                let array = tables
-                    .iter()
-                    .map(|row| row.table.get_row().partition_split_threshold().clone())
-                    .collect::<Vec<_>>();
-                Arc::new(UInt64Array::from(array))
+                Arc::new(UInt64Array::from_iter(tables.iter().map(|row| {
+                    row.table.get_row().partition_split_threshold().clone()
+                })))
             }),
             Box::new(|tables| {
-                Arc::new(TimestampNanosecondArray::from(
-                    tables
-                        .iter()
-                        .map(|row| {
-                            row.table
-                                .get_row()
-                                .created_at()
-                                .as_ref()
-                                .map(|t| t.timestamp_nanos())
-                        })
-                        .collect::<Vec<_>>(),
+                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
+                    |row| {
+                        row.table
+                            .get_row()
+                            .created_at()
+                            .as_ref()
+                            .map(|t| t.timestamp_nanos())
+                    },
+                )))
+            }),
+            Box::new(|tables| {
+                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
+                    |row| {
+                        row.table
+                            .get_row()
+                            .build_range_end()
+                            .as_ref()
+                            .map(|t| t.timestamp_nanos())
+                    },
+                )))
+            }),
+            Box::new(|tables| {
+                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
+                    |row| {
+                        row.table
+                            .get_row()
+                            .seal_at()
+                            .as_ref()
+                            .map(|t| t.timestamp_nanos())
+                    },
+                )))
+            }),
+            Box::new(|tables| {
+                Arc::new(BooleanArray::from_iter(
+                    tables.iter().map(|row| Some(row.table.get_row().sealed())),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(TimestampNanosecondArray::from(
-                    tables
-                        .iter()
-                        .map(|row| {
-                            row.table
-                                .get_row()
-                                .build_range_end()
-                                .as_ref()
-                                .map(|t| t.timestamp_nanos())
-                        })
-                        .collect::<Vec<_>>(),
-                ))
+                Arc::new(StringArray::from_iter(tables.iter().map(|row| {
+                    row.table
+                        .get_row()
+                        .select_statement()
+                        .as_ref()
+                        .map(|t| t.as_str())
+                })))
             }),
             Box::new(|tables| {
-                Arc::new(TimestampNanosecondArray::from(
+                Arc::new(StringArray::from_iter(
                     tables
                         .iter()
-                        .map(|row| {
-                            row.table
-                                .get_row()
-                                .seal_at()
-                                .as_ref()
-                                .map(|t| t.timestamp_nanos())
-                        })
-                        .collect::<Vec<_>>(),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(BooleanArray::from(
-                    tables
-                        .iter()
-                        .map(|row| row.table.get_row().sealed())
-                        .collect::<Vec<_>>(),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from(
-                    tables
-                        .iter()
-                        .map(|row| {
-                            row.table
-                                .get_row()
-                                .select_statement()
-                                .as_ref()
-                                .map(|t| t.as_str())
-                        })
-                        .collect::<Vec<_>>(),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from(
-                    tables
-                        .iter()
-                        .map(|row| row.table.get_row().extension().as_ref().map(|t| t.as_str()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.table.get_row().extension().as_deref()),
                 ))
             }),
         ]

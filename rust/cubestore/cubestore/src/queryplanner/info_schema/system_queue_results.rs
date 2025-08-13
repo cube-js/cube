@@ -52,11 +52,10 @@ impl InfoSchemaTableDef for SystemQueueResultsTableDef {
                 ))
             }),
             Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from(
+                Arc::new(TimestampNanosecondArray::from_iter_values(
                     items
                         .iter()
-                        .map(|row| row.get_row().get_expire().timestamp_nanos())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.get_row().get_expire().timestamp_nanos()),
                 ))
             }),
             Box::new(|items| {
@@ -65,11 +64,8 @@ impl InfoSchemaTableDef for SystemQueueResultsTableDef {
                 ))
             }),
             Box::new(|items| {
-                Arc::new(StringArray::from(
-                    items
-                        .iter()
-                        .map(|row| row.get_row().get_value().clone())
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter_values(
+                    items.iter().map(|row| row.get_row().get_value().clone()),
                 ))
             }),
         ]

@@ -166,7 +166,7 @@ Object {
   },
   "fileName": "custom_calendar.js",
   "hierarchies": Object {},
-  "joins": Object {},
+  "joins": Array [],
   "measures": Object {
     "count": Object {
       "ownedByCube": true,
@@ -385,7 +385,7 @@ Object {
       "title": "Retail Calendar Hierarchy",
     },
   },
-  "joins": Object {},
+  "joins": Array [],
   "measures": Object {
     "count": Object {
       "ownedByCube": true,
@@ -585,25 +585,28 @@ Object {
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): joins 1`] = `
-Object {
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): joins 2`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+  Object {
+    "name": "line_items",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): measures 1`] = `
@@ -925,25 +928,28 @@ Object {
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): joins 1`] = `
-Object {
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): joins 2`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+  Object {
+    "name": "line_items",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): measures 1`] = `
@@ -1223,25 +1229,28 @@ Object {
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): joins 1`] = `
-Object {
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): joins 2`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+  Object {
+    "name": "line_items",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): measures 1`] = `
@@ -1563,25 +1572,28 @@ Object {
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): joins 1`] = `
-Object {
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): joins 2`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+  Object {
+    "name": "line_items",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): measures 1`] = `
@@ -1675,6 +1687,46 @@ Object {
     "sql": [Function],
   },
 }
+`;
+
+exports[`Schema Testing Joins join types (joins as array) 1`] = `
+Array [
+  Object {
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeC",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeD",
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+]
+`;
+
+exports[`Schema Testing Joins join types (joins as object) 1`] = `
+Array [
+  Object {
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeC",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeD",
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Views allows to override \`title\`, \`description\`, \`meta\`, and \`format\` on includes members 1`] = `
@@ -1813,7 +1865,7 @@ Object {
     },
   ],
   "isView": true,
-  "joins": Object {},
+  "joins": Array [],
   "measures": Object {
     "count": Object {
       "aggType": "count",

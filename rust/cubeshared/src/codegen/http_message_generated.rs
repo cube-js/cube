@@ -1246,7 +1246,7 @@ impl core::fmt::Debug for HttpColumnValue<'_> {
 /// catch every error, or be maximally performant. For the
 /// previous, unchecked, behavior use
 /// `root_as_http_message_unchecked`.
-pub fn root_as_http_message(buf: &[u8]) -> Result<HttpMessage, flatbuffers::InvalidFlatbuffer> {
+pub fn root_as_http_message(buf: &[u8]) -> Result<HttpMessage<'_>, flatbuffers::InvalidFlatbuffer> {
     flatbuffers::root::<HttpMessage>(buf)
 }
 #[inline]
@@ -1258,7 +1258,7 @@ pub fn root_as_http_message(buf: &[u8]) -> Result<HttpMessage, flatbuffers::Inva
 /// `size_prefixed_root_as_http_message_unchecked`.
 pub fn size_prefixed_root_as_http_message(
     buf: &[u8],
-) -> Result<HttpMessage, flatbuffers::InvalidFlatbuffer> {
+) -> Result<HttpMessage<'_>, flatbuffers::InvalidFlatbuffer> {
     flatbuffers::size_prefixed_root::<HttpMessage>(buf)
 }
 #[inline]
@@ -1291,14 +1291,14 @@ pub fn size_prefixed_root_as_http_message_with_opts<'b, 'o>(
 /// Assumes, without verification, that a buffer of bytes contains a HttpMessage and returns it.
 /// # Safety
 /// Callers must trust the given bytes do indeed contain a valid `HttpMessage`.
-pub unsafe fn root_as_http_message_unchecked(buf: &[u8]) -> HttpMessage {
+pub unsafe fn root_as_http_message_unchecked(buf: &[u8]) -> HttpMessage<'_> {
     flatbuffers::root_unchecked::<HttpMessage>(buf)
 }
 #[inline]
 /// Assumes, without verification, that a buffer of bytes contains a size prefixed HttpMessage and returns it.
 /// # Safety
 /// Callers must trust the given bytes do indeed contain a valid size prefixed `HttpMessage`.
-pub unsafe fn size_prefixed_root_as_http_message_unchecked(buf: &[u8]) -> HttpMessage {
+pub unsafe fn size_prefixed_root_as_http_message_unchecked(buf: &[u8]) -> HttpMessage<'_> {
     flatbuffers::size_prefixed_root_unchecked::<HttpMessage>(buf)
 }
 #[inline]

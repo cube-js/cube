@@ -3,6 +3,53 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.50](https://github.com/cube-js/cube/compare/v1.3.49...v1.3.50) (2025-08-13)
+
+### Bug Fixes
+
+- **client-core:** Remove default value in table pivot ([#9869](https://github.com/cube-js/cube/issues/9869)) ([692c4ae](https://github.com/cube-js/cube/commit/692c4ae8ccd6ff1e1a26bddd5d8e65f81c4f3488))
+
+### Features
+
+- **cubestore:** Support EXPLAIN for meta queries ([#9876](https://github.com/cube-js/cube/issues/9876)) ([619eb90](https://github.com/cube-js/cube/commit/619eb901544ae08d0fbf5fccdcff546a06cac6cf))
+- **tesseract:** Support time series queries in Databricks ([#9871](https://github.com/cube-js/cube/issues/9871)) ([b238a29](https://github.com/cube-js/cube/commit/b238a29f0637054386a84a8d6f72cc63949eb7d0))
+
+## [1.3.49](https://github.com/cube-js/cube/compare/v1.3.48...v1.3.49) (2025-08-12)
+
+### Bug Fixes
+
+- **cubesql:** Improve SQL push down for Athena/Presto ([#9873](https://github.com/cube-js/cube/issues/9873)) ([893e9b3](https://github.com/cube-js/cube/commit/893e9b3e0dd200a26c8b97bb7a39532707edf632))
+
+### Features
+
+- **docker:** Security upgrade Node.js from 22.16.0 to 22.18.0 ([#9854](https://github.com/cube-js/cube/issues/9854)) ([78ec2a5](https://github.com/cube-js/cube/commit/78ec2a59e332dbe5f06ba67efbe0d56ed39b064c))
+
+## [1.3.48](https://github.com/cube-js/cube/compare/v1.3.47...v1.3.48) (2025-08-09)
+
+### Bug Fixes
+
+- access_policy is not applied for JS models ([#9865](https://github.com/cube-js/cube/issues/9865)) ([89c78ec](https://github.com/cube-js/cube/commit/89c78ec921d12e14aefa89193df544eadc221cfb))
+- **cubesql:** Allow repeated aliases (auto-realias) ([#9863](https://github.com/cube-js/cube/issues/9863)) ([0fb183a](https://github.com/cube-js/cube/commit/0fb183a8c63f180f92913d84fa6890aec4339fcc))
+- **cubesql:** Improve Trino SQL push down compatibility ([#9861](https://github.com/cube-js/cube/issues/9861)) ([9d5794e](https://github.com/cube-js/cube/commit/9d5794e9eb3610d722adc0a8ec5092140efdf0f1))
+- **cubesql:** Support concatenating non-strings in SQL push down for Athena/Presto ([#9853](https://github.com/cube-js/cube/issues/9853)) ([97e54e0](https://github.com/cube-js/cube/commit/97e54e01ad78a9483736d92339769332c9934e68))
+
+### Features
+
+- **cubesql:** Support date type for parameter binding ([#9864](https://github.com/cube-js/cube/issues/9864)) ([5246fa0](https://github.com/cube-js/cube/commit/5246fa0836a11f38a9cc86357674c203414085dd))
+- **cubestore:** Upgrade rust to nightly-2025-08-01 ([#9858](https://github.com/cube-js/cube/issues/9858)) ([54b1553](https://github.com/cube-js/cube/commit/54b1553e04e674a6bc342dfd6d757a0136d67425))
+
+### Performance Improvements
+
+- **cubestore:** Reduce allocations in info schema tables ([#9855](https://github.com/cube-js/cube/issues/9855)) ([3cc34ff](https://github.com/cube-js/cube/commit/3cc34ff9e11b5dc1fe94463f82d587f5db8a76ac))
+
+## [1.3.47](https://github.com/cube-js/cube/compare/v1.3.46...v1.3.47) (2025-08-04)
+
+### Features
+
+- **cubesql:** Allow to bind float64 (support in pg-srv) ([#9846](https://github.com/cube-js/cube/issues/9846)) ([760640c](https://github.com/cube-js/cube/commit/760640cadfa8e6a6728608de2cc7d71431fe93ce))
+- **cubesql:** Support `BETWEEN` SQL push down ([#9834](https://github.com/cube-js/cube/issues/9834)) ([195402f](https://github.com/cube-js/cube/commit/195402f76f893a0649488a373fb5b46b7f0a04b3))
+- **cubesql:** Support timestamp parameter binding, fix [#9784](https://github.com/cube-js/cube/issues/9784) ([#9847](https://github.com/cube-js/cube/issues/9847)) ([8a614bb](https://github.com/cube-js/cube/commit/8a614bb715f4e7baf597a03a1134702ea6e3c286))
+
 ## [1.3.46](https://github.com/cube-js/cube/compare/v1.3.45...v1.3.46) (2025-07-31)
 
 ### Bug Fixes
