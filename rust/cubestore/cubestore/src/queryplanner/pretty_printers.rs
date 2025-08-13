@@ -257,7 +257,11 @@ fn pp_source(t: &dyn TableProvider) -> String {
         format!("CubeTable(index: {})", pp_index(t.index_snapshot()))
     } else if let Some(t) = t.as_any().downcast_ref::<InlineTableProvider>() {
         format!("InlineTableProvider(data: {} rows)", t.get_data().len())
-    } else if t.as_any().downcast_ref::<InfoSchemaTableProvider>().is_some() {
+    } else if t
+        .as_any()
+        .downcast_ref::<InfoSchemaTableProvider>()
+        .is_some()
+    {
         "InfoSchemaTableProvider".to_string()
     } else {
         panic!("unknown table provider");
