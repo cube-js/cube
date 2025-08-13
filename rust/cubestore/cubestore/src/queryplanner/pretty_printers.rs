@@ -30,7 +30,7 @@ use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
-use crate::queryplanner::CubeTableLogical;
+use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use datafusion::cube_ext::join::CrossJoinExec;
 use datafusion::cube_ext::joinagg::CrossJoinAggExec;
 use datafusion::cube_ext::rolling::RollingWindowAggExec;
@@ -257,6 +257,12 @@ fn pp_source(t: &dyn TableProvider) -> String {
         format!("CubeTable(index: {})", pp_index(t.index_snapshot()))
     } else if let Some(t) = t.as_any().downcast_ref::<InlineTableProvider>() {
         format!("InlineTableProvider(data: {} rows)", t.get_data().len())
+    } else if t
+        .as_any()
+        .downcast_ref::<InfoSchemaTableProvider>()
+        .is_some()
+    {
+        "InfoSchemaTableProvider".to_string()
     } else {
         panic!("unknown table provider");
     }
