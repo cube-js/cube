@@ -422,33 +422,48 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  protected prepareJoins(cube: any, _errorReporter: ErrorReporter) {
+  protected prepareJoins(cube: any, errorReporter: ErrorReporter) {
     if (!cube.joins) {
       return;
     }
 
-    const joins: JoinDefinition[] = Array.isArray(cube.joins) ? cube.joins : Object.values(cube.joins);
-
-    joins.forEach(join => {
-      // eslint-disable-next-line default-case
-      switch (join.relationship) {
+    const transformRelationship = (relationship: string): string => {
+      switch (relationship) {
         case 'belongs_to':
         case 'many_to_one':
         case 'manyToOne':
-          join.relationship = 'belongsTo';
-          break;
+          return 'belongsTo';
         case 'has_many':
         case 'one_to_many':
         case 'oneToMany':
-          join.relationship = 'hasMany';
-          break;
+          return 'hasMany';
         case 'has_one':
         case 'one_to_one':
         case 'oneToOne':
-          join.relationship = 'hasOne';
-          break;
+          return 'hasOne';
+        default:
+          return relationship;
       }
-    });
+    };
+
+    let joins: JoinDefinition[] = [];
+
+    if (Array.isArray(cube.joins)) {
+      joins = cube.joins.map((join: JoinDefinition) => {
+        join.relationship = transformRelationship(join.relationship);
+        return join;
+      });
+    } else if (typeof cube.joins === 'object') {
+      joins = Object.entries(cube.joins).map(([name, join]: [string, any]) => {
+        join.relationship = transformRelationship(join.relationship);
+        join.name = name;
+        return join as JoinDefinition;
+      });
+    } else {
+      errorReporter.error(`Invalid joins definition for cube '${cube.name}': expected an array or an object.`);
+    }
+
+    cube.joins = joins;
   }
 
   protected preparePreAggregations(cube: any, errorReporter: ErrorReporter) {
