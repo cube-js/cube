@@ -784,7 +784,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
       [
         ...(normalizedPivotConfig.x).map((key, index): [string, string | number] => [
           key,
-          xValues[index] ?? ''
+          xValues[index]
         ]),
         ...(isMeasuresPresent
           ? yValuesArray.map(([yValues, measure]): [string, string | number] => [
