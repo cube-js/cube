@@ -67,6 +67,7 @@
     "@types/babel__traverse": "^7.20.5",
     "@types/inflection": "^1.5.28",
     "@types/jest": "^29",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
     "@types/node-dijkstra": "^2.5.6",
     "@types/ramda": "^0.27.34",

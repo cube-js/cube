@@ -2,10 +2,13 @@
 import R from 'ramda';
 
 import {
+  AccessPolicyDefinition,
   CubeDefinitionExtended,
   CubeSymbols,
-  HierarchyDefinition, JoinDefinition,
-  PreAggregationDefinition, PreAggregationDefinitionRollup,
+  HierarchyDefinition,
+  JoinDefinition,
+  PreAggregationDefinition,
+  PreAggregationDefinitionRollup,
   type ToString
 } from './CubeSymbols';
 import { UserError } from './UserError';
@@ -110,30 +113,6 @@ export type EvaluatedHierarchy = {
   [key: string]: any;
 };
 
-export type Filter =
-  | {
-      member: string;
-      memberReference?: string;
-      [key: string]: any;
-    }
-  | {
-      and?: Filter[];
-      or?: Filter[];
-      [key: string]: any;
-    };
-
-export type AccessPolicy = {
-  rowLevel?: {
-    filters: Filter[];
-  };
-  memberLevel?: {
-    includes?: string | string[];
-    excludes?: string | string[];
-    includesMembers?: string[];
-    excludesMembers?: string[];
-  };
-};
-
 export type EvaluatedFolder = {
   name: string;
   includes: (EvaluatedFolder | DimensionDefinition | MeasureDefinition)[];
@@ -145,7 +124,7 @@ export type EvaluatedCube = {
   measures: Record<string, MeasureDefinition>;
   dimensions: Record<string, DimensionDefinition>;
   segments: Record<string, SegmentDefinition>;
-  joins: Record<string, JoinDefinition>;
+  joins: JoinDefinition[];
   hierarchies: Record<string, HierarchyDefinition>;
   evaluatedHierarchies: EvaluatedHierarchy[];
   preAggregations: Record<string, PreAggregationDefinitionExtended>;
@@ -153,7 +132,7 @@ export type EvaluatedCube = {
   folders: EvaluatedFolder[];
   sql?: (...args: any[]) => string;
   sqlTable?: (...args: any[]) => string;
-  accessPolicy?: AccessPolicy[];
+  accessPolicy?: AccessPolicyDefinition[];
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -200,7 +179,7 @@ export class CubeEvaluator extends CubeSymbols {
     );
   }
 
-  protected prepareCube(cube, errorReporter: ErrorReporter) {
+  protected prepareCube(cube, errorReporter: ErrorReporter): EvaluatedCube {
     this.prepareJoins(cube, errorReporter);
     this.preparePreAggregations(cube, errorReporter);
     this.prepareMembers(cube.measures, cube, errorReporter);
@@ -443,36 +422,55 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  protected prepareJoins(cube: any, _errorReporter: ErrorReporter) {
-    if (cube.joins) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const join of Object.values(cube.joins) as any[]) {
-        // eslint-disable-next-line default-case
-        switch (join.relationship) {
-          case 'belongs_to':
-          case 'many_to_one':
-          case 'manyToOne':
-            join.relationship = 'belongsTo';
-            break;
-          case 'has_many':
-          case 'one_to_many':
-          case 'oneToMany':
-            join.relationship = 'hasMany';
-            break;
-          case 'has_one':
-          case 'one_to_one':
-          case 'oneToOne':
-            join.relationship = 'hasOne';
-            break;
-        }
-      }
+  protected prepareJoins(cube: any, errorReporter: ErrorReporter) {
+    if (!cube.joins) {
+      return;
     }
+
+    const transformRelationship = (relationship: string): string => {
+      switch (relationship) {
+        case 'belongs_to':
+        case 'many_to_one':
+        case 'manyToOne':
+          return 'belongsTo';
+        case 'has_many':
+        case 'one_to_many':
+        case 'oneToMany':
+          return 'hasMany';
+        case 'has_one':
+        case 'one_to_one':
+        case 'oneToOne':
+          return 'hasOne';
+        default:
+          return relationship;
+      }
+    };
+
+    let joins: JoinDefinition[] = [];
+
+    if (Array.isArray(cube.joins)) {
+      joins = cube.joins.map((join: JoinDefinition) => {
+        join.relationship = transformRelationship(join.relationship);
+        return join;
+      });
+    } else if (typeof cube.joins === 'object') {
+      joins = Object.entries(cube.joins).map(([name, join]: [string, any]) => {
+        join.relationship = transformRelationship(join.relationship);
+        join.name = name;
+        return join as JoinDefinition;
+      });
+    } else {
+      errorReporter.error(`Invalid joins definition for cube '${cube.name}': expected an array or an object.`);
+    }
+
+    cube.joins = joins;
   }
 
   protected preparePreAggregations(cube: any, errorReporter: ErrorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
       for (const preAggregation of Object.values(cube.preAggregations) as any) {
+        // preAggregation is actually (PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql)
         if (preAggregation.timeDimension) {
           preAggregation.timeDimensionReference = preAggregation.timeDimension;
           delete preAggregation.timeDimension;
@@ -574,7 +572,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  public cubesByFileName(fileName) {
+  public cubesByFileName(fileName): CubeDefinitionExtended[] {
     return this.byFileName[fileName] || [];
   }
 
@@ -691,7 +689,7 @@ export class CubeEvaluator extends CubeSymbols {
     return this.preAggregations({ scheduled: true });
   }
 
-  public cubeNames() {
+  public cubeNames(): string[] {
     return Object.keys(this.evaluatedCubes);
   }
 

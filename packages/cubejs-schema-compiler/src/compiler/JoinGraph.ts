@@ -109,70 +109,64 @@ export class JoinGraph {
   }
 
   protected buildJoinEdges(cube: CubeDefinition, errorReporter: ErrorReporter): Array<[string, JoinEdge]> {
-    // @ts-ignore
-    return R.compose(
-      // @ts-ignore
-      R.filter(R.identity),
-      R.map((join: [string, JoinEdge]) => {
-        const multipliedMeasures: ((m: Record<string, MeasureDefinition>) => MeasureDefinition[]) = R.compose(
-          R.filter<MeasureDefinition>(
-            (m: MeasureDefinition): boolean => m.sql && this.cubeEvaluator.funcArguments(m.sql).length === 0 && m.sql() === 'count(*)' ||
-            ['sum', 'avg', 'count', 'number'].indexOf(m.type) !== -1
-          ),
-          R.values as (input: Record<string, MeasureDefinition>) => MeasureDefinition[]
-        );
-        const joinRequired =
-          (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
-        if (
-          !this.cubeEvaluator.primaryKeys[join[1].from].length &&
-          multipliedMeasures(this.cubeEvaluator.measuresForCube(join[1].from)).length > 0
-        ) {
-          errorReporter.error(joinRequired(join[1].from));
-          return null;
+    if (!cube.joins) {
+      return [];
+    }
+
+    const getMultipliedMeasures = (cubeName: string): MeasureDefinition[] => {
+      const measures = this.cubeEvaluator.measuresForCube(cubeName);
+      return Object.values(measures).filter((m: MeasureDefinition) => (m.sql &&
+          this.cubeEvaluator.funcArguments(m.sql).length === 0 &&
+          m.sql() === 'count(*)') ||
+        ['sum', 'avg', 'count', 'number'].includes(m.type));
+    };
+
+    const joinRequired =
+      (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
+
+    return cube.joins
+      .filter(join => {
+        if (!this.cubeEvaluator.cubeExists(join.name)) {
+          errorReporter.error(`Cube ${join.name} doesn't exist`);
+          return false;
         }
-        if (!this.cubeEvaluator.primaryKeys[join[1].to].length &&
-          multipliedMeasures(this.cubeEvaluator.measuresForCube(join[1].to)).length > 0) {
-          errorReporter.error(joinRequired(join[1].to));
-          return null;
+
+        const fromMultipliedMeasures = getMultipliedMeasures(cube.name);
+        if (!this.cubeEvaluator.primaryKeys[cube.name].length && fromMultipliedMeasures.length > 0) {
+          errorReporter.error(joinRequired(cube.name));
+          return false;
         }
-        return join;
-      }),
-      R.unnest,
-      R.map((join: [string, JoinDefinition]): [[string, JoinEdge]] => [
-        [`${cube.name}-${join[0]}`, {
-          join: join[1],
+
+        const toMultipliedMeasures = getMultipliedMeasures(join.name);
+        if (!this.cubeEvaluator.primaryKeys[join.name].length && toMultipliedMeasures.length > 0) {
+          errorReporter.error(joinRequired(join.name));
+          return false;
+        }
+
+        return true;
+      })
+      .map(join => {
+        const joinEdge: JoinEdge = {
+          join,
           from: cube.name,
-          to: join[0],
+          to: join.name,
           originalFrom: cube.name,
-          originalTo: join[0]
-        }]
-      ]),
-      // @ts-ignore
-      R.filter(R.identity),
-      R.map((join: [string, JoinDefinition]) => {
-        if (!this.cubeEvaluator.cubeExists(join[0])) {
-          errorReporter.error(`Cube ${join[0]} doesn't exist`);
-          return undefined;
-        }
-        return join;
-      }),
-      // @ts-ignore
-      R.toPairs
-    // @ts-ignore
-    )(cube.joins || {});
+          originalTo: join.name
+        };
+
+        return [`${cube.name}-${join.name}`, joinEdge] as [string, JoinEdge];
+      });
   }
 
   protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {
-    return R.compose<
-      Record<string, JoinDefinition>,
-      Array<[string, JoinDefinition]>,
-      Array<[string, 1]>,
-      Record<string, 1>
-    >(
-      R.fromPairs,
-      R.map(v => [v[0], 1]),
-      R.toPairs
-    )(cube.joins || {});
+    if (!cube.joins) {
+      return {};
+    }
+
+    return cube.joins.reduce((acc, join) => {
+      acc[join.name] = 1;
+      return acc;
+    }, {} as Record<string, 1>);
   }
 
   public buildJoin(cubesToJoin: JoinHints): FinishedJoinTree | null {
