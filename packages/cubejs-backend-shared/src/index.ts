@@ -20,3 +20,4 @@ export * from './time';
 export * from './process';
 export * from './platform';
 export * from './FileRepository';
+export * from './decorators';

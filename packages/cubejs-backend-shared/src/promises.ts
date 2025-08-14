@@ -1,5 +1,6 @@
 /* eslint-disable arrow-body-style,no-restricted-syntax */
 import crypto from 'crypto';
+import { LRUCache } from 'lru-cache';
 
 import { Optional } from './type-helpers';
 
@@ -264,28 +265,35 @@ export const retryWithTimeout = <T>(
     timeout
   );
 
-/**
- * Creates a debounced version of an asynchronous function.
- */
-export const asyncDebounce = <Ret, Arguments>(
+export type AsyncDebounceOptions = {
+  max?: number;
+  ttl?: number;
+};
+
+export const asyncDebounceFn = <Ret, Arguments>(
   fn: (...args: Arguments[]) => Promise<Ret>,
+  options: AsyncDebounceOptions = {}
 ) => {
-  const cache = new Map<string, Promise<Ret>>();
+  const { max = 100, ttl = 60 * 1000 } = options;
+
+  const cache = new LRUCache<string, Promise<Ret>>({
+    max,
+    ttl,
+  });
 
   return async (...args: Arguments[]) => {
     const key = crypto.createHash('md5')
       .update(args.map((v) => JSON.stringify(v)).join(','))
       .digest('hex');
 
-    if (cache.has(key)) {
-      return <Promise<Ret>>cache.get(key);
+    const existing = cache.get(key);
+    if (existing) {
+      return existing;
     }
 
     try {
       const promise = fn(...args);
-
       cache.set(key, promise);
-
       return await promise;
     } finally {
       cache.delete(key);
@@ -309,7 +317,7 @@ export const asyncMemoize = <Ret, Arguments>(
 ) => {
   const cache = new Map<string, MemoizeBucket<Ret>>();
 
-  const debouncedFn = asyncDebounce(fn);
+  const debouncedFn = asyncDebounceFn(fn);
 
   const call = async (...args: Arguments[]) => {
     const key = options.extractKey(...args);
@@ -372,7 +380,7 @@ export const asyncMemoizeBackground = <Ret, Arguments>(
 ) => {
   const cache = new Map<string, BackgroundMemoizeBucket<Ret, Arguments>>();
 
-  const debouncedFn = asyncDebounce(fn);
+  const debouncedFn = asyncDebounceFn(fn);
 
   const refreshBucket = async (bucket: BackgroundMemoizeBucket<Ret, Arguments>) => {
     try {

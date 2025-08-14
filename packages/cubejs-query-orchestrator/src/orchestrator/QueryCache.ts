@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import { LRUCache } from 'lru-cache';
 import { pipeline } from 'stream';
-import { asyncDebounce, getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
+import { AsyncDebounce, getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   BaseDriver,
@@ -811,7 +811,8 @@ export class QueryCache {
     return cacheKeyQueries.map((q) => this.loadRefreshKey(q, expireSecs, options));
   }
 
-  public loadRefreshKey = asyncDebounce(async (q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) => {
+  @AsyncDebounce()
+  public async loadRefreshKey(q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) {
     const [query, values, queryOptions]: QueryWithParams = Array.isArray(q) ? q : [q, [], {}];
 
     return this.cacheQueryResult(
@@ -829,7 +830,7 @@ export class QueryCache {
         external: queryOptions?.external,
       },
     );
-  });
+  }
 
   public withLock = <T = any>(
     key: string,

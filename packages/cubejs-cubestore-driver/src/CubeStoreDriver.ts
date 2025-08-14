@@ -14,7 +14,7 @@ import {
   QueryOptions,
   ExternalDriverCompatibilities, TableStructure, TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
-import { getEnv } from '@cubejs-backend/shared';
+import { AsyncDebounce, getEnv } from '@cubejs-backend/shared';
 import { format as formatSql, escape } from 'sqlstring';
 import fetch from 'node-fetch';
 
@@ -158,6 +158,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     });
   }
 
+  @AsyncDebounce()
   public async getTablesQuery(schemaName) {
     return this.query(
       `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
@@ -165,6 +166,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     );
   }
 
+  @AsyncDebounce()
   public async getPrefixTablesQuery(schemaName, tablePrefixes) {
     const prefixWhere = tablePrefixes.map(_ => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
     return this.query(
