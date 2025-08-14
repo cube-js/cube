@@ -128,6 +128,7 @@ export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string |
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
 export type PreAggregationsSchemaFn = (context: RequestContext) => string | Promise<string>;
+export type SchemaVersionFn = (context: RequestContext) => string | Promise<string>;
 
 export type ScheduledRefreshTimeZonesFn = (context: RequestContext) => string[] | Promise<string[]>;
 
@@ -208,7 +209,7 @@ export interface CreateOptions {
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
-  schemaVersion?: (context: RequestContext) => string | Promise<string>;
+  schemaVersion?: SchemaVersionFn;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
   scheduledRefreshTimeZones?: string[] | ScheduledRefreshTimeZonesFn;
