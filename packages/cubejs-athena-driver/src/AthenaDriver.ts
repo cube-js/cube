@@ -36,6 +36,7 @@ import {
 } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
+import { fromTemporaryCredentials } from '@aws-sdk/credential-providers';
 import { URL } from 'url';
 
 interface AthenaDriverOptions extends AthenaClientConfig {
@@ -124,16 +125,37 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       config.secretAccessKey ||
       getEnv('athenaAwsSecret', { dataSource });
 
+    const assumeRoleArn = getEnv('athenaAwsAssumeRoleArn', { dataSource });
+    const assumeRoleExternalId = getEnv('athenaAwsAssumeRoleExternalId', { dataSource });
+
     const { schema, ...restConfig } = config;
 
     this.schema = schema ||
       getEnv('dbName', { dataSource }) ||
       getEnv('dbSchema', { dataSource });
 
+    // Configure credentials based on authentication method
+    let credentials;
+    if (assumeRoleArn) {
+      // Use assume role authentication
+      credentials = fromTemporaryCredentials({
+        params: {
+          RoleArn: assumeRoleArn,
+          ...(assumeRoleExternalId && { ExternalId: assumeRoleExternalId }),
+        },
+        ...(accessKeyId && secretAccessKey && {
+          masterCredentials: { accessKeyId, secretAccessKey },
+        }),
+      });
+    } else if (accessKeyId && secretAccessKey) {
+      // If access key and secret are provided, use them as master credentials
+      // Otherwise, let the SDK use the default credential chain (IRSA, instance profile, etc.)
+      credentials = { accessKeyId, secretAccessKey };
+    }
+
     this.config = {
-      credentials: accessKeyId && secretAccessKey
-        ? { accessKeyId, secretAccessKey }
-        : undefined,
+      // If no credentials are provided, the SDK will use the default chain
+      ...(credentials && { credentials }),
       ...restConfig,
       region:
         config.region ||

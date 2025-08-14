@@ -13,6 +13,8 @@
 
 Add the following to a `.env` file in your Cube project:
 
+#### Static Credentials
+
 ```dotenv
 CUBEJS_DB_TYPE=athena
 CUBEJS_AWS_KEY=AKIA************
@@ -23,6 +25,24 @@ CUBEJS_AWS_ATHENA_WORKGROUP=primary
 CUBEJS_DB_NAME=my_non_default_athena_database
 CUBEJS_AWS_ATHENA_CATALOG=AwsDataCatalog
 ```
+
+#### IAM Role Assumption
+
+For enhanced security, you can configure Cube to assume an IAM role to access Athena:
+
+```dotenv
+CUBEJS_DB_TYPE=athena
+CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN=arn:aws:iam::123456789012:role/AthenaAccessRole
+CUBEJS_AWS_REGION=us-east-1
+CUBEJS_AWS_S3_OUTPUT_LOCATION=s3://my-athena-output-bucket
+CUBEJS_AWS_ATHENA_WORKGROUP=primary
+# Optional: if the role requires an external ID
+CUBEJS_AWS_ATHENA_ASSUME_ROLE_EXTERNAL_ID=unique-external-id
+```
+
+When using role assumption:
+- If running in AWS (EC2, ECS, EKS with IRSA), the driver will use the instance's IAM role or service account to assume the target role
+- You can also provide `CUBEJS_AWS_KEY` and `CUBEJS_AWS_SECRET` as master credentials for the role assumption
 
 ### Cube Cloud
 
@@ -52,17 +72,21 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 
 ## Environment Variables
 
-| Environment Variable            | Description                                                                                                            | Possible Values                                  | Required |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :------: |
-| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                                                                  | A valid AWS Access Key ID                        |    ✅    |
-| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                                                              | A valid AWS Secret Access Key                    |    ✅    |
-| `CUBEJS_AWS_REGION`             | The AWS region of the Cube deployment                                                                                  | [A valid AWS region][aws-docs-regions]           |    ✅    |
-| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube deployment                                                         | A valid S3 path                                  |    ❌    |
-| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                                                          | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
-| `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                                                              | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |
-| `CUBEJS_DB_NAME`                | The name of the database to use by default                                                                             | A valid Athena Database name                     |    ❌    |
-| `CUBEJS_DB_SCHEMA`              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |
-| `CUBEJS_CONCURRENCY`            | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                     | A valid number                                   |    ❌    |
+| Environment Variable                            | Description                                                                                                            | Possible Values                                  | Required |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :------: |
+| `CUBEJS_AWS_KEY`                                | The AWS Access Key ID to use for database connections                                                                  | A valid AWS Access Key ID                        | ❌<sup>1</sup> |
+| `CUBEJS_AWS_SECRET`                             | The AWS Secret Access Key to use for database connections                                                              | A valid AWS Secret Access Key                    | ❌<sup>1</sup> |
+| `CUBEJS_AWS_REGION`                             | The AWS region of the Cube deployment                                                                                  | [A valid AWS region][aws-docs-regions]           |    ✅    |
+| `CUBEJS_AWS_S3_OUTPUT_LOCATION`                 | The S3 path to store query results made by the Cube deployment                                                         | A valid S3 path                                  |    ❌    |
+| `CUBEJS_AWS_ATHENA_WORKGROUP`                   | The name of the workgroup in which the query is being started                                                          | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
+| `CUBEJS_AWS_ATHENA_CATALOG`                     | The name of the catalog to use by default                                                                              | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |
+| `CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN`             | The ARN of the IAM role to assume for Athena access                                                                    | A valid IAM role ARN                             |    ❌    |
+| `CUBEJS_AWS_ATHENA_ASSUME_ROLE_EXTERNAL_ID`     | The external ID to use when assuming the IAM role (if required by the role's trust policy)                             | A string                                          |    ❌    |
+| `CUBEJS_DB_NAME`                                | The name of the database to use by default                                                                             | A valid Athena Database name                     |    ❌    |
+| `CUBEJS_DB_SCHEMA`                              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |
+| `CUBEJS_CONCURRENCY`                            | The number of [concurrent queries][ref-data-source-concurrency] to the data source                                     | A valid number                                   |    ❌    |
+
+<sup>1</sup> Either provide `CUBEJS_AWS_KEY` and `CUBEJS_AWS_SECRET` for static credentials, or use `CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN` for role-based authentication. When using role assumption without static credentials, the driver will use the AWS SDK's default credential chain (IAM instance profile, EKS IRSA, etc.).
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
