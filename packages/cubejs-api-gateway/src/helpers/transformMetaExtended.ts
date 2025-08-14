@@ -79,6 +79,16 @@ function transformJoins(joins: any) {
     return undefined;
   }
 
+  // Handle joins as array (new format after PR #9800)
+  if (Array.isArray(joins)) {
+    return joins.map((join: any) => ({
+      ...join,
+      name: join.name,
+      sql: stringifyMemberSql(join.sql),
+    }));
+  }
+
+  // Fallback for object format (legacy)
   return Object.entries(joins)?.map(([joinName, join]: [joinName: string, join: any]) => ({
     ...join,
     name: joinName,
