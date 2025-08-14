@@ -10,5 +10,6 @@
     "outDir": "dist",
     "rootDir": ".",
     "baseUrl": ".",
+    "experimentalDecorators": true
   }
 }
