@@ -201,6 +201,7 @@ pub enum PortalFrom {
     Extended,
 }
 
+#[derive(Debug)]
 pub enum PortalBatch {
     Description(protocol::RowDescription),
     Rows(BatchWriter),

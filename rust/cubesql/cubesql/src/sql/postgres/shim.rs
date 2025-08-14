@@ -1500,20 +1500,6 @@ impl AsyncPostgresShim {
                 sensitive,
                 hold,
             } => {
-                // TODO: move envs to config
-                let stream_mode = self.session.server.config_obj.stream_mode();
-                if stream_mode {
-                    return Err(ConnectionError::Protocol(
-                        protocol::ErrorResponse::error(
-                            protocol::ErrorCode::FeatureNotSupported,
-                            "DECLARE statement can not be used if CUBESQL_STREAM_MODE == true"
-                                .to_string(),
-                        )
-                        .into(),
-                        span_id.clone(),
-                    ));
-                }
-
                 // The default is to allow scrolling in some cases; this is not the same as specifying SCROLL.
                 if scroll.is_some() {
                     return Err(ConnectionError::Protocol(
