@@ -14,5 +14,6 @@
     "strictFunctionTypes": false,
     "strictBindCallApply": false,
     "strictPropertyInitialization": false,
+    "experimentalDecorators": true
   },
 }
