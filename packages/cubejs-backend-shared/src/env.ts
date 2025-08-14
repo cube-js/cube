@@ -1147,6 +1147,32 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Athena AWS Assume Role ARN.
+   */
+  athenaAwsAssumeRoleArn: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN', dataSource)
+    ]
+  ),
+
+  /**
+   * Athena AWS Assume Role External ID.
+   */
+  athenaAwsAssumeRoleExternalId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_AWS_ATHENA_ASSUME_ROLE_EXTERNAL_ID', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * BigQuery Driver                                                 *
    ***************************************************************** */
