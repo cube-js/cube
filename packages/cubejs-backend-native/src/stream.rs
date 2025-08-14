@@ -312,10 +312,10 @@ pub async fn call_js_with_stream_as_callback(
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
 ) -> Result<Receiver<Chunk>, CubeError> {
-    let channel_size = std::env::var("CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK")
-        .ok()
-        .map(|v| v.parse::<usize>().unwrap())
-        .unwrap_or(8192);
+    // Each chunk is a RecordBatch of up to CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK rows.
+    // Let's keep the size small to avoid memory issues and allow linear scaling
+    // of the buffer size depending on the env value.
+    let channel_size = 10;
 
     let (sender, receiver) = mpsc_channel::<Chunk>(channel_size);
     let (ready_sender, ready_receiver) = oneshot::channel();
