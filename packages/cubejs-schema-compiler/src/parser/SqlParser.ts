@@ -1,11 +1,9 @@
 /* eslint-disable no-underscore-dangle */
 import R from 'ramda';
-import { ANTLRErrorListener, CommonTokenStream, CharStreams } from 'antlr4ts';
-import { RuleNode, ParseTree } from 'antlr4ts/tree';
+import { ErrorListener, CommonTokenStream, CharStream, RuleNode } from 'antlr4';
 
-import { GenericSqlLexer } from './GenericSqlLexer';
-import {
-  GenericSqlParser,
+import GenericSqlLexer from './GenericSqlLexer';
+import GenericSqlParser, {
   QueryContext,
   SelectFieldsContext,
   IdPathContext,
@@ -13,7 +11,7 @@ import {
   StatementContext,
 } from './GenericSqlParser';
 import { UserError } from '../compiler/UserError';
-import { GenericSqlVisitor } from './GenericSqlVisitor';
+import GenericSqlVisitor from './GenericSqlVisitor';
 
 const nodeVisitor = <Result = void>(visitor: { visitNode: (node: RuleNode) => void }): GenericSqlVisitor<void> => ({
   visit: () => {
@@ -32,10 +30,12 @@ const nodeVisitor = <Result = void>(visitor: { visitNode: (node: RuleNode) => vo
 
     visitor.visitNode(node);
 
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.getChild(i);
-      if (child && child.childCount) {
-        child.accept(this);
+    if ((node as any).children) {
+      for (let i = 0; i < (node as any).children.length; i++) {
+        const child: any = (node as any).children[i];
+        if (child && child.children && child.children.length > 0) {
+          child.accept(this);
+        }
       }
     }
   }
@@ -110,11 +110,23 @@ export class SqlParser {
 
     const { errors } = this;
 
-    class ExprErrorListener implements ANTLRErrorListener<number> {
+    class ExprErrorListener implements ErrorListener<number> {
       public syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
         errors.push({
           msg, column, err, line, recognizer, offendingSymbol
         });
+      }
+
+      public reportAmbiguity(recognizer, dfa, startIndex, stopIndex, exact, ambigAlts, configs) {
+        // Optional: log ambiguity warnings if needed
+      }
+
+      public reportAttemptingFullContext(recognizer, dfa, startIndex, stopIndex, conflictingAlts, configs) {
+        // Optional: log full context attempts if needed
+      }
+
+      public reportContextSensitivity(recognizer, dfa, startIndex, stopIndex, prediction, configs) {
+        // Optional: log context sensitivity if needed
       }
     }
 
@@ -125,7 +137,7 @@ export class SqlParser {
     const parser = new GenericSqlParser(
       new CommonTokenStream(lexer)
     );
-    parser.buildParseTree = true;
+    parser.buildParseTrees = true;
     parser.removeErrorListeners();
     parser.addErrorListener(new ExprErrorListener());
 

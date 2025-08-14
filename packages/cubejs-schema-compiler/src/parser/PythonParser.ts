@@ -1,11 +1,9 @@
 /* eslint-disable no-underscore-dangle,camelcase */
-import { ANTLRErrorListener, CommonTokenStream, CharStreams } from 'antlr4ts';
-import { RuleNode } from 'antlr4ts/tree';
+import { ErrorListener, CommonTokenStream, CharStream, RuleNode } from 'antlr4';
 import * as t from '@babel/types';
 
-import { Python3Lexer } from './Python3Lexer';
-import {
-  Python3Parser,
+import Python3Lexer from './Python3Lexer';
+import Python3Parser, {
   // eslint-disable-next-line camelcase
   File_inputContext,
   Double_string_template_atomContext,
@@ -20,9 +18,10 @@ import {
   Single_string_template_atomContext,
   ArglistContext,
   CallArgumentsContext,
+  AnnassignContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
-import { Python3ParserVisitor } from './Python3ParserVisitor';
+import Python3ParserVisitor from './Python3ParserVisitor';
 
 const nodeVisitor = <R>(visitor: { visitNode: (node: RuleNode, children: R[]) => R }): Python3ParserVisitor<R> => ({
   // TODO null -- note used?
@@ -35,10 +34,12 @@ const nodeVisitor = <R>(visitor: { visitNode: (node: RuleNode, children: R[]) =>
     }
 
     const result: R[] = [];
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.getChild(i);
-      if (child?.childCount) {
-        result.push(child.accept(this));
+    if ((node as any).children) {
+      for (let i = 0; i < (node as any).children.length; i++) {
+        const child: any = (node as any).children[i];
+        if (child && child.children && child.children.length > 0) {
+          result.push(child.accept(this));
+        }
       }
     }
     return visitor.visitNode(node, result);
@@ -87,11 +88,23 @@ export class PythonParser {
 
     const { errors } = this;
 
-    class ExprErrorListener implements ANTLRErrorListener<number> {
+    class ExprErrorListener implements ErrorListener<number> {
       public syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
         errors.push({
           msg, column, err, line, recognizer, offendingSymbol
         });
+      }
+
+      public reportAmbiguity(recognizer, dfa, startIndex, stopIndex, exact, ambigAlts, configs) {
+        // Optional: log ambiguity warnings if needed
+      }
+
+      public reportAttemptingFullContext(recognizer, dfa, startIndex, stopIndex, conflictingAlts, configs) {
+        // Optional: log full context attempts if needed
+      }
+
+      public reportContextSensitivity(recognizer, dfa, startIndex, stopIndex, prediction, configs) {
+        // Optional: log context sensitivity if needed
       }
     }
 
@@ -104,14 +117,14 @@ export class PythonParser {
     const parser = new Python3Parser(
       commonTokenStream
     );
-    parser.buildParseTree = true;
+    parser.buildParseTrees = true;
     parser.removeErrorListeners();
     parser.addErrorListener(new ExprErrorListener());
 
     return parser.file_input();
   }
 
-  public transpileToJs() {
+  public transpileToJs(): t.Program {
     return this.ast.accept(nodeVisitor<any>({
       visitNode: (node, children) => {
         const singleNodeReturn = () => {
