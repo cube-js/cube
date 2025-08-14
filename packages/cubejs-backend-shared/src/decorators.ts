@@ -1,36 +1,26 @@
-import crypto from 'crypto';
+import { asyncDebounceFn, AsyncDebounceOptions } from './promises';
 
-/**
- * Decorator version of asyncDebounce for methods and functions.
- * Caches promises by method arguments to prevent concurrent execution of the same operation.
- */
-export function AsyncDebounce() {
-  return function (
+export function AsyncDebounce(options: AsyncDebounceOptions = {}) {
+  return (
     target: any,
     propertyKey: string | symbol,
     descriptor: PropertyDescriptor
-  ) {
+  ): PropertyDescriptor => {
     const originalMethod = descriptor.value;
-    const cache = new Map<string, Promise<any>>();
 
-    descriptor.value = async function (...args: any[]) {
-      const key = crypto.createHash('md5')
-        .update(args.map((v) => JSON.stringify(v)).join(','))
-        .digest('hex');
+    return {
+      configurable: true,
+      get() {
+        const debouncedMethod = asyncDebounceFn(originalMethod.bind(this), options);
 
-      if (cache.has(key)) {
-        return cache.get(key);
-      }
+        Object.defineProperty(this, propertyKey, {
+          value: debouncedMethod,
+          configurable: true,
+          writable: false
+        });
 
-      try {
-        const promise = originalMethod.apply(this, args);
-        cache.set(key, promise);
-        return await promise;
-      } finally {
-        cache.delete(key);
+        return debouncedMethod;
       }
     };
-
-    return descriptor;
   };
 }

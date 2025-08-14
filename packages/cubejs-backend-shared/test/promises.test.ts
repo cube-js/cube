@@ -5,7 +5,7 @@ import {
   retryWithTimeout,
   withTimeout,
   withTimeoutRace,
-  asyncMemoize, asyncRetry, asyncDebounce, asyncMemoizeBackground,
+  asyncMemoize, asyncRetry, asyncDebounceFn, asyncMemoizeBackground,
 } from '../src';
 
 test('createCancelablePromise', async () => {
@@ -453,7 +453,7 @@ describe('asyncDebounce', () => {
   test('multiple async calls to single', async () => {
     let called = 0;
 
-    const doOnce = asyncDebounce(
+    const doOnce = asyncDebounceFn(
       async (arg1: string, arg2: string) => {
         called++;
 
