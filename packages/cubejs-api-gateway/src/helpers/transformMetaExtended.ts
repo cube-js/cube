@@ -79,21 +79,19 @@ function transformJoins(joins: any) {
     return undefined;
   }
 
+  const transformJoin = (join: any, name: string) => ({
+    ...join,
+    name,
+    sql: stringifyMemberSql(join.sql),
+  });
+
   // Handle joins as array (new format after PR #9800)
   if (Array.isArray(joins)) {
-    return joins.map((join: any) => ({
-      ...join,
-      name: join.name,
-      sql: stringifyMemberSql(join.sql),
-    }));
+    return joins.map((join: any) => transformJoin(join, join.name));
   }
 
   // Fallback for object format (legacy)
-  return Object.entries(joins)?.map(([joinName, join]: [joinName: string, join: any]) => ({
-    ...join,
-    name: joinName,
-    sql: stringifyMemberSql(join.sql),
-  }));
+  return Object.entries(joins)?.map(([joinName, join]: [joinName: string, join: any]) => transformJoin(join, joinName));
 }
 
 function transformPreAggregations(preAggregations: any) {
