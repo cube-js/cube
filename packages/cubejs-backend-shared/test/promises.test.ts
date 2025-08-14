@@ -5,7 +5,10 @@ import {
   retryWithTimeout,
   withTimeout,
   withTimeoutRace,
-  asyncMemoize, asyncRetry, asyncDebounceFn, asyncMemoizeBackground,
+  asyncMemoize,
+  asyncRetry,
+  asyncDebounceFn,
+  asyncMemoizeBackground,
 } from '../src';
 
 test('createCancelablePromise', async () => {
