@@ -9,7 +9,6 @@
     "noImplicitAny": false,
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
-    "experimentalDecorators": true
+    "baseUrl": "."
   }
 }
