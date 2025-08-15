@@ -102,6 +102,34 @@ export type DryRunResponse = {
   transformedQueries: TransformedQuery[];
 };
 
+export type CubeSqlOptions = LoadMethodOptions & {
+  /**
+   * Query timeout in milliseconds
+   */
+  timeout?: number;
+};
+
+export type CubeSqlSchemaColumn = {
+  name: string;
+  columnType: string;
+};
+
+export type CubeSqlResult = {
+  schema: CubeSqlSchemaColumn[];
+  data: (string | number | boolean | null)[][];
+};
+
+export type CubeSqlStreamChunk = {
+  type: 'schema';
+  schema: CubeSqlSchemaColumn[];
+} | {
+  type: 'data';
+  data: (string | number | boolean | null)[];
+} | {
+  type: 'error';
+  error: string;
+};
+
 interface BodyResponse {
   error?: string;
   [key: string]: any;
@@ -350,7 +378,7 @@ class CubeApi {
           await requestInstance.unsubscribe();
         }
 
-        const error = new RequestError(body.error || '', body, response.status);
+        const error = new RequestError(body.error || (response as any).error || '', body, response.status);
         if (callback) {
           callback(error);
         } else {
@@ -668,6 +696,161 @@ class CubeApi {
       options,
       callback
     );
+  }
+
+  public cubeSql(sqlQuery: string, options?: CubeSqlOptions): Promise<CubeSqlResult>;
+
+  public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): UnsubscribeObj;
+
+  /**
+   * Execute a Cube SQL query against Cube SQL interface and return the results.
+   */
+  public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): Promise<CubeSqlResult> | UnsubscribeObj {
+    return this.loadMethod(
+      () => {
+        const request = this.request('cubesql', {
+          query: sqlQuery,
+          method: 'POST',
+          signal: options?.signal,
+          fetchTimeout: options?.timeout
+        });
+
+        return request;
+      },
+      (response: any) => {
+        // TODO: The response is sending both errors and successful results as `error`
+        if (!response || !response.error) {
+          throw new Error('Invalid response format');
+        }
+
+        // Check if this is a timeout or abort error from transport
+        if (response.error === 'timeout') {
+          const timeoutMs = options?.timeout || 5 * 60 * 1000;
+          throw new Error(`CubeSQL query timed out after ${timeoutMs}ms`);
+        }
+
+        if (response.error === 'aborted') {
+          throw new Error('CubeSQL query was aborted');
+        }
+
+        const [schema, ...data] = response.error.split('\n');
+
+        try {
+          return {
+            schema: JSON.parse(schema).schema,
+            data: data
+              .filter((d: string) => d.trim().length)
+              .map((d: string) => JSON.parse(d).data)
+              .reduce((a: any, b: any) => a.concat(b), []),
+          };
+        } catch (err) {
+          throw new Error(response.error);
+        }
+      },
+      options,
+      callback
+    );
+  }
+
+  /**
+   * Execute a Cube SQL query against Cube SQL interface and return streaming results as an async generator.
+   * The server returns JSONL (JSON Lines) format with schema first, then data rows.
+   */
+  public async* cubeSqlStream(sqlQuery: string, options?: CubeSqlOptions): AsyncGenerator<CubeSqlStreamChunk> {
+    if (!this.transport.requestStream) {
+      throw new Error('Transport does not support streaming');
+    }
+
+    const streamResponse = this.transport.requestStream('cubesql', {
+      method: 'POST',
+      signal: options?.signal,
+      fetchTimeout: options?.timeout,
+      baseRequestId: uuidv4(),
+      params: {
+        query: sqlQuery
+      }
+    });
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      const stream = await streamResponse.stream();
+
+      for await (const chunk of stream) {
+        buffer += decoder.decode(chunk, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const parsed = JSON.parse(line);
+
+              if (parsed.schema) {
+                yield {
+                  type: 'schema' as const,
+                  schema: parsed.schema
+                };
+              } else if (parsed.data) {
+                yield {
+                  type: 'data' as const,
+                  data: parsed.data
+                };
+              } else if (parsed.error) {
+                yield {
+                  type: 'error' as const,
+                  error: parsed.error
+                };
+              }
+            } catch (parseError) {
+              yield {
+                type: 'error' as const,
+                error: `Failed to parse JSON line: ${line}`
+              };
+            }
+          }
+        }
+      }
+
+      if (buffer.trim()) {
+        try {
+          const parsed = JSON.parse(buffer);
+
+          if (parsed.schema) {
+            yield {
+              type: 'schema' as const,
+              schema: parsed.schema
+            };
+          } else if (parsed.data) {
+            yield {
+              type: 'data' as const,
+              data: parsed.data
+            };
+          } else if (parsed.error) {
+            yield {
+              type: 'error' as const,
+              error: parsed.error
+            };
+          }
+        } catch (parseError) {
+          yield {
+            type: 'error' as const,
+            error: `Failed to parse remaining JSON: ${buffer}`
+          };
+        }
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('aborted');
+      }
+      throw error;
+    } finally {
+      if (streamResponse.unsubscribe) {
+        await streamResponse.unsubscribe();
+      }
+    }
   }
 }
 
