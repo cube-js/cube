@@ -18,7 +18,6 @@ import Python3Parser, {
   Single_string_template_atomContext,
   ArglistContext,
   CallArgumentsContext,
-  AnnassignContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
 import Python3ParserVisitor from './Python3ParserVisitor';
@@ -70,11 +69,8 @@ export class PythonParser {
   protected parse() {
     const { codeString } = this;
 
-    const chars = CharStreams.fromString(codeString);
-    chars.getText = (interval) => {
-      const start = interval.a;
-      let stop = interval.b;
-
+    const chars = new CharStream(codeString);
+    chars.getText = (start, stop) => {
       if (stop >= chars.size) {
         stop = chars.size - 1;
       }
@@ -131,7 +127,7 @@ export class PythonParser {
           if (children.length === 1) {
             return children[0];
           } else {
-            throw new UserError(`Unsupported Python multiple children node: ${node.constructor.name}: ${node.text}`);
+            throw new UserError(`Unsupported Python multiple children node: ${node.constructor.name}: ${node.getText()}`);
           }
         };
 
@@ -141,7 +137,7 @@ export class PythonParser {
           if (children.length === 1) {
             return t.expressionStatement(children[0]);
           } else {
-            throw new UserError(`Unsupported Python multiple children node: ${node.constructor.name}: ${node.text}`);
+            throw new UserError(`Unsupported Python multiple children node: ${node.constructor.name}: ${node.getText()}`);
           }
         } else if (
           node instanceof Double_string_template_atomContext ||
@@ -150,7 +146,7 @@ export class PythonParser {
           if ((node.test() || node.star_expr()) && children.length === 1) {
             return children[0];
           }
-          return t.templateElement({ raw: node.text, cooked: node.text });
+          return t.templateElement({ raw: node.getText(), cooked: node.getText() });
         } else if (node instanceof String_templateContext) {
           if (children[children.length - 1].type === 'TemplateElement') {
             children[children.length - 1].tail = true;
@@ -177,15 +173,21 @@ export class PythonParser {
             }
             return expr;
           } else {
-            throw new UserError(`Empty Python atom_expr node: ${node.constructor.name}: ${node.text}`);
+            throw new UserError(`Empty Python atom_expr node: ${node.constructor.name}: ${node.getText()}`);
           }
         } else if (node instanceof AtomContext) {
           const name = node.NAME();
-          const string = node.STRING();
+          const stringList = node.STRING_list();
+          const number = node.NUMBER();
+
           if (name) {
-            return t.identifier(name.text);
-          } else if (string?.length) {
-            return t.stringLiteral(string.map(s => this.stripQuotes(s.text)).join(''));
+            return t.identifier(name.getText());
+          } else if (stringList && stringList.length) {
+            return t.stringLiteral(stringList.map(s => this.stripQuotes(s.getText())).join(''));
+          } else if (number) {
+            const numText = number.getText();
+            const numValue = parseFloat(numText);
+            return t.numericLiteral(numValue);
           } else {
             return singleNodeReturn();
           }
@@ -206,16 +208,16 @@ export class PythonParser {
             // which was already processed (see other if branch)
             return children[0];
           } else if (name) {
-            return { identifier: t.identifier(name.text) };
+            return { identifier: t.identifier(name.getText()) };
           } else {
-            throw new UserError(`Unsupported Python Trailer children node: ${node.constructor.name}: ${node.text}`);
+            throw new UserError(`Unsupported Python Trailer children node: ${node.constructor.name}: ${node.getText()}`);
           }
         } else if (node instanceof VfpdefContext) {
           const name = node.NAME();
           if (name) {
-            return t.identifier(name.text);
+            return t.identifier(name.getText());
           } else {
-            throw new UserError(`Unsupported Python vfpdef children node: ${node.constructor.name}: ${node.text}`);
+            throw new UserError(`Unsupported Python vfpdef children node: ${node.constructor.name}: ${node.getText()}`);
           }
         } else if (node instanceof VarargslistContext) {
           return { args: children };
