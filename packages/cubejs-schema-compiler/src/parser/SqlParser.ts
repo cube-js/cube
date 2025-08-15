@@ -1,11 +1,9 @@
 /* eslint-disable no-underscore-dangle */
 import R from 'ramda';
-import { ANTLRErrorListener, CommonTokenStream, CharStreams } from 'antlr4ts';
-import { RuleNode, ParseTree } from 'antlr4ts/tree';
+import { ErrorListener, CommonTokenStream, CharStream, RuleNode, ParseTree } from 'antlr4';
 
-import { GenericSqlLexer } from './GenericSqlLexer';
-import {
-  GenericSqlParser,
+import GenericSqlLexer from './GenericSqlLexer';
+import GenericSqlParser, {
   QueryContext,
   SelectFieldsContext,
   IdPathContext,
@@ -13,7 +11,7 @@ import {
   StatementContext,
 } from './GenericSqlParser';
 import { UserError } from '../compiler/UserError';
-import { GenericSqlVisitor } from './GenericSqlVisitor';
+import GenericSqlVisitor from './GenericSqlVisitor';
 
 const nodeVisitor = <Result = void>(visitor: { visitNode: (node: RuleNode) => void }): GenericSqlVisitor<void> => ({
   visit: () => {
@@ -32,10 +30,12 @@ const nodeVisitor = <Result = void>(visitor: { visitNode: (node: RuleNode) => vo
 
     visitor.visitNode(node);
 
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.getChild(i);
-      if (child && child.childCount) {
-        child.accept(this);
+    if ((node as any).children) {
+      for (let i = 0; i < (node as any).children.length; i++) {
+        const child: any = (node as any).children[i];
+        if (child && child.children && child.children.length > 0) {
+          child.accept(this);
+        }
       }
     }
   }
@@ -92,11 +92,8 @@ export class SqlParser {
   protected parse() {
     const { sql } = this;
 
-    const chars = CharStreams.fromString(SqlParser.sqlUpperCase(sql));
-    chars.getText = (interval) => {
-      const start = interval.a;
-      let stop = interval.b;
-
+    const chars = new CharStream(SqlParser.sqlUpperCase(sql));
+    chars.getText = (start, stop) => {
       if (stop >= chars.size) {
         stop = chars.size - 1;
       }
@@ -110,11 +107,23 @@ export class SqlParser {
 
     const { errors } = this;
 
-    class ExprErrorListener implements ANTLRErrorListener<number> {
+    class ExprErrorListener implements ErrorListener<number> {
       public syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
         errors.push({
           msg, column, err, line, recognizer, offendingSymbol
         });
+      }
+
+      public reportAmbiguity(recognizer, dfa, startIndex, stopIndex, exact, ambigAlts, configs) {
+        // Optional: log ambiguity warnings if needed
+      }
+
+      public reportAttemptingFullContext(recognizer, dfa, startIndex, stopIndex, conflictingAlts, configs) {
+        // Optional: log full context attempts if needed
+      }
+
+      public reportContextSensitivity(recognizer, dfa, startIndex, stopIndex, prediction, configs) {
+        // Optional: log context sensitivity if needed
       }
     }
 
@@ -125,7 +134,7 @@ export class SqlParser {
     const parser = new GenericSqlParser(
       new CommonTokenStream(lexer)
     );
-    parser.buildParseTree = true;
+    parser.buildParseTrees = true;
     parser.removeErrorListeners();
     parser.addErrorListener(new ExprErrorListener());
 
@@ -154,8 +163,8 @@ export class SqlParser {
     this.ast.accept(nodeVisitor({
       visitNode(ctx) {
         if (ctx instanceof QueryContext) {
-          const selectItems = ctx.tryGetRuleContext(0, SelectFieldsContext);
-          if (selectItems && selectItems.text === '*') {
+          const selectItems = ctx.getTypedRuleContext(SelectFieldsContext, 0);
+          if (selectItems && selectItems.getText() === '*') {
             result = true;
           }
         }
@@ -179,20 +188,21 @@ export class SqlParser {
     const whereBuildingVisitor = nodeVisitor({
       visitNode(ctx) {
         if (ctx instanceof IdPathContext) {
-          result += sql.substring(cursor, ctx.start.startIndex);
-          cursor = ctx.start.startIndex;
+          result += sql.substring(cursor, ctx.start.start);
+          cursor = ctx.start.start;
 
-          const child = ctx.getChild(0);
-          if (child && child.text === originalAlias) {
-            const withoutFirst = R.drop(1, <ParseTree[]>ctx.children);
-            result += [tableAlias].concat(withoutFirst.map(c => c.text)).join('');
-            cursor = <number>ctx.stop?.stopIndex + 1;
-          } else if (ctx.childCount === 1) {
-            result += [tableAlias, '.'].concat(ctx.children?.map(c => c.text)).join('');
-            cursor = <number>ctx.stop?.stopIndex + 1;
+          const { children } = ctx as any;
+          const child = children ? children[0] : null;
+          if (child && child.getText() === originalAlias) {
+            const withoutFirst = R.drop(1, <ParseTree[]>ctx.children || []);
+            result += [tableAlias].concat(withoutFirst.map((c: ParseTree) => c.getText())).join('');
+            cursor = (ctx.stop?.stop || 0) + 1;
+          } else if (children && children.length === 1) {
+            result += [tableAlias, '.'].concat(children?.map((c: ParseTree) => c.getText())).join('');
+            cursor = (ctx.stop?.stop || 0) + 1;
           } else {
-            result += sql.substring(cursor, ctx.stop?.stopIndex);
-            cursor = <number>ctx.stop?.stopIndex;
+            result += sql.substring(cursor, ctx.stop?.stop);
+            cursor = <number>ctx.stop?.stop;
           }
         }
       }
@@ -200,17 +210,17 @@ export class SqlParser {
 
     this.ast.accept(nodeVisitor({
       visitNode(ctx) {
-        if (ctx instanceof QueryContext && ctx._from && ctx._where) {
-          const aliasField = ctx._from.getRuleContext(0, AliasFieldContext);
-          const lastNode = aliasField.getChild(aliasField.childCount - 1);
+        if (ctx instanceof QueryContext && ctx._from_ && ctx._where) {
+          const aliasField = ctx._from_.getTypedRuleContext(AliasFieldContext, 0);
+          const lastNode: any = (aliasField as any).children ? (aliasField as any).children[(aliasField as any).children.length - 1] : null;
           if (lastNode instanceof IdPathContext) {
-            originalAlias = lastNode.getChild(lastNode.childCount - 1).text;
+            originalAlias = lastNode.children ? lastNode.children[lastNode.children.length - 1].getText() : '';
           } else {
-            originalAlias = lastNode.text;
+            originalAlias = lastNode ? lastNode.getText() : '';
           }
 
-          cursor = ctx._where.start.startIndex;
-          end = <number>ctx._where.stop?.stopIndex + 1;
+          cursor = ctx._where.start.start;
+          end = <number>(ctx._where.stop?.stop || 0) + 1;
           ctx._where.accept(whereBuildingVisitor);
         }
       }
@@ -227,9 +237,9 @@ export class SqlParser {
 
     this.ast.accept(nodeVisitor({
       visitNode(ctx) {
-        if (ctx instanceof QueryContext && ctx._from) {
-          const aliasField = ctx._from.getRuleContext(0, AliasFieldContext);
-          result = aliasField.getChild(0).text;
+        if (ctx instanceof QueryContext && ctx._from_) {
+          const aliasField = ctx._from_.getTypedRuleContext(AliasFieldContext, 0);
+          result = (aliasField as any).children ? (aliasField as any).children[0].getText() : null;
         }
       }
     }));
