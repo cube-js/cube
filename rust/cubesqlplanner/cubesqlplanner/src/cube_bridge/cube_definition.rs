@@ -20,6 +20,16 @@ pub struct CubeDefinitionStatic {
     pub is_calendar: Option<bool>,
 }
 
+impl CubeDefinitionStatic {
+    pub fn resolved_alias(&self) -> &String {
+        if let Some(alias) = &self.sql_alias {
+            alias
+        } else {
+            &self.name
+        }
+    }
+}
+
 #[nativebridge::native_bridge(CubeDefinitionStatic)]
 pub trait CubeDefinition {
     #[nbridge(field, optional)]

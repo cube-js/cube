@@ -1,5 +1,6 @@
 use super::*;
 use crate::planner::BaseCube;
+use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -47,5 +48,31 @@ impl Cube {
             cube: self.cube.clone(),
             original_sql_pre_aggregation: Some(original_sql_pre_aggregation),
         })
+    }
+}
+
+impl LogicalNode for Cube {
+    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
+        PlanNode::Cube(self.clone())
+    }
+
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![] // Cube has no inputs
+    }
+
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 0, self.node_name())?;
+        Ok(self)
+    }
+
+    fn node_name(&self) -> &'static str {
+        "Cube"
+    }
+    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
+        if let PlanNode::Cube(item) = plan_node {
+            Ok(item)
+        } else {
+            Err(cast_error(&plan_node, "Cube"))
+        }
     }
 }

@@ -1,5 +1,6 @@
 use super::*;
 use crate::planner::sql_evaluator::MemberSymbol;
+use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct MultiStageSubqueryRef {
@@ -21,7 +22,18 @@ impl PrettyPrint for MultiStageSubqueryRef {
 #[derive(Clone)]
 pub enum ResolvedMultipliedMeasures {
     ResolveMultipliedMeasures(Rc<ResolveMultipliedMeasures>),
-    PreAggregation(Rc<SimpleQuery>),
+    PreAggregation(Rc<Query>),
+}
+
+impl ResolvedMultipliedMeasures {
+    pub fn schema(&self) -> Rc<LogicalSchema> {
+        match self {
+            ResolvedMultipliedMeasures::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
+                resolve_multiplied_measures.schema.clone()
+            }
+            ResolvedMultipliedMeasures::PreAggregation(simple_query) => simple_query.schema.clone(),
+        }
+    }
 }
 
 impl PrettyPrint for ResolvedMultipliedMeasures {
@@ -38,11 +50,70 @@ impl PrettyPrint for ResolvedMultipliedMeasures {
     }
 }
 
+#[derive(Clone)]
 pub struct FullKeyAggregate {
-    pub join_dimensions: Vec<Rc<MemberSymbol>>,
+    pub schema: Rc<LogicalSchema>,
     pub use_full_join_and_coalesce: bool,
     pub multiplied_measures_resolver: Option<ResolvedMultipliedMeasures>,
     pub multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
+}
+
+impl LogicalNode for FullKeyAggregate {
+    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
+        PlanNode::FullKeyAggregate(self.clone())
+    }
+
+    fn inputs(&self) -> Vec<PlanNode> {
+        if let Some(resolver) = &self.multiplied_measures_resolver {
+            vec![match resolver {
+                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(item) => item.as_plan_node(),
+                ResolvedMultipliedMeasures::PreAggregation(item) => item.as_plan_node(),
+            }]
+        } else {
+            vec![]
+        }
+    }
+
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        let multiplied_measures_resolver = if self.multiplied_measures_resolver.is_none() {
+            check_inputs_len(&inputs, 0, self.node_name())?;
+            None
+        } else {
+            check_inputs_len(&inputs, 1, self.node_name())?;
+            let input_source = &inputs[0];
+
+            Some(match self.multiplied_measures_resolver.as_ref().unwrap() {
+                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(_) => {
+                    ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
+                        input_source.clone().into_logical_node()?,
+                    )
+                }
+                ResolvedMultipliedMeasures::PreAggregation(_) => {
+                    ResolvedMultipliedMeasures::PreAggregation(
+                        input_source.clone().into_logical_node()?,
+                    )
+                }
+            })
+        };
+
+        Ok(Rc::new(Self {
+            schema: self.schema.clone(),
+            use_full_join_and_coalesce: self.use_full_join_and_coalesce,
+            multiplied_measures_resolver,
+            multi_stage_subquery_refs: self.multi_stage_subquery_refs.clone(),
+        }))
+    }
+
+    fn node_name(&self) -> &'static str {
+        "FullKeyAggregate"
+    }
+    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
+        if let PlanNode::FullKeyAggregate(item) = plan_node {
+            Ok(item)
+        } else {
+            Err(cast_error(&plan_node, "FullKeyAggregate"))
+        }
+    }
 }
 
 impl PrettyPrint for FullKeyAggregate {
@@ -50,10 +121,8 @@ impl PrettyPrint for FullKeyAggregate {
         result.println("FullKeyAggregate: ", state);
         let state = state.new_level();
         let details_state = state.new_level();
-        result.println(
-            &format!("join_dimensions: {}", print_symbols(&self.join_dimensions)),
-            &state,
-        );
+        result.println(&format!("schema:"), &state);
+        self.schema.pretty_print(result, &details_state);
         result.println(
             &format!(
                 "use_full_join_and_coalesce: {}",
