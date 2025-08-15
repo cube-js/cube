@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.54](https://github.com/cube-js/cube/compare/v1.3.53...v1.3.54) (2025-08-15)
+
+### Features
+
+- **schema-compiler:** Reduce memory usage after compilation is done ([#9890](https://github.com/cube-js/cube/issues/9890)) ([812efec](https://github.com/cube-js/cube/commit/812efec7afa071b77d4da0a39fcbf3987b7f0464))
+
 ## [1.3.53](https://github.com/cube-js/cube/compare/v1.3.52...v1.3.53) (2025-08-15)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
