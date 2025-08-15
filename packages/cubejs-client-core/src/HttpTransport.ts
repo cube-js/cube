@@ -47,14 +47,22 @@ export interface ITransportStreamResponse {
   unsubscribe?: () => Promise<void>;
 }
 
+export interface ITransportStreamParams<T extends Record<string, unknown> = Record<string, unknown>> {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH';
+  fetchTimeout?: number;
+  baseRequestId?: string;
+  signal?: AbortSignal;
+  params?: T;
+}
+
 export interface ITransport<R> {
   request(
     method: string,
     params: Record<string, unknown>
   ): ITransportResponse<R>;
-  requestStream?(
+  requestStream?<T extends Record<string, unknown> = Record<string, unknown>>(
     method: string,
-    params: Record<string, unknown>
+    params: ITransportStreamParams<T>
   ): ITransportStreamResponse;
   authorization: TransportOptions['authorization'];
 }
@@ -135,19 +143,18 @@ export class HttpTransport implements ITransport<Response> {
 
     // Currently, all methods make GET requests. If a method makes a request with a body payload,
     // remember to add {'Content-Type': 'application/json'} to the header.
-    const runRequest = () =>
-      fetch(url, {
-        method: requestMethod,
-        headers: {
-          Authorization: this.authorization,
-          'x-request-id':
-            baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
-          ...this.headers,
-        } as HeadersInit,
-        credentials: this.credentials,
-        body: requestMethod === 'POST' ? JSON.stringify(params) : null,
-        signal: actualSignal,
-      });
+    const runRequest = () => fetch(url, {
+      method: requestMethod,
+      headers: {
+        Authorization: this.authorization,
+        'x-request-id':
+          baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
+        ...this.headers,
+      } as HeadersInit,
+      credentials: this.credentials,
+      body: requestMethod === 'POST' ? JSON.stringify(params) : null,
+      signal: actualSignal,
+    });
 
     return {
       /* eslint no-unsafe-finally: off */
@@ -176,40 +183,44 @@ export class HttpTransport implements ITransport<Response> {
     };
   }
 
-  public requestStream(
+  public requestStream<T extends Record<string, unknown> = Record<string, unknown>>(
     apiMethod: string,
-    { method, fetchTimeout, baseRequestId, signal, ...params }: any
+    { method, fetchTimeout, baseRequestId, signal, params }: ITransportStreamParams<T>
   ): ITransportStreamResponse {
-    const searchParams = new URLSearchParams(
-      params &&
-        Object.keys(params)
-          .map((k) => ({
-            [k]:
-              typeof params[k] === 'object'
-                ? JSON.stringify(params[k])
-                : params[k],
-          }))
-          .reduce((a, b) => ({ ...a, ...b }), {})
-    );
+    const processedParams: Record<string, string> = {};
+
+    // Handle the generic params object
+    if (params) {
+      Object.keys(params).forEach((k) => {
+        const value = params[k];
+        if (value !== undefined) {
+          processedParams[k] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        }
+      });
+    }
+
+    const searchParams = new URLSearchParams(processedParams);
 
     let url = `${this.apiUrl}/${apiMethod}${
       searchParams.toString().length ? `?${searchParams}` : ''
     }`;
 
-    const requestMethod = method ?? this.method ?? 'POST'; // Default to POST for streaming
+    const requestMethod = method ?? this.method ?? 'POST';
     if (requestMethod === 'POST') {
       url = `${this.apiUrl}/${apiMethod}`;
       this.headers['Content-Type'] = 'application/json';
     }
 
-    // Use request-specific fetchTimeout if provided, otherwise fall back to instance fetchTimeout
     const effectiveFetchTimeout = fetchTimeout ?? this.fetchTimeout;
-    const actualSignal: AbortSignal | undefined =
-      signal ||
-      this.signal ||
-      (effectiveFetchTimeout
-        ? AbortSignal.timeout(effectiveFetchTimeout)
-        : undefined);
+
+    let controller: AbortController | undefined;
+    let actualSignal: AbortSignal | undefined = signal || this.signal;
+
+    if (!actualSignal && effectiveFetchTimeout) {
+      controller = new AbortController();
+      actualSignal = controller.signal;
+      setTimeout(() => controller?.abort(), effectiveFetchTimeout);
+    }
 
     return {
       stream: async () => {
@@ -221,7 +232,7 @@ export class HttpTransport implements ITransport<Response> {
             ...this.headers,
           } as HeadersInit,
           credentials: this.credentials,
-          body: requestMethod === 'POST' ? JSON.stringify(params) : null,
+          body: requestMethod === 'POST' ? JSON.stringify(params || {}) : null,
           signal: actualSignal,
         });
 
@@ -236,9 +247,8 @@ export class HttpTransport implements ITransport<Response> {
         return responseChunks(response);
       },
       unsubscribe: async () => {
-        // If signal is an AbortController signal, abort it
-        if (actualSignal) {
-          // actualSignal.
+        if (controller) {
+          controller.abort();
         }
       },
     };

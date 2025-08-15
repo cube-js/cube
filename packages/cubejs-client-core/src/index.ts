@@ -762,29 +762,27 @@ class CubeApi {
     }
 
     const streamResponse = this.transport.requestStream('cubesql', {
-      query: sqlQuery,
       method: 'POST',
       signal: options?.signal,
       fetchTimeout: options?.timeout,
-      baseRequestId: uuidv4()
+      baseRequestId: uuidv4(),
+      params: {
+        query: sqlQuery
+      }
     });
 
     const decoder = new TextDecoder();
     let buffer = '';
 
-    const stream = await streamResponse.stream();
     try {
+      const stream = await streamResponse.stream();
+
       for await (const chunk of stream) {
-        // Decode chunk and add to buffer
         buffer += decoder.decode(chunk, { stream: true });
 
-        // Split buffer into lines
         const lines = buffer.split('\n');
-
-        // Keep the last incomplete line in buffer
         buffer = lines.pop() || '';
 
-        // Process complete lines
         for (const line of lines) {
           if (line.trim()) {
             try {
