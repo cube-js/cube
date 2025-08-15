@@ -72,7 +72,7 @@ cubes:
               - member: "{CUBE}.created_at"
                 operator: notInDateRange
                 values:
-                  - 2022-01-01
+                  - "2022-01-01"
                   - "{ security_context.currentDate }"
               - member: "created_at"
                 operator: equals

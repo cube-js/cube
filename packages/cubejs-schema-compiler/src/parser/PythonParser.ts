@@ -18,7 +18,6 @@ import Python3Parser, {
   Single_string_template_atomContext,
   ArglistContext,
   CallArgumentsContext,
-  AnnassignContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
 import Python3ParserVisitor from './Python3ParserVisitor';
@@ -68,8 +67,7 @@ export class PythonParser {
   }
 
   protected parse() {
-    // For unknown reason ANTLR4 returns date strings as Date objects, so we need to convert them to strings
-    const codeString = String(this.codeString);
+    const { codeString } = this;
 
     const chars = new CharStream(codeString);
     chars.getText = (start, stop) => {
