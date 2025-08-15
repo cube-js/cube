@@ -335,6 +335,9 @@ export class DataSchemaCompiler {
         if (!this.omitErrors) {
           this.throwIfAnyErrors();
         }
+        // Free unneeded resources
+        this.cubeDictionary.free();
+        this.cubeSymbols.free();
         return res;
       });
     }
