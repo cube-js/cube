@@ -155,6 +155,10 @@ export class YamlCompiler {
                   ast = t.booleanLiteral(code);
                 } else if (typeof code === 'number') {
                   ast = t.numericLiteral(code);
+                } else if (code instanceof Date) {
+                  // Special case when dates are defined in YAML as strings without quotes
+                  // YAML parser treats them as Date objects, but for conversion we need them as strings
+                  ast = this.parsePythonAndTranspileToJs(`f"${this.escapeDoubleQuotes(code.toISOString())}"`, errorsReport);
                 }
               }
               if (ast === null) {
