@@ -214,6 +214,15 @@ export class CubeSymbols {
     this.evaluateViews = evaluateViews;
   }
 
+  public free() {
+    this.symbols = {};
+    this.builtCubes = {};
+    this.cubeDefinitions = {};
+    this.funcArgumentsValues = {};
+    this.cubeList = [];
+    this.resolveSymbolsCallContext = undefined;
+  }
+
   public compile(cubes: CubeDefinition[], errorReporter: ErrorReporter) {
     this.cubeDefinitions = Object.fromEntries(
       cubes.map((c): [string, CubeDefinition] => [c.name, c])

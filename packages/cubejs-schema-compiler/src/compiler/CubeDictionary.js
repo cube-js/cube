@@ -13,4 +13,8 @@ export class CubeDictionary {
   resolveCube(cubeName) {
     return this.byId[cubeName];
   }
+
+  free() {
+    this.byId = {};
+  }
 }
