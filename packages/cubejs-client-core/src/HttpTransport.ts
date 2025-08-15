@@ -69,7 +69,7 @@ export class HttpTransport implements ITransport<Response> {
     this.signal = signal;
   }
 
-  public request(apiMethod: string, { method, baseRequestId, signal, ...params }: any): ITransportResponse<Response> {
+  public request(apiMethod: string, { method, fetchTimeout, baseRequestId, signal, ...params }: any): ITransportResponse<Response> {
     let spanCounter = 1;
     const searchParams = new URLSearchParams(
       params && Object.keys(params)
@@ -85,6 +85,9 @@ export class HttpTransport implements ITransport<Response> {
       this.headers['Content-Type'] = 'application/json';
     }
 
+    const effectiveFetchTimeout = fetchTimeout ?? this.fetchTimeout;
+    const actualSignal = signal || this.signal || (effectiveFetchTimeout ? AbortSignal.timeout(effectiveFetchTimeout) : undefined);
+
     // Currently, all methods make GET requests. If a method makes a request with a body payload,
     // remember to add {'Content-Type': 'application/json'} to the header.
     const runRequest = () => fetch(url, {
@@ -96,7 +99,7 @@ export class HttpTransport implements ITransport<Response> {
       } as HeadersInit,
       credentials: this.credentials,
       body: requestMethod === 'POST' ? JSON.stringify(params) : null,
-      signal: signal || this.signal || (this.fetchTimeout ? AbortSignal.timeout(this.fetchTimeout) : undefined),
+      signal: actualSignal,
     });
 
     return {
@@ -105,8 +108,18 @@ export class HttpTransport implements ITransport<Response> {
         try {
           const result = await runRequest();
           return callback(result, () => this.subscribe(callback));
-        } catch (e) {
-          const result: ErrorResponse = { error: 'network Error' };
+        } catch (e: any) {
+          let errorMessage = 'network Error';
+
+          if (e.name === 'AbortError') {
+            if (actualSignal?.reason === 'TimeoutError' || actualSignal?.reason?.name === 'TimeoutError') {
+              errorMessage = 'timeout';
+            } else {
+              errorMessage = 'aborted';
+            }
+          }
+
+          const result: ErrorResponse = { error: errorMessage };
           return callback(result, () => this.subscribe(callback));
         }
       }
