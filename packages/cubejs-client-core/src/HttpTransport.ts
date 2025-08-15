@@ -1,5 +1,6 @@
 import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
+import { responseChunks } from './streaming';
 
 export interface ErrorResponse {
   error: string;
@@ -31,13 +32,30 @@ export type TransportOptions = {
 };
 
 export interface ITransportResponse<R> {
-  subscribe: <CBResult>(cb: (result: R | ErrorResponse, resubscribe: () => Promise<CBResult>) => CBResult) => Promise<CBResult>;
+  subscribe: <CBResult>(
+    cb: (
+      result: R | ErrorResponse,
+      resubscribe: () => Promise<CBResult>
+    ) => CBResult
+  ) => Promise<CBResult>;
   // Optional, supported in WebSocketTransport
   unsubscribe?: () => Promise<void>;
 }
 
+export interface ITransportStreamResponse {
+  stream(): Promise<AsyncIterable<Uint8Array>>;
+  unsubscribe?: () => Promise<void>;
+}
+
 export interface ITransport<R> {
-  request(method: string, params: Record<string, unknown>): ITransportResponse<R>;
+  request(
+    method: string,
+    params: Record<string, unknown>
+  ): ITransportResponse<R>;
+  requestStream?(
+    method: string,
+    params: Record<string, unknown>
+  ): ITransportStreamResponse;
   authorization: TransportOptions['authorization'];
 }
 
@@ -59,7 +77,17 @@ export class HttpTransport implements ITransport<Response> {
 
   private readonly signal: AbortSignal | undefined;
 
-  public constructor({ authorization, apiUrl, method, headers = {}, credentials, fetchTimeout, signal }: Omit<TransportOptions, 'headers'> & { headers?: TransportOptions['headers'] }) {
+  public constructor({
+    authorization,
+    apiUrl,
+    method,
+    headers = {},
+    credentials,
+    fetchTimeout,
+    signal,
+  }: Omit<TransportOptions, 'headers'> & {
+    headers?: TransportOptions['headers'];
+  }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
     this.method = method;
@@ -69,38 +97,57 @@ export class HttpTransport implements ITransport<Response> {
     this.signal = signal;
   }
 
-  public request(apiMethod: string, { method, fetchTimeout, baseRequestId, signal, ...params }: any): ITransportResponse<Response> {
+  public request(
+    apiMethod: string,
+    { method, fetchTimeout, baseRequestId, signal, ...params }: any
+  ): ITransportResponse<Response> {
     let spanCounter = 1;
     const searchParams = new URLSearchParams(
-      params && Object.keys(params)
-        .map(k => ({ [k]: typeof params[k] === 'object' ? JSON.stringify(params[k]) : params[k] }))
-        .reduce((a, b) => ({ ...a, ...b }), {})
+      params &&
+        Object.keys(params)
+          .map((k) => ({
+            [k]:
+              typeof params[k] === 'object'
+                ? JSON.stringify(params[k])
+                : params[k],
+          }))
+          .reduce((a, b) => ({ ...a, ...b }), {})
     );
 
-    let url = `${this.apiUrl}/${apiMethod}${searchParams.toString().length ? `?${searchParams}` : ''}`;
+    let url = `${this.apiUrl}/${apiMethod}${
+      searchParams.toString().length ? `?${searchParams}` : ''
+    }`;
 
-    const requestMethod = method ?? this.method ?? (url.length < 2000 ? 'GET' : 'POST');
+    const requestMethod =
+      method ?? this.method ?? (url.length < 2000 ? 'GET' : 'POST');
     if (requestMethod === 'POST') {
       url = `${this.apiUrl}/${apiMethod}`;
       this.headers['Content-Type'] = 'application/json';
     }
 
     const effectiveFetchTimeout = fetchTimeout ?? this.fetchTimeout;
-    const actualSignal = signal || this.signal || (effectiveFetchTimeout ? AbortSignal.timeout(effectiveFetchTimeout) : undefined);
+    const actualSignal =
+      signal ||
+      this.signal ||
+      (effectiveFetchTimeout
+        ? AbortSignal.timeout(effectiveFetchTimeout)
+        : undefined);
 
     // Currently, all methods make GET requests. If a method makes a request with a body payload,
     // remember to add {'Content-Type': 'application/json'} to the header.
-    const runRequest = () => fetch(url, {
-      method: requestMethod,
-      headers: {
-        Authorization: this.authorization,
-        'x-request-id': baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
-        ...this.headers
-      } as HeadersInit,
-      credentials: this.credentials,
-      body: requestMethod === 'POST' ? JSON.stringify(params) : null,
-      signal: actualSignal,
-    });
+    const runRequest = () =>
+      fetch(url, {
+        method: requestMethod,
+        headers: {
+          Authorization: this.authorization,
+          'x-request-id':
+            baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
+          ...this.headers,
+        } as HeadersInit,
+        credentials: this.credentials,
+        body: requestMethod === 'POST' ? JSON.stringify(params) : null,
+        signal: actualSignal,
+      });
 
     return {
       /* eslint no-unsafe-finally: off */
@@ -112,7 +159,10 @@ export class HttpTransport implements ITransport<Response> {
           let errorMessage = 'network Error';
 
           if (e.name === 'AbortError') {
-            if (actualSignal?.reason === 'TimeoutError' || actualSignal?.reason?.name === 'TimeoutError') {
+            if (
+              actualSignal?.reason === 'TimeoutError' ||
+              actualSignal?.reason?.name === 'TimeoutError'
+            ) {
               errorMessage = 'timeout';
             } else {
               errorMessage = 'aborted';
@@ -122,7 +172,75 @@ export class HttpTransport implements ITransport<Response> {
           const result: ErrorResponse = { error: errorMessage };
           return callback(result, () => this.subscribe(callback));
         }
-      }
+      },
+    };
+  }
+
+  public requestStream(
+    apiMethod: string,
+    { method, fetchTimeout, baseRequestId, signal, ...params }: any
+  ): ITransportStreamResponse {
+    const searchParams = new URLSearchParams(
+      params &&
+        Object.keys(params)
+          .map((k) => ({
+            [k]:
+              typeof params[k] === 'object'
+                ? JSON.stringify(params[k])
+                : params[k],
+          }))
+          .reduce((a, b) => ({ ...a, ...b }), {})
+    );
+
+    let url = `${this.apiUrl}/${apiMethod}${
+      searchParams.toString().length ? `?${searchParams}` : ''
+    }`;
+
+    const requestMethod = method ?? this.method ?? 'POST'; // Default to POST for streaming
+    if (requestMethod === 'POST') {
+      url = `${this.apiUrl}/${apiMethod}`;
+      this.headers['Content-Type'] = 'application/json';
+    }
+
+    // Use request-specific fetchTimeout if provided, otherwise fall back to instance fetchTimeout
+    const effectiveFetchTimeout = fetchTimeout ?? this.fetchTimeout;
+    const actualSignal: AbortSignal | undefined =
+      signal ||
+      this.signal ||
+      (effectiveFetchTimeout
+        ? AbortSignal.timeout(effectiveFetchTimeout)
+        : undefined);
+
+    return {
+      stream: async () => {
+        const response = await fetch(url, {
+          method: requestMethod,
+          headers: {
+            Authorization: this.authorization,
+            'x-request-id': baseRequestId || 'stream-request',
+            ...this.headers,
+          } as HeadersInit,
+          credentials: this.credentials,
+          body: requestMethod === 'POST' ? JSON.stringify(params) : null,
+          signal: actualSignal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        if (!response.body) {
+          throw new Error('No response body available for streaming');
+        }
+
+        return responseChunks(response);
+      },
+      unsubscribe: async () => {
+        // If signal is an AbortController signal, abort it
+        if (actualSignal) {
+          // actualSignal.
+        }
+      },
     };
   }
 }

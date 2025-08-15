@@ -116,7 +116,18 @@ export type CubeSqlSchemaColumn = {
 
 export type CubeSqlResult = {
   schema: CubeSqlSchemaColumn[];
-  data: (string | boolean | null)[][];
+  data: (string | number | boolean | null)[][];
+};
+
+export type CubeSqlStreamChunk = {
+  type: 'schema';
+  schema: CubeSqlSchemaColumn[];
+} | {
+  type: 'data';
+  data: (string | number | boolean | null)[];
+} | {
+  type: 'error';
+  error: string;
 };
 
 interface BodyResponse {
@@ -739,6 +750,112 @@ class CubeApi {
       options,
       callback
     );
+  }
+
+  /**
+   * Execute a Cube SQL query against Cube SQL interface and return streaming results as an async generator.
+   * The server returns JSONL (JSON Lines) format with schema first, then data rows.
+   */
+  public async* cubeSqlStream(sqlQuery: string, options?: CubeSqlOptions): AsyncGenerator<CubeSqlStreamChunk> {
+    if (!this.transport.requestStream) {
+      throw new Error('Transport does not support streaming');
+    }
+
+    const streamResponse = this.transport.requestStream('cubesql', {
+      query: sqlQuery,
+      method: 'POST',
+      signal: options?.signal,
+      fetchTimeout: options?.timeout,
+      baseRequestId: uuidv4()
+    });
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    const stream = await streamResponse.stream();
+    try {
+      for await (const chunk of stream) {
+        // Decode chunk and add to buffer
+        buffer += decoder.decode(chunk, { stream: true });
+
+        // Split buffer into lines
+        const lines = buffer.split('\n');
+
+        // Keep the last incomplete line in buffer
+        buffer = lines.pop() || '';
+
+        // Process complete lines
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const parsed = JSON.parse(line);
+
+              if (parsed.schema) {
+                yield {
+                  type: 'schema' as const,
+                  schema: parsed.schema
+                };
+              } else if (parsed.data) {
+                yield {
+                  type: 'data' as const,
+                  data: parsed.data
+                };
+              } else if (parsed.error) {
+                yield {
+                  type: 'error' as const,
+                  error: parsed.error
+                };
+              }
+            } catch (parseError) {
+              yield {
+                type: 'error' as const,
+                error: `Failed to parse JSON line: ${line}`
+              };
+            }
+          }
+        }
+      }
+
+      if (buffer.trim()) {
+        try {
+          const parsed = JSON.parse(buffer);
+
+          if (parsed.schema) {
+            yield {
+              type: 'schema' as const,
+              schema: parsed.schema
+            };
+          } else if (parsed.data) {
+            yield {
+              type: 'data' as const,
+              data: parsed.data
+            };
+          } else if (parsed.error) {
+            yield {
+              type: 'error' as const,
+              error: parsed.error
+            };
+          }
+        } catch (parseError) {
+          yield {
+            type: 'error' as const,
+            error: `Failed to parse remaining JSON: ${buffer}`
+          };
+        }
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        const message = options?.signal
+          ? 'CubeSQL streaming query was aborted'
+          : `CubeSQL streaming query timed out after ${options?.timeout || 5 * 60 * 1000}ms`;
+        throw new Error(message);
+      }
+      throw error;
+    } finally {
+      if (streamResponse.unsubscribe) {
+        await streamResponse.unsubscribe();
+      }
+    }
   }
 }
 
