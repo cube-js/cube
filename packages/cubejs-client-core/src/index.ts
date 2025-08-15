@@ -104,7 +104,7 @@ export type DryRunResponse = {
 
 export type CubeSqlOptions = LoadMethodOptions & {
   /**
-   * Query timeout in milliseconds. Defaults to 5 minutes.
+   * Query timeout in milliseconds
    */
   timeout?: number;
 };
