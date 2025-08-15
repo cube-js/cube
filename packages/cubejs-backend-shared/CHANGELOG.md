@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.53](https://github.com/cube-js/cube/compare/v1.3.52...v1.3.53) (2025-08-15)
+
+### Features
+
+- **athena-driver:** export env variables for IAM assume role auth ([#9882](https://github.com/cube-js/cube/issues/9882)) ([3c6fc89](https://github.com/cube-js/cube/commit/3c6fc89dcabe651d83599e7568f571c841ee8bbb))
+
 ## [1.3.52](https://github.com/cube-js/cube/compare/v1.3.51...v1.3.52) (2025-08-14)
 
 **Note:** Version bump only for package @cubejs-backend/shared
