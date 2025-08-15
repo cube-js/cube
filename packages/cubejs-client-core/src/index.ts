@@ -843,10 +843,7 @@ class CubeApi {
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        const message = options?.signal
-          ? 'CubeSQL streaming query was aborted'
-          : `CubeSQL streaming query timed out after ${options?.timeout || 5 * 60 * 1000}ms`;
-        throw new Error(message);
+        throw new Error('aborted');
       }
       throw error;
     } finally {
