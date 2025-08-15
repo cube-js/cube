@@ -69,7 +69,7 @@ export class HttpTransport implements ITransport<Response> {
     this.signal = signal;
   }
 
-  public request(method: string, { baseRequestId, signal, ...params }: any): ITransportResponse<Response> {
+  public request(apiMethod: string, { method, baseRequestId, signal, ...params }: any): ITransportResponse<Response> {
     let spanCounter = 1;
     const searchParams = new URLSearchParams(
       params && Object.keys(params)
@@ -77,11 +77,11 @@ export class HttpTransport implements ITransport<Response> {
         .reduce((a, b) => ({ ...a, ...b }), {})
     );
 
-    let url = `${this.apiUrl}/${method}${searchParams.toString().length ? `?${searchParams}` : ''}`;
+    let url = `${this.apiUrl}/${apiMethod}${searchParams.toString().length ? `?${searchParams}` : ''}`;
 
-    const requestMethod = this.method || (url.length < 2000 ? 'GET' : 'POST');
+    const requestMethod = method ?? this.method ?? (url.length < 2000 ? 'GET' : 'POST');
     if (requestMethod === 'POST') {
-      url = `${this.apiUrl}/${method}`;
+      url = `${this.apiUrl}/${apiMethod}`;
       this.headers['Content-Type'] = 'application/json';
     }
 

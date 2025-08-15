@@ -102,6 +102,23 @@ export type DryRunResponse = {
   transformedQueries: TransformedQuery[];
 };
 
+export type CubeSqlOptions = LoadMethodOptions & {
+  /**
+   * Query timeout in milliseconds. Defaults to 5 minutes.
+   */
+  timeout?: number;
+};
+
+export type CubeSqlSchemaColumn = {
+  name: string;
+  columnType: string;
+};
+
+export type CubeSqlResult = {
+  schema: CubeSqlSchemaColumn[];
+  data: (string | boolean | null)[][];
+};
+
 interface BodyResponse {
   error?: string;
   [key: string]: any;
@@ -665,6 +682,66 @@ class CubeApi {
         signal: options?.signal
       }),
       (response: DryRunResponse) => response,
+      options,
+      callback
+    );
+  }
+
+  public cubeSql(sqlQuery: string, options?: CubeSqlOptions): Promise<CubeSqlResult>;
+
+  public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): UnsubscribeObj;
+
+  /**
+   * Execute a Cube SQL query against Cube SQL interface and return the results.
+   */
+  public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): Promise<CubeSqlResult> | UnsubscribeObj {
+    const queryTimeout = options?.timeout || 5 * 60 * 1000;
+
+    return this.loadMethod(
+      () => {
+        let signal = options?.signal;
+        let timeoutId: NodeJS.Timeout | undefined;
+
+        // If no signal is provided and we have a timeout, create our own AbortController
+        if (!signal && queryTimeout < Infinity) {
+          const controller = new AbortController();
+          signal = controller.signal;
+          timeoutId = setTimeout(() => controller.abort(), queryTimeout);
+        }
+
+        const request = this.request('cubesql', {
+          query: sqlQuery,
+          method: 'POST',
+          signal
+        });
+
+        // Clear timeout when request completes if we created it
+        if (timeoutId) {
+          request.subscribe(() => clearTimeout(timeoutId));
+        }
+
+        return request;
+      },
+      (response: any) => {
+        // TODO: The response is sending both errors and successful results as `error`
+        if (!response || !response.error) {
+          throw new Error('Invalid response format');
+        }
+
+        const [schema, ...data] = response.error.split('\n');
+
+        try {
+          return {
+            schema: JSON.parse(schema).schema,
+            data: data
+              .filter((d: string) => d.trim().length)
+              .map((d: string) => JSON.parse(d).data)
+              .reduce((a: any, b: any) => a.concat(b), []),
+          };
+        } catch (err) {
+          throw new Error(response.error);
+        }
+      },
       options,
       callback
     );
