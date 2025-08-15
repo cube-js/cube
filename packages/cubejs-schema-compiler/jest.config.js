@@ -19,6 +19,5 @@ module.exports = {
     ...base.moduleNameMapper,
     '^yaml$': require.resolve('yaml'), // Because we have `yaml` as direct dependency here we need to resolve it relative to this package
     '^axios$': require.resolve('axios'),
-    '^antlr4$': require.resolve('antlr4'),
   }
 };

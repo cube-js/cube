@@ -15,6 +15,7 @@ module.exports = {
     // @See https://github.com/uuidjs/uuid/issues/451
     '^uuid$': require.resolve('uuid'),
     '^yaml$': require.resolve('yaml'),
+    '^antlr4$': require.resolve('antlr4'),
   },
   setupFiles: ['../../jest.setup.js'],
   snapshotFormat: {
