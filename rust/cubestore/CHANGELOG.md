@@ -3,6 +3,72 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.54](https://github.com/cube-js/cube/compare/v1.3.53...v1.3.54) (2025-08-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.53](https://github.com/cube-js/cube/compare/v1.3.52...v1.3.53) (2025-08-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.52](https://github.com/cube-js/cube/compare/v1.3.51...v1.3.52) (2025-08-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.51](https://github.com/cube-js/cube/compare/v1.3.50...v1.3.51) (2025-08-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.50](https://github.com/cube-js/cube/compare/v1.3.49...v1.3.50) (2025-08-13)
+
+### Features
+
+- **cubestore:** Support EXPLAIN for meta queries ([#9876](https://github.com/cube-js/cube/issues/9876)) ([619eb90](https://github.com/cube-js/cube/commit/619eb901544ae08d0fbf5fccdcff546a06cac6cf))
+
+## [1.3.49](https://github.com/cube-js/cube/compare/v1.3.48...v1.3.49) (2025-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.48](https://github.com/cube-js/cube/compare/v1.3.47...v1.3.48) (2025-08-09)
+
+### Features
+
+- **cubestore:** Upgrade rust to nightly-2025-08-01 ([#9858](https://github.com/cube-js/cube/issues/9858)) ([54b1553](https://github.com/cube-js/cube/commit/54b1553e04e674a6bc342dfd6d757a0136d67425))
+
+### Performance Improvements
+
+- **cubestore:** Reduce allocations in info schema tables ([#9855](https://github.com/cube-js/cube/issues/9855)) ([3cc34ff](https://github.com/cube-js/cube/commit/3cc34ff9e11b5dc1fe94463f82d587f5db8a76ac))
+
+## [1.3.47](https://github.com/cube-js/cube/compare/v1.3.46...v1.3.47) (2025-08-04)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.46](https://github.com/cube-js/cube/compare/v1.3.45...v1.3.46) (2025-07-31)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.45](https://github.com/cube-js/cube/compare/v1.3.44...v1.3.45) (2025-07-29)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.44](https://github.com/cube-js/cube/compare/v1.3.43...v1.3.44) (2025-07-28)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.43](https://github.com/cube-js/cube/compare/v1.3.42...v1.3.43) (2025-07-24)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.42](https://github.com/cube-js/cube/compare/v1.3.41...v1.3.42) (2025-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.3.41](https://github.com/cube-js/cube/compare/v1.3.40...v1.3.41) (2025-07-22)
+
+### Features
+
+- **cubestore:** Upgrade rocksdb to 7.10.2 from 7.9.2 ([#9802](https://github.com/cube-js/cube/issues/9802)) ([585bb1e](https://github.com/cube-js/cube/commit/585bb1e2c4992b13e1919623a6fcf38ed00d96af))
+
 ## [1.3.40](https://github.com/cube-js/cube/compare/v1.3.39...v1.3.40) (2025-07-20)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

@@ -92,7 +92,7 @@ impl PostgresIntegrationTestSuite {
         )
         .await;
 
-        AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client, port }))
+        AsyncTestConstructorResult::Success(Box::new(PostgresIntegrationTestSuite { client, port }))
     }
 
     async fn create_client(config: tokio_postgres::Config) -> Client {
@@ -407,19 +407,17 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
-    async fn test_prepare(&self) -> RunResult<()> {
+    async fn test_prepare_autodetect(&self) -> RunResult<()> {
         // Unknown variables will be detected as TEXT
         // LIMIT has a typehint for i64
         let stmt = self
             .client
             .prepare("SELECT $1 as t1, $2 as t2 LIMIT $3")
-            .await
-            .unwrap();
+            .await?;
 
         self.client
             .query(&stmt, &[&"test1", &"test2", &0_i64])
-            .await
-            .unwrap();
+            .await?;
 
         Ok(())
     }
@@ -444,9 +442,9 @@ impl PostgresIntegrationTestSuite {
     }
 
     async fn test_prepare_empty_query(&self) -> RunResult<()> {
-        let stmt = self.client.prepare("").await.unwrap();
+        let stmt = self.client.prepare("").await?;
 
-        self.client.query(&stmt, &[]).await.unwrap();
+        self.client.query(&stmt, &[]).await?;
 
         Ok(())
     }
@@ -1170,7 +1168,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
     async fn run(&mut self) -> RunResult<()> {
         self.test_cancel_simple_query().await?;
         self.test_cancel_execute_prepared().await?;
-        self.test_prepare().await?;
+        self.test_prepare_autodetect().await?;
         self.test_extended_error().await?;
         self.test_prepare_empty_query().await?;
         self.test_stream_all().await?;

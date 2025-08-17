@@ -3,6 +3,72 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.54](https://github.com/cube-js/cube/compare/v1.3.53...v1.3.54) (2025-08-15)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.53](https://github.com/cube-js/cube/compare/v1.3.52...v1.3.53) (2025-08-15)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.52](https://github.com/cube-js/cube/compare/v1.3.51...v1.3.52) (2025-08-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.51](https://github.com/cube-js/cube/compare/v1.3.50...v1.3.51) (2025-08-14)
+
+### Performance Improvements
+
+- Debounce information schema queries to Cube Store (1.8x) ([#9879](https://github.com/cube-js/cube/issues/9879)) ([6fe6b09](https://github.com/cube-js/cube/commit/6fe6b09ed933660ab73009a2f30b9baf0f147570))
+
+## [1.3.50](https://github.com/cube-js/cube/compare/v1.3.49...v1.3.50) (2025-08-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.49](https://github.com/cube-js/cube/compare/v1.3.48...v1.3.49) (2025-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.48](https://github.com/cube-js/cube/compare/v1.3.47...v1.3.48) (2025-08-09)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.47](https://github.com/cube-js/cube/compare/v1.3.46...v1.3.47) (2025-08-04)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.46](https://github.com/cube-js/cube/compare/v1.3.45...v1.3.46) (2025-07-31)
+
+### Features
+
+- add datasource schema read methods ([#9818](https://github.com/cube-js/cube/issues/9818)) ([8fd6dcc](https://github.com/cube-js/cube/commit/8fd6dcc2ec69fa37f79d22c78d2a9e50160d62df))
+
+## [1.3.45](https://github.com/cube-js/cube/compare/v1.3.44...v1.3.45) (2025-07-29)
+
+### Features
+
+- **query-ochestrator:** Reduce number of cache set for used flag ([#9828](https://github.com/cube-js/cube/issues/9828)) ([b9ff371](https://github.com/cube-js/cube/commit/b9ff3714ecdbe058f941ee79a3e6e6e0687e1005))
+
+## [1.3.44](https://github.com/cube-js/cube/compare/v1.3.43...v1.3.44) (2025-07-28)
+
+### Bug Fixes
+
+- **query-orchestrator:** QueryQueue - update heartbeat by queue id ([#9817](https://github.com/cube-js/cube/issues/9817)) ([c388350](https://github.com/cube-js/cube/commit/c38835023f5a4b164a2aa503b2eab0df5f899b00))
+
+## [1.3.43](https://github.com/cube-js/cube/compare/v1.3.42...v1.3.43) (2025-07-24)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.42](https://github.com/cube-js/cube/compare/v1.3.41...v1.3.42) (2025-07-23)
+
+### Bug Fixes
+
+- **query-orchestrator:** Reduce number of refresh key queries ([#9809](https://github.com/cube-js/cube/issues/9809)) ([a6b68f8](https://github.com/cube-js/cube/commit/a6b68f84fac89d2fc710aa3ccd1ef10b741e1fa5))
+
+## [1.3.41](https://github.com/cube-js/cube/compare/v1.3.40...v1.3.41) (2025-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
 ## [1.3.40](https://github.com/cube-js/cube/compare/v1.3.39...v1.3.40) (2025-07-20)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

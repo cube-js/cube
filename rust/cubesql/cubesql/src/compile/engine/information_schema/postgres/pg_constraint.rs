@@ -43,6 +43,7 @@ struct PgCatalogConstraintBuilder {
     conffeqop: StringBuilder,
     conexclop: StringBuilder,
     conbin: StringBuilder,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogConstraintBuilder {
@@ -75,6 +76,7 @@ impl PgCatalogConstraintBuilder {
             conffeqop: StringBuilder::new(capacity),
             conexclop: StringBuilder::new(capacity),
             conbin: StringBuilder::new(capacity),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
@@ -105,6 +107,7 @@ impl PgCatalogConstraintBuilder {
             Arc::new(self.conffeqop.finish()),
             Arc::new(self.conexclop.finish()),
             Arc::new(self.conbin.finish()),
+            Arc::new(self.xmin.finish()),
         ];
 
         columns
@@ -170,6 +173,7 @@ impl TableProvider for PgCatalogConstraintProvider {
             Field::new("conffeqop", DataType::Utf8, true),
             Field::new("conexclop", DataType::Utf8, true),
             Field::new("conbin", DataType::Utf8, true),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 

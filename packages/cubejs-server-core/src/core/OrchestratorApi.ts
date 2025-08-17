@@ -297,14 +297,6 @@ export class OrchestratorApi {
     return this.orchestrator.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource);
   }
 
-  public async subscribeQueueEvents(id: string, callback) {
-    return this.orchestrator.subscribeQueueEvents(id, callback);
-  }
-
-  public async unSubscribeQueueEvents(id: string) {
-    return this.orchestrator.unSubscribeQueueEvents(id);
-  }
-
   public async updateRefreshEndReached() {
     return this.orchestrator.updateRefreshEndReached();
   }

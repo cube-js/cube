@@ -46,6 +46,7 @@ Object {
   "measures": Array [
     Object {
       "aggType": "number",
+      "aliasMember": "CubeA.count_a",
       "cumulative": false,
       "cumulativeTotal": false,
       "description": "Description for CubeA.count_a",
@@ -67,6 +68,7 @@ Object {
     },
     Object {
       "aggType": "number",
+      "aliasMember": "CubeB.count_b",
       "cumulative": false,
       "cumulativeTotal": false,
       "description": "Description for CubeB.count_b",
@@ -126,6 +128,7 @@ Object {
   "measures": Array [
     Object {
       "aggType": "number",
+      "aliasMember": "CubeA.count_a",
       "cumulative": false,
       "cumulativeTotal": false,
       "description": "Description for CubeA.count_a",
@@ -147,6 +150,7 @@ Object {
     },
     Object {
       "aggType": "number",
+      "aliasMember": "CubeB.count_b",
       "cumulative": false,
       "cumulativeTotal": false,
       "description": "Description for CubeB.count_b",
@@ -240,6 +244,7 @@ Object {
   "measures": Array [
     Object {
       "aggType": "number",
+      "aliasMember": "CubeA.count_a",
       "cumulative": false,
       "cumulativeTotal": false,
       "description": "Description for CubeA.count_a",
@@ -261,6 +266,7 @@ Object {
     },
     Object {
       "aggType": "number",
+      "aliasMember": "CubeB.count_b",
       "cumulative": false,
       "cumulativeTotal": false,
       "description": "Description for CubeB.count_b",
@@ -320,6 +326,7 @@ Object {
   "measures": Array [
     Object {
       "aggType": "number",
+      "aliasMember": "CubeA.count_a",
       "cumulative": false,
       "cumulativeTotal": false,
       "description": "Description for CubeA.count_a",
@@ -341,6 +348,7 @@ Object {
     },
     Object {
       "aggType": "number",
+      "aliasMember": "CubeB.count_b",
       "cumulative": false,
       "cumulativeTotal": false,
       "description": "Description for CubeB.count_b",

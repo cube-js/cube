@@ -78,6 +78,7 @@ struct PgCatalogClassBuilder {
     relacl: StringBuilder,
     reloptions: StringBuilder,
     relpartbound: StringBuilder,
+    xmin: UInt32Builder,
     // This column was removed after PostgreSQL 12, but it's required to support Tableau Desktop with ODBC
     // True if we generate an OID for each row of the relation
     relhasoids: BooleanBuilder,
@@ -121,6 +122,7 @@ impl PgCatalogClassBuilder {
             relacl: StringBuilder::new(capacity),
             reloptions: StringBuilder::new(capacity),
             relpartbound: StringBuilder::new(capacity),
+            xmin: UInt32Builder::new(capacity),
             relhasoids: BooleanBuilder::new(capacity),
         }
     }
@@ -161,6 +163,7 @@ impl PgCatalogClassBuilder {
         self.relacl.append_null().unwrap();
         self.reloptions.append_null().unwrap();
         self.relpartbound.append_null().unwrap();
+        self.xmin.append_value(1).unwrap();
         self.relhasoids.append_value(false).unwrap();
     }
 
@@ -199,6 +202,7 @@ impl PgCatalogClassBuilder {
             Arc::new(self.relacl.finish()),
             Arc::new(self.reloptions.finish()),
             Arc::new(self.relpartbound.finish()),
+            Arc::new(self.xmin.finish()),
             Arc::new(self.relhasoids.finish()),
         ];
 
@@ -317,6 +321,7 @@ impl TableProvider for PgCatalogClassProvider {
             Field::new("relacl", DataType::Utf8, true),
             Field::new("reloptions", DataType::Utf8, true),
             Field::new("relpartbound", DataType::Utf8, true),
+            Field::new("xmin", DataType::UInt32, false),
             Field::new("relhasoids", DataType::Boolean, false),
         ]))
     }

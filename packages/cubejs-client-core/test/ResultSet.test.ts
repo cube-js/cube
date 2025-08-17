@@ -1807,5 +1807,28 @@ describe('ResultSet', () => {
         ]
       );
     });
+
+    test('keeps null values on non-matching rows', () => {
+      const resultSet = new ResultSet({
+        query: {
+          dimensions: [
+            'User.name',
+            'Friend.name'
+          ],
+        },
+        data: [
+          {
+            'User.name': 'Bob',
+            'Friend.name': null,
+          }
+        ],
+      } as any);
+
+      expect(resultSet.tablePivot()).toEqual(
+        [
+          { 'User.name': 'Bob', 'Friend.name': null },
+        ]
+      );
+    });
   });
 });

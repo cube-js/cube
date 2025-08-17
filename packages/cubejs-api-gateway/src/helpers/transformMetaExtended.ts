@@ -4,7 +4,7 @@ function stringifyMemberSql(sql?: () => string) {
   }
 
   const sqlStr = sql.toString();
-  return sqlStr.substring(sqlStr.indexOf('=>') + 3);
+  return sqlStr.substring(sqlStr.indexOf('=>') + 2).trim();
 }
 
 type MemberPath = {
@@ -79,11 +79,19 @@ function transformJoins(joins: any) {
     return undefined;
   }
 
-  return Object.entries(joins)?.map(([joinName, join]: [joinName: string, join: any]) => ({
+  const transformJoin = (join: any, name: string) => ({
     ...join,
-    name: joinName,
+    name,
     sql: stringifyMemberSql(join.sql),
-  }));
+  });
+
+  // Handle joins as array (new format after PR #9800)
+  if (Array.isArray(joins)) {
+    return joins.map((join: any) => transformJoin(join, join.name));
+  }
+
+  // Fallback for object format (legacy)
+  return Object.entries(joins)?.map(([joinName, join]: [joinName: string, join: any]) => transformJoin(join, joinName));
 }
 
 function transformPreAggregations(preAggregations: any) {

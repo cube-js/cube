@@ -140,7 +140,7 @@ pub trait QueryEngine {
 
         let optimizer_config = OptimizerConfig::new();
         let optimizers: Vec<Arc<dyn OptimizerRule + Sync + Send>> = vec![
-            Arc::new(PlanNormalize::new()),
+            Arc::new(PlanNormalize::new(&cube_ctx)),
             Arc::new(ProjectionDropOut::new()),
             Arc::new(FilterPushDown::new()),
             Arc::new(SortPushDown::new()),
@@ -436,6 +436,7 @@ impl QueryEngine for SqlQueryEngine {
                 "PostgreSQL 14.2 on x86_64-cubesql".to_string(),
             ));
             ctx.register_udf(create_db_udf("current_database".to_string(), state.clone()));
+            ctx.register_udf(create_db_udf("current_catalog".to_string(), state.clone()));
             ctx.register_udf(create_db_udf("current_schema".to_string(), state.clone()));
             ctx.register_udf(create_current_user_udf(
                 state.clone(),
@@ -518,6 +519,10 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udf(create_age_udf());
         ctx.register_udf(create_pg_get_partkeydef_udf());
         ctx.register_udf(create_pg_relation_size_udf());
+        ctx.register_udf(create_pg_postmaster_start_time_udf());
+        ctx.register_udf(create_txid_current_udf());
+        ctx.register_udf(create_pg_is_in_recovery_udf());
+        ctx.register_udf(create_pg_tablespace_location_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());

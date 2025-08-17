@@ -165,6 +165,7 @@ interface SnowflakeDriverOptions {
   identIgnoreCase?: boolean,
   application: string,
   readOnly?: boolean,
+  queryTag?: string,
 
   /**
    * The export bucket CSV file escape symbol.
@@ -439,6 +440,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       role: this.config.role,
       resultPrefetch: this.config.resultPrefetch,
     };
+
+    if (this.config.queryTag) {
+      config.queryTag = this.config.queryTag;
+    }
 
     if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
       config.token = this.config.oauthToken || await this.readOAuthToken();
@@ -715,6 +720,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       FILE_FORMAT: '(' +
         'TYPE = CSV, ' +
         'COMPRESSION = GZIP, ' +
+        'DATE_FORMAT = \'YYYY-MM-DD\', ' +
+        'TIMESTAMP_FORMAT = \'YYYY-MM-DD"T"HH24:MI:SS.FF3TZH:TZM\', ' +
         'FIELD_OPTIONALLY_ENCLOSED_BY = \'"\'' +
         ')',
     };

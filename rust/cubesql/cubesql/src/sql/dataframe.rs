@@ -1,12 +1,4 @@
-use chrono::{
-    format::{
-        Fixed, Item,
-        Numeric::{Day, Hour, Minute, Month, Second, Year},
-        Pad::Zero,
-    },
-    prelude::*,
-};
-use chrono_tz::Tz;
+use chrono::prelude::*;
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
@@ -18,15 +10,10 @@ use datafusion::arrow::{
     },
     datatypes::{DataType, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
-    temporal_conversions,
 };
-use pg_srv::IntervalValue;
 use rust_decimal::prelude::*;
 use serde::{Serialize, Serializer};
-use std::{
-    fmt::{self, Debug, Formatter},
-    io,
-};
+use std::fmt::Debug;
 
 use super::{ColumnFlags, ColumnType};
 use crate::CubeError;
@@ -87,6 +74,10 @@ impl Row {
         self.values.push(val);
     }
 }
+
+// Type aliases for compatibility - actual implementations are in pg-srv
+pub type IntervalValue = pg_srv::IntervalValue;
+pub type TimestampValue = pg_srv::TimestampValue;
 
 #[derive(Debug)]
 pub enum TableValue {
@@ -204,83 +195,6 @@ impl DataFrame {
         }
 
         table.trim_fmt()
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct TimestampValue {
-    unix_nano: i64,
-    tz: Option<String>,
-}
-
-impl TimestampValue {
-    pub fn new(mut unix_nano: i64, tz: Option<String>) -> TimestampValue {
-        // This is a hack to workaround a mismatch between on-disk and in-memory representations.
-        // We use millisecond precision on-disk.
-        unix_nano -= unix_nano % 1000;
-        TimestampValue { unix_nano, tz }
-    }
-
-    pub fn to_naive_datetime(&self) -> NaiveDateTime {
-        assert!(self.tz.is_none());
-
-        temporal_conversions::timestamp_ns_to_datetime(self.unix_nano)
-    }
-
-    pub fn to_fixed_datetime(&self) -> io::Result<DateTime<Tz>> {
-        assert!(self.tz.is_some());
-
-        let tz = self
-            .tz
-            .as_ref()
-            .unwrap()
-            .parse::<Tz>()
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
-
-        let ndt = temporal_conversions::timestamp_ns_to_datetime(self.unix_nano);
-        Ok(tz.from_utc_datetime(&ndt))
-    }
-
-    pub fn tz_ref(&self) -> &Option<String> {
-        &self.tz
-    }
-
-    pub fn get_time_stamp(&self) -> i64 {
-        self.unix_nano
-    }
-}
-
-impl Debug for TimestampValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TimestampValue")
-            .field("unix_nano", &self.unix_nano)
-            .field("tz", &self.tz)
-            .field("str", &self.to_string())
-            .finish()
-    }
-}
-
-impl ToString for TimestampValue {
-    fn to_string(&self) -> String {
-        Utc.timestamp_nanos(self.unix_nano)
-            .format_with_items(
-                [
-                    Item::Numeric(Year, Zero),
-                    Item::Literal("-"),
-                    Item::Numeric(Month, Zero),
-                    Item::Literal("-"),
-                    Item::Numeric(Day, Zero),
-                    Item::Literal("T"),
-                    Item::Numeric(Hour, Zero),
-                    Item::Literal(":"),
-                    Item::Numeric(Minute, Zero),
-                    Item::Literal(":"),
-                    Item::Numeric(Second, Zero),
-                    Item::Fixed(Fixed::Nanosecond3),
-                ]
-                .iter(),
-            )
-            .to_string()
     }
 }
 

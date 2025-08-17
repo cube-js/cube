@@ -81,6 +81,14 @@ impl SingleAliasedSource {
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
         let sql = self.source.to_sql(templates, context)?;
+        /* if let SingleSource::Subquery(plan) = &self.source {
+            if let QueryPlan::Union(_) = plan.as_ref() {
+                //FIXME CubeStore (at least old cubestore) don't support alias for union
+                if templates.is_external() {
+                    return Ok(sql);
+                }
+            }
+        } */
 
         templates.query_aliased(&sql, &self.alias)
     }

@@ -47,17 +47,14 @@ impl InfoSchemaTableDef for SystemCacheTableDef {
                 ))
             }),
             Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from(
-                    items
-                        .iter()
-                        .map(|row| {
-                            row.get_row()
-                                .get_expire()
-                                .as_ref()
-                                .map(|t| t.timestamp_nanos())
-                        })
-                        .collect::<Vec<_>>(),
-                ))
+                Arc::new(TimestampNanosecondArray::from_iter(items.iter().map(
+                    |row| {
+                        row.get_row()
+                            .get_expire()
+                            .as_ref()
+                            .map(|t| t.timestamp_nanos())
+                    },
+                )))
             }),
             Box::new(|items| {
                 Arc::new(StringArray::from_iter(

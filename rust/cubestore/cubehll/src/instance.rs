@@ -1217,7 +1217,7 @@ struct BitCursor<'a> {
 }
 
 impl BitCursor<'_> {
-    pub fn new(input: &[u8]) -> BitCursor {
+    pub fn new(input: &[u8]) -> BitCursor<'_> {
         BitCursor {
             input,
             pos: 0,

@@ -113,10 +113,14 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
       exportBucketRegion: getEnv('dbExportBucketAwsRegion', { dataSource }),
       credentials: getEnv('dbExportGCSCredentials', { dataSource }),
+      queryTimeout: getEnv('dbQueryTimeout', { dataSource }),
       ...config
     };
     this.catalog = this.config.catalog;
-    this.client = new presto.Client(this.config);
+    this.client = new presto.Client({
+      timeout: this.config.queryTimeout,
+      ...this.config,
+    });
   }
 
   public async testConnection(): Promise<void> {
@@ -319,7 +323,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
     const { schema, tableName } = this.splitTableFullName(params.tableFullName);
     const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
-    
+
     const protocol = {
       gcs: 'gs',
       s3: this.config.exportBucketS3AdvancedFS ? 's3a' : 's3'

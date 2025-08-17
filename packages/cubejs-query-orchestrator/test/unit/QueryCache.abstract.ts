@@ -8,7 +8,7 @@ export type QueryCacheTestOptions = QueryCacheOptions & {
   afterAll?: () => Promise<void>,
 };
 
-export const QueryCacheTest = (name: string, options?: QueryCacheTestOptions) => {
+export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => {
   describe(`QueryQueue${name}`, () => {
     const cache = new QueryCache(
       crypto.randomBytes(16).toString('hex'),

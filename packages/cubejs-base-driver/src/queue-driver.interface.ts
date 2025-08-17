@@ -1,14 +1,12 @@
-export type QueryDef = unknown;
+export type QueryDef = any;
 // Primary key of Queue item
 export type QueueId = string | number | bigint;
-// This was used as lock for Redis, deprecated.
-export type ProcessingId = string | number;
+// This was used as a lock for Redis, deprecated.
+export type ProcessingId = string | number | bigint;
 export type QueryKey = (string | [string, any[]]) & {
   persistent?: true,
 };
-export interface QueryKeyHash extends String {
-  __type: 'QueryKeyHash'
-}
+export type QueryKeyHash = string & { __type: 'QueryKeyHash' };
 
 export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId | null /** Supported by new Cube Store and Memory */];
 export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess: QueryKeysTuple[]];
@@ -16,7 +14,7 @@ export type AddToQueueResponse = [added: number, queueId: QueueId | null, queueS
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
 export type RetrieveForProcessingSuccess = [
   added: unknown,
-  // QueueId is required for Cube Store, other providers doesn't support it
+  // QueueId is required for Cube Store, other providers don't support it
   queueId: QueueId | null,
   active: QueryKeyHash[],
   pending: number,
@@ -25,7 +23,7 @@ export type RetrieveForProcessingSuccess = [
 ];
 export type RetrieveForProcessingFail = [
   added: unknown,
-  // QueueId is required for Cube Store, other providers doesn't support it
+  // QueueId is required for Cube Store, other providers don't support it
   queueId: QueueId | null,
   active: QueryKeyHash[],
   pending: number,
@@ -40,10 +38,12 @@ export interface AddToQueueQuery {
 }
 
 export interface AddToQueueOptions {
-  stageQueryKey: string,
+  // It's an ugly workaround for skip queue tasks
+  queueId?: QueueId,
+  stageQueryKey?: any,
   requestId: string,
+  spanId?: string,
   orphanedTimeout?: number,
-  queueId: QueueId,
 }
 
 export interface QueueDriverOptions {
@@ -52,7 +52,6 @@ export interface QueueDriverOptions {
   continueWaitTimeout: number,
   orphanedTimeout: number,
   heartBeatTimeout: number,
-  getQueueEventsBus?: any,
   processUid?: string;
 }
 
@@ -67,7 +66,7 @@ export interface QueueDriverConnectionInterface {
    * @param keyScore Redis specific thing
    * @param queryKey
    * @param orphanedTime
-   * @param queryHandler Our queue allow to use different handlers. For example query, cvsQuery, etc.
+   * @param queryHandler Our queue allows using different handlers. For example, query, cvsQuery, etc.
    * @param query
    * @param priority
    * @param options
