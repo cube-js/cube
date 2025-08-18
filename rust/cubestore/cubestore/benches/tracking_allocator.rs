@@ -84,7 +84,10 @@ impl TrackingAllocator {
             }
         } else {
             self.deallocations.fetch_add(1, Ordering::Relaxed);
-            self.current_allocated.fetch_sub(size, Ordering::Relaxed);
+            // Use saturating_sub to prevent underflow
+            let current = self.current_allocated.load(Ordering::Relaxed);
+            let new_current = current.saturating_sub(size);
+            self.current_allocated.store(new_current, Ordering::Relaxed);
         }
     }
 }
@@ -109,8 +112,9 @@ unsafe impl GlobalAlloc for TrackingAllocator {
             self.reallocations.fetch_add(1, Ordering::Relaxed);
 
             // Update counters: subtract old size, add new size
-            self.current_allocated
-                .fetch_sub(layout.size(), Ordering::Relaxed);
+            let current = self.current_allocated.load(Ordering::Relaxed);
+            let after_sub = current.saturating_sub(layout.size());
+            self.current_allocated.store(after_sub, Ordering::Relaxed);
             self.total_allocated.fetch_add(new_size, Ordering::Relaxed);
             let current = self
                 .current_allocated
