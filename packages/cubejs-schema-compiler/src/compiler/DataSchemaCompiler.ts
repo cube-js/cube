@@ -140,6 +140,8 @@ export class DataSchemaCompiler {
 
   private readonly compiledScriptCache: LRUCache<string, vm.Script>;
 
+  private compileV8ContextCache: vm.Context;
+
   // FIXME: Is public only because of tests, should be private
   public compilePromise: any;
 
@@ -172,6 +174,7 @@ export class DataSchemaCompiler {
     this.workerPool = null;
     this.compilerId = options.compilerId || 'default';
     this.compiledScriptCache = options.compiledScriptCache;
+    this.compileV8ContextCache = vm.createContext({});
   }
 
   public compileObjects(compileServices, objects, errorsReport: ErrorReporter) {
@@ -563,7 +566,20 @@ export class DataSchemaCompiler {
       return this.compiledScriptCache.get(cacheKey)!;
     }
 
-    const script = new vm.Script(file.content, { filename: file.fileName });
+    // As we run all data model files in the same context,
+    // we need to wrap the code in an IIFE to avoid errors like:
+    // Identifier 'xxx' has already been declared,
+    // avoid polluting and modifying the global scope,
+    // and to provide a controlled environment for the code execution.
+    const wrappedCode = `
+      (function(globals) {
+        "use strict";
+        const { view, cube, context, addExport, setExport, asyncModule, require, COMPILE_CONTEXT } = globals;
+        ${file.content}
+      })(sandboxLocals);
+    `;
+
+    const script = new vm.Script(wrappedCode, { filename: file.fileName });
     this.compiledScriptCache.set(cacheKey, script);
     return script;
   }
@@ -582,18 +598,17 @@ export class DataSchemaCompiler {
     try {
       const script = this.getJsScript(file);
 
-      script.runInNewContext({
+      const sandboxLocals = Object.freeze({
         view: (name, cube) => (
           !cube ?
             this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
             cubes.push({ ...cube, name, fileName: file.fileName, isView: true })
         ),
-        cube:
-          (name, cube) => (
-            !cube ?
-              this.cubeFactory({ ...name, fileName: file.fileName }) :
-              cubes.push({ ...cube, name, fileName: file.fileName })
-          ),
+        cube: (name, cube) => (
+          !cube ?
+            this.cubeFactory({ ...name, fileName: file.fileName }) :
+            cubes.push({ ...cube, name, fileName: file.fileName })
+        ),
         context: (name, context) => contexts.push({ ...context, name, fileName: file.fileName }),
         addExport: (obj) => {
           exports[file.fileName] = exports[file.fileName] || {};
@@ -637,9 +652,15 @@ export class DataSchemaCompiler {
           }
         },
         COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : this.cloneCompileContextWithGetterAlias(this.compileContext || {}),
-      }, { filename: file.fileName, timeout: 15000 });
+      });
+
+      this.compileV8ContextCache.sandboxLocals = sandboxLocals;
+
+      script.runInContext(this.compileV8ContextCache, { timeout: 15000 });
     } catch (e) {
       errorsReport.error(e);
+    } finally {
+      delete this.compileV8ContextCache.sandboxLocals;
     }
   }
 
