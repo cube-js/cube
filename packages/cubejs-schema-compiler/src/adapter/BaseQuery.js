@@ -4174,7 +4174,7 @@ export class BaseQuery {
         select: '{% if ctes %} WITH \n' +
           '{{ ctes | join(\',\n\') }}\n' +
           '{% endif %}' +
-          'SELECT {% if distinct %}DISTINCT {% endif %}' +
+          ' {% if distinct %}DISTINCT {% endif %}' +
           '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
           'FROM (\n' +
           '{{ from | indent(2, true) }}\n' +
