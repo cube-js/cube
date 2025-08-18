@@ -26,11 +26,8 @@ impl InfoSchemaTableDef for SchemataInfoSchemaTableDef {
 
     fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
         vec![Box::new(|tables| {
-            Arc::new(StringArray::from(
-                tables
-                    .iter()
-                    .map(|row| row.get_row().get_name().as_str())
-                    .collect::<Vec<_>>(),
+            Arc::new(StringArray::from_iter_values(
+                tables.iter().map(|row| row.get_row().get_name()),
             ))
         })]
     }

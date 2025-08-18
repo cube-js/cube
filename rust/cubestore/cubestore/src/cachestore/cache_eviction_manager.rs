@@ -575,7 +575,7 @@ impl CacheEvictionManager {
         store: &Arc<RocksStore>,
     ) -> Result<KeysVector, CubeError> {
         let (expired, stats_total_keys, stats_total_raw_size) = store
-            .read_operation_out_of_queue(move |db_ref| {
+            .read_operation_out_of_queue("collect_stats_and_expired_keys", move |db_ref| {
                 let mut stats_total_keys: u32 = 0;
                 let mut stats_total_raw_size: u64 = 0;
 
@@ -624,7 +624,7 @@ impl CacheEvictionManager {
         let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
 
         let (all_keys, stats_total_keys, stats_total_raw_size, expired_keys) = store
-            .read_operation_out_of_queue(move |db_ref| {
+            .read_operation_out_of_queue("collect_allkeys_to_evict", move |db_ref| {
                 let mut stats_total_keys: u32 = 0;
                 let mut stats_total_raw_size: u64 = 0;
 
@@ -768,7 +768,7 @@ impl CacheEvictionManager {
         let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
 
         let to_delete: Vec<(u64, u32)> = store
-            .read_operation_out_of_queue(move |db_ref| {
+            .read_operation_out_of_queue("do_eviction_by_sampling", move |db_ref| {
                 let mut pending_volume_remove: u64 = 0;
 
                 let now_at_start = Utc::now();
@@ -1146,6 +1146,7 @@ impl CacheEvictionManager {
 
             let _ = store
                 .read_operation_out_of_queue_opt(
+                    "check_compaction_trigger",
                     |db_ref| {
                         let start: Option<&[u8]> = None;
                         let end: Option<&[u8]> = None;

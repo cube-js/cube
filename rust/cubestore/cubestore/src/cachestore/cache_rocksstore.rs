@@ -273,8 +273,10 @@ impl RocksCacheStore {
                     .upload_loop
                     .process(
                         cachestore.clone(),
-                        async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
-                        async move |m, _| m.store.run_upload().await,
+                        move |_| async move {
+                            Ok(Delay::new(Duration::from_secs(upload_interval)).await)
+                        },
+                        move |m, _| async move { m.store.run_upload().await },
                     )
                     .await;
 
@@ -292,8 +294,10 @@ impl RocksCacheStore {
                     .metrics_loop
                     .process(
                         cachestore.clone(),
-                        async move |_| Ok(Delay::new(Duration::from_secs(metrics_interval)).await),
-                        async move |m, _| {
+                        move |_| async move {
+                            Ok(Delay::new(Duration::from_secs(metrics_interval)).await)
+                        },
+                        move |m, _| async move {
                             if let Err(err) = m.submit_metrics().await {
                                 log::error!("Error while submitting cachestore metrics: {}", err)
                             };
@@ -872,7 +876,7 @@ pub trait CacheStore: DIService + Send + Sync {
 impl CacheStore for RocksCacheStore {
     async fn cache_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
         self.store
-            .read_operation_out_of_queue(move |db_ref| {
+            .read_operation_out_of_queue("cache_all", move |db_ref| {
                 Ok(CacheItemRocksTable::new(db_ref).scan_rows(limit)?)
             })
             .await
@@ -1506,7 +1510,7 @@ impl CacheStore for RocksCacheStore {
 
     async fn compaction(&self) -> Result<(), CubeError> {
         self.store
-            .read_operation_out_of_queue(move |db_ref| {
+            .read_operation_out_of_queue("compaction", move |db_ref| {
                 let start: Option<&[u8]> = None;
                 let end: Option<&[u8]> = None;
 
@@ -1521,7 +1525,7 @@ impl CacheStore for RocksCacheStore {
 
     async fn info(&self) -> Result<CachestoreInfo, CubeError> {
         self.store
-            .read_operation_out_of_queue(move |db_ref| {
+            .read_operation_out_of_queue("info", move |db_ref| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let cache_schema_stats = cache_schema.collect_table_stats_by_extended_index(
                     &CacheItemRocksIndex::ByPath,

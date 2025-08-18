@@ -54,6 +54,8 @@ format, e.g., `America/Los_Angeles`.
   > refresh loops and overall system instability.
 - `ungrouped`: If set to `true`, Cube will run an [ungrouped
 query][ref-ungrouped-query].
+- `joinHints`: Query-time [join hints][ref-join-hints], provided as an array of
+two-element arrays of cube names.
 
 ```json
 {
@@ -682,3 +684,4 @@ refer to its documentation for more examples.
 [ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
 [ref-custom-granularities]: /product/data-modeling/reference/dimensions#granularities
 [wiki-iso-8601]: https://en.wikipedia.org/wiki/ISO_8601
+[ref-join-hints]: /product/data-modeling/concepts/working-with-joins#join-hints

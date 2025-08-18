@@ -1813,6 +1813,231 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver SQL API: Extended nested Rollup over asterisk 1`] = `
+Array [
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-100811",
+    "row": 4012,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-102379",
+    "row": 6272,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-102554",
+    "row": 3448,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-102925",
+    "row": 9473,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-105620",
+    "row": 8958,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-107503",
+    "row": 849,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-109183",
+    "row": 7293,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-112172",
+    "row": 7310,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-112515",
+    "row": 2655,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-115546",
+    "row": 4161,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-116127",
+    "row": 9584,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-118437",
+    "row": 1013,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-119284",
+    "row": 8697,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-120327",
+    "row": 4227,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-123001",
+    "row": 3934,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-123372",
+    "row": 2661,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-124296",
+    "row": 4031,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-126928",
+    "row": 8878,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-131492",
+    "row": 3060,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-131492",
+    "row": 3059,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-133648",
+    "row": 1995,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-134915",
+    "row": 2952,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-135069",
+    "row": 7425,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-138422",
+    "row": 2329,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-139661",
+    "row": 1494,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-140949",
+    "row": 2455,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-143567",
+    "row": 4882,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-144568",
+    "row": 3717,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-145142",
+    "row": 523,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-145653",
+    "row": 5220,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-145660",
+    "row": 6205,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-145772",
+    "row": 6125,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-147333",
+    "row": 5277,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-149048",
+    "row": 2595,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-150091",
+    "row": 8425,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-151799",
+    "row": 7698,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-160633",
+    "row": 9619,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-160633",
+    "row": 9618,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "CA-2017-163265",
+    "row": 8673,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-119319",
+    "row": 8621,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-124779",
+    "row": 6651,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-132297",
+    "row": 3083,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-133361",
+    "row": 6459,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "order": "US-2017-141677",
+    "row": 7174,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver SQL API: NULLS FIRST/LAST SQL push down: nulls_first_last_sql_push_down 1`] = `
 Array [
   Object {
@@ -9060,6 +9285,186 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "RetailCalendar.retail_date": "2020-02-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "RetailCalendar.retail_date": "2020-03-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "RetailCalendar.retail_date": "2020-04-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "5",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "RetailCalendar.retail_date": "2020-05-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "7",
+    "BigECommerce.totalCountRetailMonthAgo": "5",
+    "RetailCalendar.retail_date": "2020-06-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "4",
+    "BigECommerce.totalCountRetailMonthAgo": "6",
+    "RetailCalendar.retail_date": "2020-10-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "9",
+    "BigECommerce.totalCountRetailMonthAgo": "5",
+    "RetailCalendar.retail_date": "2020-11-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "7",
+    "BigECommerce.totalCountRetailMonthAgo": "8",
+    "RetailCalendar.retail_date": "2020-12-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-12-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-03-22",
+    "RetailCalendar.retail_date.week": "2020-03-22",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-05-31",
+    "RetailCalendar.retail_date.week": "2020-05-31",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-06-07",
+    "RetailCalendar.retail_date.week": "2020-06-07",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-06-14",
+    "RetailCalendar.retail_date.week": "2020-06-14",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-06-21",
+    "RetailCalendar.retail_date.week": "2020-06-21",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-09-06",
+    "RetailCalendar.retail_date.week": "2020-09-06",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-09-13",
+    "RetailCalendar.retail_date.week": "2020-09-13",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-09-20",
+    "RetailCalendar.retail_date.week": "2020-09-20",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-10-18",
+    "RetailCalendar.retail_date.week": "2020-10-18",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-10-25",
+    "RetailCalendar.retail_date.week": "2020-10-25",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-11-01",
+    "RetailCalendar.retail_date.week": "2020-11-01",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "3",
+    "RetailCalendar.retail_date": "2020-11-08",
+    "RetailCalendar.retail_date.week": "2020-11-08",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-11-15",
+    "RetailCalendar.retail_date.week": "2020-11-15",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "3",
+    "RetailCalendar.retail_date": "2020-11-22",
+    "RetailCalendar.retail_date.week": "2020-11-22",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-11-29",
+    "RetailCalendar.retail_date.week": "2020-11-29",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-12-20",
+    "RetailCalendar.retail_date.week": "2020-12-20",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce with Retail Calendar: totalCountRetailYearAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "42",
+    "BigECommerce.totalCountRetailYearAgo": "2",
+    "RetailCalendar.retail_date": "2020-02-02",
+    "RetailCalendar.retail_date.year": "2020-02-02",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: filtering with possible casts 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalSales": 48.896,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.totalSales": 232.88,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: null boolean 1`] = `
 Array [
   Object {
@@ -10882,6 +11287,71 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: rolling window YTD without date range 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "11",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "18",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "18",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "18",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "24",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "28",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "37",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountYTD": "44",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: rolling window YTD without granularity 1`] = `
 Array [
   Object {
@@ -10955,7 +11425,137 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: rolling window by 2 day without date range 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: rolling window by 2 month 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "12",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "7",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "10",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "13",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "16",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: rolling window by 2 month without date range 1`] = `
 Array [
   Object {
     "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
@@ -15901,6 +16501,46 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range 1`] = `
+Array [
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "8",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "12",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "6",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-06-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "19",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "16",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": null,
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": null,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing 1`] = `
 Array [
   Object {
@@ -15977,21 +16617,6 @@ Array [
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
     "ECommerce.rollingCountByUnbounded": "44",
-  },
-]
-`;
-
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: filtering with possible casts 1`] = `
-Array [
-  Object {
-    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
-    "BigECommerce.totalSales": 48.896,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
-    "BigECommerce.totalSales": 232.88,
   },
 ]
 `;

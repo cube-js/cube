@@ -1,14 +1,22 @@
-# Working with Joins
+# Joins between cubes
 
-A join creates a relationship between two cubes in your Cube project. Cube
-supports three [types of join relationships][ref-schema-ref-joins-relationship]
-often found in SQL databases:
+Joins create relationships between cubes in the [data model][ref-data-model].
 
-- `one_to_one`
-- `one_to_many`
-- `many_to_one`
+They allow to build complex [queries][ref-queries] that involve members from multiple
+cubes. They also allow to [reference][ref-references] members from other cubes in
+[calculated members][ref-calculated-members], [views][ref-views], and
+[pre-aggregations][ref-preaggs].
 
-To use an example, let's use two cubes, `customers` and `orders`:
+When defining joins, it's important to understand [join types](#join-types) and the
+[direction of joins](#direction-of-joins) as well as how [join paths](#join-paths) and
+[join hints](#join-hints) are used to work with the joined cubes.
+
+## Join types
+
+Cube supports three [types of join relationships][ref-schema-ref-joins-relationship]
+often found in SQL databases: `one_to_one`, `one_to_many`, and `many_to_one`.
+
+For example, let's take two cubes, `customers` and `orders`:
 
 <CodeTabs>
 
@@ -197,17 +205,7 @@ As we can see, the base table in the query is `orders`, and `customers` is in
 the `LEFT JOIN` clause; this means any orders without a customer will also be
 retrieved.
 
-<InfoBox>
-
-In Cube, joins only need to be defined from one direction. In the above example,
-we explicitly _removed_ the `one_to_many` relationship from the `customer` cube;
-not doing so would cause the query to fail as Cube would be unable to determine
-a valid join path. [Click here][self-join-direction] to learn more about how the
-direction of joins affects query results.
-
-</InfoBox>
-
-## Many-to-many joins
+### Many-to-many joins
 
 A many-to-many relationship occurs when multiple records in a cube are
 associated with multiple records in another cube.
@@ -219,13 +217,6 @@ more than one `topic`, and a `topic` may have more than one `post`.
 In a database, you would most likely have an associative table (also known as a
 junction table or cross-reference table). In our example, this table name might
 be `post_topics`.
-
-<InfoBox>
-
-You can [jump to this section][self-many-to-many-no-assoc-table] if you don't
-have an associative table in your database.
-
-</InfoBox>
 
 The diagram below shows the tables `posts`, `topics`, `post_topics`, and their
 relationships.
@@ -324,7 +315,7 @@ cubes:
 
 The following example uses the `many_to_one` relationship on the `post_topics`
 cube; this causes the direction of joins to be `posts → post_topics → topics`.
-[Read more about direction of joins here][self-join-direction].
+Read more about the [direction of joins](#direction-of-joins).
 
 </InfoBox>
 
@@ -361,8 +352,7 @@ cubes:
 
 </CodeTabs>
 
-### Using virtual associative cube
-
+**Virtual associative cubes.**
 Sometimes there is no associative table in the database, when in reality, there
 is a many-to-many relationship. In this case, the solution is to extract some
 data from existing tables and create a virtual (not backed by a real table in
@@ -625,26 +615,194 @@ cubes:
 
 </CodeTabs>
 
-## Directions of joins
+## Join tree
 
-The direction of [joins][ref-schema-ref-joins] greatly influences the final
-result set. It can be explicitly controlled on a [view][ref-schema-ref-view]
-level.
+When Cube analyzes a [query][ref-queries], it builds a _join tree_ that connects all
+cubes involved in the query in compliance with the [direction of joins](#direction-of-joins).
+If the join tree cannot be built, the query will fail to execute. The presence of
+[bidirectional joins](#bidirectional-joins) or [diamond subgraphs](#diamond-subgraphs)
+can complicate the join tree structure.
 
-As an example, let's take two cubes, `orders` and `customers`:
+### Direction of joins
+
+**All joins in Cube's data model are _directed_.** They flow from the source cube (the one
+where the join is defined) to the target cube (the one referenced in the join).
+
+Cube will respect the join graph when generating SQL queries. It means that _source_
+cubes will be on the left side of `JOIN` clauses and _target_ cubes will be on the right
+side of `JOIN` clauses.  Consider the following data model, consisting of cubes `left`
+and `right`:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: left
+    sql: >
+      SELECT 1 AS id, 11 AS value UNION ALL
+      SELECT 2 AS id, 12 AS value UNION ALL
+      SELECT 3 AS id, 13 AS value
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: value
+        sql: value
+        type: number
+
+    joins:
+      - name: right
+        sql: "{left.id} = {right.id}"
+        relationship: one_to_one
+
+  - name: right
+    sql: >
+      SELECT 1 AS id, 101 AS value UNION ALL
+      SELECT 2 AS id, 102 AS value UNION ALL
+      SELECT 3 AS id, 103 AS value
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: value
+        sql: value
+        type: number
+
+    # joins:
+    #   - name: left
+    #     sql: "{left.id} = {right.id}"
+    #     relationship: one_to_one
+```
+
+```javascript
+cube(`left`, {
+  sql: `
+    SELECT 1 AS id, 11 AS value UNION ALL
+    SELECT 2 AS id, 12 AS value UNION ALL
+    SELECT 3 AS id, 13 AS value
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    value: {
+      sql: `value`,
+      type: `number`
+    }
+  },
+
+  joins: {
+    right: {
+      sql: `${left.id} = ${right.id}`,
+      relationship: `one_to_one`
+    }
+  }
+})
+
+cube(`right`, {
+  sql: `
+    SELECT 1 AS id, 101 AS value UNION ALL
+    SELECT 2 AS id, 102 AS value UNION ALL
+    SELECT 3 AS id, 103 AS value
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    value: {
+      sql: `value`,
+      type: `number`
+    }
+  }
+
+  // joins: {
+  //   left: {
+  //     sql: `${left.id} = ${right.id}`,
+  //     relationship: `one_to_one`
+  //   }
+  // }
+})
+```
+
+</CodeTabs>
+
+It defines a join that is directed from `left` to `right`. If you query for `left.value`
+and `right.value`, Cube will generate the following SQL query. As you can see, `left` is
+on the left side of the `JOIN` clause, and `right` is on the right side:
+
+```sql
+SELECT
+  "left".value "left__value",
+  "right".value "right__value"
+FROM (
+  SELECT 1 AS id, 11 AS value UNION ALL
+  SELECT 2 AS id, 12 AS value UNION ALL
+  SELECT 3 AS id, 13 AS value
+) AS "left"
+LEFT JOIN (
+  SELECT 1 AS id, 101 AS value UNION ALL
+  SELECT 2 AS id, 102 AS value UNION ALL
+  SELECT 3 AS id, 103 AS value
+) AS "right" ON "left".id = "right".id
+GROUP BY 1, 2
+```
+
+If you comment out the join definition in the `left` cube and uncomment the join
+definition in the `right` cube, Cube will generate the following SQL for the same query:
+
+```sql
+SELECT
+  "left".value "left__value",
+  "right".value "right__value"
+FROM (
+  SELECT 1 AS id, 101 AS value UNION ALL
+  SELECT 2 AS id, 102 AS value UNION ALL
+  SELECT 3 AS id, 103 AS value
+) AS "right"
+LEFT JOIN (
+  SELECT 1 AS id, 11 AS value UNION ALL
+  SELECT 2 AS id, 12 AS value UNION ALL
+  SELECT 3 AS id, 13 AS value
+) AS "left" ON "left".id = "right".id
+GROUP BY 1, 2
+```
+
+As you can see, the direction of joins greatly influences the generated SQL and,
+conseqently, the final result set.
+
+### Bidirectional joins
+
+**As a rule of thumb, it's not recommended to define _bidirectional joins_** in the data
+model (i.e., having both cubes define a join to each other) by default. However, it can
+still be useful for some valid analytical use cases.
+
+Consider the following data model with `orders` and `customers` for an e-commerce that
+has both registered and guest customers (they have `NULL` as `customer_id`):
 
 <CodeTabs>
 
 ```javascript
 cube(`orders`, {
-  sql_table: `orders`,
-
-  measures: {
-    count: {
-      sql: `id`,
-      type: `count`
-    }
-  },
+  sql: `
+    SELECT 1 AS id, 1001 AS customer_id, 123 AS revenue UNION ALL
+    SELECT 2 AS id, 1001 AS customer_id, 234 AS revenue UNION ALL
+    SELECT 3 AS id, 1002 AS customer_id, 345 AS revenue UNION ALL
+    SELECT 4 AS id, NULL AS customer_id, 456 AS revenue
+  `,
 
   dimensions: {
     id: {
@@ -657,15 +815,10 @@ cube(`orders`, {
       sql: `customer_id`,
       type: `number`
     }
-  }
-})
-
-cube(`customers`, {
-  sql_table: `customers`,
+  },
 
   measures: {
-    count: {
-      sql: `id`,
+    order_count: {
       type: `count`
     },
 
@@ -675,29 +828,57 @@ cube(`customers`, {
     }
   },
 
+  joins: {
+    customers: {
+      sql: `${orders.customer_id} = ${customers.id}`,
+      relationship: `many_to_one`
+    }
+  }
+})
+
+cube(`customers`, {
+  sql: `
+    SELECT 1001 AS id, 'Alice' AS name UNION ALL
+    SELECT 1002 AS id, 'Bob' AS name UNION ALL
+    SELECT 1003 AS id, 'Eve' AS name
+  `,
+
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       primary_key: true
+    },
+
+    name: {
+      sql: `name`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    customer_count: {
+      type: `count`
     }
   }
+
+  // joins: {
+  //   orders: {
+  //     sql: `${orders.customer_id} = ${customers.id}`,
+  //     relationship: `one_to_many`
+  //   }
+  // }
 })
 ```
 
 ```yaml
 cubes:
   - name: orders
-    sql_table: orders
-
-    measures:
-      - name: count
-        sql: id
-        type: count
-
-      - name: total_revenue
-        sql: revenue
-        type: sum
+    sql: >
+      SELECT 1 AS id, 1001 AS customer_id, 123 AS revenue UNION ALL
+      SELECT 2 AS id, 1001 AS customer_id, 234 AS revenue UNION ALL
+      SELECT 3 AS id, 1002 AS customer_id, 345 AS revenue UNION ALL
+      SELECT 4 AS id, NULL AS customer_id, 456 AS revenue
 
     dimensions:
       - name: id
@@ -709,13 +890,191 @@ cubes:
         sql: customer_id
         type: number
 
+    measures:
+      - name: order_count
+        type: count
+
+      - name: total_revenue
+        sql: revenue
+        type: sum
+
+    joins:
+      - name: customers
+        sql: "{orders.customer_id} = {customers.id}"
+        relationship: many_to_one
+
   - name: customers
-    sql_table: customers
+    sql: >
+      SELECT 1001 AS id, 'Alice' AS name UNION ALL
+      SELECT 1002 AS id, 'Bob' AS name UNION ALL
+      SELECT 1003 AS id, 'Eve' AS name
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: name
+        type: string
 
     measures:
-      - name: count
-        sql: id
+      - name: customer_count
         type: count
+
+    # joins:
+    #   - name: orders
+    #     sql: "{orders.customer_id} = {customers.id}"
+    #     relationship: one_to_many
+```
+
+</CodeTabs>
+
+Querying `customers.name` and `orders.order_count` will produce the following result:
+
+<Screenshot src="https://lgo0ecceic.ucarecd.net/f65257ee-486a-4069-8b9b-8617b6b83e5f/"/>
+
+As you can see, the result set only includes registered customers; we get no data for
+guest checkouts. Check the generated SQL query:
+
+```sql
+SELECT
+  "customers".name "customers__name",
+  count("orders".id) "orders__order_count"
+FROM (
+  SELECT 1001 AS id, 'Alice' AS name UNION ALL
+  SELECT 1002 AS id, 'Bob' AS name UNION ALL
+  SELECT 1003 AS id, 'Eve' AS name
+) AS "customers"
+LEFT JOIN (
+  SELECT 1 AS id, 1001 AS customer_id, 123 AS revenue UNION ALL
+  SELECT 2 AS id, 1001 AS customer_id, 234 AS revenue UNION ALL
+  SELECT 3 AS id, 1002 AS customer_id, 345 AS revenue UNION ALL
+  SELECT 4 AS id, NULL AS customer_id, 456 AS revenue
+) AS "orders" ON "orders".customer_id = "customers".id
+GROUP BY 1
+```
+
+The `customers` cube is on the left side of the `JOIN` clause, since the direction of
+joins is from `customers` to `orders`. This means that the query will only return
+registered customers and all orders by guest customers will be excluded.
+
+Now, if you uncomment the join definition in the `orders` cube and comment out the
+join definition in the `customers` cube, running the same query will produce the following
+result:
+
+<Screenshot src="https://lgo0ecceic.ucarecd.net/1f5c764e-9f9d-456a-887a-42fec52319ac/"/>
+
+As you can see, now the result set includes guest checkouts, but we have no data for
+registered customers who have not placed any orders (namely, `Eve`). Check the
+generated SQL query, which reveals why:
+
+```sql
+SELECT
+  "customers".name "customers__name",
+  count("orders".id) "orders__order_count"
+FROM (
+  SELECT 1 AS id, 1001 AS customer_id, 123 AS revenue UNION ALL
+  SELECT 2 AS id, 1001 AS customer_id, 234 AS revenue UNION ALL
+  SELECT 3 AS id, 1002 AS customer_id, 345 AS revenue UNION ALL
+  SELECT 4 AS id, NULL AS customer_id, 456 AS revenue
+) AS "orders"
+LEFT JOIN (
+  SELECT 1001 AS id, 'Alice' AS name UNION ALL
+  SELECT 1002 AS id, 'Bob' AS name UNION ALL
+  SELECT 1003 AS id, 'Eve' AS name
+) AS "customers" ON "orders".customer_id = "customers".id
+GROUP BY 1
+```
+
+**Bidirectional joins often lead to the ambiguity in the data model** and can produce
+ambiguous results, as Cube may not know which direction to follow when generating SQL
+queries. You can remove the ambiguity by using [join paths](#join-paths) and [join
+hints](#join-hints).
+
+### Diamond subgraphs
+
+A _diamond subgraph_ is a specific type of join structure where there's more than one
+join path between two cubes, e.g., `users.schools.countries` and
+`users.employers.countries`. Join structures like `a.b.c` + `a.c` or `a.b.c.d` + `a.b.d`
+are also be considered diamond subgraphs for the purpose of this section.
+
+In the following example, four cubes are joined together as a _diamond_: `a` joins to `b`
+and `c`, and both `b` and `c` join to `d`:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: a
+    sql: >
+      SELECT 1 AS id UNION ALL
+      SELECT 2 AS id UNION ALL
+      SELECT 3 AS id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: d_via_b
+        sql: "{b.d.id}"
+        type: number
+
+      - name: d_via_c
+        sql: "{c.d.id}"
+        type: number
+
+    joins:
+      - name: b
+        sql: "{a.id} = {b.id}"
+        relationship: one_to_one
+
+      - name: c
+        sql: "{a.id} = {c.id}"
+        relationship: one_to_one
+
+  - name: b
+    sql: >
+      SELECT 1 AS id UNION ALL
+      SELECT 2 AS id UNION ALL
+      SELECT 3 AS id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    joins:
+      - name: d
+        sql: "{b.id} = {d.id}"
+        relationship: one_to_one
+
+  - name: c
+    sql: >
+      SELECT 1 AS id UNION ALL
+      SELECT 2 AS id UNION ALL
+      SELECT 3 AS id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    joins:
+      - name: d
+        sql: "{c.id} = {d.id}"
+        relationship: one_to_one
+
+  - name: d
+    sql: >
+      SELECT 1 AS id UNION ALL
+      SELECT 2 AS id UNION ALL
+      SELECT 3 AS id
 
     dimensions:
       - name: id
@@ -724,106 +1083,567 @@ cubes:
         primary_key: true
 ```
 
+```javascript
+cube(`a`, {
+  sql: `
+    SELECT 1 AS id UNION ALL
+    SELECT 2 AS id UNION ALL
+    SELECT 3 AS id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    d_via_b: {
+      sql: `${b.d.id}`,
+      type: `number`
+    },
+
+    d_via_c: {
+      sql: `${c.d.id}`,
+      type: `number`
+    }
+  },
+
+  joins: {
+    b: {
+      sql: `${a.id} = ${b.id}`,
+      relationship: `one_to_one`
+    },
+
+    c: {
+      sql: `${a.id} = ${c.id}`,
+      relationship: `one_to_one`
+    }
+  }
+})
+
+cube(`b`, {
+  sql: `
+    SELECT 1 AS id UNION ALL
+    SELECT 2 AS id UNION ALL
+    SELECT 3 AS id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  joins: {
+    d: {
+      sql: `${b.id} = ${d.id}`,
+      relationship: `one_to_one`
+    }
+  }
+})
+
+cube(`c`, {
+  sql: `
+    SELECT 1 AS id UNION ALL
+    SELECT 2 AS id UNION ALL
+    SELECT 3 AS id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  joins: {
+    d: {
+      sql: `${c.id} = ${d.id}`,
+      relationship: `one_to_one`
+    }
+  }
+})
+
+cube(`d`, {
+  sql: `
+    SELECT 1 AS id UNION ALL
+    SELECT 2 AS id UNION ALL
+    SELECT 3 AS id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  }
+})
+```
+
 </CodeTabs>
 
-With the given data model, we have two valid analytics use cases that require
-different join directions.
+When querying `a.d_via_b`, Cube will generate the following SQL query, joining through
+`b`:
 
-**The first case is to calculate the total revenue per customer.** To do this,
-we'll use the `total_revenue` measure that is defined on the orders cube. We
-need to be aware that orders can be placed without customer registration
-(anonymous customers/guest checkouts). Therefore, we should start the join from
-the `orders` cube onto the `customers` cube to ensure that we do not lose data
-from anonymous orders.
+```sql
+SELECT
+  "d".id "a__d_via_b"
+FROM (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "a"
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "b" ON "a".id = "b".id
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "d" ON "b".id = "d".id
+GROUP BY 1
+```
+
+However, when querying `a.d_via_c`, Cube will generate the following SQL query, joining
+through `c`:
+
+```sql
+SELECT
+  "d".id "a__d_via_c"
+FROM (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "a"
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "c" ON "a".id = "c".id
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "d" ON "c".id = "d".id
+GROUP BY 1
+```
+
+<WarningBox>
+
+Note that having both `a.d_via_b` and `a.d_via_c` in the same query will produce
+ambiguous results, as Cube will only use `d` to the generated SQL once:
+
+```sql
+SELECT
+  "d".id "a__d_via_b",
+  "d".id "a__d_via_c"
+FROM (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "a"
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "b" ON "a".id = "b".id
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "d" ON "b".id = "d".id
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "c" ON "a".id = "c".id
+GROUP BY 1, 2
+```
+
+</WarningBox>
+
+Similar to bidirectional joins, **diamond subgraphs often lead to the ambiguity in the
+data model** and can produce ambiguous results, as Cube may not know which direction to
+follow when generating SQL queries. You can remove the ambiguity by using [join
+paths](#join-paths) and [join hints](#join-hints).
+
+## Join paths
+
+_Join paths_ serve as the recommended mechanism to remove the ambiguity of joins in the
+data model, including cases of [bidirectional joins](#bidirectional-joins) and [diamond
+subgraphs](#diamond-subgraphs).
+
+A join path is defined as a sequence of cube names, separated by dots, that will be
+followed in that specific order when resolving a cube or its member, e.g.,
+`users.locations.countries.flag_aspect_ratio`.
+
+### Calculated members
+
+When referencing a member of another cube in a [calculated member][ref-calculated-members],
+you can use a join path to specify the path to follow, as demonstrated in the [diamond
+subgraphs example](#diamond-subgraphs).
+
+### Views
+
+When referencing cubes in a [view][ref-views], you literally provide join paths via the
+[`join_path` parameter][ref-view-join-path]. The [bidirectional joins
+example](#bidirectional-joins) can be disambiguated with the following views:
 
 <CodeTabs>
+
+```javascript
+view(`total_revenue_per_customer`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: ['total_revenue']
+    },
+    {
+      join_path: orders.customers,
+      includes: ['name']
+    }
+  ]
+})
+
+view(`customers_without_orders`, {
+  cubes: [
+    {
+      join_path: customers,
+      includes: ['name']
+    },
+    {
+      join_path: customers.orders,
+      includes: ['order_count']
+    }
+  ]
+})
+```
 
 ```yaml
 views:
   - name: total_revenue_per_customer
-    description: Total revenue per customer
-
     cubes:
       - join_path: orders
         includes:
           - total_revenue
-          - created_at
 
       - join_path: orders.customers
         includes:
-          - company
-```
+          - name
 
-```javascript
-view(`total_revenue_per_customer`, {})
+  - name: customers_without_orders
+    cubes:
+      - join_path: customers
+        includes:
+          - name
+
+      - join_path: customers.orders
+        includes:
+          - order_count
 ```
 
 </CodeTabs>
 
-We can query this view as follows:
+### Pre-aggregations
 
-```json
-{
-  "dimensions": ["total_revenue_per_customer.company"],
-  "measures": ["total_revenue_per_customer.total_revenue"],
-  "timeDimensions": [
-    {
-      "dimension": "total_revenue_per_customer.created_at"
-    }
-  ]
-}
-```
-
-**The second case is to find customers who have not placed any orders.** We will
-use the count measure on the customers cube for that. In this case, we should
-join the customers cube with the orders cube to find customers with zero orders
-placed. The reverse order of joins would result in a dataset without data for
-customers with no orders.
+When referencing members of another cubes in a [pre-aggregation][ref-preaggs], you can
+also use join paths, as shown in the following example:
 
 <CodeTabs>
 
 ```yaml
-views:
-  - name: customers_without_orders
-    description: Customers without orders
+cubes:
+  - name: a
+    sql: >
+      SELECT 1 AS id, 1 AS b_id, 1 AS c_id UNION ALL
+      SELECT 2 AS id, 2 AS b_id, 2 AS c_id
 
-    cubes:
-      - join_path: customers
-        includes:
-          - company
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
 
-      - join_path: customers.orders
-        prefix: true
-        includes:
-          - created_at
-          - count
+      - name: dimension1
+        sql: "CONCAT({CUBE}.b_id, {CUBE}.b_id)"
+        type: string
+
+    measures:
+      - name: measure1
+        type: count
+
+    joins:
+      - name: b
+        relationship: one_to_one
+        sql: "{CUBE}.b_id = {b.id}"
+
+      - name: c
+        relationship: one_to_one
+        sql: "{CUBE}.c_id = {c.id}"
+
+    pre_aggregations:
+      - name: a_and_c
+        dimensions:
+          - a.dimension1
+          - a.b.c.dimension2
+        measures:
+          - a.measure1
+          - a.b.c.measure2
+
+  - name: b
+    sql: >
+      SELECT 1 AS id, 1 AS c_id UNION ALL
+      SELECT 2 AS id, 2 AS c_id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    joins:
+      - name: c
+        relationship: one_to_one
+        sql: "{CUBE}.c_id = {c.id}"
+
+  - name: c
+    sql: >
+      SELECT 1 AS id UNION ALL
+      SELECT 2 AS id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: dimension2
+        sql: "{CUBE}.id * 3"
+        type: string
+
+    measures:
+      - name: measure2
+        sql: "{CUBE.dimension2}"
+        type: sum
 ```
 
 ```javascript
+cube(`a`, {
+  sql: `
+    SELECT 1 AS id, 1 AS b_id, 1 AS c_id UNION ALL
+    SELECT 2 AS id, 2 AS b_id, 2 AS c_id
+  `,
 
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    dimension1: {
+      sql: `CONCAT(${CUBE}.b_id, ${CUBE}.b_id)`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    measure1: {
+      type: `count`
+    }
+  },
+
+  joins: {
+    b: {
+      relationship: `one_to_one`,
+      sql: `${CUBE}.b_id = ${b.id}`
+    },
+
+    c: {
+      relationship: `one_to_one`,
+      sql: `${CUBE}.c_id = ${c.id}`
+    }
+  },
+
+  pre_aggregations: {
+    a_and_c: {
+      dimensions: [
+        `a.dimension1`,
+        `a.b.c.dimension2`
+      ],
+      measures: [
+        `a.measure1`,
+        `a.b.c.measure2`
+      ]
+    }
+  }
+})
+
+cube(`b`, {
+  sql: `
+    SELECT 1 AS id, 1 AS c_id UNION ALL
+    SELECT 2 AS id, 2 AS c_id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  joins: {
+    c: {
+      relationship: `one_to_one`,
+      sql: `${CUBE}.c_id = ${c.id}`
+    }
+  }
+})
+
+cube(`c`, {
+  sql: `
+    SELECT 1 AS id UNION ALL
+    SELECT 2 AS id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    dimension2: {
+      sql: `${CUBE}.id * 3`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    measure2: {
+      sql: `${CUBE.dimension2}`,
+      type: `sum`
+    }
+  }
+})
 ```
 
 </CodeTabs>
 
-We can then query the cube as follows:
+When this pre-aggregation is built, Cube will generate and execute the following SQL
+query:
+
+```sql
+CREATE TABLE prod_pre_aggregations.a_a_and_c AS
+SELECT
+  "c".id * 3 "c__dimension2",
+  CONCAT("a".b_id, "a".b_id) "a__dimension1",
+  sum("c".id * 3) "c__measure2",
+  count("a".id) "a__measure1"
+FROM (
+  SELECT 1 AS id, 1 AS b_id, 1 AS c_id UNION ALL
+  SELECT 2 AS id, 2 AS b_id, 2 AS c_id
+) AS "a"
+LEFT JOIN (
+  SELECT 1 AS id, 1 AS c_id UNION ALL
+  SELECT 2 AS id, 2 AS c_id
+) AS "b" ON "a".b_id = "b".id
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id
+) AS "c" ON "b".c_id = "c".id
+GROUP BY 1, 2
+```
+
+As you can see, in this query, `a` is joined to `c` though `b` here, even though a
+direct join from `a` to `c` is also defined in the data model. However, Cube respects
+join paths from the pre-aggregation definition and uses them to generate the SQL query.
+
+## Join hints
+
+_Join hints_ serve as an auxiliary mechanism to remove the ambiguity of joins _at the
+query time_. When possible, use [join paths](#join-paths) in the data model instead.
+
+### SQL API
+
+In queries to the [SQL API][ref-sql-api], cubes can be [joined][ref-sql-api-joins] via
+the `CROSS JOIN` clause or via `__cubeJoinField`. In any case, Cube will analyze the
+query and follow provided join hints.
+
+Let's run the following query with the data model from the [diamond subgraphs
+example](#diamond-subgraphs):
+
+```sql
+SELECT
+  a.id AS id,
+  d.id AS d_via_b
+FROM a
+CROSS JOIN b
+CROSS JOIN d
+GROUP BY 1, 2
+```
+
+The following SQL query will be generated:
+
+```sql
+SELECT
+  "a".id "a__id",
+  "d".id "d__id"
+FROM (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "a"
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "b" ON "a".id = "b".id
+LEFT JOIN (
+  SELECT 1 AS id UNION ALL
+  SELECT 2 AS id UNION ALL
+  SELECT 3 AS id
+) AS "d" ON "b".id = "d".id
+GROUP BY 1, 2
+```
+
+If the SQL API query contained `CROSS JOIN c` instead of `CROSS JOIN b`, then the
+generated SQL query would contain a join through `c` instead of `b`.
+
+### REST API
+
+In queries to the [REST API][ref-rest-api], join hints can be provided via the
+[`joinHints` parameter][ref-rest-api-join-hints].
+
+The SQL API query from the previous section can be rewritten as a REST API query
+with join hints as follows:
 
 ```json
 {
-  "dimensions": ["customers_without_orders.company"],
-  "timeDimensions": [
-    {
-      "dimension": "customers_without_orders.orders_created_at"
-    }
+  "dimensions": [
+    "a.id",
+    "d.id"
   ],
-  "filters": [
-    {
-      "member": "customers_without_orders.orders_count",
-      "operator": "equals",
-      "values": ["0"]
-    }
+  "joinHints": [
+    ["a", "b"],
+    ["b", "d"]
   ]
 }
 ```
+
+The same SQL query as in the previous section will be generated.
+
+Similarly, if the `joinHints` parameter contained `[["a", "c"], ["c", "d"]]` instead of
+`[["a", "b"], ["b", "d"]]`, then the generated SQL query would contain a join through
+`c` instead of `b`.
 
 ## Troubleshooting
 
@@ -1096,14 +1916,23 @@ also shows that you can reach `companies` from `cubes` by going left to right.
 
 <Diagram src="https://ucarecdn.com/0736a570-c1c2-45b5-a806-e90a216ce202/" />
 
+
 [ref-schema-ref-view]: /product/data-modeling/reference/view
-[ref-schema-ref-joins]: /product/data-modeling/reference/joins
 [ref-schema-ref-joins-relationship]: /product/data-modeling/reference/joins#relationship
-[self-many-to-many-no-assoc-table]: #many-to-many-relationship-without-an-associative-table
-[self-join-direction]: /product/data-modeling/concepts/working-with-joins#directions-of-joins
 [ref-visual-model]: /product/workspace/visual-model
 [ref-cube]: /product/data-modeling/reference/cube
 [ref-cube-public]: /product/data-modeling/reference/cube#public
 [ref-rest-meta]: /product/apis-integrations/rest-api/reference#base_pathv1meta
 [ref-preaggs]: /product/data-modeling/concepts#pre-aggregations
 [ref-primary-key]: /product/data-modeling/reference/dimensions#primary_key
+[ref-data-model]: /product/data-modeling/concepts
+[ref-queries]: /product/apis-integrations/queries
+[ref-references]: /product/data-modeling/syntax#cubecolumn-cubemember
+[ref-calculated-members]: /product/data-modeling/concepts/calculated-members
+[ref-views]: /product/data-modeling/concepts#views
+[ref-view-join-path]: /product/data-modeling/reference/view#join_path
+[ref-preaggs]: /product/data-modeling/concepts#pre-aggregations
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-sql-api-joins]: /product/apis-integrations/sql-api/joins
+[ref-rest-api-join-hints]: /product/apis-integrations/rest-api/query-format#query-properties

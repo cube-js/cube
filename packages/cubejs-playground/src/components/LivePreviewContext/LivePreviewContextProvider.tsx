@@ -70,7 +70,7 @@ const useLivePreview = (disabled = false) => {
   // }, [status]);
 
   const fetchStatus = () => {
-    return fetch('/playground/live-preview/status')
+    return fetch('playground/live-preview/status')
       .then((res) => res.json())
       .then((status) => {
         setStatus({
@@ -81,7 +81,7 @@ const useLivePreview = (disabled = false) => {
   };
 
   const createTokenWithPayload = async (payload): Promise<any> => {
-    const res = await fetch('/playground/live-preview/token', {
+    const res = await fetch('playground/live-preview/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ const useLivePreview = (disabled = false) => {
     statusLivePreview: status,
     createTokenWithPayload,
     stopLivePreview: async (): Promise<Boolean> => {
-      await fetch('/playground/live-preview/stop');
+      await fetch('playground/live-preview/stop');
       await fetchStatus();
       return true;
     },

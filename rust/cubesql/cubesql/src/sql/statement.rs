@@ -624,6 +624,12 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsBinder {
                     BindValue::Float64(v) => {
                         *value = ast::Value::Number(v.to_string(), *v < 0_f64);
                     }
+                    BindValue::Timestamp(v) => {
+                        *value = ast::Value::SingleQuotedString(v.to_string());
+                    }
+                    BindValue::Date(v) => {
+                        *value = ast::Value::SingleQuotedString(v.to_string());
+                    }
                     BindValue::Null => {
                         *value = ast::Value::Null;
                     }
@@ -1070,6 +1076,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
 mod tests {
     use super::*;
     use crate::CubeError;
+    use pg_srv::{DateValue, TimestampValue};
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
     fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {
@@ -1249,6 +1256,26 @@ mod tests {
             "#,
             "SELECT * FROM (SELECT * FROM testdata WHERE fieldA = 'test1')",
             vec![BindValue::String("test1".to_string())],
+        )?;
+
+        // test TimestampValue binding in the WHERE clause
+        run_pg_binder(
+            "SELECT * FROM events WHERE created_at BETWEEN $1 AND $2",
+            "SELECT * FROM events WHERE created_at BETWEEN '2022-04-25T12:38:42.000' AND '2025-08-08T09:30:45.123'",
+            vec![
+                BindValue::Timestamp(TimestampValue::new(1650890322000000000, None)),
+                BindValue::Timestamp(TimestampValue::new(1754645445123456000, None)),
+            ],
+        )?;
+
+        // test DateValue binding in the WHERE clause
+        run_pg_binder(
+            "SELECT * FROM orders WHERE order_date >= $1 AND order_date <= $2",
+            "SELECT * FROM orders WHERE order_date >= '1999-12-31' AND order_date <= '2000-01-01'",
+            vec![
+                BindValue::Date(DateValue::from_ymd_opt(1999, 12, 31).unwrap()),
+                BindValue::Date(DateValue::from_ymd_opt(2000, 1, 1).unwrap()),
+            ],
         )?;
 
         Ok(())

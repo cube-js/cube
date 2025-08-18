@@ -1,16 +1,8 @@
 use crate::sql::{
-    dataframe::{Decimal128Value, ListValue, TimestampValue},
+    dataframe::{Decimal128Value, ListValue},
     df_type_to_pg_tid,
 };
 use bytes::{BufMut, BytesMut};
-use chrono::{
-    format::{
-        Fixed, Item,
-        Numeric::{Day, Hour, Minute, Month, Second, Year},
-        Pad::Zero,
-    },
-    prelude::*,
-};
 use datafusion::arrow::{
     array::{
         Array, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array,
@@ -24,87 +16,7 @@ use pg_srv::{
     PgTypeId, ProtocolError, ToProtocolValue,
 };
 use postgres_types::{ToSql, Type};
-use std::{convert::TryFrom, io, io::Error};
-
-// POSTGRES_EPOCH_JDATE
-fn pg_base_date_epoch() -> NaiveDateTime {
-    NaiveDate::from_ymd_opt(2000, 1, 1)
-        .unwrap()
-        .and_hms_opt(0, 0, 0)
-        .unwrap()
-}
-
-impl ToProtocolValue for TimestampValue {
-    fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
-        let ndt = match self.tz_ref() {
-            None => self.to_naive_datetime(),
-            Some(_) => self.to_fixed_datetime()?.naive_utc(),
-        };
-
-        // 2022-04-25 15:36:49.39705+00
-        let as_str = ndt
-            .format_with_items(
-                [
-                    Item::Numeric(Year, Zero),
-                    Item::Literal("-"),
-                    Item::Numeric(Month, Zero),
-                    Item::Literal("-"),
-                    Item::Numeric(Day, Zero),
-                    Item::Literal(" "),
-                    Item::Numeric(Hour, Zero),
-                    Item::Literal(":"),
-                    Item::Numeric(Minute, Zero),
-                    Item::Literal(":"),
-                    Item::Numeric(Second, Zero),
-                    Item::Fixed(Fixed::Nanosecond6),
-                ]
-                .iter(),
-            )
-            .to_string();
-
-        match self.tz_ref() {
-            None => as_str.to_text(buf),
-            Some(_) => (as_str + "+00").to_text(buf),
-        }
-    }
-
-    fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
-        match self.tz_ref() {
-            None => {
-                let seconds = self
-                    .to_naive_datetime()
-                    .signed_duration_since(pg_base_date_epoch())
-                    .num_microseconds()
-                    .ok_or(Error::new(
-                        io::ErrorKind::Other,
-                        "Unable to extract number of seconds from timestamp",
-                    ))?;
-
-                buf.put_i32(8_i32);
-                buf.put_i64(seconds)
-            }
-            Some(tz) => {
-                let seconds = self
-                    .to_fixed_datetime()?
-                    .naive_utc()
-                    .signed_duration_since(pg_base_date_epoch())
-                    .num_microseconds()
-                    .ok_or(Error::new(
-                        io::ErrorKind::Other,
-                        format!(
-                            "Unable to extract number of seconds from timestamp with tz: {}",
-                            tz
-                        ),
-                    ))?;
-
-                buf.put_i32(8_i32);
-                buf.put_i64(seconds)
-            }
-        };
-
-        Ok(())
-    }
-}
+use std::convert::TryFrom;
 
 /// https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/numeric.c#L1022
 impl ToProtocolValue for Decimal128Value {
@@ -324,13 +236,13 @@ impl Serialize for BatchWriter {
 #[cfg(test)]
 mod tests {
     use crate::sql::{
-        dataframe::{Decimal128Value, ListValue, TimestampValue},
+        dataframe::{Decimal128Value, ListValue},
         shim::ConnectionError,
         writer::{BatchWriter, ToProtocolValue},
     };
     use bytes::BytesMut;
     use datafusion::arrow::array::{ArrayRef, Int64Builder};
-    use pg_srv::{buffer, protocol::Format};
+    use pg_srv::{buffer, protocol::Format, TimestampValue};
     use std::{io::Cursor, sync::Arc};
 
     fn assert_text_encode<T: ToProtocolValue>(value: T, expected: &[u8]) {

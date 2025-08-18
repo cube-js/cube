@@ -78,7 +78,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
   async loadDBSchema() {
     this.setState({ schemaLoading: true });
     try {
-      const res = await playgroundFetch('/playground/db-schema');
+      const res = await playgroundFetch('playground/db-schema');
       const result = await res.json();
       this.setState({
         tablesSchema: result.tablesSchema,
@@ -91,7 +91,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
   }
 
   async loadFiles() {
-    const res = await playgroundFetch('/playground/files');
+    const res = await playgroundFetch('playground/files');
     const result = await res.json();
     this.setState({
       files: result.files,
@@ -106,7 +106,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
     const options = { format };
 
     playgroundAction('Generate Schema', options);
-    const res = await playgroundFetch('/playground/generate-schema', {
+    const res = await playgroundFetch('playground/generate-schema', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
