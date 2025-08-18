@@ -33,7 +33,6 @@ impl TrackingAllocator {
         self.total_allocated.store(0, Ordering::Relaxed);
     }
 
-
     pub fn print_stats(&self) {
         let allocations = self.allocations.load(Ordering::Relaxed);
         let deallocations = self.deallocations.load(Ordering::Relaxed);
@@ -46,9 +45,21 @@ impl TrackingAllocator {
         println!("Total allocations: {}", allocations);
         println!("Total deallocations: {}", deallocations);
         println!("Total reallocations: {}", reallocations);
-        println!("Current allocated: {} bytes ({:.2} MB)", current_allocated, current_allocated as f64 / 1024.0 / 1024.0);
-        println!("Peak allocated: {} bytes ({:.2} MB)", peak_allocated, peak_allocated as f64 / 1024.0 / 1024.0);
-        println!("Total allocated: {} bytes ({:.2} MB)", total_allocated, total_allocated as f64 / 1024.0 / 1024.0);
+        println!(
+            "Current allocated: {} bytes ({:.2} MB)",
+            current_allocated,
+            current_allocated as f64 / 1024.0 / 1024.0
+        );
+        println!(
+            "Peak allocated: {} bytes ({:.2} MB)",
+            peak_allocated,
+            peak_allocated as f64 / 1024.0 / 1024.0
+        );
+        println!(
+            "Total allocated: {} bytes ({:.2} MB)",
+            total_allocated,
+            total_allocated as f64 / 1024.0 / 1024.0
+        );
         println!("===============================");
     }
 
@@ -57,7 +68,7 @@ impl TrackingAllocator {
             self.allocations.fetch_add(1, Ordering::Relaxed);
             self.total_allocated.fetch_add(size, Ordering::Relaxed);
             let current = self.current_allocated.fetch_add(size, Ordering::Relaxed) + size;
-            
+
             // Update peak if current exceeds it
             let mut peak = self.peak_allocated.load(Ordering::Relaxed);
             while current > peak {
@@ -96,12 +107,16 @@ unsafe impl GlobalAlloc for TrackingAllocator {
         let new_ptr = self.inner.realloc(ptr, layout, new_size);
         if !new_ptr.is_null() {
             self.reallocations.fetch_add(1, Ordering::Relaxed);
-            
+
             // Update counters: subtract old size, add new size
-            self.current_allocated.fetch_sub(layout.size(), Ordering::Relaxed);
+            self.current_allocated
+                .fetch_sub(layout.size(), Ordering::Relaxed);
             self.total_allocated.fetch_add(new_size, Ordering::Relaxed);
-            let current = self.current_allocated.fetch_add(new_size, Ordering::Relaxed) + new_size;
-            
+            let current = self
+                .current_allocated
+                .fetch_add(new_size, Ordering::Relaxed)
+                + new_size;
+
             // Update peak if current exceeds it
             let mut peak = self.peak_allocated.load(Ordering::Relaxed);
             while current > peak {

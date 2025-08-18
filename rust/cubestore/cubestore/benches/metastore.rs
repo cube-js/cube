@@ -113,8 +113,11 @@ fn do_get_tables_with_path_bench(
 ) {
     let total_tables = num_schemas * tables_per_schema;
     let metastore = runtime.block_on(async {
-        let metastore = prepare_metastore(&format!("get_tables_with_path_{}", total_tables)).unwrap();
-        populate_metastore(&metastore, num_schemas, tables_per_schema).await.unwrap();
+        let metastore =
+            prepare_metastore(&format!("get_tables_with_path_{}", total_tables)).unwrap();
+        populate_metastore(&metastore, num_schemas, tables_per_schema)
+            .await
+            .unwrap();
         metastore
     });
 
@@ -139,7 +142,9 @@ fn do_get_tables_with_path_bench(
 
 async fn do_cold_cache_test(num_schemas: usize, tables_per_schema: usize) {
     let fresh_metastore = prepare_metastore("cold_cache_fresh").unwrap();
-    populate_metastore(&fresh_metastore, num_schemas, tables_per_schema).await.unwrap();
+    populate_metastore(&fresh_metastore, num_schemas, tables_per_schema)
+        .await
+        .unwrap();
     let result = fresh_metastore.get_tables_with_path(false).await;
     assert!(result.is_ok());
 }
@@ -157,12 +162,15 @@ fn do_cold_vs_warm_cache_bench(
 ) {
     let metastore = runtime.block_on(async {
         let metastore = prepare_metastore("cold_warm_cache").unwrap();
-        populate_metastore(&metastore, num_schemas, tables_per_schema).await.unwrap();
+        populate_metastore(&metastore, num_schemas, tables_per_schema)
+            .await
+            .unwrap();
         metastore
     });
 
     c.bench_function("get_tables_with_path_cold_cache", |b| {
-        b.to_async(runtime).iter(|| do_cold_cache_test(num_schemas, tables_per_schema));
+        b.to_async(runtime)
+            .iter(|| do_cold_cache_test(num_schemas, tables_per_schema));
     });
 
     c.bench_function("get_tables_with_path_warm_cache", |b| {
@@ -177,7 +185,7 @@ fn do_benches(c: &mut Criterion) {
     do_get_tables_with_path_bench(c, &runtime, 10, 10, 100);
     do_get_tables_with_path_bench(c, &runtime, 50, 20, 50);
     do_get_tables_with_path_bench(c, &runtime, 25, 1000, 10);
-    
+
     do_cold_vs_warm_cache_bench(c, &runtime, 20, 50);
 }
 
