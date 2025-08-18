@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, BenchmarkId, Criterion};
 use cubestore::config::Config;
 use cubestore::metastore::{BaseRocksStoreFs, Column, ColumnType, MetaStore, RocksMetaStore};
 use cubestore::remotefs::LocalDirRemoteFs;
@@ -7,6 +7,13 @@ use std::env;
 use std::fs;
 use std::sync::Arc;
 use tokio::runtime::{Builder, Runtime};
+
+mod tracking_allocator;
+
+use tracking_allocator::TrackingAllocator;
+
+#[global_allocator]
+static ALLOCATOR: TrackingAllocator = TrackingAllocator::new();
 
 fn prepare_metastore(name: &str) -> Result<Arc<RocksMetaStore>, CubeError> {
     let config = Config::test(name);
@@ -97,16 +104,26 @@ async fn bench_get_tables_with_path(
     }
 }
 
-fn benchmark_get_tables_with_path_small(c: &mut Criterion, runtime: &Runtime) {
+fn do_get_tables_with_path_bench(
+    c: &mut Criterion,
+    runtime: &Runtime,
+    num_schemas: usize,
+    tables_per_schema: usize,
+    iterations: usize,
+) {
+    let total_tables = num_schemas * tables_per_schema;
     let metastore = runtime.block_on(async {
-        let metastore = prepare_metastore("get_tables_with_path_small").unwrap();
-        populate_metastore(&metastore, 10, 10).await.unwrap(); // 100 tables
+        let metastore =
+            prepare_metastore(&format!("get_tables_with_path_{}", total_tables)).unwrap();
+        populate_metastore(&metastore, num_schemas, tables_per_schema)
+            .await
+            .unwrap();
         metastore
     });
 
     c.bench_with_input(
-        BenchmarkId::new("get_tables_with_path_small_include_non_ready_true", 100),
-        &100,
+        BenchmarkId::new("get_tables_with_path_include_non_ready_true", total_tables),
+        &iterations,
         |b, &iterations| {
             b.to_async(runtime)
                 .iter(|| bench_get_tables_with_path(&metastore, true, iterations));
@@ -114,8 +131,8 @@ fn benchmark_get_tables_with_path_small(c: &mut Criterion, runtime: &Runtime) {
     );
 
     c.bench_with_input(
-        BenchmarkId::new("get_tables_with_path_small_include_non_ready_false", 100),
-        &100,
+        BenchmarkId::new("get_tables_with_path_include_non_ready_false", total_tables),
+        &iterations,
         |b, &iterations| {
             b.to_async(runtime)
                 .iter(|| bench_get_tables_with_path(&metastore, false, iterations));
@@ -123,92 +140,58 @@ fn benchmark_get_tables_with_path_small(c: &mut Criterion, runtime: &Runtime) {
     );
 }
 
-fn benchmark_get_tables_with_path_medium(c: &mut Criterion, runtime: &Runtime) {
-    let metastore = runtime.block_on(async {
-        let metastore = prepare_metastore("get_tables_with_path_medium").unwrap();
-        populate_metastore(&metastore, 50, 20).await.unwrap(); // 1,000 tables
-        metastore
-    });
-
-    c.bench_with_input(
-        BenchmarkId::new("get_tables_with_path_medium_include_non_ready_true", 50),
-        &50,
-        |b, &iterations| {
-            b.to_async(runtime)
-                .iter(|| bench_get_tables_with_path(&metastore, true, iterations));
-        },
-    );
-
-    c.bench_with_input(
-        BenchmarkId::new("get_tables_with_path_medium_include_non_ready_false", 50),
-        &50,
-        |b, &iterations| {
-            b.to_async(runtime)
-                .iter(|| bench_get_tables_with_path(&metastore, false, iterations));
-        },
-    );
+async fn do_cold_cache_test(num_schemas: usize, tables_per_schema: usize) {
+    let fresh_metastore = prepare_metastore("cold_cache_fresh").unwrap();
+    populate_metastore(&fresh_metastore, num_schemas, tables_per_schema)
+        .await
+        .unwrap();
+    let result = fresh_metastore.get_tables_with_path(false).await;
+    assert!(result.is_ok());
 }
 
-fn benchmark_get_tables_with_path_large(c: &mut Criterion, runtime: &Runtime) {
-    let metastore = runtime.block_on(async {
-        let metastore = prepare_metastore("get_tables_with_path_large").unwrap();
-        populate_metastore(&metastore, 25, 1000).await.unwrap(); // 25,000 tables
-        metastore
-    });
-
-    c.bench_with_input(
-        BenchmarkId::new("get_tables_with_path_large_include_non_ready_true", 10),
-        &10,
-        |b, &iterations| {
-            b.to_async(runtime)
-                .iter(|| bench_get_tables_with_path(&metastore, true, iterations));
-        },
-    );
-
-    c.bench_with_input(
-        BenchmarkId::new("get_tables_with_path_large_include_non_ready_false", 10),
-        &10,
-        |b, &iterations| {
-            b.to_async(runtime)
-                .iter(|| bench_get_tables_with_path(&metastore, false, iterations));
-        },
-    );
+async fn do_warm_cache_test(metastore: &Arc<RocksMetaStore>) {
+    let result = metastore.get_tables_with_path(false).await;
+    assert!(result.is_ok());
 }
 
-fn cold_vs_warm_cache_benchmark(c: &mut Criterion, runtime: &Runtime) {
+fn do_cold_vs_warm_cache_bench(
+    c: &mut Criterion,
+    runtime: &Runtime,
+    num_schemas: usize,
+    tables_per_schema: usize,
+) {
     let metastore = runtime.block_on(async {
         let metastore = prepare_metastore("cold_warm_cache").unwrap();
-        populate_metastore(&metastore, 20, 50).await.unwrap(); // 1,000 tables
+        populate_metastore(&metastore, num_schemas, tables_per_schema)
+            .await
+            .unwrap();
         metastore
     });
 
-    // Cold cache benchmark (first call)
     c.bench_function("get_tables_with_path_cold_cache", |b| {
-        b.to_async(runtime).iter(|| async {
-            let fresh_metastore = prepare_metastore("cold_cache_fresh").unwrap();
-            populate_metastore(&fresh_metastore, 20, 50).await.unwrap();
-            let result = fresh_metastore.get_tables_with_path(false).await;
-            assert!(result.is_ok());
-        });
+        b.to_async(runtime)
+            .iter(|| do_cold_cache_test(num_schemas, tables_per_schema));
     });
 
-    // Warm cache benchmark (subsequent calls)
     c.bench_function("get_tables_with_path_warm_cache", |b| {
-        b.to_async(runtime).iter(|| async {
-            let result = metastore.get_tables_with_path(false).await;
-            assert!(result.is_ok());
-        });
+        b.to_async(runtime).iter(|| do_warm_cache_test(&metastore));
     });
 }
 
 fn do_benches(c: &mut Criterion) {
+    ALLOCATOR.reset_stats();
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
-    benchmark_get_tables_with_path_small(c, &runtime);
-    benchmark_get_tables_with_path_medium(c, &runtime);
-    benchmark_get_tables_with_path_large(c, &runtime);
-    cold_vs_warm_cache_benchmark(c, &runtime);
+    do_get_tables_with_path_bench(c, &runtime, 10, 10, 100);
+    do_get_tables_with_path_bench(c, &runtime, 50, 20, 50);
+    do_get_tables_with_path_bench(c, &runtime, 25, 1000, 10);
+
+    do_cold_vs_warm_cache_bench(c, &runtime, 20, 50);
 }
 
 criterion_group!(benches, do_benches);
-criterion_main!(benches);
+
+fn main() {
+    benches();
+    ALLOCATOR.print_stats();
+}
