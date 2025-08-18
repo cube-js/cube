@@ -242,7 +242,7 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
           .map((name) => ({ name, category: 'dimensions' }) as MissingMember) || []),
       ],
     ];
-  }, [usedCubes, usedMembers, meta]);
+  }, [usedCubes, usedMembers, meta, members]);
 
   // place joined cubes first
   cubes.sort((c1, c2) => {
@@ -340,7 +340,6 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
         };
 
         setIsMetaLoading(false);
-        setMeta(newMeta);
 
         const memberData: CubeMembers = {
           dimensions: {},
@@ -377,6 +376,8 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
             })
             .sort((a, b) => a.name.localeCompare(b.name)) as Cube[]
         );
+
+        setMeta(newMeta);
       })
       .catch((error) => {
         if (currentRequest !== metaLoadingRef.current) {
@@ -1083,46 +1084,46 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
   // @ts-ignore
   const connectionId = usedCubes[0]
     ? // @ts-ignore
-      (() => {
-        const cubeName = usedCubes.find((cubeName) => getCubeByName(cubeName)?.connectedComponent);
+    (() => {
+      const cubeName = usedCubes.find((cubeName) => getCubeByName(cubeName)?.connectedComponent);
 
-        return cubeName ? getCubeByName(cubeName)?.connectedComponent : undefined;
-      })()
+      return cubeName ? getCubeByName(cubeName)?.connectedComponent : undefined;
+    })()
     : undefined;
 
   // @ts-ignore
   const joinableCubes = !usedCubes.length
     ? [...cubes]
     : cubes.filter((cube) =>
-        // @ts-ignore
-        connectionId != null ? cube.connectedComponent === connectionId : cube.name === usedCubes[0]
-      );
+      // @ts-ignore
+      connectionId != null ? cube.connectedComponent === connectionId : cube.name === usedCubes[0]
+    );
   const joinableCubeNames = joinableCubes.map((cube) => cube.name);
   const joinableMembers = useMemo(
     () =>
       !usedCubes.length
         ? {
-            dimensions: members.dimensions,
-            measures: members.measures,
-            segments: members.segments,
-          }
+          dimensions: members.dimensions,
+          measures: members.measures,
+          segments: members.segments,
+        }
         : {
-            dimensions: Object.fromEntries(
-              Object.entries(members.dimensions).filter(([name]) =>
-                joinableCubeNames.includes(name.split('.')[0])
-              )
-            ),
-            measures: Object.fromEntries(
-              Object.entries(members.measures).filter(([name]) =>
-                joinableCubeNames.includes(name.split('.')[0])
-              )
-            ),
-            segments: Object.fromEntries(
-              Object.entries(members.segments).filter(([name]) =>
-                joinableCubeNames.includes(name.split('.')[0])
-              )
-            ),
-          },
+          dimensions: Object.fromEntries(
+            Object.entries(members.dimensions).filter(([name]) =>
+              joinableCubeNames.includes(name.split('.')[0])
+            )
+          ),
+          measures: Object.fromEntries(
+            Object.entries(members.measures).filter(([name]) =>
+              joinableCubeNames.includes(name.split('.')[0])
+            )
+          ),
+          segments: Object.fromEntries(
+            Object.entries(members.segments).filter(([name]) =>
+              joinableCubeNames.includes(name.split('.')[0])
+            )
+          ),
+        },
     [joinableCubeNames.join(',')]
   );
 
