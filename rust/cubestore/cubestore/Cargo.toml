@@ -126,6 +126,10 @@ md5 = "0.8.0"
 name = "cachestore_queue"
 harness = false
 
+[[bench]]
+name = "metastore"
+harness = false
+
 [features]
 # When enabled, child processes will die whenever parent process exits.
 # Highly recomended for production, available only on Linux with prctl system call.
