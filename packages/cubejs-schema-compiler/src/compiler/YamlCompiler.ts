@@ -16,6 +16,7 @@ import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
+import { perfTracker } from './PerfTracker';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -90,7 +91,9 @@ export class YamlCompiler {
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
+          const transpileAndPrepareJsFileTimer = perfTracker.start('yaml-transpileAndPrepareJsFile');
           const transpiledFile = this.transpileAndPrepareJsFile(file, 'cube', { name, ...cube }, errorsReport);
+          transpileAndPrepareJsFileTimer.end();
           this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
         });
       } else if (key === 'views') {
@@ -132,7 +135,10 @@ export class YamlCompiler {
 
     cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
 
-    return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
+    const transpileYamlTimer = perfTracker.start('transpileYaml');
+    const res = this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
+    transpileYamlTimer.end();
+    return res;
   }
 
   private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
@@ -270,8 +276,12 @@ export class YamlCompiler {
     }
 
     try {
+      const parsePythonAndTranspileToJsTimer = perfTracker.start('PythonParser->transpileToJs()');
+
       const pythonParser = new PythonParser(codeString);
-      return pythonParser.transpileToJs();
+      const res = pythonParser.transpileToJs();
+      parsePythonAndTranspileToJsTimer.end();
+      return res;
     } catch (e: any) {
       errorsReport.error(`Can't parse python expression. Most likely this type of syntax isn't supported yet: ${e.message || e}`);
     }
@@ -280,6 +290,7 @@ export class YamlCompiler {
   }
 
   private astIntoArrowFunction(input: t.Program | t.NullLiteral, codeString: string, cubeName, resolveSymbol?: (string) => any) {
+    const astIntoArrowFunctionTimer = perfTracker.start('astIntoArrowFunction');
     const initialJs = babelGenerator(input, {}, codeString).code;
 
     // Re-parse generated JS to set all necessary parent paths
@@ -304,6 +315,7 @@ export class YamlCompiler {
     babelTraverse(ast, traverseObj);
 
     const body: any = ast.program.body[0];
+    astIntoArrowFunctionTimer.end();
     return body?.expression;
   }
 
