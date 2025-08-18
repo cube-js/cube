@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, BenchmarkId, Criterion};
 use cubestore::cachestore::{
     CacheStore, QueueAddPayload, QueueItemStatus, QueueKey, RocksCacheStore,
 };
@@ -6,6 +6,13 @@ use cubestore::config::{Config, CubeServices};
 use cubestore::CubeError;
 use std::sync::Arc;
 use tokio::runtime::{Builder, Runtime};
+
+mod tracking_allocator;
+
+use tracking_allocator::TrackingAllocator;
+
+#[global_allocator]
+static ALLOCATOR: TrackingAllocator = TrackingAllocator::new();
 
 fn prepare_cachestore(name: &str) -> Result<Arc<RocksCacheStore>, CubeError> {
     let config = Config::test(&name).update_config(|mut config| {
@@ -188,6 +195,7 @@ fn do_get_bench(
 }
 
 fn do_benches(c: &mut Criterion) {
+    ALLOCATOR.reset_stats();
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
     do_insert_bench(c, &runtime, 512, 64);
@@ -201,4 +209,8 @@ fn do_benches(c: &mut Criterion) {
 }
 
 criterion_group!(benches, do_benches);
-criterion_main!(benches);
+
+fn main() {
+    benches();
+    ALLOCATOR.print_stats();
+}

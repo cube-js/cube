@@ -9,3 +9,6 @@ members = [
     "cuberpc",
     "cuberockstore",
 ]
+
+[profile.bench]
+debug = true
