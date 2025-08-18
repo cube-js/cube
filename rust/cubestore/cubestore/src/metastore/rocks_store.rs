@@ -700,7 +700,9 @@ macro_rules! meta_store_table_impl {
 
             async fn all_rows(&self) -> Result<Vec<IdRow<Self::T>>, CubeError> {
                 self.rocks_meta_store
-                    .read_operation_out_of_queue(move |db_ref| Ok(Self::table(db_ref).all_rows()?))
+                    .read_operation_out_of_queue("all_rows", move |db_ref| {
+                        Ok(Self::table(db_ref).all_rows()?)
+                    })
                     .await
             }
 
@@ -1413,6 +1415,7 @@ impl RocksStore {
 
     pub async fn read_operation_out_of_queue_opt<F, R>(
         &self,
+        op_name: &'static str,
         f: F,
         timeout: Duration,
     ) -> Result<R, CubeError>
@@ -1422,9 +1425,14 @@ impl RocksStore {
     {
         let mem_seq = MemorySequence::new(self.seq_store.clone());
         let db_to_send = self.db.clone();
+        let span_name = format!(
+            "{} read operation out of queue: {}",
+            self.details.get_name(),
+            op_name
+        );
 
         cube_ext::spawn_blocking(move || {
-            let db_span = warn_long("store read operation out of queue", timeout);
+            let db_span = warn_long(&span_name, timeout);
             let span = tracing::trace_span!("store read operation out of queue");
             let span_holder = span.enter();
 
@@ -1444,12 +1452,16 @@ impl RocksStore {
         .await?
     }
 
-    pub async fn read_operation_out_of_queue<F, R>(&self, f: F) -> Result<R, CubeError>
+    pub async fn read_operation_out_of_queue<F, R>(
+        &self,
+        op_name: &'static str,
+        f: F,
+    ) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
         R: Send + Sync + 'static,
     {
-        self.read_operation_out_of_queue_opt::<F, R>(f, Duration::from_millis(100))
+        self.read_operation_out_of_queue_opt::<F, R>(op_name, f, Duration::from_millis(100))
             .await
     }
 
@@ -1781,7 +1793,9 @@ mod tests {
             .await
             .unwrap();
         let all_schemas = rocks_store
-            .read_operation_out_of_queue(move |db_ref| SchemaRocksTable::new(db_ref).all_rows())
+            .read_operation_out_of_queue("test_snapshot_uplaods", move |db_ref| {
+                SchemaRocksTable::new(db_ref).all_rows()
+            })
             .await
             .unwrap();
         let expected = vec![

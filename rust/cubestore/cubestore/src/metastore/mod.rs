@@ -1497,12 +1497,16 @@ impl RocksMetaStore {
     }
 
     #[inline(always)]
-    pub async fn read_operation_out_of_queue<F, R>(&self, f: F) -> Result<R, CubeError>
+    pub async fn read_operation_out_of_queue<F, R>(
+        &self,
+        op_name: &'static str,
+        f: F,
+    ) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
         R: Send + Sync + 'static,
     {
-        self.store.read_operation_out_of_queue(f).await
+        self.store.read_operation_out_of_queue(op_name, f).await
     }
 
     #[inline(always)]
@@ -1921,8 +1925,10 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn get_schemas(&self) -> Result<Vec<IdRow<Schema>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| SchemaRocksTable::new(db_ref).all_rows())
-            .await
+        self.read_operation_out_of_queue("get_schemas", move |db_ref| {
+            SchemaRocksTable::new(db_ref).all_rows()
+        })
+        .await
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -2362,8 +2368,10 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn get_tables(&self) -> Result<Vec<IdRow<Table>>, CubeError> {
-        self.read_operation_out_of_queue(|db_ref| TableRocksTable::new(db_ref).all_rows())
-            .await
+        self.read_operation_out_of_queue("get_tables", |db_ref| {
+            TableRocksTable::new(db_ref).all_rows()
+        })
+        .await
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -2372,7 +2380,7 @@ impl MetaStore for RocksMetaStore {
         include_non_ready: bool,
     ) -> Result<Arc<Vec<TablePath>>, CubeError> {
         if include_non_ready {
-            self.read_operation_out_of_queue(move |db_ref| {
+            self.read_operation_out_of_queue("get_tables_with_path(true)", move |db_ref| {
                 let tables = TableRocksTable::new(db_ref.clone()).all_rows()?;
                 let schemas = SchemaRocksTable::new(db_ref);
                 let tables = Arc::new(schemas.build_path_rows(
@@ -2428,7 +2436,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         created_seconds_ago: i64,
     ) -> Result<Vec<IdRow<Table>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("not_ready_tables", move |db_ref| {
             let table_rocks_table = TableRocksTable::new(db_ref);
             let tables = table_rocks_table.scan_all_rows()?;
             let mut res = Vec::new();
@@ -2492,7 +2500,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         partition_id: u64,
     ) -> Result<IdRow<Partition>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("get_partition_out_of_queue", move |db_ref| {
             PartitionRocksTable::new(db_ref).get_row_or_not_found(partition_id)
         })
         .await
@@ -2610,7 +2618,7 @@ impl MetaStore for RocksMetaStore {
     async fn get_all_partitions_and_chunks_out_of_queue(
         &self,
     ) -> Result<(Vec<IdRow<Partition>>, Vec<IdRow<Chunk>>), CubeError> {
-        self.read_operation_out_of_queue(move |db| {
+        self.read_operation_out_of_queue("get_all_partitions_and_chunks_out_of_queue", move |db| {
             let partitions = PartitionRocksTable::new(db.clone()).all_rows()?;
             let chunks = ChunkRocksTable::new(db).all_rows()?;
             Ok((partitions, chunks))
@@ -2825,7 +2833,7 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn can_delete_partition(&self, partition_id: u64) -> Result<bool, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("can_delete_partition", move |db_ref| {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
@@ -2860,7 +2868,7 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn can_delete_middle_man_partition(&self, partition_id: u64) -> Result<bool, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("can_delete_middle_man_partition", move |db_ref| {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
@@ -2900,7 +2908,7 @@ impl MetaStore for RocksMetaStore {
     async fn all_inactive_partitions_to_repartition(
         &self,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("all_inactive_partitions_to_repartition", move |db_ref| {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
@@ -2934,7 +2942,7 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn all_inactive_middle_man_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("all_inactive_middle_man_partitions", move |db_ref| {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
@@ -2980,7 +2988,7 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn all_just_created_partitions(&self) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("all_just_created_partitions", move |db_ref| {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
 
             let orphaned_partitions = partitions_table.scan_rows_by_index(
@@ -3005,37 +3013,40 @@ impl MetaStore for RocksMetaStore {
         &self,
         seconds_ago: i64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
-            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+        self.read_operation_out_of_queue(
+            "get_partitions_with_chunks_created_seconds_ago",
+            move |db_ref| {
+                let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
-            let now = Utc::now();
-            let mut partition_ids = HashSet::new();
-            for c in chunks_table.scan_all_rows()? {
-                let c = c?;
-                if c.get_row().active()
-                    && c.get_row()
-                        .created_at()
-                        .as_ref()
-                        .map(|created_at| {
-                            now.signed_duration_since(created_at.clone()).num_seconds()
-                                >= seconds_ago
-                        })
-                        .unwrap_or(false)
-                {
-                    partition_ids.insert(c.get_row().get_partition_id());
+                let now = Utc::now();
+                let mut partition_ids = HashSet::new();
+                for c in chunks_table.scan_all_rows()? {
+                    let c = c?;
+                    if c.get_row().active()
+                        && c.get_row()
+                            .created_at()
+                            .as_ref()
+                            .map(|created_at| {
+                                now.signed_duration_since(created_at.clone()).num_seconds()
+                                    >= seconds_ago
+                            })
+                            .unwrap_or(false)
+                    {
+                        partition_ids.insert(c.get_row().get_partition_id());
+                    }
                 }
-            }
 
-            let partitions_table = PartitionRocksTable::new(db_ref.clone());
-            let mut partitions = Vec::new();
-            for id in partition_ids {
-                if let Some(partition) = partitions_table.get_row(id)? {
-                    partitions.push(partition);
+                let partitions_table = PartitionRocksTable::new(db_ref.clone());
+                let mut partitions = Vec::new();
+                for id in partition_ids {
+                    if let Some(partition) = partitions_table.get_row(id)? {
+                        partitions.push(partition);
+                    }
                 }
-            }
 
-            Ok(partitions)
-        })
+                Ok(partitions)
+            },
+        )
         .await
     }
 
@@ -3053,7 +3064,7 @@ impl MetaStore for RocksMetaStore {
         CubeError,
     > {
         let config = self.store.config.clone();
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("get_partitions_for_in_memory_compaction", move |db_ref| {
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
             let mut partitions_map = HashMap::new();
@@ -3104,7 +3115,7 @@ impl MetaStore for RocksMetaStore {
         node: String,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         let config = self.store.config.clone();
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("get_all_node_in_memory_chunks", move |db_ref| {
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
 
@@ -3139,41 +3150,44 @@ impl MetaStore for RocksMetaStore {
         &self,
         seconds_ago: i64,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
-            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+        self.read_operation_out_of_queue(
+            "get_chunks_without_partition_created_seconds_ago",
+            move |db_ref| {
+                let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
-            let now = Utc::now();
-            let mut partitions = HashMap::new();
-            for c in chunks_table.scan_all_rows()? {
-                let c = c?;
-                if c.get_row().active()
-                    && c.get_row()
-                        .created_at()
-                        .as_ref()
-                        .map(|created_at| {
-                            now.signed_duration_since(created_at.clone()).num_seconds()
-                                >= seconds_ago
-                        })
-                        .unwrap_or(false)
-                {
-                    partitions
-                        .entry(c.get_row().get_partition_id())
-                        .or_insert(vec![])
-                        .push(c);
+                let now = Utc::now();
+                let mut partitions = HashMap::new();
+                for c in chunks_table.scan_all_rows()? {
+                    let c = c?;
+                    if c.get_row().active()
+                        && c.get_row()
+                            .created_at()
+                            .as_ref()
+                            .map(|created_at| {
+                                now.signed_duration_since(created_at.clone()).num_seconds()
+                                    >= seconds_ago
+                            })
+                            .unwrap_or(false)
+                    {
+                        partitions
+                            .entry(c.get_row().get_partition_id())
+                            .or_insert(vec![])
+                            .push(c);
+                    }
                 }
-            }
 
-            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+                let partitions_table = PartitionRocksTable::new(db_ref.clone());
 
-            let mut result = Vec::new();
-            for (id, mut chunks) in partitions {
-                if partitions_table.get_row(id)?.is_none() {
-                    result.append(&mut chunks);
+                let mut result = Vec::new();
+                for (id, mut chunks) in partitions {
+                    if partitions_table.get_row(id)?.is_none() {
+                        result.append(&mut chunks);
+                    }
                 }
-            }
 
-            Ok(result)
-        })
+                Ok(result)
+            },
+        )
         .await
     }
 
@@ -3248,7 +3262,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         table_id: u64,
     ) -> Result<Vec<IdRow<Index>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("get_table_indexes_out_of_queue", move |db_ref| {
             let index_table = IndexRocksTable::new(db_ref);
             Ok(index_table
                 .get_rows_by_index(&IndexIndexKey::TableId(table_id), &IndexRocksIndex::TableID)?)
@@ -3261,7 +3275,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("get_active_partitions_by_index_id", move |db_ref| {
             let rocks_partition = PartitionRocksTable::new(db_ref);
             // TODO iterate over range
             Ok(rocks_partition
@@ -3288,21 +3302,24 @@ impl MetaStore for RocksMetaStore {
         &self,
         index_id: u64,
     ) -> Result<(IdRow<Index>, Vec<IdRow<Partition>>), CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
-            let index = IndexRocksTable::new(db_ref.clone()).get_row_or_not_found(index_id)?;
-            let rocks_partition = PartitionRocksTable::new(db_ref);
+        self.read_operation_out_of_queue(
+            "get_index_with_active_partitions_out_of_queue",
+            move |db_ref| {
+                let index = IndexRocksTable::new(db_ref.clone()).get_row_or_not_found(index_id)?;
+                let rocks_partition = PartitionRocksTable::new(db_ref);
 
-            let partitions = rocks_partition
-                .get_rows_by_index(
-                    &PartitionIndexKey::ByIndexId(index.get_id()),
-                    &PartitionRocksIndex::IndexId,
-                )?
-                .into_iter()
-                .filter(|r| r.get_row().active)
-                .collect::<Vec<_>>();
+                let partitions = rocks_partition
+                    .get_rows_by_index(
+                        &PartitionIndexKey::ByIndexId(index.get_id()),
+                        &PartitionRocksIndex::IndexId,
+                    )?
+                    .into_iter()
+                    .filter(|r| r.get_row().active)
+                    .collect::<Vec<_>>();
 
-            Ok((index, partitions))
-        })
+                Ok((index, partitions))
+            },
+        )
         .await
     }
 
@@ -3381,44 +3398,47 @@ impl MetaStore for RocksMetaStore {
         &self,
         index_id: Vec<u64>,
     ) -> Result<Vec<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
-            let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
-            let rocks_partition = PartitionRocksTable::new(db_ref);
+        self.read_operation_out_of_queue(
+            "get_active_partitions_and_chunks_by_index_id_for_select",
+            move |db_ref| {
+                let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
+                let rocks_partition = PartitionRocksTable::new(db_ref);
 
-            let mut results = Vec::with_capacity(index_id.len());
-            for index_id in index_id {
-                let mut processed = HashSet::new();
-                let mut partitions = Vec::new();
-                let mut add_with_parents = |mut p: u64| -> Result<(), CubeError> {
-                    loop {
-                        if !processed.insert(p) {
-                            break;
+                let mut results = Vec::with_capacity(index_id.len());
+                for index_id in index_id {
+                    let mut processed = HashSet::new();
+                    let mut partitions = Vec::new();
+                    let mut add_with_parents = |mut p: u64| -> Result<(), CubeError> {
+                        loop {
+                            if !processed.insert(p) {
+                                break;
+                            }
+                            let r = rocks_partition.get_row_or_not_found(p)?;
+                            let parent = r.row.parent_partition_id().clone();
+                            partitions.push((r, Vec::new()));
+                            match parent {
+                                None => break,
+                                Some(parent) => p = parent,
+                            }
                         }
-                        let r = rocks_partition.get_row_or_not_found(p)?;
-                        let parent = r.row.parent_partition_id().clone();
-                        partitions.push((r, Vec::new()));
-                        match parent {
-                            None => break,
-                            Some(parent) => p = parent,
-                        }
+                        Ok(())
+                    };
+                    // TODO iterate over range.
+                    for p in rocks_partition.get_row_ids_by_index(
+                        &PartitionIndexKey::ByIndexId(index_id),
+                        &PartitionRocksIndex::IndexId,
+                    )? {
+                        add_with_parents(p)?;
                     }
-                    Ok(())
-                };
-                // TODO iterate over range.
-                for p in rocks_partition.get_row_ids_by_index(
-                    &PartitionIndexKey::ByIndexId(index_id),
-                    &PartitionRocksIndex::IndexId,
-                )? {
-                    add_with_parents(p)?;
-                }
 
-                for (p, chunks) in &mut partitions {
-                    *chunks = Self::chunks_by_partition(p.id, &rocks_chunk, false)?;
+                    for (p, chunks) in &mut partitions {
+                        *chunks = Self::chunks_by_partition(p.id, &rocks_chunk, false)?;
+                    }
+                    results.push(partitions)
                 }
-                results.push(partitions)
-            }
-            Ok(results)
-        })
+                Ok(results)
+            },
+        )
         .await
     }
 
@@ -3426,7 +3446,7 @@ impl MetaStore for RocksMetaStore {
     async fn get_warmup_partitions(
         &self,
     ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
-        self.read_operation_out_of_queue(|db| {
+        self.read_operation_out_of_queue("get_warmup_partitions", |db| {
             // Do full scan, likely only a small number chunks and partitions are inactive.
             let mut partition_to_chunks = HashMap::new();
             for c in ChunkRocksTable::new(db.clone()).table_scan(db.snapshot)? {
@@ -3463,7 +3483,7 @@ impl MetaStore for RocksMetaStore {
         .await
     }
     async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError> {
-        self.read_operation_out_of_queue(|db| {
+        self.read_operation_out_of_queue("get_all_filenames", |db| {
             let mut filenames = Vec::new();
             for c in ChunkRocksTable::new(db.clone()).table_scan(db.snapshot)? {
                 let c = c?;
@@ -3529,7 +3549,7 @@ impl MetaStore for RocksMetaStore {
     }
     #[tracing::instrument(level = "trace", skip(self))]
     async fn get_chunks_out_of_queue(&self, ids: Vec<u64>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation_out_of_queue(move |db| {
+        self.read_operation_out_of_queue("get_chunks_out_of_queue", move |db| {
             let db = ChunkRocksTable::new(db.clone());
             let mut res = Vec::with_capacity(ids.len());
             for id in ids.into_iter() {
@@ -3545,7 +3565,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         ids: Vec<u64>,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation_out_of_queue(move |db| {
+        self.read_operation_out_of_queue("get_partitions_out_of_queue", move |db| {
             let db = PartitionRocksTable::new(db.clone());
             let mut res = Vec::with_capacity(ids.len());
             for id in ids.into_iter() {
@@ -3576,7 +3596,7 @@ impl MetaStore for RocksMetaStore {
         partition_id: u64,
         include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation_out_of_queue(move |db| {
+        self.read_operation_out_of_queue("read_operation_out_of_queue", move |db| {
             Self::chunks_by_partition(partition_id, &ChunkRocksTable::new(db), include_inactive)
         })
         .await
@@ -3790,7 +3810,7 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("all_inactive_chunks", move |db_ref| {
             let table = ChunkRocksTable::new(db_ref);
             let mut res = Vec::new();
             for c in table.scan_all_rows()? {
@@ -3806,7 +3826,7 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn all_inactive_not_uploaded_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("read_operation_out_of_queue", move |db_ref| {
             let table = ChunkRocksTable::new(db_ref);
 
             let mut res = Vec::new();
@@ -3892,8 +3912,10 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| Ok(JobRocksTable::new(db_ref).all_rows()?))
-            .await
+        self.read_operation_out_of_queue("all_jobs", move |db_ref| {
+            Ok(JobRocksTable::new(db_ref).all_rows()?)
+        })
+        .await
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -3947,7 +3969,7 @@ impl MetaStore for RocksMetaStore {
         orphaned_timeout: Duration,
     ) -> Result<Vec<IdRow<Job>>, CubeError> {
         let duration = chrono::Duration::from_std(orphaned_timeout).unwrap();
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("get_orphaned_jobs", move |db_ref| {
             let jobs_table = JobRocksTable::new(db_ref);
             let time = Utc::now();
             let all_jobs = jobs_table
@@ -3977,7 +3999,7 @@ impl MetaStore for RocksMetaStore {
             .iter()
             .map(|s| s.to_string())
             .collect::<HashSet<_>>();
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("get_orphaned_jobs", move |db_ref| {
             let jobs_table = JobRocksTable::new(db_ref);
             let all_jobs = jobs_table
                 .all_rows()?
@@ -4166,7 +4188,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         table_id: u64,
     ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("read_operation_out_of_queue", move |db_ref| {
             Ok(ReplayHandleRocksTable::new(db_ref).get_rows_by_index(
                 &ReplayHandleIndexKey::ByTableId(table_id),
                 &ReplayHandleRocksIndex::ByTableId,
@@ -4289,7 +4311,7 @@ impl MetaStore for RocksMetaStore {
     async fn all_replay_handles_to_merge(
         &self,
     ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
+        self.read_operation_out_of_queue("all_replay_handles_to_merge", move |db_ref| {
             let all_replay_handles = ReplayHandleRocksTable::new(db_ref.clone()).all_rows()?;
             let chunks_table = ChunkRocksTable::new(db_ref);
             let mut result = Vec::new();
@@ -4315,7 +4337,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         table_name: Vec<(String, String)>,
     ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError> {
-        self.read_operation_out_of_queue(|db| {
+        self.read_operation_out_of_queue("table_info_by_name", |db| {
             let mut r = Vec::with_capacity(table_name.len());
             for (schema, table) in table_name {
                 let table = get_table_impl(db.clone(), schema, table)?;
@@ -4395,7 +4417,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         multi_part_ids: Vec<u64>,
     ) -> Result<HashMap<u64, MultiPartition>, CubeError> {
-        self.read_operation_out_of_queue(move |db| {
+        self.read_operation_out_of_queue("multi_partitions_with_children", move |db| {
             let table = MultiPartitionRocksTable::new(db);
             let mut r = HashMap::new();
             for m in multi_part_ids {
