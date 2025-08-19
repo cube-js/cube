@@ -860,6 +860,25 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         includes: ['count']
       }]
     })
+
+    cube('boolean_dimension', {
+      sql: \`
+        SELECT
+          'true' AS dim
+      \`,
+      dimensions: {
+        dim: {
+          sql: \`dim\`,
+          type: 'boolean',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        }
+      }
+    });
     `);
 
   it('simple join', async () => {
@@ -1993,6 +2012,31 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     console.log(query.buildSqlAndParams());
 
     expect(query.buildSqlAndParams()[0]).toMatch(/OFFSET (\d)\s+LIMIT (\d)/);
+  });
+
+  it('bool param cast (PrestoQuery)', async () => {
+    await compiler.compile();
+
+    const query = new PrestodbQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'boolean_dimension.count',
+      ],
+      timeDimensions: [{
+        dimension: 'boolean_dimension.dim',
+      }],
+      filters: [
+        {
+          member: 'boolean_dimension.dim',
+          operator: 'equals',
+          values: ['true'],
+        },
+      ],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+
+    expect(queryAndParams[0]).toContain('"boolean_dimension".dim = CAST(? AS BOOLEAN)');
   });
 
   it('calculated join', async () => {
