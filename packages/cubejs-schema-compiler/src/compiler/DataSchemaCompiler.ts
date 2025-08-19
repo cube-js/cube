@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'async_hooks';
 import crypto from 'crypto';
 import vm from 'vm';
 import fs from 'fs';
@@ -22,6 +23,8 @@ import { CompilerInterface } from './PrepareCompiler';
 import { YamlCompiler } from './YamlCompiler';
 import { CubeDictionary } from './CubeDictionary';
 import { CompilerCache } from './CompilerCache';
+
+const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
@@ -231,7 +234,7 @@ export class DataSchemaCompiler {
       );
     }
 
-    const transpile = async (stage: CompileStage) => {
+    const transpile = async (stage: CompileStage): Promise<FileContent[]> => {
       let cubeNames: string[] = [];
       let cubeSymbols: Record<string, Record<string, boolean>> = {};
       let transpilerNames: string[] = [];
@@ -306,34 +309,62 @@ export class DataSchemaCompiler {
     let contexts: Record<string, any>[] = [];
     let compiledFiles: Record<string, boolean> = {};
     let asyncModules: CallableFunction[] = [];
+    let transpiledFiles: FileContent[] = [];
 
     this.compileV8ContextCache = vm.createContext({
-      view: (name, cube) => (
-        !cube ?
+      view: (name, cube) => {
+        const file = ctxFileStorage.getStore();
+        if (!file) {
+          throw new Error('No file stored in context');
+        }
+        return !cube ?
           this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
-          cubes.push({ ...cube, name, fileName: file.fileName, isView: true })
-      ),
-      cube: (name, cube) => (
-        !cube ?
+          cubes.push({ ...cube, name, fileName: file.fileName, isView: true });
+      },
+      cube: (name, cube) => {
+        const file = ctxFileStorage.getStore();
+        if (!file) {
+          throw new Error('No file stored in context');
+        }
+        return !cube ?
           this.cubeFactory({ ...name, fileName: file.fileName }) :
-          cubes.push({ ...cube, name, fileName: file.fileName })
-      ),
-      context: (name, context) => contexts.push({ ...context, name, fileName: file.fileName }),
+          cubes.push({ ...cube, name, fileName: file.fileName });
+      },
+      context: (name: string, context) => {
+        const file = ctxFileStorage.getStore();
+        if (!file) {
+          throw new Error('No file stored in context');
+        }
+        return contexts.push({ ...context, name, fileName: file.fileName });
+      },
       addExport: (obj) => {
+        const file = ctxFileStorage.getStore();
+        if (!file) {
+          throw new Error('No file stored in context');
+        }
         exports[file.fileName] = exports[file.fileName] || {};
         exports[file.fileName] = Object.assign(exports[file.fileName], obj);
       },
       setExport: (obj) => {
+        const file = ctxFileStorage.getStore();
+        if (!file) {
+          throw new Error('No file stored in context');
+        }
         exports[file.fileName] = obj;
       },
       asyncModule: (fn) => {
         asyncModules.push(fn);
       },
-      require: (extensionName) => {
+      require: (extensionName: string) => {
+        const file = ctxFileStorage.getStore();
+        if (!file) {
+          throw new Error('No file stored in context');
+        }
+
         if (this.extensions[extensionName]) {
           return new (this.extensions[extensionName])(this.cubeFactory, this, cubes);
         } else {
-          const foundFile = this.resolveModuleFile(file, extensionName, toCompile, errorsReport);
+          const foundFile = this.resolveModuleFile(file, extensionName, transpiledFiles, errorsReport);
           if (!foundFile && this.allowNodeRequire) {
             if (extensionName.indexOf('.') === 0) {
               extensionName = path.resolve(this.repository.localPath(), extensionName);
@@ -360,7 +391,8 @@ export class DataSchemaCompiler {
     });
 
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
-      const res = this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, await transpile(stage), errorsReport);
+      transpiledFiles = await transpile(stage);
+      const res = this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
 
       // clear the objects for the next phase
       cubes = [];
@@ -368,6 +400,7 @@ export class DataSchemaCompiler {
       contexts = [];
       compiledFiles = {};
       asyncModules = [];
+      transpiledFiles = [];
 
       return res;
     };
@@ -676,7 +709,13 @@ export class DataSchemaCompiler {
 
     try {
       const script = this.getJsScript(file);
-      script.runInContext(this.compileV8ContextCache!, { timeout: 15000 });
+
+      // We use AsyncLocalStorage to store the current file context
+      // so that it can be accessed in the script execution context even within async functions.
+      // @see https://nodejs.org/api/async_context.html
+      ctxFileStorage.run(file, () => {
+        script.runInContext(this.compileV8ContextCache!, { timeout: 15000 });
+      });
     } catch (e) {
       errorsReport.error(e);
     }
