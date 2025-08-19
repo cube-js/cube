@@ -66,38 +66,17 @@ export class YamlCompiler {
   public async compileYamlWithJinjaFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    cubes: CubeDefinition[],
-    contexts: Record<string, any>[],
-    exports: Record<string, Record<string, any>>,
-    asyncModules: CallableFunction[],
-    toCompile: FileContent[],
-    compiledFiles: Record<string, boolean>,
     compileContext,
     pythonContext: PythonCtx
   ) {
     const compiledFile = await this.renderTemplate(file, compileContext, pythonContext);
 
-    return this.compileYamlFile(
-      compiledFile,
-      errorsReport,
-      cubes,
-      contexts,
-      exports,
-      asyncModules,
-      toCompile,
-      compiledFiles
-    );
+    return this.compileYamlFile(compiledFile, errorsReport);
   }
 
   public compileYamlFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    cubes: CubeDefinition[],
-    contexts: Record<string, any>[],
-    exports: Record<string, Record<string, any>>,
-    asyncModules: CallableFunction[],
-    toCompile: FileContent[],
-    compiledFiles: Record<string, boolean>
   ) {
     if (!file.content.trim()) {
       return;
@@ -112,12 +91,12 @@ export class YamlCompiler {
       if (key === 'cubes') {
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
           const transpiledFile = this.transpileAndPrepareJsFile(file, 'cube', { name, ...cube }, errorsReport);
-          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
         });
       } else if (key === 'views') {
         (yamlObj.views || []).forEach(({ name, ...cube }) => {
           const transpiledFile = this.transpileAndPrepareJsFile(file, 'view', { name, ...cube }, errorsReport);
-          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
         });
       } else {
         errorsReport.error(`Unexpected YAML key: ${key}. Only 'cubes' and 'views' are allowed here.`);

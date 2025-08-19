@@ -140,7 +140,7 @@ export class DataSchemaCompiler {
 
   private readonly compiledScriptCache: LRUCache<string, vm.Script>;
 
-  private compileV8ContextCache: vm.Context;
+  private compileV8ContextCache: vm.Context | null = null;
 
   // FIXME: Is public only because of tests, should be private
   public compilePromise: any;
@@ -174,7 +174,6 @@ export class DataSchemaCompiler {
     this.workerPool = null;
     this.compilerId = options.compilerId || 'default';
     this.compiledScriptCache = options.compiledScriptCache;
-    this.compileV8ContextCache = vm.createContext({});
   }
 
   public compileObjects(compileServices, objects, errorsReport: ErrorReporter) {
@@ -308,8 +307,60 @@ export class DataSchemaCompiler {
     let compiledFiles: Record<string, boolean> = {};
     let asyncModules: CallableFunction[] = [];
 
+    this.compileV8ContextCache = vm.createContext({
+      view: (name, cube) => (
+        !cube ?
+          this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
+          cubes.push({ ...cube, name, fileName: file.fileName, isView: true })
+      ),
+      cube: (name, cube) => (
+        !cube ?
+          this.cubeFactory({ ...name, fileName: file.fileName }) :
+          cubes.push({ ...cube, name, fileName: file.fileName })
+      ),
+      context: (name, context) => contexts.push({ ...context, name, fileName: file.fileName }),
+      addExport: (obj) => {
+        exports[file.fileName] = exports[file.fileName] || {};
+        exports[file.fileName] = Object.assign(exports[file.fileName], obj);
+      },
+      setExport: (obj) => {
+        exports[file.fileName] = obj;
+      },
+      asyncModule: (fn) => {
+        asyncModules.push(fn);
+      },
+      require: (extensionName) => {
+        if (this.extensions[extensionName]) {
+          return new (this.extensions[extensionName])(this.cubeFactory, this, cubes);
+        } else {
+          const foundFile = this.resolveModuleFile(file, extensionName, toCompile, errorsReport);
+          if (!foundFile && this.allowNodeRequire) {
+            if (extensionName.indexOf('.') === 0) {
+              extensionName = path.resolve(this.repository.localPath(), extensionName);
+            }
+            // eslint-disable-next-line global-require,import/no-dynamic-require
+            const Extension = require(extensionName);
+            if (Object.getPrototypeOf(Extension).name === 'AbstractExtension') {
+              return new Extension(this.cubeFactory, this, cubes);
+            }
+            return Extension;
+          }
+          this.compileFile(
+            foundFile,
+            errorsReport,
+            compiledFiles,
+            [],
+            { doSyntaxCheck: true }
+          );
+          exports[foundFile.fileName] = exports[foundFile.fileName] || {};
+          return exports[foundFile.fileName];
+        }
+      },
+      COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : this.cloneCompileContextWithGetterAlias(this.compileContext || {}),
+    });
+
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
-      const res = this.compileCubeFiles(cubes, exports, contexts, compiledFiles, asyncModules, compilers, await transpile(stage), errorsReport);
+      const res = this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, await transpile(stage), errorsReport);
 
       // clear the objects for the next phase
       cubes = [];
@@ -356,6 +407,7 @@ export class DataSchemaCompiler {
           this.throwIfAnyErrors();
         }
         // Free unneeded resources
+        this.compileV8ContextCache = null;
         this.cubeDictionary.free();
         this.cubeSymbols.free();
         return res;
@@ -527,7 +579,6 @@ export class DataSchemaCompiler {
 
   private async compileCubeFiles(
     cubes: CubeDefinition[],
-    exports: Record<string, Record<string, any>>,
     contexts: Record<string, any>[],
     compiledFiles: Record<string, boolean>,
     asyncModules: CallableFunction[],
@@ -540,10 +591,6 @@ export class DataSchemaCompiler {
         this.compileFile(
           file,
           errorsReport,
-          cubes,
-          exports,
-          contexts,
-          toCompile,
           compiledFiles,
           asyncModules
         );
@@ -560,10 +607,6 @@ export class DataSchemaCompiler {
   private compileFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    cubes: CubeDefinition[],
-    exports: Record<string, Record<string, any>>,
-    contexts: Record<string, any>[],
-    toCompile: FileContent[],
     compiledFiles: Record<string, boolean>,
     asyncModules: CallableFunction[],
     { doSyntaxCheck } = { doSyntaxCheck: false }
@@ -575,7 +618,7 @@ export class DataSchemaCompiler {
     compiledFiles[file.fileName] = true;
 
     if (file.fileName.endsWith('.js')) {
-      this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck });
+      this.compileJsFile(file, errorsReport, { doSyntaxCheck });
     } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||
       (
         file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')
@@ -585,17 +628,11 @@ export class DataSchemaCompiler {
       asyncModules.push(() => this.yamlCompiler.compileYamlWithJinjaFile(
         file,
         errorsReport,
-        cubes,
-        contexts,
-        exports,
-        asyncModules,
-        toCompile,
-        compiledFiles,
         this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
         this.pythonContext!
       ));
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+      this.yamlCompiler.compileYamlFile(file, errorsReport);
     }
   }
 
@@ -627,12 +664,6 @@ export class DataSchemaCompiler {
   public compileJsFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    cubes: CubeDefinition[],
-    contexts: Record<string, any>[],
-    exports: Record<string, Record<string, any>>,
-    asyncModules: CallableFunction[],
-    toCompile: FileContent[],
-    compiledFiles: Record<string, boolean>,
     { doSyntaxCheck } = { doSyntaxCheck: false }
   ) {
     if (doSyntaxCheck) {
@@ -647,70 +678,9 @@ export class DataSchemaCompiler {
 
     try {
       const script = this.getJsScript(file);
-
-      const sandboxLocals = Object.freeze({
-        view: (name, cube) => (
-          !cube ?
-            this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
-            cubes.push({ ...cube, name, fileName: file.fileName, isView: true })
-        ),
-        cube: (name, cube) => (
-          !cube ?
-            this.cubeFactory({ ...name, fileName: file.fileName }) :
-            cubes.push({ ...cube, name, fileName: file.fileName })
-        ),
-        context: (name, context) => contexts.push({ ...context, name, fileName: file.fileName }),
-        addExport: (obj) => {
-          exports[file.fileName] = exports[file.fileName] || {};
-          exports[file.fileName] = Object.assign(exports[file.fileName], obj);
-        },
-        setExport: (obj) => {
-          exports[file.fileName] = obj;
-        },
-        asyncModule: (fn) => {
-          asyncModules.push(fn);
-        },
-        require: (extensionName) => {
-          if (this.extensions[extensionName]) {
-            return new (this.extensions[extensionName])(this.cubeFactory, this, cubes);
-          } else {
-            const foundFile = this.resolveModuleFile(file, extensionName, toCompile, errorsReport);
-            if (!foundFile && this.allowNodeRequire) {
-              if (extensionName.indexOf('.') === 0) {
-                extensionName = path.resolve(this.repository.localPath(), extensionName);
-              }
-              // eslint-disable-next-line global-require,import/no-dynamic-require
-              const Extension = require(extensionName);
-              if (Object.getPrototypeOf(Extension).name === 'AbstractExtension') {
-                return new Extension(this.cubeFactory, this, cubes);
-              }
-              return Extension;
-            }
-            this.compileFile(
-              foundFile,
-              errorsReport,
-              cubes,
-              exports,
-              contexts,
-              toCompile,
-              compiledFiles,
-              [],
-              { doSyntaxCheck: true }
-            );
-            exports[foundFile.fileName] = exports[foundFile.fileName] || {};
-            return exports[foundFile.fileName];
-          }
-        },
-        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : this.cloneCompileContextWithGetterAlias(this.compileContext || {}),
-      });
-
-      this.compileV8ContextCache.sandboxLocals = sandboxLocals;
-
-      script.runInContext(this.compileV8ContextCache, { timeout: 15000 });
+      script.runInContext(this.compileV8ContextCache!, { timeout: 15000 });
     } catch (e) {
       errorsReport.error(e);
-    } finally {
-      delete this.compileV8ContextCache.sandboxLocals;
     }
   }
 
