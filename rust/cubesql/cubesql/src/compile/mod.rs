@@ -17468,4 +17468,40 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("DATE_DIFF('day', "));
     }
+
+    #[tokio::test]
+    async fn test_count_over_joined_cubes() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT COUNT(*)
+            FROM (
+                SELECT
+                    t1.id AS id,
+                    t2.read AS read
+                FROM KibanaSampleDataEcommerce t1
+                LEFT JOIN Logs t2 ON t1.__cubeJoinField = t2.__cubeJoinField
+            ) t
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("COUNT(*)"));
+        assert!(sql.contains("KibanaSampleDataEcommerce"));
+        assert!(sql.contains("Logs"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
 }
