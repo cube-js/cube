@@ -887,7 +887,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for RedshiftDatePartReplacer {
     }
 }
 
-/// Postgres to_timestamp clashes with Datafusion to_timestamp so we replace it with str_to_date
+/// Postgres to_timestamp clashes with Datafusion to_timestamp so we replace it with str_to_date/epoch_to_timestamp
 #[derive(Debug)]
 pub struct ToTimestampReplacer {}
 
@@ -906,11 +906,31 @@ impl ToTimestampReplacer {
 }
 
 impl<'ast> Visitor<'ast, ConnectionError> for ToTimestampReplacer {
-    fn visit_identifier(&mut self, identifier: &mut Ident) -> Result<(), ConnectionError> {
-        if identifier.value.to_lowercase() == "to_timestamp" {
-            identifier.value = "str_to_date".to_string()
-        };
+    fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
+        if fun.name.to_string().to_lowercase() == "to_timestamp" {
+            if fun.args.len() == 1 {
+                fun.name = ObjectName(vec![Ident {
+                    value: "epoch_to_timestamp".to_string(),
+                    quote_style: None,
+                }]);
+            } else {
+                fun.name = ObjectName(vec![Ident {
+                    value: "str_to_date".to_string(),
+                    quote_style: None,
+                }]);
+            }
+        }
 
+        // Continue visiting function arguments
+        self.visit_function_args(&mut fun.args)?;
+        if let Some(over) = &mut fun.over {
+            for res in over.partition_by.iter_mut() {
+                self.visit_expr(res)?;
+            }
+            for order_expr in over.order_by.iter_mut() {
+                self.visit_expr(&mut order_expr.expr)?;
+            }
+        }
         Ok(())
     }
 }
