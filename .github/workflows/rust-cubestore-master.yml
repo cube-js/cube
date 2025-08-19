@@ -45,9 +45,6 @@ jobs:
         run: cargo fmt -- --check
       - name: Run cargo check
         run: cargo check --benches
-      - name: Run cargo build
-        run:
-          cargo build --manifest-path rust/cubestore/Cargo.toml -j 4
       - name: Run cargo test
         env:
           CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
