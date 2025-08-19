@@ -52,9 +52,11 @@ jobs:
           key: ubuntu-22.04
       - name: Run cargo fmt
         run: cargo fmt --check
+        working-directory: rust/cubestore
       - name: Run cargo check
         # Re-using test profile to speedup builds
         run: cargo check --benches --profile test
+        working-directory: rust/cubestore
       - name: Run cargo test
         env:
           # LocalDirRemoteFs expect that std::env::temp_dir and its local dir is on same FS, to use `rename`
@@ -62,7 +64,8 @@ jobs:
           # When using `container` in GHA checkout will be located in `/__w`, and that's a separate mount from `/tmp`
           TMPDIR: /__w/tmp
         run: |
-          cargo test --manifest-path rust/cubestore/Cargo.toml
+          cargo test
+        working-directory: rust/cubestore
 
   docker-image-latest:
     name: Build only :latest image
