@@ -331,8 +331,27 @@ export class CubeSymbols {
 
       get joins() {
         if (!joins) {
-          const parentJoins = cubeDefinition.extends ? super.joins : [];
-          joins = [...parentJoins, ...(cubeDefinition.joins || [])];
+          // In dynamic models we still can hit the cases where joins are returned as map
+          // instead of array, so we need to convert them here to array.
+          // TODO: Simplify/Remove this when we drop map joins support totally.
+          let parentJoins = cubeDefinition.extends ? super.joins : [];
+          if (!Array.isArray(parentJoins)) {
+            parentJoins = Object.entries(parentJoins).map(([name, join]: [string, any]) => {
+              join.name = name;
+              return join as JoinDefinition;
+            });
+          }
+
+          let localJoins = cubeDefinition.joins || [];
+          // TODO: Simplify/Remove this when we drop map joins support totally.
+          if (!Array.isArray(localJoins)) {
+            localJoins = Object.entries(localJoins).map(([name, join]: [string, any]) => {
+              join.name = name;
+              return join as JoinDefinition;
+            });
+          }
+
+          joins = [...parentJoins, ...localJoins];
         }
         return joins;
       },
