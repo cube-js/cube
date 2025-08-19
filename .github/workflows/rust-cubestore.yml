@@ -50,15 +50,10 @@ jobs:
           # We should use a separate key for testing to pass disk space limitations
           shared-key: cubestore-testing
           key: ubuntu-22.04
-      - name: Run cargo fmt cubestore
-        run: |
-          cargo fmt --manifest-path rust/cubestore/cubestore/Cargo.toml -- --check
-      - name: Run cargo fmt cubehll
-        run: |
-          cargo fmt --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
-      - name: Run cargo build
-        run: |
-          cargo build --manifest-path rust/cubestore/Cargo.toml
+      - name: Run cargo fmt
+        run: cargo fmt -- --check
+      - name: Run cargo check
+        run: cargo check --benches
       - name: Run cargo test
         env:
           # LocalDirRemoteFs expect that std::env::temp_dir and its local dir is on same FS, to use `rename`

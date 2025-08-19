@@ -41,12 +41,10 @@ jobs:
           workspaces: ./rust/cubestore -> target
           shared-key: cubestore
           key: ubuntu-22.04
-      - name: Run cargo fmt cubestore
-        run: |
-          cargo fmt --manifest-path rust/cubestore/cubestore/Cargo.toml -- --check
-      - name: Run cargo fmt cubehll
-        run: |
-          cargo fmt --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
+      - name: Run cargo fmt
+        run: cargo fmt -- --check
+      - name: Run cargo check
+        run: cargo check --benches
       - name: Run cargo build
         run:
           cargo build --manifest-path rust/cubestore/Cargo.toml -j 4
