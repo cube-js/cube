@@ -346,13 +346,9 @@ impl ExtendedRemoteFs for MINIORemoteFs {}
 //TODO
 impl MINIORemoteFs {
     fn s3_path(&self, remote_path: &str) -> String {
-        format!(
-            "{}/{}",
-            self.sub_path
-                .as_ref()
-                .map(|p| p.to_string())
-                .unwrap_or_else(|| "".to_string()),
-            remote_path
-        )
+        self.sub_path
+            .as_ref()
+            .map(|p| format!("{}/{}", p, remote_path))
+            .unwrap_or_else(|| format!("{}", remote_path))
     }
 }
