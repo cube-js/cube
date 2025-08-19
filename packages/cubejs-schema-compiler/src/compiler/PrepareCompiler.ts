@@ -61,10 +61,10 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const compiledScriptCache = options.compiledScriptCache || new LRUCache<string, vm.Script>({ max: 250 });
 
   const transpilers: TranspilerInterface[] = [
-    new IIFETranspiler(),
     new ValidationTranspiler(),
     new ImportExportTranspiler(),
     new CubePropContextTranspiler(cubeSymbols, cubeDictionary, viewCompiler),
+    new IIFETranspiler(),
   ];
 
   if (!options.allowJsDuplicatePropsInSchema) {
