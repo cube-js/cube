@@ -649,11 +649,9 @@ export class DataSchemaCompiler {
     // avoid polluting and modifying the global scope,
     // and to provide a controlled environment for the code execution.
     const wrappedCode = `
-      (function(globals) {
-        "use strict";
-        const { view, cube, context, addExport, setExport, asyncModule, require, COMPILE_CONTEXT } = globals;
+      (function() {
         ${file.content}
-      })(sandboxLocals);
+      })();
     `;
 
     const script = new vm.Script(wrappedCode, { filename: file.fileName });
