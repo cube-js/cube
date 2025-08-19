@@ -688,18 +688,7 @@ export class DataSchemaCompiler {
       return this.compiledScriptCache.get(cacheKey)!;
     }
 
-    // As we run all data model files in the same context,
-    // we need to wrap the code in an IIFE to avoid errors like:
-    // Identifier 'xxx' has already been declared,
-    // avoid polluting and modifying the global scope,
-    // and to provide a controlled environment for the code execution.
-    const wrappedCode = `
-      (function() {
-        ${file.content}
-      })();
-    `;
-
-    const script = new vm.Script(wrappedCode, { filename: file.fileName });
+    const script = new vm.Script(file.content, { filename: file.fileName });
     this.compiledScriptCache.set(cacheKey, script);
     return script;
   }
