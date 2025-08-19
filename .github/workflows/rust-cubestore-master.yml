@@ -42,9 +42,10 @@ jobs:
           shared-key: cubestore
           key: ubuntu-22.04
       - name: Run cargo fmt
-        run: cargo fmt -- --check
+        run: cargo fmt --check
       - name: Run cargo check
-        run: cargo check --benches
+        # Re-using test profile to speedup builds
+        run: cargo check --benches --profile test
       - name: Run cargo test
         env:
           CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
