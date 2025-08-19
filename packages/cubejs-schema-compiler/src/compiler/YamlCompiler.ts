@@ -10,7 +10,7 @@ import type { FileContent } from '@cubejs-backend/shared';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
-import { CubeDefinition, CubeSymbols } from './CubeSymbols';
+import { CubeSymbols } from './CubeSymbols';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
 import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
