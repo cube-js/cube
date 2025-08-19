@@ -353,7 +353,14 @@ export class DataSchemaCompiler {
         exports[file.fileName] = obj;
       },
       asyncModule: (fn) => {
-        asyncModules.push(fn);
+        const file = ctxFileStorage.getStore();
+        if (!file) {
+          throw new Error('No file stored in context');
+        }
+        // We need to run async module code in the context of the original data model file
+        // where it was defined. So we pass the same file to the async context.
+        // @see https://nodejs.org/api/async_context.html#class-asynclocalstorage
+        asyncModules.push(async () => ctxFileStorage.run(file, () => fn()));
       },
       require: (extensionName: string) => {
         const file = ctxFileStorage.getStore();
