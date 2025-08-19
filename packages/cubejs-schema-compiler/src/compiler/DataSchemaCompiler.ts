@@ -712,7 +712,7 @@ export class DataSchemaCompiler {
 
       // We use AsyncLocalStorage to store the current file context
       // so that it can be accessed in the script execution context even within async functions.
-      // @see https://nodejs.org/api/async_context.html
+      // @see https://nodejs.org/api/async_context.html#class-asynclocalstorage
       ctxFileStorage.run(file, () => {
         script.runInContext(this.compileV8ContextCache!, { timeout: 15000 });
       });
