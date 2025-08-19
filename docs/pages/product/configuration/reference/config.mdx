@@ -1401,7 +1401,7 @@ def context_to_roles(ctx: dict) -> list[str]:
 
 module.exports = {
   contextToRoles: ({ securityContext }) => {
-    const cloud_ctx = securityContext.cloud || { roles: [] }
+    const cloud_ctx = securityContext.cubeCloud || { roles: [] }
     return cloud_ctx.roles || []
   }
 }
