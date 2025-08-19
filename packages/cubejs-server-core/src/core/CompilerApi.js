@@ -31,6 +31,7 @@ export class CompilerApi {
     this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
     this.schemaVersion = this.options.schemaVersion;
     this.contextToRoles = this.options.contextToRoles;
+    this.contextToGroups = this.options.contextToGroups;
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
@@ -243,8 +244,19 @@ export class CompilerApi {
     return new Set(await this.contextToRoles(context));
   }
 
+  async getGroupsFromContext(context) {
+    if (!this.contextToGroups) {
+      return new Set();
+    }
+    return new Set(await this.contextToGroups(context));
+  }
+
   userHasRole(userRoles, role) {
     return userRoles.has(role) || role === '*';
+  }
+
+  userHasGroup(userGroups, group) {
+    return userGroups.has(group) || group === '*';
   }
 
   roleMeetsConditions(evaluatedConditions) {

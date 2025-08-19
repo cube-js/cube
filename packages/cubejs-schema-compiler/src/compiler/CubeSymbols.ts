@@ -118,6 +118,9 @@ export type Filter =
     };
 
 export type AccessPolicyDefinition = {
+  role?: string;
+  group?: string;
+  groups?: string[];
   rowLevel?: {
     filters: Filter[];
   };
