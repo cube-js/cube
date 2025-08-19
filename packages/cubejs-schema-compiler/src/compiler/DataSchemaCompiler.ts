@@ -238,7 +238,7 @@ export class DataSchemaCompiler {
       let cubeNames: string[] = [];
       let cubeSymbols: Record<string, Record<string, boolean>> = {};
       let transpilerNames: string[] = [];
-      let results;
+      let results: (FileContent | undefined)[];
 
       if (transpilationNative || transpilationWorkerThreads) {
         cubeNames = Object.keys(this.cubeDictionary.byId);
@@ -301,7 +301,7 @@ export class DataSchemaCompiler {
         results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, {})));
       }
 
-      return results.filter(f => !!f);
+      return results.filter(f => !!f) as FileContent[];
     };
 
     let cubes: CubeDefinition[] = [];
