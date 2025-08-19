@@ -10,7 +10,7 @@ import type { FileContent } from '@cubejs-backend/shared';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
-import { CubeSymbols } from './CubeSymbols';
+import { CubeDefinition, CubeSymbols } from './CubeSymbols';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
 import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
@@ -66,12 +66,12 @@ export class YamlCompiler {
   public async compileYamlWithJinjaFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    cubes,
-    contexts,
-    exports,
-    asyncModules,
-    toCompile,
-    compiledFiles,
+    cubes: CubeDefinition[],
+    contexts: Record<string, any>[],
+    exports: Record<string, Record<string, any>>,
+    asyncModules: CallableFunction[],
+    toCompile: FileContent[],
+    compiledFiles: Record<string, boolean>,
     compileContext,
     pythonContext: PythonCtx
   ) {
@@ -89,7 +89,16 @@ export class YamlCompiler {
     );
   }
 
-  public compileYamlFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
+  public compileYamlFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    cubes: CubeDefinition[],
+    contexts: Record<string, any>[],
+    exports: Record<string, Record<string, any>>,
+    asyncModules: CallableFunction[],
+    toCompile: FileContent[],
+    compiledFiles: Record<string, boolean>
+  ) {
     if (!file.content.trim()) {
       return;
     }

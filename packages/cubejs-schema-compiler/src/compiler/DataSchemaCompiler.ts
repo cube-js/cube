@@ -15,7 +15,7 @@ import { FileContent, getEnv, isNativeSupported, SchemaFileRepository } from '@c
 import { NativeInstance, PythonCtx, transpileJs } from '@cubejs-backend/native';
 import { UserError } from './UserError';
 import { ErrorReporter, ErrorReporterOptions, SyntaxErrorInterface } from './ErrorReporter';
-import { CONTEXT_SYMBOLS, CubeSymbols } from './CubeSymbols';
+import { CONTEXT_SYMBOLS, CubeDefinition, CubeSymbols } from './CubeSymbols';
 import { ViewCompilationGate } from './ViewCompilationGate';
 import { TranspilerInterface } from './transpilers';
 import { CompilerInterface } from './PrepareCompiler';
@@ -302,7 +302,24 @@ export class DataSchemaCompiler {
       return results.filter(f => !!f);
     };
 
-    const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => this.compileCubeFiles(compilers, await transpile(stage), errorsReport);
+    let cubes: CubeDefinition[] = [];
+    let exports: Record<string, Record<string, any>> = {};
+    let contexts: Record<string, any>[] = [];
+    let compiledFiles: Record<string, boolean> = {};
+    let asyncModules: CallableFunction[] = [];
+
+    const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
+      const res = this.compileCubeFiles(cubes, exports, contexts, compiledFiles, asyncModules, compilers, await transpile(stage), errorsReport);
+
+      // clear the objects for the next phase
+      cubes = [];
+      exports = {};
+      contexts = [];
+      compiledFiles = {};
+      asyncModules = [];
+
+      return res;
+    };
 
     return compilePhase({ cubeCompilers: this.cubeNameCompilers }, 0)
       .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }, 1))
@@ -348,7 +365,11 @@ export class DataSchemaCompiler {
     return this.compilePromise;
   }
 
-  private async transpileFile(file: FileContent, errorsReport: ErrorReporter, options: TranspileOptions = {}) {
+  private async transpileFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    options: TranspileOptions = {}
+  ): Promise<(FileContent | undefined)> {
     if (file.fileName.endsWith('.jinja') ||
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
       // TODO do Jinja syntax check with jinja compiler
@@ -377,7 +398,11 @@ export class DataSchemaCompiler {
    * Right now it is used only for transpilation in native,
    * so no checks for transpilation type inside this method
    */
-  private async transpileJsFilesBulk(files: FileContent[], errorsReport: ErrorReporter, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions) {
+  private async transpileJsFilesBulk(
+    files: FileContent[],
+    errorsReport: ErrorReporter,
+    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+  ): Promise<(FileContent | undefined)[]> {
     // for bulk processing this data may be optimized even more by passing transpilerNames, compilerId only once for a bulk
     // but this requires more complex logic to be implemented in the native side.
     // And comparing to the file content sizes, a few bytes of JSON data is not a big deal here
@@ -411,7 +436,11 @@ export class DataSchemaCompiler {
     });
   }
 
-  private async transpileJsFile(file: FileContent, errorsReport: ErrorReporter, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions) {
+  private async transpileJsFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+  ): Promise<(FileContent | undefined)> {
     try {
       if (getEnv('transpilationNative')) {
         const reqData = {
@@ -496,13 +525,16 @@ export class DataSchemaCompiler {
     return this.currentQuery;
   }
 
-  private async compileCubeFiles(compilers: CompileCubeFilesCompilers, toCompile: FileContent[], errorsReport: ErrorReporter) {
-    const cubes = [];
-    const exports = {};
-    const contexts = [];
-    const compiledFiles = {};
-    const asyncModules = [];
-
+  private async compileCubeFiles(
+    cubes: CubeDefinition[],
+    exports: Record<string, Record<string, any>>,
+    contexts: Record<string, any>[],
+    compiledFiles: Record<string, boolean>,
+    asyncModules: CallableFunction[],
+    compilers: CompileCubeFilesCompilers,
+    toCompile: FileContent[],
+    errorsReport: ErrorReporter
+  ) {
     toCompile
       .forEach((file) => {
         this.compileFile(
@@ -526,7 +558,15 @@ export class DataSchemaCompiler {
   }
 
   private compileFile(
-    file: FileContent, errorsReport: ErrorReporter, cubes, exports, contexts, toCompile, compiledFiles, asyncModules, { doSyntaxCheck } = { doSyntaxCheck: false }
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    cubes: CubeDefinition[],
+    exports: Record<string, Record<string, any>>,
+    contexts: Record<string, any>[],
+    toCompile: FileContent[],
+    compiledFiles: Record<string, boolean>,
+    asyncModules: CallableFunction[],
+    { doSyntaxCheck } = { doSyntaxCheck: false }
   ) {
     if (compiledFiles[file.fileName]) {
       return;
@@ -584,7 +624,17 @@ export class DataSchemaCompiler {
     return script;
   }
 
-  public compileJsFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck } = { doSyntaxCheck: false }) {
+  public compileJsFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    cubes: CubeDefinition[],
+    contexts: Record<string, any>[],
+    exports: Record<string, Record<string, any>>,
+    asyncModules: CallableFunction[],
+    toCompile: FileContent[],
+    compiledFiles: Record<string, boolean>,
+    { doSyntaxCheck } = { doSyntaxCheck: false }
+  ) {
     if (doSyntaxCheck) {
       // There is no need to run syntax check for data model files
       // because they were checked during transpilation/transformation phase
