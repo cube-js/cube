@@ -1388,6 +1388,10 @@ impl RocksMetaStore {
         })
     }
 
+    pub fn reset_cached_tables(&self) {
+        *self.store.cached_tables.lock().unwrap() = None;
+    }
+
     pub async fn load_from_dump(
         path: &Path,
         dump_path: &Path,

@@ -223,7 +223,7 @@ impl RocksCacheStore {
             cache_eviction_manager,
             upload_loop: Arc::new(WorkerLoop::new("Cachestore upload")),
             metrics_loop: Arc::new(WorkerLoop::new("Cachestore metrics")),
-            rw_loop_queue_cf: RocksStoreRWLoop::new("queue"),
+            rw_loop_queue_cf: RocksStoreRWLoop::new("cachestore", "queue"),
         }))
     }
 

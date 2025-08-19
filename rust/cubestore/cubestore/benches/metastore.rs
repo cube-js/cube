@@ -140,28 +140,22 @@ fn do_get_tables_with_path_bench(
     );
 }
 
-async fn do_cold_cache_test(num_schemas: usize, tables_per_schema: usize) {
-    let fresh_metastore = prepare_metastore("cold_cache_fresh").unwrap();
-    populate_metastore(&fresh_metastore, num_schemas, tables_per_schema)
-        .await
-        .unwrap();
-    let result = fresh_metastore.get_tables_with_path(false).await;
-    assert!(result.is_ok());
-}
-
-async fn do_warm_cache_test(metastore: &Arc<RocksMetaStore>) {
-    let result = metastore.get_tables_with_path(false).await;
-    assert!(result.is_ok());
-}
-
 fn do_cold_vs_warm_cache_bench(
     c: &mut Criterion,
     runtime: &Runtime,
     num_schemas: usize,
     tables_per_schema: usize,
 ) {
-    let metastore = runtime.block_on(async {
-        let metastore = prepare_metastore("cold_warm_cache").unwrap();
+    let cold_metastore = runtime.block_on(async {
+        let metastore = prepare_metastore("warm_cache").unwrap();
+        populate_metastore(&metastore, num_schemas, tables_per_schema)
+            .await
+            .unwrap();
+        metastore
+    });
+
+    let warm_metastore = runtime.block_on(async {
+        let metastore = prepare_metastore("cold_cache").unwrap();
         populate_metastore(&metastore, num_schemas, tables_per_schema)
             .await
             .unwrap();
@@ -169,12 +163,21 @@ fn do_cold_vs_warm_cache_bench(
     });
 
     c.bench_function("get_tables_with_path_cold_cache", |b| {
-        b.to_async(runtime)
-            .iter(|| do_cold_cache_test(num_schemas, tables_per_schema));
+        b.to_async(runtime).iter_batched(
+            || cold_metastore.reset_cached_tables(),
+            async |_| {
+                let result = cold_metastore.get_tables_with_path(false).await;
+                assert!(result.is_ok());
+            },
+            criterion::BatchSize::SmallInput,
+        );
     });
 
     c.bench_function("get_tables_with_path_warm_cache", |b| {
-        b.to_async(runtime).iter(|| do_warm_cache_test(&metastore));
+        b.to_async(runtime).iter(async || {
+            let result = warm_metastore.get_tables_with_path(false).await;
+            assert!(result.is_ok());
+        });
     });
 }
 
