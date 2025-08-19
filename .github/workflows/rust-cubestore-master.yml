@@ -56,7 +56,7 @@ jobs:
           TEST_KSQL_USER: ${{ secrets.TEST_KSQL_USER }}
           TEST_KSQL_PASS: ${{ secrets.TEST_KSQL_PASS }}
           TEST_KSQL_URL: ${{ secrets.TEST_KSQL_URL }}
-        run: cargo test
+        run: cargo test -- --test-threads=1
         working-directory: rust/cubestore
 
   cubestore-docker-image-dev:
