@@ -1,7 +1,6 @@
 use crate::config::ConfigObj;
 use crate::metastore::table::TablePath;
 use crate::metastore::{MetaStoreEvent, MetaStoreFs};
-use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::time_span::warn_long;
 
 use crate::CubeError;
@@ -813,36 +812,42 @@ pub type RocksStoreRWLoopFn = Box<dyn FnOnce() -> Result<(), CubeError> + Send +
 pub struct RocksStoreRWLoop {
     name: &'static str,
     tx: tokio::sync::mpsc::Sender<RocksStoreRWLoopFn>,
-    _join_handle: Arc<AbortingJoinHandle<()>>,
 }
 
 impl RocksStoreRWLoop {
-    pub fn new(name: &'static str) -> Self {
+    pub fn new(store_name: &'static str, name: &'static str) -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::channel::<RocksStoreRWLoopFn>(32_768);
 
-        let join_handle = cube_ext::spawn_blocking(move || loop {
-            if let Some(fun) = rx.blocking_recv() {
-                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(fun)) {
-                    Err(panic_payload) => {
-                        let restore_error = CubeError::from_panic_payload(panic_payload);
-                        log::error!("Panic during read write loop execution: {}", restore_error);
-                    }
-                    Ok(res) => {
-                        if let Err(e) = res {
-                            log::error!("Error during read write loop execution: {}", e);
+        let thread_name = format!("{}-{}-rwloop", store_name, name);
+        std::thread::Builder::new()
+            .name(thread_name)
+            .spawn(move || loop {
+                if let Some(fun) = rx.blocking_recv() {
+                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(fun)) {
+                        Err(panic_payload) => {
+                            let restore_error = CubeError::from_panic_payload(panic_payload);
+                            log::error!(
+                                "Panic during read write loop execution: {}",
+                                restore_error
+                            );
+                        }
+                        Ok(res) => {
+                            if let Err(e) = res {
+                                log::error!("Error during read write loop execution: {}", e);
+                            }
                         }
                     }
+                } else {
+                    return;
                 }
-            } else {
-                return;
-            }
-        });
+            })
+            .expect(&format!(
+                "Failed to spawn RWLoop thread for store '{}', name '{}'",
+                store_name, name
+            ));
 
-        Self {
-            name,
-            tx,
-            _join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
-        }
+        // Thread handle is intentionally dropped - thread will exit when tx is dropped
+        Self { name, tx }
     }
 
     pub async fn schedule(&self, fun: RocksStoreRWLoopFn) -> Result<(), CubeError> {
@@ -928,7 +933,7 @@ impl RocksStore {
             snapshots_upload_stopped: Arc::new(AsyncMutex::new(false)),
             config,
             cached_tables: Arc::new(Mutex::new(None)),
-            rw_loop_default_cf: RocksStoreRWLoop::new("default"),
+            rw_loop_default_cf: RocksStoreRWLoop::new("metastore", "default"),
             details,
         };
 

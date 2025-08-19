@@ -573,7 +573,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn migration_check_table(&self) -> Result<(), CubeError> {
         let snapshot = self.snapshot();
 
-        let table_info = snapshot.get_pinned(
+        let table_info = snapshot.get(
             &RowKey::TableInfo {
                 table_id: Self::table_id(),
             }
@@ -633,7 +633,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn migration_check_indexes(&self) -> Result<(), CubeError> {
         let snapshot = self.snapshot();
         for index in Self::indexes().into_iter() {
-            let index_info = snapshot.get_pinned(
+            let index_info = snapshot.get(
                 &RowKey::SecondaryIndexInfo {
                     index_id: Self::index_id(index.get_id()),
                 }
@@ -977,7 +977,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             RowKey::SecondaryIndex(Self::index_id(index_id), secondary_key_hash, row_id);
         let secondary_index_key = secondary_index_row_key.to_bytes();
 
-        if let Some(secondary_key_bytes) = self.db().get_pinned(&secondary_index_key)? {
+        if let Some(secondary_key_bytes) = self.db().get(&secondary_index_key)? {
             let index_value_version = RocksSecondaryIndex::value_version(secondary_index);
             let new_value = match RocksSecondaryIndexValue::from_bytes(
                 &secondary_key_bytes,
@@ -1102,6 +1102,11 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
     fn get_row(&self, row_id: u64) -> Result<Option<IdRow<Self::T>>, CubeError> {
         let ref db = self.snapshot();
+        // Use pinned access to avoid double copying. While zero-copy deserialization would be ideal, but
+        // we're using flex buffers with serde, which copies String values during deserialization. There is a way
+        // to solve it by using &[u8] types, but it's not worth the effort right now.
+        //
+        // Let's avoid copying on lookup row, but doing copy on deserialization.
         let res = db.get_pinned(RowKey::Table(Self::table_id(), row_id).to_bytes())?;
 
         if let Some(buffer) = res {
