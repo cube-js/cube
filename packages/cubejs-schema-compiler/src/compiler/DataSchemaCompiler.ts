@@ -391,18 +391,15 @@ export class DataSchemaCompiler {
     });
 
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
-      transpiledFiles = await transpile(stage);
-      const res = this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
-
       // clear the objects for the next phase
       cubes = [];
       exports = {};
       contexts = [];
       compiledFiles = {};
       asyncModules = [];
-      transpiledFiles = [];
+      transpiledFiles = await transpile(stage);
 
-      return res;
+      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
     };
 
     return compilePhase({ cubeCompilers: this.cubeNameCompilers }, 0)
@@ -415,6 +412,14 @@ export class DataSchemaCompiler {
         contextCompilers: this.contextCompilers,
       }, 3))
       .then(() => {
+        // Free unneeded resources
+        cubes = [];
+        exports = {};
+        contexts = [];
+        compiledFiles = {};
+        asyncModules = [];
+        transpiledFiles = [];
+
         if (transpilationNative) {
           // Clean up cache
           const dummyFile = {
