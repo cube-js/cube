@@ -63,8 +63,7 @@ jobs:
           # On Unix it's controlled by TMPDIR
           # When using `container` in GHA checkout will be located in `/__w`, and that's a separate mount from `/tmp`
           TMPDIR: /__w/tmp
-        run: |
-          cargo test
+        run: cargo test
         working-directory: rust/cubestore
 
   docker-image-latest:
