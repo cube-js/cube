@@ -13,6 +13,7 @@
   "scripts": {
     "unit": "vitest run",
     "dev": "vite",
+    "serve": "vite preview",
     "watch": "tsc --noEmit false --watch",
     "build:lib": "tsc --noEmit false && node postbuild.js && cp -R src/img/ lib/img/",
     "build:vizard": "cd ./vizard && yarn && yarn build && cp -R ./build ../public/vizard",
