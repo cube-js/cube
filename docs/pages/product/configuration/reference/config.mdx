@@ -1393,7 +1393,7 @@ from cube import config
 
 @config('context_to_roles')
 def context_to_roles(ctx: dict) -> list[str]:
-  cloud_ctx = ctx['securityContext'].get('cloud', {'roles': []})
+  cloud_ctx = ctx['securityContext'].get('cubeCloud', {'roles': []})
   return cloud_ctx.get('roles', [])
 ```
 
