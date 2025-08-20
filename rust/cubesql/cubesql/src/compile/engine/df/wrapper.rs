@@ -3824,6 +3824,21 @@ impl<'ctx, 'mem> CollectMembersVisitor<'ctx, 'mem> {
 
         Ok(())
     }
+
+    fn handle_count_rows(&mut self) -> Result<()> {
+        // COUNT(*) references all members in the ungrouped scan node
+        for member in &self.push_to_cube_context.ungrouped_scan_node.member_fields {
+            match member {
+                MemberField::Member(member) => {
+                    self.used_members.insert(member.member.clone());
+                }
+                MemberField::Literal(_) => {
+                    // Do nothing
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
@@ -3831,6 +3846,13 @@ impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
         match expr {
             Expr::Column(ref c) => {
                 self.handle_column(c)?;
+            }
+            Expr::AggregateFunction {
+                fun: AggregateFunction::Count,
+                args,
+                ..
+            } if args.len() == 1 && matches!(args[0], Expr::Literal(_)) => {
+                self.handle_count_rows()?;
             }
             _ => {}
         }
