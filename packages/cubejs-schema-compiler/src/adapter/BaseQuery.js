@@ -2134,10 +2134,6 @@ export class BaseQuery {
       if (m.expressionName && !collectedMeasures.length && !m.isMemberExpression) {
         throw new UserError(`Subquery measure ${m.expressionName} should reference at least one member`);
       }
-      if (!collectedMeasures.length && m.isMemberExpression && m.query.allCubeNames.length > 1 && m.measureSql() === 'COUNT(*)') {
-        const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
-        throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
-      }
 
       if (collectedMeasures.length === 0 && m.isMemberExpression) {
         // `m` is member expression measure, but does not reference any other measure
