@@ -12,6 +12,7 @@ use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use test::TestFn::DynTestFn;
 use test::{ShouldPanic, TestDesc, TestDescAndFn, TestName, TestType};
+use itertools::Itertools;
 use tests::sql_tests;
 
 mod benches;
@@ -66,7 +67,7 @@ pub fn run_sql_tests(
         .collect();
 
     test::test_main(
-        &env::args().chain(extra_args).collect::<Vec<String>>(),
+        &env::args().chain(extra_args).unique().collect::<Vec<String>>(),
         tests,
         None,
     );
