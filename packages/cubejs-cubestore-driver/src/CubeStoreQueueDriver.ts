@@ -252,9 +252,6 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     const payload = JSON.parse(row.payload);
 
     if (row.extra) {
-      console.log(row.extra, typeof row.extra);
-      console.log(payload, typeof payload);
-      console.log(row.payload, typeof row.payload);
       return Object.assign(payload, JSON.parse(row.extra));
     }
 
