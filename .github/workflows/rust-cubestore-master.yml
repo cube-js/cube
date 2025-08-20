@@ -41,15 +41,13 @@ jobs:
           workspaces: ./rust/cubestore -> target
           shared-key: cubestore
           key: ubuntu-22.04
-      - name: Run cargo fmt cubestore
-        run: |
-          cargo fmt --manifest-path rust/cubestore/cubestore/Cargo.toml -- --check
-      - name: Run cargo fmt cubehll
-        run: |
-          cargo fmt --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
-      - name: Run cargo build
-        run:
-          cargo build --manifest-path rust/cubestore/Cargo.toml -j 4
+      - name: Run cargo fmt
+        run: cargo fmt --check
+        working-directory: rust/cubestore
+      - name: Run cargo check
+        # Re-using test profile to speedup builds
+        run: cargo check --benches --profile test
+        working-directory: rust/cubestore
       - name: Run cargo test
         env:
           CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
@@ -58,8 +56,8 @@ jobs:
           TEST_KSQL_USER: ${{ secrets.TEST_KSQL_USER }}
           TEST_KSQL_PASS: ${{ secrets.TEST_KSQL_PASS }}
           TEST_KSQL_URL: ${{ secrets.TEST_KSQL_URL }}
-        run: |
-          cargo test --manifest-path rust/cubestore/Cargo.toml -j 1
+        run: cargo test -- --test-threads=1
+        working-directory: rust/cubestore
 
   cubestore-docker-image-dev:
     name: Release Cube Store :dev image

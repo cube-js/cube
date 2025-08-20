@@ -227,7 +227,7 @@ fn do_benches(c: &mut Criterion) {
     do_list_bench(c, &runtime, Some(QueueItemStatus::Pending), 1_000, 128, 128);
     do_list_bench(c, &runtime, Some(QueueItemStatus::Active), 1_000, 128, 128);
 
-    do_get_bench(c, &runtime, 2_500, 128, 128, 4na);
+    do_get_bench(c, &runtime, 2_500, 128, 128, 4);
 }
 
 criterion_group!(benches, do_benches);
