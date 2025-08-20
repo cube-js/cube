@@ -397,10 +397,14 @@ jobs:
     strategy:
       matrix:
         node-version: [22.x]
+        # Vertica tests are disabled because around 20.08.2025 someone
+        # totally removed all vertica-ce docker repository from dockerhub.
+        # @see https://github.com/vertica/vertica-containers/issues/64
         db: [
             'athena', 'bigquery', 'snowflake', 'trino',
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
-            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio', 'vertica'
+            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio'
+#            'vertica'
         ]
         use_tesseract_sql_planner: [ false ]
         include:
