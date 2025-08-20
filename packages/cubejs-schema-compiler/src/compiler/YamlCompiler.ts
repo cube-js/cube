@@ -206,14 +206,26 @@ export class YamlCompiler {
     } else if (typeof obj === 'string') {
       let code = obj;
 
-      if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
-        code = `f"${this.escapeDoubleQuotes(obj)}"`;
+      if (obj === '') {
+        return t.nullLiteral();
       }
 
-      const parsePythonAndTranspileToJsTimer225 = perfTracker.start('parsePythonAndTranspileToJs call 225');
-      const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-      parsePythonAndTranspileToJsTimer225.end();
-      return this.extractProgramBodyIfNeeded(ast);
+      if (code.match(PY_TEMPLATE_SYNTAX)) {
+        if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
+          code = `f"${this.escapeDoubleQuotes(obj)}"`;
+        }
+
+        const parsePythonAndTranspileToJsTimer225 = perfTracker.start('parsePythonAndTranspileToJs call 225');
+        const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
+        parsePythonAndTranspileToJsTimer225.end();
+        return this.extractProgramBodyIfNeeded(ast);
+      }
+
+      if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
+        return t.templateLiteral([t.templateElement({ raw: code, cooked: code })], []);
+      }
+
+      return t.identifier(code);
     } else if (typeof obj === 'boolean') {
       return t.booleanLiteral(obj);
     } else if (typeof obj === 'number') {
