@@ -149,9 +149,19 @@ export class YamlCompiler {
         const fullPath = propertyPath.join('.');
         if (fullPath.match(p)) {
           if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
-            return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
+            if (obj.match(PY_TEMPLATE_SYNTAX)) {
+              return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
+            } else {
+              // Optimization: directly create arrow function returning string instead of parsing Python
+              return t.arrowFunctionExpression([], t.stringLiteral(obj));
+            }
           } else if (typeof obj === 'string') {
-            return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
+            if (obj.match(PY_TEMPLATE_SYNTAX)) {
+              return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
+            } else {
+              // Optimization: directly create arrow function returning identifier instead of parsing Python
+              return this.astIntoArrowFunction(t.program([t.expressionStatement(t.identifier(obj))]), obj, cubeName);
+            }
           } else if (Array.isArray(obj)) {
             const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
               let ast: t.Program | t.NullLiteral | t.BooleanLiteral | t.NumericLiteral | t.StringLiteral | null = null;
@@ -172,7 +182,7 @@ export class YamlCompiler {
                 } else if (code instanceof Date) {
                   // Special case when dates are defined in YAML as strings without quotes
                   // YAML parser treats them as Date objects, but for conversion we need them as strings
-                  ast = this.parsePythonAndTranspileToJs(`f"${this.escapeDoubleQuotes(code.toISOString())}"`, errorsReport);
+                  ast = t.stringLiteral(code.toISOString());
                 }
               }
               if (ast === null) {
@@ -196,14 +206,26 @@ export class YamlCompiler {
     } else if (typeof obj === 'string') {
       let code = obj;
 
-      if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
-        code = `f"${this.escapeDoubleQuotes(obj)}"`;
+      if (obj === '') {
+        return t.nullLiteral();
       }
 
-      const parsePythonAndTranspileToJsTimer225 = perfTracker.start('parsePythonAndTranspileToJs call 225');
-      const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-      parsePythonAndTranspileToJsTimer225.end();
-      return this.extractProgramBodyIfNeeded(ast);
+      if (code.match(PY_TEMPLATE_SYNTAX)) {
+        if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
+          code = `f"${this.escapeDoubleQuotes(obj)}"`;
+        }
+
+        const parsePythonAndTranspileToJsTimer225 = perfTracker.start('parsePythonAndTranspileToJs call 225');
+        const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
+        parsePythonAndTranspileToJsTimer225.end();
+        return this.extractProgramBodyIfNeeded(ast);
+      }
+
+      if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
+        return t.templateLiteral([t.templateElement({ raw: code, cooked: code })], []);
+      }
+
+      return t.identifier(code);
     } else if (typeof obj === 'boolean') {
       return t.booleanLiteral(obj);
     } else if (typeof obj === 'number') {
