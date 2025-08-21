@@ -57,9 +57,12 @@ echo "::group::MongoBI"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:mongobi
 echo "::endgroup::"
 
-echo "::group::Vertica"
-yarn lerna run --concurrency 1 --stream --no-prefix smoke:vertica
-echo "::endgroup::"
+# Vertica tests are disabled because around 20.08.2025 someone
+# totally removed all vertica-ce docker repository from dockerhub.
+# @see https://github.com/vertica/vertica-containers/issues/64
+#echo "::group::Vertica"
+#yarn lerna run --concurrency 1 --stream --no-prefix smoke:vertica
+#echo "::endgroup::"
 
 echo "::group::RBAC"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:rbac
