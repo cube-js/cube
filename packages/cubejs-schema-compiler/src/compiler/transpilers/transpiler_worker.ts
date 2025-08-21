@@ -10,6 +10,7 @@ import { CubePropContextTranspiler } from './CubePropContextTranspiler';
 import { ErrorReporter } from '../ErrorReporter';
 import { LightweightSymbolResolver } from './LightweightSymbolResolver';
 import { LightweightNodeCubeDictionary } from './LightweightNodeCubeDictionary';
+import { IIFETranspiler } from './IIFETranspiler';
 
 type TransferContent = {
   fileName: string;
@@ -28,6 +29,7 @@ const transpilers = {
   ImportExportTranspiler: new ImportExportTranspiler(),
   CubeCheckDuplicatePropTranspiler: new CubeCheckDuplicatePropTranspiler(),
   CubePropContextTranspiler: new CubePropContextTranspiler(cubeSymbols, cubeDictionary, cubeSymbols),
+  IIFETranspiler: new IIFETranspiler(),
 };
 
 const transpile = (data: TransferContent) => {

@@ -9,6 +9,7 @@ import { DataSchemaCompiler } from './DataSchemaCompiler';
 import {
   CubeCheckDuplicatePropTranspiler,
   CubePropContextTranspiler,
+  IIFETranspiler,
   ImportExportTranspiler,
   TranspilerInterface,
   ValidationTranspiler,
@@ -63,6 +64,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     new ValidationTranspiler(),
     new ImportExportTranspiler(),
     new CubePropContextTranspiler(cubeSymbols, cubeDictionary, viewCompiler),
+    new IIFETranspiler(),
   ];
 
   if (!options.allowJsDuplicatePropsInSchema) {

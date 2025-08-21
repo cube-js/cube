@@ -77,7 +77,7 @@ describe('Transpilers', () => {
     expect(content).toEqual(`const helperFunction = () => 'hello';
 addExport({
   helperFunction: helperFunction
-})
+});
 addExport({
   alias: helperFunction
 });
@@ -87,11 +87,11 @@ function requireFilterParam() {
 }
 addExport({
   requireFilterParam: requireFilterParam
-})
+});
 const someVar = 42;
 addExport({
   someVar: someVar
-})`);
+});`);
 
     errorsReport.throwIfAny(); // should not throw
   });
