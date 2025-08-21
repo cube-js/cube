@@ -1,5 +1,6 @@
 module.exports = {
   contextToRoles: async (context) => context.securityContext.auth?.roles || [],
+  contextToGroups: async (context) => context.securityContext.auth?.groups || [],
   canSwitchSqlUser: async () => true,
   checkSqlAuth: async (req, user, password) => {
     if (user === 'admin') {
@@ -19,6 +20,7 @@ module.exports = {
               minDefaultId: 10000,
             },
             roles: ['admin', 'ownder', 'hr'],
+            groups: ['leadership', 'hr'],
           },
         },
       };
@@ -40,6 +42,7 @@ module.exports = {
               minDefaultId: 10000,
             },
             roles: ['manager'],
+            groups: ['management'],
           },
         },
       };
@@ -61,6 +64,7 @@ module.exports = {
               minDefaultId: 20000,
             },
             roles: [],
+            groups: ['general'],
           },
         },
       };
@@ -82,6 +86,7 @@ module.exports = {
               minDefaultId: 20000,
             },
             roles: ['restricted'],
+            groups: ['restricted'],
           },
         },
       };

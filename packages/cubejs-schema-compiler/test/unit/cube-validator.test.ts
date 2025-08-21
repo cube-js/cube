@@ -1166,4 +1166,130 @@ describe('Cube Validation', () => {
       }
     });
   });
+
+  describe('Access Policy group/groups support:', () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+
+    it('should allow group instead of role', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          group: 'admin',
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow groups as array', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          groups: ['admin', 'user'],
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow role as single string (existing behavior)', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          role: 'admin',
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should allow group: "*" syntax', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          group: '*',
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeFalsy();
+    });
+
+    it('should reject role and group together', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          role: 'admin',
+          group: 'admin',
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeTruthy();
+    });
+
+    it('should reject role and groups together', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          role: 'admin',
+          groups: ['user'],
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeTruthy();
+    });
+
+    it('should reject group and groups together', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          group: 'admin',
+          groups: ['user'],
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeTruthy();
+    });
+
+    it('should reject access policy without role/group/groups', () => {
+      const cube = {
+        name: 'TestCube',
+        fileName: 'test.js',
+        sql: () => 'SELECT * FROM test',
+        accessPolicy: [{
+          rowLevel: { allowAll: true }
+        }]
+      };
+
+      const result = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(result.error).toBeTruthy();
+    });
+  });
 });

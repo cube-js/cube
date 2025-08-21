@@ -122,6 +122,7 @@ export type DatabaseType =
 
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;
+export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
 
@@ -195,6 +196,7 @@ export interface CreateOptions {
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
   contextToRoles?: ContextToRolesFn;
+  contextToGroups?: ContextToGroupsFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
