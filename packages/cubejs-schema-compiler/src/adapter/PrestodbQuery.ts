@@ -166,6 +166,8 @@ export class PrestodbQuery extends BaseQuery {
     delete templates.types.interval;
     templates.types.binary = 'VARBINARY';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
+    templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOLEAN)';
+    templates.tesseract.number_param_cast = 'CAST({{ expr }} AS DOUBLE)';
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %}) ESCAPE \'\\\'';
     templates.statements.time_series_select = 'SELECT from_iso8601_timestamp(dates.f) date_from, from_iso8601_timestamp(dates.t) date_to \n' +
     'FROM (\n' +
