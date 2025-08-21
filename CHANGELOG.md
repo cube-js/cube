@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.56](https://github.com/cube-js/cube/compare/v1.3.55...v1.3.56) (2025-08-21)
+
+### Bug Fixes
+
+- **cubejs-playground:** meta update propagation ([#9895](https://github.com/cube-js/cube/issues/9895)) ([2b64bc1](https://github.com/cube-js/cube/commit/2b64bc1fa0c692cc8a8341ce945d11e2009593d6))
+- **tesseract:** Param casting in Presto ([#9908](https://github.com/cube-js/cube/issues/9908)) ([346d300](https://github.com/cube-js/cube/commit/346d300f4d4ac0c231229a5883c2cf9cec746035))
+
+### Features
+
+- **cubesql:** Avoid `COUNT(*)` pushdown to joined cubes ([#9905](https://github.com/cube-js/cube/issues/9905)) ([e073a72](https://github.com/cube-js/cube/commit/e073a7217e25c3bc4b3c63145d4a22973a587491))
+
+### Performance Improvements
+
+- **schema-compiler:** Reduce JS compilation memory usage 3x-5x times. ([#9897](https://github.com/cube-js/cube/issues/9897)) ([3f1ff57](https://github.com/cube-js/cube/commit/3f1ff57589bc206bdf3cd30fed270343ef68a284))
+
 ## [1.3.55](https://github.com/cube-js/cube/compare/v1.3.54...v1.3.55) (2025-08-19)
 
 ### Bug Fixes

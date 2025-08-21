@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.56](https://github.com/cube-js/cube/compare/v1.3.55...v1.3.56) (2025-08-21)
+
+### Bug Fixes
+
+- **cubejs-playground:** meta update propagation ([#9895](https://github.com/cube-js/cube/issues/9895)) ([2b64bc1](https://github.com/cube-js/cube/commit/2b64bc1fa0c692cc8a8341ce945d11e2009593d6))
+
 ## [1.3.55](https://github.com/cube-js/cube/compare/v1.3.54...v1.3.55) (2025-08-19)
 
 **Note:** Version bump only for package @cubejs-client/playground
