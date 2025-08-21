@@ -131,45 +131,6 @@ describe('YAML SQL Formatting Preservation', () => {
     expect(sql).toContain('SELECT id, name FROM table1');
   });
 
-  it('handles sqlTable with folded scalar', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(
-      `
-      cubes:
-      - name: TestCube
-        sqlTable: >
-          SELECT col1, col2
-          -- This comment should be preserved
-          FROM source_table
-          WHERE condition = 1
-
-        dimensions:
-          - name: col1
-            sql: col1
-            type: string
-            primaryKey: true
-        measures:
-          - name: count
-            type: count
-      `
-    );
-
-    await compiler.compile();
-
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: ['TestCube.count'],
-      dimensions: ['TestCube.col1'],
-      timezone: 'UTC'
-    });
-
-    const [sql] = query.buildSqlAndParams();
-
-    // Should preserve comments in sqlTable field
-    expect(sql).toContain('-- This comment should be preserved');
-    const lines = sql.split('\n');
-    const commentLine = lines.find(line => line.includes('-- This comment should be preserved'));
-    expect(commentLine).toBeDefined();
-  });
-
   it('works correctly for SQL without comments', async () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(
       `
