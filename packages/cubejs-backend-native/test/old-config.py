@@ -78,3 +78,15 @@ def logger(msg, params):
     print('[python] logger msg', msg, 'params=', params)
 
 settings.logger = logger
+
+def context_to_roles(ctx):
+    print('[python] context_to_roles', ctx)
+    return ['admin']
+
+settings.context_to_roles = context_to_roles
+
+def context_to_groups(ctx):
+    print('[python] context_to_groups', ctx)
+    return ['dev', 'analytics']
+
+settings.context_to_groups = context_to_groups

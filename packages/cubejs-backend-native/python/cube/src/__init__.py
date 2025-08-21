@@ -78,6 +78,7 @@ class Configuration:
     pre_aggregations_schema: Union[Callable[[RequestContext], str], str]
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
     context_to_roles: Callable[[RequestContext], list[str]]
+    context_to_groups: Callable[[RequestContext], list[str]]
     fast_reload: bool
 
     def __init__(self):
@@ -128,6 +129,7 @@ class Configuration:
         self.pre_aggregations_schema = None
         self.orchestrator_options = None
         self.context_to_roles = None
+        self.context_to_groups = None
         self.fast_reload = None
 
     def __call__(self, func):
