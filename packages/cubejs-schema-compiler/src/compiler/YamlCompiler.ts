@@ -16,7 +16,6 @@ import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
-import { perfTracker } from './PerfTracker';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -93,9 +92,7 @@ export class YamlCompiler {
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
-          const transpileAndPrepareJsFileTimer = perfTracker.start('yaml-transpileAndPrepareJsFile');
           const transpiledFile = this.transpileAndPrepareJsFile(file, 'cube', { name, ...cube }, errorsReport);
-          transpileAndPrepareJsFileTimer.end();
           this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
         });
       } else if (key === 'views') {
@@ -137,10 +134,7 @@ export class YamlCompiler {
 
     cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
 
-    const transpileYamlTimer = perfTracker.start('transpileYaml');
-    const res = this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
-    transpileYamlTimer.end();
-    return res;
+    return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
 
   private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
@@ -169,9 +163,7 @@ export class YamlCompiler {
               if (propertyPath[propertyPath.length - 1] === 'values') {
                 if (typeof code === 'string') {
                   if (code.match(PY_TEMPLATE_SYNTAX)) {
-                    const parsePythonAndTranspileToJsTimer184 = perfTracker.start('parsePythonAndTranspileToJs call 184');
                     ast = this.parsePythonAndTranspileToJs(`f"${this.escapeDoubleQuotes(code)}"`, errorsReport);
-                    parsePythonAndTranspileToJsTimer184.end();
                   } else {
                     ast = t.stringLiteral(code);
                   }
@@ -186,9 +178,7 @@ export class YamlCompiler {
                 }
               }
               if (ast === null) {
-                const parsePythonAndTranspileToJsTimer201 = perfTracker.start('parsePythonAndTranspileToJs call 201');
                 ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-                parsePythonAndTranspileToJsTimer201.end();
               }
               return this.extractProgramBodyIfNeeded(ast);
             }).filter(ast => !!ast)))]);
@@ -199,9 +189,7 @@ export class YamlCompiler {
     }
 
     if (propertyPath[propertyPath.length - 1] === 'extends') {
-      const parsePythonAndTranspileToJsTimer214 = perfTracker.start('parsePythonAndTranspileToJs call 214');
       const ast = this.parsePythonAndTranspileToJs(obj, errorsReport);
-      parsePythonAndTranspileToJsTimer214.end();
       return this.astIntoArrowFunction(ast, obj, cubeName, name => this.cubeDictionary.resolveCube(name));
     } else if (typeof obj === 'string') {
       let code = obj;
@@ -215,9 +203,7 @@ export class YamlCompiler {
           code = `f"${this.escapeDoubleQuotes(obj)}"`;
         }
 
-        const parsePythonAndTranspileToJsTimer225 = perfTracker.start('parsePythonAndTranspileToJs call 225');
         const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-        parsePythonAndTranspileToJsTimer225.end();
         return this.extractProgramBodyIfNeeded(ast);
       }
 
@@ -302,9 +288,7 @@ export class YamlCompiler {
   }
 
   private parsePythonIntoArrowFunction(codeString: string, cubeName, originalObj, errorsReport: ErrorReporter) {
-    const parsePythonAndTranspileToJsTimer301 = perfTracker.start('parsePythonAndTranspileToJs call 301');
     const ast = this.parsePythonAndTranspileToJs(codeString, errorsReport);
-    parsePythonAndTranspileToJsTimer301.end();
     return this.astIntoArrowFunction(ast as any, codeString, cubeName);
   }
 
@@ -314,12 +298,8 @@ export class YamlCompiler {
     }
 
     try {
-      const parsePythonAndTranspileToJsTimer = perfTracker.start('PythonParser->transpileToJs()');
-
       const pythonParser = new PythonParser(codeString);
-      const res = pythonParser.transpileToJs();
-      parsePythonAndTranspileToJsTimer.end();
-      return res;
+      return pythonParser.transpileToJs();
     } catch (e: any) {
       errorsReport.error(`Can't parse python expression. Most likely this type of syntax isn't supported yet: ${e.message || e}`);
     }
@@ -328,7 +308,6 @@ export class YamlCompiler {
   }
 
   private astIntoArrowFunction(input: t.Program | t.NullLiteral, codeString: string, cubeName, resolveSymbol?: (string) => any) {
-    const astIntoArrowFunctionTimer = perfTracker.start('astIntoArrowFunction');
     const initialJs = babelGenerator(input, {}, codeString).code;
 
     // Re-parse generated JS to set all necessary parent paths
@@ -353,7 +332,6 @@ export class YamlCompiler {
     babelTraverse(ast, traverseObj);
 
     const body: any = ast.program.body[0];
-    astIntoArrowFunctionTimer.end();
     return body?.expression;
   }
 
