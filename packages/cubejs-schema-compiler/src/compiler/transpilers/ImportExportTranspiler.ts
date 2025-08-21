@@ -69,9 +69,9 @@ export class ImportExportTranspiler implements TranspilerInterface {
 
             path.replaceWithMultiple([
               decl.node,
-              t.callExpression(t.identifier('addExport'), [
+              t.expressionStatement(t.callExpression(t.identifier('addExport'), [
                 t.objectExpression([t.objectProperty(name, name)])
-              ])
+              ]))
             ]);
             return;
           }
@@ -80,12 +80,12 @@ export class ImportExportTranspiler implements TranspilerInterface {
           if (t.isVariableDeclaration(decl.node)) {
             path.replaceWithMultiple([
               decl.node,
-              t.callExpression(t.identifier('addExport'), [
+              t.expressionStatement(t.callExpression(t.identifier('addExport'), [
                 t.objectExpression(
                   // @ts-ignore
                   decl.get('declarations').map(d => t.objectProperty(d.get('id').node, d.get('id').node))
                 )
-              ])
+              ]))
             ]);
             return;
           }
@@ -97,12 +97,12 @@ export class ImportExportTranspiler implements TranspilerInterface {
           return;
         }
 
-        const addExportCall = t.callExpression(t.identifier('addExport'), [t.objectExpression(<t.ObjectProperty[]>declarations)]);
+        const addExportCall = t.expressionStatement(t.callExpression(t.identifier('addExport'), [t.objectExpression(<t.ObjectProperty[]>declarations)]));
         path.replaceWith(addExportCall);
       },
       ExportDefaultDeclaration(path) {
         // @ts-ignore
-        path.replaceWith(t.callExpression(t.identifier('setExport'), [path.get('declaration').node]));
+        path.replaceWith(t.expressionStatement(t.callExpression(t.identifier('setExport'), [path.get('declaration').node])));
       }
     };
   }
