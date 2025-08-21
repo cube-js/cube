@@ -348,10 +348,10 @@ export class YamlCompiler {
   }
 
   private preprocessYamlSqlMultilineValues(yamlContent: string): string {
-    // Convert all folded scalars (sql: >) to literal scalars
+    // Convert all folded scalars (sql: >) to literal scalars (sql: |)
     // to preserve SQL formatting including comments and whitespace
     return yamlContent.replace(
-      /(\s+(?:sql|sqlTable):\s*)>/g,
+      /(\s+sql:\s*)>/g,
       '$1|'
     );
   }
