@@ -2439,6 +2439,7 @@ describe('PreAggregations', () => {
       }, {
         id: 'cards.visitorId',
       }],
+      timezone: 'UTC',
     });
 
     const queryAndParams = query.buildSqlAndParams();
