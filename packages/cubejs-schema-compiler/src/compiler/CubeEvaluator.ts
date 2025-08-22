@@ -15,6 +15,7 @@ import { UserError } from './UserError';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
+import { FinishedJoinTree } from './JoinGraph';
 
 // TODO replace Function with proper types
 
@@ -86,25 +87,6 @@ export type PreAggregationTimeDimensionReference = {
   granularity: string,
 };
 
-// TODO: Move to JonGraph when it will be ts
-export type JoinEdge = {
-  from: string;
-  to: string;
-  originalFrom: string;
-  originalTo: string;
-  join: {
-    relationship: string; // TODO Use an enum from validator
-    sql: Function,
-  }
-};
-
-// TODO: Move to JonGraph when it will be ts
-export type JoinTree = {
-  root: string;
-  joins: JoinEdge[];
-  multiplicationFactor: Record<string, boolean>;
-};
-
 /// Strings in `dimensions`, `measures` and `timeDimensions[*].dimension` can contain full join path, not just `cube.member`
 export type PreAggregationReferences = {
   allowNonStrictDateRangeMatch?: boolean,
@@ -116,7 +98,7 @@ export type PreAggregationReferences = {
   fullNameTimeDimensions: Array<PreAggregationTimeDimensionReference>,
   rollups: Array<string>,
   multipliedMeasures?: Array<string>,
-  joinTree?: JoinTree;
+  joinTree?: FinishedJoinTree;
 };
 
 export type PreAggregationInfo = {
