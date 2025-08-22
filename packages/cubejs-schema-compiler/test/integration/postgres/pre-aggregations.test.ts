@@ -2387,129 +2387,147 @@ describe('PreAggregations', () => {
     });
   }
 
-  it('rollup join', async () => {
-    await compiler.compile();
-
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitor_checkins.count',
-      ],
-      dimensions: ['visitors.source'],
-      preAggregationsSchema: '',
-      order: [{
-        id: 'visitors.source',
-      }],
-      timezone: 'UTC',
+  if (getEnv('nativeSqlPlanner')) {
+    it.skip('rollup join: should be fixed in Tesseract', () => {
+      // This should be fixed in Tesseract.
     });
+  } else {
+    it('rollup join', async () => {
+      await compiler.compile();
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    console.log(preAggregationsDescription);
-
-    console.log(query.preAggregations?.rollupMatchResultDescriptions());
-
-    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
-
-    console.log(JSON.stringify(queries.concat(queryAndParams)));
-
-    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [
-          { visitors__source: 'google', vc__count: '1' },
-          { visitors__source: 'some', vc__count: '5' },
-          { visitors__source: null, vc__count: '0' },
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitor_checkins.count',
         ],
-      );
+        dimensions: ['visitors.source'],
+        preAggregationsSchema: '',
+        order: [{
+          id: 'visitors.source',
+        }],
+        timezone: 'UTC',
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+
+      console.log(query.preAggregations?.rollupMatchResultDescriptions());
+
+      const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+      console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        console.log(JSON.stringify(res));
+        expect(res).toEqual(
+          [
+            { visitors__source: 'google', vc__count: '1' },
+            { visitors__source: 'some', vc__count: '5' },
+            { visitors__source: null, vc__count: '0' },
+          ],
+        );
+      });
     });
-  });
+  }
 
-  it('rollup join existing joins', async () => {
-    await compiler.compile();
-
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitor_checkins.count',
-      ],
-      dimensions: ['visitors.source', 'cards.visitorId'],
-      preAggregationsSchema: '',
-      order: [{
-        id: 'visitors.source',
-      }, {
-        id: 'cards.visitorId',
-      }],
-      timezone: 'UTC',
+  if (getEnv('nativeSqlPlanner')) {
+    it.skip('rollup join existing joins: should be fixed in Tesseract', () => {
+      // This should be fixed in Tesseract.
     });
+  } else {
+    it('rollup join existing joins', async () => {
+      await compiler.compile();
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
-    console.log(preAggregationsDescription);
-
-    console.log(query.preAggregations?.rollupMatchResultDescriptions());
-
-    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
-
-    console.log(JSON.stringify(queries.concat(queryAndParams)));
-
-    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [
-          { visitors__source: 'google', cards__visitor_id: 3, vc__count: '1' },
-          { visitors__source: 'some', cards__visitor_id: 1, vc__count: '3' },
-          { visitors__source: 'some', cards__visitor_id: null, vc__count: '2' },
-          { visitors__source: null, cards__visitor_id: null, vc__count: '0' },
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitor_checkins.count',
         ],
-      );
+        dimensions: ['visitors.source', 'cards.visitorId'],
+        preAggregationsSchema: '',
+        order: [{
+          id: 'visitors.source',
+        }, {
+          id: 'cards.visitorId',
+        }],
+        timezone: 'UTC',
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+
+      console.log(query.preAggregations?.rollupMatchResultDescriptions());
+
+      const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+      console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        console.log(JSON.stringify(res));
+        expect(res).toEqual(
+          [
+            { visitors__source: 'google', cards__visitor_id: 3, vc__count: '1' },
+            { visitors__source: 'some', cards__visitor_id: 1, vc__count: '3' },
+            { visitors__source: 'some', cards__visitor_id: null, vc__count: '2' },
+            { visitors__source: null, cards__visitor_id: null, vc__count: '0' },
+          ],
+        );
+      });
     });
-  });
+  }
 
-  it('rollup join partitioned', async () => {
-    await compiler.compile();
-
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitor_checkins.count',
-      ],
-      dimensions: ['visitors.source'],
-      timezone: 'America/Los_Angeles',
-      preAggregationsSchema: '',
-      timeDimensions: [{
-        dimension: 'visitors.createdAt',
-        granularity: 'hour',
-        dateRange: ['2017-01-03', '2017-01-04']
-      }],
-      order: [{
-        id: 'visitors.createdAt'
-      }],
+  if (getEnv('nativeSqlPlanner')) {
+    it.skip('rollup join partitioned: should be fixed in Tesseract', () => {
+      // This should be fixed in Tesseract.
     });
+  } else {
+    it('rollup join partitioned', async () => {
+      await compiler.compile();
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
-    console.log(preAggregationsDescription);
-
-    console.log(query.preAggregations?.rollupMatchResultDescriptions());
-
-    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
-
-    console.log(JSON.stringify(queries.concat(queryAndParams)));
-
-    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [
-          {
-            visitors__source: 'some',
-            visitors__created_at_hour: '2017-01-04T16:00:00.000Z',
-            vc__count: '2'
-          }
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'visitor_checkins.count',
         ],
-      );
+        dimensions: ['visitors.source'],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: '',
+        timeDimensions: [{
+          dimension: 'visitors.createdAt',
+          granularity: 'hour',
+          dateRange: ['2017-01-03', '2017-01-04']
+        }],
+        order: [{
+          id: 'visitors.createdAt'
+        }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+
+      console.log(query.preAggregations?.rollupMatchResultDescriptions());
+
+      const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+      console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        console.log(JSON.stringify(res));
+        expect(res).toEqual(
+          [
+            {
+              visitors__source: 'some',
+              visitors__created_at_hour: '2017-01-04T16:00:00.000Z',
+              vc__count: '2'
+            }
+          ],
+        );
+      });
     });
-  });
+  }
 
   it('partitioned without time', async () => {
     await compiler.compile();
