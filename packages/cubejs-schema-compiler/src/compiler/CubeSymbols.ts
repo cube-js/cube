@@ -1173,6 +1173,8 @@ export class CubeSymbols {
           };
         }
         if (cube[propertyName as string]) {
+          // We put cubeName at the beginning of the cubeReferenceProxy(), no need to add it again
+          // so let's cut it off from joinHints
           return this.cubeReferenceProxy(cubeName, joinHints?.slice(0, -1), propertyName);
         }
         if (self.symbols[propertyName]) {
