@@ -360,24 +360,24 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
   }
 
   public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    const columns: TableStructure = await super.tableColumnTypes(table);
+
+    if (columns.length) {
+      return columns;
+    }
+
+    // It's possible that table is external Spectrum table, so we need to query it separately
     const [schema, name] = table.split('.');
 
     // We might get table from Spectrum schema, so common request via `information_schema.columns`
     // won't return anything. `getColumnsForSpecificTables` is aware of Spectrum tables.
-    const columns = await this.getColumnsForSpecificTables([{
-      schema_name: schema,
-      table_name: name,
-    }]);
+    const columnRes = await this.columnsForExternalTable(schema, name);
 
-    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
+    return columnRes.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
   public async isUnloadSupported() {
-    if (this.config.exportBucket) {
-      return true;
-    }
-
-    return false;
+    return !!this.config.exportBucket;
   }
 
   public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
