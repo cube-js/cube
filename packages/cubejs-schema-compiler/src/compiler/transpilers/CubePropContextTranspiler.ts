@@ -78,10 +78,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
   }
 
   public static replaceValueWithArrowFunction(resolveSymbol: SymbolResolver, value: NodePath<any>) {
-    const knownIds = CubePropContextTranspiler.collectKnownIdentifiers(
+    const knownIds = CubePropContextTranspiler.collectKnownIdentifiersAndTransform(
       resolveSymbol,
       value,
     );
+
     value.replaceWith(
       t.arrowFunctionExpression(
         knownIds.map(i => t.identifier(i)),
@@ -198,6 +199,25 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     return R.uniq(identifiers);
   }
 
+  protected static collectKnownIdentifiersAndTransform(resolveSymbol: SymbolResolver, path: NodePath): string[] {
+    const identifiers: string[] = [];
+
+    if (path.node.type === 'Identifier') {
+      CubePropContextTranspiler.matchAndPushIdentifier(path, resolveSymbol, identifiers);
+    }
+
+    path.traverse({
+      Identifier: (p) => {
+        CubePropContextTranspiler.matchAndTransformIdentifier(p, resolveSymbol, identifiers);
+      },
+      MemberExpression: (p) => {
+        CubePropContextTranspiler.transformUserAttributesMemberExpression(p);
+      }
+    });
+
+    return R.uniq(identifiers);
+  }
+
   protected static matchAndPushIdentifier(path, resolveSymbol: SymbolResolver, identifiers: string[]) {
     if (
       (!path.parent ||
@@ -206,6 +226,35 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       resolveSymbol(path.node.name)
     ) {
       identifiers.push(path.node.name);
+    }
+  }
+
+  protected static matchAndTransformIdentifier(path, resolveSymbol: SymbolResolver, identifiers: string[]) {
+    if (
+      (!path.parent ||
+        (path.parent.type !== 'MemberExpression' || path.parent.type === 'MemberExpression' && path.key !== 'property')
+      ) &&
+      resolveSymbol(path.node.name)
+    ) {
+      // Special handling for userAttributes - replace in parameter list with securityContext
+      if (path.node.name === 'userAttributes') {
+        identifiers.push('securityContext');
+      } else {
+        identifiers.push(path.node.name);
+      }
+    }
+  }
+
+  protected static transformUserAttributesMemberExpression(path: NodePath<t.MemberExpression>) {
+    // Check if this is userAttributes.someProperty (object should be identifier named 'userAttributes')
+    if (t.isIdentifier(path.node.object, { name: 'userAttributes' })) {
+      // Replace userAttributes with securityContext.cubeCloud.userAttributes
+      const securityContext = t.identifier('securityContext');
+      const cubeCloud = t.memberExpression(securityContext, t.identifier('cubeCloud'));
+      const userAttributes = t.memberExpression(cubeCloud, t.identifier('userAttributes'));
+      const newMemberExpression = t.memberExpression(userAttributes, path.node.property, path.node.computed);
+
+      path.replaceWith(newMemberExpression);
     }
   }
 }
