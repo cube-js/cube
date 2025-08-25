@@ -2033,6 +2033,90 @@ describe('SQL Generation', () => {
     FROM
       (select * from order where (type = ?)) AS "order"  WHERE ("order".type = ?) AND ("order".category = ?)`);
     });
+
+    it('view referencing cube with FILTER_PARAMS - multiple filters and complex query', async () => {
+      /** @type {Compilers} */
+      const viewCompiler = prepareYamlCompiler(
+        createSchemaYaml({
+          cubes: [{
+            name: 'Product',
+            sql: 'select * from products where {FILTER_PARAMS.Product.category.filter(\'category\')} and {FILTER_PARAMS.Product.status.filter(\'status\')}',
+            measures: [
+              {
+                name: 'count',
+                type: 'count',
+              },
+              {
+                name: 'revenue',
+                sql: 'price',
+                type: 'sum',
+              }
+            ],
+            dimensions: [
+              {
+                name: 'category',
+                sql: 'category',
+                type: 'string'
+              },
+              {
+                name: 'status',
+                sql: 'status',
+                type: 'string'
+              },
+              {
+                name: 'name',
+                sql: 'name',
+                type: 'string'
+              }
+            ]
+          }],
+          views: [{
+            name: 'product_analytics',
+            cubes: [{
+              join_path: 'Product',
+              prefix: true,
+              includes: [
+                'category',
+                'status',
+                'name',
+                'count',
+                'revenue'
+              ]
+            }]
+          }]
+        })
+      );
+
+      await viewCompiler.compiler.compile();
+      const query = new PostgresQuery(viewCompiler, {
+        measures: ['product_analytics.Product_count', 'product_analytics.Product_revenue'],
+        dimensions: ['product_analytics.Product_name'],
+        filters: [
+          {
+            member: 'product_analytics.Product_category',
+            operator: 'equals',
+            values: ['electronics'],
+          },
+          {
+            member: 'product_analytics.Product_status',
+            operator: 'equals',
+            values: ['active'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+
+      expect(queryString).toContain('select * from products where (category = $1) and (status = $2)');
+      // Test that the view query contains the expected structure
+      expect(queryString).toMatch(/SELECT\s+"product"\.name/);
+      expect(queryString).toMatch(/count\(\*\)/);
+      expect(queryString).toMatch(/sum\("product"\.price\)/);
+      // Test that view filters are properly applied
+      expect(queryString).toContain('WHERE ("product".category = $3) AND ("product".status = $4)');
+      // Test parameter values
+      expect(queryAndParams[1]).toEqual(['electronics', 'active', 'electronics', 'active']);
+    });
   });
 
   describe('FILTER_GROUP', () => {
