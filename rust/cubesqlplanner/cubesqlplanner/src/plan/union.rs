@@ -1,5 +1,5 @@
 use super::{QueryPlan, Schema};
-use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::{plan::Select, planner::sql_templates::PlanSqlTemplates};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -18,6 +18,14 @@ impl Union {
         Self { union, schema }
     }
 
+    pub fn new_from_subselects(selects: &Vec<Rc<Select>>) -> Self {
+        let union = selects
+            .iter()
+            .map(|s| QueryPlan::Select(s.clone()))
+            .collect();
+        Self::new(union)
+    }
+
     pub fn schema(&self) -> Rc<Schema> {
         self.schema.clone()
     }
@@ -28,7 +36,7 @@ impl Union {
             .iter()
             .map(|q| q.to_sql(templates))
             .collect::<Result<Vec<_>, _>>()?
-            .join(" UNION ALL ");
+            .join("\n UNION ALL \n");
         Ok(res)
     }
 }

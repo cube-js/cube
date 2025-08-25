@@ -9,9 +9,8 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::BaseMember;
+use crate::planner::GranularityHelper;
 use crate::planner::QueryProperties;
-use crate::planner::{BaseDimension, BaseMeasure, BaseTimeDimension, GranularityHelper};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -42,8 +41,8 @@ impl MultiStageQueryPlanner {
             .query_properties
             .all_members(false)
             .into_iter()
-            .filter_map(|memb: Rc<dyn BaseMember>| -> Option<Result<_, CubeError>> {
-                match has_multi_stage_members(&memb.member_evaluator(), false) {
+            .filter_map(|memb| -> Option<Result<_, CubeError>> {
+                match has_multi_stage_members(&memb, false) {
                     Ok(true) => Some(Ok(memb)),
                     Ok(false) => None,
                     Err(e) => Some(Err(e)),
@@ -66,11 +65,8 @@ impl MultiStageQueryPlanner {
         let top_level_ctes = multi_stage_members
             .into_iter()
             .map(|memb| -> Result<_, CubeError> {
-                let description = self.make_queries_descriptions(
-                    memb.member_evaluator().clone(),
-                    state.clone(),
-                    &mut descriptions,
-                )?;
+                let description =
+                    self.make_queries_descriptions(memb.clone(), state.clone(), &mut descriptions)?;
                 let result = (
                     description.alias().clone(),
                     vec![description.member_node().clone()],
@@ -109,9 +105,7 @@ impl MultiStageQueryPlanner {
         &self,
         base_member: Rc<MemberSymbol>,
     ) -> Result<(MultiStageInodeMember, bool), CubeError> {
-        let inode = if let Some(measure) =
-            BaseMeasure::try_new(base_member.clone(), self.query_tools.clone())?
-        {
+        let inode = if let Ok(measure) = base_member.as_measure() {
             let member_type = if measure.measure_type() == "rank" {
                 MultiStageInodeMemberType::Rank
             } else if !measure.is_calculated() {
@@ -120,22 +114,16 @@ impl MultiStageQueryPlanner {
                 MultiStageInodeMemberType::Calculate
             };
 
-            let time_shift = measure.time_shift();
+            let time_shift = measure.time_shift().clone();
 
             let is_ungrupped = match &member_type {
                 MultiStageInodeMemberType::Rank | MultiStageInodeMemberType::Calculate => true,
                 _ => self.query_properties.ungrouped(),
             };
-            let (reduce_by, add_group_by, group_by) =
-                if let Ok(measure_symbol) = measure.member_evaluator().as_measure() {
-                    (
-                        measure_symbol.reduce_by().clone().unwrap_or_default(),
-                        measure_symbol.add_group_by().clone().unwrap_or_default(),
-                        measure_symbol.group_by().clone(),
-                    )
-                } else {
-                    (vec![], vec![], None)
-                };
+
+            let reduce_by = measure.reduce_by().clone().unwrap_or_default();
+            let add_group_by = measure.add_group_by().clone().unwrap_or_default();
+            let group_by = measure.group_by().clone();
             (
                 MultiStageInodeMember::new(
                     member_type,
@@ -208,13 +196,7 @@ impl MultiStageQueryPlanner {
             let (multi_stage_member, is_ungrupped) =
                 self.create_multi_stage_inode_member(member.clone())?;
 
-            let dimensions_to_add = multi_stage_member
-                .add_group_by_symbols()
-                .iter()
-                .map(|symbol| {
-                    BaseDimension::try_new_required(symbol.clone(), self.query_tools.clone())
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+            let dimensions_to_add = multi_stage_member.add_group_by_symbols();
 
             let new_state = if !dimensions_to_add.is_empty()
                 || multi_stage_member.time_shift().is_some()
@@ -222,7 +204,7 @@ impl MultiStageQueryPlanner {
             {
                 let mut new_state = state.clone_state();
                 if !dimensions_to_add.is_empty() {
-                    new_state.add_dimensions(dimensions_to_add);
+                    new_state.add_dimensions(dimensions_to_add.clone());
                 }
                 if let Some(time_shift) = multi_stage_member.time_shift() {
                     new_state.add_time_shifts(time_shift.clone())?;
@@ -301,14 +283,15 @@ impl MultiStageQueryPlanner {
 
                 let ungrouped = measure.is_rolling_window() && !measure.is_addictive();
 
-                let mut time_dimensions = self.query_properties.time_dimensions().clone();
-                for dim in self.query_properties.dimension_symbols() {
-                    let dim = dim.resolve_reference_chain();
-                    if let Ok(time_dimension_symbol) = dim.as_time_dimension() {
-                        let time_dimension = BaseTimeDimension::try_new_from_td_symbol(
-                            self.query_tools.clone(),
-                            time_dimension_symbol,
-                        )?;
+                let mut time_dimensions = self
+                    .query_properties
+                    .time_dimensions()
+                    .iter()
+                    .map(|d| d.as_time_dimension())
+                    .collect::<Result<Vec<_>, _>>()?;
+                for dim in self.query_properties.dimensions() {
+                    let dim = dim.clone().resolve_reference_chain();
+                    if let Ok(time_dimension) = dim.as_time_dimension() {
                         time_dimensions.push(time_dimension);
                     }
                 }
@@ -324,7 +307,7 @@ impl MultiStageQueryPlanner {
                 }
                 let uniq_time_dimensions = time_dimensions
                     .iter()
-                    .unique_by(|a| (a.cube_name(), a.name(), a.get_date_range()))
+                    .unique_by(|a| (a.cube_name(), a.name(), a.date_range_vec()))
                     .collect_vec();
                 if uniq_time_dimensions.len() != 1 {
                     return Err(CubeError::internal(
@@ -335,6 +318,7 @@ impl MultiStageQueryPlanner {
 
                 let time_dimension =
                     GranularityHelper::find_dimension_with_min_granularity(&time_dimensions)?;
+                let time_dimension = MemberSymbol::new_time_dimension(time_dimension);
 
                 let (base_rolling_state, base_time_dimension) = self.make_rolling_base_state(
                     time_dimension.clone(),
@@ -412,7 +396,7 @@ impl MultiStageQueryPlanner {
 
     fn add_time_series_get_range_query(
         &self,
-        time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
@@ -427,7 +411,7 @@ impl MultiStageQueryPlanner {
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeriesGetRange(
                         time_dimension.clone(),
                     )),
-                    time_dimension.member_evaluator(),
+                    time_dimension.clone(),
                     true,
                     false,
                 ),
@@ -443,7 +427,7 @@ impl MultiStageQueryPlanner {
 
     fn add_time_series(
         &self,
-        time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
@@ -452,7 +436,11 @@ impl MultiStageQueryPlanner {
         {
             description.clone()
         } else {
-            let get_range_query_description = if time_dimension.get_date_range().is_some() {
+            let get_range_query_description = if time_dimension
+                .as_time_dimension()?
+                .date_range_vec()
+                .is_some()
+            {
                 None
             } else {
                 Some(self.add_time_series_get_range_query(
@@ -469,7 +457,7 @@ impl MultiStageQueryPlanner {
                             date_range_cte: get_range_query_description.map(|d| d.alias().clone()),
                         },
                     ))),
-                    time_dimension.member_evaluator(),
+                    time_dimension.clone(),
                     true,
                     false,
                 ),
@@ -530,11 +518,12 @@ impl MultiStageQueryPlanner {
 
     fn make_rolling_base_state(
         &self,
-        time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
         rolling_window: &RollingWindow,
         state: Rc<MultiStageAppliedState>,
-    ) -> Result<(Rc<MultiStageAppliedState>, Rc<BaseTimeDimension>), CubeError> {
-        let time_dimension_base_name = time_dimension.base_dimension().full_name();
+    ) -> Result<(Rc<MultiStageAppliedState>, Rc<MemberSymbol>), CubeError> {
+        let time_dimension_symbol = time_dimension.as_time_dimension()?;
+        let time_dimension_base_name = time_dimension_symbol.base_symbol().full_name();
         let mut new_state = state.clone_state();
         let trailing_granularity =
             GranularityHelper::granularity_from_interval(&rolling_window.trailing);
@@ -544,10 +533,12 @@ impl MultiStageQueryPlanner {
             GranularityHelper::min_granularity(&trailing_granularity, &leading_granularity)?;
         let result_granularity = GranularityHelper::min_granularity(
             &window_granularity,
-            &time_dimension.resolved_granularity()?,
+            &time_dimension_symbol.resolved_granularity()?,
         )?;
 
-        let new_time_dimension = time_dimension.change_granularity(result_granularity.clone())?;
+        let new_time_dimension_symbol = time_dimension_symbol
+            .change_granularity(self.query_tools.clone(), result_granularity.clone())?;
+        let new_time_dimension = MemberSymbol::new_time_dimension(new_time_dimension_symbol);
         //We keep only one time_dimension in the leaf query because, even if time_dimension values have different granularity, in the leaf query we need to group by the lowest granularity.
         new_state.set_time_dimensions(vec![new_time_dimension.clone()]);
 
@@ -556,7 +547,7 @@ impl MultiStageQueryPlanner {
             .clone()
             .into_iter()
             .filter(|d| {
-                d.member_evaluator()
+                d.clone()
                     .resolve_reference_chain()
                     .as_time_dimension()
                     .is_err()

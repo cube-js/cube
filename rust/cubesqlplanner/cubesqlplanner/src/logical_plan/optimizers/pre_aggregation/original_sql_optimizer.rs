@@ -41,10 +41,7 @@ impl OriginalSqlOptimizer {
                 multistage_members: query.multistage_members.clone(),
                 schema: query.schema.clone(),
                 filter: query.filter.clone(),
-                offset: query.offset,
-                limit: query.limit,
-                ungrouped: query.ungrouped,
-                order_by: query.order_by.clone(),
+                modifers: query.modifers.clone(),
                 source: optimized_source.unwrap_or_else(|| query.source.clone()),
             }))
         } else {
@@ -146,10 +143,7 @@ impl OriginalSqlOptimizer {
                     .unwrap_or_else(|| query.dimension_subqueries.clone()),
                 schema: query.schema.clone(),
                 filter: query.filter.clone(),
-                offset: query.offset,
-                limit: query.limit,
-                ungrouped: query.ungrouped,
-                order_by: query.order_by.clone(),
+                modifers: query.modifers.clone(),
             }))
         } else {
             Ok(None)

@@ -1,5 +1,5 @@
 use super::sql_evaluator::{Compiler, MemberSymbol};
-use super::{BaseMember, ParamsAllocator};
+use super::ParamsAllocator;
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
@@ -50,15 +50,6 @@ impl QueryToolsCachedData {
             self.join_hints.insert(full_name, join_hints.clone());
             Ok(join_hints)
         }
-    }
-
-    pub fn join_hints_for_base_member_vec<T: BaseMember>(
-        &mut self,
-        vec: &Vec<Rc<T>>,
-    ) -> Result<Vec<Rc<Vec<JoinHintItem>>>, CubeError> {
-        vec.iter()
-            .map(|b| self.join_hints_for_member(&b.member_evaluator()))
-            .collect::<Result<Vec<_>, _>>()
     }
 
     pub fn join_hints_for_member_symbol_vec(

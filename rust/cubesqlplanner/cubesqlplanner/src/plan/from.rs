@@ -1,4 +1,5 @@
 use super::{Join, QueryPlan, Schema, Select};
+use crate::plan::Union;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseCube, VisitorContext};
 use cubenativeutils::CubeError;
@@ -137,12 +138,33 @@ impl From {
         )))
     }
 
+    pub fn new_from_union(union: Rc<Union>, alias: String) -> Rc<Self> {
+        Self::new(FromSource::Single(SingleAliasedSource::new_from_subquery(
+            Rc::new(QueryPlan::Union(union)),
+            alias,
+        )))
+    }
+
     pub fn new_from_subselect(plan: Rc<Select>, alias: String) -> Rc<Self> {
         Self::new(FromSource::Single(SingleAliasedSource::new_from_subquery(
             Rc::new(QueryPlan::Select(plan)),
             alias,
         )))
     }
+
+    /* pub fn all_sources(&self) -> Vec<String> {
+        match &self.source {
+            FromSource::Empty => vec![],
+            FromSource::Single(s) => vec![s.alias.clone()],
+            FromSource::Join(j) => {
+                let mut sources = vec![j.root.alias.clone()];
+                for itm in j.joins.iter() {
+                    sources.push(itm.from.alias.clone());
+                }
+                sources
+            }
+        }
+    } */
 
     pub fn to_sql(
         &self,
