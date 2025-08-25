@@ -138,6 +138,10 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
           } else {
             counters.events[event] = 1;
           }
+
+          if (event.includes('error')) {
+            console.log(event, _params);
+          }
         },
         queueDriverFactory,
         ...options
@@ -159,7 +163,8 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
       const progressIntervalId = setInterval(() => {
         console.log('running', {
           ...counters,
-          processingPromisses: processingPromisses.length
+          processingPromisses: processingPromisses.length,
+          benchSettings,
         });
       }, 1000);
 
@@ -177,18 +182,25 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
 
         const queueId = crypto.randomBytes(12).toString('hex');
         const running = (async () => {
-          await queue.executeInQueue('query', queueId, {
-            // eslint-disable-next-line no-bitwise
-            payload: 'a'.repeat(benchSettings.queuePayloadSize)
-          }, 1, {
+          try {
+            await queue.executeInQueue('query', queueId, {
+              // eslint-disable-next-line no-bitwise
+              payload: {
+                large_str: 'a'.repeat(benchSettings.queuePayloadSize)
+              },
+              orphanedTimeout: 120
+            }, 1, {
             stageQueryKey: 1,
             requestId: 'request-id',
             spanId: 'span-id'
-          });
+            });
+          } catch (e) {
+            console.error(e);
+          }
 
           counters.queueResolved++;
 
-          // loosing memory for result
+          // losing memory for a result
           return null;
         })();
 
