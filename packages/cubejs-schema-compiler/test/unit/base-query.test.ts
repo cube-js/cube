@@ -2108,14 +2108,92 @@ describe('SQL Generation', () => {
       const queryString = queryAndParams[0];
 
       expect(queryString).toContain('select * from products where (category = $1) and (status = $2)');
-      // Test that the view query contains the expected structure
       expect(queryString).toMatch(/SELECT\s+"product"\.name/);
       expect(queryString).toMatch(/count\(\*\)/);
       expect(queryString).toMatch(/sum\("product"\.price\)/);
-      // Test that view filters are properly applied
       expect(queryString).toContain('WHERE ("product".category = $3) AND ("product".status = $4)');
-      // Test parameter values
       expect(queryAndParams[1]).toEqual(['electronics', 'active', 'electronics', 'active']);
+    });
+
+    it('cube with FILTER_PARAMS in measure filters - triggers backAlias collection', async () => {
+      /** @type {Compilers} */
+      const filterParamsCompiler = prepareYamlCompiler(
+        createSchemaYaml({
+          cubes: [{
+            name: 'Sales',
+            sql: 'select * from sales',
+            measures: [
+              {
+                name: 'count',
+                type: 'count',
+              },
+              {
+                name: 'filtered_revenue',
+                sql: 'amount',
+                type: 'sum',
+                // This measure filter with FILTER_PARAMS should trigger backAlias collection
+                // when evaluating symbols
+                filters: [
+                  { sql: '{FILTER_PARAMS.Sales.category.filter(\'category\')}' }
+                ]
+              }
+            ],
+            dimensions: [
+              {
+                name: 'id',
+                sql: 'id',
+                type: 'number',
+                primaryKey: true
+              },
+              {
+                name: 'category',
+                sql: 'category',
+                type: 'string'
+              },
+              {
+                name: 'region',
+                sql: 'region',
+                type: 'string'
+              }
+            ]
+          }],
+          views: [{
+            name: 'sales_analytics',
+            cubes: [{
+              join_path: 'Sales',
+              prefix: true,
+              includes: [
+                'count',
+                'filtered_revenue',
+                'category',
+                'region'
+              ]
+            }]
+          }]
+        })
+      );
+
+      await filterParamsCompiler.compiler.compile();
+
+      const query = new PostgresQuery(filterParamsCompiler, {
+        measures: ['sales_analytics.Sales_filtered_revenue'],
+        dimensions: ['sales_analytics.Sales_region'],
+        filters: [
+          {
+            member: 'sales_analytics.Sales_category',
+            operator: 'equals',
+            values: ['electronics'],
+          },
+        ],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+
+      expect(queryString).toContain('CASE WHEN (((category = $1)))');
+      expect(queryString).toMatch(/sum.*CASE WHEN/);
+      expect(queryString).toContain('WHERE ("sales".category = $2)');
+      expect(queryAndParams[1]).toEqual(['electronics', 'electronics']);
     });
   });
 
