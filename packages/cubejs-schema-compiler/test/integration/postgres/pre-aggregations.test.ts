@@ -601,7 +601,7 @@ describe('PreAggregations', () => {
     });
     `);
 
-  it('simple pre-aggregation 1', async () => {
+  it('simple pre-aggregation', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -2315,7 +2315,7 @@ describe('PreAggregations', () => {
     });
   });
 
-  if (true) { // getEnv('nativeSqlPlanner') && getEnv('nativeSqlPlannerPreAggregations')) {
+  if (getEnv('nativeSqlPlanner') && getEnv('nativeSqlPlannerPreAggregations')) {
     it('rollup lambda', async () => {
       await compiler.compile();
 
