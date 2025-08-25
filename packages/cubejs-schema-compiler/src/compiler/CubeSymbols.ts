@@ -188,7 +188,12 @@ export const CONTEXT_SYMBOLS = {
   securityContext: 'securityContext',
   FILTER_PARAMS: 'filterParams',
   FILTER_GROUP: 'filterGroup',
-  SQL_UTILS: 'sqlUtils'
+  SQL_UTILS: 'sqlUtils',
+  // This is syntax sugar for `securityContext.cubeCloud.userAttributes`
+  // while resolveSymbol won't return the exact path from securityContext
+  // it's not a problem, because this is only needed for the transpilation phase
+  // and then this shorthand will be transpiled with the full path
+  userAttributes: 'securityContext.cubeCloud.userAttributes'
 };
 
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
