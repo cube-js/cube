@@ -74,7 +74,7 @@ With this data model, you can run queries that aggregate data by dimensions such
 ```yaml
 cubes:
   - name: requests
-    sql: >
+    sql: |
       SELECT
         *,
         api_response_duration_ms / 1000 AS api_response_duration,
@@ -148,7 +148,7 @@ cubes:
         type: count
 
       - name: count_non_production
-        description: >
+        description: |
           Counts all non-production environments.
           See for details: https://cube.dev/docs/product/workspace/environments
         type: count

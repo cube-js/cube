@@ -21,7 +21,7 @@ Let's use an example of a cube with a nested SQL query:
 ```yaml
 cubes:
   - name: users_with_organizations
-    sql: >
+    sql: |
       WITH users AS (
         SELECT
           md5(company) AS organization_id,
@@ -168,7 +168,7 @@ properties][ref-schema-ref-preagg-buildrange]:
 ```yaml
 cubes:
   - name: users_with_organizations
-    sql: >
+    sql: |
       WITH users AS (
         SELECT
           md5(company) AS organization_id,

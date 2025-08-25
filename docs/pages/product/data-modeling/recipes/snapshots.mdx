@@ -104,7 +104,7 @@ cube(`status_snapshots`, {
 cubes:
   - name: status_snapshots
     extends: statuses
-    sql: >
+    sql: |
       -- Create a range from the earlist date to the latest date
       WITH range AS (
         SELECT date

@@ -1377,6 +1377,16 @@ See [this issue](https://github.com/cube-js/cube/issues/9285) for details.
 
 </ReferenceBox>
 
+## `CUBEJS_YAML_FOLDED_STRINGS_AS_LITERAL`
+
+If `true`, enables interpreting [folded strings][ref-yaml-folded-and-literal] in
+YAML-based data model files as literal strings. This affects how line breaks and spaces
+are handled in multi-line strings.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
 ## `CUBEJS_WEB_SOCKETS`
 
 If `true`, then use WebSocket for data fetching.
@@ -1800,3 +1810,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-folders]: /product/data-modeling/reference/view#folders
 [ref-dataviz-tools]: /product/configuration/visualization-tools
 [ref-context-to-app-id]: /product/configuration/reference/config#context_to_app_id
+[ref-yaml-folded-and-literal]: /product/data-modeling/dynamic/jinja#folded-and-literal-strings

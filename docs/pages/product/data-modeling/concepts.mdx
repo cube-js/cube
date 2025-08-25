@@ -85,7 +85,7 @@ cube(`orders`, {
 ```yaml
 cubes:
   - name: orders
-    sql: >
+    sql: |
       SELECT *
       FROM orders, line_items
       WHERE orders.id = line_items.order_id
@@ -564,7 +564,7 @@ Consider the following cube:
 ```yaml
 cubes:
   - name: employees
-    sql: >
+    sql: |
       SELECT 1 AS id, 'Ali' AS first_name, 20 AS age, 'Los Gatos' AS city UNION ALL
       SELECT 2 AS id, 'Bob' AS first_name, 30 AS age, 'San Diego' AS city UNION ALL
       SELECT 3 AS id, 'Eve' AS first_name, 40 AS age, 'San Diego' AS city
