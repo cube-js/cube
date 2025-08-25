@@ -174,6 +174,22 @@ pub trait QueryEngine {
             )
             .map_err(|e| CompilationError::internal(e.to_string()))?;
 
+        let rewriting_start = SystemTime::now();
+        if let Some(span_id) = span_id.as_ref() {
+            if let Some(auth_context) = state.auth_context() {
+                self.transport_ref()
+                    .log_load_state(
+                        Some(span_id.clone()),
+                        auth_context,
+                        state.get_load_request_meta("sql"),
+                        "SQL API Plan Rewrite".to_string(),
+                        serde_json::json!({}),
+                    )
+                    .await
+                    .map_err(|e| CompilationError::internal(e.to_string()))?;
+            }
+        }
+
         let mut finalized_graph = self
             .compiler_cache_ref()
             .rewrite(
@@ -266,6 +282,23 @@ pub trait QueryEngine {
         }
 
         let rewrite_plan = result?;
+
+        if let Some(span_id) = span_id.as_ref() {
+            if let Some(auth_context) = state.auth_context() {
+                self.transport_ref()
+                    .log_load_state(
+                        Some(span_id.clone()),
+                        auth_context,
+                        state.get_load_request_meta("sql"),
+                        "SQL API Plan Rewrite Success".to_string(),
+                        serde_json::json!({
+                            "duration": rewriting_start.elapsed().unwrap().as_millis() as u64,
+                        }),
+                    )
+                    .await
+                    .map_err(|e| CompilationError::internal(e.to_string()))?;
+            }
+        }
 
         // DF optimizes logical plan (second time) on physical plan creation
         // It's not safety to use all optimizers from DF for OLAP queries, because it will lead to errors
