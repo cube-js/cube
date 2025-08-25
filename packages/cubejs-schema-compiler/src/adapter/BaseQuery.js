@@ -4977,8 +4977,6 @@ export class BaseQuery {
   backAliasMembers(members) {
     const query = this;
 
-    const buildJoinPath = this.buildJoinPathFn();
-
     const aliases = Object.fromEntries(members.flatMap(
       member => {
         const collectedMembers = query.evaluateSymbolSqlWithContext(
@@ -4997,6 +4995,15 @@ export class BaseQuery {
           .map(d => [query.cubeEvaluator.byPathAnyType(d).aliasMember, memberPath]);
       }
     ));
+
+    // No join/graph  might be in place when collecting members from the query with some injected filters,
+    // like FILTER_PARAMS or securityContext...
+    // So we simply return aliases as is
+    if (!this.join || !this.joinGraphPaths) {
+      return aliases;
+    }
+
+    const buildJoinPath = this.buildJoinPathFn();
 
     /**
      * @type {Record<string, string>}
