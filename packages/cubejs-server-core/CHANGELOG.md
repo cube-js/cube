@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.58](https://github.com/cube-js/cube/compare/v1.3.57...v1.3.58) (2025-08-25)
+
+### Bug Fixes
+
+- **schema-compiler:** Use join tree for pre-agg matching ([#9597](https://github.com/cube-js/cube/issues/9597)) ([c0341ba](https://github.com/cube-js/cube/commit/c0341ba94c5aae9c5ffef178bd6ccca27735db46))
+
 ## [1.3.57](https://github.com/cube-js/cube/compare/v1.3.56...v1.3.57) (2025-08-22)
 
 ### Features
