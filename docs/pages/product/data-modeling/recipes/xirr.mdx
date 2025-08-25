@@ -38,7 +38,7 @@ Consider the following data model:
 ```yaml
 cubes:
   - name: payments
-    sql: >
+    sql: |
       SELECT '2014-01-01'::date AS date, -10000.0 AS payment UNION ALL
       SELECT '2014-03-01'::date AS date,   2750.0 AS payment UNION ALL
       SELECT '2014-10-30'::date AS date,   4250.0 AS payment UNION ALL

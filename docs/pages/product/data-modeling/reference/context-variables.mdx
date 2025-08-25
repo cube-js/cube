@@ -136,7 +136,7 @@ following syntax:
 ```yaml
 cubes:
   - name: cube_name
-    sql: >
+    sql: |
       SELECT *
       FROM table
       WHERE {FILTER_PARAMS.cube_name.member_name.filter(sql_expression)}
@@ -202,7 +202,7 @@ cube(`order_facts`, {
 ```yaml
 cubes:
   - name: order_facts
-    sql: >
+    sql: |
       SELECT *
       FROM orders
       WHERE {FILTER_PARAMS.order_facts.date.filter('date')}
@@ -259,7 +259,7 @@ add BigQuery shard filtering, which will reduce your billing cost.
 ```yaml
 cubes:
   - name: events
-    sql: >
+    sql: |
       SELECT *
       FROM schema.`events*`
       WHERE {FILTER_PARAMS.events.date.filter(
@@ -353,7 +353,7 @@ following syntax:
 ```yaml
 cubes:
   - name: cube_name
-    sql: >
+    sql: |
       SELECT *
       FROM table
       WHERE {FILTER_GROUP(
@@ -408,7 +408,7 @@ where two `FILTER_PARAMS` are combined in SQL using the `OR` operator:
 ```yaml
 cubes:
   - name: filter_group
-    sql: >
+    sql: |
       SELECT *
         FROM (
           SELECT 1 AS a, 3 AS b UNION ALL
@@ -521,7 +521,7 @@ Now, if the cube is defined the following way...
 ```yaml
 cubes:
   - name: filter_group
-    sql: >
+    sql: |
       SELECT *
         FROM (
           SELECT 1 AS a, 3 AS b UNION ALL
