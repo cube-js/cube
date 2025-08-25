@@ -15,3 +15,5 @@ export interface TranspilerSymbolResolver {
 export interface TranspilerCubeResolver {
   resolveCube(name): boolean;
 }
+
+export type SymbolResolver = (name: string) => any;

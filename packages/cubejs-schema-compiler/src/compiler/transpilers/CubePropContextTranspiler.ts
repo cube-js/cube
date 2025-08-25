@@ -3,6 +3,7 @@ import R from 'ramda';
 
 import type { NodePath } from '@babel/traverse';
 import {
+  SymbolResolver,
   TranspilerCubeResolver,
   TranspilerInterface,
   TranspilerSymbolResolver,
@@ -59,7 +60,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
                 args[0].node.type === 'TemplateLiteral' &&
                 args[0].node.quasis.length &&
                 args[0].node.quasis[0].value.cooked;
-              args[args.length - 1].traverse(this.sqlAndReferencesFieldVisitor(cubeName));
+              args[args.length - 1].traverse(this.sqlAndReferencesFieldVisitor(cubeName as string));
               args[args.length - 1].traverse(
                 this.knownIdentifiersInjectVisitor('extends', name => this.cubeDictionary.resolveCube(name))
               );
@@ -72,11 +73,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     };
   }
 
-  protected transformObjectProperty(path: NodePath<t.ObjectProperty>, resolveSymbol: (name: string) => void) {
+  protected transformObjectProperty(path: NodePath<t.ObjectProperty>, resolveSymbol: SymbolResolver) {
     CubePropContextTranspiler.replaceValueWithArrowFunction(resolveSymbol, path.get('value'));
   }
 
-  public static replaceValueWithArrowFunction(resolveSymbol: (name: string) => any, value: NodePath<any>) {
+  public static replaceValueWithArrowFunction(resolveSymbol: SymbolResolver, value: NodePath<any>) {
     const knownIds = CubePropContextTranspiler.collectKnownIdentifiers(
       resolveSymbol,
       value,
@@ -91,7 +92,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     );
   }
 
-  protected sqlAndReferencesFieldVisitor(cubeName): TraverseObject {
+  protected sqlAndReferencesFieldVisitor(cubeName: string | null | undefined): TraverseObject {
     const resolveSymbol = n => this.viewCompiler.resolveSymbol(cubeName, n) ||
       this.cubeSymbols.resolveSymbol(cubeName, n) ||
       this.cubeSymbols.isCurrentCube(n);
@@ -171,7 +172,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     return fp;
   }
 
-  protected knownIdentifiersInjectVisitor(field: RegExp | string, resolveSymbol: (name: string) => void): TraverseObject {
+  protected knownIdentifiersInjectVisitor(field: RegExp | string, resolveSymbol: SymbolResolver): TraverseObject {
     return {
       ObjectProperty: (path) => {
         if (path.node.key.type === 'Identifier' && path.node.key.name.match(field)) {
@@ -181,8 +182,8 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     };
   }
 
-  protected static collectKnownIdentifiers(resolveSymbol, path: NodePath) {
-    const identifiers = [];
+  protected static collectKnownIdentifiers(resolveSymbol: SymbolResolver, path: NodePath): string[] {
+    const identifiers: string[] = [];
 
     if (path.node.type === 'Identifier') {
       CubePropContextTranspiler.matchAndPushIdentifier(path, resolveSymbol, identifiers);
@@ -197,7 +198,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     return R.uniq(identifiers);
   }
 
-  protected static matchAndPushIdentifier(path, resolveSymbol, identifiers) {
+  protected static matchAndPushIdentifier(path, resolveSymbol: SymbolResolver, identifiers: string[]) {
     if (
       (!path.parent ||
         (path.parent.type !== 'MemberExpression' || path.parent.type === 'MemberExpression' && path.key !== 'property')
