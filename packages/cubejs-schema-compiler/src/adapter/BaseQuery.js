@@ -130,9 +130,7 @@ export class BaseQuery {
   /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
   timeDimensions;
 
-  /**
-   * @type {import('../compiler/JoinGraph').FinishedJoinTree}
-   */
+  /** @type {import('../compiler/JoinGraph').FinishedJoinTree} */
   join;
 
   /**
@@ -332,6 +330,9 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
     /**
+     * For now this might come only from SQL API, it might be some queries that uses measures and filters to
+     * get the dimensions that are then used as join conditions to get the final results.
+     * As consequence - if there are such sub query joins - pre-aggregations can't be used.
      * @type {Array<{sql: string, on: {expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}>}
      */
     this.customSubQueryJoins = this.options.subqueryJoins ?? [];
@@ -365,6 +366,17 @@ export class BaseQuery {
     try {
       // TODO allJoinHints should contain join hints form pre-agg
       this.join = this.joinGraph.buildJoin(this.allJoinHints);
+      /**
+       * @type {Record<string, string[]>}
+       */
+      const queryJoinGraph = {};
+      for (const { originalFrom, originalTo } of (this.join?.joins || [])) {
+        if (!queryJoinGraph[originalFrom]) {
+          queryJoinGraph[originalFrom] = [];
+        }
+        queryJoinGraph[originalFrom].push(originalTo);
+      }
+      this.joinGraphPaths = queryJoinGraph || {};
     } catch (e) {
       if (this.useNativeSqlPlanner) {
         // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
@@ -420,7 +432,7 @@ export class BaseQuery {
 
   /**
    *
-   * @returns {Array<Array<string>>}
+   * @returns {Array<string | Array<string>>}
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
@@ -708,7 +720,9 @@ export class BaseQuery {
     if (this.from) {
       return this.simpleQuery();
     }
-    if (!this.options.preAggregationQuery) {
+    const hasMemberExpressions = this.allMembersConcat(false).some(m => m.isMemberExpression);
+
+    if (!this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
@@ -720,8 +734,6 @@ export class BaseQuery {
         multipliedMeasures,
         regularMeasures,
         cumulativeMeasures,
-        withQueries,
-        multiStageMembers,
       } = this.fullKeyQueryAggregateMeasures();
 
       if (cumulativeMeasures.length === 0) {
@@ -785,7 +797,7 @@ export class BaseQuery {
   externalPreAggregationQuery() {
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
-      if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
+      if (preAggregationForQuery?.preAggregation.external) {
         return true;
       }
       const preAggregationsDescription = this.preAggregations.preAggregationsDescription();
@@ -3810,7 +3822,7 @@ export class BaseQuery {
 
   /**
    *
-   * @param options
+   * @param {unknown} options
    * @returns {this}
    */
   newSubQuery(options) {
@@ -4964,7 +4976,10 @@ export class BaseQuery {
    */
   backAliasMembers(members) {
     const query = this;
-    return Object.fromEntries(members.flatMap(
+
+    const buildJoinPath = this.buildJoinPathFn();
+
+    const aliases = Object.fromEntries(members.flatMap(
       member => {
         const collectedMembers = query.evaluateSymbolSqlWithContext(
           () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
@@ -4982,5 +4997,88 @@ export class BaseQuery {
           .map(d => [query.cubeEvaluator.byPathAnyType(d).aliasMember, memberPath]);
       }
     ));
+
+    /**
+     * @type {Record<string, string>}
+     */
+    const res = {};
+    for (const [original, alias] of Object.entries(aliases)) {
+      const [cube, field] = original.split('.');
+      const path = buildJoinPath(cube);
+
+      const [aliasCube, aliasField] = alias.split('.');
+      const aliasPath = aliasCube !== cube ? buildJoinPath(aliasCube) : path;
+
+      if (path) {
+        res[`${path}.${field}`] = aliasPath ? `${aliasPath}.${aliasField}` : alias;
+      }
+
+      // Aliases might come from proxied members, in such cases
+      // we need to map them to originals too
+      if (aliasPath) {
+        res[original] = `${aliasPath}.${aliasField}`;
+      }
+    }
+
+    return res;
+  }
+
+  buildJoinPathFn() {
+    const query = this;
+    const { root } = this.join || {};
+
+    return (target) => {
+      const visited = new Set();
+      const path = [];
+
+      /**
+       * @param {string} node
+       * @returns {boolean}
+       */
+      function dfs(node) {
+        if (node === target) {
+          path.push(node);
+          return true;
+        }
+
+        if (visited.has(node)) return false;
+        visited.add(node);
+
+        const neighbors = query.joinGraphPaths[node] || [];
+        for (const neighbor of neighbors) {
+          if (dfs(neighbor)) {
+            path.unshift(node);
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      return dfs(root) ? path.join('.') : null;
+    };
+  }
+
+  /**
+   * Returns a function that constructs the full member path
+   * based on the query's join structure.
+   * @returns {(function(member: string): (string))}
+   */
+  resolveFullMemberPathFn() {
+    const { root: queryJoinRoot } = this.join || {};
+
+    const buildJoinPath = this.buildJoinPathFn();
+
+    return (member) => {
+      const [cube, field] = member.split('.');
+      if (!cube || !field) return member;
+
+      if (cube === queryJoinRoot.root) {
+        return member;
+      }
+
+      const path = buildJoinPath(cube);
+      return path ? `${path}.${field}` : member;
+    };
   }
 }

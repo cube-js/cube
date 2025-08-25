@@ -90,7 +90,7 @@ export class BaseSegment {
 
   public expressionPath(): string {
     if (this.expression) {
-      return `expr:${this.expression.expressionName}`;
+      return `expr:${this.expressionName}`;
     }
 
     const path = this.path();

@@ -15,6 +15,7 @@ import { UserError } from './UserError';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
+import { FinishedJoinTree } from './JoinGraph';
 
 export type SegmentDefinition = {
   type: string;
@@ -88,10 +89,14 @@ export type PreAggregationTimeDimensionReference = {
 export type PreAggregationReferences = {
   allowNonStrictDateRangeMatch?: boolean,
   dimensions: Array<string>,
+  fullNameDimensions: Array<string>,
   measures: Array<string>,
+  fullNameMeasures: Array<string>,
   timeDimensions: Array<PreAggregationTimeDimensionReference>,
+  fullNameTimeDimensions: Array<PreAggregationTimeDimensionReference>,
   rollups: Array<string>,
   multipliedMeasures?: Array<string>,
+  joinTree?: FinishedJoinTree;
 };
 
 export type PreAggregationInfo = {
@@ -545,14 +550,15 @@ export class CubeEvaluator extends CubeSymbols {
       if (member.sql && !member.subQuery) {
         const funcArgs = this.funcArguments(member.sql);
         const { cubeReferencesUsed, evaluatedSql, pathReferencesUsed } = this.collectUsedCubeReferences(cube.name, member.sql);
-        // We won't check for FILTER_PARAMS here as it shouldn't affect ownership and it should obey the same reference rules.
+        // We won't check for FILTER_PARAMS here as it shouldn't affect ownership, and it should obey the same reference rules.
         // To affect ownership FILTER_PARAMS can be declared as `${FILTER_PARAMS.Foo.bar.filter(`${Foo.bar}`)}`.
         // It isn't owned if there are non {CUBE} references
         if (funcArgs.length > 0 && cubeReferencesUsed.length === 0) {
           ownedByCube = false;
         }
         // Aliases one to one some another member as in case of views
-        if (!ownedByCube && !member.filters && CubeSymbols.isCalculatedMeasureType(member.type) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
+        // Note: Segments do not have type set
+        if (!ownedByCube && !member.filters && (!member.type || CubeSymbols.isCalculatedMeasureType(member.type)) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
           aliasMember = this.pathFromArray(pathReferencesUsed[0]);
         }
         const foreignCubes = cubeReferencesUsed.filter(usedCube => usedCube !== cube.name);
@@ -879,6 +885,9 @@ export class CubeEvaluator extends CubeSymbols {
       timeDimensions,
       rollups:
         aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences, { originalSorting: true }) || [],
+      fullNameDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
+      fullNameMeasures: [], // May be filled in PreAggregations.evaluateAllReferences()
+      fullNameTimeDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
     };
   }
 }
