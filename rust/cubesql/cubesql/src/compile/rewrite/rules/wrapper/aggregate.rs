@@ -609,7 +609,7 @@ impl WrapperRules {
                             ),
                         ),
                         wrapper_pullup_replacer(
-                            wrapped_select_subqueries_empty_tail(),
+                            "?inner_subqueries",
                             wrapper_replacer_context(
                                 "?alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
@@ -735,7 +735,7 @@ impl WrapperRules {
                         ),
                     ),
                     wrapper_pullup_replacer(
-                        wrapped_select_subqueries_empty_tail(),
+                        "?inner_subqueries",
                         wrapper_replacer_context(
                             "?alias_to_cube",
                             "WrapperReplacerContextPushToCube:true",
