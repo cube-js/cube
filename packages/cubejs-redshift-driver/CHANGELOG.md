@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.59](https://github.com/cube-js/cube/compare/v1.3.58...v1.3.59) (2025-08-26)
+
+### Bug Fixes
+
+- **redshift-driver:** Use proper query for table column types that respects fetchColumnsByOrdinalPosition ([#9915](https://github.com/cube-js/cube/issues/9915)) ([2e97019](https://github.com/cube-js/cube/commit/2e97019b272ad6d991733e8fa8becdf248256f6c))
+
 ## [1.3.58](https://github.com/cube-js/cube/compare/v1.3.57...v1.3.58) (2025-08-25)
 
 **Note:** Version bump only for package @cubejs-backend/redshift-driver

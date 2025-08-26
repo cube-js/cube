@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.59](https://github.com/cube-js/cube/compare/v1.3.58...v1.3.59) (2025-08-26)
+
+### Bug Fixes
+
+- **cubesql:** Merge subqueries with SQL push down ([#9916](https://github.com/cube-js/cube/issues/9916)) ([9a5597b](https://github.com/cube-js/cube/commit/9a5597bfb555bc8f81f851b1b6866d159cf4a304))
+- **redshift-driver:** Use proper query for table column types that respects fetchColumnsByOrdinalPosition ([#9915](https://github.com/cube-js/cube/issues/9915)) ([2e97019](https://github.com/cube-js/cube/commit/2e97019b272ad6d991733e8fa8becdf248256f6c))
+- **schema-compiler:** Fix incorrect backAlias members collection for FILTER_PARAMS members ([#9919](https://github.com/cube-js/cube/issues/9919)) ([91115d7](https://github.com/cube-js/cube/commit/91115d7344920ed13eb9ef1b9f522c9ee67fe8af))
+
+### Features
+
+- **cubesql:** Report rewrite start/success events ([#9917](https://github.com/cube-js/cube/issues/9917)) ([7cc80b2](https://github.com/cube-js/cube/commit/7cc80b2e2c43ec401e95482fb9d8969ed53f458c))
+
 ## [1.3.58](https://github.com/cube-js/cube/compare/v1.3.57...v1.3.58) (2025-08-25)
 
 ### Bug Fixes
