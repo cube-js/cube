@@ -17504,4 +17504,49 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             displayable(physical_plan.as_ref()).indent()
         );
     }
+
+    #[tokio::test]
+    async fn test_where_subquery_sql_push_down_measure_fn() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            WITH top_customers AS (
+                SELECT
+                    KibanaSampleDataEcommerce.id,
+                    MEASURE(KibanaSampleDataEcommerce.sumPrice) AS sum_value
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1
+                ORDER BY 2 DESC
+                LIMIT 3
+            )
+            SELECT
+                KibanaSampleDataEcommerce.id,
+                MEASURE(KibanaSampleDataEcommerce.sumPrice) AS sum_value
+            FROM KibanaSampleDataEcommerce
+            WHERE KibanaSampleDataEcommerce.id IN (
+                SELECT id FROM top_customers
+            )
+            GROUP BY 1
+            ORDER BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("IN (SELECT"));
+        assert!(sql.contains(r#"\\\"limit\\\": 3\\n"#));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
 }
