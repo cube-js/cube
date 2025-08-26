@@ -198,24 +198,39 @@ views:
         }
       ],
       timezone: 'UTC'
-    }, [{
-      orders__date_year: '2023-01-01T00:00:00.000Z',
-      orders__revenue: '15',
-      orders__revenue_1_y_ago: '5',
-      orders__cagr_1_y: '2.0000000000000000'
-    },
-    {
-      orders__date_year: '2024-01-01T00:00:00.000Z',
-      orders__revenue: '30',
-      orders__revenue_1_y_ago: '15',
-      orders__cagr_1_y: '1.0000000000000000'
-    },
-    {
-      orders__date_year: '2025-01-01T00:00:00.000Z',
-      orders__revenue: '5',
-      orders__revenue_1_y_ago: '30',
-      orders__cagr_1_y: '-0.83333333333333333333'
-    }],
+    }, [
+      {
+        orders__cagr_1_y: null,
+        orders__date_year: '2022-01-01T00:00:00.000Z',
+        orders__revenue: '5',
+        orders__revenue_1_y_ago: null,
+      },
+      {
+        orders__date_year: '2023-01-01T00:00:00.000Z',
+        orders__revenue: '15',
+        orders__revenue_1_y_ago: '5',
+        orders__cagr_1_y: '2.0000000000000000'
+      },
+      {
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '30',
+        orders__revenue_1_y_ago: '15',
+        orders__cagr_1_y: '1.0000000000000000'
+      },
+      {
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '5',
+        orders__revenue_1_y_ago: '30',
+        orders__cagr_1_y: '-0.83333333333333333333'
+      },
+
+      {
+        orders__cagr_1_y: null,
+        orders__date_year: '2026-01-01T00:00:00.000Z',
+        orders__revenue: null,
+        orders__revenue_1_y_ago: '5',
+      },
+    ],
     { joinGraph, cubeEvaluator, compiler }));
   } else {
     // This test is working only in tesseract
