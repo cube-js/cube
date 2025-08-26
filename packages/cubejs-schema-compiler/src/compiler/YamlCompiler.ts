@@ -194,24 +194,12 @@ export class YamlCompiler {
     } else if (typeof obj === 'string') {
       let code = obj;
 
-      if (obj === '') {
-        return t.nullLiteral();
-      }
-
-      if (code.match(PY_TEMPLATE_SYNTAX)) {
-        if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
-          code = `f"${this.escapeDoubleQuotes(obj)}"`;
-        }
-
-        const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-        return this.extractProgramBodyIfNeeded(ast);
-      }
-
       if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
-        return t.templateLiteral([t.templateElement({ raw: code, cooked: code })], []);
+        code = `f"${this.escapeDoubleQuotes(obj)}"`;
       }
 
-      return t.identifier(code);
+      const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
+      return this.extractProgramBodyIfNeeded(ast);
     } else if (typeof obj === 'boolean') {
       return t.booleanLiteral(obj);
     } else if (typeof obj === 'number') {
