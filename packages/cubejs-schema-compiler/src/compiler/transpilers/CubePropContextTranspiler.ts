@@ -101,14 +101,14 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     return {
       ObjectProperty: (path) => {
         if (path.node.key.type === 'Identifier' && path.node.key.name === 'joins' && t.isObjectExpression(path.node.value)) {
-          const fullPath = this.fullPath(path);
+          const fullPath = CubePropContextTranspiler.fullPath(path);
           if (fullPath === 'joins') {
             this.convertJoinsObjectToArray(path);
           }
         }
 
         if (path.node.key.type === 'Identifier' && transpiledFields.has(path.node.key.name)) {
-          const fullPath = this.fullPath(path);
+          const fullPath = CubePropContextTranspiler.fullPath(path);
           // eslint-disable-next-line no-restricted-syntax
           for (const p of transpiledFieldsPatterns) {
             if (fullPath.match(p)) {
@@ -154,7 +154,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     valuePath.replaceWith(t.arrayExpression(elements));
   }
 
-  protected fullPath(path: NodePath<t.ObjectProperty>): string {
+  protected static fullPath(path: NodePath): string {
     // @ts-ignore
     let fp = path?.node?.key?.name || '';
     let pp: NodePath<t.Node> | null | undefined = path?.parentPath;
@@ -183,27 +183,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     };
   }
 
-  protected static collectKnownIdentifiers(resolveSymbol: SymbolResolver, path: NodePath): string[] {
-    const identifiers: string[] = [];
-
-    if (path.node.type === 'Identifier') {
-      CubePropContextTranspiler.matchAndPushIdentifier(path, resolveSymbol, identifiers);
-    }
-
-    path.traverse({
-      Identifier: (p) => {
-        CubePropContextTranspiler.matchAndPushIdentifier(p, resolveSymbol, identifiers);
-      }
-    });
-
-    return R.uniq(identifiers);
-  }
-
   protected static collectKnownIdentifiersAndTransform(resolveSymbol: SymbolResolver, path: NodePath): string[] {
     const identifiers: string[] = [];
 
     if (path.node.type === 'Identifier') {
-      CubePropContextTranspiler.matchAndPushIdentifier(path, resolveSymbol, identifiers);
+      CubePropContextTranspiler.matchAndTransformIdentifier(path, resolveSymbol, identifiers);
     }
 
     path.traverse({
@@ -218,17 +202,6 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     return R.uniq(identifiers);
   }
 
-  protected static matchAndPushIdentifier(path, resolveSymbol: SymbolResolver, identifiers: string[]) {
-    if (
-      (!path.parent ||
-        (path.parent.type !== 'MemberExpression' || path.parent.type === 'MemberExpression' && path.key !== 'property')
-      ) &&
-      resolveSymbol(path.node.name)
-    ) {
-      identifiers.push(path.node.name);
-    }
-  }
-
   protected static matchAndTransformIdentifier(path, resolveSymbol: SymbolResolver, identifiers: string[]) {
     if (
       (!path.parent ||
@@ -237,7 +210,8 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       resolveSymbol(path.node.name)
     ) {
       // Special handling for userAttributes - replace in parameter list with securityContext
-      if (path.node.name === 'userAttributes') {
+      const fullPath = this.fullPath(path);
+      if (path.node.name === 'userAttributes' && (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))) {
         identifiers.push('securityContext');
       } else {
         identifiers.push(path.node.name);
@@ -247,7 +221,8 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
   protected static transformUserAttributesMemberExpression(path: NodePath<t.MemberExpression>) {
     // Check if this is userAttributes.someProperty (object should be identifier named 'userAttributes')
-    if (t.isIdentifier(path.node.object, { name: 'userAttributes' })) {
+    const fullPath = this.fullPath(path);
+    if (t.isIdentifier(path.node.object, { name: 'userAttributes' }) && (fullPath.startsWith('accessPolicy') || fullPath.startsWith('access_policy'))) {
       // Replace userAttributes with securityContext.cubeCloud.userAttributes
       const securityContext = t.identifier('securityContext');
       const cubeCloud = t.memberExpression(securityContext, t.identifier('cubeCloud'));
