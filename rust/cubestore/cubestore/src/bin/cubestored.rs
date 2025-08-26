@@ -37,7 +37,7 @@ fn main() {
     let metrics_server_address = format!("{}:{}", metrics_addr, metrics_port);
 
     init_metrics(
-        "127.0.0.1:0",
+        "0.0.0.0:0",
         metrics_server_address,
         metrics_format,
         vec![],
