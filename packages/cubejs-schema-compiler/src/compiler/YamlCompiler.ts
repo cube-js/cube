@@ -71,7 +71,7 @@ export class YamlCompiler {
   ) {
     const renderedFile = await this.renderTemplate(file, compileContext, pythonContext);
 
-    const transpiledFile = this.compileYamlFile(renderedFile, errorsReport);
+    const transpiledFile = this.transpileYamlFile(renderedFile, errorsReport);
 
     if (!transpiledFile) {
       return;
@@ -80,7 +80,7 @@ export class YamlCompiler {
     this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
   }
 
-  public compileYamlFile(
+  public transpileYamlFile(
     file: FileContent,
     errorsReport: ErrorReporter,
   ): FileContent | undefined {

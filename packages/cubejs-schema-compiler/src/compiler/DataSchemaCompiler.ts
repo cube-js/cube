@@ -483,7 +483,7 @@ export class DataSchemaCompiler {
 
       return file;
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      return file;
+      return this.yamlCompiler.transpileYamlFile(file, errorsReport);
     } else if (file.fileName.endsWith('.js')) {
       return this.transpileJsFile(file, errorsReport, options);
     } else {
@@ -678,10 +678,8 @@ export class DataSchemaCompiler {
         this.pythonContext!
       ));
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      const transpiledFile = this.yamlCompiler.compileYamlFile(file, errorsReport);
-      if (transpiledFile) {
-        this.compileJsFile(transpiledFile, errorsReport);
-      }
+      // original yaml file was already transpiled into js
+      this.compileJsFile(file, errorsReport);
     }
   }
 
