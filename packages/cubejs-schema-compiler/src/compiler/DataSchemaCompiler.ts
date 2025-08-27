@@ -172,7 +172,6 @@ export class DataSchemaCompiler {
     this.standalone = options.standalone || false;
     this.nativeInstance = options.nativeInstance;
     this.yamlCompiler = options.yamlCompiler;
-    this.yamlCompiler.dataSchemaCompiler = this;
     this.pythonContext = null;
     this.workerPool = null;
     this.compilerId = options.compilerId || 'default';
@@ -671,12 +670,17 @@ export class DataSchemaCompiler {
         // TODO do Jinja syntax check with jinja compiler
       ) && file.content.match(JINJA_SYNTAX)
     ) {
-      asyncModules.push(() => this.yamlCompiler.compileYamlWithJinjaFile(
-        file,
-        errorsReport,
-        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
-        this.pythonContext!
-      ));
+      asyncModules.push(async () => {
+        const transpiledFile = await this.yamlCompiler.compileYamlWithJinjaFile(
+          file,
+          errorsReport,
+          this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
+          this.pythonContext!
+        );
+        if (transpiledFile) {
+          this.compileJsFile(transpiledFile, errorsReport);
+        }
+      });
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
       // original yaml file was already transpiled into js
       this.compileJsFile(file, errorsReport);
