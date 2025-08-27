@@ -11,7 +11,6 @@ import { getEnv } from '@cubejs-backend/shared';
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
-import { DataSchemaCompiler } from './DataSchemaCompiler';
 import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
@@ -25,8 +24,6 @@ type EscapeStateStack = {
 };
 
 export class YamlCompiler {
-  public dataSchemaCompiler: DataSchemaCompiler | null = null;
-
   protected jinjaEngine: JinjaEngine | null = null;
 
   public constructor(
@@ -68,16 +65,10 @@ export class YamlCompiler {
     errorsReport: ErrorReporter,
     compileContext,
     pythonContext: PythonCtx
-  ) {
+  ): Promise<FileContent | undefined> {
     const renderedFile = await this.renderTemplate(file, compileContext, pythonContext);
 
-    const transpiledFile = this.transpileYamlFile(renderedFile, errorsReport);
-
-    if (!transpiledFile) {
-      return;
-    }
-
-    this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
+    return this.transpileYamlFile(renderedFile, errorsReport);
   }
 
   public transpileYamlFile(
