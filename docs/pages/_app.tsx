@@ -84,6 +84,8 @@ export default function MyApp({ origin, Component, pageProps }: AppProps & Props
     }
   }, [router])
 
+  let fontFamily = `-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif`;
+
   return (
     <SearchProvider
       algoliaAppId={process.env.NEXT_PUBLIC_ALGOLIA_APP_ID}
@@ -92,7 +94,7 @@ export default function MyApp({ origin, Component, pageProps }: AppProps & Props
     >
       <style jsx global>{`
         :root {
-          --font: ${inter.style.fontFamily};
+          --font: ${fontFamily};
           --font-title: ${CeraPro.style.fontFamily};
           --font-mono: ${JetBrainsMono.style.fontFamily};
           --font-code: ${SourceCodePro.style.fontFamily};
