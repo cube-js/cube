@@ -20,7 +20,7 @@ const withNextra = nextra({
   theme: "nextra-theme-docs",
   themeConfig: "./theme.config.tsx",
   defaultShowCopyCode: true,
-  flexsearch: false,
+  search: false,
   mdxOptions: {
     remarkPlugins: [
       remarkMath,

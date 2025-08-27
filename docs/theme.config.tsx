@@ -51,23 +51,6 @@ const config: DocsThemeConfig = {
       {isProduction && <GoogleTagManager />}
     </>
   ),
-  useNextSeoProps: () => {
-    return {
-      description: "Documentation for Cube, the Semantic Layer for building data apps",
-      titleTemplate: "%s | Cube Docs",
-      openGraph: {
-        description: "Documentation for Cube, the Semantic Layer for building data apps",
-      },
-      twitter: {
-        handle: 'the_cube_dev',
-        site: 'the_cube_dev',
-      },
-    };
-  },
-  primaryHue: {
-    light: 251,
-    dark: 342,
-  },
   components,
   main: MainLayout,
   sidebar: {

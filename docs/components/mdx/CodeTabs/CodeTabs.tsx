@@ -155,7 +155,7 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
             );
           })}
       </div>
-      <Pre className="!rounded-t-none" hasCopyCode={true}>
+      <Pre className="!rounded-t-none">
         {children && children.find(child => child.props['data-language'] === selectedTab)?.props.children}
       </Pre>
     </div>

@@ -1,5 +1,3 @@
-import { Navbar } from "nextra-theme-docs";
-
 const Logo = () => {
   return (
     <svg
@@ -36,8 +34,6 @@ export const Navigation = () => {
   return (
     <div className="w-full p-4 sticky top-0 bg-white dark:bg-[#111111] h-16 flex items-center border-b border-neutral-200 dark:border-neutral-800">
       <Logo />
-
-      <Navbar flatDirectories={[]} items={[]} />
     </div>
   );
 };
