@@ -69,15 +69,21 @@ export class YamlCompiler {
     compileContext,
     pythonContext: PythonCtx
   ) {
-    const compiledFile = await this.renderTemplate(file, compileContext, pythonContext);
+    const renderedFile = await this.renderTemplate(file, compileContext, pythonContext);
 
-    return this.compileYamlFile(compiledFile, errorsReport);
+    const transpiledFile = this.compileYamlFile(renderedFile, errorsReport);
+
+    if (!transpiledFile) {
+      return;
+    }
+
+    this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
   }
 
   public compileYamlFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-  ) {
+  ): FileContent | undefined {
     if (!file.content.trim()) {
       return;
     }
@@ -87,33 +93,37 @@ export class YamlCompiler {
       return;
     }
 
+    const transpiledFilesContent: string[] = [];
+
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
-          const transpiledFile = this.transpileAndPrepareJsFile(file, 'cube', { name, ...cube }, errorsReport);
-          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
+          const transpiledFile = this.transpileAndPrepareJsFile('cube', { name, ...cube }, errorsReport);
+          transpiledFilesContent.push(transpiledFile);
         });
       } else if (key === 'views') {
         (yamlObj.views || []).forEach(({ name, ...cube }) => {
-          const transpiledFile = this.transpileAndPrepareJsFile(file, 'view', { name, ...cube }, errorsReport);
-          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
+          const transpiledFile = this.transpileAndPrepareJsFile('view', { name, ...cube }, errorsReport);
+          transpiledFilesContent.push(transpiledFile);
         });
       } else {
         errorsReport.error(`Unexpected YAML key: ${key}. Only 'cubes' and 'views' are allowed here.`);
       }
     }
+
+    // eslint-disable-next-line consistent-return
+    return {
+      fileName: file.fileName,
+      content: transpiledFilesContent.join('\n\n'),
+    } as FileContent;
   }
 
-  private transpileAndPrepareJsFile(file: FileContent, methodFn: ('cube' | 'view'), cubeObj, errorsReport: ErrorReporter): FileContent {
+  private transpileAndPrepareJsFile(methodFn: ('cube' | 'view'), cubeObj, errorsReport: ErrorReporter): string {
     const yamlAst = this.transformYamlCubeObj(cubeObj, errorsReport);
 
     const cubeOrViewCall = t.callExpression(t.identifier(methodFn), [t.stringLiteral(cubeObj.name), yamlAst]);
 
-    const content = babelGenerator(cubeOrViewCall, {}, '').code;
-    return {
-      fileName: file.fileName,
-      content
-    };
+    return babelGenerator(cubeOrViewCall, {}, '').code;
   }
 
   private transformYamlCubeObj(cubeObj, errorsReport: ErrorReporter) {

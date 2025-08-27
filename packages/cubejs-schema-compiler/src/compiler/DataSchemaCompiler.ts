@@ -678,7 +678,10 @@ export class DataSchemaCompiler {
         this.pythonContext!
       ));
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      this.yamlCompiler.compileYamlFile(file, errorsReport);
+      const transpiledFile = this.yamlCompiler.compileYamlFile(file, errorsReport);
+      if (transpiledFile) {
+        this.compileJsFile(transpiledFile, errorsReport);
+      }
     }
   }
 
