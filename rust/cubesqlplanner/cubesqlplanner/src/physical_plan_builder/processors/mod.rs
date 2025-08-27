@@ -12,4 +12,3 @@ mod multi_stage_time_series;
 mod pre_aggregation;
 mod query;
 mod resolve_multiplied_measures;
-mod resolved_multiplied_measures;
