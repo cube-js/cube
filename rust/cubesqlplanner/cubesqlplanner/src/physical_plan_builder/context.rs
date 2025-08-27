@@ -16,6 +16,7 @@ pub(super) struct PushDownBuilderContext {
     pub original_sql_pre_aggregations: HashMap<String, String>,
     pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
     pub dimensions_query: bool,
+    pub measure_subquery: bool,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
 }
 

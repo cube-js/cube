@@ -115,6 +115,7 @@ impl PhysicalPlanBuilder {
     ) -> Result<(), CubeError> {
         let mut context = context.clone();
         context.dimensions_query = false;
+        context.measure_subquery = true;
         let sub_query = self.process_node(dimension_subquery.query.as_ref(), &context)?;
         let dim_name = dimension_subquery.subquery_dimension.name();
         let cube_name = dimension_subquery.subquery_dimension.cube_name();

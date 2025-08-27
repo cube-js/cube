@@ -8,9 +8,9 @@ pub struct NodeRewriteResult {
 }
 
 impl NodeRewriteResult {
-    pub fn rewritten(rewrited: PlanNode) -> Self {
+    pub fn rewritten(rewritten_node: PlanNode) -> Self {
         Self {
-            rewritten: Some(rewrited),
+            rewritten: Some(rewritten_node),
             stop: true,
         }
     }

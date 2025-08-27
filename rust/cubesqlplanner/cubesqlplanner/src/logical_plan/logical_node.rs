@@ -100,10 +100,10 @@ pub(super) fn check_inputs_len(
         Ok(())
     } else {
         Err(CubeError::internal(format!(
-            "For node {} expected {} inputs but received {}",
+            "{} received {} inputs, but {} were expected",
             node_type,
-            expected,
-            inputs.len()
+            inputs.len(),
+            expected
         )))
     }
 }

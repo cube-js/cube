@@ -240,9 +240,14 @@ impl QueryProperties {
                                         }
                                     }
                                     let source_measure_compiled = evaluator_compiler.add_measure_evaluator(source_measure.clone())?;
-                                    let patched_measure = source_measure_compiled.as_measure()?.new_patched(new_measure_type, filters_to_add)?;
-                                    let patched_symbol = MemberSymbol::new_measure(patched_measure);
-                                    MemberExpressionExpression::PatchedSymbol(patched_symbol)
+                                    let symbol = if let Ok(source_measure) = source_measure_compiled.as_measure() {
+
+                                        let patched_measure = source_measure.new_patched(new_measure_type, filters_to_add)?;
+                                        MemberSymbol::new_measure(patched_measure)
+                                    } else {
+                                        source_measure_compiled
+                                    };
+                                    MemberExpressionExpression::PatchedSymbol(symbol)
 
                                 } else {
                                     return Err(CubeError::user(format!("Source measure is required for `PatchMeasure` type of memeber expression")));
@@ -808,12 +813,20 @@ impl QueryProperties {
                             .rendered_as_multiplied_measures
                             .insert(item.measure.full_name());
                     }
-                    if item.multiplied
-                        && !item
-                            .measure
-                            .as_measure()?
-                            .can_used_as_addictive_in_multplied()
-                    {
+                    let is_multiplied_measure = if item.multiplied {
+                        if let Ok(measure) = item.measure.as_measure() {
+                            if measure.can_used_as_addictive_in_multplied() {
+                                false
+                            } else {
+                                true
+                            }
+                        } else {
+                            true
+                        }
+                    } else {
+                        false
+                    };
+                    if is_multiplied_measure {
                         result
                             .multiplied_measures
                             .push(MultipliedMeasure::new(item.measure.clone(), item.cube_name));

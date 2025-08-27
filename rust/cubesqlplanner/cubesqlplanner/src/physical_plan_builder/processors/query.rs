@@ -94,7 +94,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 &None,
                 &mut render_references,
             )?;
-            select_builder.add_projection_member(member, None);
+            if context.measure_subquery {
+                select_builder.add_projection_member_without_schema(member, None);
+            } else {
+                select_builder.add_projection_member(member, None);
+            }
         }
 
         for (measure, exists) in self
