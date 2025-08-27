@@ -406,7 +406,7 @@ export class DataSchemaCompiler {
       asyncModules = [];
       transpiledFiles = await transpile(stage);
 
-      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
+      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, toCompile, errorsReport);
     };
 
     return compilePhase({ cubeCompilers: this.cubeNameCompilers }, 0)
@@ -628,10 +628,11 @@ export class DataSchemaCompiler {
     compiledFiles: Record<string, boolean>,
     asyncModules: CallableFunction[],
     compilers: CompileCubeFilesCompilers,
+    transpiledFiles: FileContent[],
     toCompile: FileContent[],
     errorsReport: ErrorReporter
   ) {
-    toCompile
+    transpiledFiles
       .forEach((file) => {
         this.compileFile(
           file,
