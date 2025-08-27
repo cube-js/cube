@@ -1,5 +1,4 @@
-import { shallowMount } from '@vue/test-utils';
-import flushPromises from 'flush-promises';
+import { shallowMount, flushPromises } from '@vue/test-utils';
 // import { h } from 'vue';
 
 import fetchMock, { meta, load } from './__mocks__/responses';
