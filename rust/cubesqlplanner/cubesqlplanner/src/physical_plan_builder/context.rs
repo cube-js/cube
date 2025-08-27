@@ -46,7 +46,7 @@ impl PushDownBuilderContext {
             Ok(schema.clone())
         } else {
             Err(CubeError::internal(format!(
-                "Cannot find schema for mulit stage cte {}",
+                "Cannot find schema for multi stage cte {}",
                 name
             )))
         }

@@ -77,7 +77,11 @@ impl SelectBuilder {
             .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
     }
 
-    pub fn add_projection_member_without_schema(&mut self, member: &Rc<MemberSymbol>, alias: Option<String>) {
+    pub fn add_projection_member_without_schema(
+        &mut self,
+        member: &Rc<MemberSymbol>,
+        alias: Option<String>,
+    ) {
         let alias = if let Some(alias) = alias {
             alias
         } else {
