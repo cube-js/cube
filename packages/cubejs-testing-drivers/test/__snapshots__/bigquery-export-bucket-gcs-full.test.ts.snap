@@ -6260,7 +6260,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo 1`] = `
 Array [
   Object {
     "BigECommerce.count": "1",
@@ -6331,7 +6331,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo 1`] = `
 Array [
   Object {
     "BigECommerce.count": "1",
@@ -6528,7 +6528,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver Tesseract: SQL API: Timeshift measure from cube 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver Tesseract: SQL API: Timeshift measure from cube 1`] = `
 Array [
   Object {
     "orderDate": 2020-01-01T00:00:00.000Z,
