@@ -89,13 +89,13 @@ export class YamlCompiler {
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
-          const transpiledFile = this.transpileAndPrepareJsFile('cube', { name, ...cube }, errorsReport);
-          transpiledFilesContent.push(transpiledFile);
+          const transpiledCube = this.transpileAndPrepareJsFile('cube', { name, ...cube }, errorsReport);
+          transpiledFilesContent.push(transpiledCube);
         });
       } else if (key === 'views') {
         (yamlObj.views || []).forEach(({ name, ...cube }) => {
-          const transpiledFile = this.transpileAndPrepareJsFile('view', { name, ...cube }, errorsReport);
-          transpiledFilesContent.push(transpiledFile);
+          const transpiledView = this.transpileAndPrepareJsFile('view', { name, ...cube }, errorsReport);
+          transpiledFilesContent.push(transpiledView);
         });
       } else {
         errorsReport.error(`Unexpected YAML key: ${key}. Only 'cubes' and 'views' are allowed here.`);
