@@ -215,7 +215,9 @@ export class DataSchemaCompiler {
     this.pythonContext = await this.loadPythonContext(files, 'globals.py');
     this.yamlCompiler.initFromPythonContext(this.pythonContext);
 
-    const toCompile = files.filter((f) => !this.filesToCompile || !this.filesToCompile.length || this.filesToCompile.indexOf(f.fileName) !== -1);
+    const toCompile = this.filesToCompile?.length
+      ? files.filter(f => this.filesToCompile.includes(f.fileName))
+      : files;
 
     const errorsReport = new ErrorReporter(null, [], this.errorReportOptions);
     this.errorsReporter = errorsReport;
