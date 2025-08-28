@@ -5,6 +5,7 @@ import babelTraverse from '@babel/traverse';
 import { prepareJsCompiler } from './PrepareCompiler';
 import { ImportExportTranspiler } from '../../src/compiler/transpilers';
 import { ErrorReporter } from '../../src/compiler/ErrorReporter';
+import { PostgresQuery } from '../../src';
 
 describe('Transpilers', () => {
   it('CubeCheckDuplicatePropTranspiler', async () => {
@@ -48,6 +49,72 @@ describe('Transpilers', () => {
     `);
 
     await compiler.compile();
+  });
+
+  it('CubePropContextTranspiler with full path to userAttributes should work normally', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            }
+          },
+          accessPolicy: [
+            {
+              role: \`*\`,
+              rowLevel: {
+                filters: [
+                  {
+                    member: \`userId\`,
+                    operator: \`equals\`,
+                    values: [ securityContext.cubeCloud.userAttributes.userId ]
+                  }
+                ]
+              }
+            }
+          ]
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
+  });
+
+  it('CubePropContextTranspiler with shorthand userAttributes should work normally', async () => {
+    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+        cube(\`Test\`, {
+          sql: 'SELECT * FROM users',
+          dimensions: {
+            userId: {
+              sql: \`userId\`,
+              type: 'string'
+            }
+          },
+          accessPolicy: [
+            {
+              role: \`*\`,
+              rowLevel: {
+                filters: [
+                  {
+                    member: \`userId\`,
+                    operator: \`equals\`,
+                    values: [ userAttributes.userId ]
+                  }
+                ]
+              }
+            }
+          ]
+        })
+    `);
+
+    await compiler.compile();
+
+    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
   });
 
   it('ImportExportTranspiler', async () => {
