@@ -100,14 +100,17 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
     return {
       ObjectProperty: (path) => {
-        if (path.node.key.type === 'Identifier' && path.node.key.name === 'joins' && t.isObjectExpression(path.node.value)) {
+        if (((path.node.key.type === 'Identifier' && path.node.key.name === 'joins') ||
+          (path.node.key.type === 'StringLiteral' && path.node.key.value === 'joins'))
+          && t.isObjectExpression(path.node.value)) {
           const fullPath = CubePropContextTranspiler.fullPath(path);
           if (fullPath === 'joins') {
             this.convertJoinsObjectToArray(path);
           }
         }
 
-        if (path.node.key.type === 'Identifier' && transpiledFields.has(path.node.key.name)) {
+        if ((path.node.key.type === 'Identifier' && transpiledFields.has(path.node.key.name)) ||
+          (path.node.key.type === 'StringLiteral' && transpiledFields.has(path.node.key.value))) {
           const fullPath = CubePropContextTranspiler.fullPath(path);
           // eslint-disable-next-line no-restricted-syntax
           for (const p of transpiledFieldsPatterns) {
@@ -176,7 +179,8 @@ export class CubePropContextTranspiler implements TranspilerInterface {
   protected knownIdentifiersInjectVisitor(field: RegExp | string, resolveSymbol: SymbolResolver): TraverseObject {
     return {
       ObjectProperty: (path) => {
-        if (path.node.key.type === 'Identifier' && path.node.key.name.match(field)) {
+        if ((path.node.key.type === 'Identifier' && path.node.key.name.match(field)) ||
+          (path.node.key.type === 'StringLiteral' && path.node.key.value.match(field))) {
           this.transformObjectProperty(path, resolveSymbol);
         }
       }
