@@ -17549,4 +17549,41 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             displayable(physical_plan.as_ref()).indent()
         );
     }
+
+    #[tokio::test]
+    async fn test_subquery_inner_context() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender IN (
+                SELECT customer_gender
+                FROM KibanaSampleDataEcommerce
+                WHERE KibanaSampleDataEcommerce.order_date > '2025-01-01'
+                GROUP BY 1
+            )
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        println!("Generated SQL: {}", sql);
+        assert!(sql.contains("2025-01-01"));
+        assert!(sql.contains("customer_gender} IN (SELECT"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
 }
