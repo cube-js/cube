@@ -23,6 +23,7 @@ import { CompilerInterface } from './PrepareCompiler';
 import { YamlCompiler } from './YamlCompiler';
 import { CubeDictionary } from './CubeDictionary';
 import { CompilerCache } from './CompilerCache';
+import { perfTracker } from './PerfTracker';
 
 const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 
@@ -212,6 +213,9 @@ export class DataSchemaCompiler {
   protected async doCompile() {
     const files = await this.repository.dataSchemaFiles();
 
+    console.log(`Compiling ${files.length} files...`);
+    const compileTimer = perfTracker.start('doCompile', true);
+
     this.pythonContext = await this.loadPythonContext(files, 'globals.py');
     this.yamlCompiler.initFromPythonContext(this.pythonContext);
 
@@ -236,6 +240,8 @@ export class DataSchemaCompiler {
     }
 
     const transpile = async (stage: CompileStage): Promise<FileContent[]> => {
+      const transpileTimer = perfTracker.start(`transpilation-stage-${stage}`);
+
       let cubeNames: string[] = [];
       let cubeSymbols: Record<string, Record<string, boolean>> = {};
       let transpilerNames: string[] = [];
@@ -301,6 +307,8 @@ export class DataSchemaCompiler {
       } else {
         results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, {})));
       }
+
+      transpileTimer.end();
 
       return results.filter(f => !!f) as FileContent[];
     };
@@ -399,6 +407,8 @@ export class DataSchemaCompiler {
     });
 
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
+      const compilePhaseTimer = perfTracker.start(`compilation-phase-${stage}`);
+
       // clear the objects for the next phase
       cubes = [];
       exports = {};
@@ -407,7 +417,9 @@ export class DataSchemaCompiler {
       asyncModules = [];
       transpiledFiles = await transpile(stage);
 
-      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, toCompile, errorsReport);
+      const res = this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, toCompile, errorsReport);
+      compilePhaseTimer.end();
+      return res;
     };
 
     return compilePhase({ cubeCompilers: this.cubeNameCompilers }, 0)
@@ -443,6 +455,12 @@ export class DataSchemaCompiler {
         } else if (transpilationWorkerThreads && this.workerPool) {
           this.workerPool.terminate();
         }
+
+        // End overall compilation timing and print performance report
+        compileTimer.end();
+        setImmediate(() => {
+          perfTracker.printReport();
+        });
       });
   }
 
@@ -665,7 +683,9 @@ export class DataSchemaCompiler {
     compiledFiles[file.fileName] = true;
 
     if (file.fileName.endsWith('.js')) {
+      const compileJsFileTimer = perfTracker.start('compileJsFile');
       this.compileJsFile(file, errorsReport, { doSyntaxCheck });
+      compileJsFileTimer.end();
     } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||
       (
         file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')
@@ -684,8 +704,10 @@ export class DataSchemaCompiler {
         }
       });
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
+      const compileYamlFileTimer = perfTracker.start('compileYamlFile');
       // original yaml file was already transpiled into js
       this.compileJsFile(file, errorsReport);
+      compileYamlFileTimer.end();
     }
   }
 
