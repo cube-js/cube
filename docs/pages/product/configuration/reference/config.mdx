@@ -551,6 +551,13 @@ the schema name dynamically depending on the security context.
 Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode]
 and `prod_pre_aggregations` in production.
 
+<InfoBox>
+
+In Cube Cloud, all [environments][ref-environments] share the same pre-aggregations schema name by default.
+This allows reusing pre-aggregations across environments, saving both time and cost.
+
+</InfoBox>
+
 This configuration option can also be set using the `CUBEJS_PRE_AGGREGATIONS_SCHEMA`
 environment variable.
 
@@ -1543,3 +1550,4 @@ If not defined, Cube will lookup for environment variable
 [ref-dax-api]: /product/apis-integrations/dax-api
 [ref-mdx-api]: /product/apis-integrations/mdx-api
 [ref-ntlm]: /product/auth/methods/ntlm
+[ref-environments]: /product/workspace/environments
