@@ -394,7 +394,7 @@ This is the `products` cube for the `avocado` tenant:
 ```yaml
 cubes:
   - name: products
-    sql: >
+    sql: |
       SELECT * FROM public.Products WHERE MOD (id, 2) = 1
 ```
 
@@ -417,7 +417,7 @@ This is the `products` cube for the `mango` tenant:
 ```yaml
 cubes:
   - name: products
-    sql: >
+    sql: |
       SELECT * FROM public.Products WHERE MOD (id, 2) = 0
 ```
 

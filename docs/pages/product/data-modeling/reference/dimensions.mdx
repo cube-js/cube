@@ -342,7 +342,7 @@ cube(`products`, {
 ```yaml
 cubes:
   - name: products
-    sql: >
+    sql: |
       SELECT 1 AS column_a, 1 AS column_b UNION ALL
       SELECT 2 AS column_a, 1 AS column_b UNION ALL
       SELECT 1 AS column_a, 2 AS column_b UNION ALL
@@ -642,7 +642,7 @@ human-friendly description.
 ```yaml
 cubes:
   - name: orders
-    sql: >
+    sql: |
       SELECT '2025-01-01T00:12:00.000Z'::TIMESTAMP AS time UNION ALL
       SELECT '2025-02-01T00:15:00.000Z'::TIMESTAMP AS time UNION ALL
       SELECT '2025-03-01T00:18:00.000Z'::TIMESTAMP AS time

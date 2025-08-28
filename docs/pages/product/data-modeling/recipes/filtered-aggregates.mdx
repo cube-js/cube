@@ -20,7 +20,7 @@ and the `store` cube has a one-to-many relationship with the `sales` cube:
 ```yml
 cubes:
   - name: retailer
-    sql: >
+    sql: |
       SELECT 101 AS id, 'Retailer 1' AS name, 10 AS sales_goal, '2025-02-01Z'::TIMESTAMP AS goal_start UNION ALL
       SELECT 102 AS id, 'Retailer 2' AS name, 10 AS sales_goal, '2025-02-01Z'::TIMESTAMP AS goal_start UNION ALL
       SELECT 103 AS id, 'Retailer 3' AS name, 10 AS sales_goal, '2025-02-01Z'::TIMESTAMP AS goal_start
@@ -64,7 +64,7 @@ cubes:
         sql: "({CUBE.sales_for_goal} / NULLIF({CUBE.sales_goal}, 0))"
 
   - name: store
-    sql: >
+    sql: |
       SELECT 201 AS id, 'Store 1' AS name, 101 AS retailer_id UNION ALL
       SELECT 202 AS id, 'Store 2' AS name, 101 AS retailer_id UNION ALL
       SELECT 203 AS id, 'Store 3' AS name, 101 AS retailer_id UNION ALL
@@ -118,7 +118,7 @@ cubes:
         type: sum
 
   - name: sales
-    sql: >
+    sql: |
       SELECT 301 AS id, 201 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 1 AS sales UNION ALL
       SELECT 302 AS id, 202 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 1 AS sales UNION ALL
       SELECT 303 AS id, 203 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 1 AS sales UNION ALL

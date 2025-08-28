@@ -82,7 +82,8 @@ export class YamlCompiler {
       return;
     }
 
-    const yamlObj: any = YAML.load(file.content);
+    const processedContent = this.preprocessYamlSqlMultilineValues(file.content);
+    const yamlObj: any = YAML.load(processedContent);
     if (!yamlObj) {
       return;
     }
@@ -344,5 +345,14 @@ export class YamlCompiler {
     }
 
     return ast;
+  }
+
+  private preprocessYamlSqlMultilineValues(yamlContent: string): string {
+    // Convert all folded scalars (sql: >) to literal scalars (sql: |)
+    // to preserve SQL formatting including comments and whitespace
+    return yamlContent.replace(
+      /(\s+sql:\s*)>/g,
+      '$1|'
+    );
   }
 }
