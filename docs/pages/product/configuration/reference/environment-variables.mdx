@@ -1077,6 +1077,13 @@ to use for storing pre-aggregations.
 It can be also set using the [`pre_aggregations_schema` configuration
 option](/product/configuration/reference/config#pre_aggregations_schema).
 
+<InfoBox>
+
+In Cube Cloud, all [environments][ref-environments] share the same pre-aggregations schema name by default.
+This allows reusing pre-aggregations across environments, saving both time and cost.
+
+</InfoBox>
+
 ## `CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`
 
 If `true`, allows non-strict date range matching for pre-aggregations by default.
@@ -1800,3 +1807,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-folders]: /product/data-modeling/reference/view#folders
 [ref-dataviz-tools]: /product/configuration/visualization-tools
 [ref-context-to-app-id]: /product/configuration/reference/config#context_to_app_id
+[ref-environments]: /product/workspace/environments
