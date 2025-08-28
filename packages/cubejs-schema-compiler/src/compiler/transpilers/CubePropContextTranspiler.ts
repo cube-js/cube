@@ -77,20 +77,37 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     CubePropContextTranspiler.replaceValueWithArrowFunction(resolveSymbol, path.get('value'));
   }
 
-  public static replaceValueWithArrowFunction(resolveSymbol: SymbolResolver, value: NodePath<any>) {
-    const knownIds = CubePropContextTranspiler.collectKnownIdentifiersAndTransform(
-      resolveSymbol,
-      value,
-    );
+  public static replaceValueWithArrowFunction(resolveSymbol: (name: string) => any, value: NodePath<any>) {
+    // If the current value is already an arrow function, update its parameters and keep the body
+    if (t.isArrowFunctionExpression(value.node)) {
+      const bodyPath = value.get('body') as NodePath<any>;
+      const knownIds = CubePropContextTranspiler.collectKnownIdentifiersAndTransform(
+        resolveSymbol,
+        bodyPath,
+      );
 
-    value.replaceWith(
-      t.arrowFunctionExpression(
-        knownIds.map(i => t.identifier(i)),
-        // @todo Replace any with assert expression
-        <any>value.node,
-        false,
-      ),
-    );
+      value.replaceWith(
+        t.arrowFunctionExpression(
+          knownIds.map(i => t.identifier(i)),
+          value.node.body,
+          false,
+        ),
+      );
+    } else {
+      const knownIds = CubePropContextTranspiler.collectKnownIdentifiersAndTransform(
+        resolveSymbol,
+        value,
+      );
+
+      value.replaceWith(
+        t.arrowFunctionExpression(
+          knownIds.map(i => t.identifier(i)),
+          // @todo Replace any with assert expression
+          <any>value.node,
+          false,
+        ),
+      );
+    }
   }
 
   protected sqlAndReferencesFieldVisitor(cubeName: string | null | undefined): TraverseObject {
@@ -159,7 +176,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
   protected static fullPath(path: NodePath): string {
     // @ts-ignore
-    let fp = path?.node?.key?.name || '';
+    let fp = path?.node?.key?.name || path?.node?.key?.value || '';
     let pp: NodePath<t.Node> | null | undefined = path?.parentPath;
     while (pp) {
       if (pp?.parentPath?.node?.type === 'ArrayExpression') {
@@ -169,6 +186,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       } else if (pp?.parentPath?.node?.key?.type === 'Identifier') {
         // @ts-ignore
         fp = `${pp?.parentPath?.node?.key?.name || '0'}.${fp}`;
+        pp = pp?.parentPath?.parentPath;
+        // @ts-ignore
+      } else if (pp?.parentPath?.node?.key?.type === 'StringLiteral') {
+        // @ts-ignore
+        fp = `${pp?.parentPath?.node?.key?.value || '0'}.${fp}`;
         pp = pp?.parentPath?.parentPath;
       } else break;
     }
