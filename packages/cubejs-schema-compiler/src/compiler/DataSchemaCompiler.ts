@@ -89,6 +89,8 @@ type CompileCubeFilesCompilers = {
   contextCompilers?: CompilerInterface[];
 };
 
+export type CompileContext = any;
+
 export class DataSchemaCompiler {
   private readonly repository: SchemaFileRepository;
 
@@ -124,7 +126,7 @@ export class DataSchemaCompiler {
 
   private readonly compilerCache: CompilerCache;
 
-  private readonly compileContext: any;
+  private readonly compileContext: CompileContext;
 
   private errorReportOptions: ErrorReporterOptions | undefined;
 
@@ -179,7 +181,7 @@ export class DataSchemaCompiler {
     this.compiledScriptCache = options.compiledScriptCache;
   }
 
-  public compileObjects(compileServices, objects, errorsReport: ErrorReporter) {
+  public compileObjects(compileServices: CompilerInterface[], objects, errorsReport: ErrorReporter) {
     try {
       return compileServices
         .map((compileService) => (() => compileService.compile(objects, errorsReport)))
@@ -193,7 +195,7 @@ export class DataSchemaCompiler {
     }
   }
 
-  protected async loadPythonContext(files, nsFileName) {
+  protected async loadPythonContext(files: FileContent[], nsFileName: string): Promise<PythonCtx> {
     const ns = files.find((f) => f.fileName === nsFileName);
     if (ns) {
       return this.nativeInstance.loadPythonContext(
