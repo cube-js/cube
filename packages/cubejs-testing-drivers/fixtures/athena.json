@@ -189,6 +189,7 @@
     "querying BigECommerce: filtering with possible casts",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "SQL API: Timeshift measure from cube",
 
     "querying BigECommerce: rolling window by 2 week",
