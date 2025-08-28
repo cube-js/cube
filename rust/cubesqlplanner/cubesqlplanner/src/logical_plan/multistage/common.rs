@@ -1,37 +1,19 @@
 use crate::logical_plan::pretty_print::*;
 use crate::planner::planners::multi_stage::MultiStageAppliedState;
 
-use crate::planner::BaseMember;
-use itertools::Itertools;
-
 impl PrettyPrint for MultiStageAppliedState {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         let details_state = state.new_level();
         result.println(
             &format!(
                 "-time_dimensions: {}",
-                print_symbols(
-                    &self
-                        .time_dimensions()
-                        .iter()
-                        .map(|d| d.member_evaluator())
-                        .collect_vec()
-                )
+                print_symbols(&self.time_dimensions())
             ),
             state,
         );
 
         result.println(
-            &format!(
-                "-dimensions: {}",
-                print_symbols(
-                    &self
-                        .dimensions()
-                        .iter()
-                        .map(|d| d.member_evaluator())
-                        .collect_vec()
-                )
-            ),
+            &format!("-dimensions: {}", print_symbols(&self.dimensions())),
             state,
         );
 

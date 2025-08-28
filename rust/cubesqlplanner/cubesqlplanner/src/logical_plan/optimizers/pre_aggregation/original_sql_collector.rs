@@ -13,10 +13,8 @@ impl OriginalSqlCollector {
         Self { query_tools }
     }
 
-    pub fn collect(&mut self, plan: &Query) -> Result<HashMap<String, String>, CubeError> {
-        let mut cube_names_collector = CubeNamesCollector::new();
-        cube_names_collector.collect(&plan)?;
-        let cube_names = cube_names_collector.result();
+    pub fn collect(&mut self, plan: &Rc<Query>) -> Result<HashMap<String, String>, CubeError> {
+        let cube_names = collect_cube_names_from_node(&plan)?;
         let mut result = HashMap::new();
         for cube_name in cube_names.iter() {
             let pre_aggregations = self

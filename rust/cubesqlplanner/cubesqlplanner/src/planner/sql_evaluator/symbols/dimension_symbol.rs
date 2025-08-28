@@ -35,6 +35,7 @@ pub struct CalendarDimensionTimeShift {
 pub struct DimensionSymbol {
     cube_name: String,
     name: String,
+    alias: String,
     member_sql: Option<Rc<SqlCall>>,
     latitude: Option<Rc<SqlCall>>,
     longitude: Option<Rc<SqlCall>>,
@@ -53,6 +54,7 @@ impl DimensionSymbol {
     pub fn new(
         cube_name: String,
         name: String,
+        alias: String,
         member_sql: Option<Rc<SqlCall>>,
         is_reference: bool,
         is_view: bool,
@@ -67,6 +69,7 @@ impl DimensionSymbol {
         Rc::new(Self {
             cube_name,
             name,
+            alias,
             member_sql,
             is_reference,
             latitude,
@@ -126,6 +129,10 @@ impl DimensionSymbol {
         format!("{}.{}", self.cube_name, self.name)
     }
 
+    pub fn alias(&self) -> String {
+        self.alias.clone()
+    }
+
     pub fn owned_by_cube(&self) -> bool {
         self.definition.static_data().owned_by_cube.unwrap_or(true)
     }
@@ -140,6 +147,13 @@ impl DimensionSymbol {
 
     pub fn dimension_type(&self) -> &String {
         &self.definition.static_data().dimension_type
+    }
+
+    pub fn propagate_filters_to_sub_query(&self) -> bool {
+        self.definition
+            .static_data()
+            .propagate_filters_to_sub_query
+            .unwrap_or(false)
     }
 
     pub fn is_reference(&self) -> bool {
@@ -419,6 +433,8 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
+        let alias =
+            PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
         let is_view = cube.static_data().is_view.unwrap_or(false);
         let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
         let mut is_self_time_shift_pk = false;
@@ -464,6 +480,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         Ok(MemberSymbol::new_dimension(DimensionSymbol::new(
             cube_name,
             name,
+            alias,
             sql,
             is_reference,
             is_view,

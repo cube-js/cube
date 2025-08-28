@@ -107,11 +107,13 @@ impl ReferencesBuilder {
 
     pub fn resolve_references_for_filter(
         &self,
-        filter: &Filter,
+        filter: &Option<Filter>,
         references: &mut HashMap<String, QualifiedColumnName>,
     ) -> Result<(), CubeError> {
-        for itm in filter.items.iter() {
-            self.resolve_references_for_filter_item(itm, references)?;
+        if let Some(filter) = filter {
+            for itm in filter.items.iter() {
+                self.resolve_references_for_filter_item(itm, references)?;
+            }
         }
         Ok(())
     }

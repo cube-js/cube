@@ -1,5 +1,4 @@
 use super::CompiledPreAggregation;
-use super::MatchState;
 use crate::plan::filter::FilterGroupOperator;
 use crate::plan::FilterItem;
 use crate::planner::filter::BaseFilter;
@@ -11,6 +10,25 @@ use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MatchState {
+    Partial,
+    Full,
+    NotMatched,
+}
+
+impl MatchState {
+    pub fn combine(&self, other: &MatchState) -> MatchState {
+        if matches!(self, MatchState::NotMatched) || matches!(other, MatchState::NotMatched) {
+            return MatchState::NotMatched;
+        }
+        if matches!(self, MatchState::Partial) || matches!(other, MatchState::Partial) {
+            return MatchState::Partial;
+        }
+        MatchState::Full
+    }
+}
 
 pub struct DimensionMatcher<'a> {
     query_tools: Rc<QueryTools>,

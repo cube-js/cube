@@ -24,6 +24,15 @@ impl LogicalFilter {
             Some(Filter { items })
         }
     }
+    pub fn measures_filter(&self) -> Option<Filter> {
+        if self.measures_filter.is_empty() {
+            None
+        } else {
+            Some(Filter {
+                items: self.measures_filter.clone(),
+            })
+        }
+    }
 }
 
 impl PrettyPrint for LogicalFilter {

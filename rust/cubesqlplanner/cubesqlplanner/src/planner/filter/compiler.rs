@@ -3,9 +3,7 @@ use super::FilterOperator;
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::Compiler;
-use crate::planner::BaseMember;
-use crate::planner::BaseTimeDimension;
+use crate::planner::sql_evaluator::{Compiler, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -40,16 +38,18 @@ impl<'a> FilterCompiler<'a> {
         Ok(())
     }
 
-    pub fn add_time_dimension_item(&mut self, item: &BaseTimeDimension) -> Result<(), CubeError> {
-        if let Some(date_range) = item.get_date_range() {
-            let filter = BaseFilter::try_new(
-                self.query_tools.clone(),
-                item.member_evaluator(),
-                FilterType::Dimension,
-                FilterOperator::InDateRange,
-                Some(date_range.into_iter().map(|v| Some(v)).collect()),
-            )?;
-            self.time_dimension_filters.push(FilterItem::Item(filter));
+    pub fn add_time_dimension_item(&mut self, item: &Rc<MemberSymbol>) -> Result<(), CubeError> {
+        if let Ok(td_item) = item.as_time_dimension() {
+            if let Some(date_range) = td_item.date_range_vec() {
+                let filter = BaseFilter::try_new(
+                    self.query_tools.clone(),
+                    item.clone(),
+                    FilterType::Dimension,
+                    FilterOperator::InDateRange,
+                    Some(date_range.into_iter().map(|v| Some(v)).collect()),
+                )?;
+                self.time_dimension_filters.push(FilterItem::Item(filter));
+            }
         }
         Ok(())
     }

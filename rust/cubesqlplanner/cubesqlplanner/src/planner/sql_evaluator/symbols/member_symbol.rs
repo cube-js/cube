@@ -4,8 +4,6 @@ use super::{
     CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol,
     TimeDimensionSymbol,
 };
-use crate::planner::query_tools::QueryTools;
-use crate::planner::{BaseMember, MemberSymbolRef};
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -88,6 +86,18 @@ impl MemberSymbol {
             Self::MemberExpression(e) => e.full_name().clone(),
         }
     }
+
+    pub fn alias(&self) -> String {
+        match self {
+            Self::Dimension(d) => d.alias(),
+            Self::TimeDimension(d) => d.alias(),
+            Self::Measure(m) => m.alias(),
+            Self::CubeName(c) => c.alias(),
+            Self::CubeTable(c) => c.alias(),
+            Self::MemberExpression(e) => e.alias(),
+        }
+    }
+
     pub fn name(&self) -> String {
         match self {
             Self::Dimension(d) => d.name().clone(),
@@ -254,13 +264,5 @@ impl MemberSymbol {
 
     pub fn is_leaf(&self) -> bool {
         self.get_dependencies().is_empty()
-    }
-
-    // To back compatibility with code that use BaseMembers
-    pub fn as_base_member(
-        self: Rc<Self>,
-        query_tools: Rc<QueryTools>,
-    ) -> Result<Rc<dyn BaseMember>, CubeError> {
-        MemberSymbolRef::try_new(self, query_tools).map(|r| r.as_base_member())
     }
 }

@@ -1,11 +1,12 @@
 use super::{CommonUtils, QueryPlanner};
-use crate::logical_plan::DimensionSubQuery;
+use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
 use crate::plan::{FilterItem, QualifiedColumnName};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions;
-use crate::planner::sql_evaluator::MemberExpressionExpression;
+use crate::planner::sql_evaluator::{
+    MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
+};
 use crate::planner::QueryProperties;
-use crate::planner::{BaseDimension, BaseMeasure, BaseMember};
 use cubenativeutils::CubeError;
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
@@ -15,7 +16,7 @@ pub struct DimensionSubqueryPlanner {
     utils: CommonUtils,
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
-    sub_query_dims: HashMap<String, Vec<Rc<BaseDimension>>>,
+    sub_query_dims: HashMap<String, Vec<Rc<MemberSymbol>>>,
     dimensions_refs: RefCell<HashMap<String, QualifiedColumnName>>,
 }
 
@@ -30,11 +31,11 @@ impl DimensionSubqueryPlanner {
         }
     }
     pub fn try_new(
-        dimensions: &Vec<Rc<BaseDimension>>,
+        dimensions: &Vec<Rc<MemberSymbol>>,
         query_tools: Rc<QueryTools>,
         query_properties: Rc<QueryProperties>,
     ) -> Result<Self, CubeError> {
-        let mut sub_query_dims: HashMap<String, Vec<Rc<BaseDimension>>> = HashMap::new();
+        let mut sub_query_dims: HashMap<String, Vec<Rc<MemberSymbol>>> = HashMap::new();
         for subquery_dimension in dimensions.iter() {
             let cube_name = subquery_dimension.cube_name().clone();
             sub_query_dims
@@ -54,7 +55,7 @@ impl DimensionSubqueryPlanner {
 
     pub fn plan_queries(
         &self,
-        dimensions: &Vec<Rc<BaseDimension>>,
+        dimensions: &Vec<Rc<MemberSymbol>>,
     ) -> Result<Vec<Rc<DimensionSubQuery>>, CubeError> {
         let mut result = Vec::new();
         for subquery_dimension in dimensions.iter() {
@@ -65,21 +66,33 @@ impl DimensionSubqueryPlanner {
 
     fn plan_query(
         &self,
-        subquery_dimension: Rc<BaseDimension>,
+        subquery_dimension: Rc<MemberSymbol>,
     ) -> Result<Rc<DimensionSubQuery>, CubeError> {
         let dim_name = subquery_dimension.name();
         let cube_name = subquery_dimension.cube_name().clone();
+        let dimension_symbol = subquery_dimension.as_dimension()?;
+
         let primary_keys_dimensions = self.utils.primary_keys_dimensions(&cube_name)?;
-        let expression = subquery_dimension.sql_call()?;
-        let measure = BaseMeasure::try_new_from_expression(
-            MemberExpressionExpression::SqlCall(expression),
+
+        let expression = if let Some(sql_call) = dimension_symbol.member_sql() {
+            sql_call.clone()
+        } else {
+            return Err(CubeError::user(format!(
+                "Subquery dimension {} must have `sql` field",
+                subquery_dimension.full_name()
+            )));
+        };
+
+        let member_expression_symbol = MemberExpressionSymbol::try_new(
             cube_name.clone(),
             dim_name.clone(),
+            MemberExpressionExpression::SqlCall(expression),
             None,
-            self.query_tools.clone(),
+            self.query_tools.base_tools().clone(),
         )?;
+        let measure = MemberSymbol::new_member_expression(member_expression_symbol);
 
-        let (dimensions_filters, time_dimensions_filters) = if subquery_dimension
+        let (dimensions_filters, time_dimensions_filters) = if dimension_symbol
             .propagate_filters_to_sub_query()
         {
             let dimensions_filters = self
@@ -114,13 +127,11 @@ impl DimensionSubqueryPlanner {
         let sub_query = query_planner.plan()?;
         let result = Rc::new(DimensionSubQuery {
             query: sub_query,
-            primary_keys_dimensions: primary_keys_dimensions
-                .into_iter()
-                .map(|d| d.member_evaluator())
-                .collect(),
-            subquery_dimension: subquery_dimension.member_evaluator(),
-            measure_for_subquery_dimension: measure.member_evaluator().clone(),
+            primary_keys_dimensions,
+            subquery_dimension,
+            measure_for_subquery_dimension: measure,
         });
+        pretty_print_rc(&result);
         Ok(result)
     }
 
