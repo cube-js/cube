@@ -278,10 +278,10 @@ export class DataSchemaCompiler {
 
         await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
 
-        const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js'))
+        const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js') && !file.convertedToJs)
           .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
 
-        const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js'));
+        const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js') || file.convertedToJs);
         let JsFilesTasks = [];
 
         if (jsFiles.length > 0) {
@@ -397,6 +397,7 @@ export class DataSchemaCompiler {
             errorsReport,
             compiledFiles,
             [],
+            [],
             { doSyntaxCheck: true }
           );
           exports[foundFile.fileName] = exports[foundFile.fileName] || {};
@@ -486,7 +487,9 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     options: TranspileOptions = {}
   ): Promise<(FileContent | undefined)> {
-    if (file.fileName.endsWith('.jinja') ||
+    if (file.fileName.endsWith('.js') || file.convertedToJs) {
+      return this.transpileJsFile(file, errorsReport, options);
+    } else if (file.fileName.endsWith('.jinja') ||
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
       // TODO do Jinja syntax check with jinja compiler
       && file.content.match(JINJA_SYNTAX)
@@ -502,9 +505,17 @@ export class DataSchemaCompiler {
 
       return file;
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      return this.yamlCompiler.transpileYamlFile(file, errorsReport);
-    } else if (file.fileName.endsWith('.js')) {
-      return this.transpileJsFile(file, errorsReport, options);
+      const res = this.yamlCompiler.transpileYamlFile(file, errorsReport);
+
+      if (res) {
+        // We update the yaml file content to the transpiled js content
+        // and raise related flag so it will go JS transpilation flow afterward
+        // avoiding costly YAML/Python parsing again.
+        file.content = res.content;
+        file.convertedToJs = true;
+      }
+
+      return res;
     } else {
       return file;
     }
@@ -657,7 +668,8 @@ export class DataSchemaCompiler {
           file,
           errorsReport,
           compiledFiles,
-          asyncModules
+          asyncModules,
+          toCompile
         );
       });
     await asyncModules.reduce((a: Promise<void>, b: CallableFunction) => a.then(() => b()), Promise.resolve());
@@ -674,6 +686,7 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     compiledFiles: Record<string, boolean>,
     asyncModules: CallableFunction[],
+    toCompile: FileContent[],
     { doSyntaxCheck } = { doSyntaxCheck: false }
   ) {
     if (compiledFiles[file.fileName]) {
@@ -682,7 +695,9 @@ export class DataSchemaCompiler {
 
     compiledFiles[file.fileName] = true;
 
-    if (file.fileName.endsWith('.js')) {
+    if (file.convertedToJs) {
+      this.compileJsFile(file, errorsReport);
+    } else if (file.fileName.endsWith('.js')) {
       const compileJsFileTimer = perfTracker.start('compileJsFile');
       this.compileJsFile(file, errorsReport, { doSyntaxCheck });
       compileJsFileTimer.end();
@@ -700,6 +715,10 @@ export class DataSchemaCompiler {
           this.pythonContext!
         );
         if (transpiledFile) {
+          const originalFile = toCompile.find(f => f.fileName === file.fileName);
+          originalFile!.content = transpiledFile.content;
+          originalFile!.convertedToJs = true;
+
           this.compileJsFile(transpiledFile, errorsReport);
         }
       });
