@@ -697,6 +697,11 @@ cubes:
           calendar_orders__count_shifted_calendar_m: '3',
           custom_calendar__retail_date_month: '2025-12-01T00:00:00.000Z',
         },
+        {
+          calendar_orders__count: null,
+          calendar_orders__count_shifted_calendar_m: '3',
+          custom_calendar__retail_date_month: '2026-01-01T00:00:00.000Z',
+        },
       ]));
 
       it('Count shifted by retail week (common shift + custom granularity)', async () => runQueryTest({
@@ -708,6 +713,11 @@ cubes:
         }],
         order: [{ id: 'custom_calendar.retail_date' }]
       }, [
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: null,
+          custom_calendar__retail_date_week: '2025-02-02T00:00:00.000Z',
+        },
         {
           calendar_orders__count: '1',
           calendar_orders__count_shifted_calendar_w: '1',
@@ -724,9 +734,29 @@ cubes:
           custom_calendar__retail_date_week: '2025-02-23T00:00:00.000Z',
         },
         {
+          calendar_orders__count: null,
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__retail_date_week: '2025-03-02T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: null,
+          custom_calendar__retail_date_week: '2025-03-09T00:00:00.000Z',
+        },
+        {
           calendar_orders__count: '1',
           calendar_orders__count_shifted_calendar_w: '1',
           custom_calendar__retail_date_week: '2025-03-16T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: null,
+          calendar_orders__count_shifted_calendar_w: '1',
+          custom_calendar__retail_date_week: '2025-03-23T00:00:00.000Z',
+        },
+        {
+          calendar_orders__count: '1',
+          calendar_orders__count_shifted_calendar_w: null,
+          custom_calendar__retail_date_week: '2025-03-30T00:00:00.000Z',
         },
         {
           calendar_orders__count: '1',

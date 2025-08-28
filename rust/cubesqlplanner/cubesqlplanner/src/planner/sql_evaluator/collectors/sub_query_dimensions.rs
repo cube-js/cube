@@ -1,8 +1,6 @@
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::planners::JoinPlanner;
-use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{DimensionSymbol, MemberSymbol, TraversalVisitor};
-use crate::planner::{BaseDimension, BaseMember};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -63,21 +61,18 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
 }
 
 pub fn collect_sub_query_dimensions_from_members(
-    members: &Vec<Rc<dyn BaseMember>>,
+    members: &Vec<Rc<MemberSymbol>>,
     join_planner: &JoinPlanner,
     join: &Rc<dyn JoinDefinition>,
-    query_tools: Rc<QueryTools>,
-) -> Result<Vec<Rc<BaseDimension>>, CubeError> {
-    let symbols = members.iter().map(|m| m.member_evaluator()).collect_vec();
-    collect_sub_query_dimensions_from_symbols(&symbols, join_planner, join, query_tools)
+) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+    collect_sub_query_dimensions_from_symbols(&members, join_planner, join)
 }
 
 pub fn collect_sub_query_dimensions_from_symbols(
     members: &Vec<Rc<MemberSymbol>>,
     join_planner: &JoinPlanner,
     join: &Rc<dyn JoinDefinition>,
-    query_tools: Rc<QueryTools>,
-) -> Result<Vec<Rc<BaseDimension>>, CubeError> {
+) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
     let mut visitor = SubQueryDimensionsCollector::new();
     for member in members.iter() {
         visitor.apply(&member, &())?;
@@ -88,11 +83,7 @@ pub fn collect_sub_query_dimensions_from_symbols(
             visitor.apply(&dep, &())?;
         }
     }
-    visitor
-        .extract_result()
-        .into_iter()
-        .map(|s| BaseDimension::try_new_required(s, query_tools.clone()))
-        .collect::<Result<Vec<_>, CubeError>>()
+    Ok(visitor.extract_result())
 }
 
 pub fn collect_sub_query_dimensions(

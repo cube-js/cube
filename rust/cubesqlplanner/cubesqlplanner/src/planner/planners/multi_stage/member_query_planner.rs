@@ -6,14 +6,11 @@ use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::{
-    BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension, GranularityHelper,
-};
+use crate::planner::GranularityHelper;
 use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct MultiStageMemberQueryPlanner {
@@ -57,7 +54,7 @@ impl MultiStageMemberQueryPlanner {
 
     fn plan_time_series_get_range_query(
         &self,
-        time_dimension: Rc<BaseTimeDimension>,
+        time_dimension: Rc<MemberSymbol>,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let cte_query_properties = QueryProperties::try_new_from_precompiled(
             self.query_tools.clone(),
@@ -81,17 +78,15 @@ impl MultiStageMemberQueryPlanner {
         let simple_query_planer =
             SimpleQueryPlanner::new(self.query_tools.clone(), cte_query_properties);
 
-        let (source, subquery_dimension_queries) =
-            simple_query_planer.source_and_subquery_dimensions()?;
+        let source = simple_query_planer.source_and_subquery_dimensions()?;
 
         let result = MultiStageGetDateRange {
-            time_dimension: time_dimension.member_evaluator(),
-            dimension_subqueries: subquery_dimension_queries,
+            time_dimension: time_dimension.clone(),
             source,
         };
         let member = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::GetDateRange(result),
+            member_type: MultiStageMemberLogicalType::GetDateRange(Rc::new(result)),
         };
 
         Ok(Rc::new(member))
@@ -103,13 +98,13 @@ impl MultiStageMemberQueryPlanner {
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let time_dimension = time_series_description.time_dimension.clone();
         let result = MultiStageTimeSeries {
-            time_dimension: time_dimension.member_evaluator().clone(),
-            date_range: time_dimension.get_date_range().clone(),
+            time_dimension: time_dimension.clone(),
+            date_range: time_dimension.as_time_dimension()?.date_range_vec(),
             get_date_range_multistage_ref: time_series_description.date_range_cte.clone(),
         };
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::TimeSeries(result),
+            member_type: MultiStageMemberLogicalType::TimeSeries(Rc::new(result)),
         }))
     }
 
@@ -138,8 +133,8 @@ impl MultiStageMemberQueryPlanner {
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
                     self.query_tools.timezone().clone(),
-                    time_dimension.cube_name(),
-                    time_dimension.name(),
+                    &time_dimension.cube_name(),
+                    &time_dimension.name(),
                     Some(query_granularity.clone()),
                 )?
                 else {
@@ -157,14 +152,14 @@ impl MultiStageMemberQueryPlanner {
             RollingWindowType::RunningTotal => MultiStageRollingWindowType::RunningTotal,
         };
 
-        let logical_schema = Rc::new(LogicalSchema {
-            time_dimensions: self.description.state().time_dimensions_symbols(),
-            dimensions: self.description.state().dimensions_symbols(),
-            measures: vec![self.description.member().evaluation_node().clone()],
-            multiplied_measures: HashSet::new(),
-        });
+        let schema = LogicalSchema::default()
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_measures(vec![self.description.member().evaluation_node().clone()])
+            .into_rc();
+
         let result = MultiStageRollingWindow {
-            schema: logical_schema,
+            schema,
             is_ungrouped: self.description.member().is_ungrupped(),
             rolling_window,
             order_by: self.query_order_by()?,
@@ -176,14 +171,12 @@ impl MultiStageMemberQueryPlanner {
                 name: inputs[1].0.clone(),
                 symbols: inputs[1].1.clone(),
             },
-            rolling_time_dimension: rolling_window_desc.time_dimension.member_evaluator(),
-            time_dimension_in_measure_input: rolling_window_desc
-                .base_time_dimension
-                .member_evaluator(), //time dimension in measure input can have different granularity
+            rolling_time_dimension: rolling_window_desc.time_dimension.clone(),
+            time_dimension_in_measure_input: rolling_window_desc.base_time_dimension.clone(),
         };
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::RollingWindow(result),
+            member_type: MultiStageMemberLogicalType::RollingWindow(Rc::new(result)),
         }))
     }
 
@@ -191,8 +184,6 @@ impl MultiStageMemberQueryPlanner {
         &self,
         multi_stage_member: &MultiStageInodeMember,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
-        let input_dimensions = self.all_input_dimensions();
-
         let partition_by = self.member_partition_by_logical(
             &multi_stage_member.reduce_by_symbols(),
             &multi_stage_member.group_by_symbols(),
@@ -210,12 +201,11 @@ impl MultiStageMemberQueryPlanner {
             _ => MultiStageCalculationWindowFunction::None,
         };
 
-        let logical_schema = LogicalSchema {
-            time_dimensions: self.description.state().time_dimensions_symbols(),
-            dimensions: self.description.state().dimensions_symbols(),
-            measures: vec![self.description.member().evaluation_node().clone()],
-            multiplied_measures: HashSet::new(),
-        };
+        let schema = LogicalSchema::default()
+            .set_dimensions(self.description.state().dimensions_symbols())
+            .set_time_dimensions(self.description.state().time_dimensions_symbols())
+            .set_measures(vec![self.description.member().evaluation_node().clone()])
+            .into_rc();
 
         let calculation_type = match multi_stage_member.inode_type() {
             MultiStageInodeMemberType::Rank => MultiStageCalculationType::Rank,
@@ -239,18 +229,17 @@ impl MultiStageMemberQueryPlanner {
             })
             .collect_vec();
 
+        let full_key_aggregate_schema = self.input_schema();
         let result = MultiStageMeasureCalculation {
-            schema: Rc::new(logical_schema),
+            schema,
             is_ungrouped: self.description.member().is_ungrupped(),
             calculation_type,
             partition_by,
             window_function_to_use,
             order_by: self.query_order_by()?,
+
             source: Rc::new(FullKeyAggregate {
-                join_dimensions: input_dimensions
-                    .iter()
-                    .map(|d| d.member_evaluator().clone())
-                    .collect(),
+                schema: full_key_aggregate_schema,
                 use_full_join_and_coalesce: true,
                 multiplied_measures_resolver: None,
                 multi_stage_subquery_refs: input_sources,
@@ -259,21 +248,18 @@ impl MultiStageMemberQueryPlanner {
 
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::MeasureCalculation(result),
+            member_type: MultiStageMemberLogicalType::MeasureCalculation(Rc::new(result)),
         };
         Ok(Rc::new(result))
     }
 
     fn plan_for_leaf_cte_query(&self) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let member_node = self.description.member_node();
-        let measures =
-            if let Some(measure) = //TODO rewrite it!!
-                BaseMeasure::try_new(member_node.clone(), self.query_tools.clone())?
-            {
-                vec![measure]
-            } else {
-                vec![]
-            };
+        let measures = if member_node.as_measure().is_ok() {
+            vec![member_node.clone()]
+        } else {
+            vec![]
+        };
 
         let cte_query_properties = QueryProperties::try_new_from_precompiled(
             self.query_tools.clone(),
@@ -306,34 +292,41 @@ impl MultiStageMemberQueryPlanner {
         };
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(leaf_measure_plan),
+            member_type: MultiStageMemberLogicalType::LeafMeasure(Rc::new(leaf_measure_plan)),
         };
         Ok(Rc::new(result))
     }
 
-    fn all_dimensions(&self) -> Vec<Rc<dyn BaseMember>> {
-        BaseMemberHelper::iter_as_base_member(self.description.state().dimensions())
-            .chain(BaseMemberHelper::iter_as_base_member(
-                self.description.state().time_dimensions(),
-            ))
+    fn all_dimensions(&self) -> Vec<Rc<MemberSymbol>> {
+        self.description
+            .state()
+            .dimensions()
+            .iter()
+            .cloned()
+            .chain(self.description.state().time_dimensions().iter().cloned())
             .collect_vec()
     }
 
-    fn input_dimensions(&self) -> Vec<Rc<BaseDimension>> {
-        self.description
+    fn input_schema(&self) -> Rc<LogicalSchema> {
+        let dimensions = self
+            .description
             .input()
             .iter()
-            .flat_map(|descr| descr.state().dimensions().clone())
+            .flat_map(|descr| descr.state().dimensions_symbols().clone())
             .unique_by(|dim| dim.full_name())
-            .collect_vec()
-    }
+            .collect_vec();
+        let time_dimensions = self
+            .description
+            .input()
+            .iter()
+            .flat_map(|descr| descr.state().time_dimensions_symbols().clone())
+            .unique_by(|dim| dim.full_name())
+            .collect_vec();
 
-    fn all_input_dimensions(&self) -> Vec<Rc<dyn BaseMember>> {
-        BaseMemberHelper::iter_as_base_member(&self.input_dimensions())
-            .chain(BaseMemberHelper::iter_as_base_member(
-                self.description.state().time_dimensions(),
-            ))
-            .collect_vec()
+        LogicalSchema::default()
+            .set_dimensions(dimensions)
+            .set_time_dimensions(time_dimensions)
+            .into_rc()
     }
 
     fn input_cte_aliases(&self) -> Vec<(String, Vec<Rc<MemberSymbol>>)> {
@@ -345,23 +338,12 @@ impl MultiStageMemberQueryPlanner {
             .collect_vec()
     }
 
-    fn query_member_as_measure(&self) -> Result<Option<Rc<BaseMeasure>>, CubeError> {
-        BaseMeasure::try_new(
-            self.description.member_node().clone(),
-            self.query_tools.clone(),
-        )
-    }
-
     fn member_partition_by_logical(
         &self,
         reduce_by: &Vec<Rc<MemberSymbol>>,
         group_by: &Option<Vec<Rc<MemberSymbol>>>,
     ) -> Vec<Rc<MemberSymbol>> {
-        let dimensions = self
-            .all_dimensions()
-            .into_iter()
-            .map(|d| d.member_evaluator().clone())
-            .collect_vec();
+        let dimensions = self.all_dimensions();
         let dimensions = if !reduce_by.is_empty() {
             dimensions
                 .into_iter()
@@ -382,8 +364,9 @@ impl MultiStageMemberQueryPlanner {
     }
 
     fn query_order_by(&self) -> Result<Vec<OrderByItem>, CubeError> {
-        let measures = if let Some(measure) = self.query_member_as_measure()? {
-            vec![measure]
+        let member_node = self.description.member_node();
+        let measures = if member_node.as_measure().is_ok() {
+            vec![member_node.clone()]
         } else {
             vec![]
         };

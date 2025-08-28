@@ -1,7 +1,6 @@
 use crate::logical_plan::*;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct FullKeyAggregateQueryPlanner {
@@ -28,18 +27,22 @@ impl FullKeyAggregateQueryPlanner {
                     resolve_multiplied_measures.clone(),
                 )
             });
-        let join_dimensions = self
-            .query_properties
-            .dimension_symbols()
-            .iter()
-            .chain(self.query_properties.time_dimension_symbols().iter())
-            .cloned()
-            .collect_vec();
+        let measures = if let Some(multiplied_source) = &resolved_multiplied_source {
+            multiplied_source.schema().measures.clone()
+        } else {
+            Vec::new()
+        };
+
+        let schema = LogicalSchema::default()
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_measures(measures)
+            .into_rc();
         Ok(Rc::new(FullKeyAggregate {
             multiplied_measures_resolver: resolved_multiplied_source,
             multi_stage_subquery_refs,
             use_full_join_and_coalesce: true,
-            join_dimensions,
+            schema,
         }))
     }
 
@@ -51,33 +54,38 @@ impl FullKeyAggregateQueryPlanner {
     ) -> Result<Rc<Query>, CubeError> {
         let source =
             self.plan_logical_source(resolve_multiplied_measures, multi_stage_subqueries)?;
+        let source = QuerySource::FullKeyAggregate(source);
+
         let multiplied_measures = self
             .query_properties
             .full_key_aggregate_measures()?
             .rendered_as_multiplied_measures
             .clone();
-        let schema = Rc::new(LogicalSchema {
-            dimensions: self.query_properties.dimension_symbols(),
-            measures: self.query_properties.measure_symbols(),
-            time_dimensions: self.query_properties.time_dimension_symbols(),
-            multiplied_measures,
-        });
+        let schema = LogicalSchema::default()
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_measures(self.query_properties.measures().clone())
+            .set_multiplied_measures(multiplied_measures)
+            .into_rc();
+
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
             time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
             measures_filter: self.query_properties.measures_filters().clone(),
             segments: self.query_properties.segments().clone(),
         });
-        let result = FullKeyAggregateQuery {
+        let result = Query {
             schema,
             multistage_members: all_multistage_members,
             filter: logical_filter,
-            offset: self.query_properties.offset(),
-            limit: self.query_properties.row_limit(),
-            ungrouped: self.query_properties.ungrouped(),
-            order_by: self.query_properties.order_by().clone(),
+            modifers: Rc::new(LogicalQueryModifiers {
+                offset: self.query_properties.offset(),
+                limit: self.query_properties.row_limit(),
+                ungrouped: self.query_properties.ungrouped(),
+                order_by: self.query_properties.order_by().clone(),
+            }),
             source,
         };
-        Ok(Rc::new(Query::FullKeyAggregateQuery(result)))
+        Ok(Rc::new(result))
     }
 }

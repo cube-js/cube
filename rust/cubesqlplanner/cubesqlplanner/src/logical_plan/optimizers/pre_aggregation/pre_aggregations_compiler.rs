@@ -157,8 +157,18 @@ impl PreAggregationsCompiler {
         let source = if static_data.pre_aggregation_type == "rollupJoin" {
             PreAggregationSource::Join(self.build_join_source(&measures, &dimensions, &rollups)?)
         } else {
+            let cube = self
+                .query_tools
+                .cube_evaluator()
+                .cube_from_path(name.cube_name.clone())?;
+            let cube_alias = if let Some(alias) = &cube.static_data().sql_alias {
+                alias.clone()
+            } else {
+                name.cube_name.clone()
+            };
             PreAggregationSource::Single(PreAggregationTable {
                 cube_name: name.cube_name.clone(),
+                cube_alias,
                 name: name.name.clone(),
                 alias: static_data.sql_alias.clone(),
             })

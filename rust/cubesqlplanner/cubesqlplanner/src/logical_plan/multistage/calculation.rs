@@ -1,10 +1,11 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::sql_evaluator::MemberSymbol;
+use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum MultiStageCalculationType {
     Rank,
     Aggregate,
@@ -21,7 +22,7 @@ impl ToString for MultiStageCalculationType {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum MultiStageCalculationWindowFunction {
     Rank,
     Window,
@@ -94,5 +95,42 @@ impl PrettyPrint for MultiStageMeasureCalculation {
         }
         result.println("source:", &state);
         self.source.pretty_print(result, &details_state);
+    }
+}
+
+impl LogicalNode for MultiStageMeasureCalculation {
+    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
+        PlanNode::MultiStageMeasureCalculation(self.clone())
+    }
+
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![self.source.as_plan_node()]
+    }
+
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 1, self.node_name())?;
+        let source = &inputs[0];
+
+        Ok(Rc::new(Self {
+            schema: self.schema.clone(),
+            is_ungrouped: self.is_ungrouped,
+            calculation_type: self.calculation_type.clone(),
+            partition_by: self.partition_by.clone(),
+            window_function_to_use: self.window_function_to_use.clone(),
+            order_by: self.order_by.clone(),
+            source: source.clone().into_logical_node()?,
+        }))
+    }
+
+    fn node_name(&self) -> &'static str {
+        "MultiStageMeasureCalculation"
+    }
+
+    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
+        if let PlanNode::MultiStageMeasureCalculation(item) = plan_node {
+            Ok(item)
+        } else {
+            Err(cast_error(&plan_node, "MultiStageMeasureCalculation"))
+        }
     }
 }

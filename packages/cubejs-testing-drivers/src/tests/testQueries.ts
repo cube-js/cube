@@ -1868,8 +1868,43 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       });
       expect(response.rawData()).toMatchSnapshot();
     });
+    execute('Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.count',
+          'BigECommerce.totalCountRetailMonthAgo',
+        ],
+        timeDimensions: [{
+          dimension: 'RetailCalendar.retail_date',
+          granularity: 'month',
+          dateRange: ['2020-02-02', '2021-02-01'],
+        }],
+        order: {
+          'RetailCalendar.retail_date': 'asc',
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
 
     execute('querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.count',
+          'BigECommerce.totalCountRetailWeekAgo',
+        ],
+        timeDimensions: [{
+          dimension: 'RetailCalendar.retail_date',
+          granularity: 'week',
+          dateRange: ['2020-02-02', '2021-03-07'],
+        }],
+        order: {
+          'RetailCalendar.retail_date': 'asc',
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo', async () => {
       const response = await client.load({
         measures: [
           'BigECommerce.count',
@@ -2316,6 +2351,20 @@ from
     });
 
     executePg('SQL API: Timeshift measure from cube', async (connection) => {
+      const res = await connection.query(`
+        SELECT
+          DATE_TRUNC('month', orderDate) AS "orderDate",
+          MEASURE(totalQuantity) AS "totalQuantity",
+          MEASURE(totalQuantityPriorMonth) AS "totalQuantityPriorMonth"
+        FROM "ECommerce"
+        WHERE orderDate >= CAST('2020-01-01' AS DATE) AND orderDate < CAST('2021-01-01' AS DATE)
+        GROUP BY 1
+        ORDER BY 1 ASC NULLS FIRST;
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    executePg('Tesseract: SQL API: Timeshift measure from cube', async (connection) => {
       const res = await connection.query(`
         SELECT
           DATE_TRUNC('month', orderDate) AS "orderDate",

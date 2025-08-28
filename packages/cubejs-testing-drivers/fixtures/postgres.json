@@ -167,7 +167,10 @@
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
-    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo"
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: SQL API: Timeshift measure from cube"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -175,6 +178,10 @@
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
     "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
     "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "SQL API: Timeshift measure from cube",
+
 
     "SQL API: Simple Rollup",
     "SQL API: Complex Rollup",
