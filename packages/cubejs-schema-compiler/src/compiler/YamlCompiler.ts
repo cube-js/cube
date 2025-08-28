@@ -15,6 +15,7 @@ import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
+import { CompileContext } from './DataSchemaCompiler';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -50,7 +51,7 @@ export class YamlCompiler {
     });
   }
 
-  public async renderTemplate(file: FileContent, compileContext, pythonContext: PythonCtx): Promise<FileContent> {
+  public async renderTemplate(file: FileContent, compileContext: CompileContext, pythonContext: PythonCtx): Promise<FileContent> {
     return {
       fileName: file.fileName,
       content: await this.getJinjaEngine().renderTemplate(file.fileName, compileContext, {
@@ -63,7 +64,7 @@ export class YamlCompiler {
   public async compileYamlWithJinjaFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    compileContext,
+    compileContext: CompileContext,
     pythonContext: PythonCtx
   ): Promise<FileContent | undefined> {
     const renderedFile = await this.renderTemplate(file, compileContext, pythonContext);
