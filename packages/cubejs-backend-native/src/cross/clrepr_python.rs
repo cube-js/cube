@@ -3,10 +3,12 @@ use crate::cross::{CLRepr, CLReprObjectKind, StringType};
 use crate::python::utils::PyAnyHelpers;
 use pyo3::exceptions::{PyException, PyNotImplementedError, PyTypeError};
 use pyo3::types::{
-    PyBool, PyComplex, PyDate, PyDateTime, PyDelta, PyDict, PyFloat, PyFrame, PyFrozenSet,
-    PyFunction, PyInt, PyList, PySequence, PySet, PyString, PyTraceback, PyTuple,
+    PyAnyMethods, PyBool, PyBoolMethods, PyComplex, PyDate, PyDateTime, PyDelta, PyDict,
+    PyDictMethods, PyFloat, PyFloatMethods, PyFrame, PyFrozenSet, PyFunction, PyInt, PyList,
+    PyListMethods, PySequence, PySet, PySetMethods, PyString, PyTraceback, PyTuple,
+    PyTupleMethods, PyTypeMethods,
 };
-use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
+use pyo3::{Bound, Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 
 #[derive(Debug, Clone)]
 pub enum PythonRef {
@@ -19,7 +21,7 @@ pub enum PythonRef {
 
 impl CLRepr {
     /// Convert python value to CLRepr
-    pub fn from_python_ref(v: &PyAny) -> Result<Self, PyErr> {
+    pub fn from_python_ref(v: &Bound<'_, PyAny>) -> Result<Self, PyErr> {
         if v.is_none() {
             return Ok(Self::Null);
         }
@@ -31,7 +33,7 @@ impl CLRepr {
                 StringType::Normal
             };
 
-            Self::String(v.to_string(), string_type)
+            Self::String(v.str()?.to_string(), string_type)
         } else if v.get_type().is_subclass_of::<PyBool>()? {
             Self::Bool(v.downcast::<PyBool>()?.is_true())
         } else if v.get_type().is_subclass_of::<PyFloat>()? {
@@ -48,7 +50,7 @@ impl CLRepr {
                 if k.get_type().is_subclass_of::<PyString>()? {
                     let key_str = k.downcast::<PyString>()?;
 
-                    obj.insert(key_str.to_string(), Self::from_python_ref(v)?);
+                    obj.insert(key_str.to_string(), Self::from_python_ref(&v)?);
                 }
             }
 
@@ -58,7 +60,7 @@ impl CLRepr {
             let mut r = Vec::with_capacity(l.len());
 
             for v in l.iter() {
-                r.push(Self::from_python_ref(v)?);
+                r.push(Self::from_python_ref(&v)?);
             }
 
             Self::Array(r)
@@ -67,7 +69,7 @@ impl CLRepr {
             let mut r = Vec::with_capacity(l.len());
 
             for v in l.iter() {
-                r.push(Self::from_python_ref(v)?);
+                r.push(Self::from_python_ref(&v)?);
             }
 
             Self::Array(r)
@@ -76,12 +78,12 @@ impl CLRepr {
             let mut r = Vec::with_capacity(l.len());
 
             for v in l.iter() {
-                r.push(Self::from_python_ref(v)?);
+                r.push(Self::from_python_ref(&v)?);
             }
 
             Self::Tuple(r)
         } else if v.get_type().is_subclass_of::<PyFunction>()? {
-            let fun: Py<PyFunction> = v.downcast::<PyFunction>()?.into();
+            let fun: Py<PyFunction> = v.downcast::<PyFunction>()?.clone().unbind();
 
             Self::PythonRef(PythonRef::PyFunction(fun))
         } else if v.get_type().is_subclass_of::<PyComplex>()? {
@@ -140,12 +142,12 @@ impl CLRepr {
             )));
         } else {
             // Fallback to PyObject, it will lead to throw error in the JS side
-            Self::PythonRef(PythonRef::PyObject(v.into()))
+            Self::PythonRef(PythonRef::PyObject(v.clone().unbind()))
         })
     }
 
-    fn into_py_dict_impl(obj: CLReprObject, py: Python<'_>) -> Result<&PyDict, PyErr> {
-        let r = PyDict::new(py);
+    fn into_py_dict_impl(obj: CLReprObject, py: Python) -> Result<Bound<'_, PyDict>, PyErr> {
+        let r = PyDict::new_bound(py);
 
         for (k, v) in obj.into_iter() {
             r.set_item(k, Self::into_py_impl(v, py)?)?;
@@ -156,11 +158,11 @@ impl CLRepr {
 
     fn into_py_impl(from: CLRepr, py: Python) -> Result<PyObject, PyErr> {
         Ok(match from {
-            CLRepr::String(v, _) => PyString::new(py, &v).to_object(py),
-            CLRepr::Bool(v) => PyBool::new(py, v).to_object(py),
-            CLRepr::Float(v) => PyFloat::new(py, v).to_object(py),
+            CLRepr::String(v, _) => PyString::new_bound(py, &v).to_object(py),
+            CLRepr::Bool(v) => PyBool::new_bound(py, v).to_object(py),
+            CLRepr::Float(v) => PyFloat::new_bound(py, v).to_object(py),
             CLRepr::Int(v) => {
-                let py_int: &PyInt = unsafe { py.from_owned_ptr(pyo3::ffi::PyLong_FromLong(v)) };
+                let py_int = unsafe { Bound::from_owned_ptr(py, pyo3::ffi::PyLong_FromLong(v)) };
 
                 py_int.to_object(py)
             }
@@ -171,7 +173,7 @@ impl CLRepr {
                     elements.push(Self::into_py_impl(el, py)?);
                 }
 
-                PyList::new(py, elements).to_object(py)
+                PyList::new_bound(py, elements).to_object(py)
             }
             CLRepr::Tuple(arr) => {
                 let mut elements = Vec::with_capacity(arr.len());
@@ -180,7 +182,7 @@ impl CLRepr {
                     elements.push(Self::into_py_impl(el, py)?);
                 }
 
-                PyTuple::new(py, elements).to_object(py)
+                PyTuple::new_bound(py, elements).to_object(py)
             }
             CLRepr::Object(obj) => {
                 let r = Self::into_py_dict_impl(obj, py)?;
@@ -213,7 +215,7 @@ impl CLRepr {
         })
     }
 
-    pub fn into_py_dict(self, py: Python<'_>) -> Result<&PyDict, PyErr> {
+    pub fn into_py_dict(self, py: Python) -> Result<Bound<'_, PyDict>, PyErr> {
         Ok(match self {
             CLRepr::Object(obj) => Self::into_py_dict_impl(obj, py)?,
             other => {

@@ -8,7 +8,7 @@ use log::error;
 use minijinja as mj;
 use minijinja::value as mjv;
 use minijinja::value::{Object, ObjectKind, StructObject, Value};
-use pyo3::types::{PyDict, PyFunction};
+use pyo3::types::{PyDict, PyDictMethods, PyFunction};
 use pyo3::{Py, PyObject, PyResult, Python};
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -171,7 +171,7 @@ impl StructObject for JinjaPythonObject {
         let res = Python::with_gil(move |py| -> PyResult<CLRepr> {
             let attr_name = obj_ref.getattr(py, name)?;
 
-            CLRepr::from_python_ref(attr_name.as_ref(py))
+            CLRepr::from_python_ref(&attr_name.bind(py))
         });
 
         match res {
@@ -190,7 +190,7 @@ impl StructObject for JinjaPythonObject {
         Python::with_gil(|py| {
             let mut fields: Vec<Arc<str>> = vec![];
 
-            match obj_ref.downcast::<PyDict>(py) {
+            match obj_ref.downcast_bound::<PyDict>(py) {
                 Ok(dict_ref) => {
                     for key in dict_ref.keys() {
                         fields.push(key.to_string().into());
