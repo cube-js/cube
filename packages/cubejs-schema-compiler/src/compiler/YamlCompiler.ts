@@ -8,11 +8,14 @@ import { JinjaEngine, NativeInstance, PythonCtx } from '@cubejs-backend/native';
 import type { FileContent } from '@cubejs-backend/shared';
 
 import { getEnv } from '@cubejs-backend/shared';
-import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
+import {
+  CubePropContextTranspiler,
+  transpiledFields,
+  transpiledFieldsPatterns,
+  TranspilerCubeResolver, TranspilerSymbolResolver
+} from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
-import { CubeSymbols } from './CubeSymbols';
 import { nonStringFields } from './CubeValidator';
-import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
 import { CompileContext } from './DataSchemaCompiler';
@@ -28,10 +31,10 @@ export class YamlCompiler {
   protected jinjaEngine: JinjaEngine | null = null;
 
   public constructor(
-    private readonly cubeSymbols: CubeSymbols,
-    private readonly cubeDictionary: CubeDictionary,
+    private readonly cubeSymbols: TranspilerSymbolResolver,
+    private readonly cubeDictionary: TranspilerCubeResolver,
     private readonly nativeInstance: NativeInstance,
-    private readonly viewCompiler: CubeSymbols,
+    private readonly viewCompiler: TranspilerSymbolResolver,
   ) {
   }
 
