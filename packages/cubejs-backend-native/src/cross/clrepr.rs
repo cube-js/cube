@@ -6,6 +6,8 @@ use crate::cross::py_in_js::{
 };
 #[cfg(feature = "python")]
 use crate::utils::bind_method;
+#[cfg(feature = "python")]
+use pyo3::Python;
 use neon::prelude::*;
 use neon::result::Throw;
 use neon::types::JsDate;
@@ -240,7 +242,7 @@ impl CLRepr {
             #[cfg(feature = "python")]
             if from.is_a::<BoxedJsPyFunctionWrapper, _>(cx) {
                 let ref_wrap = from.downcast_or_throw::<BoxedJsPyFunctionWrapper, _>(cx)?;
-                let fun = ref_wrap.borrow().get_fun().clone();
+                let fun = Python::with_gil(|py| ref_wrap.borrow().get_fun().clone_ref(py));
 
                 return Ok(CLRepr::PythonRef(PythonRef::PyFunction(fun)));
             }
