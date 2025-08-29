@@ -79,7 +79,6 @@ impl TimeDimensionSymbol {
         let new_granularity_obj = GranularityHelper::make_granularity_obj(
             query_tools.cube_evaluator().clone(),
             &mut evaluator_compiler,
-            query_tools.timezone(),
             &&self.base_symbol.cube_name(),
             &self.base_symbol.name(),
             new_granularity.clone(),

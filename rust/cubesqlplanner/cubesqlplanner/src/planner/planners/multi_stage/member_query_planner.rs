@@ -132,7 +132,6 @@ impl MultiStageMemberQueryPlanner {
                 let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    self.query_tools.timezone().clone(),
                     &time_dimension.cube_name(),
                     &time_dimension.name(),
                     Some(query_granularity.clone()),

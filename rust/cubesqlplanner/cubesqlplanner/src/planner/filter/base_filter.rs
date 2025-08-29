@@ -203,7 +203,6 @@ impl BaseFilter {
                     let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
                         self.query_tools.cube_evaluator().clone(),
                         &mut evaluator_compiler,
-                        self.query_tools.timezone().clone(),
                         &symbol.cube_name(),
                         &symbol.name(),
                         Some(query_granularity.clone()),

@@ -85,6 +85,15 @@ export class RedshiftQuery extends PostgresQuery {
     const templates = super.sqlTemplates();
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
     templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})';
+    templates.statements.time_series_select = 'SELECT dates.f::timestamp date_from, dates.t::timestamp date_to \n' +
+    'FROM (\n' +
+    '{% for time_item in seria  %}' +
+    '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
+    '{% if not loop.last %} UNION ALL\n{% endif %}' +
+    '{% endfor %}' +
+    ') AS dates';
+    delete templates.statements.generated_time_series_select;
+    delete templates.operators.is_not_distinct_from;
     delete templates.functions.COVAR_POP;
     delete templates.functions.COVAR_SAMP;
     delete templates.window_frame_types.range;

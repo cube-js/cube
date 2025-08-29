@@ -11624,6 +11624,81 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/postgres-driver querying BigECommerce: multi-stage group by time dimension 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": "29.65480",
+    "BigECommerce.totalProfitForQuarter": "619.44850",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": "6.19920",
+    "BigECommerce.totalProfitForQuarter": "619.44850",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": "583.59450",
+    "BigECommerce.totalProfitForQuarter": "619.44850",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": "6.41760",
+    "BigECommerce.totalProfitForQuarter": "394.33860",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": "353.68490",
+    "BigECommerce.totalProfitForQuarter": "394.33860",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": "34.23610",
+    "BigECommerce.totalProfitForQuarter": "394.33860",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-07-01T00:00:00.000",
+    "BigECommerce.totalProfit": "461.13320",
+    "BigECommerce.totalProfitForQuarter": "461.13320",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": "139.99700",
+    "BigECommerce.totalProfitForQuarter": "1576.63240",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": "1132.66170",
+    "BigECommerce.totalProfitForQuarter": "1576.63240",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": "303.97370",
+    "BigECommerce.totalProfitForQuarter": "1576.63240",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/postgres-driver querying BigECommerce: null boolean 1`] = `
 Array [
   Object {
