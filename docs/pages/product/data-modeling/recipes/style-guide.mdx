@@ -199,7 +199,7 @@ views:
 ```yaml
 cubes:
   - name: california_users
-    sql: >
+    sql: |
       SELECT
         id,
         first_name,
@@ -233,6 +233,8 @@ cubes:
 - Use a new line to separate list items that are dictionaries, where
   appropriate.
 - Make sure lines are no longer than 80 characters.
+- Prefer [literal style][ref-yaml-folded-and-literal] (`|`) for multi-line strings
+over folded style (`>`).
 - If quotes are needed around a string, use double quotes.
 
 ### Example YAML
@@ -240,6 +242,9 @@ cubes:
 ```yaml
 cubes:
   - name: users
+    description: |
+      All users in the system.
+      Note that this dataset contains PII data.
     sql_table: public.users
 
     dimensions:
@@ -337,3 +342,4 @@ This style guide was inspired in part by:
 [wiki-cte]:
   https://en.wikipedia.org/wiki/Hierarchical_and_recursive_queries_in_SQL#Common_table_expression
 [wiki-backtick]: https://en.wikipedia.org/wiki/Backtick
+[ref-yaml-folded-and-literal]: /product/data-modeling/dynamic/jinja#folded-and-literal-strings

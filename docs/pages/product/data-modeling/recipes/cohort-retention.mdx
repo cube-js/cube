@@ -47,7 +47,7 @@ the months' list.
 ```yaml
 cubes:
   - name: monthly_retention
-    sql: >
+    sql: |
       SELECT
         users.id as user_id,
         date_trunc('month', users.created_at) as signup_month,
