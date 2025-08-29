@@ -23,7 +23,7 @@ measure parameter.
 ```yaml
 cubes:
   - name: active_users
-    sql: |
+    sql: >
       SELECT user_id, created_at FROM public.orders
 
     measures:

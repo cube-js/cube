@@ -51,7 +51,7 @@ column with a single value that the user chose so that we can use it in other ca
 ```yaml
 cubes:
   - name: users
-    sql: |
+    sql: >
       WITH data AS (
         SELECT
           users.id AS id,
@@ -91,7 +91,7 @@ cubes:
 
       - name: ratio
         title: Ratio Women in the City to Total Number of People
-        sql: |
+        sql: >
           1.0 * {number_of_people_of_any_gender_in_the_city} /
           {total_number_of_women}
         type: number
@@ -173,7 +173,7 @@ The above code shows very clearly what is happening, but it is even simplier to 
 ```yaml
 cubes:
   - name: users
-    sql: |
+    sql: >
       WITH 
       city AS (
         SELECT DISTINCT city AS city_filter

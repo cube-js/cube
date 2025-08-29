@@ -40,7 +40,7 @@ materialized as a table using a data transformation tool:
 cubes:
   - name: calendar_454
     public: false
-    sql: |
+    sql: >
       WITH RECURSIVE fiscal_weeks AS (
           -- Step 1: Define the start of the fiscal years (Sunday closest to Feb 1st)
           SELECT 

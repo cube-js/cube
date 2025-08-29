@@ -125,7 +125,7 @@ cubes:
         granularity: day
         partition_granularity: month # this is where we specify the partition
         refreshKey:
-          sql: |
+          sql: >
             SELECT max(updated_at) FROM public.orders WHERE
             {FILTER_PARAMS.orders.created_at.filter('created_at')}
 ```

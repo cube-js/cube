@@ -56,7 +56,7 @@ cubes:
 
     segments:
       - name: sf_users
-        sql: |
+        sql: >
           {CUBE}.location = 'San Francisco' OR {CUBE}.state = 'CA'
 ```
 
@@ -324,7 +324,7 @@ cubes:
 
     segments:
       - name: sf_ny_users
-        sql: |
+        sql: >
           {CUBE}.location = 'San Francisco' OR {CUBE}.location like '%New York%'
 ```
 

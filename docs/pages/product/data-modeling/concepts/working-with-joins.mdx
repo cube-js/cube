@@ -463,7 +463,7 @@ cube(`campaigns`, {
 ```yaml
 cubes:
   - name: campaigns
-    sql: |
+    sql: >
       SELECT
         campaign_id,
         campaign_name,
@@ -571,7 +571,7 @@ cubes:
     joins:
       - name: campaigns
         relationship: many_to_one
-        sql: |
+        sql: >
           {CUBE}.campaign_id = {campaigns.id} AND {CUBE}.customer_name =
           {campaigns.customer_name}
 
@@ -598,7 +598,7 @@ cubes:
     joins:
       - name: transactions
         relationship: one_to_many
-        sql: |
+        sql: >
           {CUBE}.customer_name = {transactions.customer_name} AND
           {CUBE}.campaign_id = {transactions.campaign_id}
 
@@ -638,7 +638,7 @@ and `right`:
 ```yaml
 cubes:
   - name: left
-    sql: |
+    sql: >
       SELECT 1 AS id, 11 AS value UNION ALL
       SELECT 2 AS id, 12 AS value UNION ALL
       SELECT 3 AS id, 13 AS value
@@ -659,7 +659,7 @@ cubes:
         relationship: one_to_one
 
   - name: right
-    sql: |
+    sql: >
       SELECT 1 AS id, 101 AS value UNION ALL
       SELECT 2 AS id, 102 AS value UNION ALL
       SELECT 3 AS id, 103 AS value
@@ -874,7 +874,7 @@ cube(`customers`, {
 ```yaml
 cubes:
   - name: orders
-    sql: |
+    sql: >
       SELECT 1 AS id, 1001 AS customer_id, 123 AS revenue UNION ALL
       SELECT 2 AS id, 1001 AS customer_id, 234 AS revenue UNION ALL
       SELECT 3 AS id, 1002 AS customer_id, 345 AS revenue UNION ALL
@@ -904,7 +904,7 @@ cubes:
         relationship: many_to_one
 
   - name: customers
-    sql: |
+    sql: >
       SELECT 1001 AS id, 'Alice' AS name UNION ALL
       SELECT 1002 AS id, 'Bob' AS name UNION ALL
       SELECT 1003 AS id, 'Eve' AS name
@@ -1008,7 +1008,7 @@ and `c`, and both `b` and `c` join to `d`:
 ```yaml
 cubes:
   - name: a
-    sql: |
+    sql: >
       SELECT 1 AS id UNION ALL
       SELECT 2 AS id UNION ALL
       SELECT 3 AS id
@@ -1037,7 +1037,7 @@ cubes:
         relationship: one_to_one
 
   - name: b
-    sql: |
+    sql: >
       SELECT 1 AS id UNION ALL
       SELECT 2 AS id UNION ALL
       SELECT 3 AS id
@@ -1054,7 +1054,7 @@ cubes:
         relationship: one_to_one
 
   - name: c
-    sql: |
+    sql: >
       SELECT 1 AS id UNION ALL
       SELECT 2 AS id UNION ALL
       SELECT 3 AS id
@@ -1071,7 +1071,7 @@ cubes:
         relationship: one_to_one
 
   - name: d
-    sql: |
+    sql: >
       SELECT 1 AS id UNION ALL
       SELECT 2 AS id UNION ALL
       SELECT 3 AS id
@@ -1361,7 +1361,7 @@ also use join paths, as shown in the following example:
 ```yaml
 cubes:
   - name: a
-    sql: |
+    sql: >
       SELECT 1 AS id, 1 AS b_id, 1 AS c_id UNION ALL
       SELECT 2 AS id, 2 AS b_id, 2 AS c_id
 
@@ -1398,7 +1398,7 @@ cubes:
           - a.b.c.measure2
 
   - name: b
-    sql: |
+    sql: >
       SELECT 1 AS id, 1 AS c_id UNION ALL
       SELECT 2 AS id, 2 AS c_id
 
@@ -1414,7 +1414,7 @@ cubes:
         sql: "{CUBE}.c_id = {c.id}"
 
   - name: c
-    sql: |
+    sql: >
       SELECT 1 AS id UNION ALL
       SELECT 2 AS id
 
@@ -1779,7 +1779,7 @@ cube(`companies_to_users`, {
 ```yaml
 cubes:
   - name: users
-    sql: |
+    sql: >
       SELECT 1 AS id, 'Ali' AS name UNION ALL
       SELECT 2 AS id, 'Bob' AS name UNION ALL
       SELECT 3 AS id, 'Eve' AS name
@@ -1795,7 +1795,7 @@ cubes:
         primary_key: true
 
   - name: companies
-    sql: |
+    sql: >
       SELECT 11 AS id, 'Acme Corporation' AS name UNION ALL
       SELECT 12 AS id, 'Stark Industries' AS name
 
@@ -1810,7 +1810,7 @@ cubes:
         type: string
 
   - name: companies_to_users
-    sql: |
+    sql: >
       SELECT 11 AS company_id, 1 AS user_id UNION ALL
       SELECT 11 AS company_id, 2 AS user_id UNION ALL
       SELECT 12 AS company_id, 3 AS user_id

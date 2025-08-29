@@ -39,7 +39,7 @@ Consider the following data model:
 ```yaml
 cubes:
   - name: nested_agg_sales
-    sql: |
+    sql: >
       SELECT 1 AS id, 1 AS store_id, 1 AS product_id, 10 AS sales UNION ALL
       SELECT 2 AS id, 1 AS store_id, 1 AS product_id, 20 AS sales UNION ALL
       SELECT 3 AS id, 1 AS store_id, 2 AS product_id, 30 AS sales UNION ALL
@@ -73,7 +73,7 @@ cubes:
         type: sum
 
   - name: nested_agg_stores_orders
-    sql: |
+    sql: >
       SELECT store_id, product_id
       FROM (
         SELECT 1 AS id, 1 AS store_id, 1 AS product_id, 10 AS sales UNION ALL

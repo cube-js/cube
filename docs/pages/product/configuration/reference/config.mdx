@@ -1082,7 +1082,7 @@ You can use the custom value from extend context in your data model like this:
 
 cubes:
   - name: users
-    sql: |
+    sql: >
       SELECT *
       FROM users
       WHERE organization_id={{ securityContext['active_organization'] }}

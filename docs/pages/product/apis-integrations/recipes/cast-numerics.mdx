@@ -16,7 +16,7 @@ numeric measure:
 ```yaml
 cubes:
   - name: cube_with_big_numbers
-    sql: |
+    sql: >
       SELECT              123::BIGINT AS number UNION ALL
       SELECT 9007199254740991::BIGINT AS number UNION ALL
       SELECT 9999999999999999::BIGINT AS number

@@ -29,7 +29,7 @@ We can also use them in further calculations like rendering `fiscal_quarter_labe
 ```yaml
 cubes:
   - name: custom_granularities
-    sql: |
+    sql: >
       SELECT '2024-01-15'::TIMESTAMP AS timestamp UNION ALL
       SELECT '2024-02-15'::TIMESTAMP AS timestamp UNION ALL
       SELECT '2024-03-15'::TIMESTAMP AS timestamp UNION ALL
@@ -76,7 +76,7 @@ cubes:
         type: time
 
       - name: fiscal_quarter_label
-        sql: |
+        sql: >
           'FY' || (EXTRACT(YEAR FROM {timestamp.fiscal_year}) + 1) ||
           '-Q' || EXTRACT(QUARTER FROM {timestamp.fiscal_quarter} + INTERVAL '3 MONTHS')
         type: string

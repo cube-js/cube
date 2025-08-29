@@ -191,7 +191,7 @@ cube(`all_sales`, {
 ```yaml
 cubes:
   - name: all_sales
-    sql: |
+    sql: >
       SELECT
         amount,
         user_id AS customer_id,
@@ -228,7 +228,7 @@ cubes:
           - sql: "{CUBE}.row_type = 'retail'"
 
       - name: online_revenue_percentage
-        sql: |
+        sql: >
           {online_revenue} /
           NULLIF({online_revenue} + {offline_revenue}, 0)
         type: number

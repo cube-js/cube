@@ -141,7 +141,7 @@ First, the `sql` parameter can be overridden in each child cube:
 ```yaml
 cubes:
   - name: product_purchases
-    sql: |
+    sql: >
       SELECT *
       FROM events
       WHERE {FILTER_PARAMS.product_purchases.timestamp.filter('time')}
@@ -172,7 +172,7 @@ in the SQL query:
 ```yaml
 cubes:
   - name: base_events
-    sql: |
+    sql: >
       SELECT *
       FROM events
       WHERE

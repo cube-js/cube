@@ -21,7 +21,7 @@ operators:
 ```yaml
 cubes:
   - name: customers
-    sql: |
+    sql: >
       SELECT *, 'Einstein' AS name FROM einstein_data UNION ALL
       SELECT *, 'Pascal'   AS name FROM pascal_data   UNION ALL
       SELECT *, 'Newton'   AS name FROM newton_data
@@ -81,7 +81,7 @@ generate necessary SQL based on a list of tables:
  
 cubes:
   - name: customers
-    sql: |
+    sql: >
       {%- for table, name in customer_tables | items %}
       SELECT *, '{{ name | safe }}' AS name FROM {{ table | safe }}
       {% if not loop.last %}UNION ALL{% endif %}

@@ -34,7 +34,7 @@ their values:
 ```yaml
 cubes:
   - name: month_over_month
-    sql: |
+    sql: >
       SELECT 1 AS value, '2024-01-01'::TIMESTAMP AS date UNION ALL
       SELECT 2 AS value, '2024-01-01'::TIMESTAMP AS date UNION ALL
       SELECT 3 AS value, '2024-02-01'::TIMESTAMP AS date UNION ALL

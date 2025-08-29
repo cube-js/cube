@@ -48,7 +48,7 @@ cube(`orders`, {
 ```yaml
 cubes:
   - name: orders
-    sql: |
+    sql: >
       SELECT *
       FROM orders, line_items
       WHERE orders.id = line_items.order_id
@@ -451,7 +451,7 @@ the dimension from `d`.
 ```yaml
 cubes:
   - name: a
-    sql: |
+    sql: >
       SELECT 1 AS id UNION ALL
       SELECT 2 AS id UNION ALL
       SELECT 3 AS id
@@ -480,7 +480,7 @@ cubes:
         relationship: one_to_one
 
   - name: b
-    sql: |
+    sql: >
       SELECT 1 AS id UNION ALL
       SELECT 2 AS id UNION ALL
       SELECT 3 AS id
@@ -497,7 +497,7 @@ cubes:
         relationship: one_to_one
 
   - name: c
-    sql: |
+    sql: >
       SELECT 1 AS id UNION ALL
       SELECT 2 AS id UNION ALL
       SELECT 3 AS id
@@ -514,7 +514,7 @@ cubes:
         relationship: one_to_one
 
   - name: d
-    sql: |
+    sql: >
       SELECT 1 AS id UNION ALL
       SELECT 2 AS id UNION ALL
       SELECT 3 AS id
@@ -781,13 +781,13 @@ cubes:
     sql_table: organisms
 
   - name: animals
-    sql: |
+    sql: >
       SELECT *
       FROM {organisms.sql()}
       WHERE kingdom = 'animals'
 
   - name: dogs
-    sql: |
+    sql: >
       SELECT *
       FROM {animals.sql()}
       WHERE species = 'dogs'
@@ -824,7 +824,7 @@ In YAML data models, use `{reference}`:
 ```yaml
 cubes:
   - name: orders
-    sql: |
+    sql: >
       SELECT id, created_at
       FROM {other_cube.sql()}
 
@@ -871,7 +871,7 @@ cubes:
     sql: SELECT CAST('\{"key":"value"\}'::JSON AS TEXT) AS json_column
 
   - name: csv_from_s3_in_duckdb
-    sql: |
+    sql: >
       SELECT *
       FROM read_csv(
         's3://bbb/aaa.csv',

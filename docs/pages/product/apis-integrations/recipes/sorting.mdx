@@ -29,7 +29,7 @@ Consider the following data model:
 ```yaml
 cubes:
   - name: sort_nulls
-    sql: |
+    sql: >
       SELECT 1234 AS value UNION ALL
       SELECT 5678 AS value UNION ALL
       SELECT NULL AS value

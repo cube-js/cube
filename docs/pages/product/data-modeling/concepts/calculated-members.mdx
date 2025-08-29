@@ -27,7 +27,7 @@ integer value.
 ```yaml
 cubes:
   - name: orders
-    sql: |
+    sql: >
       SELECT 1 AS id, 'processing' AS status UNION ALL
       SELECT 2 AS id, 'completed'  AS status UNION ALL
       SELECT 3 AS id, 'completed'  AS status
@@ -177,7 +177,7 @@ between `orders` and `users`:
 ```yaml
 cubes:
   - name: orders
-    sql: |
+    sql: >
       SELECT 1 AS id, 1 AS user_id UNION ALL
       SELECT 2 AS id, 1 AS user_id UNION ALL
       SELECT 3 AS id, 2 AS user_id
@@ -202,7 +202,7 @@ cubes:
         relationship: one_to_many
 
   - name: users
-    sql: |
+    sql: >
       SELECT 1 AS id, 'Alice' AS name UNION ALL
       SELECT 2 AS id, 'Bob'   AS name
 
@@ -308,7 +308,7 @@ granularity. It can be one of the [default granularities][ref-default-granularit
 ```yaml
 cubes:
   - name: users
-    sql: |
+    sql: >
       SELECT '2025-01-01T00:00:00Z' AS created_at UNION ALL
       SELECT '2025-02-01T00:00:00Z' AS created_at UNION ALL
       SELECT '2025-03-01T00:00:00Z' AS created_at
@@ -416,7 +416,7 @@ relationship between `orders` and `users`:
 ```yaml
 cubes:
   - name: orders
-    sql: |
+    sql: >
       SELECT 1 AS id, 1 AS user_id UNION ALL
       SELECT 2 AS id, 1 AS user_id UNION ALL
       SELECT 3 AS id, 2 AS user_id
@@ -437,7 +437,7 @@ cubes:
         relationship: one_to_many
 
   - name: users
-    sql: |
+    sql: >
       SELECT 1 AS id, 'Alice' AS name UNION ALL
       SELECT 2 AS id, 'Bob'   AS name
 

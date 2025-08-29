@@ -109,14 +109,14 @@ cube(`students`, {
 cubes:
   - name: teachers
     extends: users
-    sql: |
+    sql: >
       SELECT *
       FROM {users.sql()}
       WHERE type = 'teacher'
 
   - name: students
     extends: users
-    sql: |
+    sql: >
       SELECT *
       FROM {users.sql()}
       WHERE type = 'student'
