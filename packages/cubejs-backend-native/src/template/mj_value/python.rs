@@ -254,7 +254,8 @@ impl Object for JinjaPythonFunction {
             )
         })?;
 
-        let call_future = Python::with_gil(|py| py_runtime.call_async(self.inner.clone_ref(py), arguments));
+        let call_future =
+            Python::with_gil(|py| py_runtime.call_async(self.inner.clone_ref(py), arguments));
 
         let tokio = tokio_runtime().map_err(|err| {
             mj::Error::new(
