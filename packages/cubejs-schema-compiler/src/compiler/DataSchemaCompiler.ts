@@ -498,33 +498,9 @@ export class DataSchemaCompiler {
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
       && file.content.match(JINJA_SYNTAX)
     ) {
-      const transpiledFile = await this.yamlCompiler.compileYamlWithJinjaFile(
-        file,
-        errorsReport,
-        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
-        this.pythonContext!
-      );
-      if (transpiledFile) {
-        // We update the jinja/yaml file content to the transpiled js content
-        // and raise related flag so it will go JS transpilation flow afterward
-        // avoiding costly YAML/Python parsing again.
-        file.content = transpiledFile.content;
-        file.convertedToJs = true;
-      }
-
-      return transpiledFile;
+      return this.transpileJinjaFile(file, errorsReport, options);
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
-
-      if (transpiledFile) {
-        // We update the yaml file content to the transpiled js content
-        // and raise related flag so it will go JS transpilation flow afterward
-        // avoiding costly YAML/Python parsing again.
-        file.content = transpiledFile.content;
-        file.convertedToJs = true;
-      }
-
-      return transpiledFile;
+      return this.transpileYamlFile(file, errorsReport, options);
     } else {
       return file;
     }
@@ -645,6 +621,58 @@ export class DataSchemaCompiler {
       }
     }
     return undefined;
+  }
+
+  private async transpileYamlFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+  ): Promise<(FileContent | undefined)> {
+    // if (getEnv('transpilationNative')) {
+    //
+    // } else if (getEnv('transpilationWorkerThreads')) {
+    //
+    // } else {
+    const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
+
+    if (transpiledFile) {
+      // We update the yaml file content to the transpiled js content
+      // and raise related flag so it will go JS transpilation flow afterward
+      // avoiding costly YAML/Python parsing again.
+      file.content = transpiledFile.content;
+      file.convertedToJs = true;
+    }
+
+    return transpiledFile;
+    // }
+  }
+
+  private async transpileJinjaFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+  ): Promise<(FileContent | undefined)> {
+    // if (getEnv('transpilationNative')) {
+    //
+    // } else if (getEnv('transpilationWorkerThreads')) {
+    //
+    // } else {
+    const transpiledFile = await this.yamlCompiler.compileYamlWithJinjaFile(
+      file,
+      errorsReport,
+      this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
+      this.pythonContext!
+    );
+    if (transpiledFile) {
+      // We update the jinja/yaml file content to the transpiled js content
+      // and raise related flag so it will go JS transpilation flow afterward
+      // avoiding costly YAML/Python parsing again.
+      file.content = transpiledFile.content;
+      file.convertedToJs = true;
+    }
+
+    return transpiledFile;
+    // }
   }
 
   public withQuery(query, fn) {
