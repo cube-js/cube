@@ -6,11 +6,11 @@ use crate::cross::py_in_js::{
 };
 #[cfg(feature = "python")]
 use crate::utils::bind_method;
-#[cfg(feature = "python")]
-use pyo3::Python;
 use neon::prelude::*;
 use neon::result::Throw;
 use neon::types::JsDate;
+#[cfg(feature = "python")]
+use pyo3::Python;
 #[cfg(feature = "python")]
 use std::cell::RefCell;
 use std::collections::hash_map::{IntoIter, Iter, Keys};
