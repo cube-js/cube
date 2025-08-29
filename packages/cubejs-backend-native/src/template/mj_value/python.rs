@@ -171,7 +171,7 @@ impl StructObject for JinjaPythonObject {
         let res = Python::with_gil(move |py| -> PyResult<CLRepr> {
             let attr_name = obj_ref.getattr(py, name)?;
 
-            CLRepr::from_python_ref(&attr_name.bind(py))
+            CLRepr::from_python_ref(attr_name.bind(py))
         });
 
         match res {

@@ -148,15 +148,12 @@ impl PyRuntime {
                 let py_kwargs = kwargs_dict_opt.as_ref();
                 let call_res = fun.call_bound(py, py_args, py_kwargs)?;
 
-                let is_coroutine =
-                    unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
-                if is_coroutine {
-                    let fut =
-                        pyo3_async_runtimes::tokio::into_future(call_res.bind(py).clone())?;
+                if call_res.is_coroutine()? {
+                    let fut = pyo3_async_runtimes::tokio::into_future(call_res.bind(py).clone())?;
                     Ok(PyScheduledFunResult::Poll(Box::pin(fut)))
                 } else {
                     Ok(PyScheduledFunResult::Ready(CLRepr::from_python_ref(
-                        &call_res.bind(py),
+                        call_res.bind(py),
                     )?))
                 }
             })
@@ -207,7 +204,7 @@ impl PyRuntime {
 
                         Python::with_gil(move |py| -> Result<CLRepr, PyErr> {
                             let res = match fut_res {
-                                Ok(r) => CLRepr::from_python_ref(&r.bind(py)),
+                                Ok(r) => CLRepr::from_python_ref(r.bind(py)),
                                 Err(err) => Err(err),
                             };
 
