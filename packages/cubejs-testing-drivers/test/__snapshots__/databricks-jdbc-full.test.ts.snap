@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Queries with the @cubejs-backend/databricks-driver querying BigECommerce: multi-stage group by time dimension 1`] = `
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: multi-stage group by time dimension 1`] = `
 Array [
   Object {
     "BigECommerce.orderDate": "2020-01-01T00:00:00.000",

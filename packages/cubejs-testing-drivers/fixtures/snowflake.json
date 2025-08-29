@@ -278,6 +278,7 @@
     "SQL API: Extended nested Rollup over asterisk",
     "SQL API: SQL push down push to cube quoted alias",
 
+    "querying BigECommerce: multi-stage group by time dimension",
 
 
     "querying BigECommerce: rolling window by 2 day without date range",
