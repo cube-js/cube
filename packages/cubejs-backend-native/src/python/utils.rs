@@ -21,7 +21,7 @@ pub fn python_fn_call_sync(py_fun: &Py<PyFunction>, arguments: Vec<CLRepr>) -> P
                 "Calling function with async response is not supported",
             ))
         } else {
-            CLRepr::from_python_ref(&call_res.bind(py))
+            CLRepr::from_python_ref(call_res.bind(py))
         }
     })
 }
@@ -44,7 +44,7 @@ pub fn python_obj_call_sync(py_fun: &PyObject, arguments: Vec<CLRepr>) -> PyResu
                 "Calling object with async response is not supported",
             ))
         } else {
-            CLRepr::from_python_ref(&call_res.bind(py))
+            CLRepr::from_python_ref(call_res.bind(py))
         }
     })
 }
@@ -74,7 +74,7 @@ where
                 "Calling object method with async response is not supported",
             ))
         } else {
-            CLRepr::from_python_ref(&call_res.bind(py))
+            CLRepr::from_python_ref(call_res.bind(py))
         }
     })
 }

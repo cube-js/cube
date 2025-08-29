@@ -116,7 +116,7 @@ impl PyRuntime {
                 Ok(PyScheduledFunResult::Poll(Box::pin(fut)))
             } else {
                 Ok(PyScheduledFunResult::Ready(CLRepr::from_python_ref(
-                    &call_res.bind(py),
+                    call_res.bind(py),
                 )?))
             }
         });
@@ -156,7 +156,7 @@ impl PyRuntime {
 
                     let res = Python::with_gil(move |py| -> Result<CLRepr, PyErr> {
                         let res = match fut_res {
-                            Ok(r) => CLRepr::from_python_ref(&r.bind(py)),
+                            Ok(r) => CLRepr::from_python_ref(r.bind(py)),
                             Err(err) => Err(err),
                         };
 
