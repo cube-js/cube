@@ -48,7 +48,7 @@ Array [
     "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
     "BigECommerce.orderDate.quarter": "2020-07-01T00:00:00.000",
-    "BigECommerce.totalProfit": "461.1332",
+    "BigECommerce.totalProfit": 461.1332,
     "BigECommerce.totalProfitForQuarter": 461.1332,
   },
   Object {
@@ -62,8 +62,8 @@ Array [
     "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
     "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
-    "BigECommerce.totalProfit": 1132.66170,
-    "BigECommerce.totalProfitForQuarter": 1576.63240,
+    "BigECommerce.totalProfit": 1132.6617,
+    "BigECommerce.totalProfitForQuarter": 1576.6324,
   },
   Object {
     "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
