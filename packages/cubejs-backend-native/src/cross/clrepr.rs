@@ -98,9 +98,9 @@ pub enum StringType {
     Safe,
 }
 
-/// Cross language representation is abstraction to transfer values between
+/// Cross-language representation is an abstraction to transfer values between
 /// JavaScript and Python across Rust. Converting between two different languages requires
-/// to use Context which is available on the call (one for python and one for js), which result as
+/// using Context which is available on the call (one for python and one for js), which results as
 /// blocking.
 #[derive(Debug, Clone)]
 pub enum CLRepr {
