@@ -269,9 +269,9 @@ jobs:
         include:
           - database: postgres
             use_tesseract_sql_planner: true
-          - database: snowflake-full
+          - database: snowflake
             use_tesseract_sql_planner: true
-          - database: redshift-full
+          - database: redshift
             use_tesseract_sql_planner: true
           - database: bigquery-export-bucket-gcs
             use_tesseract_sql_planner: true
