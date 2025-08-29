@@ -10,13 +10,23 @@ use pyo3::types::{
 };
 use pyo3::{Bound, Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum PythonRef {
     PyObject(PyObject),
     PyFunction(Py<PyFunction>),
     /// Special type to transfer functions through JavaScript
     /// In JS it's an external object.
     PyExternalFunction(Py<PyFunction>),
+}
+
+impl Clone for PythonRef {
+    fn clone(&self) -> Self {
+        Python::with_gil(|py| match self {
+            PythonRef::PyObject(obj) => PythonRef::PyObject(obj.clone_ref(py)),
+            PythonRef::PyFunction(fun) => PythonRef::PyFunction(fun.clone_ref(py)),
+            PythonRef::PyExternalFunction(fun) => PythonRef::PyExternalFunction(fun.clone_ref(py)),
+        })
+    }
 }
 
 impl CLRepr {
