@@ -575,14 +575,9 @@ export class DataSchemaCompiler {
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
       && file.content.match(JINJA_SYNTAX)
     ) {
-      return this.yamlCompiler.compileYamlWithJinjaFile(
-        file,
-        errorsReport,
-        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
-        this.pythonContext!
-      );
+      return this.transpileJinjaFile(file, errorsReport, options);
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      return this.yamlCompiler.transpileYamlFile(file, errorsReport);
+      return this.transpileYamlFile(file, errorsReport, options);
     } else {
       return file;
     }
@@ -703,6 +698,39 @@ export class DataSchemaCompiler {
       }
     }
     return undefined;
+  }
+
+  private async transpileYamlFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+  ): Promise<(FileContent | undefined)> {
+    // if (getEnv('transpilationNative')) {
+    //
+    // } else if (getEnv('transpilationWorkerThreads')) {
+    //
+    // } else {
+    return this.yamlCompiler.transpileYamlFile(file, errorsReport);
+    // }
+  }
+
+  private async transpileJinjaFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+  ): Promise<(FileContent | undefined)> {
+    // if (getEnv('transpilationNative')) {
+    //
+    // } else if (getEnv('transpilationWorkerThreads')) {
+    //
+    // } else {
+    return this.yamlCompiler.compileYamlWithJinjaFile(
+      file,
+      errorsReport,
+      this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
+      this.pythonContext!
+    );
+    // }
   }
 
   public withQuery(query, fn) {
