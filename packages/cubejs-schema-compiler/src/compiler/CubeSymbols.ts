@@ -32,6 +32,9 @@ export type CubeSymbolDefinition = {
   granularities?: Record<string, GranularityDefinition>;
   timeShift?: TimeshiftDefinition[];
   format?: string;
+  drillMembers?: (...args: any[]) => ToString | ToString[];
+  drillMemberReferences?: (...args: any[]) => ToString | ToString[];
+  aliasMember?: string;
 };
 
 export type HierarchyDefinition = {
@@ -638,6 +641,9 @@ export class CubeSymbols {
     [...memberSets.allMembers].filter(it => !memberSets.resolvedMembers.has(it)).forEach(it => {
       errorReporter.error(`Member '${it}' is included in '${cube.name}' but not defined in any cube`);
     });
+
+    // Add drillMembers to view measures after all include processing is complete
+    this.validateAndAddDrillMembers(cube, errorReporter);
   }
 
   protected applyIncludeMembers(includeMembers: any[], cube: CubeDefinition, type: string, errorReporter: ErrorReporter) {
@@ -838,6 +844,101 @@ export class CubeSymbols {
         throw new Error(`Unexpected member type: ${type}`);
       }
       return [memberRef.name || path[path.length - 1], memberDefinition];
+    });
+  }
+
+  /**
+   * Validates and adds drillMembers to view measures by checking if they're included in the view
+   */
+  protected validateAndAddDrillMembers(cube: CubeDefinitionExtended, errorReporter: ErrorReporter) {
+    if (!cube.isView || !cube.measures) {
+      return;
+    }
+
+    // Create a set of all available members in this view for quick lookup
+    const availableViewMembers = new Set<string>();
+
+    // Add all dimensions and measures to the available set
+    ['dimensions', 'measures', 'segments'].forEach(type => {
+      if (cube[type]) {
+        Object.keys(cube[type]).forEach(memberName => {
+          availableViewMembers.add(`${cube.name}.${memberName}`);
+        });
+      }
+    });
+
+    // Also add included members if they exist
+    if (cube.includedMembers) {
+      cube.includedMembers.forEach(included => {
+        availableViewMembers.add(included.memberPath);
+      });
+    }
+
+    // Process each measure in the view
+    Object.entries(cube.measures).forEach(([, measureDef]) => {
+      // Skip if this measure doesn't have an aliasMember (not from an included cube)
+      if (!measureDef.aliasMember) {
+        return;
+      }
+
+      // Extract original cube name from aliasMember
+      const aliasParts = measureDef.aliasMember.split('.');
+      if (aliasParts.length < 2) {
+        return;
+      }
+
+      const originalCubeName = aliasParts[0];
+      const originalMeasureName = aliasParts[1];
+
+      // Get the original measure definition from the source cube
+      const originalMeasure = this.getResolvedMember('measures', originalCubeName, originalMeasureName);
+      if (!originalMeasure || (!originalMeasure.drillMembers && !originalMeasure.drillMemberReferences)) {
+        return;
+      }
+
+      try {
+        // Evaluate drillMembers at cube level like CubeToMetaTransformer does
+        const drillMembers = originalMeasure.drillMembers || originalMeasure.drillMemberReferences;
+        const evaluatedResult = this.evaluateReferences(
+          originalCubeName,
+          drillMembers,
+          { originalSorting: true }
+        );
+
+        // Handle both string and array results from evaluateReferences
+        let evaluatedDrillMembers: string[];
+        if (Array.isArray(evaluatedResult)) {
+          evaluatedDrillMembers = evaluatedResult;
+        } else if (evaluatedResult) {
+          evaluatedDrillMembers = [evaluatedResult];
+        } else {
+          evaluatedDrillMembers = [];
+        }
+
+        // Filter drillMembers to only include those available in the view
+        const validDrillMembers = evaluatedDrillMembers.filter(memberRef => availableViewMembers.has(memberRef));
+
+        // Only add drillMembers if we have valid ones
+        if (validDrillMembers.length > 0) {
+          // Add drillMembers to the measure definition - need to use any since drillMembers can be a function or array at runtime
+          (measureDef as any).drillMembers = validDrillMembers;
+        }
+
+        // Log a warning if some drillMembers were excluded
+        if (validDrillMembers.length < evaluatedDrillMembers.length) {
+          const excludedMembers = evaluatedDrillMembers.filter(memberRef => !availableViewMembers.has(memberRef));
+          errorReporter.warning({
+            message: `Some drillMembers from '${originalCubeName}.${originalMeasureName}' are not included in view '${cube.name}': ${excludedMembers.join(', ')}`,
+            loc: null,
+          });
+        }
+      } catch (error: any) {
+        // If evaluation fails, log a warning but don't fail compilation
+        errorReporter.warning({
+          message: `Failed to evaluate drillMembers for '${originalCubeName}.${originalMeasureName}' in view '${cube.name}': ${error?.message || error}`,
+          loc: null,
+        });
+      }
     });
   }
 
