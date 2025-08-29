@@ -425,6 +425,13 @@
           }]
         },
         {
+          "name": "totalProfitForQuarter",
+          "type": "sum",
+          "sql": "{totalProfit}",
+          "multi_stage": true,
+          "group_by": ["orderDate.quarter"]
+        },
+        {
           "name": "totalProfitForStatus",
           "type": "sum",
           "sql": "{totalProfit}",

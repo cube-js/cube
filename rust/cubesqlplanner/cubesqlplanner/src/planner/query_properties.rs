@@ -172,7 +172,6 @@ impl QueryProperties {
                     let granularity_obj = GranularityHelper::make_granularity_obj(
                         query_tools.cube_evaluator().clone(),
                         &mut evaluator_compiler,
-                        query_tools.timezone().clone(),
                         &base_symbol.cube_name(),
                         &base_symbol.name(),
                         d.granularity.clone(),

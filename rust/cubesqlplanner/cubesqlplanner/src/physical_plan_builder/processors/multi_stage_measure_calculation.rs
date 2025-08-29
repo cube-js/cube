@@ -26,7 +26,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
         measure_calculation: &MultiStageMeasureCalculation,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let query_tools = self.builder.query_tools();
+        let (query_tools, templates) = self.builder.qtools_and_templates();
         let from = self
             .builder
             .process_node(measure_calculation.source.as_ref(), context)?;
@@ -81,7 +81,16 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
                 if let Some(reference) =
                     references_builder.find_reference_for_member(&dim.full_name(), &None)
                 {
-                    Ok(format!("{}", reference))
+                    let table_ref = if let Some(table_name) = reference.source() {
+                        format!("{}.", templates.quote_identifier(table_name)?)
+                    } else {
+                        format!("")
+                    };
+                    Ok(format!(
+                        "{}{}",
+                        table_ref,
+                        templates.quote_identifier(&reference.name())?
+                    ))
                 } else {
                     Err(CubeError::internal(format!(
                         "Alias not found for partition_by dimension {}",
