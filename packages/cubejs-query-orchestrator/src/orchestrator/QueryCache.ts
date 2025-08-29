@@ -865,6 +865,17 @@ export class QueryCache {
     const { renewalThreshold, primaryQuery, renewCycle } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
     const redisKey = this.queryRedisKey(cacheKey);
+
+    this.logger('Cache lookup started', {
+      cacheKey,
+      newRenewalKey: renewalKey,
+      renewalThreshold,
+      requestId: options.requestId,
+      spanId,
+      primaryQuery,
+      renewCycle
+    });
+
     const fetchNew = () => (
       this.queryWithRetryAndRelease(query, values, {
         cacheKey,
