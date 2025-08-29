@@ -7,6 +7,7 @@ import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
+import { TranspilerSymbolResolver } from './transpilers';
 
 export type ToString = { toString(): string };
 
@@ -193,7 +194,7 @@ export const CONTEXT_SYMBOLS = {
 
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
-export class CubeSymbols {
+export class CubeSymbols implements TranspilerSymbolResolver {
   public symbols: Record<string | symbol, CubeSymbolsDefinition>;
 
   private builtCubes: Record<string, CubeDefinitionExtended>;
