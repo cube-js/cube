@@ -96,18 +96,19 @@ impl PyRuntime {
 
         let task_result = Python::with_gil(move |py| -> PyResult<PyScheduledFunResult> {
             let mut prep_tuple = Vec::with_capacity(args.len());
-            let mut py_kwargs = None;
+            let mut kwargs_dict_opt = None;
 
             for arg in args {
                 if arg.is_kwarg() {
-                    py_kwargs = Some(arg.into_py_dict(py)?);
+                    kwargs_dict_opt = Some(arg.into_py_dict(py)?);
                 } else {
                     prep_tuple.push(arg.into_py(py)?);
                 }
             }
 
-            let py_args = PyTuple::new(py, prep_tuple);
-            let call_res = fun.call(py, py_args, py_kwargs)?;
+            let py_args = PyTuple::new_bound(py, prep_tuple);
+            let py_kwargs = kwargs_dict_opt.as_ref();
+            let call_res = fun.call_bound(py, py_args, py_kwargs)?;
 
             let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
             if is_coroutine {
@@ -115,7 +116,7 @@ impl PyRuntime {
                 Ok(PyScheduledFunResult::Poll(Box::pin(fut)))
             } else {
                 Ok(PyScheduledFunResult::Ready(CLRepr::from_python_ref(
-                    call_res.as_ref(py),
+                    &call_res.bind(py),
                 )?))
             }
         });
@@ -155,7 +156,7 @@ impl PyRuntime {
 
                     let res = Python::with_gil(move |py| -> Result<CLRepr, PyErr> {
                         let res = match fut_res {
-                            Ok(r) => CLRepr::from_python_ref(r.as_ref(py)),
+                            Ok(r) => CLRepr::from_python_ref(&r.bind(py)),
                             Err(err) => Err(err),
                         };
 

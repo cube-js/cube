@@ -11,7 +11,7 @@ pub fn python_fn_call_sync(py_fun: &Py<PyFunction>, arguments: Vec<CLRepr>) -> P
             args_tuple.push(arg.into_py(py)?);
         }
 
-        let tuple = PyTuple::new(py, args_tuple);
+        let tuple = PyTuple::new_bound(py, args_tuple);
 
         let call_res = py_fun.call1(py, tuple)?;
 
@@ -21,7 +21,7 @@ pub fn python_fn_call_sync(py_fun: &Py<PyFunction>, arguments: Vec<CLRepr>) -> P
                 "Calling function with async response is not supported",
             ))
         } else {
-            CLRepr::from_python_ref(call_res.as_ref(py))
+            CLRepr::from_python_ref(&call_res.bind(py))
         }
     })
 }
@@ -34,7 +34,7 @@ pub fn python_obj_call_sync(py_fun: &PyObject, arguments: Vec<CLRepr>) -> PyResu
             args_tuple.push(arg.into_py(py)?);
         }
 
-        let tuple = PyTuple::new(py, args_tuple);
+        let tuple = PyTuple::new_bound(py, args_tuple);
 
         let call_res = py_fun.call1(py, tuple)?;
 
@@ -44,7 +44,7 @@ pub fn python_obj_call_sync(py_fun: &PyObject, arguments: Vec<CLRepr>) -> PyResu
                 "Calling object with async response is not supported",
             ))
         } else {
-            CLRepr::from_python_ref(call_res.as_ref(py))
+            CLRepr::from_python_ref(&call_res.bind(py))
         }
     })
 }
@@ -64,7 +64,7 @@ where
             args_tuple.push(arg.into_py(py)?);
         }
 
-        let tuple = PyTuple::new(py, args_tuple);
+        let tuple = PyTuple::new_bound(py, args_tuple);
 
         let call_res = py_fun.call_method1(py, name, tuple)?;
 
@@ -74,7 +74,7 @@ where
                 "Calling object method with async response is not supported",
             ))
         } else {
-            CLRepr::from_python_ref(call_res.as_ref(py))
+            CLRepr::from_python_ref(&call_res.bind(py))
         }
     })
 }
