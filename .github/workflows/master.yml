@@ -48,7 +48,7 @@ jobs:
     timeout-minutes: 60
     name: Build Linux Native backend for Dev image
     container:
-      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024-python-3.11
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-31072025-python-3.11
 
     steps:
       - name: Checkout
