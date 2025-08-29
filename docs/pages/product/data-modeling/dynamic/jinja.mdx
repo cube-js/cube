@@ -1,4 +1,4 @@
-# Dynamic data models with Jinja and Python
+# Data modeling with YAML, Jinja, and Python
 
 Cube supports authoring dynamic data models using the [Jinja templating
 language][jinja] and Python. This allows de-duplicating common patterns in your data models
@@ -6,22 +6,48 @@ as well as dynamically generating data models from a remote data source.
 
 Jinja is supported in all YAML data model files.
 
+## YAML
+
+It is recommended to default to YAML syntax because of its simplicity and readability.
+
+### Folded and literal strings
+
+Sometimes you might want to use multi-line strings in YAML-based data models, e.g.,
+in parameters such as `sql` or `description`. It is recommended to use [literal][ref-yaml-literal]
+(`|`) string style in such cases as it preserves line breaks.
+
+```yaml
+cubes:
+  - name: orders
+    description: |
+      This cube represents customer orders.
+      It includes measures for total sales and order count.
+    sql: |
+      -- Fetch only relevant columns
+      SELECT id, created_at, total_amount
+      FROM staging.orders
+```
+
 ## Jinja
 
 Please check the [Jinja documentation][jinja-docs] for details on Jinja syntax.
 
+### Previewing YAML
+
+You can preview the data model code after applying Jinja templates in the <Btn>[Data
+Model][ref-data-model-editor]</Btn> editor by clicking <Btn>... → Jinja Preview</Btn>
+on files that contain Jinja templates in the sidebar.
+
 <ReferenceBox>
 
 Currently, there's no way to preview the data model code in YAML after applying
-Jinja templates.
-Please [track this issue](https://github.com/cube-js/cube/issues/8134).
-
-As a workaround, you can view the resulting data model in
-[Playground](/product/workspace/playground) and [Visual Model][ref-visual-model].
-You can also introspect the data model using the [`/v1/meta` REST API
-endpoint](/product/apis-integrations/rest-api/reference#base_pathv1meta).
+Jinja templates in Cube Core. Please [track this issue](https://github.com/cube-js/cube/issues/8134).
 
 </ReferenceBox>
+
+You can also view the resulting data model in [Playground][ref-payground] and [Visual
+Model][ref-visual-model]. Also, you can introspect the data model using the
+[`/v1/meta` REST API endpoint][ref-meta-api].
 
 ### Loops
 
@@ -40,7 +66,7 @@ the following example, we loop over a list of nested properties and generate a
 
 cubes:
   - name: analytics
-    sql: >
+    sql: |
       SELECT
       {%- for prop in nested_properties %}
         {{ prop }}_prop.value AS {{ prop }}
@@ -118,7 +144,7 @@ property:
 
 cubes:
   - name: payments
-    sql: >
+    sql: |
       SELECT
         id AS payment_id,
         {{ cents_to_dollars('amount') }} AS amount_usd
@@ -300,3 +326,8 @@ image][ref-docker-image-extension].
 [ref-cube-template-context]: /product/data-modeling/reference/cube-package#templatecontext-class
 [ref-cube-dbt-package]: /product/data-modeling/reference/cube_dbt
 [ref-cube-with-dbt]: /product/data-modeling/recipes/dbt
+[ref-data-model-editor]: /product/workspace/data-model
+[ref-payground]: /product/workspace/playground
+[ref-meta-api]: /product/apis-integrations/rest-api/reference#base_pathv1meta
+[ref-yaml-literal]: https://yaml.org/spec/1.2.2/#812-literal-style
+[ref-yaml-folded]: https://yaml.org/spec/1.2.2/#813-folded-style
