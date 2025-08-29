@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.62](https://github.com/cube-js/cube/compare/v1.3.61...v1.3.62) (2025-08-29)
+
+### Bug Fixes
+
+- **tesseract:** Dimnesions with granularity in group_by + drivers support ([#9928](https://github.com/cube-js/cube/issues/9928)) ([6b582f6](https://github.com/cube-js/cube/commit/6b582f6adace840dd3ad0d56efd871c3ad65431f))
+
 ## [1.3.61](https://github.com/cube-js/cube/compare/v1.3.60...v1.3.61) (2025-08-28)
 
 ### Features
