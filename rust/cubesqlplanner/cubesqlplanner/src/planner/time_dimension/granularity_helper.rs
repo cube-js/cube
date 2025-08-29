@@ -224,11 +224,11 @@ impl GranularityHelper {
     pub fn make_granularity_obj(
         cube_evaluator: Rc<dyn CubeEvaluator>,
         compiler: &mut Compiler,
-        timezone: Tz,
         cube_name: &String,
         name: &String,
         granularity: Option<String>,
     ) -> Result<Option<Granularity>, CubeError> {
+        let timezone = compiler.timezone();
         let granularity_obj = if let Some(granularity) = &granularity {
             let path = vec![
                 cube_name.clone(),

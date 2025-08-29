@@ -302,6 +302,18 @@ describe('SQL Generation', () => {
           type: 'sum',
           group_by: [visitors.source]
         },
+        visitors_revenue_per_year: {
+          multi_stage: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          group_by: [visitors.created_at.year]
+        },
+        visitors_revenue_reduce_day: {
+          multi_stage: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          reduce_by: [visitors.created_at.day]
+        },
         visitors_revenue_without_date: {
           multi_stage: true,
           sql: \`\${revenue}\`,
@@ -4433,6 +4445,184 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       visitors__revenue: '900'
     }]
   ));
+
+  if (getEnv('nativeSqlPlanner')) {
+  it('multi stage sum with group by time dim with granularity', async () => runQueryTest(
+    {
+      measures: ['visitors.visitors_revenue_per_year', 'visitors.revenue'],
+      dimensions: ['visitors.source'],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'year',
+        dateRange: ['2016-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors.source'
+      }, {
+        id: 'visitors.created_at'
+      }],
+    },
+
+    [{
+      visitors__source: 'google',
+      visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+      visitors__visitors_revenue_per_year: '1500',
+      visitors__revenue: '300'
+    },
+    {
+      visitors__source: 'some',
+      visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+      visitors__visitors_revenue_per_year: '1500',
+      visitors__revenue: '300'
+    },
+    {
+      visitors__source: null,
+      visitors__created_at_year: '2016-01-01T00:00:00.000Z',
+      visitors__visitors_revenue_per_year: '500',
+      visitors__revenue: '500'
+    },
+    {
+      visitors__source: null,
+      visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+      visitors__visitors_revenue_per_year: '1500',
+      visitors__revenue: '900'
+    }]
+  ));
+  } else {
+    it.skip('multi stage sum with group by time dim with granularity', async () => {
+    // Works only in Tesseract
+    });
+  }
+
+if (getEnv('nativeSqlPlanner')) {
+  it('multi stage sum multiple time dims group by time dim with granularity', async () => runQueryTest(
+    {
+      measures: ['visitors.visitors_revenue_per_year', 'visitors.revenue'],
+      dimensions: ['visitors.source'],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'year',
+        dateRange: ['2014-01-01', '2018-01-30']
+      },
+      {
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2014-01-01', '2018-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors.source'
+      }, {
+        id: 'visitors.created_at'
+      }],
+    },
+
+    [
+      {
+        visitors__source: 'google',
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors__visitors_revenue_per_year: '1500',
+        visitors__revenue: '300'
+      },
+      {
+        visitors__source: 'some',
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__visitors_revenue_per_year: '1500',
+        visitors__revenue: '100'
+      },
+      {
+        visitors__source: 'some',
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__visitors_revenue_per_year: '1500',
+        visitors__revenue: '200'
+      },
+      {
+        visitors__source: null,
+        visitors__created_at_year: '2016-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2016-09-06T00:00:00.000Z',
+        visitors__visitors_revenue_per_year: '500',
+        visitors__revenue: '500'
+      },
+      {
+        visitors__source: null,
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors__visitors_revenue_per_year: '1500',
+        visitors__revenue: '900'
+      }
+    ]
+  ));
+  } else {
+    it.skip('multi stage sum multiple time dims group by time dim with granularity', async () => {
+    // Works only in Tesseract
+    });
+  }
+
+  if (getEnv('nativeSqlPlanner')) {
+  it('multi stage sum multiple time dims reduce by time dim with granularity', async () => runQueryTest(
+    {
+      measures: ['visitors.visitors_revenue_reduce_day', 'visitors.revenue'],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'year',
+        dateRange: ['2014-01-01', '2018-01-30']
+      },
+      {
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2014-01-01', '2018-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors.source'
+      }, {
+        id: 'visitors.created_at'
+      }],
+    },
+
+    [
+
+      {
+        visitors__created_at_year: '2016-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2016-09-06T00:00:00.000Z',
+        visitors__visitors_revenue_reduce_day: '500',
+        visitors__revenue: '500'
+      },
+      {
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__visitors_revenue_reduce_day: '1500',
+        visitors__revenue: '100'
+      },
+      {
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__visitors_revenue_reduce_day: '1500',
+        visitors__revenue: '200'
+      },
+      {
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors__visitors_revenue_reduce_day: '1500',
+        visitors__revenue: '300'
+      },
+      {
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors__visitors_revenue_reduce_day: '1500',
+        visitors__revenue: '900'
+      }
+    ]
+  ));
+  } else {
+    it.skip('multi stage sum multiple time dims reduce by time dim with granularity', async () => {
+    // Works only in Tesseract
+    });
+  }
 
   if (getEnv('nativeSqlPlanner')) {
     it('multi stage sum with group by over view', async () => runQueryTest(
