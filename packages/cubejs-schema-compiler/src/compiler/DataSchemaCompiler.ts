@@ -586,7 +586,7 @@ export class DataSchemaCompiler {
           cubeSymbols,
         };
 
-        const res = await this.workerPool!.exec('transpile', [data]);
+        const res = await this.workerPool!.exec('transpileJs', [data]);
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
 
@@ -628,23 +628,35 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    // if (getEnv('transpilationNative')) {
-    //
-    // } else if (getEnv('transpilationWorkerThreads')) {
-    //
-    // } else {
-    const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
+    /* if (getEnv('transpilationNative')) {
 
-    if (transpiledFile) {
-      // We update the yaml file content to the transpiled js content
-      // and raise related flag so it will go JS transpilation flow afterward
-      // avoiding costly YAML/Python parsing again.
-      file.content = transpiledFile.content;
-      file.convertedToJs = true;
+    } else */ if (getEnv('transpilationWorkerThreads')) {
+      const data = {
+        fileName: file.fileName,
+        content: file.content,
+        transpilers: [],
+        cubeNames,
+        cubeSymbols,
+      };
+
+      const res = await this.workerPool!.exec('transpileYaml', [data]);
+      errorsReport.addErrors(res.errors);
+      errorsReport.addWarnings(res.warnings);
+
+      return { ...file, content: res.content };
+    } else {
+      const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
+
+      if (transpiledFile) {
+        // We update the yaml file content to the transpiled js content
+        // and raise related flag so it will go JS transpilation flow afterward
+        // avoiding costly YAML/Python parsing again.
+        file.content = transpiledFile.content;
+        file.convertedToJs = true;
+      }
+
+      return transpiledFile;
     }
-
-    return transpiledFile;
-    // }
   }
 
   private async transpileJinjaFile(
