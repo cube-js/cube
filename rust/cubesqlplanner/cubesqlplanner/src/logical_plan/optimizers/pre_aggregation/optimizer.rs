@@ -49,9 +49,10 @@ impl PreAggregationOptimizer {
         query: Rc<Query>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<Option<Rc<Query>>, CubeError> {
+        let is_external = pre_aggregation.external.unwrap_or_default();
         if query.multistage_members.is_empty() {
             self.try_rewrite_simple_query(&query, pre_aggregation)
-        } else if !self.allow_multi_stage {
+        } else if is_external && !self.allow_multi_stage {
             Ok(None)
         } else {
             self.try_rewrite_query_with_multistages(&query, pre_aggregation)
