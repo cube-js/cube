@@ -111,7 +111,7 @@ impl PyRuntime {
 
             let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
             if is_coroutine {
-                let fut = pyo3_asyncio::tokio::into_future(call_res.as_ref(py))?;
+                let fut = pyo3_async_runtimes::tokio::into_future(call_res.bind(py).clone())?;
                 Ok(PyScheduledFunResult::Poll(Box::pin(fut)))
             } else {
                 Ok(PyScheduledFunResult::Ready(CLRepr::from_python_ref(
@@ -206,12 +206,12 @@ impl PyRuntime {
             trace!("Initializing executor in a separate thread");
 
             std::thread::spawn(|| {
-                pyo3_asyncio::tokio::get_runtime()
-                    .block_on(pyo3_asyncio::tokio::re_exports::pending::<()>())
+                pyo3_async_runtimes::tokio::get_runtime()
+                    .block_on(pyo3_async_runtimes::tokio::re_exports::pending::<()>())
             });
 
             let res = Python::with_gil(|py| -> Result<(), PyErr> {
-                pyo3_asyncio::tokio::run(py, async move {
+                pyo3_async_runtimes::tokio::run(py, async move {
                     loop {
                         if let Some(task) = receiver.recv().await {
                             trace!("New task");
@@ -247,7 +247,7 @@ pub fn py_runtime_init<'a, C: Context<'a>>(
 
     pyo3::prepare_freethreaded_python();
     // it's safe to unwrap
-    pyo3_asyncio::tokio::init_with_runtime(runtime).unwrap();
+    pyo3_async_runtimes::tokio::init_with_runtime(runtime).unwrap();
 
     if PY_RUNTIME.set(PyRuntime::new(channel)).is_err() {
         cx.throw_error("Error on setting PyRuntime")
