@@ -1,16 +1,17 @@
 use super::QualifiedColumnName;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{BaseMember, VisitorContext};
+use crate::planner::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct MemberExpression {
-    pub member: Rc<dyn BaseMember>,
+    pub member: Rc<MemberSymbol>,
 }
 
 impl MemberExpression {
-    pub fn new(member: Rc<dyn BaseMember>) -> Self {
+    pub fn new(member: Rc<MemberSymbol>) -> Self {
         Self { member }
     }
 
@@ -19,7 +20,7 @@ impl MemberExpression {
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
-        self.member.to_sql(context, templates)
+        evaluate_with_context(&self.member, context, templates)
     }
 }
 
@@ -31,14 +32,16 @@ pub struct FunctionExpression {
 
 #[derive(Clone)]
 pub enum Expr {
+    Null,
     Member(MemberExpression),
     Reference(QualifiedColumnName),
+    GroupAny(QualifiedColumnName),
     Function(FunctionExpression),
     Asterisk,
 }
 
 impl Expr {
-    pub fn new_member(member: Rc<dyn BaseMember>) -> Self {
+    pub fn new_member(member: Rc<MemberSymbol>) -> Self {
         Self::Member(MemberExpression::new(member))
     }
     pub fn new_reference(source: Option<String>, reference: String) -> Self {
@@ -50,9 +53,15 @@ impl Expr {
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
         match self {
+            Self::Null => Ok(format!("CAST(NULL as integer)")),
             Self::Member(member) => member.to_sql(templates, context),
             Self::Reference(reference) => {
                 templates.column_reference(reference.source(), &reference.name())
+            }
+            Self::GroupAny(reference) => {
+                let reference =
+                    templates.column_reference(reference.source(), &reference.name())?;
+                templates.group_any(&reference)
             }
             Expr::Function(FunctionExpression {
                 function,

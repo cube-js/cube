@@ -302,6 +302,18 @@ describe('SQL Generation', () => {
           type: 'sum',
           group_by: [visitors.source]
         },
+        visitors_revenue_per_year: {
+          multi_stage: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          group_by: [visitors.created_at.year]
+        },
+        visitors_revenue_reduce_day: {
+          multi_stage: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          reduce_by: [visitors.created_at.day]
+        },
         visitors_revenue_without_date: {
           multi_stage: true,
           sql: \`\${revenue}\`,
@@ -1097,28 +1109,84 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       id: 'visitors.created_at'
     }],
     timezone: 'America/Los_Angeles'
-  }, [
-    {
-      visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-      visitors__revenue_rolling: null,
-      vc__visitor_checkins_count: '3'
-    },
-    {
-      visitors__created_at_day: '2017-01-04T00:00:00.000Z',
-      visitors__revenue_rolling: '100',
-      vc__visitor_checkins_count: '2'
-    },
-    {
-      visitors__created_at_day: '2017-01-05T00:00:00.000Z',
-      visitors__revenue_rolling: '200',
-      vc__visitor_checkins_count: '1'
-    },
-    {
-      visitors__created_at_day: '2017-01-06T00:00:00.000Z',
-      visitors__revenue_rolling: '500',
-      vc__visitor_checkins_count: '0'
-    }
-  ]));
+  },
+  getEnv('nativeSqlPlanner') ?
+    [
+      {
+        vc__visitor_checkins_count: null,
+        visitors__created_at_day: '2017-01-01T00:00:00.000Z',
+        visitors__revenue_rolling: null,
+      },
+      {
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__revenue_rolling: null,
+        vc__visitor_checkins_count: '3'
+      },
+      {
+
+        vc__visitor_checkins_count: null,
+        visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+        visitors__revenue_rolling: '100',
+      },
+      {
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__revenue_rolling: '100',
+        vc__visitor_checkins_count: '2'
+      },
+      {
+        visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors__revenue_rolling: '200',
+        vc__visitor_checkins_count: '1'
+      },
+      {
+        visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors__revenue_rolling: '500',
+        vc__visitor_checkins_count: '0'
+      },
+      {
+        vc__visitor_checkins_count: null,
+        visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+        visitors__revenue_rolling: '1200',
+      },
+      {
+        vc__visitor_checkins_count: null,
+        visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+        visitors__revenue_rolling: '900',
+      },
+      {
+        vc__visitor_checkins_count: null,
+        visitors__created_at_day: '2017-01-09T00:00:00.000Z',
+        visitors__revenue_rolling: null,
+      },
+      {
+        vc__visitor_checkins_count: null,
+        visitors__created_at_day: '2017-01-10T00:00:00.000Z',
+        visitors__revenue_rolling: null,
+      }
+    ]
+    :
+    [
+      {
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__revenue_rolling: null,
+        vc__visitor_checkins_count: '3'
+      },
+      {
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__revenue_rolling: '100',
+        vc__visitor_checkins_count: '2'
+      },
+      {
+        visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors__revenue_rolling: '200',
+        vc__visitor_checkins_count: '1'
+      },
+      {
+        visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors__revenue_rolling: '500',
+        vc__visitor_checkins_count: '0'
+      }
+    ]));
 
   it('rolling window with one time dimension with granularity', async () => runQueryTest({
     measures: [
@@ -1795,10 +1863,43 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       id: 'visitors.created_at'
     }],
     timezone: 'America/Los_Angeles'
-  }, [
-    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago: '200' },
-    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago: '300' }
-  ]));
+  },
+  getEnv('nativeSqlPlanner') ?
+    [
+      {
+        visitors__cagr_day: null,
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__revenue: '100',
+        visitors__revenue_day_ago: null,
+      },
+      {
+        visitors__cagr_day: null,
+        visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+        visitors__revenue: null,
+        visitors__revenue_day_ago: '100',
+      },
+      {
+        visitors__cagr_day: null,
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__revenue: '200',
+        visitors__revenue_day_ago: null,
+      },
+      { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago: '200' },
+      { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago: '300' },
+
+      {
+        visitors__cagr_day: null,
+        visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+        visitors__revenue: null,
+        visitors__revenue_day_ago: '900',
+      },
+
+    ]
+
+    : [
+      { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago: '200' },
+      { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago: '300' }
+    ]));
 
   it('CAGR (no td in time_shift)', async () => runQueryTest({
     measures: [
@@ -1815,10 +1916,43 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       id: 'visitors.created_at'
     }],
     timezone: 'America/Los_Angeles'
-  }, [
-    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago_no_td: '200' },
-    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago_no_td: '300' }
-  ]));
+  },
+  getEnv('nativeSqlPlanner') ?
+    [
+      {
+        visitors__cagr_day: null,
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__revenue: '100',
+        visitors__revenue_day_ago_no_td: null,
+      },
+      {
+        visitors__cagr_day: null,
+        visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+        visitors__revenue: null,
+        visitors__revenue_day_ago_no_td: '100',
+      },
+      {
+        visitors__cagr_day: null,
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__revenue: '200',
+        visitors__revenue_day_ago_no_td: null,
+      },
+      { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago_no_td: '200' },
+      { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago_no_td: '300' },
+
+      {
+        visitors__cagr_day: null,
+        visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+        visitors__revenue: null,
+        visitors__revenue_day_ago_no_td: '900',
+      },
+
+    ]
+
+    : [
+      { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago_no_td: '200' },
+      { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago_no_td: '300' }
+    ]));
 
   it('CAGR via view (td from main cube)', async () => runQueryTest({
     measures: [
@@ -1835,10 +1969,41 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       id: 'visitors_multi_stage.created_at'
     }],
     timezone: 'America/Los_Angeles'
-  }, [
-    { visitors_multi_stage__created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__cagr_day: '150', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago: '200' },
-    { visitors_multi_stage__created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__cagr_day: '300', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago: '300' }
-  ]));
+  },
+  getEnv('nativeSqlPlanner') ?
+    [
+      {
+        visitors_multi_stage__cagr_day: null,
+        visitors_multi_stage__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors_multi_stage__revenue: '100',
+        visitors_multi_stage__revenue_day_ago: null,
+      },
+      {
+        visitors_multi_stage__cagr_day: null,
+        visitors_multi_stage__created_at_day: '2017-01-03T00:00:00.000Z',
+        visitors_multi_stage__revenue: null,
+        visitors_multi_stage__revenue_day_ago: '100',
+      },
+      {
+        visitors_multi_stage__cagr_day: null,
+        visitors_multi_stage__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors_multi_stage__revenue: '200',
+        visitors_multi_stage__revenue_day_ago: null,
+      },
+      { visitors_multi_stage__created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__cagr_day: '150', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago: '200' },
+      { visitors_multi_stage__created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__cagr_day: '300', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago: '300' },
+
+      {
+        visitors_multi_stage__cagr_day: null,
+        visitors_multi_stage__created_at_day: '2017-01-07T00:00:00.000Z',
+        visitors_multi_stage__revenue: null,
+        visitors_multi_stage__revenue_day_ago: '900',
+      },
+    ]
+    : [
+      { visitors_multi_stage__created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__cagr_day: '150', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago: '200' },
+      { visitors_multi_stage__created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__cagr_day: '300', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago: '300' }
+    ]));
 
   it('CAGR via view (td from joined cube)', async () => runQueryTest({
     measures: [
@@ -1854,10 +2019,37 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       id: 'visitors_multi_stage.create_date_created_at'
     }],
     timezone: 'America/Los_Angeles'
-  }, [
-    { visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago_via_join: '200' },
-    { visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago_via_join: '300' }
-  ]));
+  },
+  getEnv('nativeSqlPlanner') ?
+    [
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors_multi_stage__revenue: '100',
+        visitors_multi_stage__revenue_day_ago_via_join: null,
+      },
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-03T00:00:00.000Z',
+        visitors_multi_stage__revenue: null,
+        visitors_multi_stage__revenue_day_ago_via_join: '100',
+      },
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors_multi_stage__revenue: '200',
+        visitors_multi_stage__revenue_day_ago_via_join: null,
+      },
+      { visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago_via_join: '200' },
+      { visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago_via_join: '300' },
+
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-07T00:00:00.000Z',
+        visitors_multi_stage__revenue: null,
+        visitors_multi_stage__revenue_day_ago_via_join: '900',
+      }
+    ]
+    : [
+      { visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago_via_join: '200' },
+      { visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago_via_join: '300' }
+    ]));
 
   it('CAGR (no td in time_shift via view)', async () => runQueryTest({
     measures: [
@@ -1873,18 +2065,54 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       id: 'visitors_multi_stage.create_date_created_at'
     }],
     timezone: 'America/Los_Angeles'
-  }, [
-    {
-      visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z',
-      visitors_multi_stage__revenue: '300',
-      visitors_multi_stage__revenue_day_ago_no_td: '200',
-    },
-    {
-      visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z',
-      visitors_multi_stage__revenue: '900',
-      visitors_multi_stage__revenue_day_ago_no_td: '300',
-    }
-  ]));
+  },
+  getEnv('nativeSqlPlanner') ?
+    [
+
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors_multi_stage__revenue: '100',
+        visitors_multi_stage__revenue_day_ago_no_td: null,
+      },
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-03T00:00:00.000Z',
+        visitors_multi_stage__revenue: null,
+        visitors_multi_stage__revenue_day_ago_no_td: '100',
+      },
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors_multi_stage__revenue: '200',
+        visitors_multi_stage__revenue_day_ago_no_td: null,
+      },
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors_multi_stage__revenue: '300',
+        visitors_multi_stage__revenue_day_ago_no_td: '200',
+      },
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors_multi_stage__revenue: '900',
+        visitors_multi_stage__revenue_day_ago_no_td: '300',
+      },
+
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-07T00:00:00.000Z',
+        visitors_multi_stage__revenue: null,
+        visitors_multi_stage__revenue_day_ago_no_td: '900',
+      },
+    ]
+    : [
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z',
+        visitors_multi_stage__revenue: '300',
+        visitors_multi_stage__revenue_day_ago_no_td: '200',
+      },
+      {
+        visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z',
+        visitors_multi_stage__revenue: '900',
+        visitors_multi_stage__revenue_day_ago_no_td: '300',
+      }
+    ]));
 
   it('sql utils', async () => runQueryTest({
     measures: [
@@ -2533,13 +2761,17 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       timeDimensions: [{
         dimension: 'visitor_checkins.created_at',
         granularity: 'day',
-        dateRange: ['2017-01-01', '2017-01-30']
+        dateRange: ['2017-01-01', '2017-01-06']
       }],
       timezone: 'America/Los_Angeles',
       filters: [],
       order: [{
         id: 'visitor_checkins.id'
-      }],
+      },
+      {
+        id: 'visitor_checkins.created_at'
+      }
+      ],
       ungrouped: true
     });
 
@@ -2547,8 +2779,97 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
-      expect(res).toEqual(
+
+      const expected = getEnv('nativeSqlPlanner') ?
         [
+          {
+            vc__id: 3,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__id: 3,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1,
+          },
+          {
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__id: 3,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1,
+          },
+          {
+            vc__id: 4,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+
+          },
+          {
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__id: 4,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1,
+          },
+          {
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__id: 4,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1,
+          },
+          {
+            vc__id: 5,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__id: 5,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1,
+          },
+          {
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__id: 5,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1,
+          },
+          {
+            vc__id: 6,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+
+          {
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__id: 6,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1,
+          },
+          {
+            vc__created_at_day: '2017-01-01T00:00:00.000Z',
+            vc__id: null,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: null,
+          },
+          {
+            vc__created_at_day: '2017-01-02T00:00:00.000Z',
+            vc__id: null,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: null,
+          },
+          {
+            vc__created_at_day: '2017-01-03T00:00:00.000Z',
+            vc__id: null,
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: null,
+          },
+        ]
+        : [
           {
             vc__id: 3,
             vc__created_at_day: '2017-01-04T00:00:00.000Z',
@@ -2573,7 +2894,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
             vc__visitor_checkins_count: 1,
             vc__visitor_checkins_rolling: 1
           }
-        ]
+        ];
+      expect(res).toEqual(
+        expected
       );
     });
   });
@@ -4122,6 +4445,184 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       visitors__revenue: '900'
     }]
   ));
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('multi stage sum with group by time dim with granularity', async () => runQueryTest(
+      {
+        measures: ['visitors.visitors_revenue_per_year', 'visitors.revenue'],
+        dimensions: ['visitors.source'],
+        timeDimensions: [{
+          dimension: 'visitors.created_at',
+          granularity: 'year',
+          dateRange: ['2016-01-01', '2017-01-30']
+        }],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'visitors.source'
+        }, {
+          id: 'visitors.created_at'
+        }],
+      },
+
+      [{
+        visitors__source: 'google',
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__visitors_revenue_per_year: '1500',
+        visitors__revenue: '300'
+      },
+      {
+        visitors__source: 'some',
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__visitors_revenue_per_year: '1500',
+        visitors__revenue: '300'
+      },
+      {
+        visitors__source: null,
+        visitors__created_at_year: '2016-01-01T00:00:00.000Z',
+        visitors__visitors_revenue_per_year: '500',
+        visitors__revenue: '500'
+      },
+      {
+        visitors__source: null,
+        visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+        visitors__visitors_revenue_per_year: '1500',
+        visitors__revenue: '900'
+      }]
+    ));
+  } else {
+    it.skip('multi stage sum with group by time dim with granularity', async () => {
+    // Works only in Tesseract
+    });
+  }
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('multi stage sum multiple time dims group by time dim with granularity', async () => runQueryTest(
+      {
+        measures: ['visitors.visitors_revenue_per_year', 'visitors.revenue'],
+        dimensions: ['visitors.source'],
+        timeDimensions: [{
+          dimension: 'visitors.created_at',
+          granularity: 'year',
+          dateRange: ['2014-01-01', '2018-01-30']
+        },
+        {
+          dimension: 'visitors.created_at',
+          granularity: 'day',
+          dateRange: ['2014-01-01', '2018-01-30']
+        }],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'visitors.source'
+        }, {
+          id: 'visitors.created_at'
+        }],
+      },
+
+      [
+        {
+          visitors__source: 'google',
+          visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+          visitors__visitors_revenue_per_year: '1500',
+          visitors__revenue: '300'
+        },
+        {
+          visitors__source: 'some',
+          visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__visitors_revenue_per_year: '1500',
+          visitors__revenue: '100'
+        },
+        {
+          visitors__source: 'some',
+          visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+          visitors__visitors_revenue_per_year: '1500',
+          visitors__revenue: '200'
+        },
+        {
+          visitors__source: null,
+          visitors__created_at_year: '2016-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2016-09-06T00:00:00.000Z',
+          visitors__visitors_revenue_per_year: '500',
+          visitors__revenue: '500'
+        },
+        {
+          visitors__source: null,
+          visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+          visitors__visitors_revenue_per_year: '1500',
+          visitors__revenue: '900'
+        }
+      ]
+    ));
+  } else {
+    it.skip('multi stage sum multiple time dims group by time dim with granularity', async () => {
+    // Works only in Tesseract
+    });
+  }
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('multi stage sum multiple time dims reduce by time dim with granularity', async () => runQueryTest(
+      {
+        measures: ['visitors.visitors_revenue_reduce_day', 'visitors.revenue'],
+        timeDimensions: [{
+          dimension: 'visitors.created_at',
+          granularity: 'year',
+          dateRange: ['2014-01-01', '2018-01-30']
+        },
+        {
+          dimension: 'visitors.created_at',
+          granularity: 'day',
+          dateRange: ['2014-01-01', '2018-01-30']
+        }],
+        timezone: 'America/Los_Angeles',
+        order: [{
+          id: 'visitors.source'
+        }, {
+          id: 'visitors.created_at'
+        }],
+      },
+
+      [
+
+        {
+          visitors__created_at_year: '2016-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2016-09-06T00:00:00.000Z',
+          visitors__visitors_revenue_reduce_day: '500',
+          visitors__revenue: '500'
+        },
+        {
+          visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__visitors_revenue_reduce_day: '1500',
+          visitors__revenue: '100'
+        },
+        {
+          visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+          visitors__visitors_revenue_reduce_day: '1500',
+          visitors__revenue: '200'
+        },
+        {
+          visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+          visitors__visitors_revenue_reduce_day: '1500',
+          visitors__revenue: '300'
+        },
+        {
+          visitors__created_at_year: '2017-01-01T00:00:00.000Z',
+          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+          visitors__visitors_revenue_reduce_day: '1500',
+          visitors__revenue: '900'
+        }
+      ]
+    ));
+  } else {
+    it.skip('multi stage sum multiple time dims reduce by time dim with granularity', async () => {
+    // Works only in Tesseract
+    });
+  }
 
   if (getEnv('nativeSqlPlanner')) {
     it('multi stage sum with group by over view', async () => runQueryTest(

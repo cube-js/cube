@@ -269,6 +269,10 @@ jobs:
         include:
           - database: postgres
             use_tesseract_sql_planner: true
+          - database: snowflake
+            use_tesseract_sql_planner: true
+          - database: redshift
+            use_tesseract_sql_planner: true
           - database: bigquery-export-bucket-gcs
             use_tesseract_sql_planner: true
           - database: athena-export-bucket-s3

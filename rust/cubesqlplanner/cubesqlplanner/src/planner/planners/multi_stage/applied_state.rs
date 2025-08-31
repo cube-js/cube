@@ -2,7 +2,6 @@ use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::planners::multi_stage::time_shift_state::TimeShiftState;
 use crate::planner::sql_evaluator::{DimensionTimeShift, MeasureTimeShifts, MemberSymbol};
-use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::PartialEq;
@@ -11,8 +10,8 @@ use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct MultiStageAppliedState {
-    time_dimensions: Vec<Rc<BaseTimeDimension>>,
-    dimensions: Vec<Rc<BaseDimension>>,
+    time_dimensions: Vec<Rc<MemberSymbol>>,
+    dimensions: Vec<Rc<MemberSymbol>>,
     time_dimensions_filters: Vec<FilterItem>,
     dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
@@ -22,8 +21,8 @@ pub struct MultiStageAppliedState {
 
 impl MultiStageAppliedState {
     pub fn new(
-        time_dimensions: Vec<Rc<BaseTimeDimension>>,
-        dimensions: Vec<Rc<BaseDimension>>,
+        time_dimensions: Vec<Rc<MemberSymbol>>,
+        dimensions: Vec<Rc<MemberSymbol>>,
         time_dimensions_filters: Vec<FilterItem>,
         dimensions_filters: Vec<FilterItem>,
         measures_filters: Vec<FilterItem>,
@@ -52,13 +51,13 @@ impl MultiStageAppliedState {
         }
     }
 
-    pub fn add_dimensions(&mut self, dimensions: Vec<Rc<BaseDimension>>) {
+    pub fn add_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
         self.dimensions = self
             .dimensions
             .iter()
             .cloned()
             .chain(dimensions.into_iter())
-            .unique_by(|d| d.member_evaluator().full_name())
+            .unique_by(|d| d.full_name())
             .collect_vec();
     }
 
@@ -170,24 +169,18 @@ impl MultiStageAppliedState {
     }
 
     pub fn time_dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
-        self.time_dimensions
-            .iter()
-            .map(|d| d.member_evaluator().clone())
-            .collect()
+        self.time_dimensions().clone()
     }
 
     pub fn dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
-        self.dimensions
-            .iter()
-            .map(|d| d.member_evaluator().clone())
-            .collect()
+        self.dimensions.clone()
     }
 
     pub fn all_dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
         self.time_dimensions
             .iter()
-            .map(|d| d.member_evaluator().clone())
-            .chain(self.dimensions.iter().map(|d| d.member_evaluator().clone()))
+            .cloned()
+            .chain(self.dimensions.iter().cloned())
             .collect()
     }
 
@@ -203,19 +196,19 @@ impl MultiStageAppliedState {
         &self.measures_filters
     }
 
-    pub fn dimensions(&self) -> &Vec<Rc<BaseDimension>> {
+    pub fn dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
         &self.dimensions
     }
 
-    pub fn time_dimensions(&self) -> &Vec<Rc<BaseTimeDimension>> {
+    pub fn time_dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
         &self.time_dimensions
     }
 
-    pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<BaseTimeDimension>>) {
+    pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<MemberSymbol>>) {
         self.time_dimensions = time_dimensions;
     }
 
-    pub fn set_dimensions(&mut self, dimensions: Vec<Rc<BaseDimension>>) {
+    pub fn set_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
         self.dimensions = dimensions;
     }
 
@@ -407,7 +400,7 @@ impl PartialEq for MultiStageAppliedState {
                 .dimensions
                 .iter()
                 .zip(other.dimensions.iter())
-                .all(|(a, b)| a.member_evaluator().full_name() == b.member_evaluator().full_name());
+                .all(|(a, b)| a.full_name() == b.full_name());
         dims_eq
             && self.time_dimensions_filters == other.time_dimensions_filters
             && self.dimensions_filters == other.dimensions_filters
@@ -421,11 +414,7 @@ impl Debug for MultiStageAppliedState {
         f.debug_struct("MultiStageAppliedState")
             .field(
                 "dimensions",
-                &self
-                    .dimensions
-                    .iter()
-                    .map(|d| d.member_evaluator().full_name())
-                    .join(", "),
+                &self.dimensions.iter().map(|d| d.full_name()).join(", "),
             )
             .field("time_shifts", &self.time_shifts)
             .finish()

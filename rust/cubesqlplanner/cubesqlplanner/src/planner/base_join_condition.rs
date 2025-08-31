@@ -1,4 +1,3 @@
-use super::query_tools::QueryTools;
 use super::sql_evaluator::SqlCall;
 use super::{evaluate_sql_call_with_context, VisitorContext};
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -13,17 +12,10 @@ pub trait BaseJoinCondition {
 }
 pub struct SqlJoinCondition {
     sql_call: Rc<SqlCall>,
-    query_tools: Rc<QueryTools>,
 }
 impl SqlJoinCondition {
-    pub fn try_new(
-        query_tools: Rc<QueryTools>,
-        sql_call: Rc<SqlCall>,
-    ) -> Result<Rc<Self>, CubeError> {
-        Ok(Rc::new(Self {
-            sql_call,
-            query_tools,
-        }))
+    pub fn try_new(sql_call: Rc<SqlCall>) -> Result<Rc<Self>, CubeError> {
+        Ok(Rc::new(Self { sql_call }))
     }
 }
 
@@ -33,6 +25,6 @@ impl BaseJoinCondition for SqlJoinCondition {
         context: Rc<VisitorContext>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        evaluate_sql_call_with_context(&self.sql_call, self.query_tools.clone(), context, templates)
+        evaluate_sql_call_with_context(&self.sql_call, context, templates)
     }
 }

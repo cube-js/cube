@@ -168,6 +168,10 @@
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: SQL API: Timeshift measure from cube",
+    "querying BigECommerce: multi-stage group by time dimension",
 
     "---------------------------------------",
     "SKIPPED SQL API (Need work)",
@@ -217,6 +221,10 @@
     "SQL API: Nested Rollup",
     "SQL API: Nested Rollup with aliases",
     "SQL API: Timeshift measure from cube",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "SQL API: Timeshift measure from cube",
+    "querying BigECommerce: multi-stage group by time dimension",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "SQL API: SQL push down push to cube quoted alias",

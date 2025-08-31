@@ -121,12 +121,7 @@ impl BaseFilter {
             self.measure_filter_where(context, plan_templates)
         } else {
             let symbol = self.member_evaluator();
-            let member_sql = evaluate_with_context(
-                &symbol,
-                self.query_tools.clone(),
-                context.clone(),
-                plan_templates,
-            )?;
+            let member_sql = evaluate_with_context(&symbol, context.clone(), plan_templates)?;
 
             let member_type = match symbol.as_ref() {
                 MemberSymbol::Dimension(dimension_symbol) => Some(
@@ -208,7 +203,6 @@ impl BaseFilter {
                     let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
                         self.query_tools.cube_evaluator().clone(),
                         &mut evaluator_compiler,
-                        self.query_tools.timezone().clone(),
                         &symbol.cube_name(),
                         &symbol.name(),
                         Some(query_granularity.clone()),

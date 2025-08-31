@@ -9,7 +9,6 @@ use std::rc::Rc;
 
 pub struct BaseSegment {
     full_name: String,
-    query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
     cube_name: String,
     name: String,
@@ -41,7 +40,6 @@ impl BaseSegment {
 
         Ok(Rc::new(Self {
             full_name,
-            query_tools,
             member_evaluator,
             cube_name,
             name,
@@ -52,12 +50,7 @@ impl BaseSegment {
         context: Rc<VisitorContext>,
         plan_templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        evaluate_with_context(
-            &self.member_evaluator,
-            self.query_tools.clone(),
-            context,
-            plan_templates,
-        )
+        evaluate_with_context(&self.member_evaluator, context, plan_templates)
     }
 
     pub fn full_name(&self) -> String {

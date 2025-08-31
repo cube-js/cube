@@ -208,6 +208,11 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn group_any(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template("functions/GROUP_ANY", context! { expr => expr })
+    }
+
     pub fn is_null_expr(&self, expr: &str, negate: bool) -> Result<String, CubeError> {
         self.render.render_template(
             "expressions/is_null",

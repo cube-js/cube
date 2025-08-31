@@ -4,7 +4,6 @@ use crate::cube_bridge::evaluator::{CallDep, CubeEvaluator};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::GranularityHelper;
-use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -65,19 +64,13 @@ pub enum Dependency {
 pub struct DependenciesBuilder<'a> {
     compiler: &'a mut Compiler,
     cube_evaluator: Rc<dyn CubeEvaluator>,
-    timezone: Tz,
 }
 
 impl<'a> DependenciesBuilder<'a> {
-    pub fn new(
-        compiler: &'a mut Compiler,
-        cube_evaluator: Rc<dyn CubeEvaluator>,
-        timezone: Tz,
-    ) -> Self {
+    pub fn new(compiler: &'a mut Compiler, cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
         DependenciesBuilder {
             compiler,
             cube_evaluator,
-            timezone,
         }
     }
 
@@ -173,7 +166,6 @@ impl<'a> DependenciesBuilder<'a> {
             if let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
                 self.cube_evaluator.clone(),
                 self.compiler,
-                self.timezone.clone(),
                 cube_name,
                 &dep.name,
                 Some(granularity.clone()),

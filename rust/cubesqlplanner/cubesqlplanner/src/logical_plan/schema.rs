@@ -4,11 +4,39 @@ use super::pretty_print::*;
 use crate::planner::sql_evaluator::MemberSymbol;
 use std::collections::HashSet;
 use std::rc::Rc;
+
+#[derive(Default, Clone)]
 pub struct LogicalSchema {
     pub time_dimensions: Vec<Rc<MemberSymbol>>,
     pub dimensions: Vec<Rc<MemberSymbol>>,
     pub measures: Vec<Rc<MemberSymbol>>,
     pub multiplied_measures: HashSet<String>,
+}
+
+impl LogicalSchema {
+    pub fn set_time_dimensions(mut self, time_dimensions: Vec<Rc<MemberSymbol>>) -> Self {
+        self.time_dimensions = time_dimensions;
+        self
+    }
+
+    pub fn set_dimensions(mut self, dimensions: Vec<Rc<MemberSymbol>>) -> Self {
+        self.dimensions = dimensions;
+        self
+    }
+
+    pub fn set_measures(mut self, measures: Vec<Rc<MemberSymbol>>) -> Self {
+        self.measures = measures;
+        self
+    }
+
+    pub fn set_multiplied_measures(mut self, multiplied_measures: HashSet<String>) -> Self {
+        self.multiplied_measures = multiplied_measures;
+        self
+    }
+
+    pub fn into_rc(self) -> Rc<Self> {
+        Rc::new(self)
+    }
 }
 
 impl LogicalSchema {
@@ -38,6 +66,14 @@ impl LogicalSchema {
 
     pub fn all_dimensions(&self) -> impl Iterator<Item = &Rc<MemberSymbol>> {
         self.dimensions.iter().chain(self.time_dimensions.iter())
+    }
+
+    pub fn all_members(&self) -> impl Iterator<Item = &Rc<MemberSymbol>> {
+        self.all_dimensions().chain(self.measures.iter())
+    }
+
+    pub fn has_dimensions(&self) -> bool {
+        !self.time_dimensions.is_empty() || !self.dimensions.is_empty()
     }
 }
 

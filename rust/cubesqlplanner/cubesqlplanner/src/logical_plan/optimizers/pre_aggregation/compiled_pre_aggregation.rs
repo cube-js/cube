@@ -25,6 +25,7 @@ pub struct PreAggregationUnion {
 #[derive(Clone)]
 pub struct PreAggregationTable {
     pub cube_name: String,
+    pub cube_alias: String,
     pub name: String,
     pub alias: Option<String>,
 }

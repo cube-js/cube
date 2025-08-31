@@ -25,6 +25,9 @@ impl CubeNameSymbol {
     pub fn cube_name(&self) -> &String {
         &self.cube_name
     }
+    pub fn alias(&self) -> String {
+        PlanSqlTemplates::alias_name(&self.cube_name)
+    }
 }
 
 pub struct CubeNameSymbolFactory {
@@ -126,6 +129,10 @@ impl CubeTableSymbol {
     }
     pub fn cube_name(&self) -> &String {
         &self.cube_name
+    }
+
+    pub fn alias(&self) -> String {
+        PlanSqlTemplates::alias_name(&self.cube_name)
     }
 }
 

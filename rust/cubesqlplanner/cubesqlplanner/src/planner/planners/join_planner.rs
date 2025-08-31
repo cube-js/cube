@@ -43,14 +43,16 @@ impl JoinPlanner {
     pub fn make_join_logical_plan_with_join_hints(
         &self,
         join_hints: Vec<JoinHintItem>,
+        dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     ) -> Result<Rc<LogicalJoin>, CubeError> {
         let join = self.query_tools.join_graph().build_join(join_hints)?;
-        self.make_join_logical_plan(join)
+        self.make_join_logical_plan(join, dimension_subqueries)
     }
 
     pub fn make_join_logical_plan(
         &self,
         join: Rc<dyn JoinDefinition>,
+        dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     ) -> Result<Rc<LogicalJoin>, CubeError> {
         let root_definition = self.utils.cube_from_path(join.static_data().root.clone())?;
         let root = Cube::new(root_definition);
@@ -62,10 +64,14 @@ impl JoinPlanner {
                 .cube_from_path(join_definition.static_data().original_to.clone())?;
             let cube = Cube::new(cube_definition);
             let on_sql = self.compile_join_condition(join_definition.clone())?;
-            joins.push(LogicalJoinItem::CubeJoinItem(CubeJoinItem { cube, on_sql }));
+            joins.push(LogicalJoinItem { cube, on_sql });
         }
 
-        Ok(Rc::new(LogicalJoin { root, joins }))
+        Ok(Rc::new(LogicalJoin {
+            root,
+            joins,
+            dimension_subqueries,
+        }))
     }
 
     pub fn compile_join_condition(

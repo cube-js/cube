@@ -21,47 +21,46 @@ impl SimpleQueryPlanner {
     }
 
     pub fn plan(&self) -> Result<Rc<Query>, CubeError> {
-        let (source, subquery_dimension_queries) = self.source_and_subquery_dimensions()?;
+        let source = self.source_and_subquery_dimensions()?;
 
         let multiplied_measures = self
             .query_properties
             .full_key_aggregate_measures()?
             .rendered_as_multiplied_measures
             .clone();
-        let schema = Rc::new(LogicalSchema {
-            dimensions: self.query_properties.dimension_symbols(),
-            measures: self.query_properties.measure_symbols(),
-            time_dimensions: self.query_properties.time_dimension_symbols(),
-            multiplied_measures,
-        });
+        let schema = LogicalSchema::default()
+            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_measures(self.query_properties.measures().clone())
+            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_multiplied_measures(multiplied_measures)
+            .into_rc();
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
             time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
             measures_filter: self.query_properties.measures_filters().clone(),
             segments: self.query_properties.segments().clone(),
         });
-        let result = SimpleQuery {
+        let result = Query {
+            multistage_members: vec![],
             schema,
             filter: logical_filter,
-            offset: self.query_properties.offset(),
-            limit: self.query_properties.row_limit(),
-            ungrouped: self.query_properties.ungrouped(),
-            order_by: self.query_properties.order_by().clone(),
-            dimension_subqueries: subquery_dimension_queries,
-            source: SimpleQuerySource::LogicalJoin(source),
+            modifers: Rc::new(LogicalQueryModifiers {
+                offset: self.query_properties.offset(),
+                limit: self.query_properties.row_limit(),
+                ungrouped: self.query_properties.ungrouped(),
+                order_by: self.query_properties.order_by().clone(),
+            }),
+            source: QuerySource::LogicalJoin(source),
         };
-        Ok(Rc::new(Query::SimpleQuery(result)))
+        Ok(Rc::new(result))
     }
 
-    pub fn source_and_subquery_dimensions(
-        &self,
-    ) -> Result<(Rc<LogicalJoin>, Vec<Rc<DimensionSubQuery>>), CubeError> {
+    pub fn source_and_subquery_dimensions(&self) -> Result<Rc<LogicalJoin>, CubeError> {
         let join = self.query_properties.simple_query_join()?;
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
-            &self.query_properties.all_member_symbols(false),
+            &self.query_properties.all_members(false),
             &self.join_planner,
             &join,
-            self.query_tools.clone(),
         )?;
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
             &subquery_dimensions,
@@ -70,7 +69,9 @@ impl SimpleQueryPlanner {
         )?;
         let subquery_dimension_queries =
             dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
-        let source = self.join_planner.make_join_logical_plan(join.clone())?;
-        Ok((source, subquery_dimension_queries))
+        let source = self
+            .join_planner
+            .make_join_logical_plan(join.clone(), subquery_dimension_queries)?;
+        Ok(source)
     }
 }

@@ -1797,6 +1797,81 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/redshift-driver querying BigECommerce: multi-stage group by time dimension 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": "29.65480",
+    "BigECommerce.totalProfitForQuarter": "619.44850",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": "6.19920",
+    "BigECommerce.totalProfitForQuarter": "619.44850",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": "583.59450",
+    "BigECommerce.totalProfitForQuarter": "619.44850",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": "6.41760",
+    "BigECommerce.totalProfitForQuarter": "394.33860",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": "353.68490",
+    "BigECommerce.totalProfitForQuarter": "394.33860",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": "34.23610",
+    "BigECommerce.totalProfitForQuarter": "394.33860",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-07-01T00:00:00.000",
+    "BigECommerce.totalProfit": "461.13320",
+    "BigECommerce.totalProfitForQuarter": "461.13320",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": "139.99700",
+    "BigECommerce.totalProfitForQuarter": "1576.63240",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": "1132.66170",
+    "BigECommerce.totalProfitForQuarter": "1576.63240",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": "303.97370",
+    "BigECommerce.totalProfitForQuarter": "1576.63240",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/redshift-driver SQL API: Date/time comparison with SQL push down 1`] = `
 Array [
   Object {
@@ -8825,6 +8900,334 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/redshift-driver Tesseract: SQL API: Timeshift measure from cube 1`] = `
+Array [
+  Object {
+    "orderDate": 2020-01-01T00:00:00.000Z,
+    "totalQuantity": 6,
+    "totalQuantityPriorMonth": null,
+  },
+  Object {
+    "orderDate": 2020-02-01T00:00:00.000Z,
+    "totalQuantity": 2,
+    "totalQuantityPriorMonth": 6,
+  },
+  Object {
+    "orderDate": 2020-03-01T00:00:00.000Z,
+    "totalQuantity": 13,
+    "totalQuantityPriorMonth": 2,
+  },
+  Object {
+    "orderDate": 2020-04-01T00:00:00.000Z,
+    "totalQuantity": 3,
+    "totalQuantityPriorMonth": 13,
+  },
+  Object {
+    "orderDate": 2020-05-01T00:00:00.000Z,
+    "totalQuantity": 15,
+    "totalQuantityPriorMonth": 3,
+  },
+  Object {
+    "orderDate": 2020-06-01T00:00:00.000Z,
+    "totalQuantity": 18,
+    "totalQuantityPriorMonth": 15,
+  },
+  Object {
+    "orderDate": 2020-07-01T00:00:00.000Z,
+    "totalQuantity": null,
+    "totalQuantityPriorMonth": 18,
+  },
+  Object {
+    "orderDate": 2020-09-01T00:00:00.000Z,
+    "totalQuantity": 27,
+    "totalQuantityPriorMonth": null,
+  },
+  Object {
+    "orderDate": 2020-10-01T00:00:00.000Z,
+    "totalQuantity": 11,
+    "totalQuantityPriorMonth": 27,
+  },
+  Object {
+    "orderDate": 2020-11-01T00:00:00.000Z,
+    "totalQuantity": 43,
+    "totalQuantityPriorMonth": 11,
+  },
+  Object {
+    "orderDate": 2020-12-01T00:00:00.000Z,
+    "totalQuantity": 22,
+    "totalQuantityPriorMonth": 43,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "RetailCalendar.retail_date": "2020-02-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-02-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "RetailCalendar.retail_date": "2020-03-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-03-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "RetailCalendar.retail_date": "2020-04-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "5",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "RetailCalendar.retail_date": "2020-05-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-05-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "7",
+    "BigECommerce.totalCountRetailMonthAgo": "5",
+    "RetailCalendar.retail_date": "2020-06-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-06-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "7",
+    "RetailCalendar.retail_date": "2020-07-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "6",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "RetailCalendar.retail_date": "2020-09-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "4",
+    "BigECommerce.totalCountRetailMonthAgo": "6",
+    "RetailCalendar.retail_date": "2020-10-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "9",
+    "BigECommerce.totalCountRetailMonthAgo": "5",
+    "RetailCalendar.retail_date": "2020-11-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "7",
+    "BigECommerce.totalCountRetailMonthAgo": "8",
+    "RetailCalendar.retail_date": "2020-12-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailMonthAgo": "7",
+    "RetailCalendar.retail_date": "2021-01-01T00:00:00.000",
+    "RetailCalendar.retail_date.month": "2021-01-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": null,
+    "RetailCalendar.retail_date": "2020-02-16T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-02-16T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-02-23T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-02-23T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": null,
+    "RetailCalendar.retail_date": "2020-03-15T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-03-15T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-03-22T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-03-22T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-03-29T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-03-29T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": null,
+    "RetailCalendar.retail_date": "2020-04-05T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-04-05T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-04-12T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-04-12T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailWeekAgo": null,
+    "RetailCalendar.retail_date": "2020-05-10T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-10T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailWeekAgo": "3",
+    "RetailCalendar.retail_date": "2020-05-17T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-17T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": null,
+    "RetailCalendar.retail_date": "2020-05-24T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-24T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-05-31T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-05-31T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-06-07T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-07T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-06-14T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-14T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-06-21T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-21T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-06-28T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-06-28T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": null,
+    "RetailCalendar.retail_date": "2020-08-30T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-08-30T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-09-06T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-06T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-09-13T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-13T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-09-20T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-20T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-09-27T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-09-27T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": null,
+    "RetailCalendar.retail_date": "2020-10-11T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-11T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-10-18T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-18T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-10-25T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-10-25T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-11-01T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "3",
+    "RetailCalendar.retail_date": "2020-11-08T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-08T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-11-15T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-15T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.totalCountRetailWeekAgo": "3",
+    "RetailCalendar.retail_date": "2020-11-22T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-22T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "3",
+    "BigECommerce.totalCountRetailWeekAgo": "1",
+    "RetailCalendar.retail_date": "2020-11-29T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-11-29T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailWeekAgo": "3",
+    "RetailCalendar.retail_date": "2020-12-06T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-06T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": null,
+    "RetailCalendar.retail_date": "2020-12-13T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-13T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-12-20T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-20T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.totalCountRetailWeekAgo": "2",
+    "RetailCalendar.retail_date": "2020-12-27T00:00:00.000",
+    "RetailCalendar.retail_date.week": "2020-12-27T00:00:00.000",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/redshift-driver filtering Customers: contains + dimensions, first 1`] = `
 Array [
   Object {
@@ -11104,6 +11507,17 @@ exports[`Queries with the @cubejs-backend/redshift-driver pre-aggregations Custo
 Array [
   Object {
     "Customers.runningTotal": "41",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver querying BigECommerce with Retail Calendar: totalCountRetailYearAgo 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "42",
+    "BigECommerce.totalCountRetailYearAgo": "2",
+    "RetailCalendar.retail_date": "2020-02-02T00:00:00.000",
+    "RetailCalendar.retail_date.year": "2020-02-02T00:00:00.000",
   },
 ]
 `;

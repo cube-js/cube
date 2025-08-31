@@ -67,6 +67,10 @@ impl MemberExpressionSymbol {
         format!("expr:{}.{}", self.cube_name, self.name)
     }
 
+    pub fn alias(&self) -> String {
+        PlanSqlTemplates::alias_name(&self.name)
+    }
+
     pub fn is_reference(&self) -> bool {
         self.is_reference
     }

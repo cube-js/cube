@@ -1,5 +1,5 @@
 use super::SchemaColumn;
-use crate::planner::BaseMember;
+use crate::planner::sql_evaluator::MemberSymbol;
 use itertools::Itertools;
 use std::rc::Rc;
 
@@ -34,11 +34,11 @@ impl Schema {
         self.columns = res.into_iter().cloned().collect_vec();
     }
 
-    pub fn resolve_member_alias(&self, member: &Rc<dyn BaseMember>) -> String {
+    pub fn resolve_member_alias(&self, member: &Rc<MemberSymbol>) -> String {
         if let Some(column) = self.find_column_for_member(&member.full_name()) {
             column.name().clone()
         } else {
-            member.alias_name()
+            member.alias()
         }
     }
 

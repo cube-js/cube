@@ -120,13 +120,16 @@ impl Compiler {
         Ok(collector.extract_result())
     }
 
+    pub fn timezone(&self) -> Tz {
+        self.timezone.clone()
+    }
+
     pub fn compile_sql_call(
         &mut self,
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        let dep_builder =
-            DependenciesBuilder::new(self, self.cube_evaluator.clone(), self.timezone.clone());
+        let dep_builder = DependenciesBuilder::new(self, self.cube_evaluator.clone());
         let deps = dep_builder.build(cube_name.clone(), member_sql.clone())?;
         let sql_call = SqlCall::new(member_sql, deps);
         Ok(Rc::new(sql_call))
