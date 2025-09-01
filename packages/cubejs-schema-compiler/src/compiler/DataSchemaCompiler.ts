@@ -268,7 +268,7 @@ export class DataSchemaCompiler {
     const transpilationNativeThreadsCount = getThreadsCount();
     const { compilerId } = this;
 
-    if (!transpilationNative && transpilationWorkerThreads) {
+    if (transpilationWorkerThreads) {
       const wc = getEnv('transpilationWorkerThreadsCount');
       this.workerPool = workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
@@ -288,7 +288,7 @@ export class DataSchemaCompiler {
 
       if (transpilationNative) {
         const nonJsFilesTasks = [...jinjaTemplatedFiles, ...yamlFiles]
-          .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
+          .map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames, compilerId }));
 
         const jsFiles = originalJsFiles;
         let jsFilesTasks: Promise<(FileContent | undefined)[]>[] = [];
