@@ -88,6 +88,7 @@ export type DataSchemaCompilerOptions = {
   compileContext?: any;
   allowNodeRequire?: boolean;
   compiledScriptCache: LRUCache<string, vm.Script>;
+  compiledYamlCache: LRUCache<string, string>;
 };
 
 export type TranspileOptions = {
@@ -163,6 +164,8 @@ export class DataSchemaCompiler {
 
   private readonly compiledScriptCache: LRUCache<string, vm.Script>;
 
+  private readonly compiledYamlCache: LRUCache<string, string>;
+
   private compileV8ContextCache: vm.Context | null = null;
 
   // FIXME: Is public only because of tests, should be private
@@ -196,6 +199,7 @@ export class DataSchemaCompiler {
     this.workerPool = null;
     this.compilerId = options.compilerId || 'default';
     this.compiledScriptCache = options.compiledScriptCache;
+    this.compiledYamlCache = options.compiledYamlCache;
   }
 
   public compileObjects(compileServices: CompilerInterface[], objects, errorsReport: ErrorReporter) {
@@ -705,6 +709,14 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
+    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
+
+    if (this.compiledYamlCache.has(cacheKey)) {
+      const content = this.compiledYamlCache.get(cacheKey)!;
+
+      return { ...file, content };
+    }
+
     /* if (getEnv('transpilationNative')) {
 
     } else */ if (getEnv('transpilationWorkerThreads')) {
@@ -720,9 +732,15 @@ export class DataSchemaCompiler {
       errorsReport.addErrors(res.errors);
       errorsReport.addWarnings(res.warnings);
 
+      this.compiledYamlCache.set(cacheKey, res.content);
+
       return { ...file, content: res.content };
     } else {
-      return this.yamlCompiler.transpileYamlFile(file, errorsReport);
+      const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
+
+      this.compiledYamlCache.set(cacheKey, transpiledFile?.content || '');
+
+      return transpiledFile;
     }
   }
 
