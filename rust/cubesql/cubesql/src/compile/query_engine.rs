@@ -49,6 +49,7 @@ use datafusion::{
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
     variable::VarType,
 };
+use uuid::Uuid;
 
 #[async_trait::async_trait]
 pub trait QueryEngine {
@@ -100,6 +101,7 @@ pub trait QueryEngine {
         let cache_entry = self.get_cache_entry(state.clone()).await?;
 
         let planning_start = SystemTime::now();
+        let query_planning_id = Uuid::new_v4();
         if let Some(span_id) = span_id.as_ref() {
             if let Some(auth_context) = state.auth_context() {
                 self.transport_ref()
@@ -110,6 +112,7 @@ pub trait QueryEngine {
                         "SQL API Query Planning".to_string(),
                         serde_json::json!({
                             "query": span_id.query_key.clone(),
+                            "planningId": query_planning_id.to_string(),
                         }),
                     )
                     .await
@@ -183,7 +186,9 @@ pub trait QueryEngine {
                         auth_context,
                         state.get_load_request_meta("sql"),
                         "SQL API Plan Rewrite".to_string(),
-                        serde_json::json!({}),
+                        serde_json::json!({
+                            "planningId": query_planning_id.to_string(),
+                        }),
                     )
                     .await
                     .map_err(|e| CompilationError::internal(e.to_string()))?;
@@ -292,6 +297,7 @@ pub trait QueryEngine {
                         state.get_load_request_meta("sql"),
                         "SQL API Plan Rewrite Success".to_string(),
                         serde_json::json!({
+                            "planningId": query_planning_id.to_string(),
                             "duration": rewriting_start.elapsed().unwrap().as_millis() as u64,
                         }),
                     )
@@ -326,6 +332,7 @@ pub trait QueryEngine {
                         "SQL API Query Planning Success".to_string(),
                         serde_json::json!({
                             "query": span_id.query_key.clone(),
+                            "planningId": query_planning_id.to_string(),
                             "duration": planning_start.elapsed().unwrap().as_millis() as u64,
                         }),
                     )
