@@ -34,6 +34,12 @@ CUBEJS_DB_SCHEMA=my_presto_schema
 | `CUBEJS_DB_SSL`            | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                               |    ❌    |
 | `CUBEJS_DB_MAX_POOL`       | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                |    ❌    |
 | `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The export bucket type for pre-aggregations | `s3`, `gcs` | ❌ |
+| `CUBEJS_DB_EXPORT_BUCKET` | The export bucket to connect to | A valid bucket URL | ❌ |
+| `CUBEJS_DB_EXPORT_BUCKET_AWS_KEY` | The AWS Access Key ID to use for export bucket writes | A valid AWS Access Key ID | ❌ |
+| `CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET` | The AWS Secret Access Key to use for export bucket writes | A valid AWS Secret Access Key | ❌ |
+| `CUBEJS_DB_EXPORT_BUCKET_AWS_REGION` | The AWS region to use for export bucket writes | A valid AWS region | ❌ |
+| `CUBEJS_DB_EXPORT_GCS_CREDENTIALS` | A Base64 encoded JSON key file for connecting to Google Cloud Storage | A valid Google Cloud JSON key file, encoded as a Base64 string | ❌ |
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
@@ -47,6 +53,64 @@ be used in pre-aggregations when using Presto as a source database. To learn
 more about Presto support for approximate aggregate functions, [click
 here][presto-docs-approx-agg-fns].
 
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Simple        |             ✅             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
+
+By default, Presto uses a [simple][self-preaggs-simple] strategy to
+build pre-aggregations.
+
+### Simple
+
+No extra configuration is required to configure simple pre-aggregation builds
+for Presto.
+
+### Export Bucket
+
+Presto supports using both [AWS S3][aws-s3] and [Google Cloud Storage][google-cloud-storage] for export bucket functionality.
+
+#### AWS S3
+
+<InfoBox>
+
+Ensure the AWS credentials are correctly configured in IAM to allow reads and
+writes to the export bucket in S3.
+
+</InfoBox>
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+#### Google Cloud Storage
+
+<InfoBox>
+
+When using an export bucket, remember to assign the **Storage Object Admin**
+role to your Google Cloud credentials (`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`).
+
+</InfoBox>
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET=gs://presto-export-bucket
+CUBEJS_DB_EXPORT_BUCKET_TYPE=gcs
+CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
+```
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube and Presto, set the
@@ -54,9 +118,14 @@ To enable SSL-encrypted connections between Cube and Presto, set the
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
+[aws-s3]: https://aws.amazon.com/s3/
+[google-cloud-storage]: https://cloud.google.com/storage
 [presto]: https://prestodb.io/
 [presto-docs-approx-agg-fns]:
   https://prestodb.io/docs/current/functions/aggregate.html
+[ref-caching-using-preaggs-build-strats]:
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]:
   /product/configuration/recipes/using-ssl-connections-to-data-source
 [ref-schema-ref-types-formats-countdistinctapprox]: /product/data-modeling/reference/types-and-formats#count_distinct_approx
+[self-preaggs-simple]: #simple
