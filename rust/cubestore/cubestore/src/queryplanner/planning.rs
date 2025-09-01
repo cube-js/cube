@@ -1597,6 +1597,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
         LogicalPlan::Extension { .. } => return Ok(p),
         // These nodes collect results from multiple partitions, return unchanged.
         LogicalPlan::Aggregate { .. }
+        | LogicalPlan::Window { .. }
         | LogicalPlan::Repartition { .. }
         | LogicalPlan::Limit { .. } => return Ok(p),
         // Collects results but let's push sort,fetch underneath the input.
