@@ -710,11 +710,9 @@ impl CubeTable {
                 let mut options = TableParquetOptions::new();
                 options.global = state.config_options().execution.parquet.clone();
 
-                let parquet_source = ParquetSource::new(
-                    options,
-                    get_reader_options_customizer(state.config()),
-                )
-                .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                let parquet_source =
+                    ParquetSource::new(options, get_reader_options_customizer(state.config()))
+                        .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
                 let parquet_source = if let Some(phys_pred) = &physical_predicate {
                     parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
                 } else {
@@ -792,11 +790,9 @@ impl CubeTable {
 
                     let mut options = TableParquetOptions::new();
                     options.global = state.config_options().execution.parquet.clone();
-                    let parquet_source = ParquetSource::new(
-                        options,
-                        get_reader_options_customizer(state.config()),
-                    )
-                    .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                    let parquet_source =
+                        ParquetSource::new(options, get_reader_options_customizer(state.config()))
+                            .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
                     let parquet_source = if let Some(phys_pred) = &physical_predicate {
                         parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
                     } else {
