@@ -128,14 +128,13 @@ export class YamlCompiler {
     cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
     cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
+    cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
 
     cubeObj.joins = cubeObj.joins || []; // For edge cases where joins are not defined/null
     if (!Array.isArray(cubeObj.joins)) {
       errorsReport.error('joins must be defined as array');
       cubeObj.joins = [];
     }
-
-    cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
 
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
