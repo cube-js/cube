@@ -759,7 +759,9 @@ export class DataSchemaCompiler {
     compiledFiles[file.fileName] = true;
 
     if (file.convertedToJs) {
+      const compileJsFileTimer = perfTracker.start('compileJsFile (convertedToJs)');
       this.compileJsFile(file, errorsReport);
+      compileJsFileTimer.end();
     } else if (file.fileName.endsWith('.js')) {
       this.compileJsFile(file, errorsReport, { doSyntaxCheck });
     } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||
