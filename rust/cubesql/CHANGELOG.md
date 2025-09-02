@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.63](https://github.com/cube-js/cube/compare/v1.3.62...v1.3.63) (2025-09-02)
+
+### Features
+
+- **cubesql:** Add "planningId" param to SQL API planning events ([#9939](https://github.com/cube-js/cube/issues/9939)) ([bc23173](https://github.com/cube-js/cube/commit/bc23173232028ea12b5dc744101226f7e25ce28c))
+
 ## [1.3.62](https://github.com/cube-js/cube/compare/v1.3.61...v1.3.62) (2025-08-29)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
