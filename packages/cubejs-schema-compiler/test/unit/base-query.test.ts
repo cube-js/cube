@@ -999,6 +999,52 @@ describe('SQL Generation', () => {
       /* expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
       expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id'); */
     });
+
+    it('Base joins - join hint cache', async () => {
+      // Create a schema with a segment that uses FILTER_PARAMS
+      const filterParamsCompilers = /** @type Compilers */ prepareJsCompiler([
+        createCubeSchema({
+          name: 'cardsA',
+          sqlTable: 'card_tbl',
+          joins: `{
+            cardsB: {
+              sql: \`\${CUBE}.other_id = \${cardsB}.id\`,
+              relationship: 'one_to_one'
+            },
+          }`
+        }).replace(`sql: \`\${CUBE}.location = 'San Francisco'\``, `sql: \`\${FILTER_PARAMS.cardsA.location.filter('location')}\``),
+        createCubeSchema({
+          name: 'cardsB',
+          sqlTable: 'card2_tbl',
+        }),
+      ]);
+      await compilers.compiler.compile();
+
+      // First query requires a join
+      const queryWithJoin = new PostgresQuery(filterParamsCompilers, {
+        dimensions: [
+          'cardsA.id',
+          'cardsB.id',
+        ],
+        segments: [
+          'cardsA.sfUsers',
+        ],
+      });
+      const queryAndParamsWithJoin = queryWithJoin.buildSqlAndParams();
+      expect(queryAndParamsWithJoin[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+
+      // Second query does not require a join and should not be impacted by the first query
+      const queryWithoutJoin = new PostgresQuery(filterParamsCompilers, {
+        dimensions: [
+          'cardsA.id',
+        ],
+        segments: [
+          'cardsA.sfUsers',
+        ],
+      });
+      const queryAndParamsWithoutJoin = queryWithoutJoin.buildSqlAndParams();
+      expect(queryAndParamsWithoutJoin[0]).not.toContain('JOIN');
+    });
   });
   describe('Common - JS', () => {
     const compilers = /** @type Compilers */ prepareJsCompiler(
