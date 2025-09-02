@@ -274,21 +274,18 @@ export class DataSchemaCompiler {
       }
 
       if (transpilationNative) {
-        // Warming up swc compiler cache
-        const dummyFile = {
-          fileName: 'dummy.js',
-          content: ';',
-        };
-
-        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
-
-        const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js') && !file.convertedToJs)
-          .map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames, compilerId }));
-
         const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js') || file.convertedToJs);
         let JsFilesTasks = [];
 
         if (jsFiles.length > 0) {
+          // Warming up swc compiler cache
+          const dummyFile = {
+            fileName: 'dummy.js',
+            content: ';',
+          };
+
+          await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
+
           let jsChunks;
           if (jsFiles.length < transpilationNativeThreadsCount * transpilationNativeThreadsCount) {
             jsChunks = [jsFiles];
@@ -304,6 +301,9 @@ export class DataSchemaCompiler {
           }
           JsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesBulk(chunk, errorsReport, { transpilerNames, compilerId }));
         }
+
+        const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js') && !file.convertedToJs)
+          .map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames, compilerId }));
 
         results = (await Promise.all([...nonJsFilesTasks, ...JsFilesTasks])).flat();
       } else if (transpilationWorkerThreads) {
