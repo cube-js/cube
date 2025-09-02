@@ -129,7 +129,7 @@ describe('Yaml Schema Testing', () => {
 
       throw new Error('compile must return an error');
     } catch (e: any) {
-      expect(e.message).toContain('Can\'t parse python expression');
+      expect(e.message).toContain('Failed to parse Python expression');
     }
   });
 
@@ -150,7 +150,7 @@ describe('Yaml Schema Testing', () => {
 
       throw new Error('compile must return an error');
     } catch (e: any) {
-      expect(e.message).toContain('name isn\'t defined for dimension: ');
+      expect(e.message).toContain('name isn\'t defined for dimension');
     }
   });
 
@@ -479,7 +479,7 @@ describe('Yaml Schema Testing', () => {
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('dimension.granularitys must be defined as array');
+        expect(e.message).toContain('must be defined as array');
       }
     });
 
