@@ -150,7 +150,7 @@ describe('Yaml Schema Testing', () => {
 
       throw new Error('compile must return an error');
     } catch (e: any) {
-      expect(e.message).toContain('name isn\'t defined for dimension: ');
+      expect(e.message).toContain('name isn\'t defined for dimension');
     }
   });
 
