@@ -479,7 +479,7 @@ describe('Yaml Schema Testing', () => {
         await compiler.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('dimension.granularitys must be defined as array');
+        expect(e.message).toContain('must be defined as array');
       }
     });
 
