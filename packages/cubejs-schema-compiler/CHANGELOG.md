@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.64](https://github.com/cube-js/cube/compare/v1.3.63...v1.3.64) (2025-09-03)
+
+### Bug Fixes
+
+- **cubesql:** Fix SQL pushdown `TRUNC` template for Presto ([#9944](https://github.com/cube-js/cube/issues/9944)) ([36c0e95](https://github.com/cube-js/cube/commit/36c0e95a855fef9a53bf6f6869dd8bb1d5f4010d))
+
 ## [1.3.63](https://github.com/cube-js/cube/compare/v1.3.62...v1.3.63) (2025-09-02)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
