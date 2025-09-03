@@ -87,28 +87,23 @@ export class SqlParser {
           openChar = null;
         }
         result += sql[i];
-      } else {
+      } else if (sql[i] === '-' && sql[i + 1] === '-') {
         // Check for start of single-line comment
-        if (sql[i] === '-' && sql[i + 1] === '-') {
-          inComment = true;
-          commentType = '--';
-          result += sql[i];
-        }
+        inComment = true;
+        commentType = '--';
+        result += sql[i];
+      } else if (sql[i] === '/' && sql[i + 1] === '*') {
         // Check for start of multi-line comment
-        else if (sql[i] === '/' && sql[i + 1] === '*') {
-          inComment = true;
-          commentType = '/*';
-          result += sql[i];
-        }
+        inComment = true;
+        commentType = '/*';
+        result += sql[i];
+      } else if (sql[i] === '\'' || sql[i] === '"' || sql[i] === '`') {
         // Check for string literals
-        else if (sql[i] === '\'' || sql[i] === '"' || sql[i] === '`') {
-          openChar = sql[i];
-          result += sql[i].toUpperCase();
-        }
+        openChar = sql[i];
+        result += sql[i].toUpperCase();
+      } else {
         // Regular character - convert to uppercase
-        else {
-          result += sql[i].toUpperCase();
-        }
+        result += sql[i].toUpperCase();
       }
     }
 

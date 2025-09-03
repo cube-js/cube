@@ -104,7 +104,7 @@ describe('SqlParser', () => {
   });
 
   it('sql with regex containing question mark', () => {
-    const sqlParser = new SqlParser("SELECT * FROM users WHERE name = ? AND REGEXP '^stripe(?!_direct).{1,}$'");
+    const sqlParser = new SqlParser('SELECT * FROM users WHERE name = ? AND REGEXP \'^stripe(?!_direct).{1,}$\'');
     expect(sqlParser.canParse()).toEqual(true);
   });
 
