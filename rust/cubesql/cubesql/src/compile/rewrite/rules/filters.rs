@@ -3610,6 +3610,9 @@ impl FilterRules {
                     let year = match year {
                         ScalarValue::Int64(Some(year)) => year,
                         ScalarValue::Int32(Some(year)) => year as i64,
+                        ScalarValue::Float64(Some(year)) if (1000.0..=9999.0).contains(&year) => {
+                            year.round() as i64
+                        }
                         ScalarValue::Utf8(Some(ref year_str)) if year_str.len() == 4 => {
                             if let Ok(year) = year_str.parse::<i64>() {
                                 year
