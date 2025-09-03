@@ -17618,4 +17618,41 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             displayable(physical_plan.as_ref()).indent()
         );
     }
+
+    #[tokio::test]
+    async fn test_trino_truncate() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                CAST(TRUNC(EXTRACT(MONTH FROM "k"."order_date")) AS INTEGER) AS "mn:order_date:ok",
+                SUM("k"."sumPrice") AS "sum:sumPrice:ok",
+                DATE_TRUNC('YEAR', CAST("k"."order_date" AS TIMESTAMP)) AS "tyr:order_date:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "k"
+            WHERE (CAST(TRUNC(EXTRACT(YEAR FROM "k"."order_date")) AS INTEGER) IN (2023, 2024))
+            GROUP BY 1, 3
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "functions/TRUNC".to_string(),
+                "TRUNCATE({{ args_concat }})".to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("TRUNCATE(EXTRACT(month FROM "));
+    }
 }
