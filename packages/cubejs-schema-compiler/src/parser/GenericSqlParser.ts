@@ -1,6 +1,5 @@
 // Generated from src/parser/GenericSql.g4 by ANTLR 4.13.2
 // noinspection ES6UnusedImports,JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-// @ts-nocheck
 
 import {
 	ATN,
@@ -41,12 +40,16 @@ export default class GenericSqlParser extends Parser {
 	public static readonly IS = 19;
 	public static readonly NULL = 20;
 	public static readonly CAST = 21;
-	public static readonly INDEXED_PARAM = 22;
-	public static readonly ID = 23;
-	public static readonly DIGIT = 24;
-	public static readonly QUOTED_ID = 25;
-	public static readonly STRING = 26;
-	public static readonly WHITESPACE = 27;
+	public static readonly REGEXP = 22;
+	public static readonly INDEXED_PARAM = 23;
+	public static readonly PARAM_PLACEHOLDER = 24;
+	public static readonly ID = 25;
+	public static readonly DIGIT = 26;
+	public static readonly QUOTED_ID = 27;
+	public static readonly STRING = 28;
+	public static readonly WHITESPACE = 29;
+	public static readonly COMMENT = 30;
+	public static readonly MULTILINE_COMMENT = 31;
 	public static override readonly EOF = Token.EOF;
 	public static readonly RULE_statement = 0;
 	public static readonly RULE_query = 1;
@@ -71,7 +74,9 @@ export default class GenericSqlParser extends Parser {
                                                             "'<='", "'>'", 
                                                             "'>='", "'='", 
                                                             null, "'IS'", 
-                                                            "'NULL'", "'CAST'" ];
+                                                            "'NULL'", "'CAST'", 
+                                                            "'REGEXP'", 
+                                                            null, "'?'" ];
 	public static readonly symbolicNames: (string | null)[] = [ null, null, 
                                                              null, null, 
                                                              null, "SELECT", 
@@ -83,10 +88,14 @@ export default class GenericSqlParser extends Parser {
                                                              "GT", "GTE", 
                                                              "EQUALS", "NOT_EQUALS", 
                                                              "IS", "NULL", 
-                                                             "CAST", "INDEXED_PARAM", 
+                                                             "CAST", "REGEXP", 
+                                                             "INDEXED_PARAM", 
+                                                             "PARAM_PLACEHOLDER", 
                                                              "ID", "DIGIT", 
                                                              "QUOTED_ID", 
-                                                             "STRING", "WHITESPACE" ];
+                                                             "STRING", "WHITESPACE", 
+                                                             "COMMENT", 
+                                                             "MULTILINE_COMMENT" ];
 	// tslint:disable:no-trailing-whitespace
 	public static readonly ruleNames: string[] = [
 		"statement", "query", "fromTables", "selectFields", "field", "aliasField", 
@@ -276,8 +285,16 @@ export default class GenericSqlParser extends Parser {
 			this.state = 56;
 			this._errHandler.sync(this);
 			switch (this._input.LA(1)) {
+			case 1:
+			case 4:
+			case 21:
+			case 22:
 			case 23:
+			case 24:
 			case 25:
+			case 26:
+			case 27:
+			case 28:
 				this.enterOuterAlt(localctx, 1);
 				{
 				this.state = 54;
@@ -318,11 +335,11 @@ export default class GenericSqlParser extends Parser {
 			this.enterOuterAlt(localctx, 1);
 			{
 			this.state = 58;
-			this.idPath();
+			this.exp(0);
 			this.state = 63;
 			this._errHandler.sync(this);
 			_la = this._input.LA(1);
-			if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 41947136) !== 0)) {
+			if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 167776256) !== 0)) {
 				{
 				this.state = 60;
 				this._errHandler.sync(this);
@@ -385,6 +402,8 @@ export default class GenericSqlParser extends Parser {
 			case 24:
 			case 25:
 			case 26:
+			case 27:
+			case 28:
 				{
 				this.state = 66;
 				this.exp(0);
@@ -486,7 +505,7 @@ export default class GenericSqlParser extends Parser {
 			let _alt: number;
 			this.enterOuterAlt(localctx, 1);
 			{
-			this.state = 111;
+			this.state = 114;
 			this._errHandler.sync(this);
 			switch ( this._interp.adaptivePredict(this._input, 10, this._ctx) ) {
 			case 1:
@@ -544,40 +563,54 @@ export default class GenericSqlParser extends Parser {
 			case 4:
 				{
 				this.state = 103;
+				this.match(GenericSqlParser.REGEXP);
+				this.state = 104;
 				this.match(GenericSqlParser.STRING);
 				}
 				break;
 			case 5:
 				{
-				this.state = 104;
-				this.numeric();
+				this.state = 105;
+				this.match(GenericSqlParser.STRING);
 				}
 				break;
 			case 6:
 				{
-				this.state = 105;
-				this.identifier();
+				this.state = 106;
+				this.numeric();
 				}
 				break;
 			case 7:
 				{
-				this.state = 106;
-				this.match(GenericSqlParser.INDEXED_PARAM);
+				this.state = 107;
+				this.identifier();
 				}
 				break;
 			case 8:
 				{
-				this.state = 107;
-				this.match(GenericSqlParser.T__0);
 				this.state = 108;
-				this.exp(0);
+				this.match(GenericSqlParser.INDEXED_PARAM);
+				}
+				break;
+			case 9:
+				{
 				this.state = 109;
+				this.match(GenericSqlParser.PARAM_PLACEHOLDER);
+				}
+				break;
+			case 10:
+				{
+				this.state = 110;
+				this.match(GenericSqlParser.T__0);
+				this.state = 111;
+				this.exp(0);
+				this.state = 112;
 				this.match(GenericSqlParser.T__1);
 				}
 				break;
 			}
 			this._ctx.stop = this._input.LT(-1);
-			this.state = 121;
+			this.state = 124;
 			this._errHandler.sync(this);
 			_alt = this._interp.adaptivePredict(this._input, 12, this._ctx);
 			while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER) {
@@ -587,39 +620,39 @@ export default class GenericSqlParser extends Parser {
 					}
 					_prevctx = localctx;
 					{
-					this.state = 119;
+					this.state = 122;
 					this._errHandler.sync(this);
 					switch ( this._interp.adaptivePredict(this._input, 11, this._ctx) ) {
 					case 1:
 						{
 						localctx = new ExpContext(this, _parentctx, _parentState);
 						this.pushNewRecursionContext(localctx, _startState, GenericSqlParser.RULE_exp);
-						this.state = 113;
-						if (!(this.precpred(this._ctx, 10))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 10)");
+						this.state = 116;
+						if (!(this.precpred(this._ctx, 12))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 12)");
 						}
-						this.state = 114;
+						this.state = 117;
 						this.binaryOperator();
-						this.state = 115;
-						this.exp(11);
+						this.state = 118;
+						this.exp(13);
 						}
 						break;
 					case 2:
 						{
 						localctx = new ExpContext(this, _parentctx, _parentState);
 						this.pushNewRecursionContext(localctx, _startState, GenericSqlParser.RULE_exp);
-						this.state = 117;
-						if (!(this.precpred(this._ctx, 9))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 9)");
+						this.state = 120;
+						if (!(this.precpred(this._ctx, 11))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 11)");
 						}
-						this.state = 118;
+						this.state = 121;
 						this.unaryOperator();
 						}
 						break;
 					}
 					}
 				}
-				this.state = 123;
+				this.state = 126;
 				this._errHandler.sync(this);
 				_alt = this._interp.adaptivePredict(this._input, 12, this._ctx);
 			}
@@ -645,13 +678,13 @@ export default class GenericSqlParser extends Parser {
 		this.enterRule(localctx, 16, GenericSqlParser.RULE_numeric);
 		try {
 			let _alt: number;
-			this.state = 143;
+			this.state = 146;
 			this._errHandler.sync(this);
 			switch (this._input.LA(1)) {
-			case 24:
+			case 26:
 				this.enterOuterAlt(localctx, 1);
 				{
-				this.state = 125;
+				this.state = 128;
 				this._errHandler.sync(this);
 				_alt = 1;
 				do {
@@ -659,7 +692,7 @@ export default class GenericSqlParser extends Parser {
 					case 1:
 						{
 						{
-						this.state = 124;
+						this.state = 127;
 						this.match(GenericSqlParser.DIGIT);
 						}
 						}
@@ -667,18 +700,18 @@ export default class GenericSqlParser extends Parser {
 					default:
 						throw new NoViableAltException(this);
 					}
-					this.state = 127;
+					this.state = 130;
 					this._errHandler.sync(this);
 					_alt = this._interp.adaptivePredict(this._input, 13, this._ctx);
 				} while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER);
-				this.state = 135;
+				this.state = 138;
 				this._errHandler.sync(this);
 				switch ( this._interp.adaptivePredict(this._input, 15, this._ctx) ) {
 				case 1:
 					{
-					this.state = 129;
+					this.state = 132;
 					this.match(GenericSqlParser.T__3);
-					this.state = 131;
+					this.state = 134;
 					this._errHandler.sync(this);
 					_alt = 1;
 					do {
@@ -686,7 +719,7 @@ export default class GenericSqlParser extends Parser {
 						case 1:
 							{
 							{
-							this.state = 130;
+							this.state = 133;
 							this.match(GenericSqlParser.DIGIT);
 							}
 							}
@@ -694,7 +727,7 @@ export default class GenericSqlParser extends Parser {
 						default:
 							throw new NoViableAltException(this);
 						}
-						this.state = 133;
+						this.state = 136;
 						this._errHandler.sync(this);
 						_alt = this._interp.adaptivePredict(this._input, 14, this._ctx);
 					} while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER);
@@ -706,9 +739,9 @@ export default class GenericSqlParser extends Parser {
 			case 4:
 				this.enterOuterAlt(localctx, 2);
 				{
-				this.state = 137;
+				this.state = 140;
 				this.match(GenericSqlParser.T__3);
-				this.state = 139;
+				this.state = 142;
 				this._errHandler.sync(this);
 				_alt = 1;
 				do {
@@ -716,7 +749,7 @@ export default class GenericSqlParser extends Parser {
 					case 1:
 						{
 						{
-						this.state = 138;
+						this.state = 141;
 						this.match(GenericSqlParser.DIGIT);
 						}
 						}
@@ -724,7 +757,7 @@ export default class GenericSqlParser extends Parser {
 					default:
 						throw new NoViableAltException(this);
 					}
-					this.state = 141;
+					this.state = 144;
 					this._errHandler.sync(this);
 					_alt = this._interp.adaptivePredict(this._input, 16, this._ctx);
 				} while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER);
@@ -756,7 +789,7 @@ export default class GenericSqlParser extends Parser {
 		try {
 			this.enterOuterAlt(localctx, 1);
 			{
-			this.state = 145;
+			this.state = 148;
 			_la = this._input.LA(1);
 			if(!((((_la) & ~0x1F) === 0 && ((1 << _la) & 516096) !== 0))) {
 			this._errHandler.recoverInline(this);
@@ -786,26 +819,26 @@ export default class GenericSqlParser extends Parser {
 		let localctx: UnaryOperatorContext = new UnaryOperatorContext(this, this._ctx, this.state);
 		this.enterRule(localctx, 20, GenericSqlParser.RULE_unaryOperator);
 		try {
-			this.state = 152;
+			this.state = 155;
 			this._errHandler.sync(this);
 			switch ( this._interp.adaptivePredict(this._input, 18, this._ctx) ) {
 			case 1:
 				this.enterOuterAlt(localctx, 1);
 				{
-				this.state = 147;
+				this.state = 150;
 				this.match(GenericSqlParser.IS);
-				this.state = 148;
+				this.state = 151;
 				this.match(GenericSqlParser.NULL);
 				}
 				break;
 			case 2:
 				this.enterOuterAlt(localctx, 2);
 				{
-				this.state = 149;
+				this.state = 152;
 				this.match(GenericSqlParser.IS);
-				this.state = 150;
+				this.state = 153;
 				this.match(GenericSqlParser.NOT);
-				this.state = 151;
+				this.state = 154;
 				this.match(GenericSqlParser.NULL);
 				}
 				break;
@@ -833,23 +866,23 @@ export default class GenericSqlParser extends Parser {
 			let _alt: number;
 			this.enterOuterAlt(localctx, 1);
 			{
-			this.state = 154;
+			this.state = 157;
 			this.identifier();
-			this.state = 159;
+			this.state = 162;
 			this._errHandler.sync(this);
 			_alt = this._interp.adaptivePredict(this._input, 19, this._ctx);
 			while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER) {
 				if (_alt === 1) {
 					{
 					{
-					this.state = 155;
+					this.state = 158;
 					this.match(GenericSqlParser.T__3);
-					this.state = 156;
+					this.state = 159;
 					this.identifier();
 					}
 					}
 				}
-				this.state = 161;
+				this.state = 164;
 				this._errHandler.sync(this);
 				_alt = this._interp.adaptivePredict(this._input, 19, this._ctx);
 			}
@@ -877,9 +910,9 @@ export default class GenericSqlParser extends Parser {
 		try {
 			this.enterOuterAlt(localctx, 1);
 			{
-			this.state = 162;
+			this.state = 165;
 			_la = this._input.LA(1);
-			if(!(_la===23 || _la===25)) {
+			if(!(_la===25 || _la===27)) {
 			this._errHandler.recoverInline(this);
 			}
 			else {
@@ -924,65 +957,66 @@ export default class GenericSqlParser extends Parser {
 	private exp_sempred(localctx: ExpContext, predIndex: number): boolean {
 		switch (predIndex) {
 		case 2:
-			return this.precpred(this._ctx, 10);
+			return this.precpred(this._ctx, 12);
 		case 3:
-			return this.precpred(this._ctx, 9);
+			return this.precpred(this._ctx, 11);
 		}
 		return true;
 	}
 
-	public static readonly _serializedATN: number[] = [4,1,27,165,2,0,7,0,2,
+	public static readonly _serializedATN: number[] = [4,1,31,168,2,0,7,0,2,
 	1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,6,2,7,7,7,2,8,7,8,2,9,7,9,2,
 	10,7,10,2,11,7,11,2,12,7,12,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,3,0,35,8,0,
 	1,1,1,1,1,1,1,1,1,1,1,1,3,1,43,8,1,1,2,1,2,1,3,1,3,1,3,5,3,50,8,3,10,3,
 	12,3,53,9,3,1,4,1,4,3,4,57,8,4,1,5,1,5,3,5,61,8,5,1,5,3,5,64,8,5,1,6,1,
 	6,1,6,1,6,3,6,70,8,6,1,6,1,6,1,6,1,6,1,6,1,6,5,6,78,8,6,10,6,12,6,81,9,
 	6,1,7,1,7,1,7,1,7,1,7,1,7,1,7,5,7,90,8,7,10,7,12,7,93,9,7,1,7,1,7,1,7,1,
-	7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,3,7,112,8,7,1,7,1,
-	7,1,7,1,7,1,7,1,7,5,7,120,8,7,10,7,12,7,123,9,7,1,8,4,8,126,8,8,11,8,12,
-	8,127,1,8,1,8,4,8,132,8,8,11,8,12,8,133,3,8,136,8,8,1,8,1,8,4,8,140,8,8,
-	11,8,12,8,141,3,8,144,8,8,1,9,1,9,1,10,1,10,1,10,1,10,1,10,3,10,153,8,10,
-	1,11,1,11,1,11,5,11,158,8,11,10,11,12,11,161,9,11,1,12,1,12,1,12,0,2,12,
-	14,13,0,2,4,6,8,10,12,14,16,18,20,22,24,0,2,1,0,13,18,2,0,23,23,25,25,177,
-	0,34,1,0,0,0,2,36,1,0,0,0,4,44,1,0,0,0,6,46,1,0,0,0,8,56,1,0,0,0,10,58,
-	1,0,0,0,12,69,1,0,0,0,14,111,1,0,0,0,16,143,1,0,0,0,18,145,1,0,0,0,20,152,
-	1,0,0,0,22,154,1,0,0,0,24,162,1,0,0,0,26,27,3,2,1,0,27,28,5,0,0,1,28,35,
-	1,0,0,0,29,30,5,1,0,0,30,31,3,2,1,0,31,32,5,2,0,0,32,33,5,0,0,1,33,35,1,
-	0,0,0,34,26,1,0,0,0,34,29,1,0,0,0,35,1,1,0,0,0,36,37,5,5,0,0,37,38,3,6,
-	3,0,38,39,5,7,0,0,39,42,3,4,2,0,40,41,5,8,0,0,41,43,3,12,6,0,42,40,1,0,
-	0,0,42,43,1,0,0,0,43,3,1,0,0,0,44,45,3,10,5,0,45,5,1,0,0,0,46,51,3,8,4,
-	0,47,48,5,3,0,0,48,50,3,8,4,0,49,47,1,0,0,0,50,53,1,0,0,0,51,49,1,0,0,0,
-	51,52,1,0,0,0,52,7,1,0,0,0,53,51,1,0,0,0,54,57,3,10,5,0,55,57,5,6,0,0,56,
-	54,1,0,0,0,56,55,1,0,0,0,57,9,1,0,0,0,58,63,3,22,11,0,59,61,5,12,0,0,60,
-	59,1,0,0,0,60,61,1,0,0,0,61,62,1,0,0,0,62,64,3,24,12,0,63,60,1,0,0,0,63,
-	64,1,0,0,0,64,11,1,0,0,0,65,66,6,6,-1,0,66,70,3,14,7,0,67,68,5,11,0,0,68,
-	70,3,12,6,1,69,65,1,0,0,0,69,67,1,0,0,0,70,79,1,0,0,0,71,72,10,3,0,0,72,
-	73,5,9,0,0,73,78,3,12,6,4,74,75,10,2,0,0,75,76,5,10,0,0,76,78,3,12,6,3,
-	77,71,1,0,0,0,77,74,1,0,0,0,78,81,1,0,0,0,79,77,1,0,0,0,79,80,1,0,0,0,80,
-	13,1,0,0,0,81,79,1,0,0,0,82,83,6,7,-1,0,83,112,3,22,11,0,84,85,3,24,12,
-	0,85,86,5,1,0,0,86,91,3,14,7,0,87,88,5,3,0,0,88,90,3,14,7,0,89,87,1,0,0,
-	0,90,93,1,0,0,0,91,89,1,0,0,0,91,92,1,0,0,0,92,94,1,0,0,0,93,91,1,0,0,0,
-	94,95,5,2,0,0,95,112,1,0,0,0,96,97,5,21,0,0,97,98,5,1,0,0,98,99,3,14,7,
-	0,99,100,5,12,0,0,100,101,3,24,12,0,101,102,5,2,0,0,102,112,1,0,0,0,103,
-	112,5,26,0,0,104,112,3,16,8,0,105,112,3,24,12,0,106,112,5,22,0,0,107,108,
-	5,1,0,0,108,109,3,14,7,0,109,110,5,2,0,0,110,112,1,0,0,0,111,82,1,0,0,0,
-	111,84,1,0,0,0,111,96,1,0,0,0,111,103,1,0,0,0,111,104,1,0,0,0,111,105,1,
-	0,0,0,111,106,1,0,0,0,111,107,1,0,0,0,112,121,1,0,0,0,113,114,10,10,0,0,
-	114,115,3,18,9,0,115,116,3,14,7,11,116,120,1,0,0,0,117,118,10,9,0,0,118,
-	120,3,20,10,0,119,113,1,0,0,0,119,117,1,0,0,0,120,123,1,0,0,0,121,119,1,
-	0,0,0,121,122,1,0,0,0,122,15,1,0,0,0,123,121,1,0,0,0,124,126,5,24,0,0,125,
-	124,1,0,0,0,126,127,1,0,0,0,127,125,1,0,0,0,127,128,1,0,0,0,128,135,1,0,
-	0,0,129,131,5,4,0,0,130,132,5,24,0,0,131,130,1,0,0,0,132,133,1,0,0,0,133,
-	131,1,0,0,0,133,134,1,0,0,0,134,136,1,0,0,0,135,129,1,0,0,0,135,136,1,0,
-	0,0,136,144,1,0,0,0,137,139,5,4,0,0,138,140,5,24,0,0,139,138,1,0,0,0,140,
-	141,1,0,0,0,141,139,1,0,0,0,141,142,1,0,0,0,142,144,1,0,0,0,143,125,1,0,
-	0,0,143,137,1,0,0,0,144,17,1,0,0,0,145,146,7,0,0,0,146,19,1,0,0,0,147,148,
-	5,19,0,0,148,153,5,20,0,0,149,150,5,19,0,0,150,151,5,11,0,0,151,153,5,20,
-	0,0,152,147,1,0,0,0,152,149,1,0,0,0,153,21,1,0,0,0,154,159,3,24,12,0,155,
-	156,5,4,0,0,156,158,3,24,12,0,157,155,1,0,0,0,158,161,1,0,0,0,159,157,1,
-	0,0,0,159,160,1,0,0,0,160,23,1,0,0,0,161,159,1,0,0,0,162,163,7,1,0,0,163,
-	25,1,0,0,0,20,34,42,51,56,60,63,69,77,79,91,111,119,121,127,133,135,141,
-	143,152,159];
+	7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,1,7,3,7,115,
+	8,7,1,7,1,7,1,7,1,7,1,7,1,7,5,7,123,8,7,10,7,12,7,126,9,7,1,8,4,8,129,8,
+	8,11,8,12,8,130,1,8,1,8,4,8,135,8,8,11,8,12,8,136,3,8,139,8,8,1,8,1,8,4,
+	8,143,8,8,11,8,12,8,144,3,8,147,8,8,1,9,1,9,1,10,1,10,1,10,1,10,1,10,3,
+	10,156,8,10,1,11,1,11,1,11,5,11,161,8,11,10,11,12,11,164,9,11,1,12,1,12,
+	1,12,0,2,12,14,13,0,2,4,6,8,10,12,14,16,18,20,22,24,0,2,1,0,13,18,2,0,25,
+	25,27,27,182,0,34,1,0,0,0,2,36,1,0,0,0,4,44,1,0,0,0,6,46,1,0,0,0,8,56,1,
+	0,0,0,10,58,1,0,0,0,12,69,1,0,0,0,14,114,1,0,0,0,16,146,1,0,0,0,18,148,
+	1,0,0,0,20,155,1,0,0,0,22,157,1,0,0,0,24,165,1,0,0,0,26,27,3,2,1,0,27,28,
+	5,0,0,1,28,35,1,0,0,0,29,30,5,1,0,0,30,31,3,2,1,0,31,32,5,2,0,0,32,33,5,
+	0,0,1,33,35,1,0,0,0,34,26,1,0,0,0,34,29,1,0,0,0,35,1,1,0,0,0,36,37,5,5,
+	0,0,37,38,3,6,3,0,38,39,5,7,0,0,39,42,3,4,2,0,40,41,5,8,0,0,41,43,3,12,
+	6,0,42,40,1,0,0,0,42,43,1,0,0,0,43,3,1,0,0,0,44,45,3,10,5,0,45,5,1,0,0,
+	0,46,51,3,8,4,0,47,48,5,3,0,0,48,50,3,8,4,0,49,47,1,0,0,0,50,53,1,0,0,0,
+	51,49,1,0,0,0,51,52,1,0,0,0,52,7,1,0,0,0,53,51,1,0,0,0,54,57,3,10,5,0,55,
+	57,5,6,0,0,56,54,1,0,0,0,56,55,1,0,0,0,57,9,1,0,0,0,58,63,3,14,7,0,59,61,
+	5,12,0,0,60,59,1,0,0,0,60,61,1,0,0,0,61,62,1,0,0,0,62,64,3,24,12,0,63,60,
+	1,0,0,0,63,64,1,0,0,0,64,11,1,0,0,0,65,66,6,6,-1,0,66,70,3,14,7,0,67,68,
+	5,11,0,0,68,70,3,12,6,1,69,65,1,0,0,0,69,67,1,0,0,0,70,79,1,0,0,0,71,72,
+	10,3,0,0,72,73,5,9,0,0,73,78,3,12,6,4,74,75,10,2,0,0,75,76,5,10,0,0,76,
+	78,3,12,6,3,77,71,1,0,0,0,77,74,1,0,0,0,78,81,1,0,0,0,79,77,1,0,0,0,79,
+	80,1,0,0,0,80,13,1,0,0,0,81,79,1,0,0,0,82,83,6,7,-1,0,83,115,3,22,11,0,
+	84,85,3,24,12,0,85,86,5,1,0,0,86,91,3,14,7,0,87,88,5,3,0,0,88,90,3,14,7,
+	0,89,87,1,0,0,0,90,93,1,0,0,0,91,89,1,0,0,0,91,92,1,0,0,0,92,94,1,0,0,0,
+	93,91,1,0,0,0,94,95,5,2,0,0,95,115,1,0,0,0,96,97,5,21,0,0,97,98,5,1,0,0,
+	98,99,3,14,7,0,99,100,5,12,0,0,100,101,3,24,12,0,101,102,5,2,0,0,102,115,
+	1,0,0,0,103,104,5,22,0,0,104,115,5,28,0,0,105,115,5,28,0,0,106,115,3,16,
+	8,0,107,115,3,24,12,0,108,115,5,23,0,0,109,115,5,24,0,0,110,111,5,1,0,0,
+	111,112,3,14,7,0,112,113,5,2,0,0,113,115,1,0,0,0,114,82,1,0,0,0,114,84,
+	1,0,0,0,114,96,1,0,0,0,114,103,1,0,0,0,114,105,1,0,0,0,114,106,1,0,0,0,
+	114,107,1,0,0,0,114,108,1,0,0,0,114,109,1,0,0,0,114,110,1,0,0,0,115,124,
+	1,0,0,0,116,117,10,12,0,0,117,118,3,18,9,0,118,119,3,14,7,13,119,123,1,
+	0,0,0,120,121,10,11,0,0,121,123,3,20,10,0,122,116,1,0,0,0,122,120,1,0,0,
+	0,123,126,1,0,0,0,124,122,1,0,0,0,124,125,1,0,0,0,125,15,1,0,0,0,126,124,
+	1,0,0,0,127,129,5,26,0,0,128,127,1,0,0,0,129,130,1,0,0,0,130,128,1,0,0,
+	0,130,131,1,0,0,0,131,138,1,0,0,0,132,134,5,4,0,0,133,135,5,26,0,0,134,
+	133,1,0,0,0,135,136,1,0,0,0,136,134,1,0,0,0,136,137,1,0,0,0,137,139,1,0,
+	0,0,138,132,1,0,0,0,138,139,1,0,0,0,139,147,1,0,0,0,140,142,5,4,0,0,141,
+	143,5,26,0,0,142,141,1,0,0,0,143,144,1,0,0,0,144,142,1,0,0,0,144,145,1,
+	0,0,0,145,147,1,0,0,0,146,128,1,0,0,0,146,140,1,0,0,0,147,17,1,0,0,0,148,
+	149,7,0,0,0,149,19,1,0,0,0,150,151,5,19,0,0,151,156,5,20,0,0,152,153,5,
+	19,0,0,153,154,5,11,0,0,154,156,5,20,0,0,155,150,1,0,0,0,155,152,1,0,0,
+	0,156,21,1,0,0,0,157,162,3,24,12,0,158,159,5,4,0,0,159,161,3,24,12,0,160,
+	158,1,0,0,0,161,164,1,0,0,0,162,160,1,0,0,0,162,163,1,0,0,0,163,23,1,0,
+	0,0,164,162,1,0,0,0,165,166,7,1,0,0,166,25,1,0,0,0,20,34,42,51,56,60,63,
+	69,77,79,91,114,122,124,130,136,138,144,146,155,162];
 
 	private static __ATN: ATN;
 	public static get _ATN(): ATN {
@@ -1189,8 +1223,8 @@ export class AliasFieldContext extends ParserRuleContext {
 		super(parent, invokingState);
     	this.parser = parser;
 	}
-	public idPath(): IdPathContext {
-		return this.getTypedRuleContext(IdPathContext, 0) as IdPathContext;
+	public exp(): ExpContext {
+		return this.getTypedRuleContext(ExpContext, 0) as ExpContext;
 	}
 	public identifier(): IdentifierContext {
 		return this.getTypedRuleContext(IdentifierContext, 0) as IdentifierContext;
@@ -1292,6 +1326,9 @@ export class ExpContext extends ParserRuleContext {
 	public AS(): TerminalNode {
 		return this.getToken(GenericSqlParser.AS, 0);
 	}
+	public REGEXP(): TerminalNode {
+		return this.getToken(GenericSqlParser.REGEXP, 0);
+	}
 	public STRING(): TerminalNode {
 		return this.getToken(GenericSqlParser.STRING, 0);
 	}
@@ -1300,6 +1337,9 @@ export class ExpContext extends ParserRuleContext {
 	}
 	public INDEXED_PARAM(): TerminalNode {
 		return this.getToken(GenericSqlParser.INDEXED_PARAM, 0);
+	}
+	public PARAM_PLACEHOLDER(): TerminalNode {
+		return this.getToken(GenericSqlParser.PARAM_PLACEHOLDER, 0);
 	}
 	public binaryOperator(): BinaryOperatorContext {
 		return this.getTypedRuleContext(BinaryOperatorContext, 0) as BinaryOperatorContext;

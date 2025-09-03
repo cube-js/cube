@@ -18,7 +18,7 @@ field:
     aliasField | ASTERISK;
 
 aliasField:
-    idPath (AS? identifier)?;
+    exp (AS? identifier)?;
 
 boolExp:
     exp |
@@ -33,10 +33,12 @@ exp:
     idPath |
     identifier '(' (exp (',' exp)*) ')' |
     CAST '(' exp AS identifier ')' |
+    REGEXP STRING |
     STRING |
     numeric |
     identifier |
     INDEXED_PARAM |
+    PARAM_PLACEHOLDER |
     '(' exp ')'
     ;
 
@@ -74,8 +76,10 @@ NOT_EQUALS: '<>' | '!=';
 IS: 'IS';
 NULL: 'NULL';
 CAST: 'CAST';
+REGEXP: 'REGEXP';
 
 INDEXED_PARAM: '$' [0-9]+ '$';
+PARAM_PLACEHOLDER: '?';
 ID: [A-Z_@] [A-Z_@0-9]*;
 DIGIT: [0-9];
 QUOTED_ID: ('"' (~'"')* '"') | ('`' (~'`')* '`');
@@ -83,3 +87,5 @@ STRING: ('\'' (~ '\'' | '\'\'')* '\'');
 
 
 WHITESPACE: [ \t\r\n] -> channel(HIDDEN);
+COMMENT: ('--' (~[\r\n])* ('\r'? '\n' | EOF)) -> channel(HIDDEN);
+MULTILINE_COMMENT: ('/*' .*? '*/') -> channel(HIDDEN);

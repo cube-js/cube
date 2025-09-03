@@ -97,4 +97,19 @@ describe('SqlParser', () => {
     expect(sqlParser.isSimpleAsteriskQuery()).toEqual(true);
     expect(sqlParser.extractWhereConditions('x')).toEqual('1 = 1');
   });
+
+  it('sql with comment and question mark', () => {
+    const sqlParser = new SqlParser('SELECT 1 as test FROM table_name -- this is comment that kaputs Cube -> ?');
+    expect(sqlParser.canParse()).toEqual(true);
+  });
+
+  it('sql with regex containing question mark', () => {
+    const sqlParser = new SqlParser("SELECT * FROM users WHERE name = ? AND REGEXP '^stripe(?!_direct).{1,}$'");
+    expect(sqlParser.canParse()).toEqual(true);
+  });
+
+  it('sql with multiline comment containing question mark', () => {
+    const sqlParser = new SqlParser('SELECT 1 as test FROM table_name /* this is comment that kaputs Cube -> ? */');
+    expect(sqlParser.canParse()).toEqual(true);
+  });
 });

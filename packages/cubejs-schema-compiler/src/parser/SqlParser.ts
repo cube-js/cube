@@ -64,9 +64,22 @@ export class SqlParser {
   protected static sqlUpperCase(sql) {
     let result = '';
     let openChar;
+    let inComment = false;
+    let commentType = '';
 
     for (let i = 0; i < sql.length; i++) {
-      if (openChar) {
+      if (inComment) {
+        if (commentType === '--' && (sql[i] === '\n' || sql[i] === '\r')) {
+          inComment = false;
+          commentType = '';
+        } else if (commentType === '/*' && sql[i] === '*' && sql[i + 1] === '/') {
+          result += sql[i];
+          i++;
+          inComment = false;
+          commentType = '';
+        }
+        result += sql[i];
+      } else if (openChar) {
         if (openChar === '\'' && sql[i] === openChar && sql[i + 1] === openChar) {
           result += sql[i];
           i++;
@@ -75,10 +88,27 @@ export class SqlParser {
         }
         result += sql[i];
       } else {
-        if (sql[i] === '\'' || sql[i] === '"' || sql[i] === '`') {
-          openChar = sql[i];
+        // Check for start of single-line comment
+        if (sql[i] === '-' && sql[i + 1] === '-') {
+          inComment = true;
+          commentType = '--';
+          result += sql[i];
         }
-        result += sql[i].toUpperCase();
+        // Check for start of multi-line comment
+        else if (sql[i] === '/' && sql[i + 1] === '*') {
+          inComment = true;
+          commentType = '/*';
+          result += sql[i];
+        }
+        // Check for string literals
+        else if (sql[i] === '\'' || sql[i] === '"' || sql[i] === '`') {
+          openChar = sql[i];
+          result += sql[i].toUpperCase();
+        }
+        // Regular character - convert to uppercase
+        else {
+          result += sql[i].toUpperCase();
+        }
       }
     }
 
