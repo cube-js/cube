@@ -277,7 +277,7 @@ export class YamlCompiler {
       const pythonParser = new PythonParser(codeString);
       return pythonParser.transpileToJs();
     } catch (e: any) {
-      errorsReport.error(`Can't parse python expression. Most likely this type of syntax isn't supported yet: ${e.message || e}`);
+      errorsReport.error(`Failed to parse Python expression. Most likely this type of syntax isn't supported yet: ${e.message || e}`);
     }
 
     return t.nullLiteral();

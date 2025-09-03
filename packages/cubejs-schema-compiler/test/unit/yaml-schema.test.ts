@@ -129,7 +129,7 @@ describe('Yaml Schema Testing', () => {
 
       throw new Error('compile must return an error');
     } catch (e: any) {
-      expect(e.message).toContain('Can\'t parse python expression');
+      expect(e.message).toContain('Failed to parse Python expression');
     }
   });
 
