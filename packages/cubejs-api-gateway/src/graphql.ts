@@ -96,31 +96,31 @@ const OrderBy = enumType({
 export const TimeDimension = objectType({
   name: 'TimeDimension',
   definition(t) {
-    t.nonNull.field('value', {
+    t.field('value', {
       type: 'DateTime',
     });
-    t.nonNull.field('second', {
+    t.field('second', {
       type: 'DateTime',
     });
-    t.nonNull.field('minute', {
+    t.field('minute', {
       type: 'DateTime',
     });
-    t.nonNull.field('hour', {
+    t.field('hour', {
       type: 'DateTime',
     });
-    t.nonNull.field('day', {
+    t.field('day', {
       type: 'DateTime',
     });
-    t.nonNull.field('week', {
+    t.field('week', {
       type: 'DateTime',
     });
-    t.nonNull.field('month', {
+    t.field('month', {
       type: 'DateTime',
     });
-    t.nonNull.field('quarter', {
+    t.field('quarter', {
       type: 'DateTime'
     });
-    t.nonNull.field('year', {
+    t.field('year', {
       type: 'DateTime',
     });
   },
