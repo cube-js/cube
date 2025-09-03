@@ -15,10 +15,13 @@ selectFields:
     (field (',' field)*);
 
 field:
-    aliasField | ASTERISK;
+    selectField | ASTERISK;
+
+selectField:
+    exp (AS? identifier)?;
 
 aliasField:
-    exp (AS? identifier)?;
+    idPath (AS? identifier)?;
 
 boolExp:
     exp |
