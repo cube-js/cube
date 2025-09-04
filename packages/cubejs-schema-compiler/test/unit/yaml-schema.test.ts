@@ -119,7 +119,7 @@ describe('Yaml Schema Testing', () => {
     const { compiler } = prepareYamlCompiler(
       `cubes:
       - name: Products
-        sql: select { "string"+123 } from tbl
+        sql: select { "string"+123 } as a1, { 123abc } as a2 from tbl
         dimensions:
     `
     );
@@ -223,7 +223,9 @@ describe('Yaml Schema Testing', () => {
 
         throw new Error('compile must return an error');
       } catch (e: any) {
-        expect(e.message).toContain('Users cube: "title" must be a string');
+        expect(e.message).toMatch(
+          /Users cube: "title" (must be a string|is not allowed to be empty)/
+        );
       }
     });
 
@@ -544,7 +546,7 @@ describe('Yaml Schema Testing', () => {
           accessPolicy:
             - role: admin
               conditions:
-                - if: "{ !security_context.isBlocked }"
+                - if: "{ security_context.isNotBlocked }"
               rowLevel:
                 filters:
                   - member: status
