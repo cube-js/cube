@@ -544,7 +544,7 @@ describe('Yaml Schema Testing', () => {
           accessPolicy:
             - role: admin
               conditions:
-                - if: "{ !security_context.isBlocked }"
+                - if: "{ security_context.isNotBlocked }"
               rowLevel:
                 filters:
                   - member: status
