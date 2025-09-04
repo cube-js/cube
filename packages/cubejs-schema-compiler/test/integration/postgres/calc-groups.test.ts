@@ -54,13 +54,14 @@ cubes:
       - name: test
         type: string
         case:
+          switch: "{CUBE}.currency"
           when:
-            - sql: "{CUBE.currency} = 'USD'"
-              label: '111'
-            - sql: "{CUBE.currency} = 'EUR'"
-              label: '333'
+            - value: USD
+              sql: "'111'"
+            - value: EUR
+              sql: "'333'"
           else:
-            label: 'def'
+            sql: "'def'"
 
       - name: strategy
         type: switch

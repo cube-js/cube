@@ -4,6 +4,8 @@ pub mod case_definition;
 pub mod case_else_item;
 pub mod case_item;
 pub mod case_label;
+pub mod case_switch_else_item;
+pub mod case_switch_item;
 pub mod cube_definition;
 pub mod dimension_definition;
 pub mod driver_tools;
