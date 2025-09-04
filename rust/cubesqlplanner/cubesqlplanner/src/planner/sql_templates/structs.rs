@@ -17,3 +17,9 @@ pub struct TemplateGroupByColumn {
 pub struct TemplateOrderByColumn {
     pub expr: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateCalcGroup {
+    pub name: String,
+    pub values: Vec<String>,
+}

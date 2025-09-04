@@ -4,6 +4,7 @@ use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
+use crate::planner::sql_evaluator::CubeTableSymbol;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
@@ -62,7 +63,7 @@ pub enum MeasureTimeShifts {
 
 #[derive(Clone)]
 pub struct MeasureSymbol {
-    cube_name: String,
+    cube: Rc<CubeTableSymbol>,
     name: String,
     alias: String,
     owned_by_cube: bool,
@@ -85,7 +86,7 @@ pub struct MeasureSymbol {
 
 impl MeasureSymbol {
     pub fn new(
-        cube_name: String,
+        cube: Rc<CubeTableSymbol>,
         name: String,
         alias: String,
         member_sql: Option<Rc<SqlCall>>,
@@ -106,7 +107,7 @@ impl MeasureSymbol {
         let rolling_window = definition.static_data().rolling_window.clone();
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
         Rc::new(Self {
-            cube_name,
+            cube,
             name,
             alias,
             member_sql,
@@ -136,7 +137,7 @@ impl MeasureSymbol {
                 self.measure_type.clone()
             };
             Rc::new(Self {
-                cube_name: self.cube_name.clone(),
+                cube: self.cube.clone(),
                 name: self.name.clone(),
                 alias: self.alias.clone(),
                 owned_by_cube: self.owned_by_cube,
@@ -219,7 +220,7 @@ impl MeasureSymbol {
             measure_filters.extend(add_filters.into_iter());
         }
         Ok(Rc::new(Self {
-            cube_name: self.cube_name.clone(),
+            cube: self.cube.clone(),
             name: self.name.clone(),
             alias: self.alias.clone(),
             owned_by_cube: self.owned_by_cube,
@@ -242,7 +243,7 @@ impl MeasureSymbol {
     }
 
     pub fn full_name(&self) -> String {
-        format!("{}.{}", self.cube_name, self.name)
+        format!("{}.{}", self.cube.cube_name(), self.name)
     }
 
     pub fn alias(&self) -> String {
@@ -447,7 +448,7 @@ impl MeasureSymbol {
     }
 
     pub fn cube_name(&self) -> &String {
-        &self.cube_name
+        &self.cube.cube_name()
     }
     pub fn name(&self) -> &String {
         &self.name
@@ -713,8 +714,12 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && add_group_by.is_none()
                 && group_by.is_none());
 
+        let cube_symbol = compiler
+            .add_cube_table_evaluator(cube_name.clone())?
+            .as_cube_table()?;
+
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
-            cube_name,
+            cube_symbol,
             name,
             alias,
             sql,

@@ -2,6 +2,7 @@ use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColu
 use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
+use crate::planner::sql_templates::structs::TemplateCalcGroup;
 use convert_case::{Boundary, Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;
@@ -340,6 +341,22 @@ impl PlanSqlTemplates {
                 from_prepared => from,
                 quoted_min_name => quoted_min_name,
                 quoted_max_name => quoted_max_name
+            },
+        )
+    }
+
+    pub fn calc_groups_join(
+        &self,
+        original_cube: &str,
+        original_cube_sql: &str,
+        groups: Vec<TemplateCalcGroup>,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "statements/calc_groups_join",
+            context! {
+                original_cube => original_cube,
+                original_cube_sql => original_cube_sql,
+                groups => groups
             },
         )
     }
