@@ -762,20 +762,16 @@ export class DataSchemaCompiler {
   private async transpileJinjaFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+    options: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    // if (getEnv('transpilationNative')) {
-    //
-    // } else if (getEnv('transpilationWorkerThreads')) {
-    //
-    // } else {
-    return this.yamlCompiler.compileYamlWithJinjaFile(
+    const renderedFile = this.yamlCompiler.compileYamlWithJinjaFile(
       file,
       errorsReport,
       this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
       this.pythonContext!
     );
-    // }
+
+    return this.transpileYamlFile(renderedFile, errorsReport, options);
   }
 
   public withQuery(query, fn) {
