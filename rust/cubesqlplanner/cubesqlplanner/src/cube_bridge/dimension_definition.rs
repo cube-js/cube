@@ -25,6 +25,7 @@ pub struct DimensionDefinitionStatic {
     pub sub_query: Option<bool>,
     #[serde(rename = "propagateFiltersToSubQuery")]
     pub propagate_filters_to_sub_query: Option<bool>,
+    pub values: Option<Vec<String>>,
 }
 
 #[nativebridge::native_bridge(DimensionDefinitionStatic)]

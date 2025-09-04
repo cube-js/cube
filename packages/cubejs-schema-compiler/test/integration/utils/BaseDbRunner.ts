@@ -29,6 +29,7 @@ export class BaseDbRunner {
 
     const res = await this.testQuery(query.buildSqlAndParams());
     console.log(JSON.stringify(res));
+    console.log('!!! res: ', res);
 
     expect(res).toEqual(
       expectedResult

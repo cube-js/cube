@@ -245,6 +245,16 @@ impl MemberSymbol {
         }
     }
 
+    pub fn as_cube_table(&self) -> Result<Rc<CubeTableSymbol>, CubeError> {
+        match self {
+            Self::CubeTable(c) => Ok(c.clone()),
+            _ => Err(CubeError::internal(format!(
+                "{} is not a cube table",
+                self.full_name()
+            ))),
+        }
+    }
+
     pub fn as_member_expression(&self) -> Result<Rc<MemberExpressionSymbol>, CubeError> {
         match self {
             Self::MemberExpression(m) => Ok(m.clone()),

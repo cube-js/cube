@@ -3232,6 +3232,9 @@ export class BaseQuery {
         }
         if (symbol.case) {
           return this.renderDimensionCase(symbol, cubeName);
+        } else if (symbol.type === 'switch') {
+          // Dimension of type switch is not supported in BaseQuery, return an empty string to make dependency resolution work.
+          return '';
         } else if (symbol.type === 'geo') {
           return this.concatStringsSql([
             this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql, isMemberExpr),
@@ -4210,7 +4213,18 @@ export class BaseQuery {
         time_series_get_range: 'SELECT {{ max_expr }} as {{ quoted_max_name }},\n' +
           '{{ min_expr }} as {{ quoted_min_name }}\n' +
           'FROM {{ from_prepared }}\n' +
-          '{% if filter %}WHERE {{ filter }}{% endif %}'
+          '{% if filter %}WHERE {{ filter }}{% endif %}',
+        calc_groups_join: 'SELECT \"{{ original_cube }}\".*, \"{{ groups | map(attribute=\'name\') | join(\'\", \"\') }}\"\n' +
+        'FROM {{ original_cube_sql }} {{ original_cube }}\n' +
+        '{% for group in groups  %}' +
+        'CROSS JOIN\n' +
+        '(\n' +
+        '{% for value in group.values  %}' +
+        'SELECT \'{{ value }}\' as \"{{ group.name }}\"' +
+        '{% if not loop.last %} UNION ALL\n{% endif %}' +
+        '{% endfor %}' +
+        ') \"{{ group.name }}_values\"\n' +
+        '{% endfor %}'
       },
       expressions: {
         column_reference: '{% if table_name %}{{ table_name }}.{% endif %}{{ name }}',

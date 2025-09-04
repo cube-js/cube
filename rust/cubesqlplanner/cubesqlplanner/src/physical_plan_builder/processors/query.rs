@@ -2,7 +2,8 @@ use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext
 use crate::logical_plan::{Query, QuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{Cte, Expr, MemberExpression, Select, SelectBuilder};
-use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::{MemberSymbol, ReferencesBuilder};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -17,6 +18,18 @@ impl QueryProcessor<'_> {
             QuerySource::FullKeyAggregate(_) => true,
             QuerySource::PreAggregation(_) => false,
             QuerySource::LogicalJoin(_) => false,
+        }
+    }
+
+    fn process_calc_group(&self, symbol: &Rc<MemberSymbol>, context_factory: &mut SqlNodesFactory) {
+        if let Ok(dimension) = symbol.as_dimension() {
+            if dimension.is_calc_group() {
+                context_factory.add_calc_group_item(
+                    dimension.cube_name().clone(),
+                    dimension.name().clone(),
+                    dimension.values().clone(),
+                );
+            }
         }
     }
 }
@@ -94,6 +107,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 &None,
                 &mut render_references,
             )?;
+            self.process_calc_group(member, &mut context_factory);
             if context.measure_subquery {
                 select_builder.add_projection_member_without_schema(member, None);
             } else {
