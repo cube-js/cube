@@ -19,6 +19,7 @@ import { nonStringFields } from './CubeValidator';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
 import { CompileContext } from './DataSchemaCompiler';
+import { perfTracker } from './PerfTracker';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -72,7 +73,10 @@ export class YamlCompiler {
   ): Promise<FileContent | undefined> {
     const renderedFile = await this.renderTemplate(file, compileContext, pythonContext);
 
-    return this.transpileYamlFile(renderedFile, errorsReport);
+    const transpileJinjaFileTimer2 = perfTracker.start('compile Jinja - transpileYamlFile');
+    const res = this.transpileYamlFile(renderedFile, errorsReport);
+    transpileJinjaFileTimer2.end();
+    return res;
   }
 
   public transpileYamlFile(

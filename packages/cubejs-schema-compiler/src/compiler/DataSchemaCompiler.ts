@@ -221,6 +221,8 @@ export class DataSchemaCompiler {
       ? files.filter(f => this.filesToCompile.includes(f.fileName))
       : files;
 
+    const jinjaLoaderTimer = perfTracker.start('loadJinjaTemplates');
+
     const jinjaTemplatedFiles = toCompile.filter((file) => file.fileName.endsWith('.jinja') ||
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) && file.content.match(JINJA_SYNTAX));
 
@@ -228,6 +230,8 @@ export class DataSchemaCompiler {
       // Preload Jinja templates to the engine
       this.loadJinjaTemplates(jinjaTemplatedFiles);
     }
+
+    jinjaLoaderTimer.end();
 
     const errorsReport = new ErrorReporter(null, [], this.errorReportOptions);
     this.errorsReporter = errorsReport;
@@ -555,6 +559,8 @@ export class DataSchemaCompiler {
   ): Promise<(FileContent | undefined)> {
     try {
       if (getEnv('transpilationNative')) {
+        const compileJsFileTimer = perfTracker.start('transpileJsFile (native)');
+
         const reqData = {
           fileName: file.fileName,
           fileContent: file.content,
@@ -576,8 +582,12 @@ export class DataSchemaCompiler {
         errorsReport.addWarnings(res[0].warnings as unknown as SyntaxErrorInterface[]);
         errorsReport.exitFile();
 
+        compileJsFileTimer.end();
+
         return { ...file, content: res[0].code };
       } else if (getEnv('transpilationWorkerThreads')) {
+        const compileJsFileTimer = perfTracker.start('transpileJsFile (threads)');
+
         const data = {
           fileName: file.fileName,
           content: file.content,
@@ -590,8 +600,12 @@ export class DataSchemaCompiler {
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
 
+        compileJsFileTimer.end();
+
         return { ...file, content: res.content };
       } else {
+        const compileJsFileTimer = perfTracker.start('transpileJsFile (inplace)');
+
         const ast = parse(
           file.content,
           {
@@ -608,6 +622,9 @@ export class DataSchemaCompiler {
         errorsReport.exitFile();
 
         const content = babelGenerator(ast, {}, file.content).code;
+
+        compileJsFileTimer.end();
+
         return { ...file, content };
       }
     } catch (e: any) {
@@ -632,6 +649,8 @@ export class DataSchemaCompiler {
     { cubeNames, cubeSymbols, compilerId }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
     if (getEnv('transpilationNative')) {
+      const transpileYamlFileTimer = perfTracker.start('transpileYamlFile (native)');
+
       const reqData = {
         fileName: file.fileName,
         fileContent: file.content,
@@ -648,8 +667,12 @@ export class DataSchemaCompiler {
       file.content = res[0].code;
       file.convertedToJs = true;
 
+      transpileYamlFileTimer.end();
+
       return { ...file, content: res[0].code };
     } else if (getEnv('transpilationWorkerThreads')) {
+      const transpileYamlFileTimer = perfTracker.start('transpileYamlFile (threads)');
+
       const data = {
         fileName: file.fileName,
         content: file.content,
@@ -665,14 +688,20 @@ export class DataSchemaCompiler {
       file.content = res.content;
       file.convertedToJs = true;
 
+      transpileYamlFileTimer.end();
+
       return { ...file, content: res.content };
     } else {
+      const transpileYamlFileTimer = perfTracker.start('transpileYamlFile (inplace)');
+
       const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
 
       if (transpiledFile) {
         file.content = transpiledFile.content;
         file.convertedToJs = true;
       }
+
+      transpileYamlFileTimer.end();
 
       return transpiledFile;
     }
@@ -688,6 +717,8 @@ export class DataSchemaCompiler {
     // } else if (getEnv('transpilationWorkerThreads')) {
     //
     // } else {
+    const transpileJinjaFileTimer = perfTracker.start('transpileJinjaFile (common)');
+
     const transpiledFile = await this.yamlCompiler.compileYamlWithJinjaFile(
       file,
       errorsReport,
@@ -701,6 +732,8 @@ export class DataSchemaCompiler {
       file.content = transpiledFile.content;
       file.convertedToJs = true;
     }
+
+    transpileJinjaFileTimer.end();
 
     return transpiledFile;
     // }
