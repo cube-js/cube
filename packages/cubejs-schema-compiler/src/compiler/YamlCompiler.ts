@@ -11,11 +11,11 @@ import { getEnv } from '@cubejs-backend/shared';
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
-import { DataSchemaCompiler } from './DataSchemaCompiler';
 import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
+import { CompileContext } from './DataSchemaCompiler';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -25,8 +25,6 @@ type EscapeStateStack = {
 };
 
 export class YamlCompiler {
-  public dataSchemaCompiler: DataSchemaCompiler | null = null;
-
   protected jinjaEngine: JinjaEngine | null = null;
 
   public constructor(
@@ -53,7 +51,7 @@ export class YamlCompiler {
     });
   }
 
-  public async renderTemplate(file: FileContent, compileContext, pythonContext: PythonCtx): Promise<FileContent> {
+  public async renderTemplate(file: FileContent, compileContext: CompileContext, pythonContext: PythonCtx): Promise<FileContent> {
     return {
       fileName: file.fileName,
       content: await this.getJinjaEngine().renderTemplate(file.fileName, compileContext, {
@@ -66,18 +64,18 @@ export class YamlCompiler {
   public async compileYamlWithJinjaFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    compileContext,
+    compileContext: CompileContext,
     pythonContext: PythonCtx
-  ) {
-    const compiledFile = await this.renderTemplate(file, compileContext, pythonContext);
+  ): Promise<FileContent | undefined> {
+    const renderedFile = await this.renderTemplate(file, compileContext, pythonContext);
 
-    return this.compileYamlFile(compiledFile, errorsReport);
+    return this.transpileYamlFile(renderedFile, errorsReport);
   }
 
-  public compileYamlFile(
+  public transpileYamlFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-  ) {
+  ): FileContent | undefined {
     if (!file.content.trim()) {
       return;
     }
@@ -87,33 +85,37 @@ export class YamlCompiler {
       return;
     }
 
+    const transpiledFilesContent: string[] = [];
+
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
-          const transpiledFile = this.transpileAndPrepareJsFile(file, 'cube', { name, ...cube }, errorsReport);
-          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
+          const transpiledCube = this.transpileAndPrepareJsFile('cube', { name, ...cube }, errorsReport);
+          transpiledFilesContent.push(transpiledCube);
         });
       } else if (key === 'views') {
         (yamlObj.views || []).forEach(({ name, ...cube }) => {
-          const transpiledFile = this.transpileAndPrepareJsFile(file, 'view', { name, ...cube }, errorsReport);
-          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport);
+          const transpiledView = this.transpileAndPrepareJsFile('view', { name, ...cube }, errorsReport);
+          transpiledFilesContent.push(transpiledView);
         });
       } else {
         errorsReport.error(`Unexpected YAML key: ${key}. Only 'cubes' and 'views' are allowed here.`);
       }
     }
+
+    // eslint-disable-next-line consistent-return
+    return {
+      fileName: file.fileName,
+      content: transpiledFilesContent.join('\n\n'),
+    } as FileContent;
   }
 
-  private transpileAndPrepareJsFile(file: FileContent, methodFn: ('cube' | 'view'), cubeObj, errorsReport: ErrorReporter): FileContent {
+  private transpileAndPrepareJsFile(methodFn: ('cube' | 'view'), cubeObj, errorsReport: ErrorReporter): string {
     const yamlAst = this.transformYamlCubeObj(cubeObj, errorsReport);
 
     const cubeOrViewCall = t.callExpression(t.identifier(methodFn), [t.stringLiteral(cubeObj.name), yamlAst]);
 
-    const content = babelGenerator(cubeOrViewCall, {}, '').code;
-    return {
-      fileName: file.fileName,
-      content
-    };
+    return babelGenerator(cubeOrViewCall, {}, '').code;
   }
 
   private transformYamlCubeObj(cubeObj, errorsReport: ErrorReporter) {

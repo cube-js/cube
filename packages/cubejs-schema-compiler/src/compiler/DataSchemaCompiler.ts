@@ -88,6 +88,8 @@ type CompileCubeFilesCompilers = {
   contextCompilers?: CompilerInterface[];
 };
 
+export type CompileContext = any;
+
 export class DataSchemaCompiler {
   private readonly repository: SchemaFileRepository;
 
@@ -123,7 +125,7 @@ export class DataSchemaCompiler {
 
   private readonly compilerCache: CompilerCache;
 
-  private readonly compileContext: any;
+  private readonly compileContext: CompileContext;
 
   private errorReportOptions: ErrorReporterOptions | undefined;
 
@@ -172,14 +174,13 @@ export class DataSchemaCompiler {
     this.standalone = options.standalone || false;
     this.nativeInstance = options.nativeInstance;
     this.yamlCompiler = options.yamlCompiler;
-    this.yamlCompiler.dataSchemaCompiler = this;
     this.pythonContext = null;
     this.workerPool = null;
     this.compilerId = options.compilerId || 'default';
     this.compiledScriptCache = options.compiledScriptCache;
   }
 
-  public compileObjects(compileServices, objects, errorsReport: ErrorReporter) {
+  public compileObjects(compileServices: CompilerInterface[], objects, errorsReport: ErrorReporter) {
     try {
       return compileServices
         .map((compileService) => (() => compileService.compile(objects, errorsReport)))
@@ -193,7 +194,7 @@ export class DataSchemaCompiler {
     }
   }
 
-  protected async loadPythonContext(files, nsFileName) {
+  protected async loadPythonContext(files: FileContent[], nsFileName: string): Promise<PythonCtx> {
     const ns = files.find((f) => f.fileName === nsFileName);
     if (ns) {
       return this.nativeInstance.loadPythonContext(
@@ -216,7 +217,17 @@ export class DataSchemaCompiler {
     this.pythonContext = await this.loadPythonContext(files, 'globals.py');
     this.yamlCompiler.initFromPythonContext(this.pythonContext);
 
-    const toCompile = files.filter((f) => !this.filesToCompile || !this.filesToCompile.length || this.filesToCompile.indexOf(f.fileName) !== -1);
+    const toCompile = this.filesToCompile?.length
+      ? files.filter(f => this.filesToCompile.includes(f.fileName))
+      : files;
+
+    const jinjaTemplatedFiles = toCompile.filter((file) => file.fileName.endsWith('.jinja') ||
+      (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) && file.content.match(JINJA_SYNTAX));
+
+    if (jinjaTemplatedFiles.length > 0) {
+      // Preload Jinja templates to the engine
+      this.loadJinjaTemplates(jinjaTemplatedFiles);
+    }
 
     const errorsReport = new ErrorReporter(null, [], this.errorReportOptions);
     this.errorsReporter = errorsReport;
@@ -271,10 +282,10 @@ export class DataSchemaCompiler {
 
         await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
 
-        const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js'))
+        const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js') && !file.convertedToJs)
           .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
 
-        const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js'));
+        const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js') || file.convertedToJs);
         let JsFilesTasks = [];
 
         if (jsFiles.length > 0) {
@@ -387,7 +398,6 @@ export class DataSchemaCompiler {
             foundFile,
             errorsReport,
             compiledFiles,
-            [],
             { doSyntaxCheck: true }
           );
           exports[foundFile.fileName] = exports[foundFile.fileName] || {};
@@ -462,30 +472,59 @@ export class DataSchemaCompiler {
     return this.compilePromise;
   }
 
+  private loadJinjaTemplates(files: FileContent[]): void {
+    if (NATIVE_IS_SUPPORTED !== true) {
+      throw new Error(
+        `Native extension is required to process jinja files. ${NATIVE_IS_SUPPORTED.reason}. Read more: ` +
+        'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
+      );
+    }
+
+    const jinjaEngine = this.yamlCompiler.getJinjaEngine();
+
+    files.forEach((file) => {
+      jinjaEngine.loadTemplate(file.fileName, file.content);
+    });
+  }
+
   private async transpileFile(
     file: FileContent,
     errorsReport: ErrorReporter,
     options: TranspileOptions = {}
   ): Promise<(FileContent | undefined)> {
-    if (file.fileName.endsWith('.jinja') ||
+    if (file.fileName.endsWith('.js') || file.convertedToJs) {
+      return this.transpileJsFile(file, errorsReport, options);
+    } else if (file.fileName.endsWith('.jinja') ||
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
-      // TODO do Jinja syntax check with jinja compiler
       && file.content.match(JINJA_SYNTAX)
     ) {
-      if (NATIVE_IS_SUPPORTED !== true) {
-        throw new Error(
-          `Native extension is required to process jinja files. ${NATIVE_IS_SUPPORTED.reason}. Read more: ` +
-          'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
-        );
+      const transpiledFile = await this.yamlCompiler.compileYamlWithJinjaFile(
+        file,
+        errorsReport,
+        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
+        this.pythonContext!
+      );
+      if (transpiledFile) {
+        // We update the jinja/yaml file content to the transpiled js content
+        // and raise related flag so it will go JS transpilation flow afterward
+        // avoiding costly YAML/Python parsing again.
+        file.content = transpiledFile.content;
+        file.convertedToJs = true;
       }
 
-      this.yamlCompiler.getJinjaEngine().loadTemplate(file.fileName, file.content);
-
-      return file;
+      return transpiledFile;
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      return file;
-    } else if (file.fileName.endsWith('.js')) {
-      return this.transpileJsFile(file, errorsReport, options);
+      const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
+
+      if (transpiledFile) {
+        // We update the yaml file content to the transpiled js content
+        // and raise related flag so it will go JS transpilation flow afterward
+        // avoiding costly YAML/Python parsing again.
+        file.content = transpiledFile.content;
+        file.convertedToJs = true;
+      }
+
+      return transpiledFile;
     } else {
       return file;
     }
@@ -628,16 +667,15 @@ export class DataSchemaCompiler {
     compiledFiles: Record<string, boolean>,
     asyncModules: CallableFunction[],
     compilers: CompileCubeFilesCompilers,
-    toCompile: FileContent[],
+    transpiledFiles: FileContent[],
     errorsReport: ErrorReporter
   ) {
-    toCompile
+    transpiledFiles
       .forEach((file) => {
         this.compileFile(
           file,
           errorsReport,
           compiledFiles,
-          asyncModules
         );
       });
     await asyncModules.reduce((a: Promise<void>, b: CallableFunction) => a.then(() => b()), Promise.resolve());
@@ -653,7 +691,6 @@ export class DataSchemaCompiler {
     file: FileContent,
     errorsReport: ErrorReporter,
     compiledFiles: Record<string, boolean>,
-    asyncModules: CallableFunction[],
     { doSyntaxCheck } = { doSyntaxCheck: false }
   ) {
     if (compiledFiles[file.fileName]) {
@@ -662,22 +699,19 @@ export class DataSchemaCompiler {
 
     compiledFiles[file.fileName] = true;
 
-    if (file.fileName.endsWith('.js')) {
+    if (file.convertedToJs) {
+      this.compileJsFile(file, errorsReport);
+    } else if (file.fileName.endsWith('.js')) {
       this.compileJsFile(file, errorsReport, { doSyntaxCheck });
     } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||
-      (
-        file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')
-        // TODO do Jinja syntax check with jinja compiler
-      ) && file.content.match(JINJA_SYNTAX)
+      (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) &&
+      file.content.match(JINJA_SYNTAX)
     ) {
-      asyncModules.push(() => this.yamlCompiler.compileYamlWithJinjaFile(
-        file,
-        errorsReport,
-        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
-        this.pythonContext!
-      ));
+      // original jinja/yaml file was already transpiled into js
+      this.compileJsFile(file, errorsReport);
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      this.yamlCompiler.compileYamlFile(file, errorsReport);
+      // original yaml file was already transpiled into js
+      this.compileJsFile(file, errorsReport);
     }
   }
 
