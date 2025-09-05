@@ -51,23 +51,23 @@ cubes:
           - EUR
           - GBP
 
-      - name: test
-        type: string
-        case:
-          switch: "{CUBE}.currency"
-          when:
-            - value: USD
-              sql: "'111'"
-            - value: EUR
-              sql: "'333'"
-          else:
-            sql: "'def'"
-
       - name: strategy
         type: switch
         values:
           - A
           - B
+
+      - name: currency_full_name
+        type: string
+        case:
+          switch: "{CUBE.currency}"
+          when:
+            - value: USD
+              sql: "'dollars'"
+            - value: EUR
+              sql: "'euros'"
+          else:
+            sql: "'unknown'"
 
     measures:
       - name: count
@@ -460,13 +460,14 @@ views:
     ],
     { joinGraph, cubeEvaluator, compiler }));
 
-    it('measure switch', async () => dbRunner.runQueryTest({
-      dimensions: ['orders.currency', 'orders.test'],
+    it('dimension switch expression simple', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.currency', 'orders.currency_full_name'],
       measures: ['orders.revenue'],
       timeDimensions: [
         {
           dimension: 'orders.date',
-          granularity: 'year'
+          granularity: 'year',
+          dateRange: ['2024-01-01', '2026-01-01']
         }
       ],
       timezone: 'UTC',
@@ -477,27 +478,43 @@ views:
       },
       ],
     }, [
-      {
-        orders__date_year: '2022-01-01T00:00:00.000Z',
-        orders__strategy: 'B',
-        orders__revenue: '5',
-      },
-      {
-        orders__date_year: '2023-01-01T00:00:00.000Z',
-        orders__strategy: 'B',
-        orders__revenue: '15',
-      },
-      {
-        orders__date_year: '2024-01-01T00:00:00.000Z',
-        orders__strategy: 'B',
-        orders__revenue: '30',
-      },
-      {
-        orders__date_year: '2025-01-01T00:00:00.000Z',
-        orders__strategy: 'B',
-        orders__revenue: '5',
-      }
-    ],
+        {
+          orders__currency: 'EUR',
+          orders__currency_full_name: 'euros',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__revenue: '30'
+        },
+        {
+          orders__currency: 'GBP',
+          orders__currency_full_name: 'unknown',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__revenue: '30'
+        },
+        {
+          orders__currency: 'USD',
+          orders__currency_full_name: 'dollars',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__revenue: '30'
+        },
+        {
+          orders__currency: 'EUR',
+          orders__currency_full_name: 'euros',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__revenue: '5'
+        },
+        {
+          orders__currency: 'GBP',
+          orders__currency_full_name: 'unknown',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__revenue: '5'
+        },
+        {
+          orders__currency: 'USD',
+          orders__currency_full_name: 'dollars',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__revenue: '5'
+        }
+      ],
     { joinGraph, cubeEvaluator, compiler }));
   } else {
     // This test is working only in tesseract

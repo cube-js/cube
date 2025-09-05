@@ -1,8 +1,9 @@
+use super::common::Case;
 use super::{MemberSymbol, SymbolFactory};
-use crate::cube_bridge::case_label::CaseLabel;
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::string_or_sql::StringOrSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_evaluator::{CubeTableSymbol, TimeDimensionSymbol};
@@ -43,7 +44,7 @@ pub struct DimensionSymbol {
     latitude: Option<Rc<SqlCall>>,
     longitude: Option<Rc<SqlCall>>,
     values: Vec<String>,
-    case: Option<DimensionCaseDefinition>,
+    case: Option<Case>,
     definition: Rc<dyn DimensionDefinition>,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
     is_view: bool,
@@ -68,7 +69,7 @@ impl DimensionSymbol {
         latitude: Option<Rc<SqlCall>>,
         longitude: Option<Rc<SqlCall>>,
         values: Vec<String>,
-        case: Option<DimensionCaseDefinition>,
+        case: Option<Case>,
         definition: Rc<dyn DimensionDefinition>,
         time_shift: Vec<CalendarDimensionTimeShift>,
         time_shift_pk_full_name: Option<String>,
@@ -141,7 +142,7 @@ impl DimensionSymbol {
         self.longitude.clone()
     }
 
-    pub fn case(&self) -> &Option<DimensionCaseDefinition> {
+    pub fn case(&self) -> &Option<Case> {
         &self.case
     }
 
@@ -216,15 +217,7 @@ impl DimensionSymbol {
             member_sql.extract_symbol_deps(&mut deps);
         }
         if let Some(case) = &self.case {
-            for itm in case.items.iter() {
-                itm.sql.extract_symbol_deps(&mut deps);
-                if let DimenstionCaseLabel::Sql(sql) = &itm.label {
-                    sql.extract_symbol_deps(&mut deps);
-                }
-            }
-            if let DimenstionCaseLabel::Sql(sql) = &case.else_label {
-                sql.extract_symbol_deps(&mut deps);
-            }
+            case.extract_symbol_deps(&mut deps);
         }
         deps
     }
@@ -241,15 +234,7 @@ impl DimensionSymbol {
             member_sql.extract_symbol_deps_with_path(&mut deps);
         }
         if let Some(case) = &self.case {
-            for itm in case.items.iter() {
-                itm.sql.extract_symbol_deps_with_path(&mut deps);
-                if let DimenstionCaseLabel::Sql(sql) = &itm.label {
-                    sql.extract_symbol_deps_with_path(&mut deps);
-                }
-            }
-            if let DimenstionCaseLabel::Sql(sql) = &case.else_label {
-                sql.extract_symbol_deps_with_path(&mut deps);
-            }
+            case.extract_symbol_deps_with_path(&mut deps);
         }
         deps
     }
@@ -408,30 +393,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let case = if let Some(native_case) = definition.case()? {
-            let items = native_case
-                .when()?
-                .iter()
-                .map(|item| -> Result<_, CubeError> {
-                    let sql = compiler.compile_sql_call(&cube_name, item.sql()?)?;
-                    let label = match item.label()? {
-                        CaseLabel::String(s) => DimenstionCaseLabel::String(s.clone()),
-                        CaseLabel::MemberSql(sql_struct) => {
-                            let sql = compiler.compile_sql_call(&cube_name, sql_struct.sql()?)?;
-                            DimenstionCaseLabel::Sql(sql)
-                        }
-                    };
-                    Ok(DimensionCaseWhenItem { sql, label })
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-
-            let else_label = match native_case.else_label()?.label()? {
-                CaseLabel::String(s) => DimenstionCaseLabel::String(s.clone()),
-                CaseLabel::MemberSql(sql_struct) => {
-                    let sql = compiler.compile_sql_call(&cube_name, sql_struct.sql()?)?;
-                    DimenstionCaseLabel::Sql(sql)
-                }
-            };
-            Some(DimensionCaseDefinition { items, else_label })
+            Some(Case::try_new(&cube_name, native_case, compiler)?)
         } else {
             None
         };

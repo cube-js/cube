@@ -1,3 +1,4 @@
+mod common;
 mod cube_symbol;
 mod dimension_symbol;
 mod measure_symbol;
@@ -6,6 +7,7 @@ mod member_symbol;
 mod symbol_factory;
 mod time_dimension_symbol;
 
+pub use common::*;
 pub use cube_symbol::{
     CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
 };

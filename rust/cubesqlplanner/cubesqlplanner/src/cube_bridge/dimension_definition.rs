@@ -1,4 +1,4 @@
-use super::case_definition::{CaseDefinition, NativeCaseDefinition};
+use super::case_variant::CaseVariant;
 use super::geo_item::{GeoItem, NativeGeoItem};
 use super::member_sql::{MemberSql, NativeMemberSql};
 use crate::cube_bridge::timeshift_definition::{NativeTimeShiftDefinition, TimeShiftDefinition};
@@ -34,7 +34,7 @@ pub trait DimensionDefinition {
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 
     #[nbridge(field, optional)]
-    fn case(&self) -> Result<Option<Rc<dyn CaseDefinition>>, CubeError>;
+    fn case(&self) -> Result<Option<CaseVariant>, CubeError>;
 
     #[nbridge(field, optional)]
     fn latitude(&self) -> Result<Option<Rc<dyn GeoItem>>, CubeError>;
