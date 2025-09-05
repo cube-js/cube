@@ -221,8 +221,6 @@ export class DataSchemaCompiler {
       ? files.filter(f => this.filesToCompile.includes(f.fileName))
       : files;
 
-    const jinjaLoaderTimer = perfTracker.start('loadJinjaTemplates');
-
     const jinjaTemplatedFiles = toCompile.filter((file) => file.fileName.endsWith('.jinja') ||
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) && file.content.match(JINJA_SYNTAX));
 
@@ -230,8 +228,6 @@ export class DataSchemaCompiler {
       // Preload Jinja templates to the engine
       this.loadJinjaTemplates(jinjaTemplatedFiles);
     }
-
-    jinjaLoaderTimer.end();
 
     const errorsReport = new ErrorReporter(null, [], this.errorReportOptions);
     this.errorsReporter = errorsReport;
@@ -559,8 +555,6 @@ export class DataSchemaCompiler {
   ): Promise<(FileContent | undefined)> {
     try {
       if (getEnv('transpilationNative')) {
-        const compileJsFileTimer = perfTracker.start('transpileJsFile (native)');
-
         const reqData = {
           fileName: file.fileName,
           fileContent: file.content,
@@ -582,12 +576,8 @@ export class DataSchemaCompiler {
         errorsReport.addWarnings(res[0].warnings as unknown as SyntaxErrorInterface[]);
         errorsReport.exitFile();
 
-        compileJsFileTimer.end();
-
         return { ...file, content: res[0].code };
       } else if (getEnv('transpilationWorkerThreads')) {
-        const compileJsFileTimer = perfTracker.start('transpileJsFile (threads)');
-
         const data = {
           fileName: file.fileName,
           content: file.content,
@@ -600,12 +590,8 @@ export class DataSchemaCompiler {
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
 
-        compileJsFileTimer.end();
-
         return { ...file, content: res.content };
       } else {
-        const compileJsFileTimer = perfTracker.start('transpileJsFile (inplace)');
-
         const ast = parse(
           file.content,
           {
@@ -622,8 +608,6 @@ export class DataSchemaCompiler {
         errorsReport.exitFile();
 
         const content = babelGenerator(ast, {}, file.content).code;
-
-        compileJsFileTimer.end();
 
         return { ...file, content };
       }
@@ -649,8 +633,6 @@ export class DataSchemaCompiler {
     { cubeNames, cubeSymbols, compilerId }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
     if (getEnv('transpilationNative')) {
-      const transpileYamlFileTimer = perfTracker.start('transpileYamlFile (native)');
-
       const reqData = {
         fileName: file.fileName,
         fileContent: file.content,
@@ -667,12 +649,8 @@ export class DataSchemaCompiler {
       file.content = res[0].code;
       file.convertedToJs = true;
 
-      transpileYamlFileTimer.end();
-
       return { ...file, content: res[0].code };
     } else if (getEnv('transpilationWorkerThreads')) {
-      const transpileYamlFileTimer = perfTracker.start('transpileYamlFile (threads)');
-
       const data = {
         fileName: file.fileName,
         content: file.content,
@@ -688,20 +666,14 @@ export class DataSchemaCompiler {
       file.content = res.content;
       file.convertedToJs = true;
 
-      transpileYamlFileTimer.end();
-
       return { ...file, content: res.content };
     } else {
-      const transpileYamlFileTimer = perfTracker.start('transpileYamlFile (inplace)');
-
       const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
 
       if (transpiledFile) {
         file.content = transpiledFile.content;
         file.convertedToJs = true;
       }
-
-      transpileYamlFileTimer.end();
 
       return transpiledFile;
     }
@@ -712,8 +684,6 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     options: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    const transpileJinjaFileTimer = perfTracker.start('transpileJinjaFile (common)');
-
     const renderedFile = await this.yamlCompiler.renderTemplate(
       file,
       this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
@@ -725,8 +695,6 @@ export class DataSchemaCompiler {
     // will update the content to the transpiled js content
     // avoiding costly YAML/Python parsing again.
     file.content = renderedFile.content;
-
-    transpileJinjaFileTimer.end();
 
     return this.transpileYamlFile(file, errorsReport, options);
   }
@@ -784,9 +752,7 @@ export class DataSchemaCompiler {
     compiledFiles[file.fileName] = true;
 
     if (file.convertedToJs) {
-      const compileJsFileTimer = perfTracker.start('compileJsFile (convertedToJs)');
       this.compileJsFile(file, errorsReport);
-      compileJsFileTimer.end();
     } else if (file.fileName.endsWith('.js')) {
       this.compileJsFile(file, errorsReport, { doSyntaxCheck });
     } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||

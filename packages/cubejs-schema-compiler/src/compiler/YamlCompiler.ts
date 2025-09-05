@@ -19,7 +19,6 @@ import { nonStringFields } from './CubeValidator';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
 import { CompileContext } from './DataSchemaCompiler';
-import { perfTracker } from './PerfTracker';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
