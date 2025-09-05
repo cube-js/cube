@@ -64,17 +64,6 @@ export class YamlCompiler {
     };
   }
 
-  public async compileYamlWithJinjaFile(
-    file: FileContent,
-    errorsReport: ErrorReporter,
-    compileContext: CompileContext,
-    pythonContext: PythonCtx
-  ): Promise<FileContent | undefined> {
-    const renderedFile = await this.renderTemplate(file, compileContext, pythonContext);
-
-    return this.transpileYamlFile(renderedFile, errorsReport);
-  }
-
   public transpileYamlFile(
     file: FileContent,
     errorsReport: ErrorReporter,
