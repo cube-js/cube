@@ -10,11 +10,11 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
-pub struct CaseDimensionSqlNode {
+pub struct CaseSqlNode {
     input: Rc<dyn SqlNode>,
 }
 
-impl CaseDimensionSqlNode {
+impl CaseSqlNode {
     pub fn new(input: Rc<dyn SqlNode>) -> Rc<Self> {
         Rc::new(Self { input })
     }
@@ -101,7 +101,7 @@ impl CaseDimensionSqlNode {
     }
 }
 
-impl SqlNode for CaseDimensionSqlNode {
+impl SqlNode for CaseSqlNode {
     fn to_sql(
         &self,
         visitor: &SqlEvaluatorVisitor,
@@ -135,9 +135,33 @@ impl SqlNode for CaseDimensionSqlNode {
                     )?
                 }
             }
+            MemberSymbol::Measure(ev) => {
+                if let Some(case) = ev.case() {
+                    match case {
+                        Case::Case(case) => {
+                            self.case_to_sql(visitor, case, query_tools, node_processor, templates)?
+                        }
+                        Case::CaseSwitch(case) => self.case_switch_to_sql(
+                            visitor,
+                            case,
+                            query_tools,
+                            node_processor,
+                            templates,
+                        )?,
+                    }
+                } else {
+                    self.input.to_sql(
+                        visitor,
+                        node,
+                        query_tools.clone(),
+                        node_processor.clone(),
+                        templates,
+                    )?
+                }
+            }
             _ => {
                 return Err(CubeError::internal(format!(
-                    "CaseDimension node processor called for wrong node",
+                    "Case node processor called for wrong node",
                 )));
             }
         };

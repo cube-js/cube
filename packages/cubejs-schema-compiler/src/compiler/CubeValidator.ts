@@ -588,6 +588,42 @@ const timeShiftItemOptional = Joi.object({
   .xor('name', 'interval')
   .and('interval', 'type');
 
+const CaseSchema = Joi.object().keys({
+  when: Joi.array().items(Joi.object().keys({
+    sql: Joi.func().required(),
+    label: Joi.alternatives([
+      Joi.string(),
+      Joi.object().keys({
+        sql: Joi.func().required()
+      })
+    ])
+  })),
+  else: Joi.object().keys({
+    label: Joi.alternatives([
+      Joi.string(),
+      Joi.object().keys({
+        sql: Joi.func().required()
+      })
+    ])
+  })
+}).required();
+
+const SwitchCaseSchema = Joi.object().keys({
+  switch: Joi.func().required(),
+  when: Joi.array().items(Joi.object().keys({
+    value: Joi.string().required(),
+    sql: Joi.func().required()
+  })),
+  else: Joi.object().keys({
+    sql: Joi.func().required()
+  })
+}).required();
+
+const CaseVariants = Joi.alternatives().try(
+  CaseSchema,
+  SwitchCaseSchema
+);
+
 const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.multiStage'), [
   {
     is: true,
@@ -595,6 +631,7 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       multiStage: Joi.boolean().strict(),
       type: multiStageMeasureType.required(),
       sql: Joi.func(), // TODO .required(),
+      case: CaseVariants,
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),
@@ -656,42 +693,6 @@ const SwitchDimension = Joi.object({
   type: Joi.string().valid('switch').required(),
   values: Joi.array().items(Joi.string()).min(1).required()
 });
-
-const CaseSchema = Joi.object().keys({
-  when: Joi.array().items(Joi.object().keys({
-    sql: Joi.func().required(),
-    label: Joi.alternatives([
-      Joi.string(),
-      Joi.object().keys({
-        sql: Joi.func().required()
-      })
-    ])
-  })),
-  else: Joi.object().keys({
-    label: Joi.alternatives([
-      Joi.string(),
-      Joi.object().keys({
-        sql: Joi.func().required()
-      })
-    ])
-  })
-}).required();
-
-const SwitchCaseSchema = Joi.object().keys({
-  switch: Joi.func().required(),
-  when: Joi.array().items(Joi.object().keys({
-    value: Joi.string().required(),
-    sql: Joi.func().required()
-  })),
-  else: Joi.object().keys({
-    sql: Joi.func().required()
-  })
-}).required();
-
-const CaseVariants = Joi.alternatives().try(
-  CaseSchema,
-  SwitchCaseSchema
-);
 
 const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.type'), {
   is: 'switch',

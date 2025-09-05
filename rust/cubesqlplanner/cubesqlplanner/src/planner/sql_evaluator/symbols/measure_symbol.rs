@@ -1,3 +1,4 @@
+use super::common::Case;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
@@ -72,6 +73,7 @@ pub struct MeasureSymbol {
     is_multi_stage: bool,
     is_reference: bool,
     is_view: bool,
+    case: Option<Case>,
     measure_filters: Vec<Rc<SqlCall>>,
     measure_drill_filters: Vec<Rc<SqlCall>>,
     time_shift: Option<MeasureTimeShifts>,
@@ -92,6 +94,7 @@ impl MeasureSymbol {
         member_sql: Option<Rc<SqlCall>>,
         is_reference: bool,
         is_view: bool,
+        case: Option<Case>,
         pk_sqls: Vec<Rc<SqlCall>>,
         definition: Rc<dyn MeasureDefinition>,
         measure_filters: Vec<Rc<SqlCall>>,
@@ -113,6 +116,7 @@ impl MeasureSymbol {
             member_sql,
             is_reference,
             is_view,
+            case,
             pk_sqls,
             owned_by_cube,
             measure_type,
@@ -146,6 +150,7 @@ impl MeasureSymbol {
                 is_multi_stage: false,
                 is_reference: false,
                 is_view: self.is_view,
+                case: self.case.clone(),
                 measure_filters: self.measure_filters.clone(),
                 measure_drill_filters: self.measure_drill_filters.clone(),
                 time_shift: self.time_shift.clone(),
@@ -229,6 +234,7 @@ impl MeasureSymbol {
             is_multi_stage: self.is_multi_stage,
             is_reference: self.is_reference,
             is_view: self.is_view,
+            case: self.case.clone(),
             measure_filters,
             measure_drill_filters: self.measure_drill_filters.clone(),
             time_shift: self.time_shift.clone(),
@@ -271,6 +277,10 @@ impl MeasureSymbol {
             "number" | "string" | "time" | "boolean" => true,
             _ => false,
         }
+    }
+
+    pub fn case(&self) -> &Option<Case> {
+        &self.case
     }
 
     pub fn is_addictive(&self) -> bool {
@@ -323,6 +333,9 @@ impl MeasureSymbol {
         for order in self.measure_order_by.iter() {
             order.sql_call().extract_symbol_deps(&mut deps);
         }
+        if let Some(case) = &self.case {
+            case.extract_symbol_deps(&mut deps);
+        }
         deps
     }
 
@@ -343,28 +356,13 @@ impl MeasureSymbol {
         for order in self.measure_order_by.iter() {
             order.sql_call().extract_symbol_deps_with_path(&mut deps);
         }
+        if let Some(case) = &self.case {
+            case.extract_symbol_deps_with_path(&mut deps);
+        }
         deps
     }
 
-    pub fn get_dependent_cubes(&self) -> Vec<String> {
-        let mut cubes = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_cube_deps(&mut cubes);
-        }
-        for pk in self.pk_sqls.iter() {
-            pk.extract_cube_deps(&mut cubes);
-        }
-        for filter in self.measure_filters.iter() {
-            filter.extract_cube_deps(&mut cubes);
-        }
-        for filter in self.measure_drill_filters.iter() {
-            filter.extract_cube_deps(&mut cubes);
-        }
-        for order in self.measure_order_by.iter() {
-            order.sql_call().extract_cube_deps(&mut cubes);
-        }
-        cubes
-    }
+
 
     pub fn can_used_as_addictive_in_multplied(&self) -> bool {
         if &self.measure_type == "countDistinct" || &self.measure_type == "countDistinctApprox" {
@@ -659,6 +657,12 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
+        let case = if let Some(native_case) = definition.case()? {
+            Some(Case::try_new(&cube_name, native_case, compiler)?)
+        } else {
+            None
+        };
+
         let reduce_by = if let Some(reduce_by) = &definition.static_data().reduce_by_references {
             let symbols = reduce_by
                 .iter()
@@ -706,6 +710,7 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && is_sql_is_direct_ref
                 && is_calculated
                 && !is_multi_stage
+                && case.is_none()
                 && measure_filters.is_empty()
                 && measure_drill_filters.is_empty()
                 && time_shifts.is_none()
@@ -725,6 +730,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             sql,
             is_reference,
             is_view,
+            case,
             pk_sqls,
             definition,
             measure_filters,

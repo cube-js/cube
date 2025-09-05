@@ -128,12 +128,6 @@ impl SqlCall {
         }
     }
 
-    pub fn get_dependent_cubes(&self) -> Vec<String> {
-        let mut deps = Vec::new();
-        self.extract_cube_deps(&mut deps);
-        deps
-    }
-
     pub fn extract_cube_deps(&self, result: &mut Vec<String>) {
         for dep in self.deps.iter() {
             match dep {

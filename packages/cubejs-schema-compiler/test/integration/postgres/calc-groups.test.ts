@@ -11,15 +11,15 @@ describe('Calc-Groups', () => {
 cubes:
   - name: orders
     sql: >
-      SELECT 9 as ID, 'completed' as STATUS, '2022-01-12T20:00:00.000Z'::timestamptz as CREATED_AT
+      SELECT 9 as ID, 'completed' as STATUS, 100.0 as amount_usd, 97.4 as amount_eur, 80.6 as amount_gbp, '2022-01-12T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 10 as ID, 'completed' as STATUS, '2023-01-12T20:00:00.000Z'::timestamptz as CREATED_AT
+      SELECT 10 as ID, 'completed' as STATUS, 10.0 as amount_usd, 9.74 as amount_eur, 8.06 as amount_gbp, '2023-01-12T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 11 as ID, 'completed' as STATUS, '2024-01-14T20:00:00.000Z'::timestamptz as CREATED_AT
+      SELECT 11 as ID, 'completed' as STATUS, 1000.0 as amount_usd, 974 as amount_eur, 806 as amount_gbp,'2024-01-14T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 12 as ID, 'completed' as STATUS, '2024-02-14T20:00:00.000Z'::timestamptz as CREATED_AT
+      SELECT 12 as ID, 'completed' as STATUS, 30.0 as amount_usd, 28 as amount_eur, 22 as amount_gbp,'2024-02-14T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 13 as ID, 'completed' as STATUS, '2025-03-14T20:00:00.000Z'::timestamptz as CREATED_AT
+      SELECT 13 as ID, 'completed' as STATUS, 40.0 as amount_usd, 38 as amount_eur, 33 as amount_gbp, '2025-03-14T20:00:00.000Z'::timestamptz as CREATED_AT
     joins:
       - name: line_items
         sql: "{CUBE}.ID = {line_items}.order_id"
@@ -77,6 +77,31 @@ cubes:
         type: count
         filters:
           - sql: "{CUBE}.STATUS = 'completed'"
+
+      - name: amount_usd
+        type: sum
+        sql: amount_usd
+
+      - name: amount_eur
+        type: sum
+        sql: amount_eur
+
+      - name: amount_gbp
+        type: sum
+        sql: amount_gbp
+
+      - name: amount_in_currency
+        type: number
+        multi_stage: true
+        case:
+          switch: "{CUBE.currency}"
+          when:
+            - value: USD
+              sql: "{CUBE.amount_usd}"
+            - value: EUR
+              sql: "{CUBE.amount_eur}"
+          else:
+            sql: "{CUBE.amount_gbp}"
 
       - name: returned_count
         type: count
@@ -514,6 +539,99 @@ views:
           orders__date_year: '2025-01-01T00:00:00.000Z',
           orders__revenue: '5'
         }
+      ],
+    { joinGraph, cubeEvaluator, compiler }));
+
+    it('measure switch cross join', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.currency'],
+      measures: ['orders.amount_usd', 'orders.amount_in_currency'],
+      timeDimensions: [
+        {
+          dimension: 'orders.date',
+          granularity: 'year',
+          dateRange: ['2024-01-01', '2026-01-01']
+        }
+      ],
+      timezone: 'UTC',
+      order: [{
+        id: 'orders.date'
+      }, {
+        id: 'orders.currency'
+      },
+      ],
+    }, [
+        {
+          orders__currency: 'EUR',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__amount_usd: '1030.0',
+          orders__amount_in_currency: '1002'
+        },
+        {
+          orders__currency: 'GBP',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__amount_usd: '1030.0',
+          orders__amount_in_currency: '828'
+        },
+        {
+          orders__currency: 'USD',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__amount_usd: '1030.0',
+          orders__amount_in_currency: '1030.0'
+        },
+        {
+          orders__currency: 'EUR',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__amount_usd: '40.0',
+          orders__amount_in_currency: '38'
+        },
+        {
+          orders__currency: 'GBP',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__amount_usd: '40.0',
+          orders__amount_in_currency: '33'
+        },
+        {
+          orders__currency: 'USD',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__amount_usd: '40.0',
+          orders__amount_in_currency: '40.0'
+        }
+      ],
+    { joinGraph, cubeEvaluator, compiler }));
+
+    it('measure switch with filter', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.currency'],
+      measures: ['orders.amount_usd', 'orders.amount_in_currency'],
+      timeDimensions: [
+        {
+          dimension: 'orders.date',
+          granularity: 'year',
+          dateRange: ['2024-01-01', '2026-01-01']
+        }
+      ],
+      filters: [
+        { dimension: 'orders.currency', operator: 'equals', values: ['EUR'] }
+      ],
+      timezone: 'UTC',
+      order: [{
+        id: 'orders.date'
+      }, {
+        id: 'orders.currency'
+      },
+      ],
+    }, [
+        {
+          orders__currency: 'EUR',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__amount_usd: '1030.0',
+          orders__amount_in_currency: '1002'
+        },
+        {
+          orders__currency: 'EUR',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__amount_usd: '40.0',
+          orders__amount_in_currency: '38'
+        },
       ],
     { joinGraph, cubeEvaluator, compiler }));
   } else {

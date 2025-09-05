@@ -5,16 +5,19 @@ use crate::{
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub enum CaseLabel {
     String(String),
     Sql(Rc<SqlCall>),
 }
 
+#[derive(Clone)]
 pub struct CaseWhenItem {
     pub sql: Rc<SqlCall>,
     pub label: CaseLabel,
 }
 
+#[derive(Clone)]
 pub struct CaseDefinition {
     pub items: Vec<CaseWhenItem>,
     pub else_label: CaseLabel,
@@ -45,16 +48,19 @@ impl CaseDefinition {
     }
 }
 
+#[derive(Clone)]
 pub struct CaseSwitchWhenItem {
     pub value: String,
     pub sql: Rc<SqlCall>,
 }
 
+#[derive(Clone)]
 pub enum CaseSwitchItem {
     Symbol(Rc<MemberSymbol>),
     Sql(Rc<SqlCall>),
 }
 
+#[derive(Clone)]
 pub struct CaseSwitchDefinition {
     pub switch: CaseSwitchItem,
     pub items: Vec<CaseSwitchWhenItem>,
@@ -84,6 +90,7 @@ impl CaseSwitchDefinition {
     }
 }
 
+#[derive(Clone)]
 pub enum Case {
     Case(CaseDefinition),
     CaseSwitch(CaseSwitchDefinition),

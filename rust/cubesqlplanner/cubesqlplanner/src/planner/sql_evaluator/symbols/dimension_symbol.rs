@@ -3,7 +3,6 @@ use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
-use crate::cube_bridge::string_or_sql::StringOrSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_evaluator::{CubeTableSymbol, TimeDimensionSymbol};
@@ -12,21 +11,6 @@ use crate::planner::GranularityHelper;
 use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
-
-pub enum DimenstionCaseLabel {
-    String(String),
-    Sql(Rc<SqlCall>),
-}
-
-pub struct DimensionCaseWhenItem {
-    pub sql: Rc<SqlCall>,
-    pub label: DimenstionCaseLabel,
-}
-
-pub struct DimensionCaseDefinition {
-    pub items: Vec<DimensionCaseWhenItem>,
-    pub else_label: DimenstionCaseLabel,
-}
 
 #[derive(Clone)]
 pub struct CalendarDimensionTimeShift {
@@ -237,14 +221,6 @@ impl DimensionSymbol {
             case.extract_symbol_deps_with_path(&mut deps);
         }
         deps
-    }
-
-    pub fn get_dependent_cubes(&self) -> Vec<String> {
-        let mut cubes = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_cube_deps(&mut cubes);
-        }
-        cubes
     }
 
     pub fn cube_name(&self) -> &String {
