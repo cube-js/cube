@@ -503,43 +503,43 @@ views:
       },
       ],
     }, [
-        {
-          orders__currency: 'EUR',
-          orders__currency_full_name: 'euros',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__revenue: '30'
-        },
-        {
-          orders__currency: 'GBP',
-          orders__currency_full_name: 'unknown',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__revenue: '30'
-        },
-        {
-          orders__currency: 'USD',
-          orders__currency_full_name: 'dollars',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__revenue: '30'
-        },
-        {
-          orders__currency: 'EUR',
-          orders__currency_full_name: 'euros',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__revenue: '5'
-        },
-        {
-          orders__currency: 'GBP',
-          orders__currency_full_name: 'unknown',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__revenue: '5'
-        },
-        {
-          orders__currency: 'USD',
-          orders__currency_full_name: 'dollars',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__revenue: '5'
-        }
-      ],
+      {
+        orders__currency: 'EUR',
+        orders__currency_full_name: 'euros',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '30'
+      },
+      {
+        orders__currency: 'GBP',
+        orders__currency_full_name: 'unknown',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '30'
+      },
+      {
+        orders__currency: 'USD',
+        orders__currency_full_name: 'dollars',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '30'
+      },
+      {
+        orders__currency: 'EUR',
+        orders__currency_full_name: 'euros',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '5'
+      },
+      {
+        orders__currency: 'GBP',
+        orders__currency_full_name: 'unknown',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '5'
+      },
+      {
+        orders__currency: 'USD',
+        orders__currency_full_name: 'dollars',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '5'
+      }
+    ],
     { joinGraph, cubeEvaluator, compiler }));
 
     it('measure switch cross join', async () => dbRunner.runQueryTest({
@@ -560,43 +560,43 @@ views:
       },
       ],
     }, [
-        {
-          orders__currency: 'EUR',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__amount_usd: '1030.0',
-          orders__amount_in_currency: '1002'
-        },
-        {
-          orders__currency: 'GBP',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__amount_usd: '1030.0',
-          orders__amount_in_currency: '828'
-        },
-        {
-          orders__currency: 'USD',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__amount_usd: '1030.0',
-          orders__amount_in_currency: '1030.0'
-        },
-        {
-          orders__currency: 'EUR',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__amount_usd: '40.0',
-          orders__amount_in_currency: '38'
-        },
-        {
-          orders__currency: 'GBP',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__amount_usd: '40.0',
-          orders__amount_in_currency: '33'
-        },
-        {
-          orders__currency: 'USD',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__amount_usd: '40.0',
-          orders__amount_in_currency: '40.0'
-        }
-      ],
+      {
+        orders__currency: 'EUR',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__amount_usd: '1030.0',
+        orders__amount_in_currency: '1002'
+      },
+      {
+        orders__currency: 'GBP',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__amount_usd: '1030.0',
+        orders__amount_in_currency: '828'
+      },
+      {
+        orders__currency: 'USD',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__amount_usd: '1030.0',
+        orders__amount_in_currency: '1030.0'
+      },
+      {
+        orders__currency: 'EUR',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__amount_usd: '40.0',
+        orders__amount_in_currency: '38'
+      },
+      {
+        orders__currency: 'GBP',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__amount_usd: '40.0',
+        orders__amount_in_currency: '33'
+      },
+      {
+        orders__currency: 'USD',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__amount_usd: '40.0',
+        orders__amount_in_currency: '40.0'
+      }
+    ],
     { joinGraph, cubeEvaluator, compiler }));
 
     it('measure switch with filter', async () => dbRunner.runQueryTest({
@@ -620,19 +620,19 @@ views:
       },
       ],
     }, [
-        {
-          orders__currency: 'EUR',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__amount_usd: '1030.0',
-          orders__amount_in_currency: '1002'
-        },
-        {
-          orders__currency: 'EUR',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__amount_usd: '40.0',
-          orders__amount_in_currency: '38'
-        },
-      ],
+      {
+        orders__currency: 'EUR',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__amount_usd: '1030.0',
+        orders__amount_in_currency: '1002'
+      },
+      {
+        orders__currency: 'EUR',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__amount_usd: '40.0',
+        orders__amount_in_currency: '38'
+      },
+    ],
     { joinGraph, cubeEvaluator, compiler }));
   } else {
     // This test is working only in tesseract
