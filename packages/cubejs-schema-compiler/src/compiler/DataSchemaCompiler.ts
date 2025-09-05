@@ -689,6 +689,7 @@ export class DataSchemaCompiler {
         errorsReport.exitFile();
 
         const content = babelGenerator(ast, {}, file.content).code;
+
         return { ...file, content };
       }
     } catch (e: any) {
@@ -764,9 +765,8 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     options: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    const renderedFile = this.yamlCompiler.compileYamlWithJinjaFile(
+    const renderedFile = await this.yamlCompiler.renderTemplate(
       file,
-      errorsReport,
       this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
       this.pythonContext!
     );
