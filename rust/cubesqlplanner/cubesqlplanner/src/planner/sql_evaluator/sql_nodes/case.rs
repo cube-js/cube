@@ -1,7 +1,7 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::symbols::{
-    Case, CaseDefinition, CaseLabel, CaseSwitchDefinition, CaseSwitchItem,
+    Case, CaseDefinition, CaseLabel, CaseSwitchDefinition,
 };
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
@@ -69,17 +69,12 @@ impl CaseSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let expr = match &case.switch {
-            CaseSwitchItem::Symbol(member_symbol) => {
-                visitor.apply(member_symbol, node_processor.clone(), templates)?
-            }
-            CaseSwitchItem::Sql(sql_call) => sql_call.eval(
-                visitor,
-                node_processor.clone(),
-                query_tools.clone(),
-                templates,
-            )?,
-        };
+        let expr = case.switch.sql.eval(
+            visitor,
+            node_processor.clone(),
+            query_tools.clone(),
+            templates,
+        )?;
         let mut when_then = Vec::new();
         for itm in case.items.iter() {
             let when = templates.quote_string(&itm.value)?;

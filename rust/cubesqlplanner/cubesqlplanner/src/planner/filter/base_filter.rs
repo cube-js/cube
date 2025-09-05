@@ -112,6 +112,14 @@ impl BaseFilter {
         self.values.len() == 1 && self.filter_operator == FilterOperator::Equal
     }
 
+    pub fn get_single_value_restriction(&self) -> Option<String> {
+        if self.is_single_value_equal() {
+            self.values[0].clone()
+        } else {
+            None
+        }
+    }
+
     pub fn to_sql(
         &self,
         context: Rc<VisitorContext>,

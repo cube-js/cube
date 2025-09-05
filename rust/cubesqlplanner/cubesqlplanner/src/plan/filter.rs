@@ -104,6 +104,60 @@ impl FilterItem {
             FilterItem::Segment(item) => result.push(item.member_evaluator().clone()),
         }
     }
+    pub fn find_single_value_restriction(&self, symbol: &Rc<MemberSymbol>) -> Option<String> {
+        match self {
+            FilterItem::Item(item) => {
+                if &item.member_evaluator() == symbol {
+                    item.get_single_value_restriction()
+                } else {
+                    None
+                }
+            }
+
+            FilterItem::Group(group) => match group.operator {
+                FilterGroupOperator::Or => {
+                    // Для OR: если хоть одна ветка не ограничивает -> нет единого ограничения
+                    // Если все ограничивают и все одинаковые -> то это значение
+                    let mut candidate: Option<String> = None;
+
+                    for child in &group.items {
+                        match child.find_single_value_restriction(symbol) {
+                            None => return None, // хотя бы одна альтернатива без фиксации => OR не фиксирует
+                            Some(v) => {
+                                if let Some(prev) = &candidate {
+                                    if prev != &v {
+                                        return None;
+                                    }
+                                } else {
+                                    candidate = Some(v);
+                                }
+                            }
+                        }
+                    }
+
+                    candidate
+                }
+
+                FilterGroupOperator::And => {
+                    let mut candidate: Option<String> = None;
+
+                    for child in &group.items {
+                        if let Some(v) = child.find_single_value_restriction(symbol) {
+                            if let Some(prev) = &candidate {
+                                if prev != &v {
+                                    return None;
+                                }
+                            }
+                            candidate = Some(v);
+                        }
+                    }
+
+                    candidate
+                }
+            },
+            FilterItem::Segment(_) => None,
+        }
+    }
 }
 
 impl Filter {

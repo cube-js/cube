@@ -23,3 +23,9 @@ pub struct TemplateCalcGroup {
     pub name: String,
     pub values: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateCalcSingleValue {
+    pub name: String,
+    pub value: String,
+}

@@ -4214,7 +4214,14 @@ export class BaseQuery {
           '{{ min_expr }} as {{ quoted_min_name }}\n' +
           'FROM {{ from_prepared }}\n' +
           '{% if filter %}WHERE {{ filter }}{% endif %}',
-        calc_groups_join: 'SELECT "{{ original_cube }}".*, "{{ groups | map(attribute=\'name\') | join(\'", "\') }}"\n' +
+        calc_groups_join: 'SELECT "{{ original_cube }}".*, ' +
+        '{%for single_value in single_values %}' +
+        '\'{{ single_value.value }}\' as "{{ single_value.name }}"{% if not loop.last %}, {% endif %}' +
+        '{% endfor %}' +
+        '{% if single_values and groups %}, {% endif %}' +
+        '{%for group in groups %}' +
+        '"{{ group.name }}"{% if not loop.last %}, {% endif %}' +
+        '{% endfor %}' +
         'FROM {{ original_cube_sql }} {{ original_cube }}\n' +
         '{% for group in groups  %}' +
         'CROSS JOIN\n' +

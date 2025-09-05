@@ -2,7 +2,6 @@ use crate::cube_bridge::member_sql::{MemberSql, NativeMemberSql};
 
 use super::case_switch_else_item::{CaseSwitchElseItem, NativeCaseSwitchElseItem};
 use super::case_switch_item::{CaseSwitchItem, NativeCaseSwitchItem};
-use super::string_or_sql::StringOrSql;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
