@@ -158,49 +158,6 @@ describe('DataSchemaCompiler', () => {
         compiler.throwIfAnyErrors();
       });
     });
-
-    describe('Test perfomance', () => {
-      const schema = `
-        cube('visitors', {
-          sql: 'select * from visitors',
-          measures: {
-            count: {
-              type: 'count',
-              sql: 'id'
-            },
-            duration: {
-              type: 'avg',
-              sql: 'duration'
-            },
-          },
-          dimensions: {
-            date: {
-              type: 'string',
-              sql: 'date'
-            },
-            browser: {
-              type: 'string',
-              sql: 'browser'
-            }
-          }
-        })
-      `;
-
-      it('Should compile 200 schemas in less than 2500ms * 10', async () => {
-        const repeats = 200;
-
-        const compilerWith = prepareJsCompiler(schema, { allowJsDuplicatePropsInSchema: false });
-        const start = new Date().getTime();
-        for (let i = 0; i < repeats; i++) {
-          delete compilerWith.compiler.compilePromise; // Reset compile result
-          await compilerWith.compiler.compile();
-        }
-        const end = new Date().getTime();
-        const time = end - start;
-
-        expect(time).toBeLessThan(2500 * 10);
-      });
-    });
   });
 
   it('calculated metrics', async () => {

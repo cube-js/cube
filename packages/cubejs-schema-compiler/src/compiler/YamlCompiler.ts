@@ -8,11 +8,14 @@ import { JinjaEngine, NativeInstance, PythonCtx } from '@cubejs-backend/native';
 import type { FileContent } from '@cubejs-backend/shared';
 
 import { getEnv } from '@cubejs-backend/shared';
-import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
+import {
+  CubePropContextTranspiler,
+  transpiledFields,
+  transpiledFieldsPatterns,
+  TranspilerCubeResolver, TranspilerSymbolResolver
+} from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
-import { CubeSymbols } from './CubeSymbols';
 import { nonStringFields } from './CubeValidator';
-import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
 import { CompileContext } from './DataSchemaCompiler';
@@ -28,10 +31,10 @@ export class YamlCompiler {
   protected jinjaEngine: JinjaEngine | null = null;
 
   public constructor(
-    private readonly cubeSymbols: CubeSymbols,
-    private readonly cubeDictionary: CubeDictionary,
+    private readonly cubeSymbols: TranspilerSymbolResolver,
+    private readonly cubeDictionary: TranspilerCubeResolver,
     private readonly nativeInstance: NativeInstance,
-    private readonly viewCompiler: CubeSymbols,
+    private readonly viewCompiler: TranspilerSymbolResolver,
   ) {
   }
 
@@ -125,14 +128,13 @@ export class YamlCompiler {
     cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
     cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
+    cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
 
     cubeObj.joins = cubeObj.joins || []; // For edge cases where joins are not defined/null
     if (!Array.isArray(cubeObj.joins)) {
       errorsReport.error('joins must be defined as array');
       cubeObj.joins = [];
     }
-
-    cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
 
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
