@@ -1,6 +1,7 @@
+use crate::plan::FilterItem;
 use crate::{
     cube_bridge::{case_variant::CaseVariant, string_or_sql::StringOrSql},
-    planner::sql_evaluator::{Compiler, MemberSymbol, SqlCall},
+    planner::sql_evaluator::{find_single_value_restriction, Compiler, MemberSymbol, SqlCall},
 };
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -46,6 +47,10 @@ impl CaseDefinition {
             sql.extract_symbol_deps_with_path(result);
         }
     }
+
+    fn apply_static_filter(&self, _filters: &Vec<FilterItem>) -> Option<Rc<SqlCall>> {
+        None
+    }
 }
 
 #[derive(Clone)]
@@ -55,9 +60,9 @@ pub struct CaseSwitchWhenItem {
 }
 
 #[derive(Clone)]
-pub enum CaseSwitchItem {
-    Symbol(Rc<MemberSymbol>),
-    Sql(Rc<SqlCall>),
+pub struct CaseSwitchItem {
+    pub sql: Rc<SqlCall>,
+    pub symbol_reference: Option<Rc<MemberSymbol>>,
 }
 
 #[derive(Clone)]
@@ -69,24 +74,34 @@ pub struct CaseSwitchDefinition {
 
 impl CaseSwitchDefinition {
     fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
-        match &self.switch {
-            CaseSwitchItem::Symbol(member_symbol) => result.push(member_symbol.clone()),
-            CaseSwitchItem::Sql(sql) => sql.extract_symbol_deps(result),
-        }
+        self.switch.sql.extract_symbol_deps(result);
         for itm in self.items.iter() {
             itm.sql.extract_symbol_deps(result);
         }
         self.else_sql.extract_symbol_deps(result);
     }
     fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
-        match &self.switch {
-            CaseSwitchItem::Symbol(member_symbol) => result.push((member_symbol.clone(), vec![])),
-            CaseSwitchItem::Sql(sql) => sql.extract_symbol_deps_with_path(result),
-        }
+        self.switch.sql.extract_symbol_deps_with_path(result);
         for itm in self.items.iter() {
             itm.sql.extract_symbol_deps_with_path(result);
         }
         self.else_sql.extract_symbol_deps_with_path(result);
+    }
+
+    fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<Rc<SqlCall>> {
+        if let Some(switch_ref) = &self.switch.symbol_reference {
+            if let Some(single_value) = find_single_value_restriction(filters, switch_ref) {
+                if let Some(result) = self.items.iter().find(|itm| itm.value == single_value) {
+                    Some(result.sql.clone())
+                } else {
+                    Some(self.else_sql.clone())
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -144,12 +159,11 @@ impl Case {
                     compiler.compile_sql_call(&cube_name, case_definition.else_sql()?.sql()?)?;
                 let switch_sql =
                     compiler.compile_sql_call(&cube_name, case_definition.switch()?)?;
-                let switch = if let Some(symbol) =
-                    switch_sql.resolve_direct_reference(compiler.base_tools())?
-                {
-                    CaseSwitchItem::Symbol(symbol)
-                } else {
-                    CaseSwitchItem::Sql(switch_sql)
+                let switch_reference =
+                    switch_sql.resolve_direct_reference(compiler.base_tools())?;
+                let switch = CaseSwitchItem {
+                    sql: switch_sql,
+                    symbol_reference: switch_reference,
                 };
                 Case::CaseSwitch(CaseSwitchDefinition {
                     switch,
@@ -171,6 +185,13 @@ impl Case {
         match self {
             Case::Case(def) => def.extract_symbol_deps_with_path(result),
             Case::CaseSwitch(def) => def.extract_symbol_deps_with_path(result),
+        }
+    }
+
+    pub fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<Rc<SqlCall>> {
+        match self {
+            Case::Case(case) => case.apply_static_filter(filters),
+            Case::CaseSwitch(case) => case.apply_static_filter(filters),
         }
     }
 }

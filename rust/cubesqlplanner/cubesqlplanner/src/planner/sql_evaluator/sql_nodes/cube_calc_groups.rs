@@ -1,9 +1,8 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::DimensionSymbol;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
-use crate::planner::sql_templates::structs::TemplateCalcGroup;
+use crate::planner::sql_templates::structs::{TemplateCalcGroup, TemplateCalcSingleValue};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -71,7 +70,22 @@ impl SqlNode for CubeCalcGroupsSqlNode {
         )?;
         let res = match node.as_ref() {
             MemberSymbol::CubeTable(ev) => {
-                let res = if let Some(groups) = self.items.get(ev.cube_name()) {
+                let res = if let Some(calc_groups) = self.items.get(ev.cube_name()) {
+                    let mut single_values = vec![];
+                    let mut groups = vec![];
+                    for calc_group in calc_groups {
+                        if calc_group.values.len() == 1 {
+                            single_values.push(TemplateCalcSingleValue {
+                                name: calc_group.name.clone(),
+                                value: calc_group.values[0].clone(),
+                            })
+                        } else {
+                            groups.push(TemplateCalcGroup {
+                                name: calc_group.name.clone(),
+                                values: calc_group.values.clone(),
+                            })
+                        }
+                    }
                     let template_groups = groups
                         .iter()
                         .map(|group| TemplateCalcGroup {
@@ -79,7 +93,12 @@ impl SqlNode for CubeCalcGroupsSqlNode {
                             values: group.values.clone(),
                         })
                         .collect_vec();
-                    let res = templates.calc_groups_join(&ev.cube_name(), &input, template_groups)?;
+                    let res = templates.calc_groups_join(
+                        &ev.cube_name(),
+                        &input,
+                        single_values,
+                        template_groups,
+                    )?;
                     format!("({})", res)
                 } else {
                     input

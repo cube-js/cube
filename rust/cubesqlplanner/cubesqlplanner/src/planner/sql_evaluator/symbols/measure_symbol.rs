@@ -248,6 +248,13 @@ impl MeasureSymbol {
         }))
     }
 
+    pub(super) fn replace_case_with_sql_call(&self, sql: Rc<SqlCall>) -> Rc<MeasureSymbol> {
+        let mut new = self.clone();
+        new.case = None;
+        new.member_sql = Some(sql);
+        Rc::new(new)
+    }
+
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.cube.cube_name(), self.name)
     }
@@ -361,8 +368,6 @@ impl MeasureSymbol {
         }
         deps
     }
-
-
 
     pub fn can_used_as_addictive_in_multplied(&self) -> bool {
         if &self.measure_type == "countDistinct" || &self.measure_type == "countDistinctApprox" {

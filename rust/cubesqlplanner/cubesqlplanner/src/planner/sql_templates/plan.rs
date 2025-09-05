@@ -1,8 +1,11 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
-use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
 use crate::planner::sql_templates::structs::TemplateCalcGroup;
+use crate::{
+    cube_bridge::driver_tools::DriverTools,
+    planner::sql_templates::structs::TemplateCalcSingleValue,
+};
 use convert_case::{Boundary, Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;
@@ -349,6 +352,7 @@ impl PlanSqlTemplates {
         &self,
         original_cube: &str,
         original_cube_sql: &str,
+        single_values: Vec<TemplateCalcSingleValue>,
         groups: Vec<TemplateCalcGroup>,
     ) -> Result<String, CubeError> {
         self.render.render_template(
@@ -356,6 +360,7 @@ impl PlanSqlTemplates {
             context! {
                 original_cube => original_cube,
                 original_cube_sql => original_cube_sql,
+                single_values => single_values,
                 groups => groups
             },
         )

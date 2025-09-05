@@ -442,48 +442,52 @@ views:
     ],
     { joinGraph, cubeEvaluator, compiler }));
 
-    it('basic cross join with measure with filters', async () => dbRunner.runQueryTest({
-      dimensions: ['orders.strategy'],
-      measures: ['orders.revenue'],
-      timeDimensions: [
+    it('basic cross join with filters', async () => {
+      const sqlAndParams = await dbRunner.runQueryTest({
+        dimensions: ['orders.strategy'],
+        measures: ['orders.revenue'],
+        timeDimensions: [
+          {
+            dimension: 'orders.date',
+            granularity: 'year'
+          }
+        ],
+        filters: [
+          { dimension: 'orders.strategy', operator: 'equals', values: ['B'] }
+        ],
+        timezone: 'UTC',
+        order: [{
+          id: 'orders.date'
+        }, {
+          id: 'orders.currency'
+        },
+        ],
+      }, [
         {
-          dimension: 'orders.date',
-          granularity: 'year'
+          orders__date_year: '2022-01-01T00:00:00.000Z',
+          orders__strategy: 'B',
+          orders__revenue: '5',
+        },
+        {
+          orders__date_year: '2023-01-01T00:00:00.000Z',
+          orders__strategy: 'B',
+          orders__revenue: '15',
+        },
+        {
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__strategy: 'B',
+          orders__revenue: '30',
+        },
+        {
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__strategy: 'B',
+          orders__revenue: '5',
         }
       ],
-      filters: [
-        { dimension: 'orders.strategy', operator: 'equals', values: ['B'] }
-      ],
-      timezone: 'UTC',
-      order: [{
-        id: 'orders.date'
-      }, {
-        id: 'orders.currency'
-      },
-      ],
-    }, [
-      {
-        orders__date_year: '2022-01-01T00:00:00.000Z',
-        orders__strategy: 'B',
-        orders__revenue: '5',
-      },
-      {
-        orders__date_year: '2023-01-01T00:00:00.000Z',
-        orders__strategy: 'B',
-        orders__revenue: '15',
-      },
-      {
-        orders__date_year: '2024-01-01T00:00:00.000Z',
-        orders__strategy: 'B',
-        orders__revenue: '30',
-      },
-      {
-        orders__date_year: '2025-01-01T00:00:00.000Z',
-        orders__strategy: 'B',
-        orders__revenue: '5',
-      }
-    ],
-    { joinGraph, cubeEvaluator, compiler }));
+      { joinGraph, cubeEvaluator, compiler });
+
+      expect(sqlAndParams[0]).not.toMatch(/CROSS.+JOIN/);
+    });
 
     it('dimension switch expression simple', async () => dbRunner.runQueryTest({
       dimensions: ['orders.currency', 'orders.currency_full_name'],
@@ -599,41 +603,46 @@ views:
     ],
     { joinGraph, cubeEvaluator, compiler }));
 
-    it('measure switch with filter', async () => dbRunner.runQueryTest({
-      dimensions: ['orders.currency'],
-      measures: ['orders.amount_usd', 'orders.amount_in_currency'],
-      timeDimensions: [
+    it('measure switch with filter', async () => {
+      const sqlAndParams = await dbRunner.runQueryTest({
+        dimensions: ['orders.currency'],
+        measures: ['orders.amount_usd', 'orders.amount_in_currency'],
+        timeDimensions: [
+          {
+            dimension: 'orders.date',
+            granularity: 'year',
+            dateRange: ['2024-01-01', '2026-01-01']
+          }
+        ],
+        filters: [
+          { dimension: 'orders.currency', operator: 'equals', values: ['EUR'] }
+        ],
+        timezone: 'UTC',
+        order: [{
+          id: 'orders.date'
+        }, {
+          id: 'orders.currency'
+        },
+        ],
+      }, [
         {
-          dimension: 'orders.date',
-          granularity: 'year',
-          dateRange: ['2024-01-01', '2026-01-01']
-        }
+          orders__currency: 'EUR',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__amount_usd: '1030.0',
+          orders__amount_in_currency: '1002'
+        },
+        {
+          orders__currency: 'EUR',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__amount_usd: '40.0',
+          orders__amount_in_currency: '38'
+        },
       ],
-      filters: [
-        { dimension: 'orders.currency', operator: 'equals', values: ['EUR'] }
-      ],
-      timezone: 'UTC',
-      order: [{
-        id: 'orders.date'
-      }, {
-        id: 'orders.currency'
-      },
-      ],
-    }, [
-      {
-        orders__currency: 'EUR',
-        orders__date_year: '2024-01-01T00:00:00.000Z',
-        orders__amount_usd: '1030.0',
-        orders__amount_in_currency: '1002'
-      },
-      {
-        orders__currency: 'EUR',
-        orders__date_year: '2025-01-01T00:00:00.000Z',
-        orders__amount_usd: '40.0',
-        orders__amount_in_currency: '38'
-      },
-    ],
-    { joinGraph, cubeEvaluator, compiler }));
+      { joinGraph, cubeEvaluator, compiler });
+
+      expect(sqlAndParams[0]).not.toMatch(/CASE/);
+      expect(sqlAndParams[0]).not.toMatch(/CROSS.+JOIN/);
+    });
   } else {
     // This test is working only in tesseract
     test.skip('calc groups testst', () => { expect(1).toBe(1); });

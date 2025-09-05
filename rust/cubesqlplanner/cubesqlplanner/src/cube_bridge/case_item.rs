@@ -1,5 +1,5 @@
-use super::string_or_sql::StringOrSql;
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::string_or_sql::StringOrSql;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };

@@ -3,7 +3,6 @@ use crate::cube_bridge::case_switch_definition::{
     CaseSwitchDefinition, NativeCaseSwitchDefinition,
 };
 
-use super::struct_with_sql_member::{NativeStructWithSqlMember, StructWithSqlMember};
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::serializer::NativeDeserialize;
 use cubenativeutils::wrappers::NativeObjectHandle;
