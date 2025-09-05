@@ -1,4 +1,4 @@
-use super::case_label::CaseLabel;
+use super::string_or_sql::StringOrSql;
 use super::member_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
@@ -14,5 +14,5 @@ pub trait CaseItem {
     #[nbridge(field)]
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;
     #[nbridge(field)]
-    fn label(&self) -> Result<CaseLabel, CubeError>;
+    fn label(&self) -> Result<StringOrSql, CubeError>;
 }

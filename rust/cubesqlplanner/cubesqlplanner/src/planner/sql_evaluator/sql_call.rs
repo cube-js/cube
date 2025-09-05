@@ -53,9 +53,16 @@ impl SqlCall {
     }
 
     pub fn is_direct_reference(&self, base_tools: Rc<dyn BaseTools>) -> Result<bool, CubeError> {
+        Ok(self.resolve_direct_reference(base_tools)?.is_some())
+    }
+
+    pub fn resolve_direct_reference(
+        &self,
+        base_tools: Rc<dyn BaseTools>,
+    ) -> Result<Option<Rc<MemberSymbol>>, CubeError> {
         let dependencies = self.get_dependencies();
         if dependencies.len() != 1 {
-            return Ok(false);
+            return Ok(None);
         }
 
         let reference_candidate = dependencies[0].clone();
@@ -67,7 +74,12 @@ impl SqlCall {
             .collect::<Result<Vec<_>, _>>()?;
         let eval_result = self.member_sql.call(args)?;
 
-        Ok(eval_result.trim() == reference_candidate.full_name())
+        let res = if eval_result.trim() == reference_candidate.full_name() {
+            Some(reference_candidate.clone())
+        } else {
+            None
+        };
+        Ok(res)
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {

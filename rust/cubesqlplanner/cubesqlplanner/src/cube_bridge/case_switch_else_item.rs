@@ -1,6 +1,5 @@
 use crate::cube_bridge::member_sql::{MemberSql, NativeMemberSql};
 
-use super::case_label::CaseLabel;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };

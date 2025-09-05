@@ -678,10 +678,7 @@ const CaseSchema = Joi.object().keys({
 }).required();
 
 const SwitchCaseSchema = Joi.object().keys({
-  switch: Joi.alternatives([
-    Joi.string(),
-    Joi.func()
-  ]).required(),
+  switch: Joi.func().required(),
   when: Joi.array().items(Joi.object().keys({
     value: Joi.string().required(),
     sql: Joi.func().required()
