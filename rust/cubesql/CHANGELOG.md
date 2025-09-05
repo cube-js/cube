@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.65](https://github.com/cube-js/cube/compare/v1.3.64...v1.3.65) (2025-09-05)
+
+### Bug Fixes
+
+- **cubesql:** Correctly calculate eclass cost for recursive nodes ([#9947](https://github.com/cube-js/cube/issues/9947)) ([f7f78e2](https://github.com/cube-js/cube/commit/f7f78e29f89e24db09b489e2b080603d539c0163))
+
 ## [1.3.64](https://github.com/cube-js/cube/compare/v1.3.63...v1.3.64) (2025-09-03)
 
 ### Bug Fixes
