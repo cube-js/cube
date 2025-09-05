@@ -76,7 +76,7 @@ const transpileYaml = (data: TransferContent) => {
   errorsReport.exitFile();
 
   return {
-    content: transpiledFile?.content,
+    content: transpiledFile?.content || '',
     errors: errorsReport.getErrors(),
     warnings: errorsReport.getWarnings()
   };
