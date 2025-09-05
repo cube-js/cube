@@ -1,5 +1,4 @@
 // Generated from src/parser/GenericSql.g4 by ANTLR 4.13.2
-// @ts-nocheck
 
 import {ParseTreeListener} from "antlr4";
 
@@ -9,6 +8,7 @@ import { QueryContext } from "./GenericSqlParser.js";
 import { FromTablesContext } from "./GenericSqlParser.js";
 import { SelectFieldsContext } from "./GenericSqlParser.js";
 import { FieldContext } from "./GenericSqlParser.js";
+import { SelectFieldContext } from "./GenericSqlParser.js";
 import { AliasFieldContext } from "./GenericSqlParser.js";
 import { BoolExpContext } from "./GenericSqlParser.js";
 import { ExpContext } from "./GenericSqlParser.js";
@@ -74,6 +74,16 @@ export default class GenericSqlListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitField?: (ctx: FieldContext) => void;
+	/**
+	 * Enter a parse tree produced by `GenericSqlParser.selectField`.
+	 * @param ctx the parse tree
+	 */
+	enterSelectField?: (ctx: SelectFieldContext) => void;
+	/**
+	 * Exit a parse tree produced by `GenericSqlParser.selectField`.
+	 * @param ctx the parse tree
+	 */
+	exitSelectField?: (ctx: SelectFieldContext) => void;
 	/**
 	 * Enter a parse tree produced by `GenericSqlParser.aliasField`.
 	 * @param ctx the parse tree
