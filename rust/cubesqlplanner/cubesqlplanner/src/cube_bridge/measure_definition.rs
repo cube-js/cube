@@ -1,3 +1,4 @@
+use super::case_variant::CaseVariant;
 use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
 use super::member_order_by::{MemberOrderBy, NativeMemberOrderBy};
 use super::member_sql::{MemberSql, NativeMemberSql};
@@ -59,6 +60,9 @@ pub trait MeasureDefinition {
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 
     fn cube(&self) -> Result<Rc<dyn CubeDefinition>, CubeError>;
+
+    #[nbridge(field, optional)]
+    fn case(&self) -> Result<Option<CaseVariant>, CubeError>;
 
     #[nbridge(field, optional, vec)]
     fn filters(&self) -> Result<Option<Vec<Rc<dyn StructWithSqlMember>>>, CubeError>;

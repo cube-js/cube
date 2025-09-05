@@ -1,5 +1,5 @@
 use super::{
-    AutoPrefixSqlNode, CaseDimensionSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
+    AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MeasureFilterSqlNode,
     MultiStageRankNode, MultiStageWindowNode, OriginalSqlPreAggregationSqlNode,
     RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
@@ -185,9 +185,9 @@ impl SqlNodesFactory {
         );
 
         let measure_filter_processor = MeasureFilterSqlNode::new(auto_prefix_processor.clone());
+        let measure_processor = CaseSqlNode::new(measure_filter_processor.clone());
 
-        let measure_processor =
-            self.add_ungrouped_measure_reference_if_needed(measure_filter_processor.clone());
+        let measure_processor = self.add_ungrouped_measure_reference_if_needed(measure_processor);
         let measure_processor = self.final_measure_node_processor(measure_processor);
         let measure_processor = self
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
@@ -279,7 +279,7 @@ impl SqlNodesFactory {
             RenderReferencesSqlNode::new(input, self.pre_aggregation_dimensions_references.clone())
         } else {
             let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
-            let input: Rc<dyn SqlNode> = CaseDimensionSqlNode::new(input);
+            let input: Rc<dyn SqlNode> = CaseSqlNode::new(input);
             input
         };
         let input: Rc<dyn SqlNode> =
