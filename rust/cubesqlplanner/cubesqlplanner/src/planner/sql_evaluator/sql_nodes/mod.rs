@@ -1,6 +1,7 @@
 pub mod auto_prefix;
 pub mod calendar_time_shift;
-pub mod case_dimension;
+pub mod case;
+pub mod cube_calc_groups;
 pub mod evaluate_sql;
 pub mod factory;
 pub mod final_measure;
@@ -20,7 +21,8 @@ pub mod ungroupped_measure;
 pub mod ungroupped_query_final_measure;
 
 pub use auto_prefix::AutoPrefixSqlNode;
-pub use case_dimension::CaseDimensionSqlNode;
+pub use case::CaseSqlNode;
+pub use cube_calc_groups::CubeCalcGroupsSqlNode;
 pub use evaluate_sql::EvaluateSqlNode;
 pub use factory::SqlNodesFactory;
 pub use final_measure::FinalMeasureSqlNode;

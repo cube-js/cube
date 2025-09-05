@@ -1,5 +1,5 @@
 use super::{
-    AutoPrefixSqlNode, CaseDimensionSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
+    AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MeasureFilterSqlNode,
     MultiStageRankNode, MultiStageWindowNode, OriginalSqlPreAggregationSqlNode,
     RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
@@ -8,6 +8,8 @@ use super::{
 use crate::plan::schema::QualifiedColumnName;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::sql_evaluator::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
+use crate::planner::sql_evaluator::sql_nodes::cube_calc_groups::CalcGroupsItems;
+use crate::planner::sql_evaluator::sql_nodes::CubeCalcGroupsSqlNode;
 use crate::planner::sql_evaluator::symbols::CalendarDimensionTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -31,6 +33,7 @@ pub struct SqlNodesFactory {
     dimensions_with_ignored_timezone: HashSet<String>,
     use_local_tz_in_date_range: bool,
     original_sql_pre_aggregations: HashMap<String, String>,
+    calc_groups: CalcGroupsItems,
 }
 
 impl SqlNodesFactory {
@@ -53,6 +56,7 @@ impl SqlNodesFactory {
             dimensions_with_ignored_timezone: HashSet::new(),
             use_local_tz_in_date_range: false,
             original_sql_pre_aggregations: HashMap::new(),
+            calc_groups: CalcGroupsItems::default(),
         }
     }
 
@@ -89,6 +93,15 @@ impl SqlNodesFactory {
 
     pub fn render_references(&self) -> &HashMap<String, QualifiedColumnName> {
         &self.render_references
+    }
+
+    pub fn add_calc_group_item(
+        &mut self,
+        cube_name: String,
+        dimension_name: String,
+        values: Vec<String>,
+    ) {
+        self.calc_groups.add(cube_name, dimension_name, values);
     }
 
     pub fn set_rendered_as_multiplied_measures(&mut self, value: HashSet<String>) {
@@ -172,9 +185,9 @@ impl SqlNodesFactory {
         );
 
         let measure_filter_processor = MeasureFilterSqlNode::new(auto_prefix_processor.clone());
+        let measure_processor = CaseSqlNode::new(measure_filter_processor.clone());
 
-        let measure_processor =
-            self.add_ungrouped_measure_reference_if_needed(measure_filter_processor.clone());
+        let measure_processor = self.add_ungrouped_measure_reference_if_needed(measure_processor);
         let measure_processor = self.final_measure_node_processor(measure_processor);
         let measure_processor = self
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
@@ -192,13 +205,15 @@ impl SqlNodesFactory {
     }
 
     fn cube_table_processor(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
-        if !self.original_sql_pre_aggregations.is_empty() {
-            OriginalSqlPreAggregationSqlNode::new(
-                default,
-                self.original_sql_pre_aggregations.clone(),
-            )
+        let input = if !self.calc_groups.is_empty() {
+            CubeCalcGroupsSqlNode::new(default, self.calc_groups.clone())
         } else {
             default
+        };
+        if !self.original_sql_pre_aggregations.is_empty() {
+            OriginalSqlPreAggregationSqlNode::new(input, self.original_sql_pre_aggregations.clone())
+        } else {
+            input
         }
     }
     fn add_ungrouped_measure_reference_if_needed(
@@ -264,7 +279,7 @@ impl SqlNodesFactory {
             RenderReferencesSqlNode::new(input, self.pre_aggregation_dimensions_references.clone())
         } else {
             let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
-            let input: Rc<dyn SqlNode> = CaseDimensionSqlNode::new(input);
+            let input: Rc<dyn SqlNode> = CaseSqlNode::new(input);
             input
         };
         let input: Rc<dyn SqlNode> =

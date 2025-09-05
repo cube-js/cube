@@ -1,5 +1,5 @@
-use super::member_sql::{MemberSql, NativeMemberSql};
-use super::string_or_sql::StringOrSql;
+use crate::cube_bridge::member_sql::{MemberSql, NativeMemberSql};
+
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -10,9 +10,7 @@ use std::any::Any;
 use std::rc::Rc;
 
 #[nativebridge::native_bridge]
-pub trait CaseItem {
+pub trait CaseSwitchElseItem {
     #[nbridge(field)]
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;
-    #[nbridge(field)]
-    fn label(&self) -> Result<StringOrSql, CubeError>;
 }
