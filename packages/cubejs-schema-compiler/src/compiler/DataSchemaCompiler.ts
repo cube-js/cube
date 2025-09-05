@@ -515,8 +515,6 @@ export class DataSchemaCompiler {
     errorsReport: ErrorReporter,
     { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
   ): Promise<(FileContent | undefined)[]> {
-    const compileJsFileTimer = perfTracker.start('transpileJsFilesBulk (native)');
-
     // for bulk processing this data may be optimized even more by passing transpilerNames, compilerId only once for a bulk
     // but this requires more complex logic to be implemented in the native side.
     // And comparing to the file content sizes, a few bytes of JSON data is not a big deal here
@@ -535,8 +533,6 @@ export class DataSchemaCompiler {
       }),
     }));
     const res = await transpileJs(reqDataArr);
-
-    compileJsFileTimer.end();
 
     return files.map((file, index) => {
       errorsReport.inFile(file);
@@ -747,9 +743,7 @@ export class DataSchemaCompiler {
     compiledFiles[file.fileName] = true;
 
     if (file.convertedToJs) {
-      const compileJsFileTimer = perfTracker.start('compileJsFile (convertedToJs)');
       this.compileJsFile(file, errorsReport);
-      compileJsFileTimer.end();
     } else if (file.fileName.endsWith('.js')) {
       this.compileJsFile(file, errorsReport, { doSyntaxCheck });
     } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||
