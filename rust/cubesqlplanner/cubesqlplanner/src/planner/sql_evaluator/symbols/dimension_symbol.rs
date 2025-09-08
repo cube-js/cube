@@ -94,12 +94,10 @@ impl DimensionSymbol {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        if self.dimension_type == "switch" {
-            Ok(format!(
-                "{}.{}",
-                templates.quote_identifier(&self.cube.alias())?,
-                templates.quote_identifier(&self.name)?
-            ))
+        if !self.is_view() && self.dimension_type == "switch" {
+            Ok(templates.quote_identifier(&self.name)?) //We don't return cube_name -
+                                                        //it should be added in
+                                                        //autoprefix processing
         } else if let Some(member_sql) = &self.member_sql {
             let sql = member_sql.eval(visitor, node_processor, query_tools, templates)?;
             Ok(sql)
@@ -112,7 +110,7 @@ impl DimensionSymbol {
     }
 
     pub fn is_calc_group(&self) -> bool {
-        self.dimension_type == "switch"
+        !self.is_view() && self.dimension_type == "switch"
     }
 
     pub fn values(&self) -> &Vec<String> {

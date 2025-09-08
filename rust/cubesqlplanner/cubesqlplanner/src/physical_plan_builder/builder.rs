@@ -5,8 +5,10 @@ use crate::plan::schema::QualifiedColumnName;
 use crate::plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::sql_evaluator::collectors::collect_calc_group_dims;
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::planner::sql_evaluator::{get_filtered_values, MemberSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -150,9 +152,7 @@ impl PhysicalPlanBuilder {
     ) -> Result<(), CubeError> {
         for dimension_subquery in dimension_subqueries.iter() {
             if let Some(dim_ref) = references_builder.find_reference_for_member(
-                &dimension_subquery
-                    .measure_for_subquery_dimension
-                    .full_name(),
+                &dimension_subquery.measure_for_subquery_dimension,
                 &None,
             ) {
                 render_references
@@ -163,6 +163,23 @@ impl PhysicalPlanBuilder {
                     dimension_subquery.subquery_dimension.full_name()
                 )));
             }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn process_calc_group(
+        &self,
+        symbol: &Rc<MemberSymbol>,
+        context_factory: &mut SqlNodesFactory,
+        filter: &Option<Filter>,
+    ) -> Result<(), CubeError> {
+        for dim in collect_calc_group_dims(symbol)? {
+            let values = get_filtered_values(&dim, filter);
+            context_factory.add_calc_group_item(
+                dim.cube_name().clone(),
+                dim.name().clone(),
+                values,
+            );
         }
         Ok(())
     }

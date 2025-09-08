@@ -32,6 +32,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         let mut context = context.clone();
         context.alias_prefix = alias_prefix;
 
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let source = self
             .builder
             .process_node(keys_subquery.source.as_ref(), &context)?;
@@ -49,12 +50,21 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
             .chain(keys_subquery.primary_keys_dimensions.iter())
         {
             let alias = member.alias();
+            self.builder.process_calc_group(
+                member,
+                &mut context_factory,
+                &keys_subquery.filter.all_filters(),
+            )?;
+            references_builder.resolve_references_for_member(
+                member.clone(),
+                &None,
+                &mut render_references,
+            )?;
             select_builder.add_projection_member(member, Some(alias));
         }
 
         select_builder.set_distinct();
         select_builder.set_filter(keys_subquery.filter.all_filters());
-        let mut context_factory = context.make_sql_nodes_factory()?;
         context_factory.set_render_references(render_references);
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)

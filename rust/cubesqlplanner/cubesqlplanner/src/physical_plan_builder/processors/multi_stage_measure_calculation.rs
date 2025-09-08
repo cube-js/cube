@@ -55,7 +55,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
                 &None,
                 &mut render_references,
             )?;
-            let alias = references_builder.resolve_alias_for_member(&measure.full_name(), &None);
+            let alias = references_builder.resolve_alias_for_member(&measure, &None);
             select_builder.add_projection_member(measure, alias);
         }
 
@@ -78,9 +78,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
             .partition_by
             .iter()
             .map(|dim| -> Result<_, CubeError> {
-                if let Some(reference) =
-                    references_builder.find_reference_for_member(&dim.full_name(), &None)
-                {
+                if let Some(reference) = references_builder.find_reference_for_member(&dim, &None) {
                     let table_ref = if let Some(table_name) = reference.source() {
                         format!("{}.", templates.quote_identifier(table_name)?)
                     } else {

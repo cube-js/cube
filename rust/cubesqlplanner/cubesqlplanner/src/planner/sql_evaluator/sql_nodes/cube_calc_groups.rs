@@ -9,13 +9,13 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CalcGroupItem {
     pub name: String,
     pub values: Vec<String>,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct CalcGroupsItems {
     items: HashMap<String, Vec<CalcGroupItem>>,
 }

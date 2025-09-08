@@ -1,10 +1,8 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{Query, QuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Cte, Expr, Filter, MemberExpression, Select, SelectBuilder};
-use crate::planner::sql_evaluator::collectors::collect_calc_group_dims;
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::{get_filtered_values, MemberSymbol, ReferencesBuilder};
+use crate::plan::{Cte, Expr, MemberExpression, Select, SelectBuilder};
+use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -20,23 +18,6 @@ impl QueryProcessor<'_> {
             QuerySource::PreAggregation(_) => false,
             QuerySource::LogicalJoin(_) => false,
         }
-    }
-
-    fn process_calc_group(
-        &self,
-        symbol: &Rc<MemberSymbol>,
-        context_factory: &mut SqlNodesFactory,
-        filter: &Option<Filter>,
-    ) -> Result<(), CubeError> {
-        for dim in collect_calc_group_dims(symbol)? {
-            let values = get_filtered_values(&dim, filter);
-            context_factory.add_calc_group_item(
-                dim.cube_name().clone(),
-                dim.name().clone(),
-                values,
-            );
-        }
-        Ok(())
     }
 }
 
@@ -116,7 +97,8 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 &None,
                 &mut render_references,
             )?;
-            self.process_calc_group(member, &mut context_factory, &filter)?;
+            self.builder
+                .process_calc_group(member, &mut context_factory, &filter)?;
             if context.measure_subquery {
                 select_builder.add_projection_member_without_schema(member, None);
             } else {

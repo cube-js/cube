@@ -135,7 +135,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 &None,
                 &mut render_references,
             )?;
-            let alias = references_builder.resolve_alias_for_member(&member.full_name(), &None);
+            let alias = references_builder.resolve_alias_for_member(&member, &None);
             group_by.push(Expr::Member(MemberExpression::new(member.clone())));
             select_builder.add_projection_member(&member, alias);
         }

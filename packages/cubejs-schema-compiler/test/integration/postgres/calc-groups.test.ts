@@ -246,7 +246,178 @@ cubes:
     measures:
       - name: count
         type: count
+
+  - name: source_root
+    sql: >
+      SELECT 1
+    public: false
+
+    joins:
+      - name: source_a
+        sql: "1 = 1"
+        relationship: one_to_many
+      - name: source_b
+        sql: "1 = 1"
+        relationship: one_to_many
+
+    dimensions:
+      - name: pk
+        type: number
+        sql: "1"
+        primary_key: true
+
+      - name: source
+        type: switch
+        values: ["A", "B"]
+
+      - name: currency
+        type: switch
+        values: ["USD", "EUR"]
+
+      - name: product_category
+        type: string
+        case:
+          switch: "{CUBE.source}"
+          when:
+            - value: A
+              sql: "{source_a.product_category}"
+            - value: B
+              sql: "{source_b.product_category}"
+          else:
+            sql: "{source_a.product_category}"
+
+
+    measures:
+      - name: count
+        type: sum
+        multi_stage: true
+        case:
+          switch: "{CUBE.source}"
+          when:
+            - value: A
+              sql: "{source_a.count}"
+            - value: B
+              sql: "{source_b.count}"
+          else:
+            sql: "{source_a.count}"
+
+      - name: price_eur
+        type: sum
+        multi_stage: true
+        case:
+          switch: "{CUBE.source}"
+          when:
+            - value: A
+              sql: "{source_a.price_eur}"
+            - value: B
+              sql: "{source_b.price_eur}"
+          else:
+            sql: "{source_a.price_eur}"
+
+      - name: price_usd
+        type: sum
+        multi_stage: true
+        case:
+          switch: "{CUBE.source}"
+          when:
+            - value: A
+              sql: "{source_a.price_usd}"
+            - value: B
+              sql: "{source_b.price_usd}"
+          else:
+            sql: "{source_a.price_usd}"
+
+      - name: price
+        type: sum
+        multi_stage: true
+        case:
+          switch: "{CUBE.currency}"
+          when:
+            - value: USD
+              sql: "{CUBE.price_usd}"
+            - value: EUR
+              sql: "{CUBE.price_eur}"
+          else:
+            sql: "{CUBE.price_usd}"
+
+
+  - name: source_a
+    sql: >
+      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 100 as PRICE_USD, 0 as PRICE_EUR
+      union all
+      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 500 as PRICE_USD, 0 as PRICE_EUR
+      union all
+      SELECT 12 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 200 as PRICE_USD, 0 as PRICE_EUR
+      union all
+      SELECT 13 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 300 as PRICE_USD, 0 as PRICE_EUR
+    public: false
+
+    dimensions:
+      - name: pk
+        type: number
+        sql: ID
+        primary_key: true
+
+      - name: product_category
+        sql: PRODUCT_CATEGORY
+        type: string
+
+    measures:
+      - name: count
+        type: 'count'
+
+      - name: price_usd
+        type: 'sum'
+        sql: PRICE_USD
+
+      - name: price_eur
+        type: 'sum'
+        sql: PRICE_EUR
+
+
+  - name: source_b
+    sql: >
+      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 100 as PRICE_EUR
+      union all
+      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 500 as PRICE_EUR
+      union all
+      SELECT 12 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 200 as PRICE_EUR
+      union all
+      SELECT 13 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR
+      union all
+      SELECT 14 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR
+    public: false
+
+    dimensions:
+      - name: pk
+        type: number
+        sql: ID
+        primary_key: true
+
+      - name: product_category
+        sql: PRODUCT_CATEGORY
+        type: string
+
+    measures:
+      - name: count
+        type: 'count'
+
+      - name: price_usd
+        type: 'sum'
+        sql: PRICE_USD
+
+      - name: price_eur
+        type: 'sum'
+        sql: PRICE_EUR
+
 views:
+  - name: source
+    cubes:
+      - join_path: source_root
+        includes: "*"
+
+
+
   - name: orders_view
 
     cubes:
@@ -825,37 +996,37 @@ views:
       },
       ],
     }, [
-        {
-          orders__currency: 'EUR',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__amount_in_currency_percent_of_usd: '97'
-        },
-        {
-          orders__currency: 'GBP',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__amount_in_currency_percent_of_usd: '80'
-        },
-        {
-          orders__currency: 'USD',
-          orders__date_year: '2024-01-01T00:00:00.000Z',
-          orders__amount_in_currency_percent_of_usd: '100'
-        },
-        {
-          orders__currency: 'EUR',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__amount_in_currency_percent_of_usd: '95'
-        },
-        {
-          orders__currency: 'GBP',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__amount_in_currency_percent_of_usd: '82'
-        },
-        {
-          orders__currency: 'USD',
-          orders__date_year: '2025-01-01T00:00:00.000Z',
-          orders__amount_in_currency_percent_of_usd: '100'
-        }
-      ],
+      {
+        orders__currency: 'EUR',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__amount_in_currency_percent_of_usd: '97'
+      },
+      {
+        orders__currency: 'GBP',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__amount_in_currency_percent_of_usd: '80'
+      },
+      {
+        orders__currency: 'USD',
+        orders__date_year: '2024-01-01T00:00:00.000Z',
+        orders__amount_in_currency_percent_of_usd: '100'
+      },
+      {
+        orders__currency: 'EUR',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__amount_in_currency_percent_of_usd: '95'
+      },
+      {
+        orders__currency: 'GBP',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__amount_in_currency_percent_of_usd: '82'
+      },
+      {
+        orders__currency: 'USD',
+        orders__date_year: '2025-01-01T00:00:00.000Z',
+        orders__amount_in_currency_percent_of_usd: '100'
+      }
+    ],
     { joinGraph, cubeEvaluator, compiler }));
 
     it('measure switch with filter', async () => {
@@ -936,6 +1107,133 @@ views:
 
       expect(sqlAndParams[0]).not.toMatch(/CASE/);
       expect(sqlAndParams[0]).not.toMatch(/CROSS.+JOIN/);
+    });
+    it('source switch cross join', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.source'],
+        measures: ['source.count'],
+        order: [{
+          id: 'source.source'
+        }
+        ],
+      }, [
+        { source__source: 'A', source__count: '4' },
+        { source__source: 'B', source__count: '5' }
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+    it('source switch cross join without dimension', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.product_category'],
+        measures: ['source.count'],
+        order: [{
+          id: 'source.product_category'
+        }
+        ],
+      }, [
+        { source__product_category: 'some category', source__count: '4' },
+        { source__product_category: 'some category A', source__count: '2' },
+        { source__product_category: 'some category B', source__count: '3' }
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+    it('source full switch', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.currency', 'source.product_category'],
+        measures: ['source.price'],
+        order: [{
+          id: 'source.product_category'
+        },
+        {
+          id: 'source.currency'
+        }
+        ],
+      }, [
+        {
+          source__currency: 'EUR',
+          source__product_category: 'some category',
+          source__price: '600'
+        },
+        {
+          source__currency: 'USD',
+          source__product_category: 'some category',
+          source__price: '600'
+        },
+        {
+          source__currency: 'EUR',
+          source__product_category: 'some category A',
+          source__price: '0'
+        },
+        {
+          source__currency: 'USD',
+          source__product_category: 'some category A',
+          source__price: '500'
+        },
+        {
+          source__currency: 'EUR',
+          source__product_category: 'some category B',
+          source__price: '800'
+        },
+        {
+          source__currency: 'USD',
+          source__product_category: 'some category B',
+          source__price: '0'
+        }
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+    it('source switch - source_a + usd', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.currency', 'source.product_category'],
+        measures: ['source.price'],
+        order: [{
+          id: 'source.product_category'
+        },
+        ],
+        filters: [
+          { dimension: 'source.currency', operator: 'equals', values: ['USD'] },
+          { dimension: 'source.source', operator: 'equals', values: ['A'] }
+        ],
+      }, [
+        {
+          source__currency: 'USD',
+          source__product_category: 'some category',
+          source__price: '600'
+        },
+        {
+          source__currency: 'USD',
+          source__product_category: 'some category A',
+          source__price: '500'
+        },
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+
+    it('source switch - source_b + eur', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.currency', 'source.product_category'],
+        measures: ['source.price'],
+        order: [{
+          id: 'source.product_category'
+        },
+        ],
+        filters: [
+          { dimension: 'source.currency', operator: 'equals', values: ['EUR'] },
+          { dimension: 'source.source', operator: 'equals', values: ['B'] }
+        ],
+      }, [
+        {
+          source__currency: 'EUR',
+          source__product_category: 'some category',
+          source__price: '600'
+        },
+        {
+          source__currency: 'EUR',
+          source__product_category: 'some category B',
+          source__price: '800'
+        },
+      ],
+      { joinGraph, cubeEvaluator, compiler });
     });
   } else {
     // This test is working only in tesseract

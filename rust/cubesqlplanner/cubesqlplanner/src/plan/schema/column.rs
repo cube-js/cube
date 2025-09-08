@@ -1,4 +1,7 @@
 use std::fmt::Display;
+use std::rc::Rc;
+
+use crate::planner::sql_evaluator::MemberSymbol;
 
 #[derive(Debug, Clone)]
 pub struct QualifiedColumnName {
@@ -42,11 +45,11 @@ impl Display for QualifiedColumnName {
 #[derive(Debug, Clone)]
 pub struct SchemaColumn {
     name: String,
-    origin_member: Option<String>,
+    origin_member: Option<Rc<MemberSymbol>>,
 }
 
 impl SchemaColumn {
-    pub fn new(name: String, origin_member: Option<String>) -> Self {
+    pub fn new(name: String, origin_member: Option<Rc<MemberSymbol>>) -> Self {
         Self {
             name,
             origin_member,
@@ -57,7 +60,7 @@ impl SchemaColumn {
         &self.name
     }
 
-    pub fn origin_member(&self) -> &Option<String> {
+    pub fn origin_member(&self) -> &Option<Rc<MemberSymbol>> {
         &self.origin_member
     }
 }
