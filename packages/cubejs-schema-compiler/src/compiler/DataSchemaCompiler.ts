@@ -841,6 +841,8 @@ export class DataSchemaCompiler {
 
     compiledFiles[file.fileName] = true;
 
+    // As now all types of files are transpiled to JS,
+    // we just call JS compiler for all of them
     this.compileJsFile(file, errorsReport, { doSyntaxCheck });
   }
 
