@@ -114,7 +114,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         for dim in rolling_window.schema.time_dimensions.iter() {
             context_factory.add_dimensions_with_ignored_timezone(dim.full_name());
             let alias = references_builder
-                .resolve_alias_for_member(&dim.full_name(), &Some(measure_input_alias.clone()));
+                .resolve_alias_for_member(&dim, &Some(measure_input_alias.clone()));
             select_builder.add_projection_member(dim, alias);
         }
 
@@ -125,7 +125,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
                 &mut render_references,
             )?;
             let alias = references_builder
-                .resolve_alias_for_member(&dim.full_name(), &Some(measure_input_alias.clone()));
+                .resolve_alias_for_member(&dim, &Some(measure_input_alias.clone()));
             select_builder.add_projection_member(dim, alias);
         }
 

@@ -62,7 +62,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
 
         let time_series = TimeSeries::new(
             query_tools.clone(),
-            time_dimension.full_name(),
+            &time_dimension,
             ts_date_range,
             granularity_obj,
         );

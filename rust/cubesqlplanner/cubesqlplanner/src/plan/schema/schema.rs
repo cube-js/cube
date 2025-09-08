@@ -35,25 +35,26 @@ impl Schema {
     }
 
     pub fn resolve_member_alias(&self, member: &Rc<MemberSymbol>) -> String {
-        if let Some(column) = self.find_column_for_member(&member.full_name()) {
+        if let Some(column) = self.find_column_for_member(member) {
             column.name().clone()
         } else {
             member.alias()
         }
     }
 
-    pub fn resolve_member_reference(&self, member_name: &String) -> Option<String> {
-        if let Some(column) = self.find_column_for_member(&member_name) {
+    pub fn resolve_member_reference(&self, member: &Rc<MemberSymbol>) -> Option<String> {
+        if let Some(column) = self.find_column_for_member(&member) {
             Some(column.name().clone())
         } else {
             None
         }
     }
 
-    pub fn find_column_for_member(&self, member_name: &String) -> Option<&SchemaColumn> {
+    pub fn find_column_for_member(&self, member: &Rc<MemberSymbol>) -> Option<&SchemaColumn> {
         self.columns.iter().find(|col| {
             if let Some(origin_member) = &col.origin_member() {
-                origin_member == member_name
+                origin_member.clone().resolve_reference_chain()
+                    == member.clone().resolve_reference_chain()
             } else {
                 false
             }

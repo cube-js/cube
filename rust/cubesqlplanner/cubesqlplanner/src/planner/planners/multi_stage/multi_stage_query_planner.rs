@@ -199,7 +199,17 @@ impl MultiStageQueryPlanner {
             let (multi_stage_member, is_ungrupped) =
                 self.create_multi_stage_inode_member(member.clone())?;
 
-            let dimensions_to_add = multi_stage_member.add_group_by_symbols();
+            let mut dimensions_to_add = multi_stage_member.add_group_by_symbols().clone();
+            if let Ok(measure) = member.as_measure() {
+                if let Some(switch_dim) = measure.case_switch_dimension() {
+                    if !state.dimensions().iter().any(|d| {
+                        d.clone().resolve_reference_chain()
+                            == switch_dim.clone().resolve_reference_chain()
+                    }) {
+                        dimensions_to_add.push(switch_dim);
+                    }
+                }
+            }
 
             let new_state = if !dimensions_to_add.is_empty()
                 || multi_stage_member.time_shift().is_some()

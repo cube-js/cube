@@ -290,6 +290,14 @@ impl MeasureSymbol {
         &self.case
     }
 
+    pub fn case_switch_dimension(&self) -> Option<Rc<MemberSymbol>> {
+        if let Some(Case::CaseSwitch(case)) = &self.case {
+            case.switch.symbol_reference.clone()
+        } else {
+            None
+        }
+    }
+
     pub fn is_addictive(&self) -> bool {
         if self.is_multi_stage() {
             false

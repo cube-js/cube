@@ -130,7 +130,7 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
         let mut keys_select_builder = SelectBuilder::new(keys_from);
 
         for member in full_key_aggregate.schema.all_dimensions() {
-            let alias = references_builder.resolve_alias_for_member(&member.full_name(), &None);
+            let alias = references_builder.resolve_alias_for_member(&member, &None);
             if alias.is_none() {
                 return Err(CubeError::internal(format!(
                     "Source for {} not found in full key aggregate subqueries",

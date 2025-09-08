@@ -107,9 +107,7 @@ impl FilterItem {
     pub fn find_single_value_restriction(&self, symbol: &Rc<MemberSymbol>) -> Option<String> {
         match self {
             FilterItem::Item(item) => {
-                if item.member_evaluator().resolve_reference_chain()
-                    == symbol.clone().resolve_reference_chain()
-                {
+                if &item.member_evaluator().resolve_reference_chain() == symbol {
                     item.get_single_value_restriction()
                 } else {
                     None

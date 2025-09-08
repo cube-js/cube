@@ -21,9 +21,8 @@ impl ReferencesBuilder {
         member: Rc<MemberSymbol>,
         strict_source: &Option<String>,
     ) -> Result<(), CubeError> {
-        let member_name = member.full_name();
         if self
-            .find_reference_for_member(&member_name, strict_source)
+            .find_reference_for_member(&member, strict_source)
             .is_some()
         {
             return Ok(());
@@ -55,7 +54,7 @@ impl ReferencesBuilder {
         if references.contains_key(&member_name) {
             return Ok(());
         }
-        if let Some(reference) = self.find_reference_for_member(&member_name, strict_source) {
+        if let Some(reference) = self.find_reference_for_member(&member, strict_source) {
             references.insert(member_name.clone(), reference);
             return Ok(());
         }
@@ -201,10 +200,10 @@ impl ReferencesBuilder {
 
     pub fn resolve_alias_for_member(
         &self,
-        member_name: &String,
+        member: &Rc<MemberSymbol>,
         strict_source: &Option<String>,
     ) -> Option<String> {
-        if let Some(reference) = self.find_reference_for_member(member_name, strict_source) {
+        if let Some(reference) = self.find_reference_for_member(member, strict_source) {
             Some(reference.name().clone())
         } else {
             None
@@ -213,19 +212,15 @@ impl ReferencesBuilder {
 
     pub fn find_reference_for_member(
         &self,
-        member_name: &String,
+        member: &Rc<MemberSymbol>,
         strict_source: &Option<String>,
     ) -> Option<QualifiedColumnName> {
         match &self.source.source {
             crate::plan::FromSource::Empty => None,
             crate::plan::FromSource::Single(source) => self
-                .find_reference_column_for_member_in_single_source(
-                    &source,
-                    member_name,
-                    strict_source,
-                ),
+                .find_reference_column_for_member_in_single_source(&source, member, strict_source),
             crate::plan::FromSource::Join(join) => {
-                self.find_reference_column_for_member_in_join(&join, member_name, strict_source)
+                self.find_reference_column_for_member_in_join(&join, member, strict_source)
             }
         }
     }
@@ -233,7 +228,7 @@ impl ReferencesBuilder {
     fn find_reference_column_for_member_in_single_source(
         &self,
         source: &SingleAliasedSource,
-        member_name: &String,
+        member: &Rc<MemberSymbol>,
         strict_source: &Option<String>,
     ) -> Option<QualifiedColumnName> {
         if let Some(strict_source) = strict_source {
@@ -243,10 +238,10 @@ impl ReferencesBuilder {
         }
         let column_name = match &source.source {
             SingleSource::Subquery(query_plan) => {
-                query_plan.schema().resolve_member_reference(member_name)
+                query_plan.schema().resolve_member_reference(member)
             }
             SingleSource::Cube(_) => None,
-            SingleSource::TableReference(_, schema) => schema.resolve_member_reference(member_name),
+            SingleSource::TableReference(_, schema) => schema.resolve_member_reference(member),
         };
         column_name.map(|col| QualifiedColumnName::new(Some(source.alias.clone()), col))
     }
@@ -254,12 +249,12 @@ impl ReferencesBuilder {
     fn find_reference_column_for_member_in_join(
         &self,
         join: &Rc<Join>,
-        member_name: &String,
+        member: &Rc<MemberSymbol>,
         strict_source: &Option<String>,
     ) -> Option<QualifiedColumnName> {
         if let Some(root_ref) = self.find_reference_column_for_member_in_single_source(
             &join.root,
-            member_name,
+            member,
             strict_source,
         ) {
             return Some(root_ref);
@@ -267,7 +262,7 @@ impl ReferencesBuilder {
         join.joins.iter().find_map(|item| {
             self.find_reference_column_for_member_in_single_source(
                 &item.from,
-                member_name,
+                member,
                 strict_source,
             )
         })

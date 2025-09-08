@@ -74,7 +74,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
     pub fn add_projection_member_without_schema(
@@ -112,7 +112,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
     pub fn add_projection_group_any_member(
@@ -130,7 +130,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
     pub fn add_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: Option<String>) {
@@ -147,7 +147,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
     pub fn add_count_all(&mut self, alias: String) {
@@ -205,7 +205,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
     pub fn add_projection_coalesce_member(
         &mut self,
@@ -243,7 +243,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
         Ok(())
     }
 
