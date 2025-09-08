@@ -699,20 +699,7 @@ export class DataSchemaCompiler {
 
     compiledFiles[file.fileName] = true;
 
-    if (file.convertedToJs) {
-      this.compileJsFile(file, errorsReport);
-    } else if (file.fileName.endsWith('.js')) {
-      this.compileJsFile(file, errorsReport, { doSyntaxCheck });
-    } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||
-      (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) &&
-      file.content.match(JINJA_SYNTAX)
-    ) {
-      // original jinja/yaml file was already transpiled into js
-      this.compileJsFile(file, errorsReport);
-    } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      // original yaml file was already transpiled into js
-      this.compileJsFile(file, errorsReport);
-    }
+    this.compileJsFile(file, errorsReport, { doSyntaxCheck });
   }
 
   private getJsScript(file: FileContent): vm.Script {
