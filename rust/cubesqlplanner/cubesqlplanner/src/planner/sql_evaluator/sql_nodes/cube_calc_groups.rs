@@ -72,7 +72,7 @@ impl SqlNode for CubeCalcGroupsSqlNode {
             MemberSymbol::CubeTable(ev) => {
                 let res = if let Some(calc_groups) = self.items.get(ev.cube_name()) {
                     let mut single_values = vec![];
-                    let mut groups = vec![];
+                    let mut template_groups = vec![];
                     for calc_group in calc_groups {
                         if calc_group.values.len() == 1 {
                             single_values.push(TemplateCalcSingleValue {
@@ -80,19 +80,13 @@ impl SqlNode for CubeCalcGroupsSqlNode {
                                 value: calc_group.values[0].clone(),
                             })
                         } else {
-                            groups.push(TemplateCalcGroup {
+                            template_groups.push(TemplateCalcGroup {
                                 name: calc_group.name.clone(),
+                                alias: format!("{}_values", calc_group.name),
                                 values: calc_group.values.clone(),
                             })
                         }
                     }
-                    let template_groups = groups
-                        .iter()
-                        .map(|group| TemplateCalcGroup {
-                            name: group.name.clone(),
-                            values: group.values.clone(),
-                        })
-                        .collect_vec();
                     let res = templates.calc_groups_join(
                         &ev.cube_name(),
                         &input,
