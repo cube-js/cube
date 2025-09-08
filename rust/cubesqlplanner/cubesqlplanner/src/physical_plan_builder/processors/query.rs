@@ -1,9 +1,10 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{Query, QuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Cte, Expr, MemberExpression, Select, SelectBuilder};
+use crate::plan::{Cte, Expr, Filter, MemberExpression, Select, SelectBuilder};
+use crate::planner::sql_evaluator::collectors::collect_calc_group_dims;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::{MemberSymbol, ReferencesBuilder};
+use crate::planner::sql_evaluator::{get_filtered_values, MemberSymbol, ReferencesBuilder};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -21,16 +22,21 @@ impl QueryProcessor<'_> {
         }
     }
 
-    fn process_calc_group(&self, symbol: &Rc<MemberSymbol>, context_factory: &mut SqlNodesFactory) {
-        if let Ok(dimension) = symbol.as_dimension() {
-            if dimension.is_calc_group() {
-                context_factory.add_calc_group_item(
-                    dimension.cube_name().clone(),
-                    dimension.name().clone(),
-                    dimension.values().clone(),
-                );
-            }
+    fn process_calc_group(
+        &self,
+        symbol: &Rc<MemberSymbol>,
+        context_factory: &mut SqlNodesFactory,
+        filter: &Option<Filter>,
+    ) -> Result<(), CubeError> {
+        for dim in collect_calc_group_dims(symbol)? {
+            let values = get_filtered_values(&dim, filter);
+            context_factory.add_calc_group_item(
+                dim.cube_name().clone(),
+                dim.name().clone(),
+                values,
+            );
         }
+        Ok(())
     }
 }
 
@@ -101,13 +107,16 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         select_builder.set_ctes(ctes);
         context_factory.set_ungrouped(logical_plan.modifers.ungrouped);
 
+        let filter = logical_plan.filter.all_filters();
+        let having = logical_plan.filter.measures_filter();
+
         for member in logical_plan.schema.all_dimensions() {
             references_builder.resolve_references_for_member(
                 member.clone(),
                 &None,
                 &mut render_references,
             )?;
-            self.process_calc_group(member, &mut context_factory);
+            self.process_calc_group(member, &mut context_factory, &filter)?;
             if context.measure_subquery {
                 select_builder.add_projection_member_without_schema(member, None);
             } else {
@@ -130,9 +139,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 select_builder.add_null_projection(&measure, None);
             }
         }
-
-        let filter = logical_plan.filter.all_filters();
-        let having = logical_plan.filter.measures_filter();
 
         if self.is_over_full_aggregated_source(logical_plan) {
             references_builder.resolve_references_for_filter(&having, &mut render_references)?;

@@ -16,7 +16,6 @@ use crate::plan::{Filter, FilterItem};
 use crate::planner::sql_evaluator::collectors::{
     collect_multiplied_measures, has_multi_stage_members,
 };
-use crate::planner::sql_evaluator::symbols::apply_static_filter_to_vec;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -417,7 +416,7 @@ impl QueryProperties {
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
         let total_query = options.static_data().total_query.unwrap_or(false);
 
-        let mut res = Self {
+        let res = Self {
             measures,
             dimensions,
             segments,
@@ -436,7 +435,6 @@ impl QueryProperties {
             total_query,
             query_join_hints,
         };
-        res.apply_static_filter();
         Ok(Rc::new(res))
     }
 
@@ -476,7 +474,7 @@ impl QueryProperties {
             &segments,
         )?;
 
-        let mut res = Self {
+        let res = Self {
             measures,
             dimensions,
             time_dimensions,
@@ -495,13 +493,7 @@ impl QueryProperties {
             total_query,
             query_join_hints,
         };
-        res.apply_static_filter();
         Ok(Rc::new(res))
-    }
-
-    fn apply_static_filter(&mut self) {
-        apply_static_filter_to_vec(&mut self.measures, &self.dimensions_filters);
-        apply_static_filter_to_vec(&mut self.dimensions, &self.dimensions_filters);
     }
 
     pub fn compute_join_multi_fact_groups_with_measures(
