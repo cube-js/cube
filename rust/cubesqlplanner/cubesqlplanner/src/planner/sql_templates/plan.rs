@@ -355,6 +355,38 @@ impl PlanSqlTemplates {
         single_values: Vec<TemplateCalcSingleValue>,
         groups: Vec<TemplateCalcGroup>,
     ) -> Result<String, CubeError> {
+        let original_cube = self.quote_identifier(original_cube)?;
+        let single_values = single_values
+            .into_iter()
+            .map(|v| -> Result<_, CubeError> {
+                Ok(TemplateCalcSingleValue {
+                    value: self.quote_string(&v.value)?,
+                    name: self.quote_identifier(&v.name)?,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let groups = groups
+            .into_iter()
+            .map(|g| -> Result<_, CubeError> {
+                let TemplateCalcGroup {
+                    name,
+                    alias,
+                    values,
+                } = g;
+                let name = self.quote_identifier(&name)?;
+                let alias = self.quote_identifier(&alias)?;
+                let values = values
+                    .into_iter()
+                    .map(|v| self.quote_string(&v))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                Ok(TemplateCalcGroup {
+                    name,
+                    alias,
+                    values,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         self.render.render_template(
             "statements/calc_groups_join",
             context! {
