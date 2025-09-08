@@ -51,11 +51,28 @@ cubes:
           - EUR
           - GBP
 
+      - name: currency_ref
+        type: string
+        sql: "{currency}"
+
+
       - name: strategy
         type: switch
         values:
           - A
           - B
+
+      - name: strategy_ref
+        type: string
+        sql: "{strategy}"
+
+      - name: currency_and_stategy
+        type: string
+        sql: "CONCAT({currency}, '-', {strategy})"
+
+      - name: currency_and_strategy_ref
+        type: string
+        sql: "{currency_and_stategy}"
 
       - name: currency_full_name
         type: string
@@ -103,10 +120,19 @@ cubes:
           else:
             sql: "{CUBE.amount_gbp}"
 
+      - name: amount_in_currency_ref
+        type: number
+        sql: "{CUBE.amount_in_currency}"
+
       - name: returned_count
         type: count
         filters:
           - sql: "{CUBE}.STATUS = 'returned'"
+
+      - name: amount_in_currency_percent_of_usd
+        type: number
+        sql: "FLOOR({CUBE.amount_in_currency_ref} / {CUBE.amount_usd} * 100)"
+
 
       - name: return_rate
         type: number
@@ -300,6 +326,67 @@ views:
     ],
     { joinGraph, cubeEvaluator, compiler }));
 
+    it('basic cross join by proxy dim', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.currency_ref'],
+      timeDimensions: [
+        {
+          dimension: 'orders.date',
+          granularity: 'year'
+        }
+      ],
+      timezone: 'UTC'
+    }, [
+      {
+        orders__currency_ref: 'EUR',
+        orders__date_year: '2022-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'GBP',
+        orders__date_year: '2022-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'USD',
+        orders__date_year: '2022-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'EUR',
+        orders__date_year: '2023-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'GBP',
+        orders__date_year: '2023-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'USD',
+        orders__date_year: '2023-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'EUR',
+        orders__date_year: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'GBP',
+        orders__date_year: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'USD',
+        orders__date_year: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'EUR',
+        orders__date_year: '2025-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'GBP',
+        orders__date_year: '2025-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_ref: 'USD',
+        orders__date_year: '2025-01-01T00:00:00.000Z'
+      }
+    ],
+    { joinGraph, cubeEvaluator, compiler }));
+
     it('basic double cross join', async () => dbRunner.runQueryTest({
       dimensions: ['orders.currency', 'orders.strategy'],
       timeDimensions: [
@@ -377,6 +464,76 @@ views:
       {
         orders__currency: 'USD',
         orders__strategy: 'B',
+        orders__date_year: '2025-01-01T00:00:00.000Z'
+      }
+    ],
+    { joinGraph, cubeEvaluator, compiler }));
+
+    it('basic double cross join by proxy', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.currency_and_strategy_ref'],
+      timeDimensions: [
+        {
+          dimension: 'orders.date',
+          granularity: 'year',
+          dateRange: ['2024-01-01', '2026-01-01']
+        }
+      ],
+      timezone: 'UTC',
+      order: [{
+        id: 'orders.date'
+      }, {
+        id: 'orders.currency'
+      }, {
+        id: 'orders.strategy'
+      },
+      ],
+    }, [
+      {
+        orders__currency_and_strategy_ref: 'EUR-A',
+        orders__date_year: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'EUR-B',
+        orders__date_year: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'GBP-A',
+        orders__date_year: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'GBP-B',
+        orders__date_year: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'USD-A',
+        orders__date_year: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'USD-B',
+        orders__date_year: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'EUR-A',
+        orders__date_year: '2025-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'EUR-B',
+        orders__date_year: '2025-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'GBP-A',
+        orders__date_year: '2025-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'GBP-B',
+        orders__date_year: '2025-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'USD-A',
+        orders__date_year: '2025-01-01T00:00:00.000Z'
+      },
+      {
+        orders__currency_and_strategy_ref: 'USD-B',
         orders__date_year: '2025-01-01T00:00:00.000Z'
       }
     ],
@@ -481,6 +638,53 @@ views:
         {
           orders__date_year: '2025-01-01T00:00:00.000Z',
           orders__strategy: 'B',
+          orders__revenue: '5',
+        }
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+
+      expect(sqlAndParams[0]).not.toMatch(/CROSS.+JOIN/);
+    });
+
+    it('basic cross join with filters proxy dim', async () => {
+      const sqlAndParams = await dbRunner.runQueryTest({
+        dimensions: ['orders.strategy_ref'],
+        measures: ['orders.revenue'],
+        timeDimensions: [
+          {
+            dimension: 'orders.date',
+            granularity: 'year'
+          }
+        ],
+        filters: [
+          { dimension: 'orders.strategy_ref', operator: 'equals', values: ['B'] }
+        ],
+        timezone: 'UTC',
+        order: [{
+          id: 'orders.date'
+        }, {
+          id: 'orders.currency'
+        },
+        ],
+      }, [
+        {
+          orders__date_year: '2022-01-01T00:00:00.000Z',
+          orders__strategy_ref: 'B',
+          orders__revenue: '5',
+        },
+        {
+          orders__date_year: '2023-01-01T00:00:00.000Z',
+          orders__strategy_ref: 'B',
+          orders__revenue: '15',
+        },
+        {
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__strategy_ref: 'B',
+          orders__revenue: '30',
+        },
+        {
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__strategy_ref: 'B',
           orders__revenue: '5',
         }
       ],
@@ -603,6 +807,57 @@ views:
     ],
     { joinGraph, cubeEvaluator, compiler }));
 
+    it('complex measure switch cross join', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.currency'],
+      measures: ['orders.amount_in_currency_percent_of_usd'],
+      timeDimensions: [
+        {
+          dimension: 'orders.date',
+          granularity: 'year',
+          dateRange: ['2024-01-01', '2026-01-01']
+        }
+      ],
+      timezone: 'UTC',
+      order: [{
+        id: 'orders.date'
+      }, {
+        id: 'orders.currency'
+      },
+      ],
+    }, [
+        {
+          orders__currency: 'EUR',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__amount_in_currency_percent_of_usd: '97'
+        },
+        {
+          orders__currency: 'GBP',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__amount_in_currency_percent_of_usd: '80'
+        },
+        {
+          orders__currency: 'USD',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__amount_in_currency_percent_of_usd: '100'
+        },
+        {
+          orders__currency: 'EUR',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__amount_in_currency_percent_of_usd: '95'
+        },
+        {
+          orders__currency: 'GBP',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__amount_in_currency_percent_of_usd: '82'
+        },
+        {
+          orders__currency: 'USD',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__amount_in_currency_percent_of_usd: '100'
+        }
+      ],
+    { joinGraph, cubeEvaluator, compiler }));
+
     it('measure switch with filter', async () => {
       const sqlAndParams = await dbRunner.runQueryTest({
         dimensions: ['orders.currency'],
@@ -636,6 +891,45 @@ views:
           orders__date_year: '2025-01-01T00:00:00.000Z',
           orders__amount_usd: '40.0',
           orders__amount_in_currency: '38'
+        },
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+
+      expect(sqlAndParams[0]).not.toMatch(/CASE/);
+      expect(sqlAndParams[0]).not.toMatch(/CROSS.+JOIN/);
+    });
+
+    it('complex measure switch with filter', async () => {
+      const sqlAndParams = await dbRunner.runQueryTest({
+        dimensions: ['orders.currency'],
+        measures: ['orders.amount_in_currency_percent_of_usd'],
+        timeDimensions: [
+          {
+            dimension: 'orders.date',
+            granularity: 'year',
+            dateRange: ['2024-01-01', '2026-01-01']
+          }
+        ],
+        filters: [
+          { dimension: 'orders.currency', operator: 'equals', values: ['EUR'] }
+        ],
+        timezone: 'UTC',
+        order: [{
+          id: 'orders.date'
+        }, {
+          id: 'orders.currency'
+        },
+        ],
+      }, [
+        {
+          orders__currency: 'EUR',
+          orders__date_year: '2024-01-01T00:00:00.000Z',
+          orders__amount_in_currency_percent_of_usd: '97'
+        },
+        {
+          orders__currency: 'EUR',
+          orders__date_year: '2025-01-01T00:00:00.000Z',
+          orders__amount_in_currency_percent_of_usd: '95'
         },
       ],
       { joinGraph, cubeEvaluator, compiler });

@@ -5,7 +5,6 @@ use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::structs::{TemplateCalcGroup, TemplateCalcSingleValue};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;

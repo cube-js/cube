@@ -1,4 +1,7 @@
-use crate::{plan::FilterItem, planner::sql_evaluator::MemberSymbol};
+use crate::{
+    plan::{Filter, FilterItem},
+    planner::sql_evaluator::MemberSymbol,
+};
 use std::rc::Rc;
 
 pub fn find_single_value_restriction(
@@ -21,20 +24,29 @@ pub fn find_single_value_restriction(
     candidate
 }
 
-pub fn apply_static_filter(
+pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -> Vec<String> {
+    if let Ok(dim) = symbol.as_dimension() {
+        if dim.dimension_type() == "switch" {
+            if let Some(filter) = filter {
+                if let Some(value) = find_single_value_restriction(&filter.items, symbol) {
+                    if dim.values().iter().any(|v| v == &value) {
+                        return vec![value];
+                    }
+                }
+            }
+        }
+        return dim.values().clone();
+    }
+
+    vec![]
+}
+
+pub fn apply_static_filter_to_symbol(
     symbol: &Rc<MemberSymbol>,
     filters: &Vec<FilterItem>,
 ) -> Rc<MemberSymbol> {
     match symbol.as_ref() {
         MemberSymbol::Dimension(dim) => {
-            if dim.dimension_type() == "switch" {
-                if let Some(value) = find_single_value_restriction(filters, symbol) {
-                    if dim.values().iter().any(|v| v == &value) {
-                        return MemberSymbol::new_dimension(dim.replace_values(vec![value]));
-                    }
-                }
-            }
-
             if let Some(case) = dim.case() {
                 if let Some(case_replacement) = case.apply_static_filter(filters) {
                     return MemberSymbol::new_dimension(
@@ -55,10 +67,4 @@ pub fn apply_static_filter(
         _ => {}
     }
     symbol.clone()
-}
-
-pub fn apply_static_filter_to_vec(symbols: &mut Vec<Rc<MemberSymbol>>, filters: &Vec<FilterItem>) {
-    symbols
-        .iter_mut()
-        .for_each(|s| *s = apply_static_filter(&s, &filters));
 }

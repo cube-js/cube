@@ -6,6 +6,7 @@ use super::{
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::logical_plan::*;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::apply_static_filter_to_symbol;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::MemberSymbol;
@@ -156,6 +157,8 @@ impl MultiStageQueryPlanner {
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let member = member.resolve_reference_chain();
+        let member = apply_static_filter_to_symbol(&member, state.dimensions_filters());
+
         let member_name = member.full_name();
         if let Some(exists) = descriptions
             .iter()
