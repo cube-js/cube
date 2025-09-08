@@ -97,4 +97,35 @@ describe('SqlParser', () => {
     expect(sqlParser.isSimpleAsteriskQuery()).toEqual(true);
     expect(sqlParser.extractWhereConditions('x')).toEqual('1 = 1');
   });
+
+  it('sql with comment and question mark', () => {
+    const sqlParser = new SqlParser('SELECT 1 as test FROM table_name -- this is comment that kaputs Cube -> ?');
+    expect(sqlParser.canParse()).toEqual(true);
+  });
+
+  it('sql with regex containing question mark', () => {
+    const sqlParser = new SqlParser('SELECT * FROM users WHERE name = ? AND REGEXP \'^stripe(?!_direct).{1,}$\'');
+    expect(sqlParser.canParse()).toEqual(true);
+  });
+
+  it('sql with multiline comment containing question mark', () => {
+    const sqlParser = new SqlParser(`SELECT 1 as test FROM table_name 
+    /* this is a real
+       multiline comment that 
+       contains ? character */`);
+    expect(sqlParser.canParse()).toEqual(true);
+  });
+
+  it('numeric literal in SELECT with table alias extraction', () => {
+    const sqlParser = new SqlParser(`SELECT 1 as test_literal, 2.5 as decimal_literal
+      FROM users u 
+      WHERE u.status = 'active' AND u.created_at > '2024-01-01'`);
+    
+    expect(sqlParser.canParse()).toEqual(true);
+    expect(sqlParser.isSimpleAsteriskQuery()).toEqual(false);
+    
+    // Verify table alias extraction still works after grammar changes
+    const extractedConditions = sqlParser.extractWhereConditions('t');
+    expect(extractedConditions).toEqual(`t.status = 'active' AND t.created_at > '2024-01-01'`);
+  });
 });
