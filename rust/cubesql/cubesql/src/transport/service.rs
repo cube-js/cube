@@ -402,6 +402,7 @@ impl SqlTemplates {
         group_by: Vec<AliasedColumn>,
         group_descs: Vec<Option<GroupingSetDesc>>,
         aggregate: Vec<AliasedColumn>,
+        window: Vec<AliasedColumn>,
         alias: String,
         filter: Option<String>,
         _having: Option<String>,
@@ -412,11 +413,13 @@ impl SqlTemplates {
     ) -> Result<String, CubeError> {
         let group_by = self.to_template_columns(group_by)?;
         let aggregate = self.to_template_columns(aggregate)?;
+        let window = self.to_template_columns(window)?;
         let projection = self.to_template_columns(projection)?;
         let order_by = self.to_template_columns(order_by)?;
         let select_concat = group_by
             .iter()
             .chain(aggregate.iter())
+            .chain(window.iter())
             .chain(projection.iter())
             .cloned()
             .collect::<Vec<_>>();
@@ -437,6 +440,7 @@ impl SqlTemplates {
                 select_concat => select_concat,
                 group_by => group_by_expr,
                 aggregate => aggregate,
+                window => window,
                 projection => projection,
                 order_by => order_by,
                 filter => filter,
