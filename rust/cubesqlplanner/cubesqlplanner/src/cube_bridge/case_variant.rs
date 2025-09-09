@@ -16,12 +16,13 @@ pub enum CaseVariant {
 
 impl<IT: InnerTypes> NativeDeserialize<IT> for CaseVariant {
     fn from_native(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
-        match NativeCaseSwitchDefinition::from_native(native_object.clone()) {
+        let res = match NativeCaseSwitchDefinition::from_native(native_object.clone()) {
             Ok(case) => Ok(Self::CaseSwitch(Rc::new(case))),
             Err(_) => match NativeCaseDefinition::from_native(native_object) {
                 Ok(case) => Ok(Self::Case(Rc::new(case))),
                 Err(_) => Err(CubeError::user(format!("Case or Case Switch  expected"))),
             },
-        }
+        };
+        res
     }
 }

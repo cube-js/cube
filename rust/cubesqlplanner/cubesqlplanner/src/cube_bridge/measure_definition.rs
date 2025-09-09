@@ -59,8 +59,6 @@ pub trait MeasureDefinition {
     #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 
-    fn cube(&self) -> Result<Rc<dyn CubeDefinition>, CubeError>;
-
     #[nbridge(field, optional)]
     fn case(&self) -> Result<Option<CaseVariant>, CubeError>;
 
