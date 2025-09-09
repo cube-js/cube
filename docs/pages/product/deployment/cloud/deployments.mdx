@@ -128,7 +128,7 @@ General → Cube version</Btn>:
 />
 
 You can select a specific version in the drop-down. Only versions that have been used by
-a deployment are available in the list.
+a deployment during the last 6 months are available in the list.
 
 There's an option to <Btn>Upgrade automatically to new patch versions</Btn>, which is
 available for both update channels. When it's turned on, an upgrade will occur if a new
@@ -139,6 +139,10 @@ settings, e.g., by updating environment variables of the Cube Cloud deployment.
 Generally, it's recommended to use the _regular channel_ to get the latest updates.
 You can _pin the version_ to a specific one by turning the <Btn>Upgrade automatically...</Btn>
 toggle off.
+
+If you choose to pin the version, make sure to upgrade periodically, especially when the
+next [minor version][ref-distribution-versions] is released. If you use the _LTS channel_,
+make sure to upgrade to the latest [LTS version][ref-lts] every few months.
 
 ## Resource consumption
 
@@ -175,3 +179,4 @@ resource consumption in different scenarios.
 [link-semver]: https://semver.org
 [ref-data-sources]: /product/configuration/data-sources
 [ref-audit-log]: /product/workspace/audit-log
+[ref-distribution-versions]: /product/distribution#versions
