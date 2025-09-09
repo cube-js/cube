@@ -5062,7 +5062,7 @@ export class BaseQuery {
         return false;
       }
 
-      return dfs(root) ? path.join('.') : null;
+      return (root && dfs(root)) ? path.join('.') : null;
     };
   }
 
@@ -5080,7 +5080,7 @@ export class BaseQuery {
       const [cube, field] = member.split('.');
       if (!cube || !field) return member;
 
-      if (cube === queryJoinRoot.root) {
+      if (cube === queryJoinRoot?.root) {
         return member;
       }
 
