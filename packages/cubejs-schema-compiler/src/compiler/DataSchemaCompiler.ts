@@ -219,9 +219,13 @@ export class DataSchemaCompiler {
 
     // As we mutate files data, we need a copy, not a refs.
     // FileContent is a plain object with primitives, so it's enough for a shallow copy.
-    let toCompile = this.filesToCompile?.length
-      ? files.filter(f => this.filesToCompile.includes(f.fileName)).map(f => ({ ...f }))
-      : files.map(f => ({ ...f }));
+    let toCompile = (this.filesToCompile?.length
+      ? files.filter(f => this.filesToCompile.includes(f.fileName))
+      : files).filter(f => f.fileName.endsWith('.js')
+        // We don't transpile/compile other files (like .py and so on)
+        || f.fileName.endsWith('.yml')
+        || f.fileName.endsWith('.yaml')
+        || f.fileName.endsWith('.jinja')).map(f => ({ ...f }));
 
     const jinjaTemplatedFiles = toCompile.filter((file) => file.fileName.endsWith('.jinja') ||
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) && file.content.match(JINJA_SYNTAX));
