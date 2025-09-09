@@ -217,9 +217,11 @@ export class DataSchemaCompiler {
     this.pythonContext = await this.loadPythonContext(files, 'globals.py');
     this.yamlCompiler.initFromPythonContext(this.pythonContext);
 
-    const toCompile = this.filesToCompile?.length
-      ? files.filter(f => this.filesToCompile.includes(f.fileName))
-      : files;
+    // As we mutate files data, we need a copy, not a refs.
+    // FileContent is a plain object with primitives, so it's enough for a shallow copy.
+    let toCompile = this.filesToCompile?.length
+      ? files.filter(f => this.filesToCompile.includes(f.fileName)).map(f => ({ ...f }))
+      : files.map(f => ({ ...f }));
 
     const jinjaTemplatedFiles = toCompile.filter((file) => file.fileName.endsWith('.jinja') ||
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) && file.content.match(JINJA_SYNTAX));
@@ -436,6 +438,7 @@ export class DataSchemaCompiler {
         compiledFiles = {};
         asyncModules = [];
         transpiledFiles = [];
+        toCompile = [];
 
         if (transpilationNative) {
           // Clean up cache
