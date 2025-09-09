@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
+
+### Bug Fixes
+
+- **cubesql:** Pass window expressions in SQL push down ([#9953](https://github.com/cube-js/cube/issues/9953)) ([a72b200](https://github.com/cube-js/cube/commit/a72b2008a53572c5cbe5f54f203612714852137b))
+
 ## [1.3.66](https://github.com/cube-js/cube/compare/v1.3.65...v1.3.66) (2025-09-09)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
