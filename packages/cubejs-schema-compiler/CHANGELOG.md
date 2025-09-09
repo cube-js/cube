@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix multifact joined queries in Tesseract ([#9954](https://github.com/cube-js/cube/issues/9954)) ([cb54545](https://github.com/cube-js/cube/commit/cb54545b5c113e840f15dfad84bfbf1e80209ac6))
+
 ## [1.3.66](https://github.com/cube-js/cube/compare/v1.3.65...v1.3.66) (2025-09-09)
 
 ### Bug Fixes
