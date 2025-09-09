@@ -386,7 +386,7 @@ export class DataSchemaCompiler {
         } else {
           const foundFile = this.resolveModuleFile(file, extensionName, transpiledFiles, errorsReport);
           if (!foundFile && this.allowNodeRequire) {
-            if (extensionName.indexOf('.') === 0) {
+            if (extensionName.startsWith('.')) {
               extensionName = path.resolve(this.repository.localPath(), extensionName);
             }
             // eslint-disable-next-line global-require,import/no-dynamic-require
