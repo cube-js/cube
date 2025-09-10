@@ -138,7 +138,7 @@ export class ErrorReporter {
     if (this.rootReporter().errors.length) {
       throw new CompileError(
         this.rootReporter().errors.map((e) => e.message).join('\n'),
-        this.rootReporter().errors.map((e) => e.plainMessage).join('\n')
+        this.rootReporter().errors.map((e) => e.plainMessage || e.message || '').join('\n')
       );
     }
   }
