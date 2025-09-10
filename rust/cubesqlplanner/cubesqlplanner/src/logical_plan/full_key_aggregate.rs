@@ -31,7 +31,9 @@ impl ResolvedMultipliedMeasures {
             ResolvedMultipliedMeasures::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
                 resolve_multiplied_measures.schema.clone()
             }
-            ResolvedMultipliedMeasures::PreAggregation(simple_query) => simple_query.schema.clone(),
+            ResolvedMultipliedMeasures::PreAggregation(simple_query) => {
+                simple_query.schema().clone()
+            }
         }
     }
 }

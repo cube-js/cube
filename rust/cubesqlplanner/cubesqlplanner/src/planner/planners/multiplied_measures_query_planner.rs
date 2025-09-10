@@ -169,9 +169,9 @@ impl MultipliedMeasuresQueryPlanner {
                 &measures,
                 &primary_keys_dimensions,
             )?;
-            AggregateMultipliedSubquerySouce::MeasureSubquery(measure_subquery)
+            measure_subquery.into()
         } else {
-            AggregateMultipliedSubquerySouce::Cube(pk_cube)
+            pk_cube.into()
         };
         Ok(Rc::new(AggregateMultipliedSubquery {
             schema,
@@ -295,7 +295,7 @@ impl MultipliedMeasuresQueryPlanner {
                 ungrouped: self.query_properties.ungrouped(),
                 order_by: vec![],
             }),
-            source: QuerySource::LogicalJoin(source),
+            source: source.into(),
             multistage_members: vec![],
         };
         Ok(Rc::new(query))
@@ -338,14 +338,13 @@ impl MultipliedMeasuresQueryPlanner {
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
 
-        let keys_query = KeysSubQuery {
-            schema,
-            primary_keys_dimensions: dimensions.clone(),
-            filter: logical_filter,
-            source,
-            //dimension_subqueries: subquery_dimension_queries,
-            pk_cube: key_cube,
-        };
+        let keys_query = KeysSubQuery::builder()
+            .schema(schema)
+            .primary_keys_dimensions(dimensions.clone())
+            .filter(logical_filter)
+            .source(source)
+            .pk_cube(key_cube)
+            .build();
 
         Ok(Rc::new(keys_query))
     }

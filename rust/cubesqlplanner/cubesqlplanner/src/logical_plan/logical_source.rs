@@ -2,7 +2,7 @@ use super::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub trait LogicalSource: Sized {
+pub trait LogicalSource: Sized + PrettyPrint {
     fn as_plan_node(&self) -> PlanNode;
     fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError>;
 }

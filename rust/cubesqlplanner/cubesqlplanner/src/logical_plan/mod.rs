@@ -1,3 +1,5 @@
+#[macro_use]
+mod logical_source;
 mod aggregate_multiplied_subquery;
 mod calc_groups_cross_join;
 mod cube;
@@ -8,7 +10,6 @@ mod join;
 mod keys_subquery;
 mod logical_node;
 mod logical_query_modifers;
-mod logical_source;
 mod measure_subquery;
 mod multistage;
 pub mod optimizers;
