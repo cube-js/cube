@@ -6,8 +6,8 @@ use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct CalcGroupDescription {
-    symbol: Rc<MemberSymbol>,
-    values: Vec<String>,
+    pub symbol: Rc<MemberSymbol>,
+    pub values: Vec<String>,
 }
 
 impl PrettyPrint for CalcGroupDescription {
@@ -20,10 +20,15 @@ impl PrettyPrint for CalcGroupDescription {
     }
 }
 
+logical_source_enum!(
+    CalcGroupsCrossJoinSource,
+    [LogicalJoin, FullKeyAggregate, PreAggregation]
+);
+
 #[derive(Clone)]
 pub struct CalcGroupsCrossJoin {
-    source: QuerySource,
-    calc_groups: Vec<Rc<CalcGroupDescription>>,
+    pub source: CalcGroupsCrossJoinSource,
+    pub calc_groups: Vec<Rc<CalcGroupDescription>>,
 }
 
 impl LogicalNode for CalcGroupsCrossJoin {
@@ -46,7 +51,7 @@ impl LogicalNode for CalcGroupsCrossJoin {
     }
 
     fn node_name(&self) -> &'static str {
-        "MultiStageGetDateRange"
+        "CalcGroupsCrossJoin"
     }
 
     fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {

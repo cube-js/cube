@@ -1,14 +1,37 @@
 use super::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+use typed_builder::TypedBuilder;
 
-#[derive(Clone)]
+#[derive(Clone, TypedBuilder)]
 pub struct Query {
-    pub multistage_members: Vec<Rc<LogicalMultiStageMember>>,
-    pub schema: Rc<LogicalSchema>,
-    pub filter: Rc<LogicalFilter>,
-    pub modifers: Rc<LogicalQueryModifiers>,
-    pub source: QuerySource,
+    #[builder(default)]
+    multistage_members: Vec<Rc<LogicalMultiStageMember>>,
+    schema: Rc<LogicalSchema>,
+    filter: Rc<LogicalFilter>,
+    modifers: Rc<LogicalQueryModifiers>,
+    source: QuerySource,
+}
+
+impl Query {
+    pub fn multistage_members(&self) -> &Vec<Rc<LogicalMultiStageMember>> {
+        &self.multistage_members
+    }
+    pub fn schema(&self) -> &Rc<LogicalSchema> {
+        &self.schema
+    }
+    pub fn filter(&self) -> &Rc<LogicalFilter> {
+        &self.filter
+    }
+    pub fn modifers(&self) -> &Rc<LogicalQueryModifiers> {
+        &self.modifers
+    }
+    pub fn source(&self) -> &QuerySource {
+        &self.source
+    }
+    pub fn set_source(&mut self, source: QuerySource) {
+        self.source = source;
+    }
 }
 
 impl LogicalNode for Query {

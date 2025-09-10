@@ -2,14 +2,33 @@ use super::*;
 use crate::planner::sql_evaluator::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+use typed_builder::TypedBuilder;
 
-#[derive(Clone)]
+#[derive(Clone, TypedBuilder)]
 pub struct KeysSubQuery {
-    pub pk_cube: Rc<Cube>,
-    pub schema: Rc<LogicalSchema>,
-    pub primary_keys_dimensions: Vec<Rc<MemberSymbol>>,
-    pub filter: Rc<LogicalFilter>,
-    pub source: Rc<LogicalJoin>,
+    pk_cube: Rc<Cube>,
+    schema: Rc<LogicalSchema>,
+    primary_keys_dimensions: Vec<Rc<MemberSymbol>>,
+    filter: Rc<LogicalFilter>,
+    source: Rc<LogicalJoin>,
+}
+
+impl KeysSubQuery {
+    pub fn pk_cube(&self) -> &Rc<Cube> {
+        &self.pk_cube
+    }
+    pub fn schema(&self) -> &Rc<LogicalSchema> {
+        &self.schema
+    }
+    pub fn primary_keys_dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
+        &self.primary_keys_dimensions
+    }
+    pub fn filter(&self) -> &Rc<LogicalFilter> {
+        &self.filter
+    }
+    pub fn source(&self) -> &Rc<LogicalJoin> {
+        &self.source
+    }
 }
 
 impl LogicalNode for KeysSubQuery {

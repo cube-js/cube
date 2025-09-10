@@ -1,5 +1,5 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySouce};
+use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
     Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select,
@@ -42,14 +42,14 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let mut context_factory = context.make_sql_nodes_factory()?;
         let primary_keys_dimensions = &aggregate_multiplied_subquery
             .keys_subquery
-            .primary_keys_dimensions;
-        let pk_cube = aggregate_multiplied_subquery.keys_subquery.pk_cube.clone();
+            .primary_keys_dimensions();
+        let pk_cube = aggregate_multiplied_subquery.keys_subquery.pk_cube().clone();
         let pk_cube_alias = pk_cube
             .cube
             .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube.default_alias())));
 
         match &aggregate_multiplied_subquery.source {
-            AggregateMultipliedSubquerySouce::Cube(cube) => {
+            AggregateMultipliedSubquerySource::Cube(cube) => {
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {
@@ -77,7 +77,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     )?;
                 }
             }
-            AggregateMultipliedSubquerySouce::MeasureSubquery(measure_subquery) => {
+            AggregateMultipliedSubquerySource::MeasureSubquery(measure_subquery) => {
                 let subquery = self
                     .builder
                     .process_node(measure_subquery.as_ref(), context)?;
@@ -146,7 +146,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             if exists {
                 if matches!(
                     &aggregate_multiplied_subquery.source,
-                    AggregateMultipliedSubquerySouce::Cube(_)
+                    AggregateMultipliedSubquerySource::Cube(_)
                 ) {
                     references_builder.resolve_references_for_member(
                         measure.clone(),

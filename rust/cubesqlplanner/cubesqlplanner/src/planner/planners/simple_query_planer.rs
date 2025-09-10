@@ -50,7 +50,7 @@ impl SimpleQueryPlanner {
                 ungrouped: self.query_properties.ungrouped(),
                 order_by: self.query_properties.order_by().clone(),
             }),
-            source: QuerySource::LogicalJoin(source),
+            source: source.into(),
         };
         Ok(Rc::new(result))
     }

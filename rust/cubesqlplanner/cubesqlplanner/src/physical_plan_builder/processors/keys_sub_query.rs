@@ -26,7 +26,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         let mut render_references = HashMap::new();
         let alias_prefix = Some(format!(
             "{}_key",
-            query_tools.alias_for_cube(&keys_subquery.pk_cube.cube.name())?
+            query_tools.alias_for_cube(&keys_subquery.pk_cube().cube.name())?
         ));
 
         let mut context = context.clone();
@@ -35,25 +35,25 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         let mut context_factory = context.make_sql_nodes_factory()?;
         let source = self
             .builder
-            .process_node(keys_subquery.source.as_ref(), &context)?;
+            .process_node(keys_subquery.source().as_ref(), &context)?;
 
         let references_builder = ReferencesBuilder::new(source.clone());
         let mut select_builder = SelectBuilder::new(source);
         self.builder.resolve_subquery_dimensions_references(
-            &keys_subquery.source.dimension_subqueries,
+            &keys_subquery.source().dimension_subqueries,
             &references_builder,
             &mut render_references,
         )?;
         for member in keys_subquery
-            .schema
+            .schema()
             .all_dimensions()
-            .chain(keys_subquery.primary_keys_dimensions.iter())
+            .chain(keys_subquery.primary_keys_dimensions().iter())
         {
             let alias = member.alias();
             self.builder.process_calc_group(
                 member,
                 &mut context_factory,
-                &keys_subquery.filter.all_filters(),
+                &keys_subquery.filter().all_filters(),
             )?;
             references_builder.resolve_references_for_member(
                 member.clone(),
@@ -64,7 +64,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         }
 
         select_builder.set_distinct();
-        select_builder.set_filter(keys_subquery.filter.all_filters());
+        select_builder.set_filter(keys_subquery.filter().all_filters());
         context_factory.set_render_references(render_references);
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)

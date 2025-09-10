@@ -54,7 +54,7 @@ impl FullKeyAggregateQueryPlanner {
     ) -> Result<Rc<Query>, CubeError> {
         let source =
             self.plan_logical_source(resolve_multiplied_measures, multi_stage_subqueries)?;
-        let source = QuerySource::FullKeyAggregate(source);
+        let source = source.into();
 
         let multiplied_measures = self
             .query_properties
