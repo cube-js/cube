@@ -2412,6 +2412,9 @@ describe('PreAggregations', () => {
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
       console.log(preAggregationsDescription);
 
+      expect(queryAndParams[0]).toContain('visitors_for_join');
+      expect(queryAndParams[0]).toContain('vc_for_join');
+
       console.log(query.preAggregations?.rollupMatchResultDescriptions());
 
       const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
