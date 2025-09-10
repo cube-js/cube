@@ -47,7 +47,7 @@ cube(\`Orders\`, {
   measures: {
     count: {
       type: \`count\`,
-      //drillMembers: [id, createdAt]
+      drillMembers: [id, createdAt]
     },
 
     runningTotal: {
@@ -429,4 +429,15 @@ view(\`OrdersView3\`, {
     orders_view3__count: '2',
     orders_view3__product_categories__name: 'Groceries',
   }]));
+
+  it('check drillMembers are inherited in views', async () => {
+    await compiler.compile();
+    const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
+    const countMeasure = cube.config.measures.find((m) => m.name === 'OrdersView.count');
+    expect(countMeasure.drillMembers).toEqual(['OrdersView.id', 'OrdersView.createdAt']);
+    expect(countMeasure.drillMembersGrouped).toEqual({
+      measures: [],
+      dimensions: ['OrdersView.id', 'OrdersView.createdAt']
+    });
+  });
 });
