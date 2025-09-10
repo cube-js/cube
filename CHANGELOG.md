@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
+
+### Bug Fixes
+
+- **cubesql:** Pass window expressions in SQL push down ([#9953](https://github.com/cube-js/cube/issues/9953)) ([a72b200](https://github.com/cube-js/cube/commit/a72b2008a53572c5cbe5f54f203612714852137b))
+- **schema-compiler:** Fix multifact joined queries in Tesseract ([#9954](https://github.com/cube-js/cube/issues/9954)) ([cb54545](https://github.com/cube-js/cube/commit/cb54545b5c113e840f15dfad84bfbf1e80209ac6))
+
+## [1.3.66](https://github.com/cube-js/cube/compare/v1.3.65...v1.3.66) (2025-09-09)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix sql parser for "?" ([#9945](https://github.com/cube-js/cube/issues/9945)) ([3386fb7](https://github.com/cube-js/cube/commit/3386fb77e6a8124fbeba477519e1d41a24101f44))
+
+### Features
+
+- Add "queryRewriteId" param to Query Rewrite events ([#9949](https://github.com/cube-js/cube/issues/9949)) ([ad5fbc2](https://github.com/cube-js/cube/commit/ad5fbc2c1c2ddef31bd91df00575afea922ac95b))
+
+## [1.3.65](https://github.com/cube-js/cube/compare/v1.3.64...v1.3.65) (2025-09-05)
+
+### Bug Fixes
+
+- **client-core:** CubeSqlSchemaColumn type ([a178744](https://github.com/cube-js/cube/commit/a17874469a6808fe72a6253d45373046f447e379))
+- **cubesql:** Correctly calculate eclass cost for recursive nodes ([#9947](https://github.com/cube-js/cube/issues/9947)) ([f7f78e2](https://github.com/cube-js/cube/commit/f7f78e29f89e24db09b489e2b080603d539c0163))
+
 ## [1.3.64](https://github.com/cube-js/cube/compare/v1.3.63...v1.3.64) (2025-09-03)
 
 ### Bug Fixes

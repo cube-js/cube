@@ -17655,4 +17655,47 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("TRUNCATE(EXTRACT(month FROM "));
     }
+
+    #[tokio::test]
+    async fn test_top_down_extractor_cache() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                id::integer AS id,
+                customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE id = 5
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.id".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.id".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    ..Default::default()
+                }]),
+                ungrouped: Some(true),
+                ..Default::default()
+            }
+        )
+    }
 }
