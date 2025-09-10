@@ -2450,6 +2450,9 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
+    expect(queryAndParams[0]).toContain('visitors_for_join_inc_cards');
+    expect(queryAndParams[0]).toContain('vc_for_join');
+
     console.log(query.preAggregations?.rollupMatchResultDescriptions());
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
@@ -2493,6 +2496,9 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
+
+    expect(queryAndParams[0]).toContain('visitors_partitioned_hourly_for_join');
+    expect(queryAndParams[0]).toContain('vc_for_join');
 
     console.log(query.preAggregations?.rollupMatchResultDescriptions());
 
