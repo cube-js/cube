@@ -286,18 +286,17 @@ impl MultipliedMeasuresQueryPlanner {
             segments: self.query_properties.segments().clone(),
         });
 
-        let query = Query {
-            schema,
-            filter: logical_filter,
-            modifers: Rc::new(LogicalQueryModifiers {
+        let query = Query::builder()
+            .schema(schema)
+            .filter(logical_filter)
+            .modifers(Rc::new(LogicalQueryModifiers {
                 offset: None,
                 limit: None,
                 ungrouped: self.query_properties.ungrouped(),
                 order_by: vec![],
-            }),
-            source: source.into(),
-            multistage_members: vec![],
-        };
+            }))
+            .source(source.into())
+            .build();
         Ok(Rc::new(query))
     }
 
