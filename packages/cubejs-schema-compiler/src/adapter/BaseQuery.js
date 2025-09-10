@@ -344,6 +344,7 @@ export class BaseQuery {
       this.canUseNativeSqlPlannerPreAggregation = fullAggregateMeasures.multiStageMembers.length > 0;
     }
     this.queryLevelJoinHints = this.options.joinHints ?? [];
+    this.collectAllMemberNames(); // Ensure member names are computed so that they are not lazily added during join computation
     this.prebuildJoin();
 
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
