@@ -119,11 +119,15 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         }
 
         for dim in rolling_window.schema.dimensions.iter() {
-            references_builder.resolve_references_for_member(
-                dim.clone(),
-                &Some(measure_input_alias.clone()),
-                &mut render_references,
-            )?;
+            if dim.clone().resolve_reference_chain()
+                != time_dimension.clone().resolve_reference_chain()
+            {
+                references_builder.resolve_references_for_member(
+                    dim.clone(),
+                    &Some(measure_input_alias.clone()),
+                    &mut render_references,
+                )?;
+            }
             let alias = references_builder
                 .resolve_alias_for_member(&dim, &Some(measure_input_alias.clone()));
             select_builder.add_projection_member(dim, alias);
