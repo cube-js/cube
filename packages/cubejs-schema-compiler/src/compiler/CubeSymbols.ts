@@ -822,6 +822,8 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.timeShift && { timeShift: resolvedMember.timeShift }),
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
+          ...(resolvedMember.drillMembers && { drillMembers: resolvedMember.drillMembers }),
+          ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
