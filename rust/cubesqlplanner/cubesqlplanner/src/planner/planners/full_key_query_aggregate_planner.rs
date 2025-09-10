@@ -74,18 +74,18 @@ impl FullKeyAggregateQueryPlanner {
             measures_filter: self.query_properties.measures_filters().clone(),
             segments: self.query_properties.segments().clone(),
         });
-        let result = Query {
-            schema,
-            multistage_members: all_multistage_members,
-            filter: logical_filter,
-            modifers: Rc::new(LogicalQueryModifiers {
+        let result = Query::builder()
+            .schema(schema)
+            .multistage_members(all_multistage_members)
+            .filter(logical_filter)
+            .modifers(Rc::new(LogicalQueryModifiers {
                 offset: self.query_properties.offset(),
                 limit: self.query_properties.row_limit(),
                 ungrouped: self.query_properties.ungrouped(),
                 order_by: self.query_properties.order_by().clone(),
-            }),
-            source,
-        };
+            }))
+            .source(source)
+            .build();
         Ok(Rc::new(result))
     }
 }
