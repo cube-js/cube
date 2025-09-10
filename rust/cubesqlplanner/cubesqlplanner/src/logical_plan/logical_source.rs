@@ -7,36 +7,64 @@ pub trait LogicalSource: Sized {
     fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError>;
 }
 
-/* test example */
-
-pub enum TestSouce {
-    Cube(Rc<Cube>),
-    MeasureSubquery(Rc<MeasureSubquery>),
-}
-
-impl LogicalSource for TestSouce {
-    fn as_plan_node(&self) -> PlanNode {
-        match self {
-            Self::Cube(item) => item.as_plan_node(),
-            Self::MeasureSubquery(item) => item.as_plan_node(),
+/// Generates an enum and trait implementations for LogicalSource types.
+///
+/// This macro creates:
+/// - An enum with variants wrapping `Rc<T>` for each specified type
+/// - LogicalSource trait implementation that delegates to inner types
+/// - PrettyPrint trait implementation for debugging SQL plans
+/// - From<Rc<T>> implementations for convenient construction
+///
+/// # Usage
+/// ```
+/// logical_source_enum!(MySource, [Table, Join, Subquery]);
+/// ```
+///
+/// The enum variant name always matches the inner type name, and all variants
+/// are wrapped in `Rc` for efficient cloning in the query planner.
+macro_rules! logical_source_enum {
+    ($enum_name:ident, [$($variant:ident),+ $(,)?]) => {
+        #[derive(Clone)]
+        pub enum $enum_name {
+            $(
+                $variant(Rc<$variant>),
+            )+
         }
-    }
-    fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError> {
-        Ok(match self {
-            Self::Cube(_) => Self::Cube(plan_node.into_logical_node()?),
-            Self::MeasureSubquery(_) => Self::MeasureSubquery(plan_node.into_logical_node()?),
-        })
-    }
-}
 
-impl From<Rc<Cube>> for TestSouce {
-    fn from(value: Rc<Cube>) -> Self {
-        Self::Cube(value)
-    }
-}
+        impl LogicalSource for $enum_name {
+            fn as_plan_node(&self) -> PlanNode {
+                match self {
+                    $(
+                        Self::$variant(item) => item.as_plan_node(),
+                    )+
+                }
+            }
 
-impl From<Rc<MeasureSubquery>> for TestSouce {
-    fn from(value: Rc<MeasureSubquery>) -> Self {
-        Self::MeasureSubquery(value)
-    }
+            fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError> {
+                Ok(match self {
+                    $(
+                        Self::$variant(_) => Self::$variant(plan_node.into_logical_node()?),
+                    )+
+                })
+            }
+        }
+
+        impl PrettyPrint for $enum_name {
+            fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
+                match self {
+                    $(
+                        Self::$variant(item) => item.pretty_print(result, state),
+                    )+
+                }
+            }
+        }
+
+        $(
+            impl From<Rc<$variant>> for $enum_name {
+                fn from(value: Rc<$variant>) -> Self {
+                    Self::$variant(value)
+                }
+            }
+        )+
+    };
 }
