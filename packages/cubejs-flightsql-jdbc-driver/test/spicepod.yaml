@@ -1,0 +1,7 @@
+version: v1
+kind: Spicepod
+name: cube-flightsql-test
+
+datasets:
+  - from: file://yellow_tripdata_2024-01_499.parquet
+    name: yellow_taxis

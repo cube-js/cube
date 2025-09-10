@@ -92,10 +92,14 @@ FROM base AS prod_base_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
+COPY packages/cubejs-flightsql-jdbc-driver/package.json packages/cubejs-flightsql-jdbc-driver/package.json
+RUN mkdir packages/cubejs-flightsql-jdbc-driver/bin
+RUN echo '#!/usr/bin/env node' > packages/cubejs-flightsql-jdbc-driver/bin/post-install
 RUN yarn install --prod
 
 FROM prod_base_dependencies AS prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
+COPY packages/cubejs-flightsql-jdbc-driver/bin packages/cubejs-flightsql-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 
 ######################################################################
@@ -147,6 +151,7 @@ COPY packages/cubejs-ksql-driver/ packages/cubejs-ksql-driver/
 COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
 COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
+COPY packages/cubejs-flightsql-jdbc-driver/ packages/cubejs-flightsql-jdbc-driver/
 COPY packages/cubejs-vertica-driver/ packages/cubejs-vertica-driver/
 
 # We dont need client libraries

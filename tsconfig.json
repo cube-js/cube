@@ -104,6 +104,9 @@
       "path": "packages/cubejs-databricks-jdbc-driver"
     },
     {
+      "path": "packages/cubejs-flightsql-jdbc-driver"
+    },
+    {
       "path": "packages/cubejs-prestodb-driver"
     },
     {
