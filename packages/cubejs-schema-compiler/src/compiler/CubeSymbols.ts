@@ -906,7 +906,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           name
         );
       // eslint-disable-next-line no-underscore-dangle
-      if (resolvedSymbol && resolvedSymbol._objectWithResolvedProperties) {
+      if (resolvedSymbol?._objectWithResolvedProperties) {
         return resolvedSymbol;
       }
       return cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [referencedCube, name]));
@@ -1016,7 +1016,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           cubeName,
           name
         );
-        if (resolvedSymbol && resolvedSymbol._objectWithResolvedProperties) {
+        if (resolvedSymbol?._objectWithResolvedProperties) {
           return resolvedSymbol;
         }
         return '';
