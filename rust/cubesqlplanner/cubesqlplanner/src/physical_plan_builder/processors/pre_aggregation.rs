@@ -85,7 +85,7 @@ impl PreAggregationProcessor<'_> {
             let table_source = self.make_pre_aggregation_table_source(&item)?;
             let from = From::new(FromSource::Single(table_source));
             let mut select_builder = SelectBuilder::new(from);
-            for dim in pre_aggregation.dimensions.iter() {
+            for dim in pre_aggregation.dimensions().iter() {
                 let name_in_table =
                     PlanSqlTemplates::memeber_alias_name(&item.cube_alias, &dim.name(), &None);
                 let alias = dim.alias();
@@ -95,7 +95,7 @@ impl PreAggregationProcessor<'_> {
                     Some(alias),
                 );
             }
-            for (dim, granularity) in pre_aggregation.time_dimensions.iter() {
+            for (dim, granularity) in pre_aggregation.time_dimensions().iter() {
                 let name_in_table = PlanSqlTemplates::memeber_alias_name(
                     &item.cube_alias,
                     &dim.name(),
@@ -113,7 +113,7 @@ impl PreAggregationProcessor<'_> {
                     Some(alias),
                 );
             }
-            for meas in pre_aggregation.measures.iter() {
+            for meas in pre_aggregation.measures().iter() {
                 let name_in_table = PlanSqlTemplates::memeber_alias_name(
                     &item.cube_alias,
                     &meas.name(),
@@ -135,8 +135,8 @@ impl PreAggregationProcessor<'_> {
         let plan = QueryPlan::Union(Rc::new(Union::new(union_sources)));
         let source = SingleSource::Subquery(Rc::new(plan));
         let alias = PlanSqlTemplates::memeber_alias_name(
-            &pre_aggregation.cube_name,
-            &pre_aggregation.name,
+            pre_aggregation.cube_name(),
+            pre_aggregation.name(),
             &None,
         );
         let aliased_source = SingleAliasedSource { source, alias };
@@ -156,18 +156,18 @@ impl<'a> LogicalNodeProcessor<'a, PreAggregation> for PreAggregationProcessor<'a
         pre_aggregation: &PreAggregation,
         _context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let source = &pre_aggregation.source;
+        let source = pre_aggregation.source();
         let from = match source.as_ref() {
             PreAggregationSource::Single(table) => {
-                let table_source = self.make_pre_aggregation_table_source(table)?;
+                let table_source = self.make_pre_aggregation_table_source(&table)?;
                 From::new(FromSource::Single(table_source))
             }
             PreAggregationSource::Union(union) => {
-                let source = self.make_pre_aggregation_union_source(pre_aggregation, union)?;
+                let source = self.make_pre_aggregation_union_source(pre_aggregation, &union)?;
                 source
             }
             PreAggregationSource::Join(join) => {
-                let source = self.make_pre_aggregation_join_source(join)?;
+                let source = self.make_pre_aggregation_join_source(&join)?;
                 source
             }
         };

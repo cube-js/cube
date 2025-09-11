@@ -38,12 +38,12 @@ impl FullKeyAggregateQueryPlanner {
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures)
             .into_rc();
-        Ok(Rc::new(FullKeyAggregate {
-            multiplied_measures_resolver: resolved_multiplied_source,
-            multi_stage_subquery_refs,
-            use_full_join_and_coalesce: true,
-            schema,
-        }))
+        Ok(Rc::new(FullKeyAggregate::builder()
+            .multiplied_measures_resolver(resolved_multiplied_source)
+            .multi_stage_subquery_refs(multi_stage_subquery_refs)
+            .use_full_join_and_coalesce(true)
+            .schema(schema)
+            .build()))
     }
 
     pub fn plan_logical_plan(

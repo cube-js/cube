@@ -45,8 +45,8 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             .primary_keys_dimensions();
         let pk_cube = aggregate_multiplied_subquery.keys_subquery.pk_cube().clone();
         let pk_cube_alias = pk_cube
-            .cube
-            .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube.default_alias())));
+            .cube()
+            .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube().default_alias())));
 
         match &aggregate_multiplied_subquery.source {
             AggregateMultipliedSubquerySource::Cube(cube) => {
@@ -64,7 +64,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     .collect::<Result<Vec<_>, _>>()?;
 
                 join_builder.left_join_cube(
-                    cube.cube.clone(),
+                    cube.cube().clone(),
                     Some(pk_cube_alias.clone()),
                     JoinCondition::new_dimension_join(conditions, false),
                 );

@@ -96,7 +96,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let is_external = if !used_pre_aggregations.is_empty() {
             used_pre_aggregations
                 .iter()
-                .all(|pre_aggregation| pre_aggregation.external)
+                .all(|pre_aggregation| pre_aggregation.external())
         } else {
             false
         };
@@ -128,8 +128,8 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         if let Some(used_pre_aggregation) = used_pre_aggregations.first() {
             //FIXME We should build this object in Rust
             let pre_aggregation_obj = self.query_tools.base_tools().get_pre_aggregation_by_name(
-                used_pre_aggregation.cube_name.clone(),
-                used_pre_aggregation.name.clone(),
+                used_pre_aggregation.cube_name().clone(),
+                used_pre_aggregation.name().clone(),
             )?;
             res.set(
                 2,

@@ -52,7 +52,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 let from = self.builder.process_node(join.as_ref(), &context)?;
                 let references_builder = ReferencesBuilder::new(from.clone());
                 self.builder.resolve_subquery_dimensions_references(
-                    &join.dimension_subqueries,
+                    &join.dimension_subqueries(),
                     &references_builder,
                     &mut render_references,
                 )?;

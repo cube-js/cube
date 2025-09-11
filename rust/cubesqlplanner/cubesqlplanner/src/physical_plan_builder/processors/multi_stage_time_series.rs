@@ -22,9 +22,9 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
         _context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let (query_tools, plan_sql_templates) = self.builder.qtools_and_templates();
-        let time_dimension = time_series.time_dimension.clone();
+        let time_dimension = time_series.time_dimension().clone();
         let time_dimension_symbol = time_dimension.as_time_dimension()?;
-        let date_range = time_series.date_range.clone();
+        let date_range = time_series.date_range().clone();
         let granularity_obj = if let Some(granularity_obj) = time_dimension_symbol.granularity_obj()
         {
             granularity_obj.clone()
@@ -42,7 +42,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
             {
                 TimeSeriesDateRange::Filter(date_range.0.clone(), date_range.1.clone())
             } else {
-                if let Some(date_range_cte) = &time_series.get_date_range_multistage_ref {
+                if let Some(date_range_cte) = time_series.get_date_range_multistage_ref() {
                     TimeSeriesDateRange::Generated(date_range_cte.clone())
                 } else {
                     return Err(CubeError::internal(
@@ -51,7 +51,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
                 }
             }
         } else {
-            if let Some(date_range) = &time_series.date_range {
+            if let Some(date_range) = time_series.date_range() {
                 TimeSeriesDateRange::Filter(date_range[0].clone(), date_range[1].clone())
             } else {
                 return Err(CubeError::user(

@@ -97,11 +97,11 @@ impl MultiStageMemberQueryPlanner {
         time_series_description: Rc<TimeSeriesDescription>,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
         let time_dimension = time_series_description.time_dimension.clone();
-        let result = MultiStageTimeSeries {
-            time_dimension: time_dimension.clone(),
-            date_range: time_dimension.as_time_dimension()?.date_range_vec(),
-            get_date_range_multistage_ref: time_series_description.date_range_cte.clone(),
-        };
+        let result = MultiStageTimeSeries::builder()
+            .time_dimension(time_dimension.clone())
+            .date_range(time_dimension.as_time_dimension()?.date_range_vec())
+            .get_date_range_multistage_ref(time_series_description.date_range_cte.clone())
+            .build();
         Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
             member_type: MultiStageMemberLogicalType::TimeSeries(Rc::new(result)),
@@ -162,14 +162,14 @@ impl MultiStageMemberQueryPlanner {
             is_ungrouped: self.description.member().is_ungrupped(),
             rolling_window,
             order_by: self.query_order_by()?,
-            time_series_input: MultiStageSubqueryRef {
-                name: inputs[0].0.clone(),
-                symbols: inputs[0].1.clone(),
-            },
-            measure_input: MultiStageSubqueryRef {
-                name: inputs[1].0.clone(),
-                symbols: inputs[1].1.clone(),
-            },
+            time_series_input: MultiStageSubqueryRef::builder()
+                .name(inputs[0].0.clone())
+                .symbols(inputs[0].1.clone())
+                .build(),
+            measure_input: MultiStageSubqueryRef::builder()
+                .name(inputs[1].0.clone())
+                .symbols(inputs[1].1.clone())
+                .build(),
             rolling_time_dimension: rolling_window_desc.time_dimension.clone(),
             time_dimension_in_measure_input: rolling_window_desc.base_time_dimension.clone(),
         };
@@ -221,29 +221,27 @@ impl MultiStageMemberQueryPlanner {
             .input_cte_aliases()
             .into_iter()
             .map(|(name, symbols)| {
-                Rc::new(MultiStageSubqueryRef {
-                    name: name.clone(),
-                    symbols: symbols.clone(),
-                })
+                Rc::new(MultiStageSubqueryRef::builder()
+                    .name(name.clone())
+                    .symbols(symbols.clone())
+                    .build())
             })
             .collect_vec();
 
         let full_key_aggregate_schema = self.input_schema();
-        let result = MultiStageMeasureCalculation {
-            schema,
-            is_ungrouped: self.description.member().is_ungrupped(),
-            calculation_type,
-            partition_by,
-            window_function_to_use,
-            order_by: self.query_order_by()?,
-
-            source: Rc::new(FullKeyAggregate {
-                schema: full_key_aggregate_schema,
-                use_full_join_and_coalesce: true,
-                multiplied_measures_resolver: None,
-                multi_stage_subquery_refs: input_sources,
-            }),
-        };
+        let result = MultiStageMeasureCalculation::builder()
+            .schema(schema)
+            .is_ungrouped(self.description.member().is_ungrupped())
+            .calculation_type(calculation_type)
+            .partition_by(partition_by)
+            .window_function_to_use(window_function_to_use)
+            .order_by(self.query_order_by()?)
+            .source(Rc::new(FullKeyAggregate::builder()
+                .schema(full_key_aggregate_schema)
+                .use_full_join_and_coalesce(true)
+                .multi_stage_subquery_refs(input_sources)
+                .build()))
+            .build();
 
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),

@@ -45,7 +45,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageGetDateRange> for MultiStageGetDateR
         );
 
         self.builder.resolve_subquery_dimensions_references(
-            &get_date_range.source.dimension_subqueries,
+            &get_date_range.source.dimension_subqueries(),
             &references_builder,
             &mut render_references,
         )?;

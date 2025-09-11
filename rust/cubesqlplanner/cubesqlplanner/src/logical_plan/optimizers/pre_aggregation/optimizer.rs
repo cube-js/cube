@@ -120,7 +120,7 @@ impl PreAggregationOptimizer {
 
         let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
             let fk_source = if let Some(resolver_multiplied_measures) =
-                &full_key_aggregate.multiplied_measures_resolver
+                full_key_aggregate.multiplied_measures_resolver()
             {
                 if let ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
                     resolver_multiplied_measures,
@@ -157,8 +157,12 @@ impl PreAggregationOptimizer {
             } else {
                 None
             };
-            let mut result = full_key_aggregate.as_ref().clone();
-            result.multiplied_measures_resolver = fk_source;
+            let result = FullKeyAggregate::builder()
+                .schema(full_key_aggregate.schema().clone())
+                .use_full_join_and_coalesce(full_key_aggregate.use_full_join_and_coalesce())
+                .multiplied_measures_resolver(fk_source)
+                .multi_stage_subquery_refs(full_key_aggregate.multi_stage_subquery_refs().clone())
+                .build();
             Rc::new(result).into()
         } else {
             query.source().clone()
@@ -388,20 +392,20 @@ impl PreAggregationOptimizer {
             measures: pre_aggregation.measures.to_vec(),
             multiplied_measures: HashSet::new(),
         };
-        let pre_aggregation = PreAggregation {
-            name: pre_aggregation.name.clone(),
-            time_dimensions: pre_aggregation.time_dimensions.clone(),
-            dimensions: pre_aggregation.dimensions.clone(),
-            measures: pre_aggregation.measures.clone(),
-            schema: Rc::new(schema),
-            external: pre_aggregation.external.unwrap_or_default(),
-            granularity: pre_aggregation.granularity.clone(),
-            source: pre_aggregation.source.clone(),
-            cube_name: pre_aggregation.cube_name.clone(),
-        };
+        let pre_aggregation = PreAggregation::builder()
+            .name(pre_aggregation.name.clone())
+            .time_dimensions(pre_aggregation.time_dimensions.clone())
+            .dimensions(pre_aggregation.dimensions.clone())
+            .measures(pre_aggregation.measures.clone())
+            .schema(Rc::new(schema))
+            .external(pre_aggregation.external.unwrap_or_default())
+            .granularity(pre_aggregation.granularity.clone())
+            .source(pre_aggregation.source.clone())
+            .cube_name(pre_aggregation.cube_name.clone())
+            .build();
         let result = Rc::new(pre_aggregation);
         self.used_pre_aggregations.insert(
-            (result.cube_name.clone(), result.name.clone()),
+            (result.cube_name().clone(), result.name().clone()),
             result.clone(),
         );
         Ok(result)

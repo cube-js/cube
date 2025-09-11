@@ -30,8 +30,8 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
         let time_dimension = rolling_window.rolling_time_dimension.clone();
-        let time_series_ref = rolling_window.time_series_input.name.clone();
-        let measure_input_ref = rolling_window.measure_input.name.clone();
+        let time_series_ref = rolling_window.time_series_input.name().clone();
+        let measure_input_ref = rolling_window.measure_input.name().clone();
 
         let time_series_schema = context.get_multi_stage_schema(&time_series_ref)?;
 
