@@ -226,8 +226,7 @@ export class CubeToMetaTransformer {
           const filteredDrillMembers = drillMembersArray.filter(member => availableMembers.has(member));
           
           // Update the drillMembersArray with filtered results
-          drillMembersArray.length = 0;
-          drillMembersArray.push(...filteredDrillMembers);
+          drillMembersArray.splice(0, drillMembersArray.length, ...filteredDrillMembers);
         }
       }
     }
