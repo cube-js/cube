@@ -605,7 +605,7 @@ export class CubeSymbols {
         }
       }
 
-      const includeMembers = this.generateIncludeMembers(cubeIncludes, type);
+      const includeMembers = this.generateIncludeMembers(cubeIncludes, type, cube);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
 
       const existing = cube.includedMembers ?? [];
@@ -756,7 +756,7 @@ export class CubeSymbols {
           splitViewDef = splitViews[viewName];
         }
 
-        const includeMembers = this.generateIncludeMembers(finalIncludes, type);
+        const includeMembers = this.generateIncludeMembers(finalIncludes, type, splitViewDef);
         this.applyIncludeMembers(includeMembers, splitViewDef, type, errorReporter);
       } else {
         for (const member of finalIncludes) {
@@ -786,12 +786,83 @@ export class CubeSymbols {
     return this.symbols[cubeName]?.cubeObj()?.[type]?.[memberName];
   }
 
-  protected generateIncludeMembers(members: any[], type: string) {
+  protected createViewAwareDrillMemberFunction(
+    originalFunction: Function,
+    sourceCubeName: string,
+    targetCubeName: string,
+    originalDrillMembers: string[]
+  ) {
+    const cubeEvaluator = this;
+
+    return function drillMemberFilter(..._args: any[]) {
+      // Transform source cube references to target cube references
+      // e.g., "Orders.id" -> "OrdersSimpleView.id"
+      const transformedDrillMembers = originalDrillMembers.map(member => {
+        const memberParts = member.split('.');
+        if (memberParts[0] === sourceCubeName) {
+          return `${targetCubeName}.${memberParts[1]}`;
+        }
+        return member; // Keep as-is if not from source cube
+      });
+      
+      // Get the target cube to check which members actually exist
+      const targetCubeSymbol = cubeEvaluator.symbols[targetCubeName];
+      if (!targetCubeSymbol) {
+        return [];
+      }
+      
+      const targetCube = targetCubeSymbol.cubeObj();
+      if (!targetCube) {
+        return [];
+      }
+      
+      // Build set of available members in the target cube
+      const availableMembers = new Set<string>();
+      ['measures', 'dimensions', 'segments'].forEach(memberType => {
+        if (targetCube[memberType]) {
+          Object.keys(targetCube[memberType]).forEach(memberName => {
+            availableMembers.add(`${targetCubeName}.${memberName}`);
+          });
+        }
+      });
+      
+      // Filter drill members to only include available ones
+      return transformedDrillMembers.filter(member => availableMembers.has(member));
+    };
+  }
+
+  protected generateIncludeMembers(members: any[], type: string, targetCube?: any) {
     return members.map(memberRef => {
       const path = memberRef.member.split('.');
       const resolvedMember = this.getResolvedMember(type, path[path.length - 2], path[path.length - 1]);
       if (!resolvedMember) {
         throw new Error(`Can't resolve '${memberRef.member}' while generating include members`);
+      }
+      
+      // Store drill member processing info for later use in the member definition
+      let processedDrillMembers = resolvedMember.drillMembers;
+      
+      if (type === 'measures' && resolvedMember.drillMembers && targetCube?.isView) {
+        const sourceCubeName = path[path.length - 2]; // e.g., "Orders"
+
+        const evaluatedDrillMembers = this.evaluateReferences(
+          sourceCubeName,
+          resolvedMember.drillMembers,
+          { originalSorting: true }
+        );
+
+        // Ensure we have an array
+        const drillMembersArray = Array.isArray(evaluatedDrillMembers)
+          ? evaluatedDrillMembers
+          : [evaluatedDrillMembers];
+
+        // Create a new filtered function for this view
+        processedDrillMembers = this.createViewAwareDrillMemberFunction(
+          resolvedMember.drillMembers,
+          sourceCubeName,
+          targetCube.name,
+          drillMembersArray
+        );
       }
 
       // eslint-disable-next-line no-new-func
@@ -809,7 +880,7 @@ export class CubeSymbols {
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.timeShift && { timeShift: resolvedMember.timeShift }),
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
-          ...(resolvedMember.drillMembers && { drillMembers: resolvedMember.drillMembers }),
+          ...(processedDrillMembers && { drillMembers: processedDrillMembers }),
           ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
         };
       } else if (type === 'dimensions') {

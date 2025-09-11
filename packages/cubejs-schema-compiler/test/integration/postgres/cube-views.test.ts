@@ -485,8 +485,6 @@ view(\`OrdersSimpleView\`, {
     
     // Check what dimensions are actually available in this limited view
     const availableDimensions = cube.config.dimensions?.map(d => d.name) || [];
-    console.log('OrdersSimpleView dimensions:', availableDimensions);
-    console.log('OrdersSimpleView drill members:', countMeasure.drillMembers);
     
     // This view only includes ['id', 'createdAt', 'count'] - should have both id and createdAt
     expect(availableDimensions).not.toContain('OrdersSimpleView.id');

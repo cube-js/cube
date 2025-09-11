@@ -206,31 +206,6 @@ export class CubeToMetaTransformer {
       cubeName, drillMembers, { originalSorting: true }
     )) || [];
 
-    // Filter drill members for views to only include available members
-    if (drillMembersArray.length > 0) {
-      const cubeSymbol = this.cubeEvaluator.symbols[cubeName];
-      if (cubeSymbol) {
-        const cube = cubeSymbol.cubeObj();
-        if (cube && cube.isView) {
-          const availableMembers = new Set();
-          // Collect all available member names from all types
-          ['measures', 'dimensions', 'segments'].forEach(memberType => {
-            if (cube[memberType]) {
-              Object.keys(cube[memberType]).forEach(memberName => {
-                availableMembers.add(`${cubeName}.${memberName}`);
-              });
-            }
-          });
-          
-          // Filter drill members to only include those available in the view
-          const filteredDrillMembers = drillMembersArray.filter(member => availableMembers.has(member));
-          
-          // Update the drillMembersArray with filtered results
-          drillMembersArray.splice(0, drillMembersArray.length, ...filteredDrillMembers);
-        }
-      }
-    }
-
     const type = CubeSymbols.toMemberDataType(nameToMetric[1].type);
 
     return {
