@@ -92,10 +92,10 @@ impl MultiStageQueryPlanner {
         let top_level_ctes = top_level_ctes
             .iter()
             .map(|(alias, symbols)| {
-                Rc::new(MultiStageSubqueryRef {
-                    name: alias.clone(),
-                    symbols: symbols.clone(),
-                })
+                Rc::new(MultiStageSubqueryRef::builder()
+                    .name(alias.clone())
+                    .symbols(symbols.clone())
+                    .build())
             })
             .collect_vec();
 

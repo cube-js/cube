@@ -39,7 +39,7 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
         let mut data_queries = vec![];
         let mut keys_context = context.clone();
         keys_context.dimensions_query = true;
-        if let Some(resolved_multiplied_measures) = &full_key_aggregate.multiplied_measures_resolver
+        if let Some(resolved_multiplied_measures) = full_key_aggregate.multiplied_measures_resolver()
         {
             match resolved_multiplied_measures {
                 ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
@@ -84,16 +84,16 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
                 }
             }
         }
-        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs.iter() {
-            let multi_stage_schema = context.get_multi_stage_schema(&multi_stage_ref.name)?;
+        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs().iter() {
+            let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
             let multi_stage_source = SingleAliasedSource::new_from_table_reference(
-                multi_stage_ref.name.clone(),
+                multi_stage_ref.name().clone(),
                 multi_stage_schema.clone(),
                 None,
             );
             let mut keys_select_builder =
                 SelectBuilder::new(From::new(FromSource::Single(multi_stage_source.clone())));
-            for dim in full_key_aggregate.schema.all_dimensions() {
+            for dim in full_key_aggregate.schema().all_dimensions() {
                 let alias = multi_stage_schema.resolve_member_alias(dim);
                 let reference = QualifiedColumnName::new(None, alias);
                 keys_select_builder.add_projection_member_reference(dim, reference);
@@ -129,7 +129,7 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
         let references_builder = ReferencesBuilder::new(keys_from.clone());
         let mut keys_select_builder = SelectBuilder::new(keys_from);
 
-        for member in full_key_aggregate.schema.all_dimensions() {
+        for member in full_key_aggregate.schema().all_dimensions() {
             let alias = references_builder.resolve_alias_for_member(&member, &None);
             if alias.is_none() {
                 return Err(CubeError::internal(format!(
@@ -153,7 +153,7 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
         for (i, query) in data_queries.into_iter().enumerate() {
             let query_alias = format!("q_{}", i);
             let conditions = full_key_aggregate
-                .schema
+                .schema()
                 .all_dimensions()
                 .map(|dim| -> Result<_, CubeError> {
                     let alias_in_keys_query = keys_select.schema().resolve_member_alias(dim);
@@ -201,7 +201,7 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
     ) -> Result<Rc<From>, CubeError> {
         let query_tools = self.builder.query_tools();
         let mut data_queries = vec![];
-        if let Some(resolved_multiplied_measures) = &full_key_aggregate.multiplied_measures_resolver
+        if let Some(resolved_multiplied_measures) = full_key_aggregate.multiplied_measures_resolver()
         {
             match resolved_multiplied_measures {
                 ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
@@ -235,10 +235,10 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
             }
         }
 
-        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs.iter() {
-            let multi_stage_schema = context.get_multi_stage_schema(&multi_stage_ref.name)?;
+        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs().iter() {
+            let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
             let multi_stage_source = SingleAliasedSource::new_from_table_reference(
-                multi_stage_ref.name.clone(),
+                multi_stage_ref.name().clone(),
                 multi_stage_schema.clone(),
                 None,
             );
@@ -270,7 +270,7 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
             let prev_alias = format!("q_{}", i);
             let query_alias = format!("q_{}", i + 1);
             let conditions = full_key_aggregate
-                .schema
+                .schema()
                 .all_dimensions()
                 .map(|dim| -> Result<_, CubeError> {
                     let alias_in_prev_query = data_queries[i].schema().resolve_member_alias(dim);
@@ -316,7 +316,7 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let strategy: Rc<dyn FullKeyAggregateStrategy> =
-            if full_key_aggregate.schema.has_dimensions() {
+            if full_key_aggregate.schema().has_dimensions() {
                 KeysFullKeyAggregateStrategy::new(self.builder)
             } else {
                 InnerJoinFullKeyAggregateStrategy::new(self.builder)

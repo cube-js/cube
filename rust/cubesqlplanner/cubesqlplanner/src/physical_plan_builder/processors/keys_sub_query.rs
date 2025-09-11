@@ -26,7 +26,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         let mut render_references = HashMap::new();
         let alias_prefix = Some(format!(
             "{}_key",
-            query_tools.alias_for_cube(&keys_subquery.pk_cube().cube.name())?
+            query_tools.alias_for_cube(&keys_subquery.pk_cube().cube().name())?
         ));
 
         let mut context = context.clone();
@@ -40,7 +40,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         let references_builder = ReferencesBuilder::new(source.clone());
         let mut select_builder = SelectBuilder::new(source);
         self.builder.resolve_subquery_dimensions_references(
-            &keys_subquery.source().dimension_subqueries,
+            &keys_subquery.source().dimension_subqueries(),
             &references_builder,
             &mut render_references,
         )?;

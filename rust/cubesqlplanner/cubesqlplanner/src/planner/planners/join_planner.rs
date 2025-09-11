@@ -64,14 +64,17 @@ impl JoinPlanner {
                 .cube_from_path(join_definition.static_data().original_to.clone())?;
             let cube = Cube::new(cube_definition);
             let on_sql = self.compile_join_condition(join_definition.clone())?;
-            joins.push(LogicalJoinItem { cube, on_sql });
+            joins.push(LogicalJoinItem::builder()
+                .cube(cube)
+                .on_sql(on_sql)
+                .build());
         }
 
-        Ok(Rc::new(LogicalJoin {
-            root,
-            joins,
-            dimension_subqueries,
-        }))
+        Ok(Rc::new(LogicalJoin::builder()
+            .root(root)
+            .joins(joins)
+            .dimension_subqueries(dimension_subqueries)
+            .build()))
     }
 
     pub fn compile_join_condition(

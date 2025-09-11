@@ -41,7 +41,7 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
                 .collect(),
         );
         self.builder.resolve_subquery_dimensions_references(
-            &measure_subquery.source.dimension_subqueries,
+            &measure_subquery.source.dimension_subqueries(),
             &references_builder,
             &mut render_references,
         )?;

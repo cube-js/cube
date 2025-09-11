@@ -21,8 +21,8 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         logical_join: &LogicalJoin,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let root = logical_join.root.cube.clone();
-        if logical_join.joins.is_empty() && logical_join.dimension_subqueries.is_empty() {
+        let root = logical_join.root().cube().clone();
+        if logical_join.joins().is_empty() && logical_join.dimension_subqueries().is_empty() {
             Ok(From::new_from_cube(
                 root.clone(),
                 Some(root.default_alias_with_prefix(&context.alias_prefix)),
@@ -34,7 +34,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
             );
 
             for dimension_subquery in logical_join
-                .dimension_subqueries //TODO move dimension_subquery to
+                .dimension_subqueries() //TODO move dimension_subquery to
                 .iter()
                 .filter(|d| &d.subquery_dimension.cube_name() == root.name())
             {
@@ -44,20 +44,20 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     context,
                 )?;
             }
-            for join in logical_join.joins.iter() {
+            for join in logical_join.joins().iter() {
                 join_builder.left_join_cube(
-                    join.cube.cube.clone(),
+                    join.cube().cube().clone(),
                     Some(
-                        join.cube
-                            .cube
+                        join.cube()
+                            .cube()
                             .default_alias_with_prefix(&context.alias_prefix),
                     ),
-                    JoinCondition::new_base_join(SqlJoinCondition::try_new(join.on_sql.clone())?),
+                    JoinCondition::new_base_join(SqlJoinCondition::try_new(join.on_sql().clone())?),
                 );
                 for dimension_subquery in logical_join
-                    .dimension_subqueries
+                    .dimension_subqueries()
                     .iter()
-                    .filter(|d| &d.subquery_dimension.cube_name() == join.cube.cube.name())
+                    .filter(|d| &d.subquery_dimension.cube_name() == join.cube().cube().name())
                 {
                     self.builder.add_subquery_join(
                         dimension_subquery.clone(),

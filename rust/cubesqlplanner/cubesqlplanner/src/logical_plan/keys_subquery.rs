@@ -72,7 +72,7 @@ impl PrettyPrint for KeysSubQuery {
         result.println("KeysSubQuery: ", state);
         let state = state.new_level();
         let details_state = state.new_level();
-        result.println(&format!("pk_cube: {}", self.pk_cube.cube.name()), &state);
+        result.println(&format!("pk_cube: {}", self.pk_cube.cube().name()), &state);
 
         result.println("schema:", &state);
         self.schema.pretty_print(result, &details_state);
