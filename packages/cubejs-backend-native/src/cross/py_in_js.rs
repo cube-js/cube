@@ -2,7 +2,7 @@ use crate::cross::CLRepr;
 use crate::python::runtime::py_runtime;
 use neon::prelude::*;
 use pyo3::types::PyFunction;
-use pyo3::Py;
+use pyo3::{Py, Python};
 use std::cell::RefCell;
 
 pub struct JsPyFunctionWrapper {
@@ -43,7 +43,7 @@ pub fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromis
         )?);
     }
 
-    let py_method = this.borrow().fun.clone();
+    let py_method = Python::with_gil(|py| this.borrow().fun.clone_ref(py));
     let py_runtime = match py_runtime() {
         Ok(r) => r,
         Err(err) => return cx.throw_error(format!("Unable to init python runtime: {:?}", err)),
