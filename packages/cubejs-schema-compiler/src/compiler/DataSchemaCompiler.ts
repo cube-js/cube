@@ -237,7 +237,7 @@ export class DataSchemaCompiler {
 
     const originalJsFiles: FileContent[] = [];
     const jinjaTemplatedFiles: FileContent[] = [];
-    const yamlTemplatedFiles: FileContent[] = [];
+    const yamlFiles: FileContent[] = [];
 
     (this.filesToCompile?.length
       ? files.filter(f => this.filesToCompile.includes(f.fileName))
@@ -248,12 +248,12 @@ export class DataSchemaCompiler {
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) && file.content.match(JINJA_SYNTAX)) {
         jinjaTemplatedFiles.push(file);
       } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-        yamlTemplatedFiles.push(file);
+        yamlFiles.push(file);
       }
       // We don't transpile/compile other files (like .py and so on)
     });
 
-    let toCompile = [...jinjaTemplatedFiles, ...yamlTemplatedFiles, ...originalJsFiles];
+    let toCompile = [...jinjaTemplatedFiles, ...yamlFiles, ...originalJsFiles];
 
     if (jinjaTemplatedFiles.length > 0) {
       // Preload Jinja templates to the engine
@@ -287,10 +287,10 @@ export class DataSchemaCompiler {
       }
 
       if (transpilationNative) {
-        const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js'))
+        const nonJsFilesTasks = [...jinjaTemplatedFiles, ...yamlFiles]
           .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
 
-        const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js'));
+        const jsFiles = originalJsFiles;
         let jsFilesTasks: Promise<(FileContent | undefined)[]>[] = [];
 
         if (jsFiles.length > 0) {
