@@ -13,7 +13,7 @@ import workerpool from 'workerpool';
 import { LRUCache } from 'lru-cache';
 
 import { FileContent, getEnv, isNativeSupported, SchemaFileRepository } from '@cubejs-backend/shared';
-import { NativeInstance, PythonCtx, transpileJs } from '@cubejs-backend/native';
+import { NativeInstance, PythonCtx, transpileJs, transpileYaml } from '@cubejs-backend/native';
 import { UserError } from './UserError';
 import { ErrorReporter, ErrorReporterOptions, SyntaxErrorInterface } from './ErrorReporter';
 import { CONTEXT_SYMBOLS, CubeDefinition, CubeSymbols } from './CubeSymbols';
@@ -707,7 +707,7 @@ export class DataSchemaCompiler {
   private async transpileYamlFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+    { cubeNames, cubeSymbols, compilerId }: TranspileOptions
   ): Promise<(FileContent | undefined)> {
     const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
 
@@ -717,9 +717,24 @@ export class DataSchemaCompiler {
       return { ...file, content };
     }
 
-    /* if (getEnv('transpilationNative')) {
+    if (getEnv('transpilationNative')) {
+      const reqData = {
+        fileName: file.fileName,
+        fileContent: file.content,
+        transpilers: [],
+        compilerId: compilerId || '',
+      };
 
-    } else */ if (getEnv('transpilationWorkerThreads')) {
+      errorsReport.inFile(file);
+      const res = await transpileYaml([reqData]);
+      errorsReport.addErrors(res[0].errors);
+      errorsReport.addWarnings(res[0].warnings as unknown as SyntaxErrorInterface[]);
+      errorsReport.exitFile();
+
+      this.compiledYamlCache.set(cacheKey, res[0].code);
+
+      return { ...file, content: res[0].code };
+    } else if (getEnv('transpilationWorkerThreads')) {
       const data = {
         fileName: file.fileName,
         content: file.content,
