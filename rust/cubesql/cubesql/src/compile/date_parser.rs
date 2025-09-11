@@ -13,6 +13,9 @@ pub fn parse_date_str(s: &str) -> Result<NaiveDateTime, DataFusionError> {
         });
 
     parsed.map_err(|e| {
-        DataFusionError::Internal(format!("Can't parse date/time string literal: {}", e))
+        DataFusionError::Internal(format!(
+            "Can't parse date/time string literal {:?}: {}",
+            s, e
+        ))
     })
 }
