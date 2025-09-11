@@ -36,12 +36,7 @@ fn main() {
     let metrics_port = std::env::var("CUBESTORE_METRICS_PORT").unwrap_or("8125".to_string());
     let metrics_server_address = format!("{}:{}", metrics_addr, metrics_port);
 
-    init_metrics(
-        "127.0.0.1:0",
-        metrics_server_address,
-        metrics_format,
-        vec![],
-    );
+    init_metrics("0.0.0.0:0", metrics_server_address, metrics_format, vec![]);
     let telemetry_env = std::env::var("CUBESTORE_TELEMETRY")
         .or(std::env::var("CUBEJS_TELEMETRY"))
         .unwrap_or("true".to_string());
