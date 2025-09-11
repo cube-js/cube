@@ -6,7 +6,6 @@ export interface FileContent {
   content: string;
   readOnly?: boolean;
   isModule?: boolean;
-  convertedToJs?: boolean;
 }
 
 export interface SchemaFileRepository {
