@@ -217,18 +217,25 @@ export class DataSchemaCompiler {
     this.pythonContext = await this.loadPythonContext(files, 'globals.py');
     this.yamlCompiler.initFromPythonContext(this.pythonContext);
 
-    // As we mutate files data, we need a copy, not a refs.
-    // FileContent is a plain object with primitives, so it's enough for a shallow copy.
-    let toCompile = (this.filesToCompile?.length
-      ? files.filter(f => this.filesToCompile.includes(f.fileName))
-      : files).filter(f => f.fileName.endsWith('.js')
-        // We don't transpile/compile other files (like .py and so on)
-        || f.fileName.endsWith('.yml')
-        || f.fileName.endsWith('.yaml')
-        || f.fileName.endsWith('.jinja')).map(f => ({ ...f }));
+    const originalJsFiles: FileContent[] = [];
+    const jinjaTemplatedFiles: FileContent[] = [];
+    const yamlTemplatedFiles: FileContent[] = [];
 
-    const jinjaTemplatedFiles = toCompile.filter((file) => file.fileName.endsWith('.jinja') ||
-      (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) && file.content.match(JINJA_SYNTAX));
+    (this.filesToCompile?.length
+      ? files.filter(f => this.filesToCompile.includes(f.fileName))
+      : files).forEach(file => {
+      if (file.fileName.endsWith('.js')) {
+        originalJsFiles.push(file);
+      } else if (file.fileName.endsWith('.jinja') ||
+      (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) && file.content.match(JINJA_SYNTAX)) {
+        jinjaTemplatedFiles.push(file);
+      } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
+        yamlTemplatedFiles.push(file);
+      }
+      // We don't transpile/compile other files (like .py and so on)
+    });
+
+    let toCompile = [...jinjaTemplatedFiles, ...yamlTemplatedFiles, ...originalJsFiles];
 
     if (jinjaTemplatedFiles.length > 0) {
       // Preload Jinja templates to the engine
@@ -422,6 +429,13 @@ export class DataSchemaCompiler {
       asyncModules = [];
       transpiledFiles = await transpile(stage);
 
+      if (stage === 0) {
+        // We render jinja and transpile yaml only once on first phase and then use resulting JS for these files
+        // afterward avoiding costly YAML/Python parsing again. Original JS files are preserved as is for cache hits.
+        const convertedToJsFiles = transpiledFiles.filter(f => f.convertedToJs);
+        toCompile = [...originalJsFiles, ...convertedToJsFiles];
+      }
+
       return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
     };
 
@@ -512,11 +526,7 @@ export class DataSchemaCompiler {
         this.pythonContext!
       );
       if (transpiledFile) {
-        // We update the jinja/yaml file content to the transpiled js content
-        // and raise related flag so it will go JS transpilation flow afterward
-        // avoiding costly YAML/Python parsing again.
-        file.content = transpiledFile.content;
-        file.convertedToJs = true;
+        transpiledFile.convertedToJs = true;
       }
 
       return transpiledFile;
@@ -524,11 +534,7 @@ export class DataSchemaCompiler {
       const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
 
       if (transpiledFile) {
-        // We update the yaml file content to the transpiled js content
-        // and raise related flag so it will go JS transpilation flow afterward
-        // avoiding costly YAML/Python parsing again.
-        file.content = transpiledFile.content;
-        file.convertedToJs = true;
+        transpiledFile.convertedToJs = true;
       }
 
       return transpiledFile;
