@@ -21,3 +21,4 @@ export * from './process';
 export * from './platform';
 export * from './FileRepository';
 export * from './decorators';
+export * from './PerfTracker';
