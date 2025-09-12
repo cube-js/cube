@@ -200,10 +200,15 @@ impl MultiStageMemberQueryPlanner {
             _ => MultiStageCalculationWindowFunction::None,
         };
 
+        let measures = if self.description.member().evaluation_node().is_measure() {
+            vec![self.description.member().evaluation_node().clone()]
+        } else {
+            vec![]
+        };
         let schema = LogicalSchema::default()
             .set_dimensions(self.description.state().dimensions_symbols())
             .set_time_dimensions(self.description.state().time_dimensions_symbols())
-            .set_measures(vec![self.description.member().evaluation_node().clone()])
+            .set_measures(measures)
             .into_rc();
 
         let calculation_type = match multi_stage_member.inode_type() {
@@ -221,10 +226,12 @@ impl MultiStageMemberQueryPlanner {
             .input_cte_aliases()
             .into_iter()
             .map(|(name, symbols)| {
-                Rc::new(MultiStageSubqueryRef::builder()
-                    .name(name.clone())
-                    .symbols(symbols.clone())
-                    .build())
+                Rc::new(
+                    MultiStageSubqueryRef::builder()
+                        .name(name.clone())
+                        .symbols(symbols.clone())
+                        .build(),
+                )
             })
             .collect_vec();
 
@@ -236,11 +243,13 @@ impl MultiStageMemberQueryPlanner {
             .partition_by(partition_by)
             .window_function_to_use(window_function_to_use)
             .order_by(self.query_order_by()?)
-            .source(Rc::new(FullKeyAggregate::builder()
-                .schema(full_key_aggregate_schema)
-                .use_full_join_and_coalesce(true)
-                .multi_stage_subquery_refs(input_sources)
-                .build()))
+            .source(Rc::new(
+                FullKeyAggregate::builder()
+                    .schema(full_key_aggregate_schema)
+                    .use_full_join_and_coalesce(true)
+                    .multi_stage_subquery_refs(input_sources)
+                    .build(),
+            ))
             .build();
 
         let result = LogicalMultiStageMember {

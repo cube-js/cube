@@ -137,6 +137,28 @@ impl MemberSymbol {
         matches!(self, Self::Dimension(_) | Self::TimeDimension(_))
     }
 
+    pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        self: &Rc<Self>,
+        f: &F,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let result = f(self)?;
+        result.apply_to_deps(f)
+    }
+
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        self: &Rc<Self>,
+        f: &F,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        match self.as_ref() {
+            Self::Dimension(d) => d.apply_to_deps(f),
+            Self::TimeDimension(d) => d.apply_to_deps(f),
+            Self::Measure(m) => m.apply_to_deps(f),
+            Self::CubeName(_) => Ok(self.clone()),
+            Self::CubeTable(_) => Ok(self.clone()),
+            Self::MemberExpression(e) => e.apply_to_deps(f),
+        }
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         match self {
             Self::Dimension(d) => d.get_dependencies(),
@@ -209,8 +231,8 @@ impl MemberSymbol {
             Self::Dimension(d) => d.owned_by_cube(),
             Self::TimeDimension(d) => d.owned_by_cube(),
             Self::Measure(m) => m.owned_by_cube(),
-            Self::CubeName(_) => false,
-            Self::CubeTable(_) => false,
+            Self::CubeName(_) => true,
+            Self::CubeTable(_) => true,
             Self::MemberExpression(_) => false,
         }
     }

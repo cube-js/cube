@@ -50,6 +50,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
         }
 
         for measure in measure_calculation.schema().measures.iter() {
+            println!("!!!! ooooo: {}", measure.full_name());
             references_builder.resolve_references_for_member(
                 measure.clone(),
                 &None,

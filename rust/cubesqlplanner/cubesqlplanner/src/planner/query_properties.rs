@@ -4,7 +4,8 @@ use super::query_tools::QueryTools;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
 use crate::planner::sql_evaluator::{
-    MemberExpressionExpression, MemberExpressionSymbol, TimeDimensionSymbol,
+    apply_static_filter_to_filter_item, apply_static_filter_to_symbol, MemberExpressionExpression,
+    MemberExpressionSymbol, TimeDimensionSymbol,
 };
 use crate::planner::GranularityHelper;
 
@@ -401,22 +402,10 @@ impl QueryProperties {
 
         let query_join_hints = Rc::new(options.join_hints()?.unwrap_or_default());
 
-        let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
-            query_join_hints.clone(),
-            query_tools.clone(),
-            &measures,
-            &dimensions,
-            &time_dimensions,
-            &time_dimensions_filters,
-            &dimensions_filters,
-            &measures_filters,
-            &segments,
-        )?;
-
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
         let total_query = options.static_data().total_query.unwrap_or(false);
 
-        let res = Self {
+        let mut res = Self {
             measures,
             dimensions,
             segments,
@@ -430,11 +419,12 @@ impl QueryProperties {
             query_tools,
             ignore_cumulative: false,
             ungrouped,
-            multi_fact_join_groups,
+            multi_fact_join_groups: vec![],
             pre_aggregation_query,
             total_query,
             query_join_hints,
         };
+        res.apply_static_filters()?;
         Ok(Rc::new(res))
     }
 
@@ -462,19 +452,7 @@ impl QueryProperties {
             order_by
         };
 
-        let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
-            query_join_hints.clone(),
-            query_tools.clone(),
-            &measures,
-            &dimensions,
-            &time_dimensions,
-            &time_dimensions_filters,
-            &dimensions_filters,
-            &measures_filters,
-            &segments,
-        )?;
-
-        let res = Self {
+        let mut res = Self {
             measures,
             dimensions,
             time_dimensions,
@@ -488,12 +466,53 @@ impl QueryProperties {
             query_tools,
             ignore_cumulative,
             ungrouped,
-            multi_fact_join_groups,
+            multi_fact_join_groups: vec![],
             pre_aggregation_query,
             total_query,
             query_join_hints,
         };
+        res.apply_static_filters()?;
+
         Ok(Rc::new(res))
+    }
+
+    fn apply_static_filters(&mut self) -> Result<(), CubeError> {
+        let dimensions_filters = self.dimensions_filters.clone();
+        for dim in self.dimensions.iter_mut() {
+            *dim = apply_static_filter_to_symbol(dim, &dimensions_filters)?;
+        }
+        for meas in self.measures.iter_mut() {
+            *meas = apply_static_filter_to_symbol(meas, &dimensions_filters)?;
+        }
+        for filter_item in self.dimensions_filters.iter_mut() {
+            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+        }
+        for filter_item in self.measures_filters.iter_mut() {
+            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+        }
+        for filter_item in self.time_dimensions_filters.iter_mut() {
+            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+        }
+        for filter_item in self.segments.iter_mut() {
+            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+        }
+        for order_item in self.order_by.iter_mut() {
+            order_item.member_evaluator =
+                apply_static_filter_to_symbol(&order_item.member_evaluator, &dimensions_filters)?;
+        }
+
+        self.multi_fact_join_groups = Self::compute_join_multi_fact_groups(
+            self.query_join_hints.clone(),
+            self.query_tools.clone(),
+            &self.measures,
+            &self.dimensions,
+            &self.time_dimensions,
+            &self.time_dimensions_filters,
+            &self.dimensions_filters,
+            &self.measures_filters,
+            &self.segments,
+        )?;
+        Ok(())
     }
 
     pub fn compute_join_multi_fact_groups_with_measures(

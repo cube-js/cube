@@ -10,6 +10,7 @@ use crate::plan::{Filter, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -80,6 +81,56 @@ impl SqlCall {
             None
         };
         Ok(res)
+    }
+
+    pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Rc<Self>, CubeError> {
+        let mut result = self.clone();
+        for dep in result.deps.iter_mut() {
+            match dep {
+                Dependency::SymbolDependency(dep) => {
+                    *dep = dep.apply_recursive(f)?;
+                }
+                Dependency::CubeDependency(cube_dep) => {
+                    *cube_dep = self.apply_recursive_to_cube_dep(cube_dep, f)?;
+                }
+                Dependency::TimeDimensionDependency(dep) => {
+                    dep.base_symbol = dep.base_symbol.apply_recursive(f)?;
+                    for (_, granularity) in dep.granularities.iter_mut() {
+                        *granularity = granularity.apply_recursive(f)?;
+                    }
+                }
+                Dependency::ContextDependency(_) => {}
+            }
+        }
+        Ok(Rc::new(result))
+    }
+
+    pub fn apply_recursive_to_cube_dep<
+        F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    >(
+        &self,
+        cube_dep: &CubeDependency,
+        f: &F,
+    ) -> Result<CubeDependency, CubeError> {
+        let mut result = cube_dep.clone();
+        for (_, v) in result.properties.iter_mut() {
+            match v {
+                CubeDepProperty::SymbolDependency(dep) => *dep = dep.apply_recursive(f)?,
+                CubeDepProperty::TimeDimensionDependency(dep) => {
+                    dep.base_symbol = dep.base_symbol.apply_recursive(f)?;
+                    for (_, granularity) in dep.granularities.iter_mut() {
+                        *granularity = granularity.apply_recursive(f)?;
+                    }
+                }
+                CubeDepProperty::CubeDependency(cube_dep) => {
+                    *cube_dep = self.apply_recursive_to_cube_dep(cube_dep, f)?;
+                }
+            };
+        }
+        Ok(result)
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
