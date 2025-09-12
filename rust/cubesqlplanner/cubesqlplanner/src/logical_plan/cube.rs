@@ -17,13 +17,15 @@ impl OriginalSqlPreAggregation {
 
 impl PrettyPrint for OriginalSqlPreAggregation {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println(&format!("OriginalSqlPreAggregation: {}", self.name()), state);
+        result.println(
+            &format!("OriginalSqlPreAggregation: {}", self.name()),
+            state,
+        );
     }
 }
 
 #[derive(Clone, TypedBuilder)]
 pub struct Cube {
-    name: String,
     cube: Rc<BaseCube>,
     #[builder(default)]
     original_sql_pre_aggregation: Option<OriginalSqlPreAggregation>,
@@ -31,7 +33,7 @@ pub struct Cube {
 
 impl Cube {
     pub fn name(&self) -> &String {
-        &self.name
+        &self.cube.name()
     }
 
     pub fn cube(&self) -> &Rc<BaseCube> {
@@ -54,21 +56,19 @@ impl PrettyPrint for Cube {
 
 impl Cube {
     pub fn new(cube: Rc<BaseCube>) -> Rc<Self> {
-        Rc::new(Self::builder()
-            .name(cube.name().clone())
-            .cube(cube)
-            .build())
+        Rc::new(Self::builder().cube(cube).build())
     }
 
     pub fn with_original_sql_pre_aggregation(
         self: Rc<Self>,
         original_sql_pre_aggregation: OriginalSqlPreAggregation,
     ) -> Rc<Self> {
-        Rc::new(Self::builder()
-            .name(self.name().clone())
-            .cube(self.cube().clone())
-            .original_sql_pre_aggregation(Some(original_sql_pre_aggregation))
-            .build())
+        Rc::new(
+            Self::builder()
+                .cube(self.cube().clone())
+                .original_sql_pre_aggregation(Some(original_sql_pre_aggregation))
+                .build(),
+        )
     }
 }
 

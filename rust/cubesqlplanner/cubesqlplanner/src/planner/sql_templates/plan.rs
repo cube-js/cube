@@ -350,21 +350,9 @@ impl PlanSqlTemplates {
 
     pub fn calc_groups_join(
         &self,
-        original_cube: &str,
-        original_cube_sql: &str,
-        single_values: Vec<TemplateCalcSingleValue>,
+        original_sql: Option<String>,
         groups: Vec<TemplateCalcGroup>,
     ) -> Result<String, CubeError> {
-        let original_cube = self.quote_identifier(original_cube)?;
-        let single_values = single_values
-            .into_iter()
-            .map(|v| -> Result<_, CubeError> {
-                Ok(TemplateCalcSingleValue {
-                    value: self.quote_string(&v.value)?,
-                    name: self.quote_identifier(&v.name)?,
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
         let groups = groups
             .into_iter()
             .map(|g| -> Result<_, CubeError> {
@@ -390,9 +378,7 @@ impl PlanSqlTemplates {
         self.render.render_template(
             "statements/calc_groups_join",
             context! {
-                original_cube => original_cube,
-                original_cube_sql => original_cube_sql,
-                single_values => single_values,
+                original_sql => original_sql,
                 groups => groups
             },
         )

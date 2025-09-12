@@ -1,9 +1,13 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{Query, QuerySource};
+use crate::logical_plan::{all_symbols, Query, QuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Cte, Expr, MemberExpression, Select, SelectBuilder};
-use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::plan::{
+    CalcGroupItem, CalcGroupsJoin, Cte, Expr, From, MemberExpression, Select, SelectBuilder,
+};
+use crate::planner::sql_evaluator::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::sql_evaluator::{get_filtered_values, ReferencesBuilder};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -47,27 +51,45 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             ctes.push(Rc::new(Cte::new(Rc::new(query), alias)));
         }
 
-        let (from, is_pre_aggregation) = match logical_plan.source() {
+        let from = self.builder.process_node(logical_plan.source(), &context)?;
+        let filter = logical_plan.filter().all_filters();
+        let having = logical_plan.filter().measures_filter();
+
+        //TODO pre-aggregations support for calc-groups
+        let from = if let QuerySource::LogicalJoin(_) = logical_plan.source() {
+            let all_symbols = all_symbols(&logical_plan.schema(), &logical_plan.filter());
+            let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?;
+
+            let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
+                let values = get_filtered_values(&dim, &filter);
+                CalcGroupItem {
+                    symbol: dim,
+                    values,
+                }
+            });
+            let calc_groups_to_join = calc_groups_items.collect_vec();
+            /* .filter(|itm| itm.values.len() == 1)
+            .collect_vec(); */
+            if calc_groups_to_join.is_empty() {
+                from
+            } else {
+                let groups_join = CalcGroupsJoin::try_new(from, calc_groups_to_join)?;
+                From::new_from_calc_groups_join(groups_join)
+            }
+        } else {
+            from
+        };
+
+        match logical_plan.source() {
             QuerySource::LogicalJoin(join) => {
-                let from = self.builder.process_node(join.as_ref(), &context)?;
                 let references_builder = ReferencesBuilder::new(from.clone());
                 self.builder.resolve_subquery_dimensions_references(
                     &join.dimension_subqueries(),
                     &references_builder,
                     &mut render_references,
                 )?;
-                (from, false)
-            }
-            QuerySource::FullKeyAggregate(full_key_aggregate) => {
-                let from = self
-                    .builder
-                    .process_node(full_key_aggregate.as_ref(), &context)?;
-                (from, false)
             }
             QuerySource::PreAggregation(pre_aggregation) => {
-                let res = self
-                    .builder
-                    .process_node(pre_aggregation.as_ref(), &context)?;
                 for member in logical_plan.schema().time_dimensions.iter() {
                     context_factory.add_dimensions_with_ignored_timezone(member.full_name());
                 }
@@ -78,18 +100,17 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
                 context_factory.set_pre_aggregation_measures_references(measure_references);
                 context_factory.set_pre_aggregation_dimensions_references(dimensions_references);
-                (res, true)
             }
-        };
+            QuerySource::FullKeyAggregate(_) => {}
+        }
+
+        let is_pre_aggregation = matches!(logical_plan.source(), QuerySource::PreAggregation(_));
 
         let references_builder = ReferencesBuilder::new(from.clone());
 
         let mut select_builder = SelectBuilder::new(from);
         select_builder.set_ctes(ctes);
         context_factory.set_ungrouped(logical_plan.modifers().ungrouped);
-
-        let filter = logical_plan.filter().all_filters();
-        let having = logical_plan.filter().measures_filter();
 
         for member in logical_plan.schema().all_dimensions() {
             references_builder.resolve_references_for_member(

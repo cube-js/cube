@@ -3,6 +3,7 @@ use crate::planner::sql_evaluator::MemberSymbol;
 use super::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+use typed_builder::TypedBuilder;
 
 #[derive(Clone)]
 pub struct CalcGroupDescription {
@@ -20,15 +21,20 @@ impl PrettyPrint for CalcGroupDescription {
     }
 }
 
-logical_source_enum!(
-    CalcGroupsCrossJoinSource,
-    [LogicalJoin, FullKeyAggregate, PreAggregation]
-);
-
-#[derive(Clone)]
+#[derive(Clone, TypedBuilder)]
 pub struct CalcGroupsCrossJoin {
-    pub source: CalcGroupsCrossJoinSource,
-    pub calc_groups: Vec<Rc<CalcGroupDescription>>,
+    source: BaseQuerySource,
+    calc_groups: Vec<Rc<CalcGroupDescription>>,
+}
+
+impl CalcGroupsCrossJoin {
+    pub fn source(&self) -> &BaseQuerySource {
+        &self.source
+    }
+
+    pub fn calc_groups(&self) -> &Vec<Rc<CalcGroupDescription>> {
+        &self.calc_groups
+    }
 }
 
 impl LogicalNode for CalcGroupsCrossJoin {

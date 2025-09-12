@@ -4214,7 +4214,7 @@ export class BaseQuery {
           '{{ min_expr }} as {{ quoted_min_name }}\n' +
           'FROM {{ from_prepared }}\n' +
           '{% if filter %}WHERE {{ filter }}{% endif %}',
-        calc_groups_join: 'SELECT {{ original_cube }}.*, ' +
+        /* calc_groups_join: 'SELECT {{ original_cube }}.*, ' +
         '{%for single_value in single_values %}' +
         '{{ single_value.value }} as {{ single_value.name }}{% if not loop.last %}, {% endif %}' +
         '{% endfor %}' +
@@ -4225,6 +4225,16 @@ export class BaseQuery {
         'FROM {{ original_cube_sql }} {{ original_cube }}\n' +
         '{% for group in groups  %}' +
         'CROSS JOIN\n' +
+        '(\n' +
+        '{% for value in group.values  %}' +
+        'SELECT {{ value }} as {{ group.name }}' +
+        '{% if not loop.last %} UNION ALL\n{% endif %}' +
+        '{% endfor %}' +
+        ') {{ group.alias }}\n' +
+        '{% endfor %}', */
+        calc_groups_join: '{% if original_sql %}{{ original_sql }}\n{% endif %}' +
+        '{% for group in groups  %}' +
+        '{% if original_sql or not loop.first %}CROSS JOIN\n{% endif %}' +
         '(\n' +
         '{% for value in group.values  %}' +
         'SELECT {{ value }} as {{ group.name }}' +
