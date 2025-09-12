@@ -247,18 +247,10 @@ cubes:
       - name: count
         type: count
 
-  - name: source_root
+  - name: source
     sql: >
       SELECT 1
     public: false
-
-    joins:
-      - name: source_a
-        sql: "1 = 1"
-        relationship: one_to_many
-      - name: source_b
-        sql: "1 = 1"
-        relationship: one_to_many
 
     dimensions:
       - name: pk
@@ -276,6 +268,7 @@ cubes:
 
       - name: product_category
         type: string
+        multi_stage: true
         case:
           switch: "{CUBE.source}"
           when:
@@ -411,15 +404,9 @@ cubes:
         sql: PRICE_EUR
 
 views:
-  - name: source
-    cubes:
-      - join_path: source_root
-        includes: "*"
-
 
 
   - name: orders_view
-
     cubes:
       - join_path: orders
         includes:
@@ -1204,6 +1191,29 @@ views:
           source__currency: 'USD',
           source__product_category: 'some category A',
           source__price: '500'
+        },
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+
+    it('source switch - source_a + usd + filter by category', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.currency', 'source.product_category'],
+        measures: ['source.price'],
+        order: [{
+          id: 'source.product_category'
+        },
+        ],
+        filters: [
+          { dimension: 'source.currency', operator: 'equals', values: ['USD'] },
+          { dimension: 'source.source', operator: 'equals', values: ['A'] },
+          { dimension: 'source.product_category', operator: 'equals', values: ['some category'] },
+        ],
+      }, [
+        {
+          source__currency: 'USD',
+          source__product_category: 'some category',
+          source__price: '600'
         },
       ],
       { joinGraph, cubeEvaluator, compiler });

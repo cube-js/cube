@@ -92,10 +92,12 @@ impl MultiStageQueryPlanner {
         let top_level_ctes = top_level_ctes
             .iter()
             .map(|(alias, symbols)| {
-                Rc::new(MultiStageSubqueryRef::builder()
-                    .name(alias.clone())
-                    .symbols(symbols.clone())
-                    .build())
+                Rc::new(
+                    MultiStageSubqueryRef::builder()
+                        .name(alias.clone())
+                        .symbols(symbols.clone())
+                        .build(),
+                )
             })
             .collect_vec();
 
@@ -136,6 +138,7 @@ impl MultiStageQueryPlanner {
                 is_ungrupped,
             )
         } else {
+            println!("!!!! jjjjj");
             (
                 MultiStageInodeMember::new(
                     MultiStageInodeMemberType::Calculate,
@@ -157,7 +160,7 @@ impl MultiStageQueryPlanner {
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let member = member.resolve_reference_chain();
-        let member = apply_static_filter_to_symbol(&member, state.dimensions_filters());
+        let member = apply_static_filter_to_symbol(&member, state.dimensions_filters())?;
 
         let member_name = member.full_name();
         if let Some(exists) = descriptions

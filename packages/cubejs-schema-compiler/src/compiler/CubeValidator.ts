@@ -699,7 +699,8 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
   then: SwitchDimension,
   otherwise: Joi.alternatives().try(
     inherit(BaseDimensionWithoutSubQuery, {
-      case: CaseVariants
+      case: CaseVariants,
+      multiStage: Joi.boolean().strict(),
     }),
     inherit(BaseDimensionWithoutSubQuery, {
       latitude: Joi.object().keys({

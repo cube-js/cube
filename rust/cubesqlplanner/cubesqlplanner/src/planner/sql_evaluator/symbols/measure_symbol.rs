@@ -33,6 +33,10 @@ impl MeasureOrderBy {
         &self.sql_call
     }
 
+    pub fn set_sql_call(&mut self, sql_call: Rc<SqlCall>) {
+        self.sql_call = sql_call;
+    }
+
     pub fn direction(&self) -> &String {
         &self.direction
     }
@@ -94,6 +98,7 @@ impl MeasureSymbol {
         member_sql: Option<Rc<SqlCall>>,
         is_reference: bool,
         is_view: bool,
+        owned_by_cube: bool,
         case: Option<Case>,
         pk_sqls: Vec<Rc<SqlCall>>,
         definition: Rc<dyn MeasureDefinition>,
@@ -105,7 +110,6 @@ impl MeasureSymbol {
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         group_by: Option<Vec<Rc<MemberSymbol>>>,
     ) -> Rc<Self> {
-        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
         let measure_type = definition.static_data().measure_type.clone();
         let rolling_window = definition.static_data().rolling_window.clone();
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
@@ -329,6 +333,38 @@ impl MeasureSymbol {
 
     pub fn has_sql(&self) -> bool {
         self.member_sql.is_some()
+    }
+
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let mut result = self.clone();
+        if let Some(member_sql) = &self.member_sql {
+            result.member_sql = Some(member_sql.apply_recursive(f)?);
+        }
+
+        for sql in result.pk_sqls.iter_mut() {
+            *sql = sql.apply_recursive(f)?
+        }
+
+        for sql in result.measure_filters.iter_mut() {
+            *sql = sql.apply_recursive(f)?
+        }
+
+        for sql in result.measure_drill_filters.iter_mut() {
+            *sql = sql.apply_recursive(f)?
+        }
+
+        for order in result.measure_order_by.iter_mut() {
+            order.set_sql_call(order.sql_call().apply_recursive(f)?);
+        }
+
+        if let Some(case) = &self.case {
+            result.case = Some(case.apply_to_deps(f)?)
+        }
+
+        Ok(MemberSymbol::new_measure(Rc::new(result)))
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
@@ -710,8 +746,11 @@ impl SymbolFactory for MeasureSymbolFactory {
         let is_calculated =
             MeasureSymbol::is_calculated_type(&definition.static_data().measure_type)
                 && !definition.static_data().multi_stage.unwrap_or(false);
-        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
+
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+        //TODO move owned logic to rust
+        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
+        let owned_by_cube = owned_by_cube && !is_multi_stage;
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
         let alias =
             PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
@@ -743,6 +782,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             sql,
             is_reference,
             is_view,
+            owned_by_cube,
             case,
             pk_sqls,
             definition,

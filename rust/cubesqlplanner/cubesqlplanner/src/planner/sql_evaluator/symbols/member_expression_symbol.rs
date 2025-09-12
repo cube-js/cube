@@ -8,11 +8,13 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub enum MemberExpressionExpression {
     SqlCall(Rc<SqlCall>),
     PatchedSymbol(Rc<MemberSymbol>),
 }
 
+#[derive(Clone)]
 pub struct MemberExpressionSymbol {
     cube_name: String,
     name: String,
@@ -84,6 +86,23 @@ impl MemberExpressionSymbol {
             return None;
         }
         deps.first().cloned()
+    }
+
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let mut result = self.clone();
+        match &mut result.expression {
+            MemberExpressionExpression::SqlCall(sql_call) => {
+                *sql_call = sql_call.apply_recursive(f)?
+            }
+            MemberExpressionExpression::PatchedSymbol(member_symbol) => {
+                *member_symbol = f(member_symbol)?
+            }
+        }
+
+        Ok(MemberSymbol::new_member_expression(Rc::new(result)))
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {

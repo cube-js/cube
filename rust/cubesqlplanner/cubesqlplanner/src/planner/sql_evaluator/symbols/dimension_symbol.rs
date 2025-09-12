@@ -195,6 +195,28 @@ impl DimensionSymbol {
         deps.first().cloned()
     }
 
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let mut result = self.clone();
+        if let Some(member_sql) = &self.member_sql {
+            result.member_sql = Some(member_sql.apply_recursive(f)?);
+        }
+        if let Some(latitude) = &self.latitude {
+            result.latitude = Some(latitude.apply_recursive(f)?);
+        }
+        if let Some(longitude) = &self.longitude {
+            result.longitude = Some(longitude.apply_recursive(f)?);
+        }
+
+        if let Some(case) = &self.case {
+            result.case = Some(case.apply_to_deps(f)?)
+        }
+
+        Ok(MemberSymbol::new_dimension(Rc::new(result)))
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         if let Some(member_sql) = &self.member_sql {
@@ -451,9 +473,13 @@ impl SymbolFactory for DimensionSymbolFactory {
             vec![]
         };
 
-        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
-        let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+
+        //TODO move owned logic to rust
+        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
+        let owned_by_cube =
+            owned_by_cube && !is_multi_stage && definition.static_data().dimension_type != "switch";
+        let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_reference = is_view
             || (!owned_by_cube
                 && !is_sub_query

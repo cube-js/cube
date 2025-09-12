@@ -18,6 +18,7 @@ pub enum FilterType {
     Measure,
 }
 
+#[derive(Clone)]
 pub struct BaseFilter {
     query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
@@ -81,6 +82,12 @@ impl BaseFilter {
         } else {
             self.member_evaluator.clone()
         }
+    }
+
+    pub fn with_member_evaluator(&self, member_evaluator: Rc<MemberSymbol>) -> Rc<Self> {
+        let mut result = self.clone();
+        result.member_evaluator = member_evaluator;
+        Rc::new(result)
     }
 
     //FIXME Not very good solution, but suitable for check time dimension filters in pre-aggregations

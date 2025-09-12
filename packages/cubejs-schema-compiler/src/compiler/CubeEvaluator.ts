@@ -556,9 +556,6 @@ export class CubeEvaluator extends CubeSymbols {
         if (funcArgs.length > 0 && cubeReferencesUsed.length === 0) {
           ownedByCube = false;
         }
-        if (member.type && member.type === 'switch') {
-          ownedByCube = false;
-        }
         // Aliases one to one some another member as in case of views
         // Note: Segments do not have type set
         if (!ownedByCube && !member.filters && (!member.type || CubeSymbols.isCalculatedMeasureType(member.type)) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {

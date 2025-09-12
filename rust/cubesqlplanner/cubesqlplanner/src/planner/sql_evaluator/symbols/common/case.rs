@@ -48,6 +48,32 @@ impl CaseDefinition {
         }
     }
 
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Self, CubeError> {
+        let items = self
+            .items
+            .iter()
+            .map(|itm| -> Result<_, CubeError> {
+                let label = match &itm.label {
+                    CaseLabel::String(_) => itm.label.clone(),
+                    CaseLabel::Sql(sql_call) => CaseLabel::Sql(sql_call.apply_recursive(f)?),
+                };
+                Ok(CaseWhenItem {
+                    sql: itm.sql.apply_recursive(f)?,
+                    label,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let else_label = match &self.else_label {
+            CaseLabel::String(_) => self.else_label.clone(),
+            CaseLabel::Sql(sql_call) => CaseLabel::Sql(sql_call.apply_recursive(f)?),
+        };
+        let res = CaseDefinition { items, else_label };
+        Ok(res)
+    }
+
     fn apply_static_filter(&self, _filters: &Vec<FilterItem>) -> Option<Rc<SqlCall>> {
         None
     }
@@ -102,6 +128,32 @@ impl CaseSwitchDefinition {
         } else {
             None
         }
+    }
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Self, CubeError> {
+        let switch = CaseSwitchItem {
+            sql: self.switch.sql.apply_recursive(f)?,
+            symbol_reference: self.switch.symbol_reference.clone(),
+        };
+        let items = self
+            .items
+            .iter()
+            .map(|itm| -> Result<_, CubeError> {
+                Ok(CaseSwitchWhenItem {
+                    sql: itm.sql.apply_recursive(f)?,
+                    value: itm.value.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let else_sql = self.else_sql.apply_recursive(f)?;
+        let res = CaseSwitchDefinition {
+            switch,
+            items,
+            else_sql,
+        };
+        Ok(res)
     }
 }
 
@@ -193,5 +245,15 @@ impl Case {
             Case::Case(case) => case.apply_static_filter(filters),
             Case::CaseSwitch(case) => case.apply_static_filter(filters),
         }
+    }
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Self, CubeError> {
+        let res = match self {
+            Case::Case(case) => Case::Case(case.apply_to_deps(f)?),
+            Case::CaseSwitch(case) => Case::CaseSwitch(case.apply_to_deps(f)?),
+        };
+        Ok(res)
     }
 }
