@@ -627,7 +627,7 @@ export class DataSchemaCompiler {
         errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
         return undefined;
       }
-      errorsReport.addErrors(res[index].errors);
+      errorsReport.addErrors(res[index].errors, file.fileName);
       errorsReport.addWarnings(res[index].warnings as unknown as SyntaxErrorInterface[]);
       errorsReport.exitFile();
 
@@ -654,7 +654,7 @@ export class DataSchemaCompiler {
         errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
         return undefined;
       }
-      errorsReport.addErrors(res[index].errors);
+      errorsReport.addErrors(res[index].errors, file.fileName);
       errorsReport.addWarnings(res[index].warnings as unknown as SyntaxErrorInterface[]);
       errorsReport.exitFile();
 
@@ -686,7 +686,7 @@ export class DataSchemaCompiler {
 
         errorsReport.inFile(file);
         const res = await transpileJs([reqData]);
-        errorsReport.addErrors(res[0].errors);
+        errorsReport.addErrors(res[0].errors, file.fileName);
         errorsReport.addWarnings(res[0].warnings as unknown as SyntaxErrorInterface[]);
         errorsReport.exitFile();
 
@@ -701,7 +701,7 @@ export class DataSchemaCompiler {
         };
 
         const res = await this.workerPool!.exec('transpileJs', [data]);
-        errorsReport.addErrors(res.errors);
+        errorsReport.addErrors(res.errors, file.fileName);
         errorsReport.addWarnings(res.warnings);
 
         return { ...file, content: res.content };
@@ -761,7 +761,7 @@ export class DataSchemaCompiler {
 
       errorsReport.inFile(file);
       const res = await transpileYaml([reqData]);
-      errorsReport.addErrors(res[0].errors);
+      errorsReport.addErrors(res[0].errors, file.fileName);
       errorsReport.addWarnings(res[0].warnings as unknown as SyntaxErrorInterface[]);
       errorsReport.exitFile();
 
@@ -778,7 +778,7 @@ export class DataSchemaCompiler {
       };
 
       const res = await this.workerPool!.exec('transpileYaml', [data]);
-      errorsReport.addErrors(res.errors);
+      errorsReport.addErrors(res.errors, file.fileName);
       errorsReport.addWarnings(res.warnings);
 
       this.compiledYamlCache.set(cacheKey, res.content);

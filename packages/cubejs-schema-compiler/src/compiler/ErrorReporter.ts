@@ -147,8 +147,8 @@ export class ErrorReporter {
     return this.rootReporter().errors;
   }
 
-  public addErrors(errors: PossibleError[]) {
-    errors.forEach((e: any) => { this.error(e); });
+  public addErrors(errors: PossibleError[], fileName?: string) {
+    errors.forEach((e: any) => { this.error(e, fileName); });
   }
 
   public getWarnings() {
