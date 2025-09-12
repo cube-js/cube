@@ -27,11 +27,11 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let (query_tools, templates) = self.builder.qtools_and_templates();
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let from = self
             .builder
             .process_node(measure_calculation.source().as_ref(), context)?;
         let references_builder = ReferencesBuilder::new(from.clone());
-        let mut render_references = HashMap::new();
 
         let mut select_builder = SelectBuilder::new(from.clone());
         let all_dimensions = measure_calculation
@@ -44,7 +44,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
             references_builder.resolve_references_for_member(
                 member.clone(),
                 &None,
-                &mut render_references,
+                context_factory.render_references_mut(),
             )?;
             select_builder.add_projection_member(&member, None);
         }
@@ -53,7 +53,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
             references_builder.resolve_references_for_member(
                 measure.clone(),
                 &None,
-                &mut render_references,
+                context_factory.render_references_mut(),
             )?;
             let alias = references_builder.resolve_alias_for_member(&measure, &None);
             select_builder.add_projection_member(measure, alias);
@@ -73,7 +73,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
             );
         }
 
-        let mut context_factory = context.make_sql_nodes_factory()?;
         let partition_by = measure_calculation
             .partition_by()
             .iter()
@@ -106,7 +105,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
             }
             MultiStageCalculationWindowFunction::None => {}
         }
-        context_factory.set_render_references(render_references);
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(QueryPlan::Select(select))
     }

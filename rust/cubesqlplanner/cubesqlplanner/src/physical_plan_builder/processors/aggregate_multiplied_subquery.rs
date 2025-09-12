@@ -27,7 +27,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         aggregate_multiplied_subquery: &AggregateMultipliedSubquery,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let mut render_references = HashMap::new();
         let query_tools = self.builder.query_tools();
         let keys_query = self.builder.process_node(
             aggregate_multiplied_subquery.keys_subquery.as_ref(),
@@ -43,7 +42,10 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let primary_keys_dimensions = &aggregate_multiplied_subquery
             .keys_subquery
             .primary_keys_dimensions();
-        let pk_cube = aggregate_multiplied_subquery.keys_subquery.pk_cube().clone();
+        let pk_cube = aggregate_multiplied_subquery
+            .keys_subquery
+            .pk_cube()
+            .clone();
         let pk_cube_alias = pk_cube
             .cube()
             .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube().default_alias())));
@@ -97,9 +99,8 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                         Ok(vec![(keys_query_ref, measure_subquery_ref)])
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                let mut ungrouped_measure_references = HashMap::new();
                 for meas in aggregate_multiplied_subquery.schema.measures.iter() {
-                    ungrouped_measure_references.insert(
+                    context_factory.add_ungrouped_measure_reference(
                         meas.full_name(),
                         QualifiedColumnName::new(
                             Some(pk_cube_alias.clone()),
@@ -107,8 +108,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                         ),
                     );
                 }
-
-                context_factory.set_ungrouped_measure_references(ungrouped_measure_references);
 
                 join_builder.left_join_subselect(
                     subquery,
@@ -126,14 +125,14 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         self.builder.resolve_subquery_dimensions_references(
             &aggregate_multiplied_subquery.dimension_subqueries,
             &references_builder,
-            &mut render_references,
+            &mut context_factory,
         )?;
 
         for member in aggregate_multiplied_subquery.schema.all_dimensions() {
             references_builder.resolve_references_for_member(
                 member.clone(),
                 &None,
-                &mut render_references,
+                context_factory.render_references_mut(),
             )?;
             let alias = references_builder.resolve_alias_for_member(&member, &None);
             group_by.push(Expr::Member(MemberExpression::new(member.clone())));
@@ -151,7 +150,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     references_builder.resolve_references_for_member(
                         measure.clone(),
                         &None,
-                        &mut render_references,
+                        context_factory.render_references_mut(),
                     )?;
                 }
                 select_builder.add_projection_member(&measure, None);
@@ -160,7 +159,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             }
         }
         select_builder.set_group_by(group_by);
-        context_factory.set_render_references(render_references);
         context_factory.set_rendered_as_multiplied_measures(
             aggregate_multiplied_subquery
                 .schema

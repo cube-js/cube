@@ -93,17 +93,16 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         context_factory.set_rolling_window(true);
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
-        let mut render_references = HashMap::new();
         let mut select_builder = SelectBuilder::new(from.clone());
 
         //We insert render reference for main time dimension (with some granularity as in time series to avoid unnecessary date_tranc)
-        render_references.insert(
+        context_factory.add_render_reference(
             time_dimension.full_name(),
             QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
         );
 
         //We also insert render reference for the base dimension of the time dimension (i.e. without `_granularity` prefix to let other time dimensions make date_tranc)
-        render_references.insert(
+        context_factory.add_render_reference(
             time_dimension
                 .as_time_dimension()?
                 .base_symbol()
@@ -125,7 +124,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
                 references_builder.resolve_references_for_member(
                     dim.clone(),
                     &Some(measure_input_alias.clone()),
-                    &mut render_references,
+                    context_factory.render_references_mut(),
                 )?;
             }
             let alias = references_builder
@@ -160,7 +159,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             context_factory.set_ungrouped(true);
         }
 
-        context_factory.set_render_references(render_references);
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(QueryPlan::Select(select))
     }

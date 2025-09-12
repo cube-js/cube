@@ -24,7 +24,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageGetDateRange> for MultiStageGetDateR
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
-        let mut render_references = HashMap::new();
         let from = self
             .builder
             .process_node(get_date_range.source.as_ref(), context)?;
@@ -47,9 +46,8 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageGetDateRange> for MultiStageGetDateR
         self.builder.resolve_subquery_dimensions_references(
             &get_date_range.source.dimension_subqueries(),
             &references_builder,
-            &mut render_references,
+            &mut context_factory,
         )?;
-        context_factory.set_render_references(render_references);
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(QueryPlan::Select(select))
     }

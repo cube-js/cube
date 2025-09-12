@@ -38,7 +38,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
         let mut context_factory = context.make_sql_nodes_factory()?;
-        let mut render_references = HashMap::new();
         let mut context = context.clone();
         let mut ctes = vec![];
 
@@ -86,7 +85,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 self.builder.resolve_subquery_dimensions_references(
                     &join.dimension_subqueries(),
                     &references_builder,
-                    &mut render_references,
+                    &mut context_factory,
                 )?;
             }
             QuerySource::PreAggregation(pre_aggregation) => {
@@ -95,11 +94,12 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 }
                 context_factory.set_use_local_tz_in_date_range(true);
 
-                let dimensions_references = pre_aggregation.all_dimensions_refererences();
-                let measure_references = pre_aggregation.all_measures_refererences();
-
-                context_factory.set_pre_aggregation_measures_references(measure_references);
-                context_factory.set_pre_aggregation_dimensions_references(dimensions_references);
+                for (name, column) in pre_aggregation.all_dimensions_refererences().into_iter() {
+                    context_factory.add_pre_aggregation_dimension_reference(name, column);
+                }
+                for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
+                    context_factory.add_pre_aggregation_measure_reference(name, column);
+                }
             }
             QuerySource::FullKeyAggregate(_) => {}
         }
@@ -116,7 +116,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             references_builder.resolve_references_for_member(
                 member.clone(),
                 &None,
-                &mut render_references,
+                context_factory.render_references_mut(),
             )?;
             self.builder
                 .process_calc_group(member, &mut context_factory, &filter)?;
@@ -135,7 +135,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 references_builder.resolve_references_for_member(
                     measure.clone(),
                     &None,
-                    &mut render_references,
+                    context_factory.render_references_mut(),
                 )?;
                 select_builder.add_projection_member(&measure, None);
             } else {
@@ -144,7 +144,8 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         if self.is_over_full_aggregated_source(logical_plan) {
-            references_builder.resolve_references_for_filter(&having, &mut render_references)?;
+            references_builder
+                .resolve_references_for_filter(&having, context_factory.render_references_mut())?;
             select_builder.set_filter(having);
         } else {
             if !logical_plan.modifers().ungrouped {
@@ -166,8 +167,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         context_factory
             .set_rendered_as_multiplied_measures(logical_plan.schema().multiplied_measures.clone());
-        if !is_pre_aggregation {
-            context_factory.set_render_references(render_references);
+
+        if is_pre_aggregation {
+            context_factory.clear_render_references();
         }
         if logical_plan.modifers().ungrouped {
             context_factory.set_ungrouped(true);

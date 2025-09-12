@@ -2,28 +2,30 @@ use super::{
     AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MeasureFilterSqlNode,
     MultiStageRankNode, MultiStageWindowNode, OriginalSqlPreAggregationSqlNode,
-    RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
-    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
+    RenderReferencesSqlNode, RenderReferencesType, RollingWindowNode, RootSqlNode, SqlNode,
+    TimeDimensionNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
+    UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::sql_evaluator::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
+use crate::planner::sql_evaluator::sql_nodes::RenderReferences;
 use crate::planner::sql_evaluator::symbols::CalendarDimensionTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
     calendar_time_shifts: HashMap<String, CalendarDimensionTimeShift>,
     ungrouped: bool,
     ungrouped_measure: bool,
     count_approx_as_state: bool,
-    render_references: HashMap<String, QualifiedColumnName>,
-    pre_aggregation_dimensions_references: HashMap<String, QualifiedColumnName>,
-    pre_aggregation_measures_references: HashMap<String, QualifiedColumnName>,
+    render_references: RenderReferences,
+    pre_aggregation_dimensions_references: RenderReferences,
+    pre_aggregation_measures_references: RenderReferences,
     rendered_as_multiplied_measures: HashSet<String>,
-    ungrouped_measure_references: HashMap<String, QualifiedColumnName>,
+    ungrouped_measure_references: RenderReferences,
     cube_name_references: HashMap<String, String>,
     multi_stage_rank: Option<Vec<String>>,   //partition_by
     multi_stage_window: Option<Vec<String>>, //partition_by
@@ -35,25 +37,7 @@ pub struct SqlNodesFactory {
 
 impl SqlNodesFactory {
     pub fn new() -> Self {
-        Self {
-            time_shifts: TimeShiftState::default(),
-            calendar_time_shifts: HashMap::new(),
-            ungrouped: false,
-            ungrouped_measure: false,
-            count_approx_as_state: false,
-            render_references: HashMap::new(),
-            pre_aggregation_dimensions_references: HashMap::new(),
-            pre_aggregation_measures_references: HashMap::new(),
-            ungrouped_measure_references: HashMap::new(),
-            cube_name_references: HashMap::new(),
-            rendered_as_multiplied_measures: HashSet::new(),
-            multi_stage_rank: None,
-            multi_stage_window: None,
-            rolling_window: false,
-            dimensions_with_ignored_timezone: HashSet::new(),
-            use_local_tz_in_date_range: false,
-            original_sql_pre_aggregations: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn set_time_shifts(&mut self, time_shifts: TimeShiftState) {
@@ -83,12 +67,20 @@ impl SqlNodesFactory {
         self.ungrouped_measure = value;
     }
 
-    pub fn set_render_references(&mut self, value: HashMap<String, QualifiedColumnName>) {
-        self.render_references = value;
+    pub fn add_render_reference<T: Into<RenderReferencesType>>(&mut self, name: String, value: T) {
+        self.render_references.insert(name, value);
     }
 
-    pub fn render_references(&self) -> &HashMap<String, QualifiedColumnName> {
+    pub fn render_references(&self) -> &RenderReferences {
         &self.render_references
+    }
+
+    pub fn clear_render_references(&mut self) {
+        self.render_references = RenderReferences::default();
+    }
+
+    pub fn render_references_mut(&mut self) -> &mut RenderReferences {
+        &mut self.render_references
     }
 
     pub fn add_calc_group_item(
@@ -104,19 +96,17 @@ impl SqlNodesFactory {
         self.rendered_as_multiplied_measures = value;
     }
 
-    pub fn set_pre_aggregation_dimensions_references(
+    pub fn add_pre_aggregation_dimension_reference<T: Into<RenderReferencesType>>(
         &mut self,
-        value: HashMap<String, QualifiedColumnName>,
+        name: String,
+        value: T,
     ) {
-        self.pre_aggregation_dimensions_references = value;
+        self.pre_aggregation_dimensions_references
+            .insert(name, value);
     }
 
     pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<String, String>) {
         self.original_sql_pre_aggregations = value;
-    }
-
-    pub fn add_render_reference(&mut self, key: String, value: QualifiedColumnName) {
-        self.render_references.insert(key, value);
     }
 
     pub fn add_dimensions_with_ignored_timezone(&mut self, value: String) {
@@ -131,19 +121,12 @@ impl SqlNodesFactory {
         self.multi_stage_window = Some(partition_by);
     }
 
-    pub fn set_pre_aggregation_measures_references(
+    pub fn add_pre_aggregation_measure_reference<T: Into<RenderReferencesType>>(
         &mut self,
-        value: HashMap<String, QualifiedColumnName>,
+        name: String,
+        value: T,
     ) {
-        self.pre_aggregation_measures_references = value;
-    }
-
-    pub fn add_pre_aggregation_measure_reference(
-        &mut self,
-        key: String,
-        value: QualifiedColumnName,
-    ) {
-        self.pre_aggregation_measures_references.insert(key, value);
+        self.pre_aggregation_measures_references.insert(name, value);
     }
 
     pub fn set_rolling_window(&mut self, value: bool) {
@@ -154,15 +137,12 @@ impl SqlNodesFactory {
         self.count_approx_as_state = value;
     }
 
-    pub fn set_ungrouped_measure_references(
+    pub fn add_ungrouped_measure_reference<T: Into<RenderReferencesType>>(
         &mut self,
-        value: HashMap<String, QualifiedColumnName>,
+        name: String,
+        value: T,
     ) {
-        self.ungrouped_measure_references = value;
-    }
-
-    pub fn add_ungrouped_measure_reference(&mut self, key: String, value: QualifiedColumnName) {
-        self.ungrouped_measure_references.insert(key, value);
+        self.ungrouped_measure_references.insert(name, value);
     }
 
     pub fn set_cube_name_references(&mut self, value: HashMap<String, String>) {

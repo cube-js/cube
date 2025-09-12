@@ -2,8 +2,8 @@ use crate::plan::{
     CalcGroupsJoin, Filter, FilterItem, From, FromSource, Join, QualifiedColumnName,
     SingleAliasedSource, SingleSource,
 };
+use crate::planner::sql_evaluator::sql_nodes::RenderReferences;
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::MemberSymbol;
@@ -49,7 +49,7 @@ impl ReferencesBuilder {
         &self,
         member: Rc<MemberSymbol>,
         strict_source: &Option<String>,
-        references: &mut HashMap<String, QualifiedColumnName>,
+        references: &mut RenderReferences,
     ) -> Result<(), CubeError> {
         let member_name = member.full_name();
         if references.contains_key(&member_name) {
@@ -108,7 +108,7 @@ impl ReferencesBuilder {
     pub fn resolve_references_for_filter(
         &self,
         filter: &Option<Filter>,
-        references: &mut HashMap<String, QualifiedColumnName>,
+        references: &mut RenderReferences,
     ) -> Result<(), CubeError> {
         if let Some(filter) = filter {
             for itm in filter.items.iter() {
@@ -138,7 +138,7 @@ impl ReferencesBuilder {
     fn resolve_references_for_filter_item(
         &self,
         item: &FilterItem,
-        references: &mut HashMap<String, QualifiedColumnName>,
+        references: &mut RenderReferences,
     ) -> Result<(), CubeError> {
         match item {
             FilterItem::Item(item) => self.resolve_references_for_member(
