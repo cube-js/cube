@@ -57,3 +57,21 @@ pub fn collect_calc_group_dims(
     let res = visitor.extract_result();
     Ok(res)
 }
+
+pub fn collect_calc_group_dims_from_nodes<'a, T>(
+    nodes: T,
+) -> Result<Vec<Rc<MemberSymbol>>, CubeError>
+where
+    T: Iterator<Item = &'a Rc<MemberSymbol>>,
+{
+    let mut visitor = CalcGroupDimsCollector::new();
+    for node in nodes {
+        visitor.apply(node, &())?;
+    }
+    let res = visitor
+        .extract_result()
+        .into_iter()
+        .unique_by(|s| s.full_name())
+        .collect();
+    Ok(res)
+}

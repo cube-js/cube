@@ -9,16 +9,45 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+pub enum RenderReferencesType {
+    QualifiedColumnName(QualifiedColumnName),
+    LiteralValue(String),
+}
+
+impl From<QualifiedColumnName> for RenderReferencesType {
+    fn from(value: QualifiedColumnName) -> Self {
+        Self::QualifiedColumnName(value)
+    }
+}
+
+impl From<String> for RenderReferencesType {
+    fn from(value: String) -> Self {
+        Self::LiteralValue(value)
+    }
+}
+
+#[derive(Default)]
+pub struct RenderReferences {
+    references: HashMap<String, RenderReferencesType>,
+}
+
+impl RenderReferences {
+    pub fn insert<T: Into<RenderReferencesType>>(&mut self, name: String, value: T) {
+        self.references.insert(name, value.into());
+    }
+
+    pub fn get(&self, name: &str) -> Option<&RenderReferencesType> {
+        self.references.get(name)
+    }
+}
+
 pub struct RenderReferencesSqlNode {
     input: Rc<dyn SqlNode>,
-    references: HashMap<String, QualifiedColumnName>,
+    references: RenderReferences,
 }
 
 impl RenderReferencesSqlNode {
-    pub fn new(
-        input: Rc<dyn SqlNode>,
-        references: HashMap<String, QualifiedColumnName>,
-    ) -> Rc<Self> {
+    pub fn new(input: Rc<dyn SqlNode>, references: RenderReferences) -> Rc<Self> {
         Rc::new(Self { input, references })
     }
 

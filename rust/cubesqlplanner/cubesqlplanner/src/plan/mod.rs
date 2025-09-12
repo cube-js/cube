@@ -1,4 +1,5 @@
 pub mod builder;
+pub mod calc_groups_join;
 pub mod cte;
 pub mod expression;
 pub mod filter;
@@ -12,6 +13,7 @@ pub mod time_series;
 pub mod union;
 
 pub use builder::{JoinBuilder, SelectBuilder};
+pub use calc_groups_join::*;
 pub use cte::Cte;
 pub use expression::{Expr, MemberExpression};
 pub use filter::{Filter, FilterGroup, FilterItem};

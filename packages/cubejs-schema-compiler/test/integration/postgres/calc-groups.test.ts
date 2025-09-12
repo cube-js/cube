@@ -436,7 +436,7 @@ views:
     `);
 
   if (getEnv('nativeSqlPlanner')) {
-    it('basic cross join', async () => dbRunner.runQueryTest({
+    it('basic cross join 1', async () => dbRunner.runQueryTest({
       dimensions: ['orders.currency'],
       timeDimensions: [
         {

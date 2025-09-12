@@ -1,11 +1,11 @@
 #[macro_use]
 mod logical_source;
 mod aggregate_multiplied_subquery;
-mod calc_groups_cross_join;
 mod cube;
 mod dimension_subquery;
 mod filter;
 mod full_key_aggregate;
+mod helper;
 mod join;
 mod keys_subquery;
 mod logical_node;
@@ -22,11 +22,11 @@ mod schema;
 pub mod visitor;
 
 pub use aggregate_multiplied_subquery::*;
-pub use calc_groups_cross_join::*;
 pub use cube::*;
 pub use dimension_subquery::*;
 pub use filter::*;
 pub use full_key_aggregate::*;
+pub use helper::*;
 pub use join::*;
 pub use keys_subquery::*;
 pub use logical_node::*;

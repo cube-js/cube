@@ -51,6 +51,16 @@ impl fmt::Display for FilterGroupOperator {
     }
 }
 
+impl Filter {
+    pub fn all_member_evaluators(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut result = Vec::new();
+        for item in self.items.iter() {
+            item.find_all_member_evaluators(&mut result);
+        }
+        result
+    }
+}
+
 impl FilterItem {
     pub fn to_sql(
         &self,
