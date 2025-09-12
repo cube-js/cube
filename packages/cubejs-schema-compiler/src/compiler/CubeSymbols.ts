@@ -572,6 +572,8 @@ export class CubeSymbols implements TranspilerSymbolResolver {
 
     const autoIncludeMembers = new Set<string>();
     // `hierarchies` must be processed first
+    // It's also important `dimensions` to be processed BEFORE `measures`
+    // because drillMembers processing for views in generateIncludeMembers() relies on this
     const types = ['hierarchies', 'dimensions', 'measures', 'segments'];
 
     const joinMap: string[][] = [];
@@ -804,52 +806,15 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     return this.symbols[cubeName]?.cubeObj()?.[type]?.[memberName];
   }
 
-  protected createViewAwareDrillMemberFunction(
-    originalFunction: Function,
-    sourceCubeName: string,
-    targetCubeName: string,
-    originalDrillMembers: string[]
-  ) {
-    const cubeEvaluator = this;
+  protected generateIncludeMembers(members: any[], type: string, targetCube: CubeDefinitionExtended) {
+    const availableDimMembers = new Set<string>();
 
-    return function drillMemberFilter(..._args: any[]) {
-      // Transform source cube references to target cube references
-      // e.g., "Orders.id" -> "OrdersSimpleView.id"
-      const transformedDrillMembers = originalDrillMembers.map(member => {
-        const memberParts = member.split('.');
-        if (memberParts[0] === sourceCubeName) {
-          return `${targetCubeName}.${memberParts[1]}`;
-        }
-        return member; // Keep as-is if not from source cube
+    if (type === 'measures') {
+      Object.keys(targetCube.dimensions || {}).forEach(dimName => {
+        availableDimMembers.add(`${targetCube.name}.${dimName}`);
       });
+    }
 
-      // Get the target cube to check which members actually exist
-      const targetCubeSymbol = cubeEvaluator.symbols[targetCubeName];
-      if (!targetCubeSymbol) {
-        return [];
-      }
-
-      const targetCube = targetCubeSymbol.cubeObj();
-      if (!targetCube) {
-        return [];
-      }
-
-      // Build set of available members in the target cube
-      const availableMembers = new Set<string>();
-      ['measures', 'dimensions', 'segments'].forEach(memberType => {
-        if (targetCube[memberType]) {
-          Object.keys(targetCube[memberType]).forEach(memberName => {
-            availableMembers.add(`${targetCubeName}.${memberName}`);
-          });
-        }
-      });
-
-      // Filter drill members to only include available ones
-      return transformedDrillMembers.filter(member => availableMembers.has(member));
-    };
-  }
-
-  protected generateIncludeMembers(members: any[], type: string, targetCube?: CubeDefinitionExtended) {
     return members.map(memberRef => {
       const path = memberRef.member.split('.');
       const resolvedMember = this.getResolvedMember(type, path[path.length - 2], path[path.length - 1]);
@@ -857,10 +822,10 @@ export class CubeSymbols implements TranspilerSymbolResolver {
         throw new Error(`Can't resolve '${memberRef.member}' while generating include members`);
       }
 
-      // Store drill member processing info for later use in the member definition
       let processedDrillMembers = resolvedMember.drillMembers;
 
-      if (type === 'measures' && resolvedMember.drillMembers && targetCube?.isView) {
+      // We need to filter only included drillMembers for views
+      if (type === 'measures' && resolvedMember.drillMembers && targetCube.isView) {
         const sourceCubeName = path[path.length - 2];
 
         const evaluatedDrillMembers = this.evaluateReferences(
@@ -869,17 +834,19 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           { originalSorting: true }
         );
 
-        const drillMembersArray = Array.isArray(evaluatedDrillMembers)
+        const drillMembersArray = (Array.isArray(evaluatedDrillMembers)
           ? evaluatedDrillMembers
-          : [evaluatedDrillMembers];
+          : [evaluatedDrillMembers]).map(member => {
+          const memberParts = member.split('.');
+          if (memberParts[0] === sourceCubeName) {
+            return `${targetCube.name}.${memberParts[1]}`;
+          }
+          return member; // Keep as-is if not from source cube
+        });
 
-        // Create a new filtered function for this view
-        processedDrillMembers = this.createViewAwareDrillMemberFunction(
-          resolvedMember.drillMembers,
-          sourceCubeName,
-          targetCube.name,
-          drillMembersArray
-        );
+        const filteredDrillMembers = drillMembersArray.filter(member => availableDimMembers.has(member));
+
+        processedDrillMembers = () => filteredDrillMembers;
       }
 
       // eslint-disable-next-line no-new-func
