@@ -9,6 +9,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub enum RenderReferencesType {
     QualifiedColumnName(QualifiedColumnName),
     LiteralValue(String),
@@ -26,7 +27,7 @@ impl From<String> for RenderReferencesType {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RenderReferences {
     references: HashMap<String, RenderReferencesType>,
 }
@@ -38,6 +39,14 @@ impl RenderReferences {
 
     pub fn get(&self, name: &str) -> Option<&RenderReferencesType> {
         self.references.get(name)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.references.is_empty()
+    }
+
+    pub fn contains_key(&self, name: &str) -> bool {
+        self.references.contains_key(name)
     }
 }
 
@@ -67,16 +76,21 @@ impl SqlNode for RenderReferencesSqlNode {
     ) -> Result<String, CubeError> {
         let full_name = node.full_name();
         if let Some(reference) = self.references.get(&full_name) {
-            let table_ref = if let Some(table_name) = reference.source() {
-                format!("{}.", templates.quote_identifier(table_name)?)
-            } else {
-                format!("")
-            };
-            Ok(format!(
-                "{}{}",
-                table_ref,
-                templates.quote_identifier(&reference.name())?
-            ))
+            match reference {
+                RenderReferencesType::QualifiedColumnName(column_name) => {
+                    let table_ref = if let Some(table_name) = column_name.source() {
+                        format!("{}.", templates.quote_identifier(table_name)?)
+                    } else {
+                        format!("")
+                    };
+                    Ok(format!(
+                        "{}{}",
+                        table_ref,
+                        templates.quote_identifier(&column_name.name())?
+                    ))
+                }
+                RenderReferencesType::LiteralValue(value) => templates.quote_string(value),
+            }
         } else {
             self.input.to_sql(
                 visitor,

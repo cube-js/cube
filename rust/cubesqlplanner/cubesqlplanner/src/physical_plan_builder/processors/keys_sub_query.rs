@@ -23,7 +23,6 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
-        let mut render_references = HashMap::new();
         let alias_prefix = Some(format!(
             "{}_key",
             query_tools.alias_for_cube(&keys_subquery.pk_cube().cube().name())?
@@ -42,7 +41,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         self.builder.resolve_subquery_dimensions_references(
             &keys_subquery.source().dimension_subqueries(),
             &references_builder,
-            &mut render_references,
+            &mut context_factory,
         )?;
         for member in keys_subquery
             .schema()
@@ -58,14 +57,13 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
             references_builder.resolve_references_for_member(
                 member.clone(),
                 &None,
-                &mut render_references,
+                context_factory.render_references_mut(),
             )?;
             select_builder.add_projection_member(member, Some(alias));
         }
 
         select_builder.set_distinct();
         select_builder.set_filter(keys_subquery.filter().all_filters());
-        context_factory.set_render_references(render_references);
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)
     }
