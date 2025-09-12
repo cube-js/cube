@@ -38,11 +38,11 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
                     self.has_multi_stage = true;
                 }
             }
-            MemberSymbol::Dimension(s) => {
+            /* MemberSymbol::Dimension(s) => {
                 if s.is_multi_stage() {
                     self.has_multi_stage = true;
                 }
-            }
+            } */
             _ => {}
         };
         if self.has_multi_stage {
