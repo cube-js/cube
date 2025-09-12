@@ -83,15 +83,6 @@ impl SqlNodesFactory {
         &mut self.render_references
     }
 
-    pub fn add_calc_group_item(
-        &mut self,
-        cube_name: String,
-        dimension_name: String,
-        values: Vec<String>,
-    ) {
-        //self.calc_groups.add(cube_name, dimension_name, values);
-    }
-
     pub fn set_rendered_as_multiplied_measures(&mut self, value: HashSet<String>) {
         self.rendered_as_multiplied_measures = value;
     }

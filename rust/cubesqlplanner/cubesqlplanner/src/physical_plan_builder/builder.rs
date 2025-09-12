@@ -169,23 +169,6 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
-    pub(crate) fn process_calc_group(
-        &self,
-        symbol: &Rc<MemberSymbol>,
-        context_factory: &mut SqlNodesFactory,
-        filter: &Option<Filter>,
-    ) -> Result<(), CubeError> {
-        for dim in collect_calc_group_dims(symbol)? {
-            let values = get_filtered_values(&dim, filter);
-            context_factory.add_calc_group_item(
-                dim.cube_name().clone(),
-                dim.name().clone(),
-                values,
-            );
-        }
-        Ok(())
-    }
-
     pub(crate) fn make_order_by(
         &self,
         logical_schema: &LogicalSchema,

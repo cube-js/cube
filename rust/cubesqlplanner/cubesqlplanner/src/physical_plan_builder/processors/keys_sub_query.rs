@@ -1,9 +1,11 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::KeysSubQuery;
+use crate::logical_plan::{all_symbols, KeysSubQuery};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Select, SelectBuilder};
-use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::plan::{CalcGroupItem, CalcGroupsJoin, From, Select, SelectBuilder};
+use crate::planner::sql_evaluator::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::sql_evaluator::{get_filtered_values, ReferencesBuilder};
 use cubenativeutils::CubeError;
+use itertools::Itertools as _;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -36,6 +38,34 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
             .builder
             .process_node(keys_subquery.source().as_ref(), &context)?;
 
+        //FIXME dublication with QueryProcessor
+        let all_symbols = all_symbols(&keys_subquery.schema(), &keys_subquery.filter());
+        let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?;
+
+        let filter = keys_subquery.filter().all_filters();
+        let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
+            let values = get_filtered_values(&dim, &filter);
+            CalcGroupItem {
+                symbol: dim,
+                values,
+            }
+        });
+        for item in calc_groups_items
+            .clone()
+            .filter(|itm| itm.values.len() == 1)
+        {
+            context_factory.add_render_reference(item.symbol.full_name(), item.values[0].clone());
+        }
+        let calc_groups_to_join = calc_groups_items
+            .filter(|itm| itm.values.len() > 1)
+            .collect_vec();
+        let source = if calc_groups_to_join.is_empty() {
+            source
+        } else {
+            let groups_join = CalcGroupsJoin::try_new(source, calc_groups_to_join)?;
+            From::new_from_calc_groups_join(groups_join)
+        };
+
         let references_builder = ReferencesBuilder::new(source.clone());
         let mut select_builder = SelectBuilder::new(source);
         self.builder.resolve_subquery_dimensions_references(
@@ -49,11 +79,11 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
             .chain(keys_subquery.primary_keys_dimensions().iter())
         {
             let alias = member.alias();
-            self.builder.process_calc_group(
+            /* self.builder.process_calc_group(
                 member,
                 &mut context_factory,
                 &keys_subquery.filter().all_filters(),
-            )?;
+            )?; */
             references_builder.resolve_references_for_member(
                 member.clone(),
                 &None,
@@ -63,7 +93,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         }
 
         select_builder.set_distinct();
-        select_builder.set_filter(keys_subquery.filter().all_filters());
+        select_builder.set_filter(filter);
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)
     }

@@ -18,7 +18,6 @@ pub(super) struct PushDownBuilderContext {
     pub dimensions_query: bool,
     pub measure_subquery: bool,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
-    pub calc_groups_resolved: bool,
 }
 
 impl PushDownBuilderContext {
