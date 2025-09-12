@@ -18,6 +18,7 @@ pub enum FilterType {
     Measure,
 }
 
+#[derive(Clone)]
 pub struct BaseFilter {
     query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
@@ -83,6 +84,12 @@ impl BaseFilter {
         }
     }
 
+    pub fn with_member_evaluator(&self, member_evaluator: Rc<MemberSymbol>) -> Rc<Self> {
+        let mut result = self.clone();
+        result.member_evaluator = member_evaluator;
+        Rc::new(result)
+    }
+
     //FIXME Not very good solution, but suitable for check time dimension filters in pre-aggregations
     pub fn time_dimension_symbol(&self) -> Option<Rc<MemberSymbol>> {
         if self.member_evaluator.as_time_dimension().is_ok() {
@@ -110,6 +117,14 @@ impl BaseFilter {
 
     pub fn is_single_value_equal(&self) -> bool {
         self.values.len() == 1 && self.filter_operator == FilterOperator::Equal
+    }
+
+    pub fn get_single_value_restriction(&self) -> Option<String> {
+        if self.is_single_value_equal() {
+            self.values[0].clone()
+        } else {
+            None
+        }
     }
 
     pub fn to_sql(

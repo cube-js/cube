@@ -1,3 +1,4 @@
+mod calc_group_dims_collector;
 mod cube_names_collector;
 mod find_owned_by_cube;
 mod has_cumulative_members;
@@ -10,6 +11,7 @@ mod sub_query_dimensions;
 pub use cube_names_collector::*;
 pub use find_owned_by_cube::*;
 
+pub use calc_group_dims_collector::{collect_calc_group_dims, collect_calc_group_dims_from_nodes};
 pub use has_cumulative_members::{has_cumulative_members, HasCumulativeMembersCollector};
 pub use has_multi_stage_members::{has_multi_stage_members, HasMultiStageMembersCollector};
 pub use join_hints_collector::{

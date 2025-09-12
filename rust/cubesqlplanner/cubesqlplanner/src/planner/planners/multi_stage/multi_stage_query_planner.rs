@@ -6,6 +6,7 @@ use super::{
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::logical_plan::*;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::apply_static_filter_to_symbol;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::MemberSymbol;
@@ -91,10 +92,12 @@ impl MultiStageQueryPlanner {
         let top_level_ctes = top_level_ctes
             .iter()
             .map(|(alias, symbols)| {
-                Rc::new(MultiStageSubqueryRef {
-                    name: alias.clone(),
-                    symbols: symbols.clone(),
-                })
+                Rc::new(
+                    MultiStageSubqueryRef::builder()
+                        .name(alias.clone())
+                        .symbols(symbols.clone())
+                        .build(),
+                )
             })
             .collect_vec();
 
@@ -135,6 +138,7 @@ impl MultiStageQueryPlanner {
                 is_ungrupped,
             )
         } else {
+            println!("!!!! jjjjj");
             (
                 MultiStageInodeMember::new(
                     MultiStageInodeMemberType::Calculate,
@@ -156,6 +160,8 @@ impl MultiStageQueryPlanner {
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let member = member.resolve_reference_chain();
+        let member = apply_static_filter_to_symbol(&member, state.dimensions_filters())?;
+
         let member_name = member.full_name();
         if let Some(exists) = descriptions
             .iter()
@@ -196,7 +202,17 @@ impl MultiStageQueryPlanner {
             let (multi_stage_member, is_ungrupped) =
                 self.create_multi_stage_inode_member(member.clone())?;
 
-            let dimensions_to_add = multi_stage_member.add_group_by_symbols();
+            let mut dimensions_to_add = multi_stage_member.add_group_by_symbols().clone();
+            if let Ok(measure) = member.as_measure() {
+                if let Some(switch_dim) = measure.case_switch_dimension() {
+                    if !state.dimensions().iter().any(|d| {
+                        d.clone().resolve_reference_chain()
+                            == switch_dim.clone().resolve_reference_chain()
+                    }) {
+                        dimensions_to_add.push(switch_dim);
+                    }
+                }
+            }
 
             let new_state = if !dimensions_to_add.is_empty()
                 || multi_stage_member.time_shift().is_some()

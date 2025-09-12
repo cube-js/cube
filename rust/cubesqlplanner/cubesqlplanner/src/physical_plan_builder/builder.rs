@@ -5,8 +5,10 @@ use crate::plan::schema::QualifiedColumnName;
 use crate::plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::sql_evaluator::collectors::collect_calc_group_dims;
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::planner::sql_evaluator::{get_filtered_values, MemberSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -146,17 +148,17 @@ impl PhysicalPlanBuilder {
         &self,
         dimension_subqueries: &Vec<Rc<DimensionSubQuery>>,
         references_builder: &ReferencesBuilder,
-        render_references: &mut HashMap<String, QualifiedColumnName>,
+        context_factory: &mut SqlNodesFactory,
     ) -> Result<(), CubeError> {
         for dimension_subquery in dimension_subqueries.iter() {
             if let Some(dim_ref) = references_builder.find_reference_for_member(
-                &dimension_subquery
-                    .measure_for_subquery_dimension
-                    .full_name(),
+                &dimension_subquery.measure_for_subquery_dimension,
                 &None,
             ) {
-                render_references
-                    .insert(dimension_subquery.subquery_dimension.full_name(), dim_ref);
+                context_factory.add_render_reference(
+                    dimension_subquery.subquery_dimension.full_name(),
+                    dim_ref,
+                );
             } else {
                 return Err(CubeError::internal(format!(
                     "Can't find source for subquery dimension {}",

@@ -72,8 +72,7 @@ impl SymbolFactory for CubeNameSymbolFactory {
 pub struct CubeTableSymbol {
     cube_name: String,
     member_sql: Option<Rc<SqlCall>>,
-    #[allow(dead_code)]
-    definition: Rc<dyn CubeDefinition>,
+    alias: String,
     is_table_sql: bool,
 }
 
@@ -81,13 +80,13 @@ impl CubeTableSymbol {
     pub fn new(
         cube_name: String,
         member_sql: Option<Rc<SqlCall>>,
-        definition: Rc<dyn CubeDefinition>,
+        alias: String,
         is_table_sql: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_name,
             member_sql,
-            definition,
+            alias,
             is_table_sql,
         })
     }
@@ -132,7 +131,7 @@ impl CubeTableSymbol {
     }
 
     pub fn alias(&self) -> String {
-        PlanSqlTemplates::alias_name(&self.cube_name)
+        self.alias.clone()
     }
 }
 
@@ -194,10 +193,15 @@ impl SymbolFactory for CubeTableSymbolFactory {
         } else {
             None
         };
+        let alias = if let Some(alias) = definition.static_data().sql_alias.clone() {
+            alias.clone()
+        } else {
+            PlanSqlTemplates::alias_name(&cube_name)
+        };
         Ok(MemberSymbol::new_cube_table(CubeTableSymbol::new(
             cube_name,
             sql,
-            definition,
+            alias,
             is_table_sql,
         )))
     }

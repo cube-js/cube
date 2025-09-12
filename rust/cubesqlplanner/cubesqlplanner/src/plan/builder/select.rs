@@ -1,6 +1,6 @@
 use crate::plan::{
-    AliasedExpr, Cte, Expr, Filter, From, MemberExpression, OrderBy, QualifiedColumnName, Schema,
-    SchemaColumn, Select, SingleAliasedSource, SingleSource,
+    AliasedExpr, Cte, Expr, Filter, From, FromSource, MemberExpression, OrderBy,
+    QualifiedColumnName, Schema, SchemaColumn, Select, SingleAliasedSource, SingleSource,
 };
 
 use crate::plan::expression::FunctionExpression;
@@ -74,7 +74,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
     pub fn add_projection_member_without_schema(
@@ -112,7 +112,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
     pub fn add_projection_group_any_member(
@@ -130,7 +130,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
     pub fn add_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: Option<String>) {
@@ -147,7 +147,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
     pub fn add_count_all(&mut self, alias: String) {
@@ -205,7 +205,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
     pub fn add_projection_coalesce_member(
         &mut self,
@@ -243,7 +243,7 @@ impl SelectBuilder {
 
         self.projection_columns.push(aliased_expr);
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
         Ok(())
     }
 
@@ -282,16 +282,17 @@ impl SelectBuilder {
     pub fn make_cube_references(from: Rc<From>) -> HashMap<String, String> {
         let mut refs = HashMap::new();
         match &from.source {
-            crate::plan::FromSource::Single(source) => {
-                Self::add_cube_reference_if_needed(source, &mut refs)
-            }
-            crate::plan::FromSource::Join(join) => {
+            FromSource::Single(source) => Self::add_cube_reference_if_needed(source, &mut refs),
+            FromSource::Join(join) => {
                 Self::add_cube_reference_if_needed(&join.root, &mut refs);
                 for join_item in join.joins.iter() {
                     Self::add_cube_reference_if_needed(&join_item.from, &mut refs);
                 }
             }
-            crate::plan::FromSource::Empty => {}
+            FromSource::Empty => {}
+            FromSource::CalcGroupsJoin(calc_groups) => {
+                refs = Self::make_cube_references(calc_groups.from().clone())
+            }
         }
         refs
     }
@@ -305,15 +306,27 @@ impl SelectBuilder {
         }
     }
 
-    fn make_asteriks_schema(&self) -> Rc<Schema> {
-        let schema = match &self.from.source {
-            crate::plan::FromSource::Empty => Rc::new(Schema::empty()),
-            crate::plan::FromSource::Single(source) => source.source.schema(),
-            crate::plan::FromSource::Join(join) => {
+    fn make_asteriks_schema(from: &Rc<From>) -> Rc<Schema> {
+        let schema = match &from.source {
+            FromSource::Empty => Rc::new(Schema::empty()),
+            FromSource::Single(source) => source.source.schema(),
+            FromSource::Join(join) => {
                 let mut schema = Schema::empty();
                 schema.merge(join.root.source.schema().as_ref());
                 for itm in join.joins.iter() {
                     schema.merge(itm.from.source.schema().as_ref())
+                }
+                Rc::new(schema)
+            }
+            FromSource::CalcGroupsJoin(calc_groups) => {
+                let mut schema = Self::make_asteriks_schema(calc_groups.from())
+                    .as_ref()
+                    .clone();
+                for itm in calc_groups.calc_groups().iter() {
+                    schema.add_column(SchemaColumn::new(
+                        itm.symbol.alias(),
+                        Some(itm.symbol.clone()),
+                    ));
                 }
                 Rc::new(schema)
             }
@@ -325,7 +338,7 @@ impl SelectBuilder {
         let cube_references = Self::make_cube_references(self.from.clone());
         nodes_factory.set_cube_name_references(cube_references);
         let schema = if self.projection_columns.is_empty() {
-            self.make_asteriks_schema()
+            Self::make_asteriks_schema(&self.from)
         } else {
             Rc::new(self.result_schema)
         };

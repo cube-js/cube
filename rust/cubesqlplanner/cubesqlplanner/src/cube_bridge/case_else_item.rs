@@ -1,4 +1,4 @@
-use super::case_label::CaseLabel;
+use super::string_or_sql::StringOrSql;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -11,5 +11,5 @@ use std::rc::Rc;
 #[nativebridge::native_bridge]
 pub trait CaseElseItem {
     #[nbridge(field)]
-    fn label(&self) -> Result<CaseLabel, CubeError>;
+    fn label(&self) -> Result<StringOrSql, CubeError>;
 }

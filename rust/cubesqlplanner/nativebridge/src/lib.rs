@@ -461,11 +461,27 @@ impl NativeService {
 
     fn struct_impl(&self) -> proc_macro2::TokenStream {
         let struct_ident = self.struct_ident();
+        let struct_name = struct_ident.to_string();
+        let has_required_fields = self.methods.iter().any(|m| !m.is_optional());
+        let required_field_check = if has_required_fields {
+            let checks = self
+                .methods
+                .iter()
+                .map(|m| m.required_field_check(&struct_name))
+                .collect_vec();
+            quote! {
+                let native_struct = native_object.to_struct()?;
+                #( #checks )*
+            }
+        } else {
+            quote! {}
+        };
         if let Some(static_data_type) = &self.static_data_type {
             quote! {
                 impl<IT: InnerTypes> #struct_ident<IT> {
                     pub fn try_new(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
                         let static_data = #static_data_type::from_native(native_object.clone())?;
+                        #required_field_check
                         Ok(Self {native_object, static_data} )
                     }
                 }
@@ -474,6 +490,7 @@ impl NativeService {
             quote! {
                 impl<IT: InnerTypes> #struct_ident<IT> {
                     pub fn try_new(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
+                        #required_field_check
                         Ok(Self {native_object} )
                     }
                 }
@@ -544,6 +561,27 @@ impl NativeMethod {
                 fn #ident(#( #args ),*) #output;
             }
         }
+    }
+
+    fn required_field_check(&self, struct_name: &str) -> proc_macro2::TokenStream {
+        let &Self { method_params, .. } = &self;
+        let js_method_name = method_params
+            .custom_name
+            .clone()
+            .unwrap_or_else(|| self.camel_case_name());
+        if method_params.is_optional {
+            quote! {}
+        } else {
+            quote! {
+               if !native_struct.has_field(#js_method_name)? {
+                   return Err(CubeError::internal(format!("Field {} is required for {}", #js_method_name, #struct_name)));
+               }
+            }
+        }
+    }
+
+    fn is_optional(&self) -> bool {
+        self.method_params.is_optional
     }
 
     fn method_impl(&self) -> proc_macro2::TokenStream {

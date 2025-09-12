@@ -51,6 +51,16 @@ impl fmt::Display for FilterGroupOperator {
     }
 }
 
+impl Filter {
+    pub fn all_member_evaluators(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut result = Vec::new();
+        for item in self.items.iter() {
+            item.find_all_member_evaluators(&mut result);
+        }
+        result
+    }
+}
+
 impl FilterItem {
     pub fn to_sql(
         &self,
@@ -102,6 +112,58 @@ impl FilterItem {
             }
             FilterItem::Item(item) => result.push(item.member_evaluator().clone()),
             FilterItem::Segment(item) => result.push(item.member_evaluator().clone()),
+        }
+    }
+    pub fn find_single_value_restriction(&self, symbol: &Rc<MemberSymbol>) -> Option<String> {
+        match self {
+            FilterItem::Item(item) => {
+                if &item.member_evaluator().resolve_reference_chain() == symbol {
+                    item.get_single_value_restriction()
+                } else {
+                    None
+                }
+            }
+
+            FilterItem::Group(group) => match group.operator {
+                FilterGroupOperator::Or => {
+                    let mut candidate: Option<String> = None;
+
+                    for child in &group.items {
+                        match child.find_single_value_restriction(symbol) {
+                            None => return None,
+                            Some(v) => {
+                                if let Some(prev) = &candidate {
+                                    if prev != &v {
+                                        return None;
+                                    }
+                                } else {
+                                    candidate = Some(v);
+                                }
+                            }
+                        }
+                    }
+
+                    candidate
+                }
+
+                FilterGroupOperator::And => {
+                    let mut candidate: Option<String> = None;
+
+                    for child in &group.items {
+                        if let Some(v) = child.find_single_value_restriction(symbol) {
+                            if let Some(prev) = &candidate {
+                                if prev != &v {
+                                    return None;
+                                }
+                            }
+                            candidate = Some(v);
+                        }
+                    }
+
+                    candidate
+                }
+            },
+            FilterItem::Segment(_) => None,
         }
     }
 }

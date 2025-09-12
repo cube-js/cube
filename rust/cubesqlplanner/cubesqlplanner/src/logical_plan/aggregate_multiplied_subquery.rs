@@ -3,30 +3,12 @@ use super::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub enum AggregateMultipliedSubquerySouce {
-    Cube(Rc<Cube>),
-    MeasureSubquery(Rc<MeasureSubquery>),
-}
-
-impl AggregateMultipliedSubquerySouce {
-    fn as_plan_node(&self) -> PlanNode {
-        match self {
-            Self::Cube(item) => item.as_plan_node(),
-            Self::MeasureSubquery(item) => item.as_plan_node(),
-        }
-    }
-    fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError> {
-        Ok(match self {
-            Self::Cube(_) => Self::Cube(plan_node.into_logical_node()?),
-            Self::MeasureSubquery(_) => Self::MeasureSubquery(plan_node.into_logical_node()?),
-        })
-    }
-}
+logical_source_enum!(AggregateMultipliedSubquerySource, [Cube, MeasureSubquery]);
 
 pub struct AggregateMultipliedSubquery {
     pub schema: Rc<LogicalSchema>,
     pub keys_subquery: Rc<KeysSubQuery>,
-    pub source: AggregateMultipliedSubquerySouce,
+    pub source: AggregateMultipliedSubquerySource,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
 }
 
@@ -127,16 +109,7 @@ impl PrettyPrint for AggregateMultipliedSubquery {
         result.println("keys_subquery:", &state);
         self.keys_subquery.pretty_print(result, &details_state);
         result.println("source:", &state);
-        match &self.source {
-            AggregateMultipliedSubquerySouce::Cube(cube) => {
-                result.println("Cube:", &details_state);
-                cube.pretty_print(result, &details_state.new_level());
-            }
-            AggregateMultipliedSubquerySouce::MeasureSubquery(measure_subquery) => {
-                result.println(&format!("MeasureSubquery: "), &details_state);
-                measure_subquery.pretty_print(result, &details_state);
-            }
-        }
+        self.source.pretty_print(result, &details_state);
         if !self.dimension_subqueries.is_empty() {
             result.println("dimension_subqueries:", &state);
             let details_state = state.new_level();

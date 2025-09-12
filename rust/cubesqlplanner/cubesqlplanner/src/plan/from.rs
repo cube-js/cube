@@ -1,4 +1,4 @@
-use super::{Join, QueryPlan, Schema, Select};
+use super::{CalcGroupsJoin, Join, QueryPlan, Schema, Select};
 use crate::plan::Union;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseCube, VisitorContext};
@@ -100,6 +100,7 @@ pub enum FromSource {
     Empty,
     Single(SingleAliasedSource),
     Join(Rc<Join>),
+    CalcGroupsJoin(Rc<CalcGroupsJoin>),
 }
 
 #[derive(Clone)]
@@ -152,19 +153,9 @@ impl From {
         )))
     }
 
-    /* pub fn all_sources(&self) -> Vec<String> {
-        match &self.source {
-            FromSource::Empty => vec![],
-            FromSource::Single(s) => vec![s.alias.clone()],
-            FromSource::Join(j) => {
-                let mut sources = vec![j.root.alias.clone()];
-                for itm in j.joins.iter() {
-                    sources.push(itm.from.alias.clone());
-                }
-                sources
-            }
-        }
-    } */
+    pub fn new_from_calc_groups_join(join: Rc<CalcGroupsJoin>) -> Rc<Self> {
+        Self::new(FromSource::CalcGroupsJoin(join))
+    }
 
     pub fn to_sql(
         &self,
@@ -174,9 +165,8 @@ impl From {
         let sql = match &self.source {
             FromSource::Empty => format!(""),
             FromSource::Single(source) => source.to_sql(templates, context.clone())?,
-            FromSource::Join(j) => {
-                format!("{}", j.to_sql(templates, context.clone())?)
-            }
+            FromSource::Join(j) => j.to_sql(templates, context.clone())?,
+            FromSource::CalcGroupsJoin(j) => j.to_sql(templates, context.clone())?,
         };
         Ok(sql)
     }
