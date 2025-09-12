@@ -51,18 +51,8 @@ impl CalcGroupsJoin {
     ) -> Result<String, CubeError> {
         let base_sql = self.from.to_sql(templates, context)?;
         let original_sql = match &self.from.source {
-            FromSource::Join(_) => Some(format!(
-                "({}) {}",
-                base_sql,
-                templates.quote_identifier("original_join")?
-            )),
             FromSource::Empty => None,
-            FromSource::Single(source) => Some(base_sql),
-            FromSource::CalcGroupsJoin(_) => {
-                return Err(CubeError::internal(format!(
-                    "Nested CalcGroupsJoin not supported"
-                )));
-            }
+            _ => Some(base_sql),
         };
 
         let template_groups = self

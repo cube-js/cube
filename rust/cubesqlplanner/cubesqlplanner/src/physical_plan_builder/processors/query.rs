@@ -66,9 +66,16 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                     values,
                 }
             });
-            let calc_groups_to_join = calc_groups_items.collect_vec();
-            /* .filter(|itm| itm.values.len() == 1)
-            .collect_vec(); */
+            for item in calc_groups_items
+                .clone()
+                .filter(|itm| itm.values.len() == 1)
+            {
+                context_factory
+                    .add_render_reference(item.symbol.full_name(), item.values[0].clone());
+            }
+            let calc_groups_to_join = calc_groups_items
+                .filter(|itm| itm.values.len() > 1)
+                .collect_vec();
             if calc_groups_to_join.is_empty() {
                 from
             } else {
@@ -118,8 +125,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 &None,
                 context_factory.render_references_mut(),
             )?;
-            self.builder
-                .process_calc_group(member, &mut context_factory, &filter)?;
             if context.measure_subquery {
                 select_builder.add_projection_member_without_schema(member, None);
             } else {

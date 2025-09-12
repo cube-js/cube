@@ -4240,7 +4240,7 @@ export class BaseQuery {
         'SELECT {{ value }} as {{ group.name }}' +
         '{% if not loop.last %} UNION ALL\n{% endif %}' +
         '{% endfor %}' +
-        ') {{ group.alias }}\n' +
+        ') AS {{ group.alias }}\n' +
         '{% endfor %}'
       },
       expressions: {
