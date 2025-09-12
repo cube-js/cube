@@ -47,7 +47,7 @@ cube(\`Orders\`, {
   measures: {
     count: {
       type: \`count\`,
-      //drillMembers: [id, createdAt]
+      drillMembers: [id, createdAt]
     },
 
     runningTotal: {
@@ -255,6 +255,13 @@ view(\`OrdersView3\`, {
     split: true
   }]
 });
+
+view(\`OrdersSimpleView\`, {
+  cubes: [{
+    join_path: Orders,
+    includes: ['createdAt', 'count']
+  }]
+});
     `);
 
   async function runQueryTest(q: any, expectedResult: any, additionalTest?: (query: BaseQuery) => any) {
@@ -429,4 +436,66 @@ view(\`OrdersView3\`, {
     orders_view3__count: '2',
     orders_view3__product_categories__name: 'Groceries',
   }]));
+
+  it('check drillMembers are inherited in views', async () => {
+    await compiler.compile();
+    const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
+    const countMeasure = cube.config.measures.find((m) => m.name === 'OrdersView.count');
+    expect(countMeasure.drillMembers).toEqual(['OrdersView.id', 'OrdersView.createdAt']);
+    expect(countMeasure.drillMembersGrouped).toEqual({
+      measures: [],
+      dimensions: ['OrdersView.id', 'OrdersView.createdAt']
+    });
+  });
+
+  it('verify drill member inheritance functionality', async () => {
+    await compiler.compile();
+
+    // Check that the source Orders cube has drill members
+    const sourceOrdersCube = metaTransformer.cubes.find(c => c.config.name === 'Orders');
+    const sourceCountMeasure = sourceOrdersCube.config.measures.find((m) => m.name === 'Orders.count');
+    expect(sourceCountMeasure.drillMembers).toEqual(['Orders.id', 'Orders.createdAt']);
+
+    // Check that the OrdersView cube inherits these drill members with correct naming
+    const viewCube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
+    const viewCountMeasure = viewCube.config.measures.find((m) => m.name === 'OrdersView.count');
+
+    expect(viewCountMeasure.drillMembers).toBeDefined();
+    expect(Array.isArray(viewCountMeasure.drillMembers)).toBe(true);
+    expect(viewCountMeasure.drillMembers.length).toBeGreaterThan(0);
+    expect(viewCountMeasure.drillMembers).toContain('OrdersView.id');
+    expect(viewCountMeasure.drillMembersGrouped).toBeDefined();
+  });
+
+  it('check drill member inheritance with limited includes in OrdersSimpleView', async () => {
+    await compiler.compile();
+    const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersSimpleView');
+
+    if (!cube) {
+      throw new Error('OrdersSimpleView not found in compiled cubes');
+    }
+
+    const countMeasure = cube.config.measures.find((m) => m.name === 'OrdersSimpleView.count');
+
+    if (!countMeasure) {
+      throw new Error('OrdersSimpleView.count measure not found');
+    }
+
+    // Check what dimensions are actually available in this limited view
+    const availableDimensions = cube.config.dimensions?.map(d => d.name) || [];
+
+    // This view only includes 'createdAt' dimension and should not include id
+    expect(availableDimensions).not.toContain('OrdersSimpleView.id');
+    expect(availableDimensions).toContain('OrdersSimpleView.createdAt');
+
+    // The source measure has drillMembers: ['Orders.id', 'Orders.createdAt']
+    // Both should be available in this view since we explicitly included them
+    expect(countMeasure.drillMembers).toBeDefined();
+    // Verify drill members are inherited and correctly transformed to use View naming
+    expect(countMeasure.drillMembers).toEqual(['OrdersSimpleView.createdAt']);
+    expect(countMeasure.drillMembersGrouped).toEqual({
+      measures: [],
+      dimensions: ['OrdersSimpleView.createdAt']
+    });
+  });
 });
