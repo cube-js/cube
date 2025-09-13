@@ -71,11 +71,14 @@ export class OracleQuery extends BaseQuery {
   }
 
   public dateTimeCast(value) {
-    return `to_date(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
+    // Use timezone-aware parsing for ISO 8601 with milliseconds and trailing 'Z', then cast to DATE
+    // to preserve index-friendly comparisons against DATE columns.
+    return `CAST(TO_TIMESTAMP_TZ(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"') AS DATE)`;
   }
 
   public timeStampCast(value) {
-    return this.dateTimeCast(value);
+    // Return timezone-aware timestamp for TIMESTAMP comparisons
+    return `TO_TIMESTAMP_TZ(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"')`;
   }
 
   public timeStampParam(timeDimension) {
