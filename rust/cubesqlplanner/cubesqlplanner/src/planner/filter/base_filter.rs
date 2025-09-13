@@ -6,6 +6,7 @@ use crate::planner::sql_templates::TemplateProjectionColumn;
 use crate::planner::{evaluate_with_context, FiltersContext, VisitorContext};
 use crate::planner::{Granularity, GranularityHelper, QueryDateTimeHelper};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 const FROM_PARTITION_RANGE: &str = "__FROM_PARTITION_RANGE";
@@ -119,11 +120,13 @@ impl BaseFilter {
         self.values.len() == 1 && self.filter_operator == FilterOperator::Equal
     }
 
-    pub fn get_single_value_restriction(&self) -> Option<String> {
-        if self.is_single_value_equal() {
-            self.values[0].clone()
+    pub fn get_value_restrictions(&self) -> Vec<String> {
+        if self.filter_operator == FilterOperator::In
+            || self.filter_operator == FilterOperator::Equal
+        {
+            self.values.iter().cloned().filter_map(|v| v).collect_vec()
         } else {
-            None
+            vec![]
         }
     }
 

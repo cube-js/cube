@@ -12,3 +12,4 @@ node_modules
 egraph-debug
 /cubesql/debug-qtrace
 .claude
+CLAUDE.md
