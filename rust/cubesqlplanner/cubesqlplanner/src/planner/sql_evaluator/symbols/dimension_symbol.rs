@@ -117,10 +117,9 @@ impl DimensionSymbol {
         &self.values
     }
 
-    pub(super) fn replace_case_with_sql_call(&self, sql: Rc<SqlCall>) -> Rc<DimensionSymbol> {
+    pub(super) fn replace_case(&self, new_case: Case) -> Rc<DimensionSymbol> {
         let mut new = self.clone();
-        new.case = None;
-        new.member_sql = Some(sql);
+        new.case = Some(new_case);
         Rc::new(new)
     }
 

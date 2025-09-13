@@ -120,13 +120,13 @@ impl BaseFilter {
         self.values.len() == 1 && self.filter_operator == FilterOperator::Equal
     }
 
-    pub fn get_value_restrictions(&self) -> Vec<String> {
+    pub fn get_value_restrictions(&self) -> Option<Vec<String>> {
         if self.filter_operator == FilterOperator::In
             || self.filter_operator == FilterOperator::Equal
         {
-            self.values.iter().cloned().filter_map(|v| v).collect_vec()
+            Some(self.values.iter().cloned().filter_map(|v| v).collect_vec())
         } else {
-            vec![]
+            None
         }
     }
 

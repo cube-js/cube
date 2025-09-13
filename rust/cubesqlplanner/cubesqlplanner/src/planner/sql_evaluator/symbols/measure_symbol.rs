@@ -5,8 +5,8 @@ use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
-use crate::planner::sql_evaluator::CubeTableSymbol;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{CaseSwitchItem, CubeTableSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
@@ -252,10 +252,9 @@ impl MeasureSymbol {
         }))
     }
 
-    pub(super) fn replace_case_with_sql_call(&self, sql: Rc<SqlCall>) -> Rc<MeasureSymbol> {
+    pub(super) fn replace_case(&self, new_case: Case) -> Rc<MeasureSymbol> {
         let mut new = self.clone();
-        new.case = None;
-        new.member_sql = Some(sql);
+        new.case = Some(new_case);
         Rc::new(new)
     }
 
@@ -296,10 +295,11 @@ impl MeasureSymbol {
 
     pub fn case_switch_dimension(&self) -> Option<Rc<MemberSymbol>> {
         if let Some(Case::CaseSwitch(case)) = &self.case {
-            case.switch.symbol_reference.clone()
-        } else {
-            None
+            if let CaseSwitchItem::Member(member) = &case.switch {
+                return Some(member.clone());
+            }
         }
+        None
     }
 
     pub fn is_addictive(&self) -> bool {

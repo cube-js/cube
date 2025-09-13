@@ -1,9 +1,10 @@
 use crate::plan::FilterItem;
 use crate::{
     cube_bridge::{case_variant::CaseVariant, string_or_sql::StringOrSql},
-    planner::sql_evaluator::{find_single_value_restriction, Compiler, MemberSymbol, SqlCall},
+    planner::sql_evaluator::{find_value_restriction, Compiler, MemberSymbol, SqlCall},
 };
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -73,10 +74,6 @@ impl CaseDefinition {
         let res = CaseDefinition { items, else_label };
         Ok(res)
     }
-
-    fn apply_static_filter(&self, _filters: &Vec<FilterItem>) -> Option<Rc<SqlCall>> {
-        None
-    }
 }
 
 #[derive(Clone)]
@@ -86,57 +83,115 @@ pub struct CaseSwitchWhenItem {
 }
 
 #[derive(Clone)]
-pub struct CaseSwitchItem {
-    pub sql: Rc<SqlCall>,
-    pub symbol_reference: Option<Rc<MemberSymbol>>,
+pub enum CaseSwitchItem {
+    Sql(Rc<SqlCall>),
+    Member(Rc<MemberSymbol>),
+}
+
+impl CaseSwitchItem {
+    fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
+        match self {
+            CaseSwitchItem::Sql(sql_call) => sql_call.extract_symbol_deps(result),
+            CaseSwitchItem::Member(member_symbol) => result.push(member_symbol.clone()),
+        }
+    }
+
+    fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
+        match self {
+            CaseSwitchItem::Sql(sql_call) => sql_call.extract_symbol_deps_with_path(result),
+            CaseSwitchItem::Member(member_symbol) => result.push((member_symbol.clone(), vec![])),
+        }
+    }
+
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Self, CubeError> {
+        let res = match self {
+            CaseSwitchItem::Sql(sql_call) => CaseSwitchItem::Sql(sql_call.apply_recursive(f)?),
+            CaseSwitchItem::Member(member) => CaseSwitchItem::Member(member.apply_recursive(f)?),
+        };
+        Ok(res)
+    }
 }
 
 #[derive(Clone)]
 pub struct CaseSwitchDefinition {
     pub switch: CaseSwitchItem,
     pub items: Vec<CaseSwitchWhenItem>,
-    pub else_sql: Rc<SqlCall>,
+    pub else_sql: Option<Rc<SqlCall>>,
 }
 
 impl CaseSwitchDefinition {
     fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
-        self.switch.sql.extract_symbol_deps(result);
+        self.switch.extract_symbol_deps(result);
         for itm in self.items.iter() {
             itm.sql.extract_symbol_deps(result);
         }
-        self.else_sql.extract_symbol_deps(result);
+        if let Some(else_sql) = &self.else_sql {
+            else_sql.extract_symbol_deps(result);
+        }
     }
     fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
-        self.switch.sql.extract_symbol_deps_with_path(result);
+        self.switch.extract_symbol_deps_with_path(result);
         for itm in self.items.iter() {
             itm.sql.extract_symbol_deps_with_path(result);
         }
-        self.else_sql.extract_symbol_deps_with_path(result);
+        if let Some(else_sql) = &self.else_sql {
+            else_sql.extract_symbol_deps_with_path(result);
+        }
     }
 
-    fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<Rc<SqlCall>> {
-        if let Some(switch_ref) = &self.switch.symbol_reference {
-            if let Some(single_value) = find_single_value_restriction(filters, switch_ref) {
-                if let Some(result) = self.items.iter().find(|itm| itm.value == single_value) {
-                    Some(result.sql.clone())
-                } else {
-                    Some(self.else_sql.clone())
+    fn get_switch_values(&self) -> Option<Vec<String>> {
+        if let CaseSwitchItem::Member(member) = &self.switch {
+            if let Ok(switch_dim) = member.as_dimension() {
+                if switch_dim.dimension_type() == "switch" {
+                    return Some(switch_dim.values().clone());
                 }
-            } else {
-                None
             }
-        } else {
-            None
         }
+        None
+    }
+
+    fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<CaseSwitchDefinition> {
+        if let CaseSwitchItem::Member(switch_member) = &self.switch {
+            if let Some(values) = find_value_restriction(filters, switch_member) {
+                let values = if let Some(values_from_switch) = self.get_switch_values() {
+                    values_from_switch
+                        .into_iter()
+                        .filter(|v| values.contains(v))
+                        .collect_vec()
+                } else {
+                    values
+                };
+                if !values.is_empty() {
+                    let items = self
+                        .items
+                        .iter()
+                        .filter(|itm| values.contains(&itm.value))
+                        .cloned()
+                        .collect_vec();
+                    let all_values_in_case = self.items.iter().map(|itm| &itm.value).collect_vec();
+                    let else_sql = if values.iter().all(|v| all_values_in_case.contains(&v)) {
+                        None
+                    } else {
+                        self.else_sql.clone()
+                    };
+                    return Some(Self {
+                        switch: self.switch.clone(),
+                        items,
+                        else_sql,
+                    });
+                }
+            }
+        }
+        None
     }
     pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         &self,
         f: &F,
     ) -> Result<Self, CubeError> {
-        let switch = CaseSwitchItem {
-            sql: self.switch.sql.apply_recursive(f)?,
-            symbol_reference: self.switch.symbol_reference.clone(),
-        };
+        let switch = self.switch.apply_to_deps(f)?;
         let items = self
             .items
             .iter()
@@ -147,7 +202,11 @@ impl CaseSwitchDefinition {
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let else_sql = self.else_sql.apply_recursive(f)?;
+        let else_sql = if let Some(else_sql) = &self.else_sql {
+            Some(else_sql.apply_recursive(f)?)
+        } else {
+            None
+        };
         let res = CaseSwitchDefinition {
             switch,
             items,
@@ -211,16 +270,17 @@ impl Case {
                     compiler.compile_sql_call(&cube_name, case_definition.else_sql()?.sql()?)?;
                 let switch_sql =
                     compiler.compile_sql_call(&cube_name, case_definition.switch()?)?;
-                let switch_reference =
-                    switch_sql.resolve_direct_reference(compiler.base_tools())?;
-                let switch = CaseSwitchItem {
-                    sql: switch_sql,
-                    symbol_reference: switch_reference,
+                let switch = if let Some(member) =
+                    switch_sql.resolve_direct_reference(compiler.base_tools())?
+                {
+                    CaseSwitchItem::Member(member)
+                } else {
+                    CaseSwitchItem::Sql(switch_sql)
                 };
                 Case::CaseSwitch(CaseSwitchDefinition {
                     switch,
                     items,
-                    else_sql,
+                    else_sql: Some(else_sql),
                 })
             }
         };
@@ -240,10 +300,12 @@ impl Case {
         }
     }
 
-    pub fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<Rc<SqlCall>> {
+    pub fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<Self> {
         match self {
-            Case::Case(case) => case.apply_static_filter(filters),
-            Case::CaseSwitch(case) => case.apply_static_filter(filters),
+            Case::Case(case) => None,
+            Case::CaseSwitch(case) => case
+                .apply_static_filter(filters)
+                .map(|r| Case::CaseSwitch(r)),
         }
     }
     pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(

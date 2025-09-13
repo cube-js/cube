@@ -3,8 +3,8 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::symbols::{
     Case, CaseDefinition, CaseLabel, CaseSwitchDefinition,
 };
-use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
+use crate::planner::sql_evaluator::{CaseSwitchItem, MemberSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -69,12 +69,33 @@ impl CaseSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let expr = case.switch.sql.eval(
-            visitor,
-            node_processor.clone(),
-            query_tools.clone(),
-            templates,
-        )?;
+        if case.items.len() == 1 && case.else_sql.is_none() {
+            return case.items[0].sql.eval(
+                visitor,
+                node_processor.clone(),
+                query_tools.clone(),
+                templates,
+            );
+        }
+        if case.items.is_empty() && case.else_sql.is_some() {
+            return case.else_sql.as_ref().unwrap().eval(
+                visitor,
+                node_processor.clone(),
+                query_tools.clone(),
+                templates,
+            );
+        }
+        let expr = match &case.switch {
+            CaseSwitchItem::Sql(sql_call) => sql_call.eval(
+                visitor,
+                node_processor.clone(),
+                query_tools.clone(),
+                templates,
+            )?,
+            CaseSwitchItem::Member(member_symbol) => {
+                visitor.apply(&member_symbol, node_processor.clone(), templates)?
+            }
+        };
         let mut when_then = Vec::new();
         for itm in case.items.iter() {
             let when = templates.quote_string(&itm.value)?;
@@ -86,13 +107,17 @@ impl CaseSqlNode {
             )?;
             when_then.push((when, then));
         }
-        let else_label = case.else_sql.eval(
-            visitor,
-            node_processor.clone(),
-            query_tools.clone(),
-            templates,
-        )?;
-        templates.case(Some(expr), when_then, Some(else_label))
+        let else_label = if let Some(else_sql) = &case.else_sql {
+            Some(else_sql.eval(
+                visitor,
+                node_processor.clone(),
+                query_tools.clone(),
+                templates,
+            )?)
+        } else {
+            None
+        };
+        templates.case(Some(expr), when_then, else_label)
     }
 }
 
