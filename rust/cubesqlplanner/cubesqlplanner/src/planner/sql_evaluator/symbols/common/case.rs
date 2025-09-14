@@ -1,6 +1,9 @@
 use crate::plan::FilterItem;
 use crate::{
-    cube_bridge::{case_variant::CaseVariant, string_or_sql::StringOrSql},
+    cube_bridge::{
+        case_switch_definition::CaseSwitchDefinition as NativeCaseSwitchDefinition,
+        case_variant::CaseVariant, string_or_sql::StringOrSql,
+    },
     planner::sql_evaluator::{find_value_restriction, Compiler, MemberSymbol, SqlCall},
 };
 use cubenativeutils::CubeError;
@@ -123,6 +126,37 @@ pub struct CaseSwitchDefinition {
 }
 
 impl CaseSwitchDefinition {
+    pub fn try_new(
+        cube_name: &String,
+        definition: Rc<dyn NativeCaseSwitchDefinition>,
+        compiler: &mut Compiler,
+    ) -> Result<Self, CubeError> {
+        let switch_sql = compiler.compile_sql_call(&cube_name, definition.switch()?)?;
+        let switch =
+            if let Some(member) = switch_sql.resolve_direct_reference(compiler.base_tools())? {
+                CaseSwitchItem::Member(member)
+            } else {
+                CaseSwitchItem::Sql(switch_sql)
+            };
+
+        let items = definition
+            .when()?
+            .iter()
+            .map(|item| -> Result<_, CubeError> {
+                let sql = compiler.compile_sql_call(&cube_name, item.sql()?)?;
+                let value = item.static_data().value.clone();
+                Ok(CaseSwitchWhenItem { sql, value })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let else_sql = compiler.compile_sql_call(&cube_name, definition.else_sql()?.sql()?)?;
+        let mut res = CaseSwitchDefinition {
+            switch,
+            items,
+            else_sql: Some(else_sql),
+        };
+        res.remove_unreachable_branches();
+        Ok(res)
+    }
     fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         self.switch.extract_symbol_deps(result);
         for itm in self.items.iter() {
@@ -151,6 +185,26 @@ impl CaseSwitchDefinition {
             }
         }
         None
+    }
+
+    pub fn get_else_values(&self) -> Option<Vec<String>> {
+        if let Some(mut switch_values) = self.get_switch_values() {
+            switch_values.retain(|v| !self.items.iter().any(|itm| v == &itm.value));
+            Some(switch_values)
+        } else {
+            None
+        }
+    }
+
+    fn remove_unreachable_branches(&mut self) {
+        if let Some(switch_values) = self.get_switch_values() {
+            self.items.retain(|itm| switch_values.contains(&itm.value));
+        }
+        if let Some(else_values) = self.get_else_values() {
+            if else_values.is_empty() {
+                self.else_sql = None;
+            }
+        }
     }
 
     fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<CaseSwitchDefinition> {
@@ -256,33 +310,9 @@ impl Case {
                 };
                 Case::Case(CaseDefinition { items, else_label })
             }
-            CaseVariant::CaseSwitch(case_definition) => {
-                let items = case_definition
-                    .when()?
-                    .iter()
-                    .map(|item| -> Result<_, CubeError> {
-                        let sql = compiler.compile_sql_call(&cube_name, item.sql()?)?;
-                        let value = item.static_data().value.clone();
-                        Ok(CaseSwitchWhenItem { sql, value })
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                let else_sql =
-                    compiler.compile_sql_call(&cube_name, case_definition.else_sql()?.sql()?)?;
-                let switch_sql =
-                    compiler.compile_sql_call(&cube_name, case_definition.switch()?)?;
-                let switch = if let Some(member) =
-                    switch_sql.resolve_direct_reference(compiler.base_tools())?
-                {
-                    CaseSwitchItem::Member(member)
-                } else {
-                    CaseSwitchItem::Sql(switch_sql)
-                };
-                Case::CaseSwitch(CaseSwitchDefinition {
-                    switch,
-                    items,
-                    else_sql: Some(else_sql),
-                })
-            }
+            CaseVariant::CaseSwitch(case_definition) => Case::CaseSwitch(
+                CaseSwitchDefinition::try_new(cube_name, case_definition.clone(), compiler)?,
+            ),
         };
         Ok(res)
     }
@@ -302,7 +332,7 @@ impl Case {
 
     pub fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<Self> {
         match self {
-            Case::Case(case) => None,
+            Case::Case(_) => None,
             Case::CaseSwitch(case) => case
                 .apply_static_filter(filters)
                 .map(|r| Case::CaseSwitch(r)),

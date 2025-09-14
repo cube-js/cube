@@ -61,6 +61,10 @@ impl MultiStageAppliedState {
             .collect_vec();
     }
 
+    pub fn add_dimension_filter(&mut self, filter: FilterItem) {
+        self.dimensions_filters.push(filter);
+    }
+
     pub fn add_time_shifts(&mut self, time_shifts: MeasureTimeShifts) -> Result<(), CubeError> {
         let resolved_shifts = match time_shifts {
             MeasureTimeShifts::Dimensions(dimensions) => dimensions,

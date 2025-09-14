@@ -576,14 +576,30 @@ impl QueryProperties {
         dimension_and_filter_join_hints_concat.extend(segments_join_hints.into_iter());
         // TODO This is not quite correct. Decide on how to handle it. Keeping it here just to blow up on unsupported case
         dimension_and_filter_join_hints_concat.extend(measures_filters_join_hints.into_iter());
+        let dimension_and_filter_join_hints_concat = dimension_and_filter_join_hints_concat
+            .into_iter()
+            .filter(|v| !v.is_empty())
+            .collect_vec();
+
+        let mut filtered_measures = Vec::new();
+        for m in measures {
+            if !has_multi_stage_members(&m, true)? {
+                filtered_measures.push(m.clone());
+            }
+        }
+        let measures = filtered_measures;
 
         let measures_to_join = if measures.is_empty() {
-            let join = query_tools
-                .cached_data_mut()
-                .join_by_hints(dimension_and_filter_join_hints_concat.clone(), |hints| {
-                    query_tools.join_graph().build_join(hints)
-                })?;
-            vec![(Vec::new(), join)]
+            if dimension_and_filter_join_hints_concat.is_empty() {
+                vec![]
+            } else {
+                let join = query_tools
+                    .cached_data_mut()
+                    .join_by_hints(dimension_and_filter_join_hints_concat.clone(), |hints| {
+                        query_tools.join_graph().build_join(hints)
+                    })?;
+                vec![(Vec::new(), join)]
+            }
         } else {
             measures
                 .iter()

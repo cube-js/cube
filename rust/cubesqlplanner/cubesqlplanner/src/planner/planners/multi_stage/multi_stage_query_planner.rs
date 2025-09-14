@@ -5,15 +5,24 @@ use super::{
 };
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::logical_plan::*;
+use crate::plan::FilterItem;
+use crate::planner::filter::base_filter::FilterType;
+use crate::planner::filter::BaseFilter;
+use crate::planner::filter::FilterOperator;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::apply_static_filter_to_symbol;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
+use crate::planner::sql_evaluator::Case;
+use crate::planner::sql_evaluator::CaseDefinition;
+use crate::planner::sql_evaluator::CaseSwitchDefinition;
+use crate::planner::sql_evaluator::CaseSwitchItem;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::GranularityHelper;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct MultiStageQueryPlanner {
@@ -138,7 +147,6 @@ impl MultiStageQueryPlanner {
                 is_ungrupped,
             )
         } else {
-            println!("!!!! jjjjj");
             (
                 MultiStageInodeMember::new(
                     MultiStageInodeMemberType::Calculate,
@@ -151,6 +159,115 @@ impl MultiStageQueryPlanner {
             )
         };
         Ok(inode)
+    }
+
+    fn make_childs(
+        &self,
+        member: Rc<MemberSymbol>,
+        new_state: Rc<MultiStageAppliedState>,
+        result: &mut Vec<Rc<MultiStageQueryDescription>>,
+        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
+    ) -> Result<(), CubeError> {
+        if let Ok(meas) = member.as_measure() {
+            if let Some(Case::CaseSwitch(case_switch)) = meas.case() {
+                if self.try_make_childs_for_case_switch(
+                    case_switch,
+                    new_state.clone(),
+                    result,
+                    descriptions,
+                )? {
+                    return Ok(());
+                }
+            }
+        }
+        self.default_make_childs(member, new_state, result, descriptions)
+    }
+
+    fn default_make_childs(
+        &self,
+        member: Rc<MemberSymbol>,
+        new_state: Rc<MultiStageAppliedState>,
+        result: &mut Vec<Rc<MultiStageQueryDescription>>,
+        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
+    ) -> Result<(), CubeError> {
+        for dep in member.get_dependencies() {
+            let dep = dep.resolve_reference_chain();
+            if dep.as_measure().is_ok() {
+                result.push(self.make_queries_descriptions(
+                    dep,
+                    new_state.clone(),
+                    descriptions,
+                )?);
+            }
+        }
+        Ok(())
+    }
+
+    //TODO refactor needed
+    fn try_make_childs_for_case_switch(
+        &self,
+        case: &CaseSwitchDefinition,
+        new_state: Rc<MultiStageAppliedState>,
+        result: &mut Vec<Rc<MultiStageQueryDescription>>,
+        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
+    ) -> Result<bool, CubeError> {
+        if let CaseSwitchItem::Member(switch_member) = &case.switch {
+            let mut processed_deps = HashSet::new();
+            for itm in &case.items {
+                let mut state = new_state.clone_state();
+                let filter = BaseFilter::try_new(
+                    self.query_tools.clone(),
+                    switch_member.clone(),
+                    FilterType::Dimension,
+                    FilterOperator::Equal,
+                    Some(vec![Some(itm.value.clone())]),
+                )?;
+                state.add_dimension_filter(FilterItem::Item(filter));
+                let state = Rc::new(state);
+
+                for dep in itm.sql.get_dependencies() {
+                    let dep = dep.resolve_reference_chain();
+                    if !processed_deps.contains(&dep.full_name()) && dep.as_measure().is_ok() {
+                        processed_deps.insert(dep.full_name());
+                        result.push(self.make_queries_descriptions(
+                            dep,
+                            state.clone(),
+                            descriptions,
+                        )?);
+                    }
+                }
+            }
+            if let Some(else_sql) = &case.else_sql {
+                let mut state = new_state.clone_state();
+                if let Some(else_values) = case.get_else_values() {
+                    if !else_values.is_empty() {
+                        let filter = BaseFilter::try_new(
+                            self.query_tools.clone(),
+                            switch_member.clone(),
+                            FilterType::Dimension,
+                            FilterOperator::Equal,
+                            Some(else_values.into_iter().map(|v| Some(v)).collect_vec()),
+                        )?;
+                        state.add_dimension_filter(FilterItem::Item(filter));
+                    }
+                }
+                let state = Rc::new(state);
+                for dep in else_sql.get_dependencies() {
+                    let dep = dep.resolve_reference_chain();
+                    if !processed_deps.contains(&dep.full_name()) && dep.as_measure().is_ok() {
+                        processed_deps.insert(dep.full_name());
+                        result.push(self.make_queries_descriptions(
+                            dep,
+                            state.clone(),
+                            descriptions,
+                        )?);
+                    }
+                }
+            }
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     fn make_queries_descriptions(
@@ -176,16 +293,8 @@ impl MultiStageQueryPlanner {
             return Ok(rolling_window_query);
         }
 
-        let childs = member_childs(&member, true)?;
-
         let has_multi_stage_members = has_multi_stage_members(&member, false)?;
-        let description = if childs.is_empty() || !has_multi_stage_members {
-            if has_multi_stage_members {
-                return Err(CubeError::internal(format!(
-                    "Leaf multi stage query cannot contain multi stage member"
-                )));
-            }
-
+        let description = if !has_multi_stage_members {
             let alias = format!("cte_{}", descriptions.len());
             MultiStageQueryDescription::new(
                 MultiStageMember::new(
@@ -233,14 +342,8 @@ impl MultiStageQueryPlanner {
                 state.clone()
             };
 
-            let input = childs
-                .into_iter()
-                .map(
-                    |child| -> Result<Rc<MultiStageQueryDescription>, CubeError> {
-                        self.make_queries_descriptions(child, new_state.clone(), descriptions)
-                    },
-                )
-                .collect::<Result<Vec<_>, _>>()?;
+            let mut input = vec![];
+            self.make_childs(member.clone(), new_state, &mut input, descriptions)?;
 
             let alias = format!("cte_{}", descriptions.len());
             MultiStageQueryDescription::new(

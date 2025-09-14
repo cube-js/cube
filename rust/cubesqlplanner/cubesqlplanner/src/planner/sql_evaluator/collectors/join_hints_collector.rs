@@ -26,10 +26,13 @@ impl TraversalVisitor for JoinHintsCollector {
         path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
+        if node.is_multi_stage() {
+            //We don't add multi stage members childs to join hints
+            return Ok(None);
+        }
         if !node.owned_by_cube() {
             return Ok(Some(()));
         }
-        println!("!!! node: {}", node.full_name());
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {
@@ -83,7 +86,6 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, 
     let mut visitor = JoinHintsCollector::new();
     visitor.apply(node, &())?;
     let res = visitor.extract_result();
-    println!("!!! join hints 0: {:#?}", res);
     Ok(res)
 }
 
@@ -95,6 +97,5 @@ pub fn collect_join_hints_for_measures(
         visitor.apply(&meas, &())?;
     }
     let res = visitor.extract_result();
-    println!("!!! join hints: {:#?}", res);
     Ok(res)
 }

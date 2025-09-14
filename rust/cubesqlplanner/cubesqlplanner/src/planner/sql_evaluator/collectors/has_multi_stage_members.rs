@@ -28,22 +28,14 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
         _path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
-        match node.as_ref() {
-            MemberSymbol::Measure(s) => {
-                if s.is_multi_stage() {
-                    self.has_multi_stage = true;
-                } else if !self.ignore_cumulative
-                    && (s.is_rolling_window() || s.measure_type() == "runningTotal")
-                {
-                    self.has_multi_stage = true;
-                }
+        if let MemberSymbol::Measure(s) = node.as_ref() {
+            if s.is_multi_stage() {
+                self.has_multi_stage = true;
+            } else if !self.ignore_cumulative
+                && (s.is_rolling_window() || s.measure_type() == "runningTotal")
+            {
+                self.has_multi_stage = true;
             }
-            /* MemberSymbol::Dimension(s) => {
-                if s.is_multi_stage() {
-                    self.has_multi_stage = true;
-                }
-            } */
-            _ => {}
         };
         if self.has_multi_stage {
             Ok(None)
