@@ -191,7 +191,7 @@ impl MultiStageQueryPlanner {
     ) -> Result<(), CubeError> {
         for dep in member.get_dependencies() {
             let dep = dep.resolve_reference_chain();
-            if dep.as_measure().is_ok() {
+            if dep.is_measure() || dep.is_dimension() {
                 result.push(self.make_queries_descriptions(
                     dep,
                     new_state.clone(),
