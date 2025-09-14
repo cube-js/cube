@@ -1,5 +1,4 @@
 use super::SqlNode;
-use crate::plan::QualifiedColumnName;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::RenderReferences;
 use crate::planner::sql_evaluator::sql_nodes::RenderReferencesType;
@@ -8,7 +7,6 @@ use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct FinalPreAggregationMeasureSqlNode {

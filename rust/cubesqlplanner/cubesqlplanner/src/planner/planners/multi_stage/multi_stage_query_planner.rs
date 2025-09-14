@@ -14,7 +14,6 @@ use crate::planner::sql_evaluator::apply_static_filter_to_symbol;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::Case;
-use crate::planner::sql_evaluator::CaseDefinition;
 use crate::planner::sql_evaluator::CaseSwitchDefinition;
 use crate::planner::sql_evaluator::CaseSwitchItem;
 use crate::planner::sql_evaluator::MemberSymbol;

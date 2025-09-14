@@ -4,7 +4,6 @@ use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{Select, SelectBuilder};
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MeasureSubqueryProcessor<'a> {

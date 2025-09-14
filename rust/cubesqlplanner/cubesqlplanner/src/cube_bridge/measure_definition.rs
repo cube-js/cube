@@ -1,5 +1,5 @@
 use super::case_variant::CaseVariant;
-use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
+use super::cube_definition::CubeDefinition;
 use super::member_order_by::{MemberOrderBy, NativeMemberOrderBy};
 use super::member_sql::{MemberSql, NativeMemberSql};
 use super::struct_with_sql_member::{NativeStructWithSqlMember, StructWithSqlMember};

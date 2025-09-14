@@ -1,9 +1,8 @@
 use super::*;
-use crate::plan::Union;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::structs::TemplateCalcGroup;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{BaseCube, VisitorContext};
+use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;

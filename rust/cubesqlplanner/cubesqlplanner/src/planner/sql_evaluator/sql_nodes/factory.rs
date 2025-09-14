@@ -6,7 +6,6 @@ use super::{
     TimeDimensionNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
     UngroupedQueryFinalMeasureSqlNode,
 };
-use crate::plan::schema::QualifiedColumnName;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::sql_evaluator::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
 use crate::planner::sql_evaluator::sql_nodes::RenderReferences;

@@ -1,6 +1,5 @@
 use super::*;
 use cubenativeutils::CubeError;
-use std::rc::Rc;
 
 pub trait LogicalSource: Sized + PrettyPrint {
     fn as_plan_node(&self) -> PlanNode;

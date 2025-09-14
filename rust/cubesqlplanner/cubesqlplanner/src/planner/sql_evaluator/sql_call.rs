@@ -10,7 +10,6 @@ use crate::plan::{Filter, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone)]

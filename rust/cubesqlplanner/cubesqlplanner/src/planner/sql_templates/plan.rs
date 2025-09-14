@@ -2,10 +2,7 @@ use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColu
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
 use crate::planner::sql_templates::structs::TemplateCalcGroup;
-use crate::{
-    cube_bridge::driver_tools::DriverTools,
-    planner::sql_templates::structs::TemplateCalcSingleValue,
-};
+use crate::cube_bridge::driver_tools::DriverTools;
 use convert_case::{Boundary, Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;

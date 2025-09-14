@@ -6,7 +6,6 @@ use crate::planner::sql_evaluator::collectors::collect_calc_group_dims_from_node
 use crate::planner::sql_evaluator::{get_filtered_values, ReferencesBuilder};
 use cubenativeutils::CubeError;
 use itertools::Itertools as _;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct KeysSubQueryProcessor<'a> {

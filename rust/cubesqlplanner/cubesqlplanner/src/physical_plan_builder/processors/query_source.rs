@@ -1,10 +1,8 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{Query, QuerySource};
+use crate::logical_plan::QuerySource;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::plan::{Cte, Expr, From, MemberExpression, Select, SelectBuilder};
-use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::plan::From;
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct QuerySourceProcessor<'a> {

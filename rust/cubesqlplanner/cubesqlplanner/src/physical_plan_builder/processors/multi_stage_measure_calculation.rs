@@ -6,7 +6,6 @@ use crate::plan::{Expr, MemberExpression, QueryPlan, SelectBuilder};
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MultiStageMeasureCalculationProcessor<'a> {
