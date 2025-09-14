@@ -1,4 +1,5 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -30,12 +31,10 @@ impl TraversalVisitor for JoinHintsCollector {
             //We don't add multi stage members childs to join hints
             return Ok(None);
         }
-        if !node.owned_by_cube() {
-            return Ok(Some(()));
-        }
+
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
-                if !e.is_view() {
+                if !e.is_view() && e.dimension_type() != "switch" {
                     if !path.is_empty() {
                         if path.len() == 1 {
                             self.hints.push(JoinHintItem::Single(path[0].clone()))

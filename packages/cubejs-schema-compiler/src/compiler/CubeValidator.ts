@@ -911,7 +911,7 @@ const viewSchema = inherit(baseSchema, {
             meta: Joi.any(),
           })
         ]))
-      ]).required(),
+      ]),
       excludes: Joi.array().items(Joi.string().required()),
     }).oxor('split', 'prefix').messages({
       'object.oxor': 'Using split together with prefix is not supported'

@@ -436,7 +436,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
         let alias =
             PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
-        let is_view = cube.static_data().is_view.unwrap_or(false);
+        let is_view = cube.static_data().is_view.unwrap_or(false) && is_sql_direct_ref;
         let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
         let mut is_self_time_shift_pk = false;
 

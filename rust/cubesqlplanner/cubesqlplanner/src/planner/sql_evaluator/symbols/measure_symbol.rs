@@ -755,7 +755,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         let alias =
             PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
 
-        let is_view = cube.static_data().is_view.unwrap_or(false);
+        let is_view = cube.static_data().is_view.unwrap_or(false) && is_sql_is_direct_ref;
 
         let is_reference = is_view
             || (!owned_by_cube

@@ -247,17 +247,79 @@ cubes:
       - name: count
         type: count
 
-  - name: source
+  - name: source_a
     sql: >
-      SELECT 1
+      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 100 as PRICE_USD, 0 as PRICE_EUR
+      union all
+      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 500 as PRICE_USD, 0 as PRICE_EUR
+      union all
+      SELECT 12 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 200 as PRICE_USD, 0 as PRICE_EUR
+      union all
+      SELECT 13 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 300 as PRICE_USD, 0 as PRICE_EUR
     public: false
 
     dimensions:
       - name: pk
         type: number
-        sql: "1"
+        sql: ID
         primary_key: true
 
+      - name: product_category
+        sql: PRODUCT_CATEGORY
+        type: string
+
+    measures:
+      - name: count
+        type: 'count'
+
+      - name: price_usd
+        type: 'sum'
+        sql: PRICE_USD
+
+      - name: price_eur
+        type: 'sum'
+        sql: PRICE_EUR
+
+
+  - name: source_b
+    sql: >
+      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 100 as PRICE_EUR
+      union all
+      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 500 as PRICE_EUR
+      union all
+      SELECT 12 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 200 as PRICE_EUR
+      union all
+      SELECT 13 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR
+      union all
+      SELECT 14 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR
+    public: false
+
+    dimensions:
+      - name: pk
+        type: number
+        sql: ID
+        primary_key: true
+
+      - name: product_category
+        sql: PRODUCT_CATEGORY
+        type: string
+
+    measures:
+      - name: count
+        type: 'count'
+
+      - name: price_usd
+        type: 'sum'
+        sql: PRICE_USD
+
+      - name: price_eur
+        type: 'sum'
+        sql: PRICE_EUR
+
+views:
+
+  - name: source
+    dimensions:
       - name: source
         type: switch
         values: ["A", "B"]
@@ -332,78 +394,6 @@ cubes:
               sql: "{CUBE.price_eur}"
           else:
             sql: "{CUBE.price_usd}"
-
-
-  - name: source_a
-    sql: >
-      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 100 as PRICE_USD, 0 as PRICE_EUR
-      union all
-      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 500 as PRICE_USD, 0 as PRICE_EUR
-      union all
-      SELECT 12 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 200 as PRICE_USD, 0 as PRICE_EUR
-      union all
-      SELECT 13 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 300 as PRICE_USD, 0 as PRICE_EUR
-    public: false
-
-    dimensions:
-      - name: pk
-        type: number
-        sql: ID
-        primary_key: true
-
-      - name: product_category
-        sql: PRODUCT_CATEGORY
-        type: string
-
-    measures:
-      - name: count
-        type: 'count'
-
-      - name: price_usd
-        type: 'sum'
-        sql: PRICE_USD
-
-      - name: price_eur
-        type: 'sum'
-        sql: PRICE_EUR
-
-
-  - name: source_b
-    sql: >
-      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 100 as PRICE_EUR
-      union all
-      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 500 as PRICE_EUR
-      union all
-      SELECT 12 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 200 as PRICE_EUR
-      union all
-      SELECT 13 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR
-      union all
-      SELECT 14 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR
-    public: false
-
-    dimensions:
-      - name: pk
-        type: number
-        sql: ID
-        primary_key: true
-
-      - name: product_category
-        sql: PRODUCT_CATEGORY
-        type: string
-
-    measures:
-      - name: count
-        type: 'count'
-
-      - name: price_usd
-        type: 'sum'
-        sql: PRICE_USD
-
-      - name: price_eur
-        type: 'sum'
-        sql: PRICE_EUR
-
-views:
 
 
   - name: orders_view
