@@ -5,6 +5,7 @@
  * Network query data types definition.
  */
 
+import { CacheMode } from '@cubejs-backend/shared';
 import {
   Member,
   TimeMember,
@@ -12,7 +13,6 @@ import {
   QueryTimeDimensionGranularity,
 } from './strings';
 import { ResultType } from './enums';
-import { CacheMode } from '@cubejs-backend/native';
 
 /**
  * Query base filter definition.

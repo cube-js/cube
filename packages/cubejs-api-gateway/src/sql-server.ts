@@ -8,10 +8,9 @@ import {
   Request as NativeRequest,
   LoadRequestMeta,
   Sql4SqlResponse,
-  CacheMode,
 } from '@cubejs-backend/native';
 import type { ShutdownMode } from '@cubejs-backend/native';
-import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
+import { displayCLIWarning, getEnv, CacheMode } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
 import type { ApiGateway } from './gateway';
