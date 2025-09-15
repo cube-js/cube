@@ -80,6 +80,8 @@ export type QueryBody = {
   persistent?: boolean;
   query?: string;
   values?: string[];
+  loadRefreshKeysOnly?: boolean;
+  scheduledRefresh?: boolean;
   continueWait?: boolean;
   // @deprecated
   renewQuery?: boolean;
