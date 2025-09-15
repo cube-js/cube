@@ -128,15 +128,18 @@ export class OrchestratorApi {
           requestId: query.requestId
         });
 
+        if (query.scheduledRefresh) {
+          throw {
+            error: 'Continue wait',
+            stage: null
+          };
+        }
+
         const fromCache = await this
           .orchestrator
           .resultFromCacheIfExists(query);
 
-        if (
-          !query.renewQuery &&
-          fromCache &&
-          !query.scheduledRefresh
-        ) {
+        if (query.cache === 'stale-if-slow' && fromCache) {
           this.logger('Slow Query Warning', {
             query: queryForLog,
             requestId: query.requestId,
@@ -151,11 +154,17 @@ export class OrchestratorApi {
           };
         }
 
+        if (query.cache === 'stale-while-revalidate' && fromCache) {
+          // TODO: Run background refresh
+          return {
+            ...fromCache,
+            slowQuery: true
+          };
+        }
+
         throw {
           error: 'Continue wait',
-          stage: !query.scheduledRefresh
-            ? await this.orchestrator.queryStage(query)
-            : null
+          stage: await this.orchestrator.queryStage(query)
         };
       }
 
