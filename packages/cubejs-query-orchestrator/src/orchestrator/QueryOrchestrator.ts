@@ -210,6 +210,25 @@ export class QueryOrchestrator {
    * @throw ContinueWaitError
    */
   public async fetchQuery(queryBody: QueryBody): Promise<any> {
+    if (queryBody.query && queryBody.cache === 'no-cache') {
+      const result = await this.queryCache.cachedQueryResult(
+        { ...queryBody, forceNoCache: true },
+        []
+      );
+
+      if (result instanceof QueryStream) {
+        return result;
+      }
+
+      return {
+        ...result,
+        dataSource: queryBody.dataSource,
+        external: queryBody.external,
+        usedPreAggregations: {},
+        lastRefreshTime: new Date(),
+      };
+    }
+
     const {
       preAggregationsTablesToTempTables,
       values,
