@@ -425,7 +425,7 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext);
+          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache);
         } catch (e: any) {
           this.handleError({
             e,
