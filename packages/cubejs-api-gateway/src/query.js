@@ -340,6 +340,8 @@ const normalizeQuery = (query, persistent) => {
   // Convert deprecated renewQuery option to new cache mode
   if (query.renewQuery && !query.cache) {
     cacheMode = 'must-revalidate';
+  } else if (!query.renewQuery && !query.cache) {
+    cacheMode = 'stale-if-slow';
   }
 
   return {
