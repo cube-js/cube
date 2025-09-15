@@ -81,7 +81,7 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      let fetchQueryPromise = query.loadRefreshKeysOnly
+      let fetchQueryPromise: Promise<any> = query.loadRefreshKeysOnly
         ? this.orchestrator.loadRefreshKeys(query)
         : this.orchestrator.fetchQuery(query);
 
@@ -120,7 +120,7 @@ export class OrchestratorApi {
 
       return data;
     } catch (err) {
-      if ((err instanceof pt.TimeoutError || err instanceof ContinueWaitError)) {
+      if (err instanceof pt.TimeoutError || err instanceof ContinueWaitError) {
         this.logger('Continue wait', {
           duration: ((new Date()).getTime() - startQueryTime),
           query: queryForLog,
@@ -131,6 +131,7 @@ export class OrchestratorApi {
         const fromCache = await this
           .orchestrator
           .resultFromCacheIfExists(query);
+
         if (
           !query.renewQuery &&
           fromCache &&
