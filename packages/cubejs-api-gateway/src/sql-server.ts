@@ -8,6 +8,7 @@ import {
   Request as NativeRequest,
   LoadRequestMeta,
   Sql4SqlResponse,
+  CacheMode,
 } from '@cubejs-backend/native';
 import type { ShutdownMode } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
@@ -65,8 +66,8 @@ export class SQLServer {
     throw new Error('Native api gateway is not enabled');
   }
 
-  public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
-    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
+  public async execSql(sqlQuery: string, stream: any, securityContext?: any, cacheMode?: CacheMode) {
+    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext, cacheMode);
   }
 
   public async sql4sql(sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> {
