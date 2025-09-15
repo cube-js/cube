@@ -504,7 +504,7 @@ export class CompilerApi {
 
   /**
    *
-   * @param {unknown} filter
+   * @param {unknown|undefined} filter
    * @returns {Promise<Array<PreAggregationInfo>>}
    */
   async preAggregations(filter) {
