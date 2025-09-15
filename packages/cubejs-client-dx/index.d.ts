@@ -1,4 +1,4 @@
-import { CacheMode } from '@cubejs-backend/native';
+import { CacheMode } from '@cubejs-backend/shared';
 
 declare module "@cubejs-client/core" {
 

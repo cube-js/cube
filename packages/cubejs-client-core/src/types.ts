@@ -1,12 +1,13 @@
 import Meta from './Meta';
 import { TimeDimensionGranularity } from './time';
 import { TransportOptions } from './HttpTransport';
-import { CacheMode } from '@cubejs-backend/native';
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 
 export type TQueryOrderObject = { [key: string]: QueryOrder };
 export type TQueryOrderArray = Array<[string, QueryOrder]>;
+
+export type CacheMode = 'stale-if-slow' | 'stale-while-revalidate' | 'must-revalidate' | 'no-cache';
 
 export type GranularityAnnotation = {
   name: string;

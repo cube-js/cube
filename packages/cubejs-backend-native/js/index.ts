@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
+import { CacheMode } from '@cubejs-backend/shared';
 import { ResultWrapper } from './ResultWrapper';
 
 export * from './ResultWrapper';
@@ -428,8 +429,6 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
 };
 
 export type ShutdownMode = 'fast' | 'semifast' | 'smart';
-
-export type CacheMode = 'stale-if-slow' | 'stale-while-revalidate' | 'must-revalidate' | 'no-cache';
 
 export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdownMode: ShutdownMode): Promise<void> => {
   const native = loadNative();

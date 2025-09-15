@@ -19,7 +19,7 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
-import { CacheMode } from '@cubejs-backend/native';
+import { CacheMode } from '@cubejs-backend/shared';
 
 type QueryOptions = {
   external?: boolean;
