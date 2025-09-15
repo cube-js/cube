@@ -12,6 +12,7 @@ import {
   QueryTimeDimensionGranularity,
 } from './strings';
 import { ResultType } from './enums';
+import { CacheMode } from '@cubejs-backend/native';
 
 /**
  * Query base filter definition.
@@ -139,7 +140,9 @@ interface Query {
   totalQuery?: boolean;
   order?: any;
   timezone?: string;
+  // @deprecated
   renewQuery?: boolean;
+  cache?: CacheMode;
   ungrouped?: boolean;
   responseFormat?: ResultType;
 
