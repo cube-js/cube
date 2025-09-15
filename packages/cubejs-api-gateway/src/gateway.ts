@@ -177,7 +177,13 @@ class ApiGateway {
 
   public constructor(
     protected readonly apiSecret: string,
+    /**
+     * It actually returns a Promise<CompilerApi>
+     */
     protected readonly compilerApi: (ctx: RequestContext) => Promise<any>,
+    /**
+     * It actually returns a Promise<OrchestratorApi>
+     */
     protected readonly adapterApi: (ctx: RequestContext) => Promise<any>,
     protected readonly logger: any,
     protected readonly options: ApiGatewayOptions,
