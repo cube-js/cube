@@ -281,7 +281,8 @@ export class QueryCache {
       }
     }
 
-    if (queryBody.renewQuery) {
+    // renewQuery has been deprecated, but keeping it for now
+    if (queryBody.cache === 'must-revalidate' || queryBody.renewQuery) {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
       return this.renewQuery(
         query,
