@@ -94,7 +94,7 @@ impl DimensionSymbol {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        if !self.is_view() && self.dimension_type == "switch" {
+        if self.member_sql.is_none() && self.dimension_type == "switch" {
             Ok(templates.quote_identifier(&self.name)?) //We don't return cube_name -
                                                         //it should be added in
                                                         //autoprefix processing
@@ -110,7 +110,7 @@ impl DimensionSymbol {
     }
 
     pub fn is_calc_group(&self) -> bool {
-        !self.is_view() && self.dimension_type == "switch"
+        self.member_sql.is_none() && self.dimension_type == "switch"
     }
 
     pub fn values(&self) -> &Vec<String> {
@@ -131,8 +131,8 @@ impl DimensionSymbol {
         self.longitude.clone()
     }
 
-    pub fn case(&self) -> &Option<Case> {
-        &self.case
+    pub fn case(&self) -> Option<&Case> {
+        self.case.as_ref()
     }
 
     pub fn member_sql(&self) -> &Option<Rc<SqlCall>> {
@@ -436,7 +436,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
         let alias =
             PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
-        let is_view = cube.static_data().is_view.unwrap_or(false) && is_sql_direct_ref;
+        let is_view = cube.static_data().is_view.unwrap_or(false);
         let is_calendar = cube.static_data().is_calendar.unwrap_or(false);
         let mut is_self_time_shift_pk = false;
 
@@ -479,7 +479,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         let owned_by_cube =
             owned_by_cube && !is_multi_stage && definition.static_data().dimension_type != "switch";
         let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
-        let is_reference = is_view
+        let is_reference = (is_view && is_sql_direct_ref)
             || (!owned_by_cube
                 && !is_sub_query
                 && is_sql_direct_ref

@@ -289,17 +289,8 @@ impl MeasureSymbol {
         }
     }
 
-    pub fn case(&self) -> &Option<Case> {
-        &self.case
-    }
-
-    pub fn case_switch_dimension(&self) -> Option<Rc<MemberSymbol>> {
-        if let Some(Case::CaseSwitch(case)) = &self.case {
-            if let CaseSwitchItem::Member(member) = &case.switch {
-                return Some(member.clone());
-            }
-        }
-        None
+    pub fn case(&self) -> Option<&Case> {
+        self.case.as_ref()
     }
 
     pub fn is_addictive(&self) -> bool {
@@ -755,9 +746,9 @@ impl SymbolFactory for MeasureSymbolFactory {
         let alias =
             PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
 
-        let is_view = cube.static_data().is_view.unwrap_or(false) && is_sql_is_direct_ref;
+        let is_view = cube.static_data().is_view.unwrap_or(false);
 
-        let is_reference = is_view
+        let is_reference = (is_view && is_sql_is_direct_ref)
             || (!owned_by_cube
                 && is_sql_is_direct_ref
                 && is_calculated

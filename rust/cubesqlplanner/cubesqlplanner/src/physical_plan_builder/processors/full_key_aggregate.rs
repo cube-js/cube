@@ -1,5 +1,7 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{pretty_print, FullKeyAggregate, ResolvedMultipliedMeasures};
+use crate::logical_plan::{
+    pretty_print, FullKeyAggregate, LogicalJoin, ResolvedMultipliedMeasures,
+};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
     Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, SelectBuilder,
@@ -39,7 +41,8 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
         let mut data_queries = vec![];
         let mut keys_context = context.clone();
         keys_context.dimensions_query = true;
-        if let Some(resolved_multiplied_measures) = full_key_aggregate.multiplied_measures_resolver()
+        if let Some(resolved_multiplied_measures) =
+            full_key_aggregate.multiplied_measures_resolver()
         {
             match resolved_multiplied_measures {
                 ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
@@ -110,10 +113,12 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
             data_queries.push(data_select);
         }
         if data_queries.is_empty() {
-            return Err(CubeError::internal(format!(
+            /* return Err(CubeError::internal(format!(
                 "FullKeyAggregate should have at least one source: {}",
                 pretty_print(full_key_aggregate)
-            )));
+            ))); */
+            let empty_join = LogicalJoin::builder().build();
+            return self.builder.process_node(&empty_join, context);
         }
 
         if data_queries.len() == 1 {
@@ -201,7 +206,8 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
     ) -> Result<Rc<From>, CubeError> {
         let query_tools = self.builder.query_tools();
         let mut data_queries = vec![];
-        if let Some(resolved_multiplied_measures) = full_key_aggregate.multiplied_measures_resolver()
+        if let Some(resolved_multiplied_measures) =
+            full_key_aggregate.multiplied_measures_resolver()
         {
             match resolved_multiplied_measures {
                 ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
@@ -251,10 +257,12 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
         }
 
         if data_queries.is_empty() {
-            return Err(CubeError::internal(format!(
+            /* return Err(CubeError::internal(format!(
                 "FullKeyAggregate should have at least one source: {}",
                 pretty_print(full_key_aggregate)
-            )));
+            ))); */
+            let empty_join = LogicalJoin::builder().build();
+            return self.builder.process_node(&empty_join, context);
         }
 
         if data_queries.len() == 1 {

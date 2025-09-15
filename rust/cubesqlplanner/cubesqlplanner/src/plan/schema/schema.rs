@@ -3,7 +3,7 @@ use crate::planner::sql_evaluator::MemberSymbol;
 use itertools::Itertools;
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Schema {
     columns: Vec<SchemaColumn>,
 }

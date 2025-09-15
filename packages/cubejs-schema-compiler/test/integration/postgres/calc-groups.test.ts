@@ -249,13 +249,13 @@ cubes:
 
   - name: source_a
     sql: >
-      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 100 as PRICE_USD, 0 as PRICE_EUR
+      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 100 as PRICE_USD, 0 as PRICE_EUR, '2022-01-12T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 500 as PRICE_USD, 0 as PRICE_EUR
+      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 500 as PRICE_USD, 0 as PRICE_EUR, '2022-01-14T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 12 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 200 as PRICE_USD, 0 as PRICE_EUR
+      SELECT 12 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 200 as PRICE_USD, 0 as PRICE_EUR, '2022-02-12T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 13 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 300 as PRICE_USD, 0 as PRICE_EUR
+      SELECT 13 as ID, 'some category A' as PRODUCT_CATEGORY, 'some name' as NAME, 300 as PRICE_USD, 0 as PRICE_EUR, '2022-03-14T20:00:00.000Z'::timestamptz as CREATED_AT
     public: false
 
     dimensions:
@@ -267,6 +267,10 @@ cubes:
       - name: product_category
         sql: PRODUCT_CATEGORY
         type: string
+
+      - name: created_at
+        sql: CREATED_AT
+        type: time
 
     measures:
       - name: count
@@ -283,15 +287,15 @@ cubes:
 
   - name: source_b
     sql: >
-      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 100 as PRICE_EUR
+      SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 100 as PRICE_EUR, '2022-01-12T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 500 as PRICE_EUR
+      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 500 as PRICE_EUR, '2022-02-12T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 12 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 200 as PRICE_EUR
+      SELECT 12 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 200 as PRICE_EUR, '2022-02-15T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 13 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR
+      SELECT 13 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR, '2022-03-12T20:00:00.000Z'::timestamptz as CREATED_AT
       union all
-      SELECT 14 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR
+      SELECT 14 as ID, 'some category B' as PRODUCT_CATEGORY, 'some name' as NAME, 0 as PRICE_USD, 300 as PRICE_EUR, '2022-04-12T20:00:00.000Z'::timestamptz as CREATED_AT
     public: false
 
     dimensions:
@@ -303,6 +307,10 @@ cubes:
       - name: product_category
         sql: PRODUCT_CATEGORY
         type: string
+
+      - name: created_at
+        sql: CREATED_AT
+        type: time
 
     measures:
       - name: count
@@ -340,6 +348,32 @@ views:
               sql: "{source_b.product_category}"
           else:
             sql: "{source_a.product_category}"
+
+      - name: product_category_ext
+        type: string
+        multi_stage: true
+        case:
+          switch: "{CUBE.currency}"
+          when:
+            - value: USD
+              sql: "CONCAT({source.product_category}, '-', 'USD', '-', {source.currency})"
+            - value: EUR
+              sql: "CONCAT({source.product_category}, '-', 'EUR', '-', {source.currency})"
+          else:
+            sql: ""
+
+      - name: created_at
+        type: time
+        multi_stage: true
+        case:
+          switch: "{CUBE.source}"
+          when:
+            - value: A
+              sql: "{source_a.created_at}"
+            - value: B
+              sql: "{source_b.created_at}"
+          else:
+            sql: "{source_a.created_at}"
 
 
     measures:
@@ -1099,6 +1133,175 @@ views:
       ],
       { joinGraph, cubeEvaluator, compiler });
     });
+    it('source product_category cross join', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.product_category'],
+        order: [{
+          id: 'source.product_category'
+        }
+        ],
+      }, [
+        { source__product_category: 'some category' },
+        { source__product_category: 'some category A' },
+        { source__product_category: 'some category B' }
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+    it('source product_category and created_at cross join', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.product_category'],
+        timeDimensions: [
+          {
+            dimension: 'source.created_at',
+            granularity: 'month'
+          }
+        ],
+        timezone: 'UTC',
+        order: [
+          {
+            id: 'source.created_at'
+          },
+          {
+            id: 'source.product_category'
+          }
+        ],
+      }, [
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-01-01T00:00:00.000Z'
+        },
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-02-01T00:00:00.000Z'
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-02-01T00:00:00.000Z'
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-02-01T00:00:00.000Z'
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-03-01T00:00:00.000Z'
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-03-01T00:00:00.000Z'
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-04-01T00:00:00.000Z'
+        }
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+
+    it('source product_category_ext and created_at cross join', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.product_category_ext'],
+        timeDimensions: [
+          {
+            dimension: 'source.created_at',
+            granularity: 'month'
+          }
+        ],
+        timezone: 'UTC',
+        order: [
+          {
+            id: 'source.created_at'
+          },
+          {
+            id: 'source.product_category_ext'
+          }
+        ],
+      }, [
+        {
+          source__product_category_ext: 'some category-EUR-EUR',
+          source__created_at_month: '2022-01-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category-USD-USD',
+          source__created_at_month: '2022-01-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category A-EUR-EUR',
+          source__created_at_month: '2022-02-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category A-USD-USD',
+          source__created_at_month: '2022-02-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category B-EUR-EUR',
+          source__created_at_month: '2022-02-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category B-USD-USD',
+          source__created_at_month: '2022-02-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category-EUR-EUR',
+          source__created_at_month: '2022-02-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category-USD-USD',
+          source__created_at_month: '2022-02-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category A-EUR-EUR',
+          source__created_at_month: '2022-03-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category A-USD-USD',
+          source__created_at_month: '2022-03-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category B-EUR-EUR',
+          source__created_at_month: '2022-03-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category B-USD-USD',
+          source__created_at_month: '2022-03-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category B-EUR-EUR',
+          source__created_at_month: '2022-04-01T00:00:00.000Z'
+        },
+        {
+          source__product_category_ext: 'some category B-USD-USD',
+          source__created_at_month: '2022-04-01T00:00:00.000Z'
+        }
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+
+    it('source product_category_ext filter', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.product_category'],
+        measures: ['source.price'],
+        filters: [
+          { dimension: 'source.product_category_ext', operator: 'equals', values: ['some category B-EUR-EUR'] }
+        ],
+        timezone: 'UTC',
+        order: [
+          {
+            id: 'source.created_at'
+          },
+          {
+            id: 'source.product_category_ext'
+          }
+        ],
+      }, [
+        {
+          source__product_category: 'some category B',
+          source__price: '800'
+        },
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+
     it('source switch cross join without dimension', async () => {
       await dbRunner.runQueryTest({
         dimensions: ['source.product_category'],
@@ -1156,6 +1359,272 @@ views:
           source__product_category: 'some category B',
           source__price: '0'
         }
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+    it('source full switch - td day', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.currency', 'source.product_category'],
+        timeDimensions: [
+          {
+            dimension: 'source.created_at',
+            granularity: 'month',
+          }
+        ],
+        timezone: 'UTC',
+        order: [{
+          id: 'source.created_at'
+        },
+        {
+          id: 'source.product_category'
+        },
+        {
+          id: 'source.currency'
+        }
+        ],
+      }, [
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-01-01T00:00:00.000Z',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-01-01T00:00:00.000Z',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-04-01T00:00:00.000Z',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-04-01T00:00:00.000Z',
+          source__currency: 'USD',
+        }
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+    it('source full switch - price - td day and date range', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.currency', 'source.product_category'],
+        measures: ['source.price'],
+        timeDimensions: [
+          {
+            dimension: 'source.created_at',
+            granularity: 'month',
+            dateRange: ['2022-02-01', '2022-04-01']
+          }
+        ],
+        timezone: 'UTC',
+        order: [{
+          id: 'source.created_at'
+        },
+        {
+          id: 'source.product_category'
+        },
+        {
+          id: 'source.currency'
+        }
+        ],
+      }, [
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '500',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '200',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '200',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__price: '300',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__price: '300',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'USD',
+        },
+      ],
+      { joinGraph, cubeEvaluator, compiler });
+    });
+    it('source full switch - price - td day and date range', async () => {
+      await dbRunner.runQueryTest({
+        dimensions: ['source.currency', 'source.product_category'],
+        measures: ['source.price'],
+        timeDimensions: [
+          {
+            dimension: 'source.created_at',
+            granularity: 'month',
+            dateRange: ['2022-02-01', '2022-04-01']
+          }
+        ],
+        timezone: 'UTC',
+        order: [{
+          id: 'source.created_at'
+        },
+        {
+          id: 'source.product_category'
+        },
+        {
+          id: 'source.currency'
+        }
+        ],
+      }, [
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '500',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '200',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '200',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-02-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category A',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__price: '300',
+          source__currency: 'USD',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__price: '300',
+          source__currency: 'EUR',
+        },
+        {
+          source__product_category: 'some category B',
+          source__created_at_month: '2022-03-01T00:00:00.000Z',
+          source__price: '0',
+          source__currency: 'USD',
+        },
       ],
       { joinGraph, cubeEvaluator, compiler });
     });

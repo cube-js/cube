@@ -21,7 +21,21 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         logical_join: &LogicalJoin,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let root = logical_join.root().cube().clone();
+        let multi_stage_dimension = context.get_multi_stage_dimensions()?;
+        if logical_join.root().is_none() {
+            let res = if let Some(multi_stage_dimension) = &multi_stage_dimension {
+                From::new_from_table_reference(
+                    multi_stage_dimension.name.clone(),
+                    multi_stage_dimension.schema.clone(),
+                    None,
+                )
+            } else {
+                From::new_empty()
+            };
+            return Ok(res);
+        }
+
+        let root = logical_join.root().clone().unwrap().cube().clone();
         if logical_join.joins().is_empty() && logical_join.dimension_subqueries().is_empty() {
             Ok(From::new_from_cube(
                 root.clone(),
@@ -65,6 +79,10 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                         context,
                     )?;
                 }
+            }
+            if let Some(multi_stage_dimension) = &multi_stage_dimension {
+                self.builder
+                    .add_multistage_dimension_join(multi_stage_dimension, &mut join_builder)?;
             }
             Ok(From::new_from_join(join_builder.build()))
         }

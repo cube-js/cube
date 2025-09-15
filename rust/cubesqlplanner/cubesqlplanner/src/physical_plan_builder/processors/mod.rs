@@ -3,6 +3,7 @@ mod full_key_aggregate;
 mod keys_sub_query;
 mod logical_join;
 mod measure_subquery;
+mod multi_stage_dimension_calculation;
 mod multi_stage_get_date_range;
 mod multi_stage_leaf_measure;
 mod multi_stage_measure_calculation;

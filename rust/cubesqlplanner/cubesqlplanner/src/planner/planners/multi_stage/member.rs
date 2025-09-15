@@ -1,5 +1,5 @@
 use crate::planner::sql_evaluator::{MeasureTimeShifts, MemberSymbol};
-use std::rc::Rc;
+use std::{collections::HashSet, rc::Rc};
 
 #[derive(Clone)]
 pub struct TimeSeriesDescription {
@@ -89,6 +89,7 @@ pub enum MultiStageInodeMemberType {
     Rank,
     Aggregate,
     Calculate,
+    Dimension,
     RollingWindow(RollingWindowDescription),
 }
 
@@ -157,6 +158,15 @@ impl MultiStageInodeMember {
 pub enum MultiStageMemberType {
     Inode(MultiStageInodeMember),
     Leaf(MultiStageLeafMemberType),
+}
+
+impl MultiStageMemberType {
+    pub fn is_multi_stage_dimension(&self) -> bool {
+        if let Self::Inode(inode) = &self {
+            return matches!(inode.inode_type(), MultiStageInodeMemberType::Dimension);
+        }
+        false
+    }
 }
 
 pub struct MultiStageMember {

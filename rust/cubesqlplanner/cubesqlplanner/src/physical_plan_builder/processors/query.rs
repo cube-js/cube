@@ -1,10 +1,12 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{all_symbols, Query, QuerySource};
+use crate::logical_plan::{all_symbols, MultiStageMemberLogicalType, Query, QuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
     CalcGroupItem, CalcGroupsJoin, Cte, Expr, From, MemberExpression, Select, SelectBuilder,
 };
-use crate::planner::sql_evaluator::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::sql_evaluator::collectors::{
+    collect_calc_group_dims_from_nodes, has_multi_stage_members,
+};
 use crate::planner::sql_evaluator::{get_filtered_values, ReferencesBuilder};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -18,6 +20,15 @@ impl QueryProcessor<'_> {
     fn is_over_full_aggregated_source(&self, logical_plan: &Query) -> bool {
         match logical_plan.source() {
             QuerySource::FullKeyAggregate(_) => true,
+            QuerySource::PreAggregation(_) => false,
+            QuerySource::LogicalJoin(_) => false,
+        }
+    }
+    fn is_multi_stage_source(&self, logical_plan: &Query) -> bool {
+        match logical_plan.source() {
+            QuerySource::FullKeyAggregate(full_key_aggregate) => {
+                !full_key_aggregate.multi_stage_subquery_refs().is_empty()
+            }
             QuerySource::PreAggregation(_) => false,
             QuerySource::LogicalJoin(_) => false,
         }
@@ -46,7 +57,24 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .process_node(&multi_stage_member.member_type, &context)?;
             let alias = multi_stage_member.name.clone();
             context.add_multi_stage_schema(alias.clone(), query.schema());
+            if let MultiStageMemberLogicalType::DimensionCalculation(dimension_calculation) =
+                &multi_stage_member.member_type
+            {
+                context.add_multi_stage_dimension_schema(
+                    dimension_calculation.resolved_dimensions()?,
+                    alias.clone(),
+                    dimension_calculation.join_dimensions()?,
+                    query.schema(),
+                );
+            }
             ctes.push(Rc::new(Cte::new(Rc::new(query), alias)));
+        }
+
+        context.remove_multi_stage_dimensions();
+        for member in logical_plan.schema().all_dimensions() {
+            if has_multi_stage_members(member, false)? {
+                context.add_multi_stage_dimension(member.full_name());
+            }
         }
 
         let from = self.builder.process_node(logical_plan.source(), &context)?;

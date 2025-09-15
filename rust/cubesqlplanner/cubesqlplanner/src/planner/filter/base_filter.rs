@@ -85,6 +85,10 @@ impl BaseFilter {
         }
     }
 
+    pub fn raw_member_evaluator(&self) -> Rc<MemberSymbol> {
+        self.member_evaluator.clone()
+    }
+
     pub fn with_member_evaluator(&self, member_evaluator: Rc<MemberSymbol>) -> Rc<Self> {
         let mut result = self.clone();
         result.member_evaluator = member_evaluator;

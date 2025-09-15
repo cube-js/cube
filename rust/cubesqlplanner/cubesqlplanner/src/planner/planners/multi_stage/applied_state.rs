@@ -1,10 +1,12 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::planners::multi_stage::time_shift_state::TimeShiftState;
+use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::{DimensionTimeShift, MeasureTimeShifts, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::PartialEq;
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -57,12 +59,37 @@ impl MultiStageAppliedState {
             .iter()
             .cloned()
             .chain(dimensions.into_iter())
-            .unique_by(|d| d.full_name())
+            .unique_by(|d| d.clone().resolve_reference_chain().full_name())
             .collect_vec();
     }
 
     pub fn add_dimension_filter(&mut self, filter: FilterItem) {
         self.dimensions_filters.push(filter);
+    }
+
+    pub fn remove_multistage_dimensions(
+        &mut self,
+        resolved_dimensions: &HashSet<String>,
+    ) -> Result<(), CubeError> {
+        let mut filtered = Vec::new();
+        for d in &self.dimensions {
+            if resolved_dimensions.contains(&d.clone().resolve_reference_chain().full_name())
+                || !has_multi_stage_members(&d, false)?
+            {
+                filtered.push(d.clone());
+            }
+        }
+        self.dimensions = filtered;
+        let mut filtered = Vec::new();
+        for d in &self.time_dimensions {
+            if resolved_dimensions.contains(&d.clone().resolve_reference_chain().full_name())
+                || !has_multi_stage_members(&d, false)?
+            {
+                filtered.push(d.clone());
+            }
+        }
+        self.time_dimensions = filtered;
+        Ok(())
     }
 
     pub fn add_time_shifts(&mut self, time_shifts: MeasureTimeShifts) -> Result<(), CubeError> {
@@ -404,7 +431,18 @@ impl PartialEq for MultiStageAppliedState {
                 .dimensions
                 .iter()
                 .zip(other.dimensions.iter())
-                .all(|(a, b)| a.full_name() == b.full_name());
+                .all(|(a, b)| {
+                    a.clone().resolve_reference_chain().full_name()
+                        == b.clone().resolve_reference_chain().full_name()
+                })
+            && self
+                .time_dimensions
+                .iter()
+                .zip(other.time_dimensions.iter())
+                .all(|(a, b)| {
+                    a.clone().resolve_reference_chain().full_name()
+                        == b.clone().resolve_reference_chain().full_name()
+                });
         dims_eq
             && self.time_dimensions_filters == other.time_dimensions_filters
             && self.dimensions_filters == other.dimensions_filters

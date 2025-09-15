@@ -9,7 +9,7 @@ use crate::planner::sql_evaluator::{
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::cell::{Ref, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 pub struct DimensionSubqueryPlanner {
@@ -122,6 +122,7 @@ impl DimensionSubqueryPlanner {
             false,
             false,
             Rc::new(vec![]),
+            true,
         )?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan()?;

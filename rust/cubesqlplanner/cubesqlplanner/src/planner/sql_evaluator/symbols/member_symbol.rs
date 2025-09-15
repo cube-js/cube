@@ -1,5 +1,7 @@
 use cubenativeutils::CubeError;
 
+use crate::planner::sql_evaluator::Case;
+
 use super::{
     CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol,
     TimeDimensionSymbol,
@@ -126,6 +128,15 @@ impl MemberSymbol {
             Self::TimeDimension(d) => d.is_multi_stage(),
             Self::Measure(m) => m.is_multi_stage(),
             _ => false,
+        }
+    }
+
+    pub fn case(&self) -> Option<&Case> {
+        match self {
+            MemberSymbol::Dimension(dimension_symbol) => dimension_symbol.case(),
+            MemberSymbol::Measure(measure_symbol) => measure_symbol.case(),
+            MemberSymbol::TimeDimension(time_dimension_symbol) => time_dimension_symbol.base_symbol().case(),
+            _ => None,
         }
     }
 

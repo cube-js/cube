@@ -113,6 +113,10 @@ impl From {
         Rc::new(Self { source })
     }
 
+    pub fn new_empty() -> Rc<Self> {
+        Self::new(FromSource::Empty)
+    }
+
     pub fn new_from_cube(cube: Rc<BaseCube>, alias: Option<String>) -> Rc<Self> {
         Self::new(FromSource::Single(SingleAliasedSource::new_from_cube(
             cube, alias,

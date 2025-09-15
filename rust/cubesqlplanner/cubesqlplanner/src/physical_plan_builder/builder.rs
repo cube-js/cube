@@ -1,13 +1,14 @@
 use super::context::PushDownBuilderContext;
 use super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::*;
+use crate::physical_plan_builder::context::MultiStageDimensionContext;
 use crate::plan::schema::QualifiedColumnName;
 use crate::plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -138,6 +139,34 @@ impl PhysicalPlanBuilder {
         join_builder.left_join_subselect(
             sub_query,
             sub_query_alias,
+            JoinCondition::new_dimension_join(conditions, false),
+        );
+        Ok(())
+    }
+
+    pub(super) fn add_multistage_dimension_join(
+        &self,
+        dimension_schema: &Rc<MultiStageDimensionContext>,
+        join_builder: &mut JoinBuilder,
+    ) -> Result<(), CubeError> {
+        let conditions = dimension_schema
+            .join_dimensions
+            .iter()
+            .map(|dim| -> Result<_, CubeError> {
+                let alias_in_cte = dimension_schema.schema.resolve_member_alias(&dim);
+                let sub_query_ref = Expr::Reference(QualifiedColumnName::new(
+                    Some(dimension_schema.name.clone()),
+                    alias_in_cte,
+                ));
+
+                Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))])
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        join_builder.left_join_table_reference(
+            dimension_schema.name.clone(),
+            dimension_schema.schema.clone(),
+            None,
             JoinCondition::new_dimension_join(conditions, false),
         );
         Ok(())

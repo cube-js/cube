@@ -330,6 +330,15 @@ impl Case {
         }
     }
 
+    pub fn case_switch_dimension(&self) -> Option<Rc<MemberSymbol>> {
+        if let Case::CaseSwitch(case) = &self {
+            if let CaseSwitchItem::Member(member) = &case.switch {
+                return Some(member.clone());
+            }
+        }
+        None
+    }
+
     pub fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<Self> {
         match self {
             Case::Case(_) => None,

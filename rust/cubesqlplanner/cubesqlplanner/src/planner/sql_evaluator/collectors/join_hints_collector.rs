@@ -34,7 +34,7 @@ impl TraversalVisitor for JoinHintsCollector {
 
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
-                if !e.is_view() && e.dimension_type() != "switch" {
+                if !e.is_view() {
                     if !path.is_empty() {
                         if path.len() == 1 {
                             self.hints.push(JoinHintItem::Single(path[0].clone()))
