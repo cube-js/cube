@@ -19,6 +19,7 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
+import { CacheMode } from '@cubejs-backend/native';
 
 type QueryOptions = {
   external?: boolean;
@@ -46,7 +47,9 @@ export type Query = {
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
+  // @deprecated
   renewQuery?: boolean;
+  cache?: CacheMode;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
 
@@ -56,7 +59,9 @@ export type QueryBody = {
   query?: string;
   values?: string[];
   continueWait?: boolean;
+  // @deprecated
   renewQuery?: boolean;
+  cache?: CacheMode;
   requestId?: string;
   external?: boolean;
   isJob?: boolean;
