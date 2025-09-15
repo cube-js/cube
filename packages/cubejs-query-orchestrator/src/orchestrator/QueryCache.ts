@@ -2,7 +2,13 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import { LRUCache } from 'lru-cache';
 import { pipeline } from 'stream';
-import { AsyncDebounce, getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
+import {
+  AsyncDebounce,
+  getEnv,
+  MaybeCancelablePromise,
+  streamToArray,
+  CacheMode,
+} from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   BaseDriver,
@@ -19,7 +25,23 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
-import { CacheMode } from '@cubejs-backend/shared';
+
+export type CacheQueryResultOptions = {
+  renewalThreshold?: number,
+  renewalKey?: any,
+  priority?: number,
+  external?: boolean,
+  requestId?: string,
+  dataSource: string,
+  waitForRenew?: boolean,
+  forceNoCache?: boolean,
+  useInMemory?: boolean,
+  useCsvQuery?: boolean,
+  lambdaTypes?: TableStructure,
+  persistent?: boolean,
+  primaryQuery?: boolean,
+  renewCycle?: boolean,
+};
 
 type QueryOptions = {
   external?: boolean;
@@ -848,22 +870,7 @@ export class QueryCache {
     values: string[],
     cacheKey: CacheKey,
     expiration: number,
-    options: {
-      renewalThreshold?: number,
-      renewalKey?: any,
-      priority?: number,
-      external?: boolean,
-      requestId?: string,
-      dataSource: string,
-      waitForRenew?: boolean,
-      forceNoCache?: boolean,
-      useInMemory?: boolean,
-      useCsvQuery?: boolean,
-      lambdaTypes?: TableStructure,
-      persistent?: boolean,
-      primaryQuery?: boolean,
-      renewCycle?: boolean,
-    }
+    options: CacheQueryResultOptions,
   ) {
     const spanId = crypto.randomBytes(16).toString('hex');
     options = options || { dataSource: 'default' };
