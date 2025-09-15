@@ -429,16 +429,18 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
 
 export type ShutdownMode = 'fast' | 'semifast' | 'smart';
 
+export type CacheMode = 'stale-if-slow' | 'stale-while-revalidate' | 'must-revalidate' | 'no-cache';
+
 export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdownMode: ShutdownMode): Promise<void> => {
   const native = loadNative();
 
   await native.shutdownInterface(instance, shutdownMode);
 };
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any): Promise<void> => {
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow'): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode);
 };
 
 // TODO parse result from native code

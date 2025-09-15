@@ -223,6 +223,7 @@ async fn handle_sql_query(
     channel: Arc<Channel>,
     stream_methods: WritableStreamMethods,
     sql_query: &str,
+    cache_mode: &str,
 ) -> Result<(), CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
         Uuid::new_v4().to_string(),
@@ -424,6 +425,8 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         Err(_) => None,
     };
 
+    let cache_mode = cx.argument::<JsString>(4)?.value(&mut cx);
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -471,6 +474,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             channel.clone(),
             stream_methods,
             &sql_query,
+            &cache_mode,
         )
         .await;
 
