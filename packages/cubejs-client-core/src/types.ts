@@ -1,6 +1,7 @@
 import Meta from './Meta';
 import { TimeDimensionGranularity } from './time';
 import { TransportOptions } from './HttpTransport';
+import { CacheMode } from '@cubejs-backend/native';
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 
@@ -113,7 +114,9 @@ export interface Query {
   offset?: number;
   order?: TQueryOrderObject | TQueryOrderArray;
   timezone?: string;
+  // @deprecated
   renewQuery?: boolean;
+  cache?: CacheMode;
   ungrouped?: boolean;
   responseFormat?: 'compact' | 'default';
   total?: boolean;
