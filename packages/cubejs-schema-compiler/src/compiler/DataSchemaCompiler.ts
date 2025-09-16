@@ -89,6 +89,7 @@ export type DataSchemaCompilerOptions = {
   allowNodeRequire?: boolean;
   compiledScriptCache: LRUCache<string, vm.Script>;
   compiledYamlCache: LRUCache<string, string>;
+  compiledJinjaCache: LRUCache<string, string>;
 };
 
 export type TranspileOptions = {
@@ -166,6 +167,8 @@ export class DataSchemaCompiler {
 
   private readonly compiledYamlCache: LRUCache<string, string>;
 
+  private readonly compiledJinjaCache: LRUCache<string, string>;
+
   private compileV8ContextCache: vm.Context | null = null;
 
   // FIXME: Is public only because of tests, should be private
@@ -200,6 +203,7 @@ export class DataSchemaCompiler {
     this.compilerId = options.compilerId || 'default';
     this.compiledScriptCache = options.compiledScriptCache;
     this.compiledYamlCache = options.compiledYamlCache;
+    this.compiledJinjaCache = options.compiledJinjaCache;
   }
 
   public compileObjects(compileServices: CompilerInterface[], objects, errorsReport: ErrorReporter) {
@@ -689,6 +693,7 @@ export class DataSchemaCompiler {
         errorsReport.exitFile();
 
         const content = babelGenerator(ast, {}, file.content).code;
+
         return { ...file, content };
       }
     } catch (e: any) {
@@ -762,20 +767,26 @@ export class DataSchemaCompiler {
   private async transpileJinjaFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+    options: TranspileOptions
   ): Promise<(FileContent | undefined)> {
-    // if (getEnv('transpilationNative')) {
-    //
-    // } else if (getEnv('transpilationWorkerThreads')) {
-    //
-    // } else {
-    return this.yamlCompiler.compileYamlWithJinjaFile(
-      file,
-      errorsReport,
-      this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
-      this.pythonContext!
-    );
-    // }
+    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
+
+    let renderedFileContent: string;
+
+    if (this.compiledJinjaCache.has(cacheKey)) {
+      renderedFileContent = this.compiledJinjaCache.get(cacheKey)!;
+    } else {
+      const renderedFile = await this.yamlCompiler.renderTemplate(
+        file,
+        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
+        this.pythonContext!
+      );
+      renderedFileContent = renderedFile.content;
+
+      this.compiledJinjaCache.set(cacheKey, renderedFileContent);
+    }
+
+    return this.transpileYamlFile({ ...file, content: renderedFileContent }, errorsReport, options);
   }
 
   public withQuery(query, fn) {
@@ -830,6 +841,8 @@ export class DataSchemaCompiler {
 
     compiledFiles[file.fileName] = true;
 
+    // As now all types of files are transpiled to JS,
+    // we just call JS compiler for all of them
     this.compileJsFile(file, errorsReport, { doSyntaxCheck });
   }
 
