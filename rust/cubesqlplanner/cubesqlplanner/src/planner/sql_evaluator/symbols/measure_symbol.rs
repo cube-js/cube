@@ -6,7 +6,7 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
-use crate::planner::sql_evaluator::{CaseSwitchItem, CubeTableSymbol};
+use crate::planner::sql_evaluator::CubeTableSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;

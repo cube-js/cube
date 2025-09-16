@@ -11,7 +11,6 @@ use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashSet;
 use std::rc::Rc;
 use std::vec;
 

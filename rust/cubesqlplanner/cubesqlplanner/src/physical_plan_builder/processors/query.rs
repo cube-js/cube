@@ -24,15 +24,6 @@ impl QueryProcessor<'_> {
             QuerySource::LogicalJoin(_) => false,
         }
     }
-    fn is_multi_stage_source(&self, logical_plan: &Query) -> bool {
-        match logical_plan.source() {
-            QuerySource::FullKeyAggregate(full_key_aggregate) => {
-                !full_key_aggregate.multi_stage_subquery_refs().is_empty()
-            }
-            QuerySource::PreAggregation(_) => false,
-            QuerySource::LogicalJoin(_) => false,
-        }
-    }
 }
 
 impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {

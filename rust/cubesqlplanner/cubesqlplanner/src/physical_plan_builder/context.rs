@@ -1,12 +1,10 @@
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 
-use crate::logical_plan::LogicalSchema;
 use crate::plan::Schema;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::MemberSymbol;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone, Debug, Default)]

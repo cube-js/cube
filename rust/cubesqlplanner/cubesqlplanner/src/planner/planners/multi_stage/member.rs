@@ -1,5 +1,5 @@
 use crate::planner::sql_evaluator::{MeasureTimeShifts, MemberSymbol};
-use std::{collections::HashSet, rc::Rc};
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct TimeSeriesDescription {

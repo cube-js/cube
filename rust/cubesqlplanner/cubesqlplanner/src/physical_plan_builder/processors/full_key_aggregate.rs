@@ -1,6 +1,6 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::{
-    pretty_print, FullKeyAggregate, LogicalJoin, ResolvedMultipliedMeasures,
+    FullKeyAggregate, LogicalJoin, ResolvedMultipliedMeasures,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{

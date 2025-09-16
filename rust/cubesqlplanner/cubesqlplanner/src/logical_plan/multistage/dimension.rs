@@ -3,8 +3,6 @@ use crate::planner::query_properties::OrderByItem;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::MemberSymbol;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
-use std::collections::HashSet;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 

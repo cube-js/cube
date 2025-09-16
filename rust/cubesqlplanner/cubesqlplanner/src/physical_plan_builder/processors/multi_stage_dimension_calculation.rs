@@ -1,11 +1,10 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
-use crate::logical_plan::{MultiStageCalculationWindowFunction, MultiStageDimensionCalculation};
+use crate::logical_plan::MultiStageDimensionCalculation;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{Expr, MemberExpression, QueryPlan, SelectBuilder};
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct MultiStageDimensionCalculationProcessor<'a> {
@@ -25,7 +24,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageDimensionCalculation>
         measure_calculation: &MultiStageDimensionCalculation,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let (query_tools, templates) = self.builder.qtools_and_templates();
+        let query_tools = self.builder.query_tools();
         let mut context_factory = context.make_sql_nodes_factory()?;
         let from = self
             .builder
