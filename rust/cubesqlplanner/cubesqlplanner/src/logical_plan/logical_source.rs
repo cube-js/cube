@@ -14,11 +14,6 @@ pub trait LogicalSource: Sized + PrettyPrint {
 /// - PrettyPrint trait implementation for debugging SQL plans
 /// - From<Rc<T>> implementations for convenient construction
 ///
-/// # Usage
-/// ```
-/// logical_source_enum!(MySource, [Table, Join, Subquery]);
-/// ```
-///
 /// The enum variant name always matches the inner type name, and all variants
 /// are wrapped in `Rc` for efficient cloning in the query planner.
 macro_rules! logical_source_enum {
