@@ -467,6 +467,13 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1LoadRequestQueryFilterItem"
+        cache:
+          type: "string"
+          enum:
+            - stale-if-slow
+            - stale-while-revalidate
+            - must-revalidate
+            - no-cache
         ungrouped:
           type: "boolean"
         # vector of (subquery sql: string, join condition: member expression, join type: enum)
