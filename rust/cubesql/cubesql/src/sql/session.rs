@@ -1,6 +1,7 @@
 use datafusion::scalar::ScalarValue;
 use log::trace;
 use rand::Rng;
+use std::str::FromStr;
 use std::{
     collections::HashMap,
     sync::{Arc, LazyLock, RwLock as RwLockSync, Weak},
@@ -57,6 +58,28 @@ pub enum QueryState {
 }
 
 #[derive(Debug)]
+pub enum CacheMode {
+    StaleIfSlow,
+    StaleWhileRevalidate,
+    MustRevalidate,
+    NoCache,
+}
+
+impl FromStr for CacheMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "stale-if-slow" => Ok(Self::StaleIfSlow),
+            "stale-while-revalidate" => Ok(Self::StaleWhileRevalidate),
+            "must-revalidate" => Ok(Self::MustRevalidate),
+            "no-cache" => Ok(Self::NoCache),
+            other => Err(format!("Unknown cache mode: {}", other)),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct SessionState {
     // connection id, immutable
     pub connection_id: u32,
@@ -92,6 +115,8 @@ pub struct SessionState {
     pub statements: RWLockAsync<HashMap<String, PreparedStatement>>,
 
     auth_context_expiration: Duration,
+
+    pub cache_mode: RwLockSync<Option<CacheMode>>,
 }
 
 impl SessionState {
@@ -123,6 +148,7 @@ impl SessionState {
             query: RwLockSync::new(QueryState::None),
             statements: RWLockAsync::new(HashMap::new()),
             auth_context_expiration,
+            cache_mode: RwLockSync::new(None),
         }
     }
 
