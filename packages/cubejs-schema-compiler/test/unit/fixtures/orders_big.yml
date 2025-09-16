@@ -62,7 +62,7 @@ cubes:
           allowAll: true
       - role: admin
         conditions:
-          - if: "{ !security_context.isBlocked }"
+          - if: "{ security_context.isNotBlocked }"
         rowLevel:
           filters:
             - member: status
