@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.68](https://github.com/cube-js/cube/compare/v1.3.67...v1.3.68) (2025-09-16)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix incorrect pre-aggregation matching for 'rollupJoin' and 'rollupLambda' pre-aggs ([#9957](https://github.com/cube-js/cube/issues/9957)) ([b279611](https://github.com/cube-js/cube/commit/b2796113bea216890b91f690626a00f09606d502))
+- **schema-compiler:** Fix memberToDataSource processing for views without cubes ([#9974](https://github.com/cube-js/cube/issues/9974)) ([46a265f](https://github.com/cube-js/cube/commit/46a265f14850dee21323c990fad678c7b68bb565))
+- **schema-compiler:** Pass filename alongside with errors to error reporter during transpilation ([#9964](https://github.com/cube-js/cube/issues/9964)) ([3758bca](https://github.com/cube-js/cube/commit/3758bca7005096fd0e27b061cbf9cf717f8a994d))
+
+### Features
+
+- **cubesql:** Print value of the date/time that couldn't be parsed ([#9961](https://github.com/cube-js/cube/issues/9961)) ([b78ae0a](https://github.com/cube-js/cube/commit/b78ae0ab4b71fd34234be22353a7c3afae674cde))
+
+### Performance Improvements
+
+- **schema-compiler:** implement yaml native bulk transpilation ([#9955](https://github.com/cube-js/cube/issues/9955)) ([8aa3562](https://github.com/cube-js/cube/commit/8aa35623ae87e942fffe5c1312a04dd51a08016a))
+- **schema-compiler:** Improve yaml compilation speed ([#9926](https://github.com/cube-js/cube/issues/9926)) ([13eb112](https://github.com/cube-js/cube/commit/13eb1129e5026e05970aa564762f86846d09299b))
+- **schema-compiler:** Introduce compiledJinjaCache ([#9950](https://github.com/cube-js/cube/issues/9950)) ([863e970](https://github.com/cube-js/cube/commit/863e97028392d87dcd9baa63ffd7ecb9469e0501))
+- **schema-compiler:** Support native YAML transpilation ([#9948](https://github.com/cube-js/cube/issues/9948)) ([368a89e](https://github.com/cube-js/cube/commit/368a89eb73c267ab0cec7119b9b57dc62495322e))
+- **schema-compiler:** YAML transpilation in worker threads ([#9929](https://github.com/cube-js/cube/issues/9929)) ([449503c](https://github.com/cube-js/cube/commit/449503cd35bf9132d35468a8b85d4ea06bd39665))
+
 ## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
 
 ### Bug Fixes
