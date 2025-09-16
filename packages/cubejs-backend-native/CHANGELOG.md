@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.68](https://github.com/cube-js/cube/compare/v1.3.67...v1.3.68) (2025-09-16)
+
+### Performance Improvements
+
+- **schema-compiler:** Support native YAML transpilation ([#9948](https://github.com/cube-js/cube/issues/9948)) ([368a89e](https://github.com/cube-js/cube/commit/368a89eb73c267ab0cec7119b9b57dc62495322e))
+
 ## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
 
 **Note:** Version bump only for package @cubejs-backend/native
