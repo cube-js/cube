@@ -2142,10 +2142,11 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         timeDimensions: [{
           dimension: 'SwitchSourceTest.orderDate',
           granularity: 'month',
-          dateRange: ['2020-01-01', '2020-12-31'],
+          dateRange: ['2020-01-01', '2020-04-01'],
         }],
         order: {
           'BigECommerce.orderDate': 'asc',
+          'BigECommerce.city' : 'asc'
         }
       });
       expect(response.rawData()).toMatchSnapshot();

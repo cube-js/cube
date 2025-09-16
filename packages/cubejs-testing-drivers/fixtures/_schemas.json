@@ -619,7 +619,7 @@
         {
           "name": "totalSalesA",
           "multiStage": true,
-          "type": "string",
+          "type": "sum",
           "case": {
             "switch": "{CUBE.source}",
             "when": [{
@@ -638,7 +638,7 @@
         {
           "name": "totalSalesB",
           "multiStage": true,
-          "type": "string",
+          "type": "sum",
           "case": {
             "switch": "{CUBE.source}",
             "when": [{
@@ -657,7 +657,7 @@
         {
           "name": "totalSales",
           "multiStage": true,
-          "type": "string",
+          "type": "sum",
           "case": {
             "switch": "{CUBE.curr}",
             "when": [{
