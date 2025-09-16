@@ -72,7 +72,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         context.remove_multi_stage_dimensions();
         for member in logical_plan.schema().all_dimensions() {
-            if has_multi_stage_members(member, false)? {
+            if has_multi_stage_members(member, true)? {
                 context.add_multi_stage_dimension(member.full_name());
             }
         }

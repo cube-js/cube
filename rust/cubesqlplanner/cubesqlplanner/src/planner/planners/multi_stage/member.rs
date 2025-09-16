@@ -172,6 +172,7 @@ impl MultiStageMemberType {
 pub struct MultiStageMember {
     member_type: MultiStageMemberType,
     member_symbol: Rc<MemberSymbol>,
+    is_without_member_leaf: bool, //FIXME hack, refactor needed
     is_ungrupped: bool,
     has_aggregates_on_top: bool,
 }
@@ -186,6 +187,22 @@ impl MultiStageMember {
         Rc::new(Self {
             member_type,
             member_symbol: evaluation_node,
+            is_without_member_leaf: false,
+            is_ungrupped,
+            has_aggregates_on_top,
+        })
+    }
+
+    pub fn new_without_member_leaf(
+        member_type: MultiStageMemberType,
+        evaluation_node: Rc<MemberSymbol>,
+        is_ungrupped: bool,
+        has_aggregates_on_top: bool,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            member_type,
+            member_symbol: evaluation_node,
+            is_without_member_leaf: true,
             is_ungrupped,
             has_aggregates_on_top,
         })
@@ -197,6 +214,10 @@ impl MultiStageMember {
 
     pub fn evaluation_node(&self) -> &Rc<MemberSymbol> {
         &self.member_symbol
+    }
+
+    pub fn is_without_member_leaf(&self) -> bool {
+        self.is_without_member_leaf
     }
 
     pub fn full_name(&self) -> String {

@@ -198,6 +198,14 @@ impl MultiStageQueryPlanner {
         )
     }
 
+    fn is_multi_stage_dimension(member: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
+        if member.is_dimension() {
+            has_multi_stage_members(member, false)
+        } else {
+            Ok(false)
+        }
+    }
+
     fn default_make_childs(
         &self,
         member: Rc<MemberSymbol>,
@@ -206,9 +214,11 @@ impl MultiStageQueryPlanner {
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         resolved_multi_stage_dimensions: &mut HashSet<String>,
     ) -> Result<(), CubeError> {
+        let mut has_inputs = false;
         for dep in member.get_dependencies() {
             let dep = &dep.resolve_reference_chain();
-            if dep.is_measure() || dep.is_dimension() {
+            if dep.is_measure() || Self::is_multi_stage_dimension(dep)? {
+                has_inputs = true;
                 let description = self.make_queries_descriptions(
                     dep.clone(),
                     new_state.clone(),
@@ -219,6 +229,24 @@ impl MultiStageQueryPlanner {
                     result.push(description);
                 }
             }
+        }
+        if !has_inputs {
+            //Rank and similas cases
+
+            let alias = format!("cte_{}", descriptions.len());
+            let description = MultiStageQueryDescription::new(
+                MultiStageMember::new_without_member_leaf(
+                    MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
+                    member.clone(),
+                    self.query_properties.ungrouped(),
+                    false,
+                ),
+                new_state.clone(),
+                vec![],
+                alias.clone(),
+            );
+            result.push(description.clone());
+            descriptions.push(description.clone());
         }
         Ok(())
     }

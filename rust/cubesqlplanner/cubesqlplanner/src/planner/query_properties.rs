@@ -848,12 +848,12 @@ impl QueryProperties {
 
     fn has_multi_stage_dimensions(&self) -> Result<bool, CubeError> {
         for dim in self.dimensions.iter() {
-            if has_multi_stage_members(dim, false)? {
+            if has_multi_stage_members(dim, true)? {
                 return Ok(true);
             }
         }
         for dim in self.time_dimensions.iter() {
-            if has_multi_stage_members(dim, false)? {
+            if has_multi_stage_members(dim, true)? {
                 return Ok(true);
             }
         }

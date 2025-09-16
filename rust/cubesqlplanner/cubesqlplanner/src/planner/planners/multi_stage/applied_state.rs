@@ -74,7 +74,7 @@ impl MultiStageAppliedState {
         let mut filtered = Vec::new();
         for d in &self.dimensions {
             if resolved_dimensions.contains(&d.clone().resolve_reference_chain().full_name())
-                || !has_multi_stage_members(&d, false)?
+                || !has_multi_stage_members(&d, true)?
             {
                 filtered.push(d.clone());
             }
@@ -83,7 +83,7 @@ impl MultiStageAppliedState {
         let mut filtered = Vec::new();
         for d in &self.time_dimensions {
             if resolved_dimensions.contains(&d.clone().resolve_reference_chain().full_name())
-                || !has_multi_stage_members(&d, false)?
+                || !has_multi_stage_members(&d, true)?
             {
                 filtered.push(d.clone());
             }

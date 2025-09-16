@@ -37,7 +37,7 @@ impl MultiStageDimensionCalculation {
     pub fn resolved_dimensions(&self) -> Result<Vec<String>, CubeError> {
         let mut result = vec![];
         for dim in self.schema.all_dimensions() {
-            if has_multi_stage_members(dim, false)? {
+            if has_multi_stage_members(dim, true)? {
                 result.push(dim.clone().resolve_reference_chain().full_name());
             }
         }
@@ -48,7 +48,7 @@ impl MultiStageDimensionCalculation {
     pub fn join_dimensions(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
         let mut result = vec![];
         for dim in self.schema.all_dimensions() {
-            if !has_multi_stage_members(dim, false)? {
+            if !has_multi_stage_members(dim, true)? {
                 result.push(dim.clone());
             }
         }

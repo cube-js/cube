@@ -272,8 +272,22 @@ impl MultiStageMemberQueryPlanner {
         let mut measures = vec![];
         let cte_member = self.description.member().evaluation_node();
         match cte_member.as_ref() {
-            MemberSymbol::Dimension(_) => dimensions.push(cte_member.clone()),
-            MemberSymbol::TimeDimension(_) => time_dimensions.push(cte_member.clone()),
+            MemberSymbol::Dimension(_) => {
+                if !dimensions.iter().any(|d| {
+                    d.clone().resolve_reference_chain()
+                        == cte_member.clone().resolve_reference_chain()
+                }) {
+                    dimensions.push(cte_member.clone())
+                }
+            }
+            MemberSymbol::TimeDimension(_) => {
+                if !time_dimensions.iter().any(|d| {
+                    d.clone().resolve_reference_chain()
+                        == cte_member.clone().resolve_reference_chain()
+                }) {
+                    time_dimensions.push(cte_member.clone())
+                }
+            }
             MemberSymbol::Measure(_) => measures.push(cte_member.clone()),
             _ => {}
         }
@@ -323,25 +337,27 @@ impl MultiStageMemberQueryPlanner {
         let mut dimensions = self.description.state().dimensions_symbols();
         let mut time_dimensions = self.description.state().time_dimensions_symbols();
         let mut measures = vec![];
-        match member_node.as_ref() {
-            MemberSymbol::Dimension(_) => {
-                if !dimensions
-                    .iter()
-                    .any(|d| d.has_member_in_reference_chain(&member_node))
-                {
-                    dimensions.push(member_node.clone())
+        if !self.description.member().is_without_member_leaf() {
+            match member_node.as_ref() {
+                MemberSymbol::Dimension(_) => {
+                    if !dimensions.iter().any(|d| {
+                        d.clone().resolve_reference_chain()
+                            == member_node.clone().resolve_reference_chain()
+                    }) {
+                        dimensions.push(member_node.clone())
+                    }
                 }
-            }
-            MemberSymbol::TimeDimension(_) => {
-                if !time_dimensions
-                    .iter()
-                    .any(|d| d.has_member_in_reference_chain(&member_node))
-                {
-                    time_dimensions.push(member_node.clone())
+                MemberSymbol::TimeDimension(_) => {
+                    if !time_dimensions.iter().any(|d| {
+                        d.clone().resolve_reference_chain()
+                            == member_node.clone().resolve_reference_chain()
+                    }) {
+                        time_dimensions.push(member_node.clone())
+                    }
                 }
+                MemberSymbol::Measure(_) => measures.push(member_node.clone()),
+                _ => {}
             }
-            MemberSymbol::Measure(_) => measures.push(member_node.clone()),
-            _ => {}
         }
 
         let cte_query_properties = QueryProperties::try_new_from_precompiled(
