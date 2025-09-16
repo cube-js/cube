@@ -38,6 +38,7 @@ export type PrepareCompilerOptions = {
   adapter?: string;
   compiledScriptCache?: LRUCache<string, vm.Script>;
   compiledYamlCache?: LRUCache<string, string>;
+  compiledJinjaCache?: LRUCache<string, string>;
 };
 
 export interface CompilerInterface {
@@ -61,6 +62,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
 
   const compiledScriptCache = options.compiledScriptCache || new LRUCache<string, vm.Script>({ max: 250 });
   const compiledYamlCache = options.compiledYamlCache || new LRUCache<string, string>({ max: 250 });
+  const compiledJinjaCache = options.compiledJinjaCache || new LRUCache<string, string>({ max: 250 });
 
   const transpilers: TranspilerInterface[] = [
     new ValidationTranspiler(),
@@ -82,6 +84,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     viewCompilationGate,
     compiledScriptCache,
     compiledYamlCache,
+    compiledJinjaCache,
     viewCompilers: [viewCompiler],
     cubeCompilers: [cubeEvaluator, joinGraph, metaTransformer],
     contextCompilers: [contextEvaluator],
