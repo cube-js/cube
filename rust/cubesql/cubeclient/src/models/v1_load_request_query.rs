@@ -29,6 +29,8 @@ pub struct V1LoadRequestQuery {
     pub offset: Option<i32>,
     #[serde(rename = "filters", skip_serializing_if = "Option::is_none")]
     pub filters: Option<Vec<models::V1LoadRequestQueryFilterItem>>,
+    #[serde(rename = "cache", skip_serializing_if = "Option::is_none")]
+    pub cache: Option<Cache>,
     #[serde(rename = "ungrouped", skip_serializing_if = "Option::is_none")]
     pub ungrouped: Option<bool>,
     #[serde(rename = "subqueryJoins", skip_serializing_if = "Option::is_none")]
@@ -48,9 +50,28 @@ impl V1LoadRequestQuery {
             limit: None,
             offset: None,
             filters: None,
+            cache: None,
             ungrouped: None,
             subquery_joins: None,
             join_hints: None,
         }
+    }
+}
+///
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub enum Cache {
+    #[serde(rename = "stale-if-slow")]
+    StaleIfSlow,
+    #[serde(rename = "stale-while-revalidate")]
+    StaleWhileRevalidate,
+    #[serde(rename = "must-revalidate")]
+    MustRevalidate,
+    #[serde(rename = "no-cache")]
+    NoCache,
+}
+
+impl Default for Cache {
+    fn default() -> Cache {
+        Self::StaleIfSlow
     }
 }
