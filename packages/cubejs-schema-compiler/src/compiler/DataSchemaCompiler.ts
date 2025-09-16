@@ -88,6 +88,7 @@ export type DataSchemaCompilerOptions = {
   compileContext?: any;
   allowNodeRequire?: boolean;
   compiledScriptCache: LRUCache<string, vm.Script>;
+  compiledYamlCache: LRUCache<string, string>;
 };
 
 export type TranspileOptions = {
@@ -163,6 +164,8 @@ export class DataSchemaCompiler {
 
   private readonly compiledScriptCache: LRUCache<string, vm.Script>;
 
+  private readonly compiledYamlCache: LRUCache<string, string>;
+
   private compileV8ContextCache: vm.Context | null = null;
 
   // FIXME: Is public only because of tests, should be private
@@ -196,6 +199,7 @@ export class DataSchemaCompiler {
     this.workerPool = null;
     this.compilerId = options.compilerId || 'default';
     this.compiledScriptCache = options.compiledScriptCache;
+    this.compiledYamlCache = options.compiledYamlCache;
   }
 
   public compileObjects(compileServices: CompilerInterface[], objects, errorsReport: ErrorReporter) {
@@ -268,7 +272,7 @@ export class DataSchemaCompiler {
     const transpilationNativeThreadsCount = getThreadsCount();
     const { compilerId } = this;
 
-    if (!transpilationNative && transpilationWorkerThreads) {
+    if (transpilationWorkerThreads) {
       const wc = getEnv('transpilationWorkerThreadsCount');
       this.workerPool = workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
@@ -288,7 +292,7 @@ export class DataSchemaCompiler {
 
       if (transpilationNative) {
         const nonJsFilesTasks = [...jinjaTemplatedFiles, ...yamlFiles]
-          .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
+          .map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames, compilerId }));
 
         const jsFiles = originalJsFiles;
         let jsFilesTasks: Promise<(FileContent | undefined)[]>[] = [];
@@ -575,14 +579,9 @@ export class DataSchemaCompiler {
       (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
       && file.content.match(JINJA_SYNTAX)
     ) {
-      return this.yamlCompiler.compileYamlWithJinjaFile(
-        file,
-        errorsReport,
-        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
-        this.pythonContext!
-      );
+      return this.transpileJinjaFile(file, errorsReport, options);
     } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
-      return this.yamlCompiler.transpileYamlFile(file, errorsReport);
+      return this.transpileYamlFile(file, errorsReport, options);
     } else {
       return file;
     }
@@ -668,7 +667,7 @@ export class DataSchemaCompiler {
           cubeSymbols,
         };
 
-        const res = await this.workerPool!.exec('transpile', [data]);
+        const res = await this.workerPool!.exec('transpileJs', [data]);
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
 
@@ -703,6 +702,65 @@ export class DataSchemaCompiler {
       }
     }
     return undefined;
+  }
+
+  private async transpileYamlFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+  ): Promise<(FileContent | undefined)> {
+    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
+
+    if (this.compiledYamlCache.has(cacheKey)) {
+      const content = this.compiledYamlCache.get(cacheKey)!;
+
+      return { ...file, content };
+    }
+
+    /* if (getEnv('transpilationNative')) {
+
+    } else */ if (getEnv('transpilationWorkerThreads')) {
+      const data = {
+        fileName: file.fileName,
+        content: file.content,
+        transpilers: [],
+        cubeNames,
+        cubeSymbols,
+      };
+
+      const res = await this.workerPool!.exec('transpileYaml', [data]);
+      errorsReport.addErrors(res.errors);
+      errorsReport.addWarnings(res.warnings);
+
+      this.compiledYamlCache.set(cacheKey, res.content);
+
+      return { ...file, content: res.content };
+    } else {
+      const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
+
+      this.compiledYamlCache.set(cacheKey, transpiledFile?.content || '');
+
+      return transpiledFile;
+    }
+  }
+
+  private async transpileJinjaFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
+  ): Promise<(FileContent | undefined)> {
+    // if (getEnv('transpilationNative')) {
+    //
+    // } else if (getEnv('transpilationWorkerThreads')) {
+    //
+    // } else {
+    return this.yamlCompiler.compileYamlWithJinjaFile(
+      file,
+      errorsReport,
+      this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
+      this.pythonContext!
+    );
+    // }
   }
 
   public withQuery(query, fn) {
