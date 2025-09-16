@@ -117,26 +117,30 @@ impl LogicalNode for FullKeyAggregate {
             check_inputs_len(&inputs, 1, self.node_name())?;
             let input_source = &inputs[0];
 
-            Some(match self.multiplied_measures_resolver().as_ref().unwrap() {
-                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(_) => {
-                    ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
-                        input_source.clone().into_logical_node()?,
-                    )
-                }
-                ResolvedMultipliedMeasures::PreAggregation(_) => {
-                    ResolvedMultipliedMeasures::PreAggregation(
-                        input_source.clone().into_logical_node()?,
-                    )
-                }
-            })
+            Some(
+                match self.multiplied_measures_resolver().as_ref().unwrap() {
+                    ResolvedMultipliedMeasures::ResolveMultipliedMeasures(_) => {
+                        ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
+                            input_source.clone().into_logical_node()?,
+                        )
+                    }
+                    ResolvedMultipliedMeasures::PreAggregation(_) => {
+                        ResolvedMultipliedMeasures::PreAggregation(
+                            input_source.clone().into_logical_node()?,
+                        )
+                    }
+                },
+            )
         };
 
-        Ok(Rc::new(Self::builder()
-            .schema(self.schema().clone())
-            .use_full_join_and_coalesce(self.use_full_join_and_coalesce())
-            .multiplied_measures_resolver(multiplied_measures_resolver)
-            .multi_stage_subquery_refs(self.multi_stage_subquery_refs().clone())
-            .build()))
+        Ok(Rc::new(
+            Self::builder()
+                .schema(self.schema().clone())
+                .use_full_join_and_coalesce(self.use_full_join_and_coalesce())
+                .multiplied_measures_resolver(multiplied_measures_resolver)
+                .multi_stage_subquery_refs(self.multi_stage_subquery_refs().clone())
+                .build(),
+        ))
     }
 
     fn node_name(&self) -> &'static str {

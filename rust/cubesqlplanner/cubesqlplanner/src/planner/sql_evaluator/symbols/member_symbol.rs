@@ -135,7 +135,9 @@ impl MemberSymbol {
         match self {
             MemberSymbol::Dimension(dimension_symbol) => dimension_symbol.case(),
             MemberSymbol::Measure(measure_symbol) => measure_symbol.case(),
-            MemberSymbol::TimeDimension(time_dimension_symbol) => time_dimension_symbol.base_symbol().case(),
+            MemberSymbol::TimeDimension(time_dimension_symbol) => {
+                time_dimension_symbol.base_symbol().case()
+            }
             _ => None,
         }
     }

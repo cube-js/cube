@@ -86,7 +86,10 @@ impl MultiStageMeasureCalculation {
 impl PrettyPrint for MultiStageMeasureCalculation {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println(
-            &format!("Measure Calculation: {}", self.calculation_type().to_string()),
+            &format!(
+                "Measure Calculation: {}",
+                self.calculation_type().to_string()
+            ),
             state,
         );
         let state = state.new_level();
@@ -145,15 +148,17 @@ impl LogicalNode for MultiStageMeasureCalculation {
         check_inputs_len(&inputs, 1, self.node_name())?;
         let source = &inputs[0];
 
-        Ok(Rc::new(Self::builder()
-            .schema(self.schema().clone())
-            .is_ungrouped(self.is_ungrouped())
-            .calculation_type(self.calculation_type().clone())
-            .partition_by(self.partition_by().clone())
-            .window_function_to_use(self.window_function_to_use().clone())
-            .order_by(self.order_by().clone())
-            .source(source.clone().into_logical_node()?)
-            .build()))
+        Ok(Rc::new(
+            Self::builder()
+                .schema(self.schema().clone())
+                .is_ungrouped(self.is_ungrouped())
+                .calculation_type(self.calculation_type().clone())
+                .partition_by(self.partition_by().clone())
+                .window_function_to_use(self.window_function_to_use().clone())
+                .order_by(self.order_by().clone())
+                .source(source.clone().into_logical_node()?)
+                .build(),
+        ))
     }
 
     fn node_name(&self) -> &'static str {

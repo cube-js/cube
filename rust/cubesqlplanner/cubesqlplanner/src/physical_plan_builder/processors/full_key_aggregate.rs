@@ -1,7 +1,5 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{
-    FullKeyAggregate, LogicalJoin, ResolvedMultipliedMeasures,
-};
+use crate::logical_plan::{FullKeyAggregate, LogicalJoin, ResolvedMultipliedMeasures};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
     Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, SelectBuilder,
