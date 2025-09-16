@@ -3452,6 +3452,7 @@ impl WrappedSelectNode {
             } else {
                 None
             },
+            cache: None,
             // TODO is it okay to just override limit?
             limit: if let Some(limit) = self.limit {
                 Some(limit as i32)

@@ -253,6 +253,17 @@ async fn handle_sql_query(
                 .await?;
         }
 
+        let cache_enum = cache_mode.parse().map_err(|e| CubeError::user(e))?;
+
+        {
+            let mut cm = session
+                .state
+                .cache_mode
+                .write()
+                .expect("failed to unlock session cache_mode for change");
+            *cm = Some(cache_enum);
+        }
+
         let session_clone = Arc::clone(&session);
         let span_id_clone = span_id.clone();
 
