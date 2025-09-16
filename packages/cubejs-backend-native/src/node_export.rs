@@ -253,7 +253,7 @@ async fn handle_sql_query(
                 .await?;
         }
 
-        let cache_enum = cache_mode.parse().map_err(|e| CubeError::user(e))?;
+        let cache_enum = cache_mode.parse().map_err(CubeError::user)?;
 
         {
             let mut cm = session
