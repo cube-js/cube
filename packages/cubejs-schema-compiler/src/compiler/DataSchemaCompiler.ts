@@ -295,11 +295,9 @@ export class DataSchemaCompiler {
       }
 
       if (transpilationNative) {
-        const nonJsFilesTasks = [...jinjaTemplatedFiles, ...yamlFiles]
-          .map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames, compilerId }));
-
         const jsFiles = originalJsFiles;
         let jsFilesTasks: Promise<(FileContent | undefined)[]>[] = [];
+        let yamlFilesTasks: Promise<(FileContent | undefined)[]>[] = [];
 
         if (jsFiles.length > 0) {
           // Warming up swc compiler cache
@@ -311,10 +309,18 @@ export class DataSchemaCompiler {
           await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
 
           const jsChunks = splitFilesToChunks(jsFiles, transpilationNativeThreadsCount);
-          jsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesBulk(chunk, errorsReport, { transpilerNames, compilerId }));
+          jsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesNativeBulk(chunk, errorsReport, { transpilerNames, compilerId }));
         }
 
-        results = (await Promise.all([...nonJsFilesTasks, ...jsFilesTasks])).flat();
+        if (yamlFiles.length > 0) {
+          const yamlChunks = splitFilesToChunks(yamlFiles, transpilationNativeThreadsCount);
+          yamlFilesTasks = yamlChunks.map(chunk => this.transpileYamlFilesNativeBulk(chunk, errorsReport, { transpilerNames, compilerId }));
+        }
+
+        const jinjaFilesTasks = jinjaTemplatedFiles
+          .map(f => this.transpileJinjaFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames }));
+
+        results = (await Promise.all([...jsFilesTasks, ...yamlFilesTasks, ...jinjaFilesTasks])).flat();
       } else if (transpilationWorkerThreads) {
         results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       } else {
@@ -350,7 +356,7 @@ export class DataSchemaCompiler {
         await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
 
         const jsChunks = splitFilesToChunks(toCompile, transpilationNativeThreadsCount);
-        const jsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesBulk(chunk, errorsReport, { transpilerNames, compilerId }));
+        const jsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesNativeBulk(chunk, errorsReport, { transpilerNames, compilerId }));
 
         results = (await Promise.all(jsFilesTasks)).flat();
       } else if (transpilationWorkerThreads) {
@@ -591,11 +597,7 @@ export class DataSchemaCompiler {
     }
   }
 
-  /**
-   * Right now it is used only for transpilation in native,
-   * so no checks for transpilation type inside this method
-   */
-  private async transpileJsFilesBulk(
+  private async transpileJsFilesNativeBulk(
     files: FileContent[],
     errorsReport: ErrorReporter,
     { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }: TranspileOptions
@@ -618,6 +620,33 @@ export class DataSchemaCompiler {
       }),
     }));
     const res = await transpileJs(reqDataArr);
+
+    return files.map((file, index) => {
+      errorsReport.inFile(file);
+      if (!res[index]) { // This should not happen in theory but just to be safe
+        errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
+        return undefined;
+      }
+      errorsReport.addErrors(res[index].errors);
+      errorsReport.addWarnings(res[index].warnings as unknown as SyntaxErrorInterface[]);
+      errorsReport.exitFile();
+
+      return { ...file, content: res[index].code };
+    });
+  }
+
+  private async transpileYamlFilesNativeBulk(
+    files: FileContent[],
+    errorsReport: ErrorReporter,
+    { compilerId }: TranspileOptions
+  ): Promise<(FileContent | undefined)[]> {
+    const reqDataArr = files.map(file => ({
+      fileName: file.fileName,
+      fileContent: file.content,
+      transpilers: [],
+      compilerId: compilerId || '',
+    }));
+    const res = await transpileYaml(reqDataArr);
 
     return files.map((file, index) => {
       errorsReport.inFile(file);
