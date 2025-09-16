@@ -2145,8 +2145,8 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           dateRange: ['2020-01-01', '2020-04-01'],
         }],
         order: {
-          'BigECommerce.orderDate': 'asc',
-          'BigECommerce.city' : 'asc'
+          'SwitchSourceTest.orderDate': 'asc',
+          'SwitchSourceTest.city' : 'asc'
         }
       });
       expect(response.rawData()).toMatchSnapshot();
