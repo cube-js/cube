@@ -32,6 +32,7 @@ pub mod v1_load_request;
 pub use self::v1_load_request::V1LoadRequest;
 pub mod v1_load_request_query;
 pub use self::v1_load_request_query::V1LoadRequestQuery;
+pub use self::v1_load_request_query::Cache;
 pub mod v1_load_request_query_filter_base;
 pub use self::v1_load_request_query_filter_base::V1LoadRequestQueryFilterBase;
 pub mod v1_load_request_query_filter_item;
