@@ -554,5 +554,127 @@
         }
       ]
     }
+  ],
+  "views": [
+    {
+      "name": "SwitchSourceTest",
+      "dimensions": [
+        {
+          "name": "source",
+          "type": "switch",
+          "values": [
+            "com",
+            "bigCom"
+          ]
+        },
+        {
+          "name": "curr",
+          "type": "switch",
+          "values": [
+            "curr_a",
+            "curr_b"
+          ]
+        },
+        {
+          "name": "orderDate",
+          "multiStage": true,
+          "type": "time",
+          "case": {
+            "switch": "{CUBE.source}",
+            "when": [{
+              "value": "com",
+              "sql": "{ECommerce.orderDate}"
+            },
+            {
+              "value": "bigCom",
+              "sql": "{BigECommerce.orderDate}"
+            }],
+            "else": {
+              "sql": "{BigECommerce.orderDate}"
+            }
+          }
+
+        },
+        {
+          "name": "city",
+          "multiStage": true,
+          "type": "string",
+          "case": {
+            "switch": "{CUBE.source}",
+            "when": [{
+              "value": "com",
+              "sql": "{ECommerce.city}"
+            },
+            {
+              "value": "bigCom",
+              "sql": "{BigECommerce.city}"
+            }],
+            "else": {
+              "sql": "{BigECommerce.city}"
+            }
+          }
+        }
+      ],
+      "measures": [
+        {
+          "name": "totalSalesA",
+          "multiStage": true,
+          "type": "string",
+          "case": {
+            "switch": "{CUBE.source}",
+            "when": [{
+              "value": "com",
+              "sql": "{ECommerce.totalSales}"
+            },
+            {
+              "value": "bigCom",
+              "sql": "{BigECommerce.totalSales}"
+            }],
+            "else": {
+              "sql": "{BigECommerce.totalSales}"
+            }
+          }
+        },
+        {
+          "name": "totalSalesB",
+          "multiStage": true,
+          "type": "string",
+          "case": {
+            "switch": "{CUBE.source}",
+            "when": [{
+              "value": "com",
+              "sql": "{ECommerce.totalSales} * 2"
+            },
+            {
+              "value": "bigCom",
+              "sql": "{BigECommerce.totalSales} * 2"
+            }],
+            "else": {
+              "sql": "{BigECommerce.totalSales} * 2"
+            }
+          }
+        },
+        {
+          "name": "totalSales",
+          "multiStage": true,
+          "type": "string",
+          "case": {
+            "switch": "{CUBE.curr}",
+            "when": [{
+              "value": "curr_a",
+              "sql": "{CUBE.totalSalesA}"
+            },
+            {
+              "value": "curr_b",
+              "sql": "{CUBE.totalSalesB}"
+            }],
+            "else": {
+              "sql": "{CUBE.totalSalesB}"
+            }
+          }
+        }
+
+      ]
+    }
   ]
 }

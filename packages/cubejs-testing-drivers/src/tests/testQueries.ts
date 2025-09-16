@@ -2131,6 +2131,26 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying SwitchSourceTest: simple cross join', async () => {
+      const response = await client.load({
+        dimensions: [
+          "SwitchSourceTest.city"
+        ],
+        measures: [
+          'SwitchSourceTest.totalSalesA',
+        ],
+        timeDimensions: [{
+          dimension: 'SwitchSourceTest.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        order: {
+          'BigECommerce.orderDate': 'asc',
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     if (includeIncrementalSchemaSuite) {
       describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
         incrementalSchemaLoadingSuite(execute, () => driver, tables);
