@@ -517,6 +517,16 @@ export const transpileJs = async (transpileRequests: TransformConfig[]): Promise
   throw new Error('TranspileJs native implementation not found!');
 };
 
+export const transpileYaml = async (transpileRequests: TransformConfig[]): Promise<TransformResponse[]> => {
+  const native = loadNative();
+
+  if (native.transpileYaml) {
+    return native.transpileYaml(transpileRequests);
+  }
+
+  throw new Error('TranspileYaml native implementation not found!');
+};
+
 export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,
   logger?: (msg: string, params: Record<string, any>) => void,
