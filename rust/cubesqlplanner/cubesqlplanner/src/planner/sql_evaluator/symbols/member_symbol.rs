@@ -1,5 +1,7 @@
 use cubenativeutils::CubeError;
 
+use crate::planner::sql_evaluator::Case;
+
 use super::{
     CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol,
     TimeDimensionSymbol,
@@ -129,12 +131,45 @@ impl MemberSymbol {
         }
     }
 
+    pub fn case(&self) -> Option<&Case> {
+        match self {
+            MemberSymbol::Dimension(dimension_symbol) => dimension_symbol.case(),
+            MemberSymbol::Measure(measure_symbol) => measure_symbol.case(),
+            MemberSymbol::TimeDimension(time_dimension_symbol) => {
+                time_dimension_symbol.base_symbol().case()
+            }
+            _ => None,
+        }
+    }
+
     pub fn is_measure(&self) -> bool {
         matches!(self, Self::Measure(_))
     }
 
     pub fn is_dimension(&self) -> bool {
         matches!(self, Self::Dimension(_) | Self::TimeDimension(_))
+    }
+
+    pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        self: &Rc<Self>,
+        f: &F,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let result = f(self)?;
+        result.apply_to_deps(f)
+    }
+
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        self: &Rc<Self>,
+        f: &F,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        match self.as_ref() {
+            Self::Dimension(d) => d.apply_to_deps(f),
+            Self::TimeDimension(d) => d.apply_to_deps(f),
+            Self::Measure(m) => m.apply_to_deps(f),
+            Self::CubeName(_) => Ok(self.clone()),
+            Self::CubeTable(_) => Ok(self.clone()),
+            Self::MemberExpression(e) => e.apply_to_deps(f),
+        }
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
@@ -209,8 +244,8 @@ impl MemberSymbol {
             Self::Dimension(d) => d.owned_by_cube(),
             Self::TimeDimension(d) => d.owned_by_cube(),
             Self::Measure(m) => m.owned_by_cube(),
-            Self::CubeName(_) => false,
-            Self::CubeTable(_) => false,
+            Self::CubeName(_) => true,
+            Self::CubeTable(_) => true,
             Self::MemberExpression(_) => false,
         }
     }
@@ -240,6 +275,16 @@ impl MemberSymbol {
             Self::Measure(m) => Ok(m.clone()),
             _ => Err(CubeError::internal(format!(
                 "{} is not a measure",
+                self.full_name()
+            ))),
+        }
+    }
+
+    pub fn as_cube_table(&self) -> Result<Rc<CubeTableSymbol>, CubeError> {
+        match self {
+            Self::CubeTable(c) => Ok(c.clone()),
+            _ => Err(CubeError::internal(format!(
+                "{} is not a cube table",
                 self.full_name()
             ))),
         }

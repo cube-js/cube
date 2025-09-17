@@ -132,6 +132,11 @@ const BaseDimensionWithoutSubQuery = {
   enableSuggestions: Joi.boolean().strict(),
   format: formatSchema,
   meta: Joi.any(),
+  values: Joi.when('type', {
+    is: 'switch',
+    then: Joi.array().items(Joi.string()),
+    otherwise: Joi.forbidden()
+  }),
   granularities: Joi.when('type', {
     is: 'time',
     then: Joi.object().pattern(identifierRegex,
@@ -583,6 +588,42 @@ const timeShiftItemOptional = Joi.object({
   .xor('name', 'interval')
   .and('interval', 'type');
 
+const CaseSchema = Joi.object().keys({
+  when: Joi.array().items(Joi.object().keys({
+    sql: Joi.func().required(),
+    label: Joi.alternatives([
+      Joi.string(),
+      Joi.object().keys({
+        sql: Joi.func().required()
+      })
+    ])
+  })),
+  else: Joi.object().keys({
+    label: Joi.alternatives([
+      Joi.string(),
+      Joi.object().keys({
+        sql: Joi.func().required()
+      })
+    ])
+  })
+}).required();
+
+const SwitchCaseSchema = Joi.object().keys({
+  switch: Joi.func().required(),
+  when: Joi.array().items(Joi.object().keys({
+    value: Joi.string().required(),
+    sql: Joi.func().required()
+  })),
+  else: Joi.object().keys({
+    sql: Joi.func().required()
+  })
+}).required();
+
+const CaseVariants = Joi.alternatives().try(
+  CaseSchema,
+  SwitchCaseSchema
+);
+
 const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.multiStage'), [
   {
     is: true,
@@ -590,6 +631,7 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       multiStage: Joi.boolean().strict(),
       type: multiStageMeasureType.required(),
       sql: Joi.func(), // TODO .required(),
+      case: CaseVariants,
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),
@@ -647,53 +689,45 @@ const CalendarTimeShiftItem = Joi.alternatives().try(
   })
 );
 
-const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().try(
-  inherit(BaseDimensionWithoutSubQuery, {
-    case: Joi.object().keys({
-      when: Joi.array().items(Joi.object().keys({
-        sql: Joi.func().required(),
-        label: Joi.alternatives([
-          Joi.string(),
-          Joi.object().keys({
-            sql: Joi.func().required()
-          })
-        ])
-      })),
-      else: Joi.object().keys({
-        label: Joi.alternatives([
-          Joi.string(),
-          Joi.object().keys({
-            sql: Joi.func().required()
-          })
-        ])
-      })
-    }).required()
-  }),
-  inherit(BaseDimensionWithoutSubQuery, {
-    latitude: Joi.object().keys({
-      sql: Joi.func().required()
-    }).required(),
-    longitude: Joi.object().keys({
-      sql: Joi.func().required()
-    }).required()
-  }),
-  inherit(BaseDimension, {
-    sql: Joi.func().required(),
-  }),
-  inherit(BaseDimension, {
-    multiStage: Joi.boolean().valid(true),
-    type: Joi.any().valid('number').required(),
-    sql: Joi.func().required(),
-    addGroupBy: Joi.func(),
-  }),
-  // TODO should be valid only for calendar cubes, but this requires significant refactoring
-  // of all schemas. Left for the future when we'll switch to zod.
-  inherit(BaseDimensionWithoutSubQuery, {
-    type: Joi.any().valid('time').required(),
-    sql: Joi.func().required(),
-    timeShift: Joi.array().items(CalendarTimeShiftItem),
-  })
-));
+const SwitchDimension = Joi.object({
+  type: Joi.string().valid('switch').required(),
+  values: Joi.array().items(Joi.string()).min(1).required()
+});
+
+const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.type'), {
+  is: 'switch',
+  then: SwitchDimension,
+  otherwise: Joi.alternatives().try(
+    inherit(BaseDimensionWithoutSubQuery, {
+      case: CaseVariants.required(),
+      multiStage: Joi.boolean().strict(),
+    }),
+    inherit(BaseDimensionWithoutSubQuery, {
+      latitude: Joi.object().keys({
+        sql: Joi.func().required()
+      }).required(),
+      longitude: Joi.object().keys({
+        sql: Joi.func().required()
+      }).required()
+    }),
+    inherit(BaseDimension, {
+      sql: Joi.func().required(),
+    }),
+    inherit(BaseDimension, {
+      multiStage: Joi.boolean().valid(true),
+      type: Joi.any().valid('number').required(),
+      sql: Joi.func().required(),
+      addGroupBy: Joi.func(),
+    }),
+    // TODO should be valid only for calendar cubes, but this requires significant refactoring
+    // of all schemas. Left for the future when we'll switch to zod.
+    inherit(BaseDimensionWithoutSubQuery, {
+      type: Joi.any().valid('time').required(),
+      sql: Joi.func().required(),
+      timeShift: Joi.array().items(CalendarTimeShiftItem),
+    })
+  )
+}));
 
 const SegmentsSchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
   aliases: Joi.array().items(Joi.string()),

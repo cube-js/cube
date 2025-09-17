@@ -4,7 +4,6 @@ use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{Select, SelectBuilder};
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MeasureSubqueryProcessor<'a> {
@@ -23,7 +22,6 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
-        let mut render_references = HashMap::new();
         let from = self
             .builder
             .process_node(measure_subquery.source.as_ref(), context)?;
@@ -41,9 +39,9 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
                 .collect(),
         );
         self.builder.resolve_subquery_dimensions_references(
-            &measure_subquery.source.dimension_subqueries,
+            &measure_subquery.source.dimension_subqueries(),
             &references_builder,
-            &mut render_references,
+            &mut context_factory,
         )?;
         for dim in measure_subquery.schema.dimensions.iter() {
             select_builder.add_projection_member(dim, None);
@@ -53,7 +51,6 @@ impl<'a> LogicalNodeProcessor<'a, MeasureSubquery> for MeasureSubqueryProcessor<
         }
 
         context_factory.set_ungrouped_measure(true);
-        context_factory.set_render_references(render_references);
 
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(select)

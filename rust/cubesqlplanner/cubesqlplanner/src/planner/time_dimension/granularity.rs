@@ -1,5 +1,5 @@
 use super::{GranularityHelper, QueryDateTime, SqlInterval};
-use crate::planner::sql_evaluator::SqlCall;
+use crate::planner::sql_evaluator::{MemberSymbol, SqlCall};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -74,6 +74,17 @@ impl Granularity {
             is_natural_aligned,
             calendar_sql,
         })
+    }
+
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Self, CubeError> {
+        let mut result = self.clone();
+        if let Some(calendar_sql) = &self.calendar_sql {
+            result.calendar_sql = Some(calendar_sql.apply_recursive(f)?);
+        }
+        Ok(result)
     }
 
     pub fn is_natural_aligned(&self) -> bool {

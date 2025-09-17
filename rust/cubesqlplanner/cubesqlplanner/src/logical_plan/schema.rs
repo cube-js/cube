@@ -3,6 +3,7 @@ use itertools::Itertools;
 use super::pretty_print::*;
 use crate::planner::sql_evaluator::MemberSymbol;
 use std::collections::HashSet;
+use std::fmt;
 use std::rc::Rc;
 
 #[derive(Default, Clone)]
@@ -11,6 +12,12 @@ pub struct LogicalSchema {
     pub dimensions: Vec<Rc<MemberSymbol>>,
     pub measures: Vec<Rc<MemberSymbol>>,
     pub multiplied_measures: HashSet<String>,
+}
+
+impl fmt::Debug for LogicalSchema {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LogicalSchema")
+    }
 }
 
 impl LogicalSchema {

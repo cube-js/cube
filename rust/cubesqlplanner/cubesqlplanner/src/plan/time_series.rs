@@ -1,5 +1,8 @@
 use super::{Schema, SchemaColumn};
-use crate::planner::{query_tools::QueryTools, sql_templates::PlanSqlTemplates, Granularity};
+use crate::planner::{
+    query_tools::QueryTools, sql_evaluator::MemberSymbol, sql_templates::PlanSqlTemplates,
+    Granularity,
+};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -20,15 +23,15 @@ pub enum TimeSeriesDateRange {
 impl TimeSeries {
     pub fn new(
         query_tools: Rc<QueryTools>,
-        time_dimension_name: String,
+        time_dimension: &Rc<MemberSymbol>,
         date_range: TimeSeriesDateRange,
         granularity: Granularity,
     ) -> Self {
-        let column = SchemaColumn::new(format!("date_from"), Some(time_dimension_name.clone()));
+        let column = SchemaColumn::new(format!("date_from"), Some(time_dimension.clone()));
         let schema = Rc::new(Schema::new(vec![column]));
         Self {
             query_tools,
-            time_dimension_name,
+            time_dimension_name: time_dimension.full_name(),
             granularity,
             date_range,
             schema,

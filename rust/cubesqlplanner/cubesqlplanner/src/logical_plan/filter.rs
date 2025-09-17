@@ -2,6 +2,7 @@ use super::pretty_print::*;
 use crate::plan::{Filter, FilterItem};
 use itertools::Itertools;
 
+#[derive(Default)]
 pub struct LogicalFilter {
     pub dimensions_filters: Vec<FilterItem>,
     pub time_dimensions_filters: Vec<FilterItem>,

@@ -1,79 +1,5 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: multi-stage group by time dimension 1`] = `
-Array [
-  Object {
-    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
-    "BigECommerce.totalProfit": 29.6548,
-    "BigECommerce.totalProfitForQuarter": 619.4485,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
-    "BigECommerce.totalProfit": 6.1992,
-    "BigECommerce.totalProfitForQuarter": 619.4485,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
-    "BigECommerce.totalProfit": 583.5945,
-    "BigECommerce.totalProfitForQuarter": 619.4485,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
-    "BigECommerce.totalProfit": 6.4176,
-    "BigECommerce.totalProfitForQuarter": 394.3386,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
-    "BigECommerce.totalProfit": 353.6849,
-    "BigECommerce.totalProfitForQuarter": 394.3386,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
-    "BigECommerce.totalProfit": 34.2361,
-    "BigECommerce.totalProfitForQuarter": 394.3386,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-07-01T00:00:00.000",
-    "BigECommerce.totalProfit": 461.1332,
-    "BigECommerce.totalProfitForQuarter": 461.1332,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
-    "BigECommerce.totalProfit": 139.997,
-    "BigECommerce.totalProfitForQuarter": 1576.6324,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
-    "BigECommerce.totalProfit": 1132.6617,
-    "BigECommerce.totalProfitForQuarter": 1576.6324,
-  },
-  Object {
-    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
-    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
-    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
-    "BigECommerce.totalProfit": 303.9737,
-    "BigECommerce.totalProfitForQuarter": 1576.6324,
-  },
-]
-`;
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver SQL API: Complex Rollup 1`] = `
 Array [
   Object {
@@ -9539,6 +9465,81 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: multi-stage group by time dimension 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": 29.6548,
+    "BigECommerce.totalProfitForQuarter": 619.4485,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": 6.1992,
+    "BigECommerce.totalProfitForQuarter": 619.4485,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-01-01T00:00:00.000",
+    "BigECommerce.totalProfit": 583.5945,
+    "BigECommerce.totalProfitForQuarter": 619.4485,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": 6.4176,
+    "BigECommerce.totalProfitForQuarter": 394.3386,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": 353.6849,
+    "BigECommerce.totalProfitForQuarter": 394.3386,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-04-01T00:00:00.000",
+    "BigECommerce.totalProfit": 34.2361,
+    "BigECommerce.totalProfitForQuarter": 394.3386,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-07-01T00:00:00.000",
+    "BigECommerce.totalProfit": 461.1332,
+    "BigECommerce.totalProfitForQuarter": 461.1332,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": 139.997,
+    "BigECommerce.totalProfitForQuarter": 1576.6324,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": 1132.6617,
+    "BigECommerce.totalProfitForQuarter": 1576.6324,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
+    "BigECommerce.totalProfit": 303.9737,
+    "BigECommerce.totalProfitForQuarter": 1576.6324,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: null boolean 1`] = `
 Array [
   Object {
@@ -16330,6 +16331,110 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying SwitchSourceTest: filter by switch dimensions 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 210.98,
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 48.896,
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 18.368,
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 2399.96,
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 71.6,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying SwitchSourceTest: full cross join 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 1265.88,
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 293.376,
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 110.208,
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 14399.76,
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": 429.6,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying SwitchSourceTest: simple cross join 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": 421.96,
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": 97.792,
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": 36.736,
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": 4799.92,
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": 143.2,
+  },
+]
+`;
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying custom granularities ECommerce: count by half_year_by_1st_april + dimension 1`] = `
 Array [
   Object {

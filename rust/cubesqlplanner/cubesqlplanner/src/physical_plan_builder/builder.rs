@@ -1,10 +1,12 @@
 use super::context::PushDownBuilderContext;
 use super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::*;
+use crate::physical_plan_builder::context::MultiStageDimensionContext;
 use crate::plan::schema::QualifiedColumnName;
 use crate::plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -142,21 +144,49 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
+    pub(super) fn add_multistage_dimension_join(
+        &self,
+        dimension_schema: &Rc<MultiStageDimensionContext>,
+        join_builder: &mut JoinBuilder,
+    ) -> Result<(), CubeError> {
+        let conditions = dimension_schema
+            .join_dimensions
+            .iter()
+            .map(|dim| -> Result<_, CubeError> {
+                let alias_in_cte = dimension_schema.schema.resolve_member_alias(&dim);
+                let sub_query_ref = Expr::Reference(QualifiedColumnName::new(
+                    Some(dimension_schema.name.clone()),
+                    alias_in_cte,
+                ));
+
+                Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))])
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        join_builder.left_join_table_reference(
+            dimension_schema.name.clone(),
+            dimension_schema.schema.clone(),
+            None,
+            JoinCondition::new_dimension_join(conditions, false),
+        );
+        Ok(())
+    }
+
     pub(super) fn resolve_subquery_dimensions_references(
         &self,
         dimension_subqueries: &Vec<Rc<DimensionSubQuery>>,
         references_builder: &ReferencesBuilder,
-        render_references: &mut HashMap<String, QualifiedColumnName>,
+        context_factory: &mut SqlNodesFactory,
     ) -> Result<(), CubeError> {
         for dimension_subquery in dimension_subqueries.iter() {
             if let Some(dim_ref) = references_builder.find_reference_for_member(
-                &dimension_subquery
-                    .measure_for_subquery_dimension
-                    .full_name(),
+                &dimension_subquery.measure_for_subquery_dimension,
                 &None,
             ) {
-                render_references
-                    .insert(dimension_subquery.subquery_dimension.full_name(), dim_ref);
+                context_factory.add_render_reference(
+                    dimension_subquery.subquery_dimension.full_name(),
+                    dim_ref,
+                );
             } else {
                 return Err(CubeError::internal(format!(
                     "Can't find source for subquery dimension {}",

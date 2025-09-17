@@ -126,6 +126,6 @@ describe('SqlParser', () => {
     
     // Verify table alias extraction still works after grammar changes
     const extractedConditions = sqlParser.extractWhereConditions('t');
-    expect(extractedConditions).toEqual(`t.status = 'active' AND t.created_at > '2024-01-01'`);
+    expect(extractedConditions).toEqual('t.status = \'active\' AND t.created_at > \'2024-01-01\'');
   });
 });
