@@ -17569,6 +17569,76 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/redshift-driver querying SwitchSourceTest: filter by switch dimensions 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "210.98000",
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "48.89600",
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "18.36800",
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "2399.96000",
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "71.60000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver querying SwitchSourceTest: full cross join 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "1265.88000",
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "293.37600",
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "110.20800",
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "14399.76000",
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "429.60000",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/redshift-driver querying SwitchSourceTest: simple cross join 1`] = `
 Array [
   Object {

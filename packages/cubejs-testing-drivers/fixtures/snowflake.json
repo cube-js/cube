@@ -249,7 +249,10 @@
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
-    "querying BigECommerce: multi-stage group by time dimension"
+    "querying BigECommerce: multi-stage group by time dimension",
+    "querying SwitchSourceTest: simple cross join",
+    "querying SwitchSourceTest: full cross join",
+    "querying SwitchSourceTest: filter by switch dimensions"
   ],
   "tesseractSkip": [
     "for the Customers.RollingExternal",

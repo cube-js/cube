@@ -2152,6 +2152,60 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying SwitchSourceTest: full cross join', async () => {
+      const response = await client.load({
+        dimensions: [
+          "SwitchSourceTest.city"
+        ],
+        measures: [
+          'SwitchSourceTest.totalSales',
+        ],
+        timeDimensions: [{
+          dimension: 'SwitchSourceTest.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-04-01'],
+        }],
+        order: {
+          'SwitchSourceTest.orderDate': 'asc',
+          'SwitchSourceTest.city' : 'asc'
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying SwitchSourceTest: filter by switch dimensions', async () => {
+      const response = await client.load({
+        dimensions: [
+          "SwitchSourceTest.city"
+        ],
+        measures: [
+          'SwitchSourceTest.totalSales',
+        ],
+        filters: [
+          {
+            values: ['com'],
+            member: 'SwitchSourceTest.source',
+            operator: 'equals'
+          },
+          {
+            values: ['curr_a'],
+            member: 'SwitchSourceTest.curr',
+            operator: 'equals'
+          }
+        ],
+        timeDimensions: [{
+          dimension: 'SwitchSourceTest.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-04-01'],
+        }],
+        order: {
+          'SwitchSourceTest.orderDate': 'asc',
+          'SwitchSourceTest.city' : 'asc'
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     if (includeIncrementalSchemaSuite) {
       describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
         incrementalSchemaLoadingSuite(execute, () => driver, tables);
