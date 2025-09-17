@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
+
+### Features
+
+- **tesseract:** Switch dimensions and case measures ([#9951](https://github.com/cube-js/cube/issues/9951)) ([3168f53](https://github.com/cube-js/cube/commit/3168f533e72ea7593b5893fe6699e743ae07967d))
+
 ## [1.3.68](https://github.com/cube-js/cube/compare/v1.3.67...v1.3.68) (2025-09-16)
 
 ### Performance Improvements
