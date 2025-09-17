@@ -26,13 +26,15 @@ export class BaseDbRunner {
     const query = this.newTestQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
     console.log(query.buildSqlAndParams());
+    const sqlAndParams = query.buildSqlAndParams();
 
-    const res = await this.testQuery(query.buildSqlAndParams());
+    const res = await this.testQuery(sqlAndParams);
     console.log(JSON.stringify(res));
 
     expect(res).toEqual(
       expectedResult
     );
+    return sqlAndParams;
   }
 
   public async testQueries(queries, fixture: any = null) {

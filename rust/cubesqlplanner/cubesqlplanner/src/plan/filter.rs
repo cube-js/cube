@@ -51,6 +51,16 @@ impl fmt::Display for FilterGroupOperator {
     }
 }
 
+impl Filter {
+    pub fn all_member_evaluators(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut result = Vec::new();
+        for item in self.items.iter() {
+            item.find_all_member_evaluators(&mut result);
+        }
+        result
+    }
+}
+
 impl FilterItem {
     pub fn to_sql(
         &self,
@@ -102,6 +112,92 @@ impl FilterItem {
             }
             FilterItem::Item(item) => result.push(item.member_evaluator().clone()),
             FilterItem::Segment(item) => result.push(item.member_evaluator().clone()),
+        }
+    }
+    /// Find value restrictions for a given symbol across filter tree
+    /// Returns:
+    /// - None: no restrictions found for this symbol
+    /// - Some(vec![]): restrictions exist but result in empty set (contradiction)
+    /// - Some(values): list of allowed values for this symbol
+    pub fn find_value_restriction(&self, symbol: &Rc<MemberSymbol>) -> Option<Vec<String>> {
+        match self {
+            FilterItem::Item(item) => {
+                // Check if this filter item applies to the target symbol
+                if &item.member_evaluator().resolve_reference_chain() == symbol {
+                    item.get_value_restrictions()
+                } else {
+                    None
+                }
+            }
+
+            FilterItem::Group(group) => match group.operator {
+                FilterGroupOperator::Or => {
+                    // OR logic: collect all possible values from all branches
+                    let mut all_values = Vec::new();
+                    let mut found_any_restriction = false;
+
+                    for child in &group.items {
+                        match child.find_value_restriction(symbol) {
+                            None => {
+                                // This branch has no restrictions - OR makes entire result unrestricted
+                                return None;
+                            }
+                            Some(values) => {
+                                found_any_restriction = true;
+                                // Add all values from this branch to our collection
+                                all_values.extend(values);
+                            }
+                        }
+                    }
+
+                    if found_any_restriction {
+                        // Remove duplicates and return combined value set
+                        all_values.sort();
+                        all_values.dedup();
+                        Some(all_values)
+                    } else {
+                        None
+                    }
+                }
+
+                FilterGroupOperator::And => {
+                    // AND logic: find intersection of all restrictions
+                    let mut result_values: Option<Vec<String>> = None;
+
+                    for child in &group.items {
+                        if let Some(values) = child.find_value_restriction(symbol) {
+                            match &result_values {
+                                None => {
+                                    // First restriction found - use it as base
+                                    result_values = Some(values);
+                                }
+                                Some(existing) => {
+                                    // Find intersection with existing restrictions
+                                    let intersection: Vec<String> = existing
+                                        .iter()
+                                        .filter(|v| values.contains(v))
+                                        .cloned()
+                                        .collect();
+
+                                    if intersection.is_empty() {
+                                        // Contradiction: no values satisfy all conditions
+                                        return Some(vec![]);
+                                    }
+
+                                    result_values = Some(intersection);
+                                }
+                            }
+                        }
+                        // If child has no restrictions, AND logic continues with existing restrictions
+                    }
+
+                    result_values
+                }
+            },
+            FilterItem::Segment(_) => {
+                // Segments don't provide value restrictions for individual symbols
+                None
+            }
         }
     }
 }

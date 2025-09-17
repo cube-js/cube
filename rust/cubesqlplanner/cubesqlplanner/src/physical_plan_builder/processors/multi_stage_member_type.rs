@@ -29,6 +29,9 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMemberLogicalType>
             MultiStageMemberLogicalType::MeasureCalculation(calculation) => {
                 self.builder.process_node(calculation.as_ref(), context)
             }
+            MultiStageMemberLogicalType::DimensionCalculation(calculation) => {
+                self.builder.process_node(calculation.as_ref(), context)
+            }
             MultiStageMemberLogicalType::GetDateRange(get_date_range) => {
                 self.builder.process_node(get_date_range.as_ref(), context)
             }

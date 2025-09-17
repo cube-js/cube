@@ -4,7 +4,8 @@ use super::query_tools::QueryTools;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
 use crate::planner::sql_evaluator::{
-    MemberExpressionExpression, MemberExpressionSymbol, TimeDimensionSymbol,
+    apply_static_filter_to_filter_item, apply_static_filter_to_symbol, MemberExpressionExpression,
+    MemberExpressionSymbol, TimeDimensionSymbol,
 };
 use crate::planner::GranularityHelper;
 
@@ -105,6 +106,7 @@ pub struct QueryProperties {
     pre_aggregation_query: bool,
     total_query: bool,
     query_join_hints: Rc<Vec<JoinHintItem>>,
+    allow_multi_stage: bool,
 }
 
 impl QueryProperties {
@@ -401,22 +403,10 @@ impl QueryProperties {
 
         let query_join_hints = Rc::new(options.join_hints()?.unwrap_or_default());
 
-        let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
-            query_join_hints.clone(),
-            query_tools.clone(),
-            &measures,
-            &dimensions,
-            &time_dimensions,
-            &time_dimensions_filters,
-            &dimensions_filters,
-            &measures_filters,
-            &segments,
-        )?;
-
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
         let total_query = options.static_data().total_query.unwrap_or(false);
 
-        Ok(Rc::new(Self {
+        let mut res = Self {
             measures,
             dimensions,
             segments,
@@ -430,11 +420,14 @@ impl QueryProperties {
             query_tools,
             ignore_cumulative: false,
             ungrouped,
-            multi_fact_join_groups,
+            multi_fact_join_groups: vec![],
             pre_aggregation_query,
             total_query,
             query_join_hints,
-        }))
+            allow_multi_stage: true,
+        };
+        res.apply_static_filters()?;
+        Ok(Rc::new(res))
     }
 
     pub fn try_new_from_precompiled(
@@ -454,6 +447,7 @@ impl QueryProperties {
         pre_aggregation_query: bool,
         total_query: bool,
         query_join_hints: Rc<Vec<JoinHintItem>>,
+        allow_multi_stage: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -461,19 +455,7 @@ impl QueryProperties {
             order_by
         };
 
-        let multi_fact_join_groups = Self::compute_join_multi_fact_groups(
-            query_join_hints.clone(),
-            query_tools.clone(),
-            &measures,
-            &dimensions,
-            &time_dimensions,
-            &time_dimensions_filters,
-            &dimensions_filters,
-            &measures_filters,
-            &segments,
-        )?;
-
-        Ok(Rc::new(Self {
+        let mut res = Self {
             measures,
             dimensions,
             time_dimensions,
@@ -487,11 +469,61 @@ impl QueryProperties {
             query_tools,
             ignore_cumulative,
             ungrouped,
-            multi_fact_join_groups,
+            multi_fact_join_groups: vec![],
             pre_aggregation_query,
             total_query,
             query_join_hints,
-        }))
+            allow_multi_stage,
+        };
+        res.apply_static_filters()?;
+
+        Ok(Rc::new(res))
+    }
+
+    pub fn allow_multi_stage(&self) -> bool {
+        self.allow_multi_stage
+    }
+
+    fn apply_static_filters(&mut self) -> Result<(), CubeError> {
+        let dimensions_filters = self.dimensions_filters.clone();
+        for dim in self.dimensions.iter_mut() {
+            *dim = apply_static_filter_to_symbol(dim, &dimensions_filters)?;
+        }
+        for dim in self.time_dimensions.iter_mut() {
+            *dim = apply_static_filter_to_symbol(dim, &dimensions_filters)?;
+        }
+        for meas in self.measures.iter_mut() {
+            *meas = apply_static_filter_to_symbol(meas, &dimensions_filters)?;
+        }
+        for filter_item in self.dimensions_filters.iter_mut() {
+            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+        }
+        for filter_item in self.measures_filters.iter_mut() {
+            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+        }
+        for filter_item in self.time_dimensions_filters.iter_mut() {
+            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+        }
+        for filter_item in self.segments.iter_mut() {
+            *filter_item = apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
+        }
+        for order_item in self.order_by.iter_mut() {
+            order_item.member_evaluator =
+                apply_static_filter_to_symbol(&order_item.member_evaluator, &dimensions_filters)?;
+        }
+
+        self.multi_fact_join_groups = Self::compute_join_multi_fact_groups(
+            self.query_join_hints.clone(),
+            self.query_tools.clone(),
+            &self.measures,
+            &self.dimensions,
+            &self.time_dimensions,
+            &self.time_dimensions_filters,
+            &self.dimensions_filters,
+            &self.measures_filters,
+            &self.segments,
+        )?;
+        Ok(())
     }
 
     pub fn compute_join_multi_fact_groups_with_measures(
@@ -555,14 +587,30 @@ impl QueryProperties {
         dimension_and_filter_join_hints_concat.extend(segments_join_hints.into_iter());
         // TODO This is not quite correct. Decide on how to handle it. Keeping it here just to blow up on unsupported case
         dimension_and_filter_join_hints_concat.extend(measures_filters_join_hints.into_iter());
+        let dimension_and_filter_join_hints_concat = dimension_and_filter_join_hints_concat
+            .into_iter()
+            .filter(|v| !v.is_empty())
+            .collect_vec();
+
+        let mut filtered_measures = Vec::new();
+        for m in measures {
+            if !has_multi_stage_members(&m, true)? {
+                filtered_measures.push(m.clone());
+            }
+        }
+        let measures = filtered_measures;
 
         let measures_to_join = if measures.is_empty() {
-            let join = query_tools
-                .cached_data_mut()
-                .join_by_hints(dimension_and_filter_join_hints_concat.clone(), |hints| {
-                    query_tools.join_graph().build_join(hints)
-                })?;
-            vec![(Vec::new(), join)]
+            if dimension_and_filter_join_hints_concat.is_empty() {
+                vec![]
+            } else {
+                let join = query_tools
+                    .cached_data_mut()
+                    .join_by_hints(dimension_and_filter_join_hints_concat.clone(), |hints| {
+                        query_tools.join_graph().build_join(hints)
+                    })?;
+                vec![(Vec::new(), join)]
+            }
         } else {
             measures
                 .iter()
@@ -580,7 +628,7 @@ impl QueryProperties {
                 })
                 .collect::<Result<Vec<_>, _>>()?
         };
-        Ok(measures_to_join
+        let res = measures_to_join
             .into_iter()
             .into_group_map_by(|(_, (key, _))| key.clone())
             .into_values()
@@ -593,15 +641,19 @@ impl QueryProperties {
                         .collect::<Vec<_>>(),
                 )
             })
-            .collect())
+            .collect_vec();
+        Ok(res)
     }
 
     pub fn is_multi_fact_join(&self) -> bool {
         self.multi_fact_join_groups.len() > 1
     }
 
-    pub fn simple_query_join(&self) -> Result<Rc<dyn JoinDefinition>, CubeError> {
-        if self.multi_fact_join_groups.len() != 1 {
+    pub fn simple_query_join(&self) -> Result<Option<Rc<dyn JoinDefinition>>, CubeError> {
+        if self.multi_fact_join_groups.is_empty() {
+            return Ok(None);
+        }
+        if self.multi_fact_join_groups.len() > 1 {
             return Err(CubeError::internal(format!(
                 "Expected just one multi-fact join group for simple query but got multiple: {}",
                 self.multi_fact_join_groups
@@ -613,7 +665,7 @@ impl QueryProperties {
                     .join(", ")
             )));
         }
-        Ok(self.multi_fact_join_groups.first().unwrap().0.clone())
+        Ok(Some(self.multi_fact_join_groups.first().unwrap().0.clone()))
     }
 
     pub fn measures(&self) -> &Vec<Rc<MemberSymbol>> {
@@ -695,11 +747,11 @@ impl QueryProperties {
             dimensions.chain(measures).collect_vec()
         } else {
             let time_dimensions = self.time_dimensions.iter().map(|d| {
-                if let Ok(td) = d.as_time_dimension() {
+                /* if let Ok(td) = d.as_time_dimension() {
                     td.base_symbol().clone()
-                } else {
-                    d.clone()
-                }
+                } else { */
+                d.clone()
+                //}
             });
             dimensions
                 .chain(time_dimensions)
@@ -784,13 +836,28 @@ impl QueryProperties {
     pub fn is_simple_query(&self) -> Result<bool, CubeError> {
         let full_aggregate_measure = self.full_key_aggregate_measures()?;
         if full_aggregate_measure.multiplied_measures.is_empty()
-            && full_aggregate_measure.multi_stage_measures.is_empty()
+            && (full_aggregate_measure.multi_stage_measures.is_empty() || !self.allow_multi_stage)
             && !self.is_multi_fact_join()
+            && (!self.has_multi_stage_dimensions()? || !self.allow_multi_stage)
         {
             Ok(true)
         } else {
             Ok(false)
         }
+    }
+
+    fn has_multi_stage_dimensions(&self) -> Result<bool, CubeError> {
+        for dim in self.dimensions.iter() {
+            if has_multi_stage_members(dim, true)? {
+                return Ok(true);
+            }
+        }
+        for dim in self.time_dimensions.iter() {
+            if has_multi_stage_members(dim, true)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {

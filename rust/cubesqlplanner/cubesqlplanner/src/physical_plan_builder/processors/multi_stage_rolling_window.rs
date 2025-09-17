@@ -8,7 +8,6 @@ use crate::plan::{
 };
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MultiStageRollingWindowProcessor<'a> {
@@ -30,8 +29,8 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
         let time_dimension = rolling_window.rolling_time_dimension.clone();
-        let time_series_ref = rolling_window.time_series_input.name.clone();
-        let measure_input_ref = rolling_window.measure_input.name.clone();
+        let time_series_ref = rolling_window.time_series_input.name().clone();
+        let measure_input_ref = rolling_window.measure_input.name().clone();
 
         let time_series_schema = context.get_multi_stage_schema(&time_series_ref)?;
 
@@ -93,17 +92,16 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         context_factory.set_rolling_window(true);
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
-        let mut render_references = HashMap::new();
         let mut select_builder = SelectBuilder::new(from.clone());
 
         //We insert render reference for main time dimension (with some granularity as in time series to avoid unnecessary date_tranc)
-        render_references.insert(
+        context_factory.add_render_reference(
             time_dimension.full_name(),
             QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
         );
 
         //We also insert render reference for the base dimension of the time dimension (i.e. without `_granularity` prefix to let other time dimensions make date_tranc)
-        render_references.insert(
+        context_factory.add_render_reference(
             time_dimension
                 .as_time_dimension()?
                 .base_symbol()
@@ -114,18 +112,22 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         for dim in rolling_window.schema.time_dimensions.iter() {
             context_factory.add_dimensions_with_ignored_timezone(dim.full_name());
             let alias = references_builder
-                .resolve_alias_for_member(&dim.full_name(), &Some(measure_input_alias.clone()));
+                .resolve_alias_for_member(&dim, &Some(measure_input_alias.clone()));
             select_builder.add_projection_member(dim, alias);
         }
 
         for dim in rolling_window.schema.dimensions.iter() {
-            references_builder.resolve_references_for_member(
-                dim.clone(),
-                &Some(measure_input_alias.clone()),
-                &mut render_references,
-            )?;
+            if dim.clone().resolve_reference_chain()
+                != time_dimension.clone().resolve_reference_chain()
+            {
+                references_builder.resolve_references_for_member(
+                    dim.clone(),
+                    &Some(measure_input_alias.clone()),
+                    context_factory.render_references_mut(),
+                )?;
+            }
             let alias = references_builder
-                .resolve_alias_for_member(&dim.full_name(), &Some(measure_input_alias.clone()));
+                .resolve_alias_for_member(&dim, &Some(measure_input_alias.clone()));
             select_builder.add_projection_member(dim, alias);
         }
 
@@ -156,7 +158,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             context_factory.set_ungrouped(true);
         }
 
-        context_factory.set_render_references(render_references);
         let select = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(QueryPlan::Select(select))
     }
