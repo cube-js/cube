@@ -144,6 +144,29 @@ export class QueryOrchestrator {
   }
 
   /**
+   * Starts background refresh cycle for a query.
+   */
+  public async startBackgroundRefresh(queryBody: QueryBody): Promise<void> {
+    if (!queryBody.query) {
+      return;
+    }
+
+    const {
+      preAggregationsTablesToTempTables,
+      values,
+    } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
+
+    if (values) {
+      queryBody = {
+        ...queryBody,
+        values
+      };
+    }
+
+    await this.queryCache.startBackgroundRefreshForQuery(queryBody, preAggregationsTablesToTempTables);
+  }
+
+  /**
    * Force reconcile queue logic to be executed.
    */
   public async forceReconcile(datasource = 'default') {

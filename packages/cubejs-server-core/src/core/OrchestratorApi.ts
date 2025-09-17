@@ -155,7 +155,15 @@ export class OrchestratorApi {
         }
 
         if (query.cache === 'stale-while-revalidate' && fromCache) {
-          // TODO: Run background refresh
+          // Start background refresh
+          this.orchestrator.startBackgroundRefresh(query).catch(e => {
+            this.logger('Error starting background refresh', {
+              query: queryForLog,
+              requestId: query.requestId,
+              error: ((e as Error).stack || e)
+            });
+          });
+
           return {
             ...fromCache,
             slowQuery: true
