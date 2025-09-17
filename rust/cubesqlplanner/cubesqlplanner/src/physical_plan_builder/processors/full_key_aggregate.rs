@@ -111,10 +111,6 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
             data_queries.push(data_select);
         }
         if data_queries.is_empty() {
-            /* return Err(CubeError::internal(format!(
-                "FullKeyAggregate should have at least one source: {}",
-                pretty_print(full_key_aggregate)
-            ))); */
             let empty_join = LogicalJoin::builder().build();
             return self.builder.process_node(&empty_join, context);
         }
@@ -255,10 +251,6 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
         }
 
         if data_queries.is_empty() {
-            /* return Err(CubeError::internal(format!(
-                "FullKeyAggregate should have at least one source: {}",
-                pretty_print(full_key_aggregate)
-            ))); */
             let empty_join = LogicalJoin::builder().build();
             return self.builder.process_node(&empty_join, context);
         }

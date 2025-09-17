@@ -1706,6 +1706,6 @@ views:
     });
   } else {
     // This test is working only in tesseract
-    test.skip('calc groups testst', () => { expect(1).toBe(1); });
+    test.skip('calc groups tests', () => { expect(1).toBe(1); });
   }
 });

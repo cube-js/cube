@@ -2134,7 +2134,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     execute('querying SwitchSourceTest: simple cross join', async () => {
       const response = await client.load({
         dimensions: [
-          "SwitchSourceTest.city"
+          'SwitchSourceTest.city'
         ],
         measures: [
           'SwitchSourceTest.totalSalesA',
@@ -2146,7 +2146,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         }],
         order: {
           'SwitchSourceTest.orderDate': 'asc',
-          'SwitchSourceTest.city' : 'asc'
+          'SwitchSourceTest.city': 'asc'
         }
       });
       expect(response.rawData()).toMatchSnapshot();
@@ -2155,7 +2155,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     execute('querying SwitchSourceTest: full cross join', async () => {
       const response = await client.load({
         dimensions: [
-          "SwitchSourceTest.city"
+          'SwitchSourceTest.city'
         ],
         measures: [
           'SwitchSourceTest.totalSales',
@@ -2167,7 +2167,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         }],
         order: {
           'SwitchSourceTest.orderDate': 'asc',
-          'SwitchSourceTest.city' : 'asc'
+          'SwitchSourceTest.city': 'asc'
         }
       });
       expect(response.rawData()).toMatchSnapshot();
@@ -2176,7 +2176,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     execute('querying SwitchSourceTest: filter by switch dimensions', async () => {
       const response = await client.load({
         dimensions: [
-          "SwitchSourceTest.city"
+          'SwitchSourceTest.city'
         ],
         measures: [
           'SwitchSourceTest.totalSales',
@@ -2200,7 +2200,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         }],
         order: {
           'SwitchSourceTest.orderDate': 'asc',
-          'SwitchSourceTest.city' : 'asc'
+          'SwitchSourceTest.city': 'asc'
         }
       });
       expect(response.rawData()).toMatchSnapshot();

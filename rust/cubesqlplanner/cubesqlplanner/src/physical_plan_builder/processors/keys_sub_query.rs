@@ -37,7 +37,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
             .builder
             .process_node(keys_subquery.source().as_ref(), &context)?;
 
-        //FIXME dublication with QueryProcessor
+        //FIXME duplication with QueryProcessor
         let all_symbols = all_symbols(&keys_subquery.schema(), &keys_subquery.filter());
         let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?;
 
