@@ -25,6 +25,8 @@ use tokio::{
 };
 use uuid::Uuid;
 
+use crate::compile::engine::df::scan::CacheMode;
+use crate::transport::TransportLoadRequestCacheMode;
 use crate::{
     compile::{
         engine::df::{
@@ -142,6 +144,7 @@ pub trait TransportService: Send + Sync + Debug {
         meta_fields: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
+        cache_mode: Option<CacheMode>,
     ) -> Result<Vec<RecordBatch>, CubeError>;
 
     async fn load_stream(
@@ -282,6 +285,7 @@ impl TransportService for HttpTransport {
         meta: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
+        cache_mode: Option<CacheMode>,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         if meta.change_user().is_some() {
             return Err(CubeError::internal(
@@ -290,10 +294,23 @@ impl TransportService for HttpTransport {
             ));
         }
 
+        let cache_mode = match cache_mode {
+            None => None,
+            Some(m) => match m {
+                CacheMode::StaleIfSlow => Some(TransportLoadRequestCacheMode::StaleIfSlow),
+                CacheMode::StaleWhileRevalidate => {
+                    Some(TransportLoadRequestCacheMode::StaleWhileRevalidate)
+                }
+                CacheMode::MustRevalidate => Some(TransportLoadRequestCacheMode::MustRevalidate),
+                CacheMode::NoCache => Some(TransportLoadRequestCacheMode::NoCache),
+            },
+        };
+
         // TODO: support meta_fields for HTTP
         let request = TransportLoadRequest {
             query: Some(query),
             query_type: Some("multi".to_string()),
+            cache: cache_mode,
         };
         let response =
             cube_api::load_v1(&self.get_client_config_for_ctx(ctx), Some(request)).await?;

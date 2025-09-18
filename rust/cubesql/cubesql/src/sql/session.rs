@@ -1,7 +1,6 @@
 use datafusion::scalar::ScalarValue;
 use log::trace;
 use rand::Rng;
-use std::str::FromStr;
 use std::{
     collections::HashMap,
     sync::{Arc, LazyLock, RwLock as RwLockSync, Weak},
@@ -10,6 +9,7 @@ use std::{
 use tokio_util::sync::CancellationToken;
 
 use super::{server_manager::ServerManager, session_manager::SessionManager, AuthContextRef};
+use crate::compile::engine::df::scan::CacheMode;
 use crate::{
     compile::{
         DatabaseProtocol, DatabaseProtocolDetails, DatabaseVariable, DatabaseVariables,
@@ -55,28 +55,6 @@ pub enum QueryState {
         query: String,
         cancel: CancellationToken,
     },
-}
-
-#[derive(Debug)]
-pub enum CacheMode {
-    StaleIfSlow,
-    StaleWhileRevalidate,
-    MustRevalidate,
-    NoCache,
-}
-
-impl FromStr for CacheMode {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "stale-if-slow" => Ok(Self::StaleIfSlow),
-            "stale-while-revalidate" => Ok(Self::StaleWhileRevalidate),
-            "must-revalidate" => Ok(Self::MustRevalidate),
-            "no-cache" => Ok(Self::NoCache),
-            other => Err(format!("Unknown cache mode: {}", other)),
-        }
-    }
 }
 
 #[derive(Debug)]
