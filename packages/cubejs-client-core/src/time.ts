@@ -86,7 +86,7 @@ export const dayRange = (from: any, to: any): DayRange => ({
     let start = internalDayjs(from);
     const end = internalDayjs(to);
 
-    while (start.isBefore(end) || start.isSame(end)) {
+    while (start.startOf(value).isBefore(end) || start.isSame(end)) {
       results.push(start);
       start = start.add(1, value);
     }
