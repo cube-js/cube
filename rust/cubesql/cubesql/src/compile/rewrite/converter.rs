@@ -1,5 +1,4 @@
 pub use super::rewriter::CubeRunner;
-use crate::sql::session::CacheMode;
 use crate::{
     compile::{
         engine::df::{
@@ -39,8 +38,7 @@ use crate::{
     CubeError,
 };
 use cubeclient::models::{
-    Cache as V1LoadRequestCache, V1LoadRequestQuery, V1LoadRequestQueryFilterItem,
-    V1LoadRequestQueryTimeDimension,
+    V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 use datafusion::{
     arrow::datatypes::{DataType, TimeUnit},
@@ -1584,26 +1582,6 @@ impl LanguageToLogicalPlanConverter {
                 let mut query_time_dimensions = Vec::new();
                 let mut query_order = Vec::new();
                 let mut query_dimensions = Vec::new();
-                let cache_mode = &*self
-                    .cube_context
-                    .session_state
-                    .cache_mode
-                    .read()
-                    .expect("failed to read lock for session cache_mode");
-
-                let v1_cache_mode = match cache_mode {
-                    None => None,
-                    Some(m) => match m {
-                        CacheMode::StaleIfSlow => Some(V1LoadRequestCache::StaleIfSlow),
-                        CacheMode::StaleWhileRevalidate => {
-                            Some(V1LoadRequestCache::StaleWhileRevalidate)
-                        }
-                        CacheMode::MustRevalidate => Some(V1LoadRequestCache::MustRevalidate),
-                        CacheMode::NoCache => Some(V1LoadRequestCache::NoCache),
-                    },
-                };
-
-                query.cache = v1_cache_mode;
 
                 for m in members {
                     match m {
@@ -2077,6 +2055,13 @@ impl LanguageToLogicalPlanConverter {
 
                 let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
 
+                let cache_mode = &*self
+                    .cube_context
+                    .session_state
+                    .cache_mode
+                    .read()
+                    .expect("failed to read lock for session cache_mode");
+
                 let node = Arc::new(CubeScanNode::new(
                     Arc::new(DFSchema::new_with_metadata(
                         fields.into_iter().map(|(f, _)| f).collect(),
@@ -2088,6 +2073,7 @@ impl LanguageToLogicalPlanConverter {
                     CubeScanOptions {
                         change_user,
                         max_records,
+                        cache_mode: cache_mode.clone(),
                     },
                     alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
                     self.span_id.clone(),
