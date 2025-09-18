@@ -300,7 +300,7 @@ export class QueryCache {
       );
     }
 
-    if (!this.options.backgroundRenew) {
+    if (!this.options.backgroundRenew && queryBody.cacheMode !== 'stale-while-revalidate') {
       const resultPromise = this.renewQuery(
         query,
         values,
@@ -758,42 +758,6 @@ export class QueryCache {
         });
       }
     });
-  }
-
-  public async startBackgroundRefreshForQuery(queryBody: QueryBody, preAggregationsTablesToTempTables: PreAggTableToTempTable[]) {
-    const replacePreAggregationTableNames =
-      (queryAndParams: string | QueryWithParams) => (
-        QueryCache.replacePreAggregationTableNames(
-          queryAndParams,
-          preAggregationsTablesToTempTables,
-        )
-      );
-
-    const query = replacePreAggregationTableNames(queryBody.query);
-    const { values } = queryBody;
-
-    const cacheKeyQueries = this
-      .cacheKeyQueriesFrom(queryBody)
-      .map(replacePreAggregationTableNames);
-
-    const renewalThreshold = queryBody.cacheKeyQueries?.renewalThreshold;
-    const expireSecs = this.getExpireSecs(queryBody);
-    const cacheKey = QueryCache.queryCacheKey(queryBody);
-
-    this.startRenewCycle(
-      query,
-      values,
-      cacheKeyQueries,
-      expireSecs,
-      cacheKey,
-      renewalThreshold,
-      {
-        external: queryBody.external,
-        requestId: queryBody.requestId,
-        dataSource: queryBody.dataSource,
-        persistent: false, // We don't need stream back as there will be no consumer
-      }
-    );
   }
 
   public renewQuery(
