@@ -12,7 +12,7 @@ struct CubeNamesCollector {
 impl LogicalNodeVisitor for CubeNamesCollector {
     fn process_node(&mut self, node: &PlanNode) -> Result<(), CubeError> {
         if let PlanNode::Cube(cube) = node {
-            self.cube_names.insert(cube.name.clone());
+            self.cube_names.insert(cube.name().clone());
         }
         Ok(())
     }

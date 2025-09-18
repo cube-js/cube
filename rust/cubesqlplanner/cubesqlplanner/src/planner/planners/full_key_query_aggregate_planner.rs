@@ -38,12 +38,14 @@ impl FullKeyAggregateQueryPlanner {
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures)
             .into_rc();
-        Ok(Rc::new(FullKeyAggregate {
-            multiplied_measures_resolver: resolved_multiplied_source,
-            multi_stage_subquery_refs,
-            use_full_join_and_coalesce: true,
-            schema,
-        }))
+        Ok(Rc::new(
+            FullKeyAggregate::builder()
+                .multiplied_measures_resolver(resolved_multiplied_source)
+                .multi_stage_subquery_refs(multi_stage_subquery_refs)
+                .use_full_join_and_coalesce(true)
+                .schema(schema)
+                .build(),
+        ))
     }
 
     pub fn plan_logical_plan(
@@ -54,7 +56,7 @@ impl FullKeyAggregateQueryPlanner {
     ) -> Result<Rc<Query>, CubeError> {
         let source =
             self.plan_logical_source(resolve_multiplied_measures, multi_stage_subqueries)?;
-        let source = QuerySource::FullKeyAggregate(source);
+        let source = source.into();
 
         let multiplied_measures = self
             .query_properties
@@ -74,18 +76,18 @@ impl FullKeyAggregateQueryPlanner {
             measures_filter: self.query_properties.measures_filters().clone(),
             segments: self.query_properties.segments().clone(),
         });
-        let result = Query {
-            schema,
-            multistage_members: all_multistage_members,
-            filter: logical_filter,
-            modifers: Rc::new(LogicalQueryModifiers {
+        let result = Query::builder()
+            .schema(schema)
+            .multistage_members(all_multistage_members)
+            .filter(logical_filter)
+            .modifers(Rc::new(LogicalQueryModifiers {
                 offset: self.query_properties.offset(),
                 limit: self.query_properties.row_limit(),
                 ungrouped: self.query_properties.ungrouped(),
                 order_by: self.query_properties.order_by().clone(),
-            }),
-            source,
-        };
+            }))
+            .source(source)
+            .build();
         Ok(Rc::new(result))
     }
 }

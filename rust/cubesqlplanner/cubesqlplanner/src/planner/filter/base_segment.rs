@@ -7,6 +7,7 @@ use crate::planner::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct BaseSegment {
     full_name: String,
     member_evaluator: Rc<MemberSymbol>,
@@ -59,6 +60,12 @@ impl BaseSegment {
 
     pub fn member_evaluator(&self) -> Rc<MemberSymbol> {
         self.member_evaluator.clone()
+    }
+
+    pub fn with_member_evaluator(&self, member_evaluator: Rc<MemberSymbol>) -> Rc<Self> {
+        let mut result = self.clone();
+        result.member_evaluator = member_evaluator;
+        Rc::new(result)
     }
 
     pub fn cube_name(&self) -> &String {

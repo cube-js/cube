@@ -9,16 +9,54 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+#[derive(Clone)]
+pub enum RenderReferencesType {
+    QualifiedColumnName(QualifiedColumnName),
+    LiteralValue(String),
+}
+
+impl From<QualifiedColumnName> for RenderReferencesType {
+    fn from(value: QualifiedColumnName) -> Self {
+        Self::QualifiedColumnName(value)
+    }
+}
+
+impl From<String> for RenderReferencesType {
+    fn from(value: String) -> Self {
+        Self::LiteralValue(value)
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct RenderReferences {
+    references: HashMap<String, RenderReferencesType>,
+}
+
+impl RenderReferences {
+    pub fn insert<T: Into<RenderReferencesType>>(&mut self, name: String, value: T) {
+        self.references.insert(name, value.into());
+    }
+
+    pub fn get(&self, name: &str) -> Option<&RenderReferencesType> {
+        self.references.get(name)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.references.is_empty()
+    }
+
+    pub fn contains_key(&self, name: &str) -> bool {
+        self.references.contains_key(name)
+    }
+}
+
 pub struct RenderReferencesSqlNode {
     input: Rc<dyn SqlNode>,
-    references: HashMap<String, QualifiedColumnName>,
+    references: RenderReferences,
 }
 
 impl RenderReferencesSqlNode {
-    pub fn new(
-        input: Rc<dyn SqlNode>,
-        references: HashMap<String, QualifiedColumnName>,
-    ) -> Rc<Self> {
+    pub fn new(input: Rc<dyn SqlNode>, references: RenderReferences) -> Rc<Self> {
         Rc::new(Self { input, references })
     }
 
@@ -38,16 +76,21 @@ impl SqlNode for RenderReferencesSqlNode {
     ) -> Result<String, CubeError> {
         let full_name = node.full_name();
         if let Some(reference) = self.references.get(&full_name) {
-            let table_ref = if let Some(table_name) = reference.source() {
-                format!("{}.", templates.quote_identifier(table_name)?)
-            } else {
-                format!("")
-            };
-            Ok(format!(
-                "{}{}",
-                table_ref,
-                templates.quote_identifier(&reference.name())?
-            ))
+            match reference {
+                RenderReferencesType::QualifiedColumnName(column_name) => {
+                    let table_ref = if let Some(table_name) = column_name.source() {
+                        format!("{}.", templates.quote_identifier(table_name)?)
+                    } else {
+                        format!("")
+                    };
+                    Ok(format!(
+                        "{}{}",
+                        table_ref,
+                        templates.quote_identifier(&column_name.name())?
+                    ))
+                }
+                RenderReferencesType::LiteralValue(value) => templates.quote_string(value),
+            }
         } else {
             self.input.to_sql(
                 visitor,
