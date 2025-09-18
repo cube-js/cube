@@ -15,6 +15,8 @@ use serde::{Deserialize, Serialize};
 pub struct V1LoadRequest {
     #[serde(rename = "queryType", skip_serializing_if = "Option::is_none")]
     pub query_type: Option<String>,
+    #[serde(rename = "cache", skip_serializing_if = "Option::is_none")]
+    pub cache: Option<Cache>,
     #[serde(rename = "query", skip_serializing_if = "Option::is_none")]
     pub query: Option<models::V1LoadRequestQuery>,
 }
@@ -23,7 +25,26 @@ impl V1LoadRequest {
     pub fn new() -> V1LoadRequest {
         V1LoadRequest {
             query_type: None,
+            cache: None,
             query: None,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub enum Cache {
+    #[serde(rename = "stale-if-slow")]
+    StaleIfSlow,
+    #[serde(rename = "stale-while-revalidate")]
+    StaleWhileRevalidate,
+    #[serde(rename = "must-revalidate")]
+    MustRevalidate,
+    #[serde(rename = "no-cache")]
+    NoCache,
+}
+
+impl Default for Cache {
+    fn default() -> Cache {
+        Self::StaleIfSlow
     }
 }
