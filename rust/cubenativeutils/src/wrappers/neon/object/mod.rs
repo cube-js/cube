@@ -2,7 +2,6 @@ pub mod base_types;
 pub mod neon_array;
 pub mod neon_function;
 pub mod neon_object;
-pub mod neon_proxy;
 pub mod neon_struct;
 pub mod object_root_holder;
 pub mod primitive_root_holder;

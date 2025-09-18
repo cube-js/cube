@@ -9,7 +9,7 @@ use crate::CubeError;
 use crate::{
     wrappers::{
         context::NativeContext, functions_args_def::FunctionArgsDef, object::NativeObject,
-        object_handle::NativeObjectHandle, NativeArray, NativeContextHolder,
+        object_handle::NativeObjectHandle, NativeContextHolder,
     },
     CubeErrorCauseType,
 };
