@@ -150,7 +150,6 @@ impl QueryBuilder {
                 } else {
                     None
                 },
-                cache: None,
                 ungrouped: None,
                 subquery_joins: None,
                 join_hints: None,

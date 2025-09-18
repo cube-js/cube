@@ -1,4 +1,16 @@
+use crate::compile::date_parser::parse_date_str;
+use crate::{
+    compile::{
+        engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
+        test::find_cube_scans_deep_search,
+    },
+    config::ConfigObj,
+    sql::AuthContextRef,
+    transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
+    CubeError,
+};
 use async_trait::async_trait;
+use chrono::{Datelike, NaiveDate};
 use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse};
 pub use datafusion::{
     arrow::{
@@ -18,28 +30,6 @@ pub use datafusion::{
         Partitioning, PhysicalPlanner, RecordBatchStream, SendableRecordBatchStream, Statistics,
     },
 };
-use futures::Stream;
-use log::warn;
-use std::{
-    any::Any,
-    borrow::Cow,
-    fmt,
-    sync::Arc,
-    task::{Context, Poll},
-};
-
-use crate::compile::date_parser::parse_date_str;
-use crate::{
-    compile::{
-        engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
-        test::find_cube_scans_deep_search,
-    },
-    config::ConfigObj,
-    sql::AuthContextRef,
-    transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
-    CubeError,
-};
-use chrono::{Datelike, NaiveDate};
 use datafusion::{
     arrow::{
         array::{
@@ -51,7 +41,17 @@ use datafusion::{
     execution::context::TaskContext,
     scalar::ScalarValue,
 };
+use futures::Stream;
+use log::warn;
 use serde_json::Value;
+use std::str::FromStr;
+use std::{
+    any::Any,
+    borrow::Cow,
+    fmt,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RegularMember {
@@ -80,9 +80,32 @@ impl MemberField {
 }
 
 #[derive(Debug, Clone)]
+pub enum CacheMode {
+    StaleIfSlow,
+    StaleWhileRevalidate,
+    MustRevalidate,
+    NoCache,
+}
+
+impl FromStr for CacheMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "stale-if-slow" => Ok(Self::StaleIfSlow),
+            "stale-while-revalidate" => Ok(Self::StaleWhileRevalidate),
+            "must-revalidate" => Ok(Self::MustRevalidate),
+            "no-cache" => Ok(Self::NoCache),
+            other => Err(format!("Unknown cache mode: {}", other)),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct CubeScanOptions {
     pub change_user: Option<String>,
     pub max_records: Option<usize>,
+    pub cache_mode: Option<CacheMode>,
 }
 
 #[derive(Debug, Clone)]
@@ -682,6 +705,7 @@ async fn load_data(
                 meta,
                 schema,
                 member_fields,
+                options.cache_mode,
             )
             .await
             .map_err(|err| ArrowError::ComputeError(err.to_string()))?;
@@ -1192,6 +1216,7 @@ mod tests {
                 _meta_fields: LoadRequestMeta,
                 schema: SchemaRef,
                 member_fields: Vec<MemberField>,
+                _cache_mode: Option<CacheMode>,
             ) -> Result<Vec<RecordBatch>, CubeError> {
                 let response = r#"
                 {
@@ -1317,6 +1342,7 @@ mod tests {
             options: CubeScanOptions {
                 change_user: None,
                 max_records: None,
+                cache_mode: None,
             },
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
