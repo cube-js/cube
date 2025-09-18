@@ -15756,7 +15756,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2019-01-01 00:00:00.0".to_string(),
+                                "2019-01-01T00:00:00.000Z".to_string(),
                                 "2019-12-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
@@ -15766,7 +15766,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2021-01-01 00:00:00.0".to_string(),
+                                "2021-01-01T00:00:00.000Z".to_string(),
                                 "2021-12-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
@@ -17576,7 +17576,6 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        println!("Generated SQL: {}", sql);
         assert!(sql.contains("2025-01-01"));
         assert!(sql.contains("customer_gender} IN (SELECT"));
 
@@ -17585,5 +17584,118 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             "Physical plan: {}",
             displayable(physical_plan.as_ref()).indent()
         );
+    }
+
+    #[tokio::test]
+    async fn test_string_literal_auto_cast() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT id
+            FROM KibanaSampleDataEcommerce
+            WHERE
+                LOWER(customer_gender) != 'unknown'
+                AND has_subscription = 'TRUE'
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("${KibanaSampleDataEcommerce.has_subscription} = TRUE"));
+        assert!(!sql.contains("'TRUE'"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_trino_truncate() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                CAST(TRUNC(EXTRACT(MONTH FROM "k"."order_date")) AS INTEGER) AS "mn:order_date:ok",
+                SUM("k"."sumPrice") AS "sum:sumPrice:ok",
+                DATE_TRUNC('YEAR', CAST("k"."order_date" AS TIMESTAMP)) AS "tyr:order_date:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "k"
+            WHERE (CAST(TRUNC(EXTRACT(YEAR FROM "k"."order_date")) AS INTEGER) IN (2023, 2024))
+            GROUP BY 1, 3
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "functions/TRUNC".to_string(),
+                "TRUNCATE({{ args_concat }})".to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("TRUNCATE(EXTRACT(month FROM "));
+    }
+
+    #[tokio::test]
+    async fn test_top_down_extractor_cache() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                id::integer AS id,
+                customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE id = 5
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.id".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.id".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    ..Default::default()
+                }]),
+                ungrouped: Some(true),
+                ..Default::default()
+            }
+        )
     }
 }

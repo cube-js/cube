@@ -52,7 +52,7 @@ GROUP BY
                 V1LoadRequestQueryFilterItem {
                     member: Some("MultiTypeCube.dim_date0".to_string()),
                     operator: Some("afterDate".to_string()),
-                    values: Some(vec!["2019-01-01 00:00:00".to_string()]),
+                    values: Some(vec!["2019-01-01T00:00:00.000Z".to_string()]),
                     or: None,
                     and: None,
                 },

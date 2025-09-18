@@ -3,6 +3,7 @@ import * as stream from 'stream';
 import { assertNever } from 'assert-never';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
+import { v4 as uuidv4 } from 'uuid';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import structuredClone from '@ungap/structured-clone';
@@ -1214,8 +1215,10 @@ class ApiGateway {
 
     const queries: Query[] = Array.isArray(query) ? query : [query];
 
+    const queryRewriteId = uuidv4();
     this.log({
       type: 'Query Rewrite',
+      queryRewriteId,
       query
     }, context);
 
@@ -1280,6 +1283,7 @@ class ApiGateway {
 
     this.log({
       type: 'Query Rewrite completed',
+      queryRewriteId,
       normalizedQueries,
       duration: new Date().getTime() - startTime,
       query

@@ -26,6 +26,11 @@ impl TraversalVisitor for JoinHintsCollector {
         path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
+        if node.is_multi_stage() {
+            //We don't add multi stage members childs to join hints
+            return Ok(None);
+        }
+
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {

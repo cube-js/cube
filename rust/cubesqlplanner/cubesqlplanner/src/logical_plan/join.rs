@@ -3,26 +3,54 @@ use super::*;
 use crate::planner::sql_evaluator::SqlCall;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+use typed_builder::TypedBuilder;
 
-#[derive(Clone)]
+#[derive(Clone, TypedBuilder)]
 pub struct LogicalJoinItem {
-    pub cube: Rc<Cube>,
-    pub on_sql: Rc<SqlCall>,
+    cube: Rc<Cube>,
+    on_sql: Rc<SqlCall>,
+}
+
+impl LogicalJoinItem {
+    pub fn cube(&self) -> &Rc<Cube> {
+        &self.cube
+    }
+
+    pub fn on_sql(&self) -> &Rc<SqlCall> {
+        &self.on_sql
+    }
 }
 
 impl PrettyPrint for LogicalJoinItem {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println(&format!("CubeJoinItem: "), state);
         let details_state = state.new_level();
-        self.cube.pretty_print(result, &details_state);
+        self.cube().pretty_print(result, &details_state);
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, TypedBuilder)]
 pub struct LogicalJoin {
-    pub root: Rc<Cube>,
-    pub joins: Vec<LogicalJoinItem>,
-    pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
+    #[builder(default)]
+    root: Option<Rc<Cube>>,
+    #[builder(default)]
+    joins: Vec<LogicalJoinItem>,
+    #[builder(default)]
+    dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
+}
+
+impl LogicalJoin {
+    pub fn root(&self) -> &Option<Rc<Cube>> {
+        &self.root
+    }
+
+    pub fn joins(&self) -> &Vec<LogicalJoinItem> {
+        &self.joins
+    }
+
+    pub fn dimension_subqueries(&self) -> &Vec<Rc<DimensionSubQuery>> {
+        &self.dimension_subqueries
+    }
 }
 
 impl LogicalNode for LogicalJoin {
@@ -41,26 +69,34 @@ impl LogicalNode for LogicalJoin {
             dimension_subqueries,
         } = LogicalJoinInputUnPacker::new(&self, &inputs)?;
 
+        let root = if let Some(r) = root {
+            Some(r.clone().into_logical_node()?)
+        } else {
+            None
+        };
+
         let joins = self
-            .joins
+            .joins()
             .iter()
             .zip(joins.iter())
             .map(|(self_item, item)| -> Result<_, CubeError> {
-                Ok(LogicalJoinItem {
-                    cube: item.clone().into_logical_node()?,
-                    on_sql: self_item.on_sql.clone(),
-                })
+                Ok(LogicalJoinItem::builder()
+                    .cube(item.clone().into_logical_node()?)
+                    .on_sql(self_item.on_sql().clone())
+                    .build())
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let result = Self {
-            root: root.clone().into_logical_node()?,
-            joins,
-            dimension_subqueries: dimension_subqueries
-                .iter()
-                .map(|itm| itm.clone().into_logical_node())
-                .collect::<Result<Vec<_>, _>>()?,
-        };
+        let result = Self::builder()
+            .root(root)
+            .joins(joins)
+            .dimension_subqueries(
+                dimension_subqueries
+                    .iter()
+                    .map(|itm| itm.clone().into_logical_node())
+                    .collect::<Result<Vec<_>, _>>()?,
+            )
+            .build();
 
         Ok(Rc::new(result))
     }
@@ -82,10 +118,12 @@ pub struct LogicalJoinInputPacker;
 impl LogicalJoinInputPacker {
     pub fn pack(join: &LogicalJoin) -> Vec<PlanNode> {
         let mut result = vec![];
-        result.push(join.root.as_plan_node());
-        result.extend(join.joins.iter().map(|item| item.cube.as_plan_node()));
+        if let Some(root) = join.root() {
+            result.push(root.as_plan_node());
+        }
+        result.extend(join.joins().iter().map(|item| item.cube().as_plan_node()));
         result.extend(
-            join.dimension_subqueries
+            join.dimension_subqueries()
                 .iter()
                 .map(|item| item.as_plan_node()),
         );
@@ -94,7 +132,7 @@ impl LogicalJoinInputPacker {
 }
 
 pub struct LogicalJoinInputUnPacker<'a> {
-    root: &'a PlanNode,
+    root: Option<&'a PlanNode>,
     joins: &'a [PlanNode],
     dimension_subqueries: &'a [PlanNode],
 }
@@ -103,9 +141,15 @@ impl<'a> LogicalJoinInputUnPacker<'a> {
     pub fn new(join: &LogicalJoin, inputs: &'a Vec<PlanNode>) -> Result<Self, CubeError> {
         check_inputs_len(&inputs, Self::inputs_len(join), join.node_name())?;
 
-        let root = &inputs[0];
-        let joins_start = 1;
-        let joins_end = joins_start + join.joins.len();
+        let mut joins_start = 0;
+        let root = if join.root.is_some() {
+            joins_start = 1;
+            Some(&inputs[0])
+        } else {
+            None
+        };
+
+        let joins_end = joins_start + join.joins().len();
         let joins = &inputs[joins_start..joins_end];
         let dimension_subqueries = &inputs[joins_end..];
 
@@ -117,28 +161,33 @@ impl<'a> LogicalJoinInputUnPacker<'a> {
     }
 
     fn inputs_len(join: &LogicalJoin) -> usize {
-        1 + join.joins.len() + join.dimension_subqueries.len()
+        1 + join.joins().len() + join.dimension_subqueries().len()
     }
 }
 
 impl PrettyPrint for LogicalJoin {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println(&format!("Join: "), state);
-        let state = state.new_level();
-        let details_state = state.new_level();
-        result.println(&format!("root: "), &state);
-        self.root.pretty_print(result, &details_state);
-        result.println(&format!("joins: "), &state);
-        let state = state.new_level();
-        for join in self.joins.iter() {
-            join.pretty_print(result, &state);
-        }
-        if !self.dimension_subqueries.is_empty() {
-            result.println("dimension_subqueries:", &state);
+        if let Some(root) = self.root() {
+            result.println(&format!("Join: "), state);
+
+            let state = state.new_level();
             let details_state = state.new_level();
-            for subquery in self.dimension_subqueries.iter() {
-                subquery.pretty_print(result, &details_state);
+            result.println(&format!("root: "), &state);
+            root.pretty_print(result, &details_state);
+            result.println(&format!("joins: "), &state);
+            let state = state.new_level();
+            for join in self.joins().iter() {
+                join.pretty_print(result, &state);
             }
+            if !self.dimension_subqueries().is_empty() {
+                result.println("dimension_subqueries:", &state);
+                let details_state = state.new_level();
+                for subquery in self.dimension_subqueries().iter() {
+                    subquery.pretty_print(result, &details_state);
+                }
+            }
+        } else {
+            result.println(&format!("Empty source"), state);
         }
     }
 }

@@ -43,6 +43,10 @@ impl MultiStageQueryDescription {
         &self.member.evaluation_node()
     }
 
+    pub fn is_multi_stage_dimension(&self) -> bool {
+        self.member.member_type().is_multi_stage_dimension()
+    }
+
     pub fn member(&self) -> &Rc<MultiStageMember> {
         &self.member
     }

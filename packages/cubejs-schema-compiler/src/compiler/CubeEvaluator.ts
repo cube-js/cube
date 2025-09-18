@@ -547,6 +547,9 @@ export class CubeEvaluator extends CubeSymbols {
       let aliasMember;
 
       const member = members[memberName];
+      if (member.type === 'switch' || member.multiStage) {
+        ownedByCube = false;
+      }
       if (member.sql && !member.subQuery) {
         const funcArgs = this.funcArguments(member.sql);
         const { cubeReferencesUsed, evaluatedSql, pathReferencesUsed } = this.collectUsedCubeReferences(cube.name, member.sql);

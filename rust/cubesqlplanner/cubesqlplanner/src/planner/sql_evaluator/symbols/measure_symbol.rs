@@ -1,9 +1,11 @@
+use super::common::Case;
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
+use crate::planner::sql_evaluator::CubeTableSymbol;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
@@ -29,6 +31,10 @@ impl MeasureOrderBy {
 
     pub fn sql_call(&self) -> &Rc<SqlCall> {
         &self.sql_call
+    }
+
+    pub fn set_sql_call(&mut self, sql_call: Rc<SqlCall>) {
+        self.sql_call = sql_call;
     }
 
     pub fn direction(&self) -> &String {
@@ -62,7 +68,7 @@ pub enum MeasureTimeShifts {
 
 #[derive(Clone)]
 pub struct MeasureSymbol {
-    cube_name: String,
+    cube: Rc<CubeTableSymbol>,
     name: String,
     alias: String,
     owned_by_cube: bool,
@@ -71,6 +77,7 @@ pub struct MeasureSymbol {
     is_multi_stage: bool,
     is_reference: bool,
     is_view: bool,
+    case: Option<Case>,
     measure_filters: Vec<Rc<SqlCall>>,
     measure_drill_filters: Vec<Rc<SqlCall>>,
     time_shift: Option<MeasureTimeShifts>,
@@ -85,12 +92,14 @@ pub struct MeasureSymbol {
 
 impl MeasureSymbol {
     pub fn new(
-        cube_name: String,
+        cube: Rc<CubeTableSymbol>,
         name: String,
         alias: String,
         member_sql: Option<Rc<SqlCall>>,
         is_reference: bool,
         is_view: bool,
+        owned_by_cube: bool,
+        case: Option<Case>,
         pk_sqls: Vec<Rc<SqlCall>>,
         definition: Rc<dyn MeasureDefinition>,
         measure_filters: Vec<Rc<SqlCall>>,
@@ -101,17 +110,17 @@ impl MeasureSymbol {
         add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         group_by: Option<Vec<Rc<MemberSymbol>>>,
     ) -> Rc<Self> {
-        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
         let measure_type = definition.static_data().measure_type.clone();
         let rolling_window = definition.static_data().rolling_window.clone();
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
         Rc::new(Self {
-            cube_name,
+            cube,
             name,
             alias,
             member_sql,
             is_reference,
             is_view,
+            case,
             pk_sqls,
             owned_by_cube,
             measure_type,
@@ -136,7 +145,7 @@ impl MeasureSymbol {
                 self.measure_type.clone()
             };
             Rc::new(Self {
-                cube_name: self.cube_name.clone(),
+                cube: self.cube.clone(),
                 name: self.name.clone(),
                 alias: self.alias.clone(),
                 owned_by_cube: self.owned_by_cube,
@@ -145,6 +154,7 @@ impl MeasureSymbol {
                 is_multi_stage: false,
                 is_reference: false,
                 is_view: self.is_view,
+                case: self.case.clone(),
                 measure_filters: self.measure_filters.clone(),
                 measure_drill_filters: self.measure_drill_filters.clone(),
                 time_shift: self.time_shift.clone(),
@@ -219,7 +229,7 @@ impl MeasureSymbol {
             measure_filters.extend(add_filters.into_iter());
         }
         Ok(Rc::new(Self {
-            cube_name: self.cube_name.clone(),
+            cube: self.cube.clone(),
             name: self.name.clone(),
             alias: self.alias.clone(),
             owned_by_cube: self.owned_by_cube,
@@ -228,6 +238,7 @@ impl MeasureSymbol {
             is_multi_stage: self.is_multi_stage,
             is_reference: self.is_reference,
             is_view: self.is_view,
+            case: self.case.clone(),
             measure_filters,
             measure_drill_filters: self.measure_drill_filters.clone(),
             time_shift: self.time_shift.clone(),
@@ -241,8 +252,14 @@ impl MeasureSymbol {
         }))
     }
 
+    pub(super) fn replace_case(&self, new_case: Case) -> Rc<MeasureSymbol> {
+        let mut new = self.clone();
+        new.case = Some(new_case);
+        Rc::new(new)
+    }
+
     pub fn full_name(&self) -> String {
-        format!("{}.{}", self.cube_name, self.name)
+        format!("{}.{}", self.cube.cube_name(), self.name)
     }
 
     pub fn alias(&self) -> String {
@@ -270,6 +287,10 @@ impl MeasureSymbol {
             "number" | "string" | "time" | "boolean" => true,
             _ => false,
         }
+    }
+
+    pub fn case(&self) -> Option<&Case> {
+        self.case.as_ref()
     }
 
     pub fn is_addictive(&self) -> bool {
@@ -305,6 +326,38 @@ impl MeasureSymbol {
         self.member_sql.is_some()
     }
 
+    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let mut result = self.clone();
+        if let Some(member_sql) = &self.member_sql {
+            result.member_sql = Some(member_sql.apply_recursive(f)?);
+        }
+
+        for sql in result.pk_sqls.iter_mut() {
+            *sql = sql.apply_recursive(f)?
+        }
+
+        for sql in result.measure_filters.iter_mut() {
+            *sql = sql.apply_recursive(f)?
+        }
+
+        for sql in result.measure_drill_filters.iter_mut() {
+            *sql = sql.apply_recursive(f)?
+        }
+
+        for order in result.measure_order_by.iter_mut() {
+            order.set_sql_call(order.sql_call().apply_recursive(f)?);
+        }
+
+        if let Some(case) = &self.case {
+            result.case = Some(case.apply_to_deps(f)?)
+        }
+
+        Ok(MemberSymbol::new_measure(Rc::new(result)))
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         if let Some(member_sql) = &self.member_sql {
@@ -321,6 +374,9 @@ impl MeasureSymbol {
         }
         for order in self.measure_order_by.iter() {
             order.sql_call().extract_symbol_deps(&mut deps);
+        }
+        if let Some(case) = &self.case {
+            case.extract_symbol_deps(&mut deps);
         }
         deps
     }
@@ -342,27 +398,10 @@ impl MeasureSymbol {
         for order in self.measure_order_by.iter() {
             order.sql_call().extract_symbol_deps_with_path(&mut deps);
         }
+        if let Some(case) = &self.case {
+            case.extract_symbol_deps_with_path(&mut deps);
+        }
         deps
-    }
-
-    pub fn get_dependent_cubes(&self) -> Vec<String> {
-        let mut cubes = vec![];
-        if let Some(member_sql) = &self.member_sql {
-            member_sql.extract_cube_deps(&mut cubes);
-        }
-        for pk in self.pk_sqls.iter() {
-            pk.extract_cube_deps(&mut cubes);
-        }
-        for filter in self.measure_filters.iter() {
-            filter.extract_cube_deps(&mut cubes);
-        }
-        for filter in self.measure_drill_filters.iter() {
-            filter.extract_cube_deps(&mut cubes);
-        }
-        for order in self.measure_order_by.iter() {
-            order.sql_call().extract_cube_deps(&mut cubes);
-        }
-        cubes
     }
 
     pub fn can_used_as_addictive_in_multplied(&self) -> bool {
@@ -447,7 +486,7 @@ impl MeasureSymbol {
     }
 
     pub fn cube_name(&self) -> &String {
-        &self.cube_name
+        &self.cube.cube_name()
     }
     pub fn name(&self) -> &String {
         &self.name
@@ -658,6 +697,12 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
+        let case = if let Some(native_case) = definition.case()? {
+            Some(Case::try_new(&cube_name, native_case, compiler)?)
+        } else {
+            None
+        };
+
         let reduce_by = if let Some(reduce_by) = &definition.static_data().reduce_by_references {
             let symbols = reduce_by
                 .iter()
@@ -692,19 +737,23 @@ impl SymbolFactory for MeasureSymbolFactory {
         let is_calculated =
             MeasureSymbol::is_calculated_type(&definition.static_data().measure_type)
                 && !definition.static_data().multi_stage.unwrap_or(false);
-        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
+
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+        //TODO move owned logic to rust
+        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
+        let owned_by_cube = owned_by_cube && !is_multi_stage;
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
         let alias =
             PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);
 
         let is_view = cube.static_data().is_view.unwrap_or(false);
 
-        let is_reference = is_view
+        let is_reference = (is_view && is_sql_is_direct_ref)
             || (!owned_by_cube
                 && is_sql_is_direct_ref
                 && is_calculated
                 && !is_multi_stage
+                && case.is_none()
                 && measure_filters.is_empty()
                 && measure_drill_filters.is_empty()
                 && time_shifts.is_none()
@@ -713,13 +762,19 @@ impl SymbolFactory for MeasureSymbolFactory {
                 && add_group_by.is_none()
                 && group_by.is_none());
 
+        let cube_symbol = compiler
+            .add_cube_table_evaluator(cube_name.clone())?
+            .as_cube_table()?;
+
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
-            cube_name,
+            cube_symbol,
             name,
             alias,
             sql,
             is_reference,
             is_view,
+            owned_by_cube,
+            case,
             pk_sqls,
             definition,
             measure_filters,

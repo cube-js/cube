@@ -144,7 +144,7 @@ export class PreAggregations {
     const { join } = this.query;
     if (!join) {
       // This can happen with Tesseract, or when there's no cubes to join
-      throw new Error('Unexpected missing join tree for query');
+      return [];
     }
     return join.joins.map(j => j.originalTo).concat([join.root]);
   }
@@ -459,7 +459,6 @@ export class PreAggregations {
         }),
         R.unnest,
         R.uniq,
-        R.map(resolveFullMemberPath),
       )(measures);
 
     function allValuesEq1(map) {
@@ -515,6 +514,7 @@ export class PreAggregations {
       measures: measurePaths,
       leafMeasureAdditive,
       leafMeasures: leafMeasurePaths,
+      leafMeasuresFullPaths: leafMeasurePaths.map(resolveFullMemberPath),
       measureToLeafMeasures,
       hasNoTimeDimensionsWithoutGranularity,
       allFiltersWithinSelectedDimensions,
@@ -728,7 +728,7 @@ export class PreAggregations {
 
       // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
       // no connections in the joinTree between cubes from different datasources
-      const dimsToMatch = references.fullNameDimensions.length > 0 ? references.fullNameDimensions : references.dimensions;
+      const dimsToMatch = references.rollups.length > 0 ? references.dimensions : references.fullNameDimensions;
 
       const dimensionsMatch = (dimensions, doBackAlias) => R.all(
         d => (
@@ -741,7 +741,7 @@ export class PreAggregations {
 
       // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
       // no connections in the joinTree between cubes from different datasources
-      const timeDimsToMatch = references.fullNameTimeDimensions.length > 0 ? references.fullNameTimeDimensions : references.timeDimensions;
+      const timeDimsToMatch = references.rollups.length > 0 ? references.timeDimensions : references.fullNameTimeDimensions;
 
       const timeDimensionsMatch = (timeDimensionsList, doBackAlias) => R.allPass(
         timeDimensionsList.map(
@@ -781,7 +781,7 @@ export class PreAggregations {
       ) && (
         R.all(
           (m: string) => references.measures.indexOf(m) !== -1,
-          transformedQuery.leafMeasures,
+          references.rollups.length > 0 ? transformedQuery.leafMeasures : transformedQuery.leafMeasuresFullPaths,
         ) || R.all(
           m => backAliasMeasures.indexOf(m) !== -1,
           transformedQuery.measures,

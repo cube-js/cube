@@ -18,7 +18,9 @@
 
       "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket",
       "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp",
-      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}"
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
+      "CUBEJS_TRANSPILATION_WORKER_THREADS": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_WORKER_THREADS}",
+      "CUBEJS_TRANSPILATION_NATIVE": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE}"
     },
     "ports" : ["4000", "5656"]
   },
@@ -172,6 +174,9 @@
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: SQL API: Timeshift measure from cube",
     "querying BigECommerce: multi-stage group by time dimension",
+    "querying SwitchSourceTest: simple cross join",
+    "querying SwitchSourceTest: full cross join",
+    "querying SwitchSourceTest: filter by switch dimensions",
 
     "---------------------------------------",
     "SKIPPED SQL API (Need work)",

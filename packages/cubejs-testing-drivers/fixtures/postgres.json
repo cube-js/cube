@@ -13,7 +13,9 @@
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
       "CUBESQL_SQL_PUSH_DOWN": "true",
-      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}"
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
+      "CUBEJS_TRANSPILATION_WORKER_THREADS": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_WORKER_THREADS}",
+      "CUBEJS_TRANSPILATION_NATIVE": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE}"
     },
     "depends_on": ["data"],
     "links": ["data"],
@@ -171,7 +173,10 @@
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: SQL API: Timeshift measure from cube",
-    "querying BigECommerce: multi-stage group by time dimension"
+    "querying BigECommerce: multi-stage group by time dimension",
+    "querying SwitchSourceTest: simple cross join",
+    "querying SwitchSourceTest: full cross join",
+    "querying SwitchSourceTest: filter by switch dimensions"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",

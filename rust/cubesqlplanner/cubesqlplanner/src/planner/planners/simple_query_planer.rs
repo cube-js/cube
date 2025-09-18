@@ -40,28 +40,31 @@ impl SimpleQueryPlanner {
             measures_filter: self.query_properties.measures_filters().clone(),
             segments: self.query_properties.segments().clone(),
         });
-        let result = Query {
-            multistage_members: vec![],
-            schema,
-            filter: logical_filter,
-            modifers: Rc::new(LogicalQueryModifiers {
+        let result = Query::builder()
+            .schema(schema)
+            .filter(logical_filter)
+            .modifers(Rc::new(LogicalQueryModifiers {
                 offset: self.query_properties.offset(),
                 limit: self.query_properties.row_limit(),
                 ungrouped: self.query_properties.ungrouped(),
                 order_by: self.query_properties.order_by().clone(),
-            }),
-            source: QuerySource::LogicalJoin(source),
-        };
+            }))
+            .source(source.into())
+            .build();
         Ok(Rc::new(result))
     }
 
     pub fn source_and_subquery_dimensions(&self) -> Result<Rc<LogicalJoin>, CubeError> {
         let join = self.query_properties.simple_query_join()?;
-        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
-            &self.query_properties.all_members(false),
-            &self.join_planner,
-            &join,
-        )?;
+        let subquery_dimensions = if let Some(join) = &join {
+            collect_sub_query_dimensions_from_symbols(
+                &self.query_properties.all_members(false),
+                &self.join_planner,
+                &join,
+            )?
+        } else {
+            vec![]
+        };
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
             &subquery_dimensions,
             self.query_tools.clone(),
@@ -69,9 +72,12 @@ impl SimpleQueryPlanner {
         )?;
         let subquery_dimension_queries =
             dimension_subquery_planner.plan_queries(&subquery_dimensions)?;
-        let source = self
-            .join_planner
-            .make_join_logical_plan(join.clone(), subquery_dimension_queries)?;
+        let source = if let Some(join) = &join {
+            self.join_planner
+                .make_join_logical_plan(join.clone(), subquery_dimension_queries)?
+        } else {
+            self.join_planner.make_empty_join_logical_plan()
+        };
         Ok(source)
     }
 }
