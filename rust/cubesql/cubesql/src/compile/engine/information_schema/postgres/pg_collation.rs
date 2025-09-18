@@ -26,7 +26,7 @@ struct PgCollation {
     collencoding: i32,
     collcollate: Option<String>,
     collctype: Option<String>,
-    // Column `colliculocale` renamed to `colllocale` since PostgreSQL 17.
+    // Column `colliculocale` is renamed to `colllocale` since PostgreSQL 17.
     colllocale: Option<String>,
     collicurules: Option<String>,
     collversion: Option<String>,
@@ -40,13 +40,13 @@ struct PgCatalogCollationBuilder {
     collprovider: StringBuilder,
     collisdeterministic: BooleanBuilder,
     collencoding: Int32Builder,
-    // Column `colliculocale` renamed to `colllocale` since PostgreSQL 17.
-    // Support both columns for backward-compatibility.
-    // Reference: https://pgpedia.info/p/pg_collation.html
-    colliculocale: StringBuilder,
     collcollate: StringBuilder,
     collctype: StringBuilder,
+    // Column `colliculocale` is renamed to `colllocale` since PostgreSQL 17.
+    // Support both columns for backward-compatibility.
+    // Reference: https://pgpedia.info/p/pg_collation.html
     colllocale: StringBuilder,
+    colliculocale: StringBuilder,
     collicurules: StringBuilder,
     collversion: StringBuilder,
 }
@@ -61,10 +61,10 @@ impl PgCatalogCollationBuilder {
             collprovider: StringBuilder::new(capacity),
             collisdeterministic: BooleanBuilder::new(capacity),
             collencoding: Int32Builder::new(capacity),
-            colliculocale: StringBuilder::new(capacity),
             collcollate: StringBuilder::new(capacity),
             collctype: StringBuilder::new(capacity),
             colllocale: StringBuilder::new(capacity),
+            colliculocale: StringBuilder::new(capacity),
             collicurules: StringBuilder::new(capacity),
             collversion: StringBuilder::new(capacity),
         }
@@ -81,9 +81,6 @@ impl PgCatalogCollationBuilder {
             .append_value(coll.collisdeterministic)
             .unwrap();
         self.collencoding.append_value(coll.collencoding).unwrap();
-        self.colliculocale
-            .append_option(coll.colliculocale.clone())
-            .unwrap();
         self.collcollate
             .append_option(coll.collcollate.clone())
             .unwrap();
@@ -91,6 +88,10 @@ impl PgCatalogCollationBuilder {
             .append_option(coll.collctype.clone())
             .unwrap();
         self.colllocale
+            .append_option(coll.colllocale.clone())
+            .unwrap();
+        // Column `colliculocale` is renamed to `colllocale` since PostgreSQL 17.
+        self.colliculocale
             .append_option(coll.colllocale.clone())
             .unwrap();
         self.collicurules
@@ -110,10 +111,10 @@ impl PgCatalogCollationBuilder {
             Arc::new(self.collprovider.finish()),
             Arc::new(self.collisdeterministic.finish()),
             Arc::new(self.collencoding.finish()),
-            Arc::new(self.colliculocale.finish()),
             Arc::new(self.collcollate.finish()),
             Arc::new(self.collctype.finish()),
             Arc::new(self.colllocale.finish()),
+            Arc::new(self.colliculocale.finish()),
             Arc::new(self.collicurules.finish()),
             Arc::new(self.collversion.finish()),
         ];
@@ -127,11 +128,13 @@ pub struct PgCatalogCollationProvider {
 
 impl PgCatalogCollationProvider {
     pub fn new() -> Self {
-        // See https://github.com/postgres/postgres/blob/REL_16_4/src/include/catalog/pg_collation.h
-        let mut builder = PgCatalogCollationBuilder::new();
+        // See https://github.com/postgres/postgres/blob/REL_17_6/src/include/catalog/pg_collation.h
+        let mut builder = PgCatalogCollationBuilder::new(6);
 
         // Initial contents of the pg_collation system catalog.
-        // See https://github.com/postgres/postgres/blob/REL_16_4/src/include/catalog/pg_collation.dat
+        // See https://github.com/postgres/postgres/blob/REL_17_6/src/include/catalog/pg_collation.dat
+
+        // database's default collation
         builder.add_collation(&PgCollation {
             oid: 100,
             collname: "default",
@@ -141,12 +144,12 @@ impl PgCatalogCollationProvider {
             collisdeterministic: true,
             collencoding: -1,
             collcollate: None,
-            colliculocale: None,
             collctype: None,
             colllocale: None,
             collicurules: None,
             collversion: None,
         });
+        // standard C collation
         builder.add_collation(&PgCollation {
             oid: 950,
             collname: "C",
@@ -156,12 +159,12 @@ impl PgCatalogCollationProvider {
             collisdeterministic: true,
             collencoding: -1,
             collcollate: Some("C".to_string()),
-            colliculocale: Some("C".to_string()),
             collctype: Some("C".to_string()),
             colllocale: None,
             collicurules: None,
             collversion: None,
         });
+        // standard POSIX collation
         builder.add_collation(&PgCollation {
             oid: 951,
             collname: "POSIX",
@@ -171,27 +174,27 @@ impl PgCatalogCollationProvider {
             collisdeterministic: true,
             collencoding: -1,
             collcollate: Some("POSIX".to_string()),
-            colliculocale: Some("POSIX".to_string()),
             collctype: Some("POSIX".to_string()),
             colllocale: None,
             collicurules: None,
             collversion: None,
         });
+        // sorts by Unicode code point, C character semantics
         builder.add_collation(&PgCollation {
             oid: 962,
-            collname: "usc_basic",
+            collname: "ucs_basic",
             collnamespace: PG_NAMESPACE_CATALOG_OID,
             collowner: 10,
-            collprovider: "c".to_string(),
+            collprovider: "b".to_string(),
             collisdeterministic: true,
             collencoding: 6,
-            collcollate: Some("C".to_string()),
-            colliculocale: Some("C".to_string()),
-            collctype: Some("C".to_string()),
-            colllocale: None,
+            collcollate: None,
+            collctype: None,
+            colllocale: Some("C".to_string()),
             collicurules: None,
-            collversion: None,
+            collversion: Some("1".to_string()),
         });
+        // sorts using the Unicode Collation Algorithm with default settings
         builder.add_collation(&PgCollation {
             oid: 963,
             collname: "unicode",
@@ -201,11 +204,25 @@ impl PgCatalogCollationProvider {
             collisdeterministic: true,
             collencoding: -1,
             collcollate: None,
-            colliculocale: None,
             collctype: None,
             colllocale: Some("und".to_string()),
             collicurules: None,
-            collversion: Some("153.121".to_string()),
+            collversion: Some("153.128".to_string()),
+        });
+        // sorts by Unicode code point; Unicode and POSIX character semantics
+        builder.add_collation(&PgCollation {
+            oid: 811,
+            collname: "pg_c_utf8",
+            collnamespace: PG_NAMESPACE_CATALOG_OID,
+            collowner: 10,
+            collprovider: "b".to_string(),
+            collisdeterministic: true,
+            collencoding: 6,
+            collcollate: None,
+            collctype: None,
+            colllocale: Some("C.UTF-8".to_string()),
+            collicurules: None,
+            collversion: Some("1".to_string()),
         });
         Self {
             data: Arc::new(builder.finish()),
@@ -227,12 +244,12 @@ impl TableProvider for PgCatalogCollationProvider {
             Field::new("collprovider", DataType::Utf8, false),
             Field::new("collisdeterministic", DataType::Boolean, false),
             Field::new("collencoding", DataType::Int32, false),
-            Field::new("colliculocale", DataType::Utf8, false),
-            Field::new("collcollate", DataType::Utf8, false),
-            Field::new("collctype", DataType::Utf8, false),
-            Field::new("colllocale", DataType::Utf8, false),
-            Field::new("collicurules", DataType::Utf8, false),
-            Field::new("collversion", DataType::Utf8, false),
+            Field::new("collcollate", DataType::Utf8, true),
+            Field::new("collctype", DataType::Utf8, true),
+            Field::new("colllocale", DataType::Utf8, true),
+            Field::new("colliculocale", DataType::Utf8, true),
+            Field::new("collicurules", DataType::Utf8, true),
+            Field::new("collversion", DataType::Utf8, true),
         ]))
     }
     async fn scan(
