@@ -902,16 +902,7 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    if (buildResult.error) {
-      if (buildResult.error.cause && buildResult.error.cause === 'User') {
-        throw new UserError(buildResult.error.message);
-      } else {
-        throw new Error(buildResult.error.message);
-      }
-    }
-
-    const res = buildResult.result;
-    const [query, params, preAggregation] = res;
+    const [query, params, preAggregation] = buildResult;
     // FIXME
     const paramsArray = [...params];
     if (preAggregation) {

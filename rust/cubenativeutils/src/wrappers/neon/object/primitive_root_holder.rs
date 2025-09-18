@@ -1,5 +1,5 @@
-use crate::wrappers::neon::context::{ContextHolder, SafeCallFn};
-use cubesql::CubeError;
+use crate::wrappers::neon::context::ContextHolder;
+use crate::CubeError;
 use neon::prelude::*;
 
 pub trait NeonPrimitiveMapping: Value {
@@ -126,26 +126,23 @@ impl<C: Context<'static> + 'static, V: Value + NeonPrimitiveMapping + 'static>
 
     pub fn map_neon_object<T, F>(&self, f: F) -> Result<T, CubeError>
     where
-        F: FnOnce(&mut C, &Handle<'static, V>) -> T,
+        F: FnOnce(&mut C, &Handle<'static, V>) -> Result<T, CubeError>,
     {
         self.context.with_context(|cx| {
             let object = V::to_neon(cx, &self.value);
             f(cx, &object)
-        })
-    }
-
-    pub fn map_neon_object_with_safe_call_fn<T, F>(&self, f: F) -> Result<T, CubeError>
-    where
-        F: FnOnce(&mut C, &Handle<'static, V>, SafeCallFn) -> T,
-    {
-        self.context.with_context_and_safe_fn(|cx, safe_call_fn| {
-            let object = V::to_neon(cx, &self.value);
-            f(cx, &object, safe_call_fn)
-        })
+        })?
     }
 
     pub fn into_object(self) -> Result<Handle<'static, V>, CubeError> {
         self.context.with_context(|cx| V::to_neon(cx, &self.value))
+    }
+
+    pub fn clone_to_context(&self, context: &ContextHolder<C>) -> Self {
+        Self {
+            context: context.clone(),
+            value: self.value.clone(),
+        }
     }
 }
 

@@ -1,5 +1,8 @@
+use std::{any::Any, rc::Rc};
+
+use super::FunctionArgsDef;
 use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
-use cubesql::CubeError;
+use crate::CubeError;
 
 pub trait NativeContext<IT: InnerTypes>: Clone {
     fn boolean(&self, v: bool) -> Result<IT::Boolean, CubeError>;
@@ -10,6 +13,10 @@ pub trait NativeContext<IT: InnerTypes>: Clone {
     fn empty_array(&self) -> Result<IT::Array, CubeError>;
     fn empty_struct(&self) -> Result<IT::Struct, CubeError>;
     fn to_string_fn(&self, result: String) -> Result<IT::Function, CubeError>;
+    fn make_function<In, Rt, F: FunctionArgsDef<IT, In, Rt>>(
+        &self,
+        f: F,
+    ) -> Result<IT::Function, CubeError>;
 }
 
 #[derive(Clone)]

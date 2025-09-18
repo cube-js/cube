@@ -1,5 +1,7 @@
-use crate::wrappers::neon::context::{ContextHolder, SafeCallFn};
-use cubesql::CubeError;
+use crate::errors::*;
+use crate::wrappers::neon::context::ContextHolder;
+use crate::wrappers::neon::js_class_name;
+use crate::CubeError;
 use neon::prelude::*;
 use std::rc::Rc;
 
@@ -29,22 +31,19 @@ impl<C: Context<'static> + 'static, V: Object + 'static> ObjectNeonTypeHolder<C,
 
     pub fn map_neon_object<T, F>(&self, f: F) -> Result<T, CubeError>
     where
-        F: FnOnce(&mut C, &Handle<'static, V>) -> T,
+        F: FnOnce(&mut C, &Handle<'static, V>) -> NeonResult<T>,
     {
-        self.context.with_context(|cx| {
+        Ok(self.context.with_context(|cx| {
             let object = self.value_ref().to_inner(cx);
             f(cx, &object)
-        })
+        })??)
     }
 
-    pub fn map_neon_object_with_safe_call_fn<T, F>(&self, f: F) -> Result<T, CubeError>
-    where
-        F: FnOnce(&mut C, &Handle<'static, V>, SafeCallFn) -> T,
-    {
-        self.context.with_context_and_safe_fn(|cx, safe_call_fn| {
-            let object = self.value_ref().to_inner(cx);
-            f(cx, &object, safe_call_fn)
-        })
+    pub fn clone_to_context(&self, context: &ContextHolder<C>) -> Self {
+        Self {
+            context: context.clone(),
+            value: self.value.clone(),
+        }
     }
 }
 

@@ -1,8 +1,8 @@
 use super::{
     context::NativeContext,
     object::{
-        NativeArray, NativeBoolean, NativeFunction, NativeNumber, NativeObject, NativeString,
-        NativeStruct,
+        NativeArray, NativeBoolean, NativeFunction, NativeNumber, NativeObject, NativeProxy,
+        NativeString, NativeStruct,
     },
 };
 pub trait InnerTypes: Clone + 'static {

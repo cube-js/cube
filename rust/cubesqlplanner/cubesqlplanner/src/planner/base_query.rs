@@ -52,38 +52,8 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         })
     }
 
-    pub fn build_sql_and_params(&self) -> NativeObjectHandle<IT> {
-        let build_result = self.build_sql_and_params_impl();
-        let result = self.context.empty_struct().unwrap();
-        match build_result {
-            Ok(res) => {
-                result.set_field("result", res).unwrap();
-            }
-            Err(e) => {
-                let error_descr = self.context.empty_struct().unwrap();
-                let error_cause = match &e.cause {
-                    CubeErrorCauseType::User(_) => "User",
-                    CubeErrorCauseType::Internal(_) => "Internal",
-                };
-                error_descr
-                    .set_field(
-                        "message",
-                        e.message.to_native(self.context.clone()).unwrap(),
-                    )
-                    .unwrap();
-                error_descr
-                    .set_field(
-                        "cause",
-                        error_cause.to_native(self.context.clone()).unwrap(),
-                    )
-                    .unwrap();
-                result
-                    .set_field("error", NativeObjectHandle::new(error_descr.into_object()))
-                    .unwrap();
-            }
-        }
-
-        NativeObjectHandle::new(result.into_object())
+    pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
+        self.build_sql_and_params_impl()
     }
 
     fn build_sql_and_params_impl(&self) -> Result<NativeObjectHandle<IT>, CubeError> {

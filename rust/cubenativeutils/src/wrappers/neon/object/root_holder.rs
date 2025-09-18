@@ -1,6 +1,6 @@
 use super::{ObjectNeonTypeHolder, PrimitiveNeonTypeHolder};
 use crate::wrappers::neon::context::ContextHolder;
-use cubesql::CubeError;
+use crate::CubeError;
 use neon::prelude::*;
 pub trait Upcast<C: Context<'static> + 'static> {
     fn upcast(self) -> RootHolder<C>;
@@ -118,6 +118,19 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
     define_into_method!(into_array, Array, ObjectNeonTypeHolder<C, JsArray>, "Object is not the Array object");
     define_into_method!(into_function, Function, ObjectNeonTypeHolder<C, JsFunction>, "Object is not the Function object");
     define_into_method!(into_struct, Struct, ObjectNeonTypeHolder<C, JsObject>, "Object is not the Struct object");
+
+    pub fn clone_to_context(&self, context: &ContextHolder<C>) -> Self {
+        match self {
+            Self::Null(v) => Self::Null(v.clone_to_context(context)),
+            Self::Undefined(v) => Self::Undefined(v.clone_to_context(context)),
+            Self::Boolean(v) => Self::Boolean(v.clone_to_context(context)),
+            Self::Number(v) => Self::Number(v.clone_to_context(context)),
+            Self::String(v) => Self::String(v.clone_to_context(context)),
+            Self::Array(v) => Self::Array(v.clone_to_context(context)),
+            Self::Function(v) => Self::Function(v.clone_to_context(context)),
+            Self::Struct(v) => Self::Struct(v.clone_to_context(context)),
+        }
+    }
 }
 
 impl<C: Context<'static> + 'static> Clone for RootHolder<C> {

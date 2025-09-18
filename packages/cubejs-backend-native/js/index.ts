@@ -461,6 +461,27 @@ export const buildSqlAndParams = (cubeEvaluator: any): String => {
       };
     }
   };
+
+  const createGetProxy = (target:any, rustHandlerBox:any) => {
+      return new Proxy(target, {
+          get(target, property, receiver) {
+              if (typeof property === 'string') {
+                  try {
+                      const propertyStr = String(property);
+                      const result = rustHandlerBox.get(propertyStr);
+
+                      if (result !== undefined) {
+                          return result;
+                      }
+                  } catch (error) {
+                      throw error;
+                  }
+              }
+
+              return Reflect.get(target, property, receiver);
+          }
+      });
+  }
   return native.buildSqlAndParams(cubeEvaluator, safeCallFn);
 };
 
