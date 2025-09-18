@@ -6,6 +6,7 @@ use crate::planner::sql_templates::TemplateProjectionColumn;
 use crate::planner::{evaluate_with_context, FiltersContext, VisitorContext};
 use crate::planner::{Granularity, GranularityHelper, QueryDateTimeHelper};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 const FROM_PARTITION_RANGE: &str = "__FROM_PARTITION_RANGE";
@@ -18,6 +19,7 @@ pub enum FilterType {
     Measure,
 }
 
+#[derive(Clone)]
 pub struct BaseFilter {
     query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
@@ -83,6 +85,16 @@ impl BaseFilter {
         }
     }
 
+    pub fn raw_member_evaluator(&self) -> Rc<MemberSymbol> {
+        self.member_evaluator.clone()
+    }
+
+    pub fn with_member_evaluator(&self, member_evaluator: Rc<MemberSymbol>) -> Rc<Self> {
+        let mut result = self.clone();
+        result.member_evaluator = member_evaluator;
+        Rc::new(result)
+    }
+
     //FIXME Not very good solution, but suitable for check time dimension filters in pre-aggregations
     pub fn time_dimension_symbol(&self) -> Option<Rc<MemberSymbol>> {
         if self.member_evaluator.as_time_dimension().is_ok() {
@@ -110,6 +122,16 @@ impl BaseFilter {
 
     pub fn is_single_value_equal(&self) -> bool {
         self.values.len() == 1 && self.filter_operator == FilterOperator::Equal
+    }
+
+    pub fn get_value_restrictions(&self) -> Option<Vec<String>> {
+        if self.filter_operator == FilterOperator::In
+            || self.filter_operator == FilterOperator::Equal
+        {
+            Some(self.values.iter().cloned().filter_map(|v| v).collect_vec())
+        } else {
+            None
+        }
     }
 
     pub fn to_sql(

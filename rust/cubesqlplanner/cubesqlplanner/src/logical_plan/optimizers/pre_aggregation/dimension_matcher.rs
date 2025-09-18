@@ -270,6 +270,7 @@ impl<'a> DimensionMatcher<'a> {
             filter.member_evaluator().clone()
         };
         let add_to_matched_dimension = add_to_matched_dimension && filter.is_single_value_equal();
-        self.try_match_symbol(&symbol, add_to_matched_dimension)
+        let res = self.try_match_symbol(&symbol, add_to_matched_dimension)?;
+        Ok(res)
     }
 }

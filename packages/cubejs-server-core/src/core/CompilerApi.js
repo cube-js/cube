@@ -688,12 +688,12 @@ export class CompilerApi {
         const cubeDef = cubeEvaluator.cubeFromPath(cube);
         if (cubeDef.isView) {
           const viewName = cubeDef.name;
-          return cubeDef.includedMembers.map(included => {
+          return cubeDef.includedMembers?.map(included => {
             const memberName = `${viewName}.${included.name}`;
             const refCubeDef = cubeEvaluator.cubeFromPath(included.memberPath);
             const dataSource = refCubeDef.dataSource ?? 'default';
             return [memberName, dataSource];
-          });
+          }) || [];
         } else {
           const cubeName = cubeDef.name;
           const dataSource = cubeDef.dataSource ?? 'default';

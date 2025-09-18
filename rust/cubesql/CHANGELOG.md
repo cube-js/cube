@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.3.68](https://github.com/cube-js/cube/compare/v1.3.67...v1.3.68) (2025-09-16)
+
+### Features
+
+- **cubesql:** Print value of the date/time that couldn't be parsed ([#9961](https://github.com/cube-js/cube/issues/9961)) ([b78ae0a](https://github.com/cube-js/cube/commit/b78ae0ab4b71fd34234be22353a7c3afae674cde))
+
 ## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
 
 ### Bug Fixes

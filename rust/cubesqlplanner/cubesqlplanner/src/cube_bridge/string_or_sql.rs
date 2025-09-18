@@ -5,12 +5,12 @@ use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub enum CaseLabel {
+pub enum StringOrSql {
     String(String),
     MemberSql(Rc<dyn StructWithSqlMember>),
 }
 
-impl<IT: InnerTypes> NativeDeserialize<IT> for CaseLabel {
+impl<IT: InnerTypes> NativeDeserialize<IT> for StringOrSql {
     fn from_native(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
         match String::from_native(native_object.clone()) {
             Ok(label) => Ok(Self::String(label)),
