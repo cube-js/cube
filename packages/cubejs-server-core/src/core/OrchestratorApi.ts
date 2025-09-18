@@ -11,6 +11,7 @@ import {
 } from '@cubejs-backend/query-orchestrator';
 
 import { DatabaseType, RequestContext } from './types';
+import { CacheMode } from '@cubejs-backend/shared';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: (dataSource: string) => Promise<DatabaseType>;
@@ -60,7 +61,7 @@ export class OrchestratorApi {
    *
    * @throw Error
    */
-  public async streamQuery(query: QueryBody): Promise<stream.Writable> {
+  public async streamQuery(query: QueryBody, cacheMode: CacheMode = 'stale-if-slow'): Promise<stream.Writable> {
     // TODO merge with fetchQuery
     return this.orchestrator.streamQuery(query);
   }
@@ -70,7 +71,7 @@ export class OrchestratorApi {
    * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
    * error otherwise.
    */
-  public async executeQuery(query: QueryBody) {
+  public async executeQuery(query: QueryBody, cacheMode: CacheMode = 'stale-if-slow') {
     const queryForLog = query.query?.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 

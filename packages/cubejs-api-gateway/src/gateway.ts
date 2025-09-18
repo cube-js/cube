@@ -1685,7 +1685,7 @@ class ApiGateway {
     const [response, total] = await Promise.all(
       queries.map(async (query) => {
         const res = await (await this.getAdapterApi(context))
-          .executeQuery(query);
+          .executeQuery(query, cacheMode);
         return res;
       })
     );
@@ -1891,6 +1891,7 @@ class ApiGateway {
             context,
             normalizedQuery,
             sqlQueries[index],
+            props.cacheMode,
           );
 
           const annotation = prepareAnnotation(
