@@ -52,8 +52,7 @@ struct PgCatalogCollationBuilder {
 }
 
 impl PgCatalogCollationBuilder {
-    fn new() -> Self {
-        let capacity = 5;
+    fn new(capacity: usize) -> Self {
         Self {
             oid: UInt32Builder::new(capacity),
             collname: StringBuilder::new(capacity),
