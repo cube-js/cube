@@ -95,7 +95,17 @@ where
         let res = func(context_holder.clone());
         res.map_or_else(
             |e| match e.cause {
-                CubeErrorCauseType::User | CubeErrorCauseType::Internal => {
+                CubeErrorCauseType::User => {
+                    context_holder
+                        .with_context(|cx| {
+                            let err = JsError::error(cx, e.message)?;
+                            let name = cx.string("TesseractUserError");
+                            err.set(cx, "name", name)?;
+                            cx.throw(err)
+                        })
+                        .unwrap() // Context is dead → cannot safely work with Js, panic.
+                }
+                CubeErrorCauseType::Internal => {
                     context_holder
                         .with_context(|cx| cx.throw_error(e.message))
                         .unwrap() // Context is dead → cannot safely work with Js, panic.
@@ -270,41 +280,3 @@ impl<C: Context<'static>> Clone for ContextHolder<C> {
         }
     }
 }
-
-/* neon_run_with_guarded_lifetime(cx, |neon_context_holder| {
-    let options = NativeObjectHandle::<NeonInnerTypes<FunctionContext<'static>>>::new(
-        NeonObject::new(
-            neon_context_holder.clone(),
-            neon_context_holder
-                .with_context(|cx| cx.argument::<JsValue>(0))
-                .unwrap()?,
-        )
-        .unwrap(),
-    );
-
-    let safe_call_fn = neon_context_holder
-        .with_context(|cx| {
-            if let Ok(func) = cx.argument::<JsFunction>(1) {
-                Some(func)
-            } else {
-                None
-            }
-        })
-        .unwrap();
-
-    neon_context_holder.set_safe_call_fn(safe_call_fn).unwrap();
-
-    let context_holder = NativeContextHolder::<NeonInnerTypes<FunctionContext<'static>>>::new(
-        neon_context_holder,
-    );
-
-    let base_query_options = Rc::new(NativeBaseQueryOptions::from_native(options).unwrap());
-
-    let base_query = BaseQuery::try_new(context_holder.clone(), base_query_options).unwrap();
-
-    let res = base_query.build_sql_and_params();
-
-    let result: NeonObject<FunctionContext<'static>> = res.into_object();
-    let result = result.get_object().unwrap();
-    Ok(result)
-}) */

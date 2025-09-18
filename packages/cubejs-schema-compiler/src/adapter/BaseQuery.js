@@ -900,15 +900,22 @@ export class BaseQuery {
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin')
     };
 
-    const buildResult = nativeBuildSqlAndParams(queryParams);
+    try {
+      const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    const [query, params, preAggregation] = buildResult;
-    // FIXME
-    const paramsArray = [...params];
-    if (preAggregation) {
-      this.preAggregations.preAggregationForQuery = preAggregation;
+      const [query, params, preAggregation] = buildResult;
+      // FIXME
+      const paramsArray = [...params];
+      if (preAggregation) {
+        this.preAggregations.preAggregationForQuery = preAggregation;
+      }
+      return [query, paramsArray];
+    } catch (e) {
+      if (e?.name === 'TesseractUserError') {
+        throw new UserError(e.message);
+      }
+      throw e;
     }
-    return [query, paramsArray];
   }
 
   // FIXME Temporary solution
