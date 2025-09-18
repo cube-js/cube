@@ -13,7 +13,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use cubesql::compile::engine::df::scan::{
-    convert_transport_response, transform_response, MemberField, RecordBatch, SchemaRef,
+    convert_transport_response, transform_response, CacheMode, MemberField, RecordBatch, SchemaRef,
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
@@ -91,6 +91,8 @@ struct LoadRequest {
     streaming: bool,
     #[serde(rename = "queryKey", skip_serializing_if = "Option::is_none")]
     query_key: Option<serde_json::Value>,
+    #[serde(rename = "cacheMode", skip_serializing_if = "Option::is_none")]
+    cache_mode: Option<CacheMode>,
 }
 
 #[derive(Debug, Serialize)]
@@ -287,6 +289,7 @@ impl TransportService for NodeBridgeTransport {
             member_to_alias,
             expression_params,
             streaming: false,
+            cache_mode: None,
         })?;
 
         let response: serde_json::Value = call_js_with_channel_as_callback(
@@ -338,6 +341,7 @@ impl TransportService for NodeBridgeTransport {
         meta: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
+        cache_mode: Option<CacheMode>,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         trace!("[transport] Request ->");
 
@@ -371,6 +375,7 @@ impl TransportService for NodeBridgeTransport {
                 member_to_alias: None,
                 expression_params: None,
                 streaming: false,
+                cache_mode: cache_mode.clone(),
             })?;
 
             let result = call_raw_js_with_channel_as_callback(
@@ -527,6 +532,7 @@ impl TransportService for NodeBridgeTransport {
                 member_to_alias: None,
                 expression_params: None,
                 streaming: true,
+                cache_mode: None,
             })?;
 
             let res = call_js_with_stream_as_callback(
