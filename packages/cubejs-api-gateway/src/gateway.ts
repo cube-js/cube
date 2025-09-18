@@ -29,6 +29,7 @@ import type {
 } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 
+import { QueryBody } from '@cubejs-backend/query-orchestrator';
 import {
   QueryType,
   ApiScopes,
@@ -734,7 +735,7 @@ class ApiGateway {
       const preAggregationPartitionsWithoutError = preAggregationPartitions.filter(p => !p?.errors?.length);
 
       const versionEntriesResult = preAggregationPartitions &&
-        await orchestratorApi.getPreAggregationVersionEntries(
+        orchestratorApi.getPreAggregationVersionEntries(
           context,
           preAggregationPartitionsWithoutError,
           compilerApi.preAggregationsSchema
@@ -1648,12 +1649,13 @@ class ApiGateway {
     sqlQuery: any,
     cacheMode: CacheMode = 'stale-if-slow',
   ): Promise<ResultWrapper> {
-    const queries = [{
+    const queries: QueryBody[] = [{
       ...sqlQuery,
       query: sqlQuery.sql[0],
       values: sqlQuery.sql[1],
       continueWait: true,
       renewQuery: normalizedQuery.renewQuery,
+      cacheMode,
       requestId: context.requestId,
       context,
       persistent: false,
@@ -1678,6 +1680,7 @@ class ApiGateway {
         values: totalQuery.sql[1],
         continueWait: true,
         renewQuery: normalizedTotal.renewQuery,
+        cacheMode,
         requestId: context.requestId,
         context
       });
@@ -1685,7 +1688,7 @@ class ApiGateway {
     const [response, total] = await Promise.all(
       queries.map(async (query) => {
         const res = await (await this.getAdapterApi(context))
-          .executeQuery(query, cacheMode);
+          .executeQuery(query);
         return res;
       })
     );
@@ -1793,12 +1796,13 @@ class ApiGateway {
       this.log({ type: 'Load Request', query, streaming: true }, context);
       const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
       const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
-      const q = {
+      const q: QueryBody = {
         ...sqlQuery,
         query: sqlQuery.sql[0],
         values: sqlQuery.sql[1],
         continueWait: true,
         renewQuery: false,
+        cacheMode: 'stale-if-slow',
         requestId: context.requestId,
         context,
         persistent: true,
@@ -1982,17 +1986,18 @@ class ApiGateway {
           normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations: request.sqlQuery }))
         );
 
-      let results;
+      let results: any[];
 
       let slowQuery = false;
 
       const streamResponse = async (sqlQuery) => {
-        const q = {
+        const q: QueryBody = {
           ...sqlQuery,
           query: sqlQuery.query || sqlQuery.sql[0],
           values: sqlQuery.values || sqlQuery.sql[1],
           continueWait: true,
           renewQuery: false,
+          cacheMode: 'stale-if-slow',
           requestId: context.requestId,
           context,
           persistent: true,
@@ -2007,11 +2012,12 @@ class ApiGateway {
       };
 
       if (request.sqlQuery) {
-        const finalQuery = {
+        const finalQuery: QueryBody = {
           query: request.sqlQuery[0],
           values: request.sqlQuery[1],
           continueWait: true,
           renewQuery: normalizedQueries[0].renewQuery,
+          cacheMode: request.cacheMode,
           requestId: context.requestId,
           context,
           ...sqlQueries[0],

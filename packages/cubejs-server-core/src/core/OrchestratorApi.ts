@@ -61,7 +61,7 @@ export class OrchestratorApi {
    *
    * @throw Error
    */
-  public async streamQuery(query: QueryBody, cacheMode: CacheMode = 'stale-if-slow'): Promise<stream.Writable> {
+  public async streamQuery(query: QueryBody): Promise<stream.Writable> {
     // TODO merge with fetchQuery
     return this.orchestrator.streamQuery(query);
   }
@@ -71,7 +71,7 @@ export class OrchestratorApi {
    * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
    * error otherwise.
    */
-  public async executeQuery(query: QueryBody, cacheMode: CacheMode = 'stale-if-slow') {
+  public async executeQuery(query: QueryBody) {
     const queryForLog = query.query?.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 
@@ -140,7 +140,7 @@ export class OrchestratorApi {
           .orchestrator
           .resultFromCacheIfExists(query);
 
-        if (query.cache === 'stale-if-slow' && fromCache) {
+        if (query.cacheMode === 'stale-if-slow' && fromCache) {
           this.logger('Slow Query Warning', {
             query: queryForLog,
             requestId: query.requestId,
@@ -155,7 +155,7 @@ export class OrchestratorApi {
           };
         }
 
-        if (query.cache === 'stale-while-revalidate' && fromCache) {
+        if (query.cacheMode === 'stale-while-revalidate' && fromCache) {
           // Start background refresh
           this.orchestrator.startBackgroundRefresh(query).catch(e => {
             this.logger('Error starting background refresh', {

@@ -71,7 +71,7 @@ export type Query = {
   preAggregationsLoadCacheByDataSource?: any;
   // @deprecated
   renewQuery?: boolean;
-  cache?: CacheMode;
+  cacheMode?: CacheMode;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
 
@@ -85,7 +85,7 @@ export type QueryBody = {
   continueWait?: boolean;
   // @deprecated
   renewQuery?: boolean;
-  cache?: CacheMode;
+  cacheMode?: CacheMode;
   requestId?: string;
   external?: boolean;
   isJob?: boolean;
@@ -282,7 +282,7 @@ export class QueryCache {
     }
 
     // renewQuery has been deprecated, but keeping it for now
-    if (queryBody.cache === 'must-revalidate' || queryBody.renewQuery) {
+    if (queryBody.cacheMode === 'must-revalidate' || queryBody.renewQuery) {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
       return this.renewQuery(
         query,
