@@ -12,6 +12,7 @@ import {
   getRealType,
   parseUtcIntoLocalDate,
   QueryAlias,
+  CacheMode,
 } from '@cubejs-backend/shared';
 import {
   ResultArrayWrapper,
@@ -317,6 +318,7 @@ class ApiGateway {
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.query.queryType,
+        cacheMode: req.query.cache,
       });
     }));
 
@@ -326,7 +328,8 @@ class ApiGateway {
         query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res),
-        queryType: req.body.queryType
+        queryType: req.body.queryType,
+        cacheMode: req.body.cache,
       });
     }));
 
@@ -335,7 +338,8 @@ class ApiGateway {
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
-        queryType: req.query.queryType
+        queryType: req.query.queryType,
+        cacheMode: req.query.cache,
       });
     }));
 
@@ -1642,6 +1646,7 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
+    cacheMode: CacheMode = 'stale-if-slow',
   ): Promise<ResultWrapper> {
     const queries = [{
       ...sqlQuery,

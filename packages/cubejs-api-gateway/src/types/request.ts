@@ -7,6 +7,7 @@
 
 import type { Request as ExpressRequest } from 'express';
 import type { DataResult } from '@cubejs-backend/native';
+import { CacheMode } from '@cubejs-backend/shared';
 import { RequestType, ApiType, ResultType } from './strings';
 import { Query } from './query';
 
@@ -133,6 +134,7 @@ type QueryRequest = BaseRequest & {
   memberExpressions?: boolean;
   disableExternalPreAggregations?: boolean;
   disableLimitEnforcing?: boolean;
+  cacheMode?: CacheMode;
 };
 
 type SqlApiRequest = BaseRequest & {
