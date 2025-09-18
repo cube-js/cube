@@ -40,6 +40,9 @@ struct PgCatalogCollationBuilder {
     collprovider: StringBuilder,
     collisdeterministic: BooleanBuilder,
     collencoding: Int32Builder,
+    // Column `colliculocale` renamed to `colllocale` since PostgreSQL 17.
+    // Support both columns for backward-compatibility.
+    // Reference: https://pgpedia.info/p/pg_collation.html
     colliculocale: StringBuilder,
     collcollate: StringBuilder,
     collctype: StringBuilder,
