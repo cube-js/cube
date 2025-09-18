@@ -27,9 +27,6 @@ struct PgCollation {
     collcollate: Option<String>,
     collctype: Option<String>,
     // Column `colliculocale` renamed to `colllocale` since PostgreSQL 17.
-    // Support both columns for backward-compatibility.
-    // Reference: https://pgpedia.info/p/pg_collation.html
-    colliculocale: Option<String>,
     colllocale: Option<String>,
     collicurules: Option<String>,
     collversion: Option<String>,
