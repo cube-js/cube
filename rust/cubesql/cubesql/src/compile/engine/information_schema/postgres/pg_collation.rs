@@ -91,11 +91,11 @@ impl PgCatalogCollationBuilder {
         self.collctype
             .append_option(coll.collctype.clone())
             .unwrap();
-        self.collicurules
-            .append_option(coll.collicurules.clone())
-            .unwrap();
         self.colllocale
             .append_option(coll.colllocale.clone())
+            .unwrap();
+        self.collicurules
+            .append_option(coll.collicurules.clone())
             .unwrap();
         self.collversion
             .append_option(coll.collversion.clone())
@@ -114,8 +114,8 @@ impl PgCatalogCollationBuilder {
             Arc::new(self.colliculocale.finish()),
             Arc::new(self.collcollate.finish()),
             Arc::new(self.collctype.finish()),
-            Arc::new(self.collicurules.finish()),
             Arc::new(self.colllocale.finish()),
+            Arc::new(self.collicurules.finish()),
             Arc::new(self.collversion.finish()),
         ];
         columns
@@ -224,6 +224,16 @@ impl TableProvider for PgCatalogCollationProvider {
             Field::new("oid", DataType::UInt32, false),
             Field::new("collname", DataType::Utf8, false),
             Field::new("collnamespace", DataType::UInt32, false),
+            Field::new("collowner", DataType::UInt32, false),
+            Field::new("collprovider", DataType::Utf8, false),
+            Field::new("collisdeterministic", DataType::Boolean, false),
+            Field::new("collencoding", DataType::Int32, false),
+            Field::new("colliculocale", DataType::Utf8, false),
+            Field::new("collcollate", DataType::Utf8, false),
+            Field::new("collctype", DataType::Utf8, false),
+            Field::new("colllocale", DataType::Utf8, false),
+            Field::new("collicurules", DataType::Utf8, false),
+            Field::new("collversion", DataType::Utf8, false),
         ]))
     }
     async fn scan(
