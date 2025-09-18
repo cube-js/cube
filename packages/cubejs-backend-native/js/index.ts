@@ -78,12 +78,13 @@ export interface SqlPayload {
 }
 
 export interface SqlApiLoadPayload {
-  request: Request<LoadRequestMeta>,
-  session: SessionContext,
-  query: any,
-  queryKey: any,
-  sqlQuery: any,
-  streaming: boolean,
+  request: Request<LoadRequestMeta>;
+  session: SessionContext;
+  query: any;
+  queryKey: any;
+  sqlQuery: any;
+  streaming: boolean;
+  cacheMode: CacheMode;
 }
 
 export interface LogLoadEventPayload {

@@ -207,10 +207,8 @@ export class SQLServer {
           }
         });
       },
-      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, streaming }) => {
+      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, streaming, cacheMode }) => {
         const context = await contextByRequest(request, session);
-
-        // XXX: Should we pass cacheMode somehow?
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
@@ -220,6 +218,7 @@ export class SQLServer {
               query,
               sqlQuery,
               streaming,
+              cacheMode,
               context,
               memberExpressions: true,
               res: (response) => {

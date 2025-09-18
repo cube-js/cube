@@ -11,7 +11,6 @@ import {
 } from '@cubejs-backend/query-orchestrator';
 
 import { DatabaseType, RequestContext } from './types';
-import { CacheMode } from '@cubejs-backend/shared';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: (dataSource: string) => Promise<DatabaseType>;
