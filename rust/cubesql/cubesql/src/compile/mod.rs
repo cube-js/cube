@@ -17698,4 +17698,17 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_pg_collation() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_collation",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_collation".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        Ok(())
+    }
 }
