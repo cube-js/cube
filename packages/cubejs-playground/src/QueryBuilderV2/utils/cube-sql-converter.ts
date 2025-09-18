@@ -318,11 +318,11 @@ export class CubeSQLConverter {
     if (filter.operator === 'inDateRange') {
       return [
         filter.member,
-        '>',
+        '>=',
         this.escapeValue(filter.values[0]),
         'AND',
         filter.member,
-        '<',
+        '<=',
         this.escapeValue(filter.values[1]),
       ].join(' ');
     }
