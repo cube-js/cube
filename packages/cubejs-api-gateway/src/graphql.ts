@@ -653,6 +653,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             apiGateway.load({
               query,
               queryType: QueryType.REGULAR_QUERY,
+              ...(query.cache ? { cacheMode: query.cache } : {}),
               context: req.context,
               res: async (message) => {
                 if (message.error) {
