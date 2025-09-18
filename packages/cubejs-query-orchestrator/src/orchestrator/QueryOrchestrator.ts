@@ -1,6 +1,6 @@
 import * as stream from 'stream';
 import R from 'ramda';
-import { getEnv } from '@cubejs-backend/shared';
+import { CacheMode, getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   QuerySchemasResult,
@@ -233,7 +233,7 @@ export class QueryOrchestrator {
    * @throw ContinueWaitError
    */
   public async fetchQuery(queryBody: QueryBody): Promise<any> {
-    if (queryBody.query && queryBody.cache === 'no-cache') {
+    if (queryBody.query && queryBody.cacheMode === 'no-cache') {
       const result = await this.queryCache.cachedQueryResult(
         { ...queryBody, forceNoCache: true },
         []
