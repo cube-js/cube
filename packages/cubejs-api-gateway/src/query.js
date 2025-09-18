@@ -336,17 +336,8 @@ const normalizeQuery = (query, persistent) => {
     newLimit = query.limit;
   }
 
-  let cacheMode = query.cache;
-  // Convert deprecated renewQuery option to new cache mode
-  if (query.renewQuery && !query.cache) {
-    cacheMode = 'must-revalidate';
-  } else if (!query.renewQuery && !query.cache) {
-    cacheMode = 'stale-if-slow';
-  }
-
   return {
     ...query,
-    ...{ cache: cacheMode },
     ...(query.order ? { order: normalizeQueryOrder(query.order) } : {}),
     limit: newLimit,
     timezone,
