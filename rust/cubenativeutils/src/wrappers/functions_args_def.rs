@@ -4,6 +4,7 @@ use crate::wrappers::{
     serializer::{NativeDeserialize, NativeSerialize},
     NativeContextHolder, NativeObjectHandle,
 };
+use std::rc::Rc;
 
 use super::inner_types::InnerTypes;
 
@@ -14,6 +15,22 @@ pub trait FunctionArgsDef<IT: InnerTypes, Input, Ret> {
         args: Vec<NativeObjectHandle<IT>>,
     ) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn args_len() -> usize;
+}
+
+impl<IT: InnerTypes, In, Rt, F> FunctionArgsDef<IT, In, Rt> for Rc<F>
+where
+    F: FunctionArgsDef<IT, In, Rt>,
+{
+    fn call_func(
+        &self,
+        ctx: NativeContextHolder<IT>,
+        args: Vec<NativeObjectHandle<IT>>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError> {
+        (**self).call_func(ctx, args)
+    }
+    fn args_len() -> usize {
+        F::args_len()
+    }
 }
 
 /// Macro to generate FunctionArgsDef implementations for various numbers of arguments
@@ -81,4 +98,3 @@ impl_function_args_def!(5, T1, T2, T3, T4, T5);
 impl_function_args_def!(6, T1, T2, T3, T4, T5, T6);
 impl_function_args_def!(7, T1, T2, T3, T4, T5, T6, T7);
 impl_function_args_def!(8, T1, T2, T3, T4, T5, T6, T7, T8);
-

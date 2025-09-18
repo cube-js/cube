@@ -9,7 +9,6 @@ pub mod primitive_root_holder;
 pub mod root_holder;
 
 pub use neon_object::*;
-use neon_proxy::*;
 use object_root_holder::*;
 use primitive_root_holder::*;
 use root_holder::*;

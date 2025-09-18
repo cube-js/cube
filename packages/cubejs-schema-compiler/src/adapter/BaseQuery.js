@@ -904,14 +904,13 @@ export class BaseQuery {
       const buildResult = nativeBuildSqlAndParams(queryParams);
 
       const [query, params, preAggregation] = buildResult;
-      // FIXME
       const paramsArray = [...params];
       if (preAggregation) {
         this.preAggregations.preAggregationForQuery = preAggregation;
       }
       return [query, paramsArray];
     } catch (e) {
-      if (e?.name === 'TesseractUserError') {
+      if (e.name === 'TesseractUserError') {
         throw new UserError(e.message);
       }
       throw e;

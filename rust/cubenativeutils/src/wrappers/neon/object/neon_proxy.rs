@@ -1,13 +1,10 @@
-use super::{NeonObject, ObjectNeonTypeHolder, RootHolder};
+use super::{NeonObject, ObjectNeonTypeHolder};
 use crate::wrappers::{
     neon::{context::ContextHolder, inner_types::NeonInnerTypes},
-    object::{NativeFunction, NativeType},
     object_handle::NativeObjectHandle,
 };
 use crate::CubeError;
-use lazy_static::lazy_static;
 use neon::prelude::*;
-use regex::Regex;
 use std::rc::Rc;
 
 trait NeonProxyCall<C: Context<'static> + 'static> {

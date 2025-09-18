@@ -1,6 +1,4 @@
-use crate::errors::*;
 use crate::wrappers::neon::context::ContextHolder;
-use crate::wrappers::neon::js_class_name;
 use crate::CubeError;
 use neon::prelude::*;
 use std::rc::Rc;

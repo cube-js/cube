@@ -228,49 +228,27 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
     fn to_string_fn(&self, result: String) -> Result<NeonFunction<C>, CubeError> {
         let obj = NeonObject::new(
             self.clone(),
-            self.with_context(|cx| {
-                JsFunction::new(cx, move |mut c| Ok(c.string(result.clone())))
-                    .unwrap()
-                    .upcast()
-            })?,
+            self.with_context(|cx| -> Result<_, CubeError> {
+                let func = JsFunction::new(cx, move |mut c| Ok(c.string(result.clone())))?;
+                Ok(func.upcast())
+            })??,
         )?;
         obj.into_function()
     }
-    fn make_function<In, Rt, F: FunctionArgsDef<NeonInnerTypes<C>, In, Rt>>(
+    fn make_function<In, Rt, F: FunctionArgsDef<NeonFuncInnerTypes, In, Rt> + 'static>(
         &self,
         f: F,
     ) -> Result<NeonFunction<C>, CubeError> {
-        todo!()
-    }
-    /* fn make_function<F>(&self, f: F) -> Result<NeonFunction<C>, CubeError>
-    where
-        F: Fn(
-                NativeContextHolder<NeonInnerTypes<C>>,
-                Vec<NativeObjectHandle<NeonInnerTypes<C>>>,
-            ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError>
-            + 'static,
-    {
-        /* let obj = NeonObject::new(
+        let f = Rc::new(f);
+        let obj = NeonObject::new(
             self.clone(),
-            self.with_context(|cx| {
-                JsFunction::new(cx, move |mut cx| {
-                    neon_run_with_guarded_lifetime(cx, |neon_context_holder| {
-                        let args = neon_context_holder
-                            .with_context(|cx| {
-                                for i in
-                            })
-
-
-                    });
-                    todo!()
-                })
-                .unwrap()
-                .upcast()
-            })?,
+            self.with_context(|cx| -> Result<_, CubeError> {
+                let func = JsFunction::new(cx, move |cx| neon_guarded_funcion_call(cx, f.clone()))?;
+                Ok(func.upcast())
+            })??,
         )?;
-        obj.into_function() */
-        todo!()
-    } */
+        obj.into_function()
+    }
 }
 
 impl<C: Context<'static>> Clone for ContextHolder<C> {

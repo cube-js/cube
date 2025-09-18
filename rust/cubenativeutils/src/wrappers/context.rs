@@ -1,5 +1,3 @@
-use std::{any::Any, rc::Rc};
-
 use super::FunctionArgsDef;
 use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
 use crate::CubeError;
@@ -13,7 +11,7 @@ pub trait NativeContext<IT: InnerTypes>: Clone {
     fn empty_array(&self) -> Result<IT::Array, CubeError>;
     fn empty_struct(&self) -> Result<IT::Struct, CubeError>;
     fn to_string_fn(&self, result: String) -> Result<IT::Function, CubeError>;
-    fn make_function<In, Rt, F: FunctionArgsDef<IT, In, Rt>>(
+    fn make_function<In, Rt, F: FunctionArgsDef<IT::FunctionIT, In, Rt> + 'static>(
         &self,
         f: F,
     ) -> Result<IT::Function, CubeError>;
