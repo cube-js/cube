@@ -5,7 +5,6 @@
  * Network query data types definition.
  */
 
-import { CacheMode } from '@cubejs-backend/shared';
 import {
   Member,
   TimeMember,
@@ -142,7 +141,6 @@ interface Query {
   timezone?: string;
   // @deprecated
   renewQuery?: boolean;
-  cache?: CacheMode;
   ungrouped?: boolean;
   responseFormat?: ResultType;
 
