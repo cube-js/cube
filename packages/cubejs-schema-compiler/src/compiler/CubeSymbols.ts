@@ -180,6 +180,11 @@ export interface CubeSymbolsBase {
 
 export type CubeSymbolsDefinition = CubeSymbolsBase & Record<string, CubeSymbolDefinition>;
 
+type MemberSets = {
+  resolvedMembers: Set<string>;
+  allMembers: Set<string>;
+};
+
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 export const CONTEXT_SYMBOLS = {
   SECURITY_CONTEXT: 'securityContext',
@@ -553,14 +558,16 @@ export class CubeSymbols implements TranspilerSymbolResolver {
       return;
     }
 
-    const memberSets = {
+    const memberSets: MemberSets = {
       resolvedMembers: new Set<string>(),
       allMembers: new Set<string>(),
     };
 
     const autoIncludeMembers = new Set<string>();
     // `hierarchies` must be processed first
-    const types = ['hierarchies', 'measures', 'dimensions', 'segments'];
+    // It's also important `dimensions` to be processed BEFORE `measures`
+    // because drillMembers processing for views in generateIncludeMembers() relies on this
+    const types = ['hierarchies', 'dimensions', 'measures', 'segments'];
 
     for (const type of types) {
       let cubeIncludes: any[] = [];
@@ -606,7 +613,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
         }
       }
 
-      const includeMembers = this.generateIncludeMembers(cubeIncludes, type);
+      const includeMembers = this.generateIncludeMembers(cubeIncludes, type, cube);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
 
       const existing = cube.includedMembers ?? [];
@@ -657,7 +664,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     type: string,
     errorReporter: ErrorReporter,
     splitViews: SplitViews,
-    memberSets: any
+    memberSets: MemberSets
   ) {
     const result: any[] = [];
     const seen = new Set<string>();
@@ -757,7 +764,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           splitViewDef = splitViews[viewName];
         }
 
-        const includeMembers = this.generateIncludeMembers(finalIncludes, type);
+        const includeMembers = this.generateIncludeMembers(finalIncludes, type, splitViewDef);
         this.applyIncludeMembers(includeMembers, splitViewDef, type, errorReporter);
       } else {
         for (const member of finalIncludes) {
@@ -787,12 +794,47 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     return this.symbols[cubeName]?.cubeObj()?.[type]?.[memberName];
   }
 
-  protected generateIncludeMembers(members: any[], type: string) {
+  protected generateIncludeMembers(members: any[], type: string, targetCube: CubeDefinitionExtended) {
+    const availableDimMembers = new Set<string>();
+
+    if (type === 'measures') {
+      Object.keys(targetCube.dimensions || {}).forEach(dimName => {
+        availableDimMembers.add(`${targetCube.name}.${dimName}`);
+      });
+    }
+
     return members.map(memberRef => {
       const path = memberRef.member.split('.');
       const resolvedMember = this.getResolvedMember(type, path[path.length - 2], path[path.length - 1]);
       if (!resolvedMember) {
         throw new Error(`Can't resolve '${memberRef.member}' while generating include members`);
+      }
+
+      let processedDrillMembers = resolvedMember.drillMembers;
+
+      // We need to filter only included drillMembers for views
+      if (type === 'measures' && resolvedMember.drillMembers && targetCube.isView) {
+        const sourceCubeName = path[path.length - 2];
+
+        const evaluatedDrillMembers = this.evaluateReferences(
+          sourceCubeName,
+          resolvedMember.drillMembers,
+          { originalSorting: true }
+        );
+
+        const drillMembersArray = (Array.isArray(evaluatedDrillMembers)
+          ? evaluatedDrillMembers
+          : [evaluatedDrillMembers]).map(member => {
+          const memberParts = member.split('.');
+          if (memberParts[0] === sourceCubeName) {
+            return `${targetCube.name}.${memberParts[1]}`;
+          }
+          return member; // Keep as-is if not from source cube
+        });
+
+        const filteredDrillMembers = drillMembersArray.filter(member => availableDimMembers.has(member));
+
+        processedDrillMembers = () => filteredDrillMembers;
       }
 
       // eslint-disable-next-line no-new-func
@@ -810,6 +852,8 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.timeShift && { timeShift: resolvedMember.timeShift }),
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
+          ...(processedDrillMembers && { drillMembers: processedDrillMembers }),
+          ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
@@ -892,8 +936,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           name
         );
       // eslint-disable-next-line no-underscore-dangle
-      // if (resolvedSymbol && resolvedSymbol._objectWithResolvedProperties) {
-      if (resolvedSymbol._objectWithResolvedProperties) {
+      if (resolvedSymbol?._objectWithResolvedProperties) {
         return resolvedSymbol;
       }
       return cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [referencedCube, name]));
@@ -1003,7 +1046,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           cubeName,
           name
         );
-        if (resolvedSymbol._objectWithResolvedProperties) {
+        if (resolvedSymbol?._objectWithResolvedProperties) {
           return resolvedSymbol;
         }
         return '';
