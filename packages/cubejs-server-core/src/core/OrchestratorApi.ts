@@ -140,29 +140,13 @@ export class OrchestratorApi {
           .orchestrator
           .resultFromCacheIfExists(query);
 
-        if (query.cacheMode === 'stale-if-slow' && fromCache) {
+        if ((query.cacheMode === 'stale-if-slow' || query.cacheMode === 'stale-while-revalidate') && fromCache) {
           this.logger('Slow Query Warning', {
             query: queryForLog,
             requestId: query.requestId,
             warning: 'Query is too slow to be renewed during the ' +
               'user request and was served from the cache. Please ' +
               'consider using low latency pre-aggregations.'
-          });
-
-          return {
-            ...fromCache,
-            slowQuery: true
-          };
-        }
-
-        if (query.cacheMode === 'stale-while-revalidate' && fromCache) {
-          // Start background refresh
-          this.orchestrator.startBackgroundRefresh(query).catch(e => {
-            this.logger('Error starting background refresh', {
-              query: queryForLog,
-              requestId: query.requestId,
-              error: ((e as Error).stack || e)
-            });
           });
 
           return {
