@@ -43,6 +43,7 @@ use datafusion::{
 };
 use futures::Stream;
 use log::warn;
+use serde::Serialize;
 use serde_json::Value;
 use std::str::FromStr;
 use std::{
@@ -79,7 +80,7 @@ impl MemberField {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum CacheMode {
     StaleIfSlow,
     StaleWhileRevalidate,
