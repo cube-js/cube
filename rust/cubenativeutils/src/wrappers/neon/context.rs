@@ -229,17 +229,17 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
         let obj = NeonObject::new(
             self.clone(),
             self.with_context(|cx| cx.boolean(v).upcast())?,
-        );
+        )?;
         obj.into_boolean()
     }
 
     fn string(&self, v: String) -> Result<NeonString<C>, CubeError> {
-        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.string(v).upcast())?);
+        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.string(v).upcast())?)?;
         obj.into_string()
     }
 
     fn number(&self, v: f64) -> Result<NeonNumber<C>, CubeError> {
-        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.number(v).upcast())?);
+        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.number(v).upcast())?)?;
         obj.into_number()
     }
 
@@ -247,21 +247,21 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.clone(),
             self.with_context(|cx| cx.undefined().upcast())?,
-        )))
+        )?))
     }
 
     fn null(&self) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.clone(),
             self.with_context(|cx| cx.null().upcast())?,
-        )))
+        )?))
     }
 
     fn empty_array(&self) -> Result<NeonArray<C>, CubeError> {
         let obj = NeonObject::new(
             self.clone(),
             self.with_context(|cx| cx.empty_array().upcast())?,
-        );
+        )?;
         obj.into_array()
     }
 
@@ -269,7 +269,7 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
         let obj = NeonObject::new(
             self.clone(),
             self.with_context(|cx| cx.empty_object().upcast())?,
-        );
+        )?;
         obj.into_struct()
     }
     fn to_string_fn(&self, result: String) -> Result<NeonFunction<C>, CubeError> {
@@ -280,7 +280,7 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
                     .unwrap()
                     .upcast()
             })?,
-        );
+        )?;
         obj.into_function()
     }
 }

@@ -1,4 +1,4 @@
-use super::{NeonObject, NeonTypeHandle};
+use super::{NeonObject, ObjectNeonTypeHolder, RootHolder};
 use crate::wrappers::{
     neon::inner_types::NeonInnerTypes,
     object::{NativeFunction, NativeType},
@@ -9,20 +9,28 @@ use lazy_static::lazy_static;
 use neon::prelude::*;
 use regex::Regex;
 
-#[derive(Clone)]
 pub struct NeonFunction<C: Context<'static>> {
-    object: NeonTypeHandle<C, JsFunction>,
+    object: ObjectNeonTypeHolder<C, JsFunction>,
 }
 
 impl<C: Context<'static> + 'static> NeonFunction<C> {
-    pub fn new(object: NeonTypeHandle<C, JsFunction>) -> Self {
+    pub fn new(object: ObjectNeonTypeHolder<C, JsFunction>) -> Self {
         Self { object }
+    }
+}
+
+impl<C: Context<'static>> Clone for NeonFunction<C> {
+    fn clone(&self) -> Self {
+        Self {
+            object: self.object.clone(),
+        }
     }
 }
 
 impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonFunction<C> {
     fn into_object(self) -> NeonObject<C> {
-        self.object.upcast()
+        let root_holder = RootHolder::from_typed(self.object);
+        NeonObject::form_root(root_holder)
     }
 }
 
@@ -33,7 +41,7 @@ impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFu
     ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
         let neon_args = args
             .into_iter()
-            .map(|arg| -> Result<_, CubeError> { Ok(arg.into_object().get_object()) })
+            .map(|arg| -> Result<_, CubeError> { arg.into_object().get_object() })
             .collect::<Result<Vec<_>, _>>()?;
         let neon_reuslt =
             self.object
@@ -42,9 +50,9 @@ impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFu
                     safe_call_fn.safe_call(cx, neon_object, null, neon_args)
                 })??;
         Ok(NativeObjectHandle::new(NeonObject::new(
-            self.object.context.clone(),
+            self.object.get_context(),
             neon_reuslt,
-        )))
+        )?))
     }
 
     fn definition(&self) -> Result<String, CubeError> {
