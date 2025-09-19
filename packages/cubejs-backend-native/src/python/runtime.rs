@@ -60,7 +60,7 @@ impl PyRuntime {
         let permit = match self.sender.try_reserve() {
             Ok(permit) => permit,
             Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-                log::warn!("Python channel is full, using async reserve. This may cause performance issues. Consider increasing the channel size for PyRuntime.");
+                log::warn!("Python channel is full, this may cause performance issues. Consider increasing the channel size for PyRuntime.");
 
                 // Channel is full, use async reserve with blocking for efficiency
                 match futures::executor::block_on(self.sender.reserve()) {
