@@ -806,7 +806,8 @@ impl AsyncPostgresShim {
                     .cloned()
                     .unwrap_or("db".to_string());
                 self.session.state.set_database(Some(database));
-                self.session.state.set_user(Some(user));
+                self.session.state.set_user(Some(user.clone()));
+                self.session.state.set_original_user(Some(user));
                 self.session.state.set_auth_context(Some(auth_context));
 
                 self.write(protocol::Authentication::new(AuthenticationRequest::Ok))
