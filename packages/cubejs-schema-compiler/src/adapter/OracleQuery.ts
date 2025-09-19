@@ -82,7 +82,7 @@ export class OracleQuery extends BaseQuery {
   }
 
   public timeStampParam(timeDimension) {
-    return timeDimension.dateFieldType() === 'string' ? ':"?"' : this.timeStampCast('?');
+    return timeDimension.dateFieldType() === 'string' ? ':"?"' : this.dateTimeCast('?');
   }
 
   public timeGroupedColumn(granularity, dimension) {
