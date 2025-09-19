@@ -231,7 +231,7 @@ export class QueryCache {
       queuePriority = queryBody.queuePriority;
     }
 
-    const forceNoCache = queryBody.forceNoCache || false;
+    const forceNoCache = queryBody.forceNoCache || (queryBody.cacheMode === 'no-cache') || false;
 
     const { values } = queryBody;
 
