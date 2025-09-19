@@ -13,8 +13,8 @@ use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::NativeType;
-use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle, NativeStruct};
-use cubenativeutils::{CubeError, CubeErrorCauseType};
+use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle};
+use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
