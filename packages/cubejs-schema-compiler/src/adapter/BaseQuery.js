@@ -950,7 +950,6 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-
     const [, , preAggregation] = buildResult;
     return preAggregation;
   }
