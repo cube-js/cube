@@ -6,7 +6,6 @@ pub mod object;
 pub mod object_handle;
 pub mod serializer;
 
-
 pub use context::NativeContextHolder;
 pub use functions_args_def::*;
 pub use object::{
