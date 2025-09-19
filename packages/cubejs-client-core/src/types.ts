@@ -7,8 +7,6 @@ export type QueryOrder = 'asc' | 'desc' | 'none';
 export type TQueryOrderObject = { [key: string]: QueryOrder };
 export type TQueryOrderArray = Array<[string, QueryOrder]>;
 
-export type CacheMode = 'stale-if-slow' | 'stale-while-revalidate' | 'must-revalidate' | 'no-cache';
-
 export type GranularityAnnotation = {
   name: string;
   title: string;
@@ -117,7 +115,6 @@ export interface Query {
   timezone?: string;
   // @deprecated
   renewQuery?: boolean;
-  cache?: CacheMode;
   ungrouped?: boolean;
   responseFormat?: 'compact' | 'default';
   total?: boolean;

@@ -1,5 +1,3 @@
-import { CacheMode } from '@cubejs-backend/shared';
-
 declare module "@cubejs-client/core" {
 
   export type IntrospectedMeasureName = import('./generated').IntrospectedMeasureName;
@@ -23,7 +21,6 @@ declare module "@cubejs-client/core" {
     timezone?: string;
     // @deprecated
     renewQuery?: boolean;
-    cache?: CacheMode;
     ungrouped?: boolean;
   }
 
