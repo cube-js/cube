@@ -735,7 +735,7 @@ export class RefreshScheduler {
                   async (partition): Promise<JobedPreAggregation[]> => {
                     const job = await orchestratorApi.executeQuery({
                       preAggregations: dependencies.concat([partition]),
-                      cacheMode: 'must-revalidate',
+                      cacheMode: 'stale-if-slow',
                       forceBuildPreAggregations: true,
                       orphanedTimeout: 60 * 60,
                       requestId: context.requestId,
