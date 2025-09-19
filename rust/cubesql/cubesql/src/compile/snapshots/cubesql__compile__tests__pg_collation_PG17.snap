@@ -1,0 +1,14 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_collation ORDER BY oid\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-----+-----------+---------------+-----------+--------------+---------------------+--------------+-------------+-----------+------------+---------------+--------------+-------------+
+| oid | collname  | collnamespace | collowner | collprovider | collisdeterministic | collencoding | collcollate | collctype | colllocale | colliculocale | collicurules | collversion |
++-----+-----------+---------------+-----------+--------------+---------------------+--------------+-------------+-----------+------------+---------------+--------------+-------------+
+| 100 | default   | 11            | 10        | d            | true                | -1           | NULL        | NULL      | NULL       | NULL          | NULL         | NULL        |
+| 811 | pg_c_utf8 | 11            | 10        | b            | true                | 6            | NULL        | NULL      | C.UTF-8    | C.UTF-8       | NULL         | 1           |
+| 950 | C         | 11            | 10        | c            | true                | -1           | C           | C         | NULL       | NULL          | NULL         | NULL        |
+| 951 | POSIX     | 11            | 10        | c            | true                | -1           | POSIX       | POSIX     | NULL       | NULL          | NULL         | NULL        |
+| 962 | ucs_basic | 11            | 10        | b            | true                | 6            | NULL        | NULL      | C          | C             | NULL         | 1           |
+| 963 | unicode   | 11            | 10        | i            | true                | -1           | NULL        | NULL      | und        | und           | NULL         | 153.128     |
++-----+-----------+---------------+-----------+--------------+---------------------+--------------+-------------+-----------+------------+---------------+--------------+-------------+
