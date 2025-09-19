@@ -82,7 +82,6 @@ export type QueryBody = {
   values?: string[];
   loadRefreshKeysOnly?: boolean;
   scheduledRefresh?: boolean;
-  continueWait?: boolean;
   // @deprecated
   renewQuery?: boolean;
   cacheMode?: CacheMode;
