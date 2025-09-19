@@ -450,39 +450,7 @@ export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
 
 export const buildSqlAndParams = (cubeEvaluator: any): String => {
   const native = loadNative();
-  const safeCallFn = (fn: Function, thisArg: any, ...args: any[]) => {
-    try {
-      return {
-        result: fn.apply(thisArg, args),
-      };
-    } catch (e: any) {
-      return {
-        error: e.toString(),
-      };
-    }
-  };
-
-  const createGetProxy = (target:any, rustHandlerBox:any) => {
-      return new Proxy(target, {
-          get(target, property, receiver) {
-              if (typeof property === 'string') {
-                  try {
-                      const propertyStr = String(property);
-                      const result = rustHandlerBox.get(propertyStr);
-
-                      if (result !== undefined) {
-                          return result;
-                      }
-                  } catch (error) {
-                      throw error;
-                  }
-              }
-
-              return Reflect.get(target, property, receiver);
-          }
-      });
-  }
-  return native.buildSqlAndParams(cubeEvaluator, safeCallFn);
+  return native.buildSqlAndParams(cubeEvaluator);
 };
 
 export type ResultRow = Record<string, string>;
