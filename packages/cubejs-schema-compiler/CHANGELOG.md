@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix view transpilation for worker_threads and native flows ([#9980](https://github.com/cube-js/cube/issues/9980)) ([333b53d](https://github.com/cube-js/cube/commit/333b53d01b9a0813ea9bace8601be0c0b82534ba))
+
 ## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
 
 ### Features
