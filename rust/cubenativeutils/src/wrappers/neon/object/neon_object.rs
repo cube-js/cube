@@ -7,7 +7,7 @@ use super::{
 };
 use crate::wrappers::neon::{context::ContextHolder, inner_types::NeonInnerTypes};
 use crate::wrappers::object::NativeObject;
-use cubesql::CubeError;
+use crate::CubeError;
 use neon::prelude::*;
 
 pub struct NeonObject<C: Context<'static> + 'static> {
@@ -37,7 +37,7 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
             RootHolder::Array(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
             RootHolder::Function(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
             RootHolder::Struct(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
-        }?
+        }
     }
 
     pub fn is_a<U: Value>(&self) -> Result<bool, CubeError> {
@@ -92,6 +92,12 @@ impl<C: Context<'static> + 'static> NativeObject<NeonInnerTypes<C>> for NeonObje
 
     fn is_undefined(&self) -> Result<bool, CubeError> {
         Ok(self.is_undefined())
+    }
+
+    fn clone_to_context(&self, context: &ContextHolder<C>) -> Self {
+        Self {
+            root_holder: self.root_holder.clone_to_context(context),
+        }
     }
 }
 

@@ -4,7 +4,7 @@ use crate::wrappers::{
     object::{NativeFunction, NativeType},
     object_handle::NativeObjectHandle,
 };
-use cubesql::CubeError;
+use crate::CubeError;
 use lazy_static::lazy_static;
 use neon::prelude::*;
 use regex::Regex;
@@ -43,12 +43,10 @@ impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFu
             .into_iter()
             .map(|arg| -> Result<_, CubeError> { arg.into_object().get_object() })
             .collect::<Result<Vec<_>, _>>()?;
-        let neon_reuslt =
-            self.object
-                .map_neon_object_with_safe_call_fn(|cx, neon_object, safe_call_fn| {
-                    let null = cx.null();
-                    safe_call_fn.safe_call(cx, neon_object, null, neon_args)
-                })??;
+        let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
+            let null = cx.null();
+            neon_object.call(cx, null, neon_args)
+        })?;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.get_context(),
             neon_reuslt,
@@ -56,18 +54,10 @@ impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFu
     }
 
     fn definition(&self) -> Result<String, CubeError> {
-        let result =
-            self.object
-                .map_neon_object(|cx, neon_object| -> Result<String, CubeError> {
-                    let res = neon_object
-                        .to_string(cx)
-                        .map_err(|_| {
-                            CubeError::internal("Can't convert function to string".to_string())
-                        })?
-                        .value(cx);
-                    Ok(res)
-                })??;
-        Ok(result)
+        self.object.map_neon_object(|cx, neon_object| {
+            let res = neon_object.to_string(cx)?.value(cx);
+            Ok(res)
+        })
     }
 
     fn args_names(&self) -> Result<Vec<String>, CubeError> {
