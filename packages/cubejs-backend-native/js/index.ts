@@ -448,7 +448,7 @@ export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   return native.sql4sql(instance, sqlQuery, disablePostProcessing, securityContext ? JSON.stringify(securityContext) : null);
 };
 
-export const buildSqlAndParams = (cubeEvaluator: any): String => {
+export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
   const native = loadNative();
   return native.buildSqlAndParams(cubeEvaluator);
 };

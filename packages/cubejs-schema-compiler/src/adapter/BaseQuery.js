@@ -950,15 +950,8 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    if (buildResult.error) {
-      if (buildResult.error.cause === 'User') {
-        throw new UserError(buildResult.error.message);
-      } else {
-        throw new Error(buildResult.error.message);
-      }
-    }
 
-    const [, , preAggregation] = buildResult.result;
+    const [, , preAggregation] = buildResult;
     return preAggregation;
   }
 
