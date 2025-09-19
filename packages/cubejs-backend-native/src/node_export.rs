@@ -604,13 +604,15 @@ pub fn reset_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
     neon_run_with_guarded_lifetime(cx, |neon_context_holder| {
-        let options =
-            NativeObjectHandle::<NeonInnerTypes<FunctionContext<'static>>>::new(NeonObject::new(
+        let options = NativeObjectHandle::<NeonInnerTypes<FunctionContext<'static>>>::new(
+            NeonObject::new(
                 neon_context_holder.clone(),
                 neon_context_holder
                     .with_context(|cx| cx.argument::<JsValue>(0))
                     .unwrap()?,
-            ));
+            )
+            .unwrap(),
+        );
 
         let safe_call_fn = neon_context_holder
             .with_context(|cx| {
@@ -635,7 +637,7 @@ fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
         let res = base_query.build_sql_and_params();
 
         let result: NeonObject<FunctionContext<'static>> = res.into_object();
-        let result = result.into_object();
+        let result = result.get_object().unwrap();
         Ok(result)
     })
 }
