@@ -771,6 +771,7 @@ async fn get_test_session_with_config_and_transport(
     // Populate like shims
     session.state.set_database(Some(db_name.to_string()));
     session.state.set_user(Some("ovr".to_string()));
+    session.state.set_original_user(Some("ovr".to_string()));
 
     let auth_ctx = HttpAuthContext {
         access_token: "access_token".to_string(),
@@ -938,7 +939,7 @@ impl TransportService for TestConnectionTransport {
         _ctx: AuthContextRef,
         to_user: String,
     ) -> Result<bool, CubeError> {
-        if to_user == "good_user" {
+        if matches!(to_user.as_str(), "good_user" | "ovr") {
             Ok(true)
         } else {
             Ok(false)

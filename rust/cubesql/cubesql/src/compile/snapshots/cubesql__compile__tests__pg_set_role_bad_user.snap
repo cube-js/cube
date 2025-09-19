@@ -1,0 +1,5 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_queries_with_flags(vec![\"SET ROLE bad_user\".to_string(),],\nDatabaseProtocol::PostgreSQL).await.err().unwrap().to_string()"
+---
+Error during planning: SQLCompilationError: User: user 'not specified' is not allowed to switch to 'bad_user'

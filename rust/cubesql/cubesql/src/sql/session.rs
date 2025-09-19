@@ -82,6 +82,8 @@ pub struct SessionState {
     // @todo Remove RWLock after split of Connection & SQLWorker
     // Context for Transport
     auth_context: RwLockSync<(Option<AuthContextRef>, SystemTime)>,
+    // Used to reset user with SET ROLE NONE
+    original_user: RwLockSync<Option<String>>,
 
     transaction: RwLockSync<TransactionState>,
     query: RwLockSync<QueryState>,
@@ -116,6 +118,7 @@ impl SessionState {
             temp_tables: Arc::new(TempTableManager::new(session_manager)),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
             auth_context: RwLockSync::new((auth_context, SystemTime::now())),
+            original_user: RwLockSync::new(None),
             transaction: RwLockSync::new(TransactionState::None),
             query: RwLockSync::new(QueryState::None),
             statements: RWLockAsync::new(HashMap::new()),
@@ -269,6 +272,25 @@ impl SessionState {
             .write()
             .expect("failed to unlock properties for writting user");
         guard.user = user;
+    }
+
+    pub fn original_user(&self) -> Option<String> {
+        let guard = self
+            .original_user
+            .read()
+            .expect("failed to unlock original_user for reading");
+        guard.clone()
+    }
+
+    pub fn set_original_user(&self, user: Option<String>) {
+        let mut guard = self
+            .original_user
+            .write()
+            .expect("failed to unlock original_user for writing");
+        if guard.is_none() {
+            // Silently ignore writing original user if it's already set
+            *guard = user;
+        }
     }
 
     pub fn database(&self) -> Option<String> {

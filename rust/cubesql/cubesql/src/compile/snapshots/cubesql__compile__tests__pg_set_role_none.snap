@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_queries_with_flags(vec![\"SET ROLE good_user\".to_string(),\n\"SET ROLE NONE\".to_string(), \"SHOW ROLE\".to_string()],\nDatabaseProtocol::PostgreSQL).await? .0"
+---
++---------+
+| setting |
++---------+
+| none    |
++---------+

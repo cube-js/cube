@@ -102,7 +102,9 @@ impl QueryRouter {
                 StatusFlags::empty(),
                 Box::new(dataframe::DataFrame::new(vec![], vec![])),
             )),
-            (ast::Statement::SetRole { role_name, .. }, _) => self.set_role_to_plan(role_name),
+            (ast::Statement::SetRole { role_name, .. }, _) => {
+                self.set_role_to_plan(role_name).await
+            }
             (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values).await
             }
@@ -283,19 +285,24 @@ impl QueryRouter {
         }
     }
 
-    fn set_role_to_plan(
+    async fn set_role_to_plan(
         &self,
         role_name: &Option<ast::Ident>,
     ) -> Result<QueryPlan, CompilationError> {
         let flags = StatusFlags::SERVER_STATE_CHANGED;
-        let role_name = role_name
-            .as_ref()
-            .map(|role_name| role_name.value.clone())
-            .unwrap_or("none".to_string());
-        let variable =
-            DatabaseVariable::system("role".to_string(), ScalarValue::Utf8(Some(role_name)), None);
+        let username = role_name.as_ref().map(|role_name| role_name.value.clone());
+        let Some(to_user) = username.clone().or_else(|| self.state.original_user()) else {
+            return Err(CompilationError::user(
+                "Cannot reset role when original role has not been set".to_string(),
+            ));
+        };
+        self.change_user(to_user).await?;
+        let variable = DatabaseVariable::system(
+            "role".to_string(),
+            ScalarValue::Utf8(Some(username.unwrap_or("none".to_string()))),
+            None,
+        );
         self.state.set_variables(vec![variable]);
-
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set))
     }
 
@@ -419,11 +426,6 @@ impl QueryRouter {
             });
 
         for v in user_variables {
-            self.reauthenticate_if_needed().await?;
-
-            let auth_context = self.state.auth_context().ok_or(CompilationError::user(
-                "No auth context set but tried to set current user".to_string(),
-            ))?;
             let to_user = match v.value {
                 ScalarValue::Utf8(Some(user)) => user,
                 _ => {
@@ -433,46 +435,7 @@ impl QueryRouter {
                     )))
                 }
             };
-            if self
-                .session_manager
-                .server
-                .transport
-                .can_switch_user_for_session(auth_context.clone(), to_user.clone())
-                .await
-                .map_err(|e| {
-                    CompilationError::internal(format!(
-                        "Error calling can_switch_user_for_session: {}",
-                        e
-                    ))
-                })?
-            {
-                self.state.set_user(Some(to_user.clone()));
-                let sql_auth_request = SqlAuthServiceAuthenticateRequest {
-                    protocol: "postgres".to_string(),
-                    method: "password".to_string(),
-                };
-                let authenticate_response = self
-                    .session_manager
-                    .server
-                    .auth
-                    .authenticate(sql_auth_request, Some(to_user.clone()), None)
-                    .await
-                    .map_err(|e| {
-                        CompilationError::internal(format!("Error calling authenticate: {}", e))
-                    })?;
-                self.state
-                    .set_auth_context(Some(authenticate_response.context));
-            } else {
-                return Err(CompilationError::user(format!(
-                    "user '{}' is not allowed to switch to '{}'",
-                    auth_context
-                        .user()
-                        .as_ref()
-                        .map(|v| v.as_str())
-                        .unwrap_or("not specified"),
-                    to_user
-                )));
-            }
+            self.change_user(to_user).await?;
         }
 
         if !session_columns_to_update.is_empty() {
@@ -486,6 +449,56 @@ impl QueryRouter {
         }
 
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set))
+    }
+
+    async fn change_user(&self, username: String) -> Result<(), CompilationError> {
+        self.reauthenticate_if_needed().await?;
+
+        let auth_context = self.state.auth_context().ok_or(CompilationError::user(
+            "No auth context set but tried to set current user".to_string(),
+        ))?;
+
+        let can_switch_user = self
+            .session_manager
+            .server
+            .transport
+            .can_switch_user_for_session(auth_context.clone(), username.clone())
+            .await
+            .map_err(|e| {
+                CompilationError::internal(format!(
+                    "Error calling can_switch_user_for_session: {}",
+                    e
+                ))
+            })?;
+        if !can_switch_user {
+            return Err(CompilationError::user(format!(
+                "user '{}' is not allowed to switch to '{}'",
+                auth_context
+                    .user()
+                    .as_ref()
+                    .map(|v| v.as_str())
+                    .unwrap_or("not specified"),
+                username
+            )));
+        }
+
+        self.state.set_user(Some(username.clone()));
+        let sql_auth_request = SqlAuthServiceAuthenticateRequest {
+            protocol: "postgres".to_string(),
+            method: "password".to_string(),
+        };
+        let authenticate_response = self
+            .session_manager
+            .server
+            .auth
+            .authenticate(sql_auth_request, Some(username), None)
+            .await
+            .map_err(|e| {
+                CompilationError::internal(format!("Error calling authenticate: {}", e))
+            })?;
+        self.state
+            .set_auth_context(Some(authenticate_response.context));
+        Ok(())
     }
 
     async fn create_table_to_plan(
