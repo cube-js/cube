@@ -369,7 +369,7 @@ export class RefreshScheduler {
           sql: null,
           preAggregations: [],
           continueWait: true,
-          renewQuery: true,
+          cacheMode: 'must-revalidate',
           requestId: context.requestId,
           scheduledRefresh: true,
           loadRefreshKeysOnly: true,
@@ -580,7 +580,7 @@ export class RefreshScheduler {
               priority: preAggregationsWarmup ? 1 : queryCursor - queries.length
             })),
             continueWait: true,
-            renewQuery: true,
+            cacheMode: 'must-revalidate',
             requestId: context.requestId,
             timezone: timezones[timezoneCursor],
             scheduledRefresh: true,
@@ -645,7 +645,7 @@ export class RefreshScheduler {
           await orchestratorApi.executeQuery({
             preAggregations: dependencies.concat([partition]),
             continueWait: true,
-            renewQuery: true,
+            cacheMode: 'must-revalidate',
             forceBuildPreAggregations: queryingOptions.forceBuildPreAggregations ?? true,
             orphanedTimeout: 60 * 60,
             requestId: context.requestId,
@@ -739,7 +739,7 @@ export class RefreshScheduler {
                     const job = await orchestratorApi.executeQuery({
                       preAggregations: dependencies.concat([partition]),
                       continueWait: true,
-                      renewQuery: false,
+                      cacheMode: 'stale-while-revalidate',
                       forceBuildPreAggregations: true,
                       orphanedTimeout: 60 * 60,
                       requestId: context.requestId,
