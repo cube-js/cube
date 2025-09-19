@@ -1,9 +1,11 @@
+use super::*;
 use super::{
     inner_types::NeonInnerTypes,
     object::{
         base_types::*, neon_array::NeonArray, neon_function::NeonFunction, neon_struct::NeonStruct,
         NeonObject,
     },
+    ContextWrapper,
 };
 use crate::CubeError;
 use crate::{
@@ -21,143 +23,14 @@ use std::{
     rc::{Rc, Weak},
 };
 
-type NeonFuncInnerTypes = NeonInnerTypes<FunctionContext<'static>>;
-
-pub trait NoenContextLifetimeExpand<'cx> {
-    type ExpandedResult: Context<'static>;
-    fn expand_lifetime(self) -> Self::ExpandedResult;
-}
-
-impl<'cx> NoenContextLifetimeExpand<'cx> for FunctionContext<'cx> {
-    type ExpandedResult = FunctionContext<'static>;
-    fn expand_lifetime(self) -> Self::ExpandedResult {
-        unsafe { std::mem::transmute::<FunctionContext<'cx>, FunctionContext<'static>>(self) }
-    }
-}
-
-pub struct ContextWrapper<C: Context<'static>> {
-    cx: C,
-}
-
-impl<C: Context<'static>> ContextWrapper<C> {
-    pub fn new(cx: C) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self { cx }))
-    }
-
-    pub fn with_context<T, F>(&mut self, f: F) -> T
-    where
-        F: FnOnce(&mut C) -> T,
-    {
-        f(&mut self.cx)
-    }
-
-    pub fn get_context(&mut self) -> &mut C {
-        &mut self.cx
-    }
-}
-
-pub struct NeonContextGuard<'cx, C: Context<'cx> + NoenContextLifetimeExpand<'cx>> {
-    context: Rc<RefCell<ContextWrapper<C::ExpandedResult>>>,
-    lifetime: PhantomData<&'cx ()>,
-}
-
-impl<'cx, C: Context<'cx> + NoenContextLifetimeExpand<'cx> + 'cx> NeonContextGuard<'cx, C> {
-    fn new(cx: C) -> Self {
-        Self {
-            context: ContextWrapper::new(cx.expand_lifetime()),
-            lifetime: PhantomData,
-        }
-    }
-
-    fn context_holder(&self) -> ContextHolder<C::ExpandedResult> {
-        ContextHolder::new(Rc::downgrade(&self.context))
-    }
-
-    fn unwrap(self) {
-        if Rc::strong_count(&self.context) > 0 {
-            match Rc::try_unwrap(self.context) {
-                Ok(_) => {}
-                Err(_) => panic!("Guarded context have more then one reference"),
-            }
-        }
-    }
-}
-
-pub fn neon_run_with_guarded_lifetime<F>(cx: FunctionContext, func: F) -> JsResult<JsValue>
-where
-    F: FnOnce(
-        ContextHolder<FunctionContext<'static>>,
-    ) -> Result<NativeObjectHandle<NeonFuncInnerTypes>, CubeError>,
-{
-    let guard = NeonContextGuard::new(cx);
-    let context_holder = guard.context_holder();
-    let res = catch_unwind(AssertUnwindSafe(|| {
-        let res = func(context_holder.clone());
-        res.map_or_else(
-            |e| match e.cause {
-                CubeErrorCauseType::User => {
-                    context_holder
-                        .with_context(|cx| {
-                            let err = JsError::error(cx, e.message)?;
-                            let name = cx.string("TesseractUserError");
-                            err.set(cx, "name", name)?;
-                            cx.throw(err)
-                        })
-                        .unwrap() // Context is dead → cannot safely work with Js, panic.
-                }
-                CubeErrorCauseType::Internal => {
-                    context_holder
-                        .with_context(|cx| cx.throw_error(e.message))
-                        .unwrap() // Context is dead → cannot safely work with Js, panic.
-                }
-                CubeErrorCauseType::NeonThrow(throw) => Err(throw),
-            },
-            |res| {
-                Ok(res.into_object().get_object().unwrap()) // Context is dead → cannot safely work with Js, panic
-            },
-        )
-    }));
-
-    guard.unwrap();
-    match res {
-        Ok(res) => res,
-        Err(e) => resume_unwind(e),
-    }
-}
-
-pub fn neon_guarded_funcion_call<In, Rt, F: FunctionArgsDef<NeonFuncInnerTypes, In, Rt>>(
-    cx: FunctionContext,
-    func: F,
-) -> JsResult<JsValue> {
-    neon_run_with_guarded_lifetime(cx, move |neon_context_holder| {
-        let args = neon_context_holder
-            .with_context(|cx| -> Result<_, CubeError> {
-                let mut args = vec![];
-                for i in 0..F::args_len() {
-                    args.push(cx.argument::<JsValue>(i)?);
-                }
-                Ok(args)
-            })??
-            .into_iter()
-            .map(|arg| -> Result<_, CubeError> {
-                Ok(NativeObjectHandle::new(NeonObject::new(
-                    neon_context_holder.clone(),
-                    arg,
-                )?))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let context_holder = NativeContextHolder::new(neon_context_holder.clone());
-
-        func.call_func(context_holder, args)
-    })
-}
-
 pub struct ContextHolder<C: Context<'static>> {
     context: Weak<RefCell<ContextWrapper<C>>>,
 }
 
+pub(super) type NeonFuncInnerTypes = NeonInnerTypes<FunctionContext<'static>>;
+
 impl<C: Context<'static>> ContextHolder<C> {
-    fn new(context: Weak<RefCell<ContextWrapper<C>>>) -> Self {
+    pub(super) fn new(context: Weak<RefCell<ContextWrapper<C>>>) -> Self {
         Self { context }
     }
 
@@ -271,3 +144,64 @@ impl<C: Context<'static>> Clone for ContextHolder<C> {
         }
     }
 }
+/*
+ * use neon::prelude::*;
+
+/// get(target, property, receiver)
+fn trap_get(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let target = cx.argument::<JsObject>(0)?;
+    let prop   = cx.argument::<JsValue>(1)?;
+    let recv   = cx.argument::<JsValue>(2)?;
+
+    // пример: если prop — строка, дергаем ваш Rust-обработчик
+    if let Ok(js_str) = prop.downcast::<JsString, _>(&mut cx) {
+        let name = js_str.value(&mut cx);
+
+        // ... ваша логика ...
+        // вернуть что-то «своё»
+        // return Ok(cx.string(format!("prop: {}", name)).upcast());
+
+        // или пробросить к Reflect.get для дефолтного поведения:
+        let reflect = cx.global()
+            .get::<JsObject, _, _>(&mut cx, "Reflect")?;
+        let reflect_get = reflect
+            .get::<JsFunction, _, _>(&mut cx, "get")?;
+        let v = reflect_get
+            .call(&mut cx, reflect.upcast(), vec![target.upcast(), prop.upcast(), recv])?;
+        return Ok(v);
+    }
+
+    // по умолчанию — Reflect.get
+    let reflect = cx.global().get::<JsObject, _, _>(&mut cx, "Reflect")?;
+    let reflect_get = reflect.get::<JsFunction, _, _>(&mut cx, "get")?;
+    reflect_get.call(&mut cx, reflect.upcast(), vec![target.upcast(), prop, recv])
+}
+
+fn make_proxy(mut cx: FunctionContext) -> JsResult<JsObject> {
+    // Proxy конструктор
+    let proxy_ctor = cx
+        .global()
+        .get::<JsFunction, _, _>(&mut cx, "Proxy")?;
+
+    // target можно принять аргументом или создать здесь
+    let target = JsObject::new(&mut cx);
+
+    // handler = { get: trap_get, ... }
+    let handler = JsObject::new(&mut cx);
+    let get_fn = JsFunction::new(&mut cx, trap_get)?;
+    handler.set(&mut cx, "get", get_fn)?;
+
+    // new Proxy(target, handler)
+    let proxy_val = proxy_ctor.construct(
+        &mut cx,
+        vec![target.upcast::<JsValue>(), handler.upcast::<JsValue>()],
+    )?;
+
+    Ok(proxy_val.downcast_or_throw::<JsObject, _>(&mut cx)?)
+}
+
+// export из модуля
+register_module!(mut cx, {
+    cx.export_function("makeProxy", make_proxy)
+});
+ * */
