@@ -6,3 +6,5 @@ index.node
 **/node_modules
 **/.DS_Store
 npm-debug.log
+test/__pycache__/
+test/subdir_for_test/__pycache__/
