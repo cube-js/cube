@@ -19,9 +19,9 @@ use super::information_schema::postgres::{
     InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
     PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogAuthMembersProvider,
     PgCatalogAvailableExtensionVersionsProvider, PgCatalogCastProvider, PgCatalogClassProvider,
-    PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
-    PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogEventTriggerProvider,
-    PgCatalogExtensionProvider, PgCatalogForeignDataWrapperProvider,
+    PgCatalogCollationProvider, PgCatalogConstraintProvider, PgCatalogDatabaseProvider,
+    PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogEnumProvider,
+    PgCatalogEventTriggerProvider, PgCatalogExtensionProvider, PgCatalogForeignDataWrapperProvider,
     PgCatalogForeignServerProvider, PgCatalogForeignTableProvider, PgCatalogIndexProvider,
     PgCatalogInheritsProvider, PgCatalogLanguageProvider, PgCatalogLocksProvider,
     PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogOperatorProvider,
@@ -99,6 +99,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_index".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogClassProvider>() {
             "pg_catalog.pg_class".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogCollationProvider>() {
+            "pg_catalog.pg_collation".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogProcProvider>() {
             "pg_catalog.pg_proc".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogSettingsProvider>() {
@@ -377,6 +379,7 @@ impl DatabaseProtocol {
                 "pg_class" => {
                     return Some(Arc::new(PgCatalogClassProvider::new(&context.meta.tables)))
                 }
+                "pg_collation" => return Some(Arc::new(PgCatalogCollationProvider::new())),
                 "pg_proc" => return Some(Arc::new(PgCatalogProcProvider::new())),
                 "pg_settings" => {
                     return Some(Arc::new(PgCatalogSettingsProvider::new(
