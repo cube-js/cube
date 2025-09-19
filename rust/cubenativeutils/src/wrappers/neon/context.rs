@@ -249,6 +249,19 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
         )?;
         obj.into_function()
     }
+    fn proxy<
+        F: Fn(
+            NativeContextHolder<NeonInnerTypes<C>>,
+            NativeObjectHandle<NeonInnerTypes<C>>,
+            String,
+        ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError>,
+    >(
+        &self,
+        target: Option<NativeObjectHandle<NeonInnerTypes<C>>>,
+        get_fn: F,
+    ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
+        todo!()
+    }
 }
 
 impl<C: Context<'static>> Clone for ContextHolder<C> {

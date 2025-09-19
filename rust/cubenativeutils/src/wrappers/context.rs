@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use super::FunctionArgsDef;
 use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
 use crate::CubeError;
@@ -15,6 +17,21 @@ pub trait NativeContext<IT: InnerTypes>: Clone {
         &self,
         f: F,
     ) -> Result<IT::Function, CubeError>;
+    fn proxy<
+        F: Fn(
+            NativeContextHolder<IT>,
+            NativeObjectHandle<IT>,
+            String,
+        ) -> Result<NativeObjectHandle<IT>, CubeError>,
+    >(
+        &self,
+        target: Option<NativeObjectHandle<IT>>,
+        get_fn: F,
+    ) -> Result<NativeObjectHandle<IT>, CubeError>;
+}
+
+pub trait NativeContextHolderRef: 'static {
+    fn as_any(&self) -> &dyn Any;
 }
 
 #[derive(Clone)]
@@ -26,7 +43,7 @@ impl<IT: InnerTypes> NativeContextHolder<IT> {
     pub fn new(context: IT::Context) -> Self {
         Self { context }
     }
-    pub fn context(&self) -> &impl NativeContext<IT> {
+    pub fn context(&self) -> &IT::Context {
         &self.context
     }
     pub fn boolean(&self, v: bool) -> Result<IT::Boolean, CubeError> {
@@ -53,5 +70,19 @@ impl<IT: InnerTypes> NativeContextHolder<IT> {
     #[allow(dead_code)]
     pub fn to_string_fn(&self, result: String) -> Result<IT::Function, CubeError> {
         self.context.to_string_fn(result)
+    }
+
+    pub fn as_holder_ref(&self) -> &dyn NativeContextHolderRef {
+        self
+    }
+}
+
+impl<IT> NativeContextHolderRef for NativeContextHolder<IT>
+where
+    IT: InnerTypes + 'static,
+    NativeContextHolder<IT>: 'static,
+{
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }

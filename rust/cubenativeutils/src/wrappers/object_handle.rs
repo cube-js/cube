@@ -1,4 +1,5 @@
 use super::{inner_types::InnerTypes, object::NativeObject};
+use super::{NativeContextHolder, NativeContextHolderRef};
 use crate::CubeError;
 
 #[derive(Clone)]
@@ -63,5 +64,20 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     }
     pub fn get_context(&self) -> IT::Context {
         self.object.get_context()
+    }
+    pub fn try_clone_to_context(
+        &self,
+        context_ref: &dyn NativeContextHolderRef,
+    ) -> Result<Self, CubeError> {
+        if let Some(context_holder) = context_ref
+            .as_any()
+            .downcast_ref::<NativeContextHolder<IT>>()
+        {
+            Ok(Self::new(
+                self.object.clone_to_context(context_holder.context()),
+            ))
+        } else {
+            Err(CubeError::internal(format!("")))
+        }
     }
 }
