@@ -10,7 +10,7 @@ import {
   Sql4SqlResponse,
 } from '@cubejs-backend/native';
 import type { ShutdownMode } from '@cubejs-backend/native';
-import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
+import { displayCLIWarning, getEnv, CacheMode } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
 import type { ApiGateway } from './gateway';
@@ -65,8 +65,8 @@ export class SQLServer {
     throw new Error('Native api gateway is not enabled');
   }
 
-  public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
-    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
+  public async execSql(sqlQuery: string, stream: any, securityContext?: any, cacheMode?: CacheMode) {
+    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext, cacheMode);
   }
 
   public async sql4sql(sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> {
@@ -207,7 +207,7 @@ export class SQLServer {
           }
         });
       },
-      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, streaming }) => {
+      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, streaming, cacheMode }) => {
         const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -218,6 +218,7 @@ export class SQLServer {
               query,
               sqlQuery,
               streaming,
+              cacheMode,
               context,
               memberExpressions: true,
               res: (response) => {

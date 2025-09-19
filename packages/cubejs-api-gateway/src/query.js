@@ -187,6 +187,7 @@ const querySchema = Joi.object().keys({
   limit: Joi.number().integer().strict().min(0),
   offset: Joi.number().integer().strict().min(0),
   total: Joi.boolean(),
+  // @deprecated
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
