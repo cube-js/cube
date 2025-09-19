@@ -448,20 +448,9 @@ export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   return native.sql4sql(instance, sqlQuery, disablePostProcessing, securityContext ? JSON.stringify(securityContext) : null);
 };
 
-export const buildSqlAndParams = (cubeEvaluator: any): String => {
+export const buildSqlAndParams = (cubeEvaluator: any): any[] => {
   const native = loadNative();
-  const safeCallFn = (fn: Function, thisArg: any, ...args: any[]) => {
-    try {
-      return {
-        result: fn.apply(thisArg, args),
-      };
-    } catch (e: any) {
-      return {
-        error: e.toString(),
-      };
-    }
-  };
-  return native.buildSqlAndParams(cubeEvaluator, safeCallFn);
+  return native.buildSqlAndParams(cubeEvaluator);
 };
 
 export type ResultRow = Record<string, string>;

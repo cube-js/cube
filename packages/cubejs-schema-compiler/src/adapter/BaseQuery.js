@@ -900,24 +900,21 @@ export class BaseQuery {
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin')
     };
 
-    const buildResult = nativeBuildSqlAndParams(queryParams);
+    try {
+      const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    if (buildResult.error) {
-      if (buildResult.error.cause && buildResult.error.cause === 'User') {
-        throw new UserError(buildResult.error.message);
-      } else {
-        throw new Error(buildResult.error.message);
+      const [query, params, preAggregation] = buildResult;
+      const paramsArray = [...params];
+      if (preAggregation) {
+        this.preAggregations.preAggregationForQuery = preAggregation;
       }
+      return [query, paramsArray];
+    } catch (e) {
+      if (e.name === 'TesseractUserError') {
+        throw new UserError(e.message);
+      }
+      throw e;
     }
-
-    const res = buildResult.result;
-    const [query, params, preAggregation] = res;
-    // FIXME
-    const paramsArray = [...params];
-    if (preAggregation) {
-      this.preAggregations.preAggregationForQuery = preAggregation;
-    }
-    return [query, paramsArray];
   }
 
   // FIXME Temporary solution
@@ -953,15 +950,7 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    if (buildResult.error) {
-      if (buildResult.error.cause === 'User') {
-        throw new UserError(buildResult.error.message);
-      } else {
-        throw new Error(buildResult.error.message);
-      }
-    }
-
-    const [, , preAggregation] = buildResult.result;
+    const [, , preAggregation] = buildResult;
     return preAggregation;
   }
 

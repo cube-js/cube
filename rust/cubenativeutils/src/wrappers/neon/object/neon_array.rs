@@ -4,7 +4,7 @@ use crate::wrappers::{
     object::{NativeArray, NativeType},
     object_handle::NativeObjectHandle,
 };
-use cubesql::CubeError;
+use crate::CubeError;
 use neon::prelude::*;
 
 pub struct NeonArray<C: Context<'static>> {
@@ -35,14 +35,12 @@ impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonArray<
 impl<C: Context<'static> + 'static> NativeArray<NeonInnerTypes<C>> for NeonArray<C> {
     fn len(&self) -> Result<u32, CubeError> {
         self.object
-            .map_neon_object::<_, _>(|cx, object| Ok(object.len(cx)))?
+            .map_neon_object::<_, _>(|cx, object| Ok(object.len(cx)))
     }
     fn to_vec(&self) -> Result<Vec<NativeObjectHandle<NeonInnerTypes<C>>>, CubeError> {
-        let neon_vec = self.object.map_neon_object::<_, _>(|cx, object| {
-            object
-                .to_vec(cx)
-                .map_err(|_| CubeError::internal("Error converting JsArray to Vec".to_string()))
-        })??;
+        let neon_vec = self
+            .object
+            .map_neon_object::<_, _>(|cx, object| object.to_vec(cx))?;
 
         neon_vec
             .into_iter()
@@ -60,18 +58,13 @@ impl<C: Context<'static> + 'static> NativeArray<NeonInnerTypes<C>> for NeonArray
         value: NativeObjectHandle<NeonInnerTypes<C>>,
     ) -> Result<bool, CubeError> {
         let value = value.into_object().get_object()?;
-        self.object.map_neon_object::<_, _>(|cx, object| {
-            object
-                .set(cx, index, value)
-                .map_err(|_| CubeError::internal(format!("Error setting index {}", index)))
-        })?
+        self.object
+            .map_neon_object::<_, _>(|cx, object| object.set(cx, index, value))
     }
     fn get(&self, index: u32) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
-        let r = self.object.map_neon_object::<_, _>(|cx, object| {
-            object
-                .get(cx, index)
-                .map_err(|_| CubeError::internal(format!("Error setting index {}", index)))
-        })??;
+        let r = self
+            .object
+            .map_neon_object::<_, _>(|cx, object| object.get(cx, index))?;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.get_context(),
             r,
