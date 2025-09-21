@@ -71,9 +71,9 @@ pub enum RootHolder<C: Context<'static> + 'static> {
 }
 
 impl<C: Context<'static> + 'static> RootHolder<C> {
-    pub fn new(
+    pub fn new<V: Value>(
         context: ContextHolder<C>,
-        value: Handle<'static, JsValue>,
+        value: Handle<'static, V>,
     ) -> Result<Self, CubeError> {
         context.with_context(|cx| {
             match_js_value_type!(context, value, cx, {
@@ -87,10 +87,7 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
                 Struct => JsObject => ObjectNeonTypeHolder,
             });
 
-            Err(CubeError::internal(format!(
-                "Unsupported JsValue {:?}",
-                value
-            )))
+            Err(CubeError::internal(format!("Unsupported JsValue",)))
         })?
     }
     pub fn from_typed<T: Upcast<C>>(typed_holder: T) -> Self {

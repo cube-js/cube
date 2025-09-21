@@ -5,19 +5,32 @@ use super::{
     neon_struct::NeonStruct,
     RootHolder,
 };
-use crate::wrappers::neon::{context::ContextHolder, inner_types::NeonInnerTypes};
 use crate::wrappers::object::NativeObject;
+use crate::wrappers::{
+    neon::{context::ContextHolder, inner_types::NeonInnerTypes},
+    NativeObjectHandle,
+};
 use crate::CubeError;
 use neon::prelude::*;
+
+pub(crate) trait IntoNeonObject<C: Context<'static> + 'static> {
+    fn into_neon_object(self, context: ContextHolder<C>) -> Result<NeonObject<C>, CubeError>;
+}
+
+impl<C: Context<'static> + 'static, V: Value> IntoNeonObject<C> for Handle<'static, V> {
+    fn into_neon_object(self, context: ContextHolder<C>) -> Result<NeonObject<C>, CubeError> {
+        NeonObject::new(context, self)
+    }
+}
 
 pub struct NeonObject<C: Context<'static> + 'static> {
     root_holder: RootHolder<C>,
 }
 
 impl<C: Context<'static> + 'static> NeonObject<C> {
-    pub fn new(
+    pub fn new<V: Value>(
         context: ContextHolder<C>,
-        object: Handle<'static, JsValue>,
+        object: Handle<'static, V>,
     ) -> Result<Self, CubeError> {
         let root_holder = RootHolder::new(context.clone(), object)?;
         Ok(Self { root_holder })
@@ -27,7 +40,7 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
         Self { root_holder: root }
     }
 
-    pub fn get_object(&self) -> Result<Handle<'static, JsValue>, CubeError> {
+    pub fn get_js_value(&self) -> Result<Handle<'static, JsValue>, CubeError> {
         match &self.root_holder {
             RootHolder::Null(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
             RootHolder::Undefined(v) => v.map_neon_object(|_cx, obj| Ok(obj.upcast())),
@@ -41,7 +54,7 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
     }
 
     pub fn is_a<U: Value>(&self) -> Result<bool, CubeError> {
-        let obj = self.get_object()?;
+        let obj = self.get_js_value()?;
         self.root_holder
             .get_context()
             .with_context(|cx| obj.is_a::<U, _>(cx))
@@ -106,5 +119,11 @@ impl<C: Context<'static> + 'static> Clone for NeonObject<C> {
         Self {
             root_holder: self.root_holder.clone(),
         }
+    }
+}
+
+impl<C: Context<'static> + 'static> From<NeonObject<C>> for NativeObjectHandle<NeonInnerTypes<C>> {
+    fn from(object: NeonObject<C>) -> Self {
+        Self::new(object)
     }
 }

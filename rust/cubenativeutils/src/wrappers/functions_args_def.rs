@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use super::inner_types::InnerTypes;
 
-pub trait FunctionArgsDef<IT: InnerTypes, Input, Ret> {
+pub trait FunctionArgsDef<IT: InnerTypes, Input, Ret>: 'static {
     fn call_func(
         &self,
         context: NativeContextHolder<IT>,
@@ -47,7 +47,7 @@ macro_rules! impl_function_args_def {
         #[allow(non_snake_case)]
         impl<IT: InnerTypes, F, Ret, $($arg),*> FunctionArgsDef<IT, ($($arg,)*), Ret> for F
         where
-            F: Fn(NativeContextHolder<IT>, $($arg),*) -> Result<Ret, CubeError>,
+            F: Fn(NativeContextHolder<IT>, $($arg),*) -> Result<Ret, CubeError> + 'static,
             $($arg: NativeDeserialize<IT>,)*
             Ret: NativeSerialize<IT>,
         {

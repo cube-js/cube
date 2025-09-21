@@ -1,16 +1,9 @@
+use super::object::NeonObject;
 use super::*;
-use super::{
-    inner_types::NeonInnerTypes,
-    object::{
-        base_types::*, neon_array::NeonArray, neon_function::NeonFunction, neon_struct::NeonStruct,
-        NeonObject,
-    },
-};
 use crate::CubeError;
 use crate::{
     wrappers::{
-        context::NativeContext, functions_args_def::FunctionArgsDef, object::NativeObject,
-        object_handle::NativeObjectHandle, NativeContextHolder,
+        functions_args_def::FunctionArgsDef, object_handle::NativeObjectHandle, NativeContextHolder,
     },
     CubeErrorCauseType,
 };
@@ -19,10 +12,10 @@ use std::{
     cell::RefCell,
     marker::PhantomData,
     panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
-pub trait NoenContextLifetimeExpand<'cx> {
+trait NoenContextLifetimeExpand<'cx> {
     type ExpandedResult: Context<'static>;
     fn expand_lifetime(self) -> Self::ExpandedResult;
 }
@@ -34,7 +27,7 @@ impl<'cx> NoenContextLifetimeExpand<'cx> for FunctionContext<'cx> {
     }
 }
 
-pub struct NeonContextGuard<'cx, C: Context<'cx> + NoenContextLifetimeExpand<'cx>> {
+struct NeonContextGuard<'cx, C: Context<'cx> + NoenContextLifetimeExpand<'cx>> {
     context: Rc<RefCell<ContextWrapper<C::ExpandedResult>>>,
     lifetime: PhantomData<&'cx ()>,
 }
@@ -61,7 +54,7 @@ impl<'cx, C: Context<'cx> + NoenContextLifetimeExpand<'cx> + 'cx> NeonContextGua
     }
 }
 
-pub fn neon_run_with_guarded_lifetime<F>(cx: FunctionContext, func: F) -> JsResult<JsValue>
+pub(super) fn neon_run_with_guarded_lifetime<F>(cx: FunctionContext, func: F) -> JsResult<JsValue>
 where
     F: FnOnce(
         ContextHolder<FunctionContext<'static>>,
@@ -91,7 +84,7 @@ where
                 CubeErrorCauseType::NeonThrow(throw) => Err(throw),
             },
             |res| {
-                Ok(res.into_object().get_object().unwrap()) // Context is dead → cannot safely work with Js, panic
+                Ok(res.into_object().get_js_value().unwrap()) // Context is dead → cannot safely work with Js, panic
             },
         )
     }));
@@ -124,7 +117,7 @@ pub fn neon_guarded_funcion_call<In, Rt, F: FunctionArgsDef<NeonFuncInnerTypes, 
                 )?))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let context_holder = NativeContextHolder::new(neon_context_holder.clone());
+        let context_holder = neon_context_holder.clone().into();
 
         func.call_func(context_holder, args)
     })

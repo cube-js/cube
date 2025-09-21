@@ -21,8 +21,8 @@ use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::{batch_to_rows, NonDebugInRelease};
-use cubenativeutils::wrappers::neon::context::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::neon::inner_types::NeonInnerTypes;
+use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
@@ -617,8 +617,7 @@ pub fn reset_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
     neon_guarded_funcion_call(
         cx,
-        |context_holder: NativeContextHolder<_>,
-         options: NativeBaseQueryOptions<NeonInnerTypes<FunctionContext<'static>>>| {
+        |context_holder: NativeContextHolder<_>, options: NativeBaseQueryOptions<_>| {
             let base_query = BaseQuery::try_new(context_holder.clone(), Rc::new(options))?;
 
             base_query.build_sql_and_params()
