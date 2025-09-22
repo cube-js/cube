@@ -94,12 +94,15 @@ pub(crate) fn internal_error_on_minusone(result: c_int) -> PyResult<()> {
     }
 }
 
-impl PyAnyHelpers for PyAny {
+impl<T> PyAnyHelpers for T
+where
+    T: AsPyPointer,
+{
     fn is_sequence(&self) -> PyResult<bool> {
         let ptr = self.as_ptr();
         if ptr.is_null() {
             return Err(PyErr::new::<PySystemError, _>(
-                "Unable to verify that object is sequence, because ptr to PyAny is null",
+                "Unable to verify that object is sequence, because ptr is null",
             ));
         }
 
@@ -113,37 +116,7 @@ impl PyAnyHelpers for PyAny {
         let ptr = self.as_ptr();
         if ptr.is_null() {
             return Err(PyErr::new::<PySystemError, _>(
-                "Unable to verify that object is sequence, because ptr to PyAny is null",
-            ));
-        }
-
-        let v = unsafe { ffi::PyCoro_CheckExact(ptr) };
-        internal_error_on_minusone(v)?;
-
-        Ok(v != 0)
-    }
-}
-
-impl PyAnyHelpers for PyObject {
-    fn is_sequence(&self) -> PyResult<bool> {
-        let ptr = self.as_ptr();
-        if ptr.is_null() {
-            return Err(PyErr::new::<PySystemError, _>(
-                "Unable to verify that object is sequence, because ptr to PyAny is null",
-            ));
-        }
-
-        let v = unsafe { ffi::PySequence_Check(ptr) };
-        internal_error_on_minusone(v)?;
-
-        Ok(v != 0)
-    }
-
-    fn is_coroutine(&self) -> PyResult<bool> {
-        let ptr = self.as_ptr();
-        if ptr.is_null() {
-            return Err(PyErr::new::<PySystemError, _>(
-                "Unable to verify that object is sequence, because ptr to PyAny is null",
+                "Unable to verify that object is coroutine, because ptr is null",
             ));
         }
 
