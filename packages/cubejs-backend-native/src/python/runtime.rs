@@ -1,5 +1,6 @@
 use crate::cross::CLRepr;
 use crate::python::neon_py::*;
+use crate::python::utils::PyAnyHelpers;
 use crate::tokio_runtime_node;
 use cubesql::CubeError;
 use log::{error, trace};
@@ -143,8 +144,7 @@ impl PyRuntime {
             let py_args = PyTuple::new(py, prep_tuple);
             let call_res = fun.call(py, py_args, py_kwargs)?;
 
-            let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
-            if is_coroutine {
+            if call_res.is_coroutine()? {
                 let fut = pyo3_asyncio::tokio::into_future(call_res.as_ref(py))?;
                 Ok(PyScheduledFunResult::Poll(Box::pin(fut)))
             } else {
