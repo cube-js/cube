@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
+
+### Features
+
+- **cubesql:** `SET ROLE` changes authentication context ([#9982](https://github.com/cube-js/cube/issues/9982)) ([c1b69cb](https://github.com/cube-js/cube/commit/c1b69cb8bac62ff8b735cbd85402c5a0df2108f9))
+- **cubesql:** add `pg_catalog.pg_collation` table ([#9968](https://github.com/cube-js/cube/issues/9968)) ([9243f4c](https://github.com/cube-js/cube/commit/9243f4c775fdc33299c2066aa5bfcb60bc883416))
+
 ## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
