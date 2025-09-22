@@ -47,7 +47,7 @@ cube(\`Orders\`, {
   measures: {
     count: {
       type: \`count\`,
-      drillMembers: [id, createdAt]
+      drillMembers: [id, createdAt, Products.ProductCategories.name]
     },
 
     runningTotal: {
@@ -183,6 +183,10 @@ cube(\`ProductCategories\`, {
   measures: {
     count: {
       type: \`count\`,
+    },
+    count2: {
+      type: \`count\`,
+      drillMembers: [id, name]
     }
   },
 
@@ -262,7 +266,28 @@ view(\`OrdersSimpleView\`, {
     includes: ['createdAt', 'count']
   }]
 });
-    `);
+
+view(\`OrdersViewDrillMembers\`, {
+  cubes: [{
+    join_path: Orders,
+    includes: ['createdAt', 'count']
+  }, {
+    join_path: Orders.Products.ProductCategories,
+    includes: ['name', 'count2']
+  }]
+});
+
+view(\`OrdersViewDrillMembersWithPrefix\`, {
+  cubes: [{
+    join_path: Orders,
+    includes: ['createdAt', 'count']
+  }, {
+    join_path: Orders.Products.ProductCategories,
+    includes: ['name', 'count2'],
+    prefix: true
+  }]
+});
+  `);
 
   async function runQueryTest(q: any, expectedResult: any, additionalTest?: (query: BaseQuery) => any) {
     await compiler.compile();
@@ -441,10 +466,10 @@ view(\`OrdersSimpleView\`, {
     await compiler.compile();
     const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
     const countMeasure = cube.config.measures.find((m) => m.name === 'OrdersView.count');
-    expect(countMeasure.drillMembers).toEqual(['OrdersView.id', 'OrdersView.createdAt']);
+    expect(countMeasure.drillMembers).toEqual(['OrdersView.id', 'OrdersView.ProductCategories_name']);
     expect(countMeasure.drillMembersGrouped).toEqual({
       measures: [],
-      dimensions: ['OrdersView.id', 'OrdersView.createdAt']
+      dimensions: ['OrdersView.id', 'OrdersView.ProductCategories_name']
     });
   });
 
@@ -454,7 +479,7 @@ view(\`OrdersSimpleView\`, {
     // Check that the source Orders cube has drill members
     const sourceOrdersCube = metaTransformer.cubes.find(c => c.config.name === 'Orders');
     const sourceCountMeasure = sourceOrdersCube.config.measures.find((m) => m.name === 'Orders.count');
-    expect(sourceCountMeasure.drillMembers).toEqual(['Orders.id', 'Orders.createdAt']);
+    expect(sourceCountMeasure.drillMembers).toEqual(['Orders.id', 'Orders.createdAt', 'ProductCategories.name']);
 
     // Check that the OrdersView cube inherits these drill members with correct naming
     const viewCube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
@@ -497,5 +522,43 @@ view(\`OrdersSimpleView\`, {
       measures: [],
       dimensions: ['OrdersSimpleView.createdAt']
     });
+  });
+
+  it('verify drill member inheritance functionality (with transitive joins)', async () => {
+    await compiler.compile();
+
+    // Check that the OrdersView cube inherits these drill members with correct naming
+    const viewCube = metaTransformer.cubes.find(c => c.config.name === 'OrdersViewDrillMembers');
+
+    const viewCountMeasure = viewCube.config.measures.find((m) => m.name === 'OrdersViewDrillMembers.count');
+    expect(viewCountMeasure.drillMembers).toBeDefined();
+    expect(Array.isArray(viewCountMeasure.drillMembers)).toBe(true);
+    expect(viewCountMeasure.drillMembers.length).toEqual(2);
+    expect(viewCountMeasure.drillMembers).toEqual(['OrdersViewDrillMembers.createdAt', 'OrdersViewDrillMembers.name']);
+
+    const viewCount2Measure = viewCube.config.measures.find((m) => m.name === 'OrdersViewDrillMembers.count2');
+    expect(viewCount2Measure.drillMembers).toBeDefined();
+    expect(Array.isArray(viewCount2Measure.drillMembers)).toBe(true);
+    expect(viewCount2Measure.drillMembers.length).toEqual(1);
+    expect(viewCount2Measure.drillMembers).toContain('OrdersViewDrillMembers.name');
+  });
+
+  it('verify drill member inheritance functionality (with transitive joins + prefix)', async () => {
+    await compiler.compile();
+
+    // Check that the OrdersView cube inherits these drill members with correct naming
+    const viewCube = metaTransformer.cubes.find(c => c.config.name === 'OrdersViewDrillMembersWithPrefix');
+
+    const viewCountMeasure = viewCube.config.measures.find((m) => m.name === 'OrdersViewDrillMembersWithPrefix.count');
+    expect(viewCountMeasure.drillMembers).toBeDefined();
+    expect(Array.isArray(viewCountMeasure.drillMembers)).toBe(true);
+    expect(viewCountMeasure.drillMembers.length).toEqual(2);
+    expect(viewCountMeasure.drillMembers).toEqual(['OrdersViewDrillMembersWithPrefix.createdAt', 'OrdersViewDrillMembersWithPrefix.ProductCategories_name']);
+
+    const viewCount2Measure = viewCube.config.measures.find((m) => m.name === 'OrdersViewDrillMembersWithPrefix.ProductCategories_count2');
+    expect(viewCount2Measure.drillMembers).toBeDefined();
+    expect(Array.isArray(viewCount2Measure.drillMembers)).toBe(true);
+    expect(viewCount2Measure.drillMembers.length).toEqual(1);
+    expect(viewCount2Measure.drillMembers).toContain('OrdersViewDrillMembersWithPrefix.ProductCategories_name');
   });
 });
