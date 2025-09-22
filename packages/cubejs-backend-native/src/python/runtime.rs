@@ -96,26 +96,27 @@ impl PyRuntime {
 
         let task_result = Python::with_gil(move |py| -> PyResult<PyScheduledFunResult> {
             let mut prep_tuple = Vec::with_capacity(args.len());
-            let mut py_kwargs = None;
+            let mut kwargs_dict_opt = None;
 
             for arg in args {
                 if arg.is_kwarg() {
-                    py_kwargs = Some(arg.into_py_dict(py)?);
+                    kwargs_dict_opt = Some(arg.into_py_dict(py)?);
                 } else {
                     prep_tuple.push(arg.into_py(py)?);
                 }
             }
 
-            let py_args = PyTuple::new(py, prep_tuple);
-            let call_res = fun.call(py, py_args, py_kwargs)?;
+            let py_args = PyTuple::new_bound(py, prep_tuple);
+            let py_kwargs = kwargs_dict_opt.as_ref();
+            let call_res = fun.call_bound(py, py_args, py_kwargs)?;
 
             let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
             if is_coroutine {
-                let fut = pyo3_asyncio::tokio::into_future(call_res.as_ref(py))?;
+                let fut = pyo3_async_runtimes::tokio::into_future(call_res.bind(py).clone())?;
                 Ok(PyScheduledFunResult::Poll(Box::pin(fut)))
             } else {
                 Ok(PyScheduledFunResult::Ready(CLRepr::from_python_ref(
-                    call_res.as_ref(py),
+                    call_res.bind(py),
                 )?))
             }
         });
@@ -155,7 +156,7 @@ impl PyRuntime {
 
                     let res = Python::with_gil(move |py| -> Result<CLRepr, PyErr> {
                         let res = match fut_res {
-                            Ok(r) => CLRepr::from_python_ref(r.as_ref(py)),
+                            Ok(r) => CLRepr::from_python_ref(r.bind(py)),
                             Err(err) => Err(err),
                         };
 
@@ -206,12 +207,12 @@ impl PyRuntime {
             trace!("Initializing executor in a separate thread");
 
             std::thread::spawn(|| {
-                pyo3_asyncio::tokio::get_runtime()
-                    .block_on(pyo3_asyncio::tokio::re_exports::pending::<()>())
+                pyo3_async_runtimes::tokio::get_runtime()
+                    .block_on(pyo3_async_runtimes::tokio::re_exports::pending::<()>())
             });
 
             let res = Python::with_gil(|py| -> Result<(), PyErr> {
-                pyo3_asyncio::tokio::run(py, async move {
+                pyo3_async_runtimes::tokio::run(py, async move {
                     loop {
                         if let Some(task) = receiver.recv().await {
                             trace!("New task");
@@ -247,7 +248,7 @@ pub fn py_runtime_init<'a, C: Context<'a>>(
 
     pyo3::prepare_freethreaded_python();
     // it's safe to unwrap
-    pyo3_asyncio::tokio::init_with_runtime(runtime).unwrap();
+    pyo3_async_runtimes::tokio::init_with_runtime(runtime).unwrap();
 
     if PY_RUNTIME.set(PyRuntime::new(channel)).is_err() {
         cx.throw_error("Error on setting PyRuntime")
