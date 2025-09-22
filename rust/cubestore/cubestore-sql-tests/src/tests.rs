@@ -6402,6 +6402,31 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT count(*) FROM s.t WHERE i in ('2', '3')")
+        .await
+        .err()
+        .unwrap();
+
+    assert!(
+        r.elide_backtrace()
+            .message
+            .contains("InList does not support datatype"),
+        "Expected unwind panic error but got: {}",
+        r.elide_backtrace().message
+    );
+}
+
 async fn panic_worker(service: Box<dyn SqlClient>) {
     let r = service.exec_query("SYS PANIC WORKER").await;
     assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
