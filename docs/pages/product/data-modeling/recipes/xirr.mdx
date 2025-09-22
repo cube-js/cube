@@ -54,8 +54,6 @@ cubes:
         sql: payment
         type: number
 
-    # Everything below this line is only needed for querying
-    # pre-aggregations in Cube Store
       - name: date__day
         sql: "{date.day}"
         type: time
@@ -101,8 +99,6 @@ cube(`payments`, {
       type: `number`
     },
 
-    // Everything below this line is only needed for querying
-    // pre-aggregations in Cube Store
     date__day: {
       sql: `${CUBE.date.day}`,
       type: `time`
