@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
+
+### Bug Fixes
+
+- **native:** Be happy, don't panic when unable to schedule task to PyRuntime ([#9983](https://github.com/cube-js/cube/issues/9983)) ([7e6037c](https://github.com/cube-js/cube/commit/7e6037c03841f5fc91eec0bbb41fe088de23571e))
+
+### Features
+
+- **native:** Improve safety for Python into CLRepr conversion ([#9984](https://github.com/cube-js/cube/issues/9984)) ([644103a](https://github.com/cube-js/cube/commit/644103a8d0c57704a2fd3ca1d9b5853fd81e05b6))
+
 ## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
 
 **Note:** Version bump only for package @cubejs-backend/native
