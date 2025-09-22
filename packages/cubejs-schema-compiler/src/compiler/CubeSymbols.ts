@@ -192,6 +192,15 @@ type MemberSets = {
   allMembers: Set<string>;
 };
 
+type ViewResolvedMember = {
+  member: string;
+  name: string;
+};
+
+type ViewExcludedMember = {
+  member: string;
+};
+
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 export const CONTEXT_SYMBOLS = {
   SECURITY_CONTEXT: 'securityContext',
@@ -578,8 +587,10 @@ export class CubeSymbols implements TranspilerSymbolResolver {
 
     const joinMap: string[][] = [];
 
+    const viewAllMembers: ViewResolvedMember[] = [];
+
     for (const type of types) {
-      let cubeIncludes: any[] = [];
+      let cubeIncludes: ViewResolvedMember[] = [];
 
       // If the hierarchy is included all members from it should be included as well
       // Extend `includes` with members from hierarchies that should be auto-included
@@ -610,6 +621,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
       }) : includedCubes;
 
       cubeIncludes = this.membersFromCubes(cube, cubes, type, errorReporter, splitViews, memberSets) || [];
+      viewAllMembers.push(...cubeIncludes);
 
       if (type === 'hierarchies') {
         for (const member of cubeIncludes) {
@@ -627,7 +639,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
         }
       }
 
-      const includeMembers = this.generateIncludeMembers(cubeIncludes, type, cube);
+      const includeMembers = this.generateIncludeMembers(cubeIncludes, type, cube, viewAllMembers);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
 
       const existing = cube.includedMembers ?? [];
@@ -677,8 +689,8 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     errorReporter: ErrorReporter,
     splitViews: SplitViews,
     memberSets: MemberSets
-  ) {
-    const result: any[] = [];
+  ): ViewResolvedMember[] {
+    const result: ViewResolvedMember[] = [];
     const seen = new Set<string>();
 
     for (const cubeInclude of cubes) {
@@ -776,7 +788,8 @@ export class CubeSymbols implements TranspilerSymbolResolver {
           splitViewDef = splitViews[viewName];
         }
 
-        const includeMembers = this.generateIncludeMembers(finalIncludes, type, splitViewDef);
+        const viewAllMembers: ViewResolvedMember[] = [];
+        const includeMembers = this.generateIncludeMembers(finalIncludes, type, splitViewDef, viewAllMembers);
         this.applyIncludeMembers(includeMembers, splitViewDef, type, errorReporter);
       } else {
         for (const member of finalIncludes) {
@@ -792,7 +805,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     return result;
   }
 
-  protected diffByMember(includes: any[], excludes: any[]) {
+  protected diffByMember(includes: ViewResolvedMember[], excludes: ViewExcludedMember[]) {
     const excludesMap = new Map();
 
     for (const exclude of excludes) {
@@ -806,15 +819,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     return this.symbols[cubeName]?.cubeObj()?.[type]?.[memberName];
   }
 
-  protected generateIncludeMembers(members: any[], type: string, targetCube: CubeDefinitionExtended) {
-    const availableDimMembers = new Set<string>();
-
-    if (type === 'measures') {
-      Object.keys(targetCube.dimensions || {}).forEach(dimName => {
-        availableDimMembers.add(`${targetCube.name}.${dimName}`);
-      });
-    }
-
+  protected generateIncludeMembers(members: any[], type: string, targetCube: CubeDefinitionExtended, viewAllMembers: ViewResolvedMember[]) {
     return members.map(memberRef => {
       const path = memberRef.member.split('.');
       const resolvedMember = this.getResolvedMember(type, path[path.length - 2], path[path.length - 1]);
@@ -836,15 +841,16 @@ export class CubeSymbols implements TranspilerSymbolResolver {
 
         const drillMembersArray = (Array.isArray(evaluatedDrillMembers)
           ? evaluatedDrillMembers
-          : [evaluatedDrillMembers]).map(member => {
-          const memberParts = member.split('.');
-          if (memberParts[0] === sourceCubeName) {
-            return `${targetCube.name}.${memberParts[1]}`;
-          }
-          return member; // Keep as-is if not from source cube
-        });
+          : [evaluatedDrillMembers]);
 
-        const filteredDrillMembers = drillMembersArray.filter(member => availableDimMembers.has(member));
+        const filteredDrillMembers = drillMembersArray.flatMap(member => {
+          const found = viewAllMembers.find(v => v.member.endsWith(member));
+          if (!found) {
+            return [];
+          }
+
+          return [`${targetCube.name}.${found.name}`];
+        });
 
         processedDrillMembers = () => filteredDrillMembers;
       }
