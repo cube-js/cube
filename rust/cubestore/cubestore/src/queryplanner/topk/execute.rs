@@ -16,6 +16,7 @@ use datafusion::physical_plan::hash_aggregate::{
     create_accumulators, create_group_by_values, write_group_result_row, AccumulatorSet,
     AggregateMode,
 };
+use core::time::Duration;
 use datafusion::physical_plan::limit::GlobalLimitExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{
@@ -29,10 +30,11 @@ use itertools::Itertools;
 use smallvec::smallvec;
 use smallvec::SmallVec;
 use std::any::Any;
-use std::collections::BTreeSet;
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
+use std::collections::HashMap;
+use std::collections::BinaryHeap;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TopKAggregateFunction {
@@ -53,6 +55,40 @@ pub struct AggregateTopKExec {
     /// Always an instance of ClusterSendExec or WorkerExec.
     pub cluster: Arc<dyn ExecutionPlan>,
     pub schema: SchemaRef,
+}
+
+struct ProfSpan {
+    spans: HashMap<String, Duration>,
+    curr_span: Option<String>,
+    curr_start: SystemTime
+}
+
+impl ProfSpan {
+    pub fn new() -> Self {
+        Self {
+            spans: HashMap::new(),
+            curr_span: None,
+            curr_start: SystemTime::now()
+        }
+    }
+    pub fn start(&mut self, name: &str) {
+        self.curr_span = Some(name.to_string());
+        self.curr_start = SystemTime::now();
+    }
+    pub fn commit(&mut self) {
+        if let Some(span) = &self.curr_span {
+            self.spans.entry(span.clone()).and_modify(|d| *d += self.curr_start.elapsed().unwrap_or_default()).or_insert(Duration::from_secs(0));
+        }
+        self.curr_span = None;
+    }
+
+    pub fn print(&self) {
+        let mut sorted = self.spans.iter().collect::<Vec<_>>();
+        sorted.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+        for (k, v) in sorted.iter() {
+            println!("\t{}: {}s", k, v.as_secs_f64());
+        }
+    }
 }
 
 /// Third item is the neutral value for the corresponding aggregate function.
@@ -184,7 +220,6 @@ impl ExecutionPlan for AggregateTopKExec {
             );
         }
 
-        let mut buffer = TopKBuffer::default();
         let mut state = TopKState::new(
             self.limit,
             nodes,
@@ -193,31 +228,47 @@ impl ExecutionPlan for AggregateTopKExec {
             &self.having,
             &self.agg_expr,
             &self.agg_descr,
-            &mut buffer,
+            TopKBuffer::default(),
             self.schema(),
         )?;
         let mut wanted_nodes = vec![true; nodes];
         let mut batches = Vec::with_capacity(nodes);
+        let mut readed_nodes = HashMap::new();
+        let time = SystemTime::now();
+        let mut prof_spans = ProfSpan::new();
+        let mut prof_spans2 = ProfSpan::new();
         'processing: loop {
             assert!(batches.is_empty());
+            prof_spans.start("read");
             for i in 0..nodes {
                 let (schema, s) = &mut streams[i];
                 let batch;
                 if wanted_nodes[i] {
                     batch = next_non_empty(s).await?;
+                    *readed_nodes.entry(i).or_insert(0) += 1;
                 } else {
                     batch = Some(RecordBatch::new_empty(schema.clone()))
                 }
                 batches.push(batch);
             }
+            prof_spans.commit();
 
-            if state.update(&mut batches).await? {
-                batches.clear();
-                break 'processing;
-            }
-            state.populate_wanted_nodes(&mut wanted_nodes);
+            prof_spans2.start("update");
+            match state.update(&mut batches, &mut prof_spans).await? {
+                Some(nodes) => wanted_nodes = nodes,
+                None => {
+                    batches.clear();
+                    break 'processing;
+                }
+            };
+            prof_spans2.commit();
+            prof_spans.start("clear batch");
             batches.clear();
+            prof_spans.commit();
         }
+        println!("total time: {}s", time.elapsed().unwrap().as_secs_f64());
+        prof_spans.print();
+        prof_spans2.print();
 
         let batch = state.finish().await?;
         let schema = batch.schema();
@@ -230,11 +281,11 @@ impl ExecutionPlan for AggregateTopKExec {
 
 // Mutex is to provide interior mutability inside async function, no actual waiting ever happens.
 // TODO: remove mutex with careful use of unsafe.
-type TopKBuffer = std::sync::Mutex<Vec<Group>>;
+type TopKBuffer = Vec<Group>;
 
 struct TopKState<'a> {
     limit: usize,
-    buffer: &'a TopKBuffer,
+    buffer: TopKBuffer,
     key_len: usize,
     order_by: &'a [SortColumn],
     having: &'a Option<Arc<dyn PhysicalExpr>>,
@@ -243,39 +294,92 @@ struct TopKState<'a> {
     /// Holds the maximum value seen in each node, used to estimate unseen scores.
     node_estimates: Vec<AccumulatorSet>,
     finished_nodes: Vec<bool>,
-    sorted: BTreeSet<SortKey<'a>>,
-    groups: HashSet<GroupKey<'a>>,
+    groups: HashMap<GroupKey, usize>,
+    threshold: Option<SmallVec<[ScalarValue; 1]>>,
+    insert_allowed: bool,
     /// Final output.
     top: Vec<usize>,
+    top_canditates: Option<HashSet<usize>>,
     schema: SchemaRef,
     /// Result Batch
     result: RecordBatch,
 }
 
+
+type GroupKey = SmallVec<[GroupByScalar; 2]>;
+
 struct Group {
-    pub group_key: SmallVec<[GroupByScalar; 2]>,
+    pub group_key: GroupKey,
     /// The real value based on all nodes seen so far.
     pub accumulators: AccumulatorSet,
     /// The estimated value. Provides correct answer after the group was visited in all nodes.
-    pub estimates: AccumulatorSet,
+    pub estimate: SmallVec<[ScalarValue; 1]>,
     /// Tracks nodes that have already reported this group.
     pub nodes: Vec<bool>,
+    pub changed: bool,
+    pub deleted: bool,
 }
 
 impl Group {
-    fn estimate(&self) -> Result<SmallVec<[ScalarValue; 1]>, DataFusionError> {
-        self.estimates.iter().map(|e| e.evaluate()).collect()
+
+    fn new(group_key: GroupKey, aggr_expr: &[Arc<dyn AggregateExpr>], nodes: Vec<bool>, estimate: SmallVec<[ScalarValue;1]>) -> Self {
+        let accumulators = create_accumulators(aggr_expr).unwrap();
+        Self{
+            group_key,
+            estimate,
+            accumulators,
+            nodes,
+            changed: true,
+            deleted: false,
+        }
     }
 
     fn estimate_correct(&self) -> bool {
         self.nodes.iter().all(|b| *b)
     }
+
+    fn apply_finished_nodes(&mut self, finished_nodes: &Vec<bool>) {
+        assert_eq!(self.nodes.len(), finished_nodes.len());
+        for node in 0..self.nodes.len() {
+            if finished_nodes[node] && !self.nodes[node] {
+                self.nodes[node] = true;
+                self.changed = true;
+            }
+        }
+
+    }
+    fn fill_estimates(&mut self, node_estimates: &Vec<Vec<ScalarValue>>, aggr_descr: &[AggDescr], dest: &mut AccumulatorSet) -> Result<(), DataFusionError> {
+        for i in 0..dest.len() {
+            dest[i].reset();
+            dest[i].merge(&self.accumulators[i].state()?)?;
+            // Node estimate might contain a neutral value (e.g. '0' for sum), but we must avoid
+            // giving invalid estimates for NULL values.
+            let use_node_estimates =
+                !aggr_descr[i].1.nulls_first || !dest[i].evaluate()?.is_null();
+            for node in 0..self.nodes.len() {
+                if !self.nodes[node] {
+                    if use_node_estimates {
+                        dest[i].update(&node_estimates[node][i..i+1])?;
+                    }
+                }
+            }
+        }
+        for i in 0..self.estimate.len() {
+            self.estimate[i] = dest[i].evaluate()?;
+        }
+        self.changed = false;
+        Ok(())
+
+    }
+    fn worse_estimate(&self) -> SmallVec<[ScalarValue;1]> {
+        self.accumulators.iter().map(|acc| acc.evaluate().unwrap()).collect::<SmallVec<_>>()
+    }
 }
 
 struct SortKey<'a> {
     order_by: &'a [SortColumn],
-    estimate: SmallVec<[ScalarValue; 1]>,
-    index: usize,
+    value: &'a SmallVec<[ScalarValue; 1]>,
+    group_key: &'a GroupKey,
     /// Informative, not used in the [cmp] implementation.
     estimate_correct: bool,
 }
@@ -294,14 +398,14 @@ impl PartialOrd for SortKey<'_> {
 
 impl Ord for SortKey<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.index == other.index {
+        if self.group_key == other.group_key {
             return Ordering::Equal;
         }
         for sc in self.order_by {
             // Assuming `self` and `other` point to the same data.
             let o = cmp_same_types(
-                &self.estimate[sc.agg_index],
-                &other.estimate[sc.agg_index],
+                &self.value[sc.agg_index],
+                &other.value[sc.agg_index],
                 sc.nulls_first,
                 sc.asc,
             );
@@ -310,27 +414,10 @@ impl Ord for SortKey<'_> {
             }
         }
         // Distinguish items with the same scores for removals/updates.
-        self.index.cmp(&other.index)
+        self.group_key.cmp(&other.group_key)
     }
 }
 
-struct GroupKey<'a> {
-    data: &'a TopKBuffer,
-    index: usize,
-}
-
-impl PartialEq for GroupKey<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        let data = self.data.lock().unwrap();
-        data[self.index].group_key == data[other.index].group_key
-    }
-}
-impl Eq for GroupKey<'_> {}
-impl Hash for GroupKey<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.data.lock().unwrap()[self.index].group_key.hash(state)
-    }
-}
 
 impl TopKState<'_> {
     pub fn new<'a>(
@@ -341,7 +428,7 @@ impl TopKState<'_> {
         having: &'a Option<Arc<dyn PhysicalExpr>>,
         agg_expr: &'a Vec<Arc<dyn AggregateExpr>>,
         agg_descr: &'a [AggDescr],
-        buffer: &'a mut TopKBuffer,
+        buffer: TopKBuffer,
         schema: SchemaRef,
     ) -> Result<TopKState<'a>, DataFusionError> {
         Ok(TopKState {
@@ -353,11 +440,13 @@ impl TopKState<'_> {
             agg_expr,
             agg_descr,
             finished_nodes: vec![false; num_nodes],
+            threshold: None,
+            insert_allowed: true,
             // initialized with the first record batches, see [update].
             node_estimates: Vec::with_capacity(num_nodes),
-            sorted: BTreeSet::new(),
-            groups: HashSet::new(),
+            groups: HashMap::new(),
             top: Vec::new(),
+            top_canditates: None,
             schema: schema.clone(),
             result: RecordBatch::new_empty(schema),
         })
@@ -365,7 +454,7 @@ impl TopKState<'_> {
 
     /// Sets `wanted_nodes[i]` iff we need to scan the node `i` to make progress on top candidate.
     pub fn populate_wanted_nodes(&self, wanted_nodes: &mut Vec<bool>) {
-        let candidate = self.sorted.first();
+        /* let candidate = self.sorted.first();
         if candidate.is_none() {
             for i in 0..wanted_nodes.len() {
                 wanted_nodes[i] = true;
@@ -379,39 +468,21 @@ impl TopKState<'_> {
         assert_eq!(candidate_nodes.len(), wanted_nodes.len());
         for i in 0..wanted_nodes.len() {
             wanted_nodes[i] = !candidate_nodes[i];
-        }
+        } */
     }
 
-    pub async fn update(
+    pub async fn scan(
         &mut self,
         batches: &mut [Option<RecordBatch>],
-    ) -> Result<bool, DataFusionError> {
+        ) -> Result<Option<Vec<bool>>, DataFusionError> {
+        
         let num_nodes = batches.len();
-        assert_eq!(num_nodes, self.finished_nodes.len());
-
-        // We need correct estimates for further processing.
-        if self.node_estimates.is_empty() {
-            for node in 0..num_nodes {
-                let mut estimates = create_accumulators(self.agg_expr)?;
-                if let Some(batch) = &batches[node] {
-                    assert_ne!(batch.num_rows(), 0, "empty batch passed to `update`");
-                    Self::update_node_estimates(
-                        self.key_len,
-                        self.agg_descr,
-                        &mut estimates,
-                        batch.columns(),
-                        0,
-                    )?;
-                }
-                self.node_estimates.push(estimates);
-            }
-        }
-
         for node in 0..num_nodes {
             if batches[node].is_none() && !self.finished_nodes[node] {
                 self.finished_nodes[node] = true;
             }
         }
+        let canditates = self.top_canditates.as_mut().unwrap();
 
         let mut num_rows = batches
             .iter()
@@ -420,10 +491,9 @@ impl TopKState<'_> {
         num_rows.sort_unstable();
 
         let mut row_i = 0;
-        let mut pop_top_counter = self.limit;
+        //Add values to group accumulators for entire butch
         for row_limit in num_rows {
             while row_i < row_limit {
-                // row_i updated at the end of the loop.
                 for node in 0..num_nodes {
                     let batch;
                     if let Some(b) = &batches[node] {
@@ -431,88 +501,27 @@ impl TopKState<'_> {
                     } else {
                         continue;
                     }
-
                     let mut key = smallvec![GroupByScalar::Int8(0); self.key_len];
                     create_group_by_values(&batch.columns()[0..self.key_len], row_i, &mut key)?;
-                    let temp_index = self.buffer.lock().unwrap().len();
-                    self.buffer.lock().unwrap().push(Group {
-                        group_key: key,
-                        accumulators: AccumulatorSet::new(),
-                        estimates: AccumulatorSet::new(),
-                        nodes: Vec::new(),
-                    });
 
-                    let existing = self
-                        .groups
-                        .get_or_insert(GroupKey {
-                            data: self.buffer,
-                            index: temp_index,
-                        })
-                        .index;
-                    if existing != temp_index {
-                        // Found existing, remove the temporary value from the buffer.
-                        let mut data = self.buffer.lock().unwrap();
-                        data.pop();
+                    if let Some(ind) = self.groups.get(&key) {
+                        if canditates.contains(&ind)
+                        {
+                            let group = &mut self.buffer[*ind];
 
-                        // Prepare to update the estimates, will re-add when done.
-                        let estimate = data[existing].estimate()?;
-                        self.sorted.remove(&SortKey {
-                            order_by: self.order_by,
-                            estimate,
-                            index: existing,
-                            // Does not affect comparison.
-                            estimate_correct: false,
-                        });
-                    } else {
-                        let mut data = self.buffer.lock().unwrap();
-                        let g = &mut data[temp_index];
-                        g.accumulators = create_accumulators(self.agg_expr).unwrap();
-                        g.estimates = create_accumulators(self.agg_expr).unwrap();
-                        g.nodes = self.finished_nodes.clone();
-                    }
+                            for i in 0..group.accumulators.len() {
+                                group.accumulators[i].update_batch(&vec![batch
+                                                                   .column(self.key_len + i)
+                                                                   .slice(row_i, 1)])?;
+                            }
 
-                    // Update the group.
-                    let key;
-                    {
-                        let mut data = self.buffer.lock().unwrap();
-                        let group = &mut data[existing];
-                        group.nodes[node] = true;
-                        for i in 0..group.accumulators.len() {
-                            group.accumulators[i].update_batch(&vec![batch
-                                .column(self.key_len + i)
-                                .slice(row_i, 1)])?;
+                            group.nodes[node] = true;
                         }
-                        self.update_group_estimates(group)?;
-                        key = SortKey {
-                            order_by: self.order_by,
-                            estimate: group.estimate()?,
-                            estimate_correct: group.estimate_correct(),
-                            index: existing,
-                        }
-                    }
-                    let inserted = self.sorted.insert(key);
-                    assert!(inserted);
+                    } 
 
-                    Self::update_node_estimates(
-                        self.key_len,
-                        self.agg_descr,
-                        &mut self.node_estimates[node],
-                        batch.columns(),
-                        row_i,
-                    )?;
                 }
-
                 row_i += 1;
-
-                pop_top_counter -= 1;
-                if pop_top_counter == 0 {
-                    if self.pop_top_elements().await? {
-                        return Ok(true);
-                    }
-                    pop_top_counter = self.limit;
-                }
             }
-
             for node in 0..num_nodes {
                 if let Some(b) = &batches[node] {
                     if b.num_rows() == row_limit {
@@ -522,44 +531,303 @@ impl TopKState<'_> {
             }
         }
 
-        self.pop_top_elements().await
-    }
-
-    /// Moves groups with known top scores into the [top].
-    /// Returns true iff [top] contains the correct answer to the top-k query.
-    async fn pop_top_elements(&mut self) -> Result<bool, DataFusionError> {
-        while self.result.num_rows() < self.limit && !self.sorted.is_empty() {
-            let mut candidate = self.sorted.pop_first().unwrap();
-            while !candidate.estimate_correct {
-                // The estimate might be stale. Update and re-insert.
-                let updated;
-                {
-                    let mut data = self.buffer.lock().unwrap();
-                    self.update_group_estimates(&mut data[candidate.index])?;
-                    updated = SortKey {
-                        order_by: self.order_by,
-                        estimate: data[candidate.index].estimate()?,
-                        estimate_correct: data[candidate.index].estimate_correct(),
-                        index: candidate.index,
-                    };
-                }
-                self.sorted.insert(updated);
-
-                let next_candidate = self.sorted.first().unwrap();
-                if candidate.index == next_candidate.index && !next_candidate.estimate_correct {
-                    // Same group with top estimate, need to wait until we see it on all nodes.
-                    return Ok(false);
-                } else {
-                    candidate = self.sorted.pop_first().unwrap();
+        let mut to_remove = Vec::new();
+        let mut wanted_nodes = vec![false;num_nodes];
+        for ind in canditates.iter() {
+            let group = &mut self.buffer[*ind];
+            group.apply_finished_nodes(&self.finished_nodes);
+            if group.estimate_correct() {
+                to_remove.push(*ind);
+                self.top.push(*ind);
+            } else {
+                for i in 0..wanted_nodes.len() {
+                    if !group.nodes[i] {
+                        wanted_nodes[i] = true;
+                    }
                 }
             }
-            self.top.push(candidate.index);
-            if self.top.len() == self.limit {
-                self.push_top_to_result().await?;
+
+        }
+        for i in to_remove {
+           canditates.remove(&i);
+        }
+        if wanted_nodes.iter().any(|n| *n) {
+            Ok(Some(wanted_nodes))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn update(
+        &mut self,
+        batches: &mut [Option<RecordBatch>],
+        prof_spans: &mut ProfSpan
+    ) -> Result<Option<Vec<bool>>, DataFusionError> {
+        let num_nodes = batches.len();
+        assert_eq!(num_nodes, self.finished_nodes.len());
+        if !self.insert_allowed {
+            return self.scan(batches).await;
+        }
+
+        prof_spans.start("make node estimates");
+
+        let mut best_estimates = Vec::new();
+        for _ in 0..num_nodes {
+            let estimates = create_accumulators(self.agg_expr)?;
+            best_estimates.push(estimates);
+        }
+
+        //We need correct estimates for further processing.
+        if self.node_estimates.is_empty() {
+            for _ in 0..num_nodes {
+                let estimates = create_accumulators(self.agg_expr)?;
+                self.node_estimates.push(estimates);
             }
         }
 
-        return Ok(self.result.num_rows() == self.limit || self.finished_nodes.iter().all(|f| *f));
+
+
+
+        let mut score_acc = create_accumulators(self.agg_expr)?;
+        prof_spans.commit();
+
+        prof_spans.start("make scores");
+        for node in 0..num_nodes {
+            if batches[node].is_none() && !self.finished_nodes[node] {
+                self.finished_nodes[node] = true;
+            } else {
+                if let Some(batch) = &batches[node] {
+                    if batch.num_rows() > 0 {
+                        //Set node estimates as the last value in batch
+                        Self::update_node_estimates(
+                            self.key_len,
+                            self.agg_descr,
+                            &mut self.node_estimates[node],
+                            batch.columns(),
+                            batch.num_rows() - 1,
+                            )?;
+                        Self::update_node_estimates(
+                            self.key_len,
+                            self.agg_descr,
+                            &mut best_estimates[node],
+                            batch.columns(),
+                            0
+                            )?;
+                        for i in 0..score_acc.len() {
+                            score_acc[i].merge(&best_estimates[node][i].state()?)?;
+
+                        }
+                    }
+
+                }
+            }
+        }
+
+        let best_scores = score_acc.iter().map(|acc| acc.evaluate().unwrap()).collect::<SmallVec<_>>();
+        prof_spans.commit();
+        
+
+
+        prof_spans.start("add estimates");
+
+        let mut num_rows = batches
+            .iter()
+            .map(|b| b.as_ref().map(|b| b.num_rows()).unwrap_or(0))
+            .collect_vec();
+        num_rows.sort_unstable();
+
+        let mut row_i = 0;
+        //Add values to group accumulators for entire butch
+        for row_limit in num_rows {
+            while row_i < row_limit {
+                for node in 0..num_nodes {
+                    let batch;
+                    if let Some(b) = &batches[node] {
+                        batch = b;
+                    } else {
+                        continue;
+                    }
+                    let mut key = smallvec![GroupByScalar::Int8(0); self.key_len];
+                    create_group_by_values(&batch.columns()[0..self.key_len], row_i, &mut key)?;
+
+                    let ind = if let Some(ind) = self.groups.get(&key) {
+                        *ind
+                    } else  {
+                        self.buffer.push(
+                            Group::new(key.clone(), self.agg_expr, self.finished_nodes.clone(), best_scores.clone())
+                            );
+                        self.groups.insert(key, self.buffer.len() - 1);
+                        self.buffer.len() - 1
+                    };
+
+                    let group = &mut self.buffer[ind];
+
+                    for i in 0..group.accumulators.len() {
+                        group.accumulators[i].update_batch(&vec![batch
+                                                           .column(self.key_len + i)
+                                                           .slice(row_i, 1)])?;
+                    }
+                    group.nodes[node] = true;
+                    //group.changed = true;
+                }
+                row_i += 1;
+            }
+            for node in 0..num_nodes {
+                if let Some(b) = &batches[node] {
+                    if b.num_rows() == row_limit {
+                        batches[node] = None;
+                    }
+                }
+            }
+        }
+        prof_spans.commit();
+        
+        prof_spans.start("heap");
+        let node_estimates_values = self.node_estimates.iter().map(|ne| {
+            ne.iter().map(|e| e.evaluate().unwrap()).collect::<Vec<ScalarValue>>()
+        }).collect::<Vec<_>>();
+
+        //Get top limit candidates with best estimates
+        let mut heap = BinaryHeap::with_capacity(self.limit);
+        let mut estimates_accumulator = create_accumulators(&self.agg_expr).unwrap();
+        for group in self.buffer.iter_mut() {
+            if group.deleted {
+                continue;
+            }
+
+            let sort_item = SortKey {
+                    order_by: self.order_by,
+                    value: &group.estimate,
+                    group_key: &group.group_key,
+                    estimate_correct: group.estimate_correct(),
+                };
+
+            if heap.len() + self.top.len() < self.limit || &sort_item < heap.peek().unwrap() {
+                group.apply_finished_nodes(&self.finished_nodes);
+                group.fill_estimates(&node_estimates_values, &self.agg_descr, &mut estimates_accumulator)?;
+
+
+                let sort_item = SortKey {
+                    order_by: self.order_by,
+                    value: &group.estimate,
+                    group_key: &group.group_key,
+                    estimate_correct: group.estimate_correct(),
+                };
+
+                if heap.len() < self.limit {
+                    heap.push(sort_item);
+                } else {
+                    if &sort_item < heap.peek().unwrap() {
+                        heap.pop();
+                        heap.push(sort_item);
+
+                    }
+                }
+            }
+        }
+        prof_spans.commit();
+
+        prof_spans.start("sorted to vec");
+        let sorted = heap.into_sorted_vec();
+        prof_spans.commit();
+
+        prof_spans.start("sorted inds");
+        let sorted_inds = sorted.iter().map(|s| self.groups[s.group_key]).collect::<Vec<_>>();
+        prof_spans.commit();
+
+        prof_spans.start("populate top");
+        let mut top_incomplete = None;
+        for item in sorted.into_iter() {
+            let ind = self.groups[item.group_key];
+            if item.estimate_correct {
+                self.top.push(ind);
+            } else 
+            {
+                top_incomplete = Some(ind);
+                break;
+            }
+        }
+        prof_spans.commit();
+        prof_spans.start("delete items");
+        for ind in self.top.iter() {
+            self.buffer[*ind].deleted = true;
+        }
+        prof_spans.commit();
+
+            
+        prof_spans.start("push to top result");
+        prof_spans.commit();
+
+        prof_spans.start("wanded nodes");
+        let wanted_nodes = if self.result.num_rows() < self.limit && self.finished_nodes.iter().any(|f| !*f) {
+            top_incomplete.map(|ind| {
+                let group = &self.buffer[ind];
+                group.nodes.iter().map(|n| !n).collect::<Vec<_>>()
+            })
+        } else {
+            None
+        };
+        prof_spans.commit();
+
+        
+        if self.insert_allowed {
+            prof_spans.start("calculate threshold");
+            if sorted_inds.len() + self.top.len() >= self.limit {
+                let threshold_ind = sorted_inds.iter().min_by(|ind1, ind2| {
+                    let value1 = self.buffer[**ind1].worse_estimate();
+                    let value2 = self.buffer[**ind2].worse_estimate();
+                    for sc in self.order_by {
+                        // Assuming `self` and `other` point to the same data.
+                        let o = cmp_same_types(
+                            &value1[sc.agg_index],
+                            &value2[sc.agg_index],
+                            sc.nulls_first,
+                            sc.asc,
+                            );
+                        if o != Ordering::Equal {
+                            return o;
+                        }
+                    }
+                    Ordering::Equal
+                }).unwrap();
+                self.threshold = Some(self.buffer[*threshold_ind].worse_estimate());
+            }
+            prof_spans.commit();
+            
+            prof_spans.start("calulate insert allowed");
+
+            if let Some(threshold) = &self.threshold {
+                let mut score_acc = create_accumulators(self.agg_expr)?;
+                for node in 0..num_nodes {
+                    for i in 0..score_acc.len() {
+                        score_acc[i].merge(&self.node_estimates[node][i].state()?)?;
+                    }
+                }
+                let worse_scores = score_acc.iter().map(|acc| acc.evaluate().unwrap()).collect::<SmallVec<[ScalarValue;2]>>();
+                for sc in self.order_by {
+                    // Assuming `self` and `other` point to the same data.
+                    let o = cmp_same_types(
+                        &threshold[sc.agg_index],
+                        &worse_scores[sc.agg_index],
+                        sc.nulls_first,
+                        sc.asc,
+                        );
+                    if o == Ordering::Less {
+                        self.insert_allowed = false;
+                        break;
+                    }
+                }
+            }
+            prof_spans.commit();
+
+            if !self.insert_allowed {
+                self.top_canditates = Some(sorted_inds.into_iter().collect::<HashSet<usize>>());
+            }
+
+        }
+
+        Ok(wanted_nodes)
+
     }
 
     ///Push groups from [top] into [result] butch, applying having filter if required and clears
@@ -573,9 +841,8 @@ impl TopKState<'_> {
         let mut value_columns = Vec::with_capacity(self.agg_expr.len());
 
         let columns = {
-            let mut data = self.buffer.lock().unwrap();
             for group in self.top.iter() {
-                let g = &mut data[*group];
+                let g = &mut self.buffer[*group];
                 write_group_result_row(
                     AggregateMode::Final,
                     &g.group_key,
@@ -623,39 +890,16 @@ impl TopKState<'_> {
     }
 
     async fn finish(mut self) -> Result<RecordBatch, DataFusionError> {
-        log::trace!(
+        /* log::trace!(
             "aggregate top-k processed {} groups to return {} rows",
             self.result.num_rows() + self.top.len() + self.sorted.len(),
             self.limit
-        );
+        ); */
         self.push_top_to_result().await?;
 
         Ok(self.result)
     }
 
-    /// Returns true iff the estimate matches the correct score.
-    fn update_group_estimates(&self, group: &mut Group) -> Result<(), DataFusionError> {
-        for i in 0..group.estimates.len() {
-            group.estimates[i].reset();
-            group.estimates[i].merge(&group.accumulators[i].state()?)?;
-            // Node estimate might contain a neutral value (e.g. '0' for sum), but we must avoid
-            // giving invalid estimates for NULL values.
-            let use_node_estimates =
-                !self.agg_descr[i].1.nulls_first || !group.estimates[i].evaluate()?.is_null();
-            for node in 0..group.nodes.len() {
-                if !group.nodes[node] {
-                    if self.finished_nodes[node] {
-                        group.nodes[node] = true;
-                        continue;
-                    }
-                    if use_node_estimates {
-                        group.estimates[i].merge(&self.node_estimates[node][i].state()?)?;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
 
     fn update_node_estimates(
         key_len: usize,
