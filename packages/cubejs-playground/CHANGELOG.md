@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
+
+### Bug Fixes
+
+- **playground:** Include lower and upper bound of date range in time dimension filter in Playground ([#9979](https://github.com/cube-js/cube/issues/9979)) ([1aeea98](https://github.com/cube-js/cube/commit/1aeea9885dbde9a32ae1071cbe483825c42b4ee9))
+
+## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+## [1.3.68](https://github.com/cube-js/cube/compare/v1.3.67...v1.3.68) (2025-09-16)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+## [1.3.66](https://github.com/cube-js/cube/compare/v1.3.65...v1.3.66) (2025-09-09)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+## [1.3.65](https://github.com/cube-js/cube/compare/v1.3.64...v1.3.65) (2025-09-05)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+## [1.3.64](https://github.com/cube-js/cube/compare/v1.3.63...v1.3.64) (2025-09-03)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+## [1.3.63](https://github.com/cube-js/cube/compare/v1.3.62...v1.3.63) (2025-09-02)
+
+### Bug Fixes
+
+- **cubejs-playground:** rollup designer accordion ([#9937](https://github.com/cube-js/cube/issues/9937)) ([eb6ca38](https://github.com/cube-js/cube/commit/eb6ca38a4cd763881f2f132b06757ca4ca1b2e95))
+
 ## [1.3.62](https://github.com/cube-js/cube/compare/v1.3.61...v1.3.62) (2025-08-29)
 
 **Note:** Version bump only for package @cubejs-client/playground

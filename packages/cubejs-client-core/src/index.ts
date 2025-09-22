@@ -111,7 +111,8 @@ export type CubeSqlOptions = LoadMethodOptions & {
 
 export type CubeSqlSchemaColumn = {
   name: string;
-  columnType: string;
+  // eslint-disable-next-line camelcase
+  column_type: string;
 };
 
 export type CubeSqlResult = {

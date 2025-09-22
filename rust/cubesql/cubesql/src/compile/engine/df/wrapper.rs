@@ -884,7 +884,7 @@ impl CubeScanWrapperNode {
                     vec![],
                     vec![],
                     vec![],
-                    // TODO
+                    vec![],
                     from_alias.clone().unwrap_or("".to_string()),
                     None,
                     None,
@@ -3579,7 +3579,7 @@ impl WrappedSelectNode {
             aggregate,
             patch_measures,
             filter,
-            window: _,
+            window,
             order,
         } = columns;
 
@@ -3597,7 +3597,7 @@ impl WrappedSelectNode {
                 group_by.into_iter().map(|(m, _)| m).collect(),
                 group_descs,
                 aggregate.into_iter().map(|(m, _)| m).collect(),
-                // TODO
+                window.into_iter().map(|(m, _)| m).collect(),
                 from_alias.unwrap_or("".to_string()),
                 if !filter.is_empty() {
                     Some(filter.iter().map(|(f, _)| f.expr.to_string()).join(" AND "))

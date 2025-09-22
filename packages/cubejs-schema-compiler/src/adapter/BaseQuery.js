@@ -901,24 +901,21 @@ export class BaseQuery {
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin')
     };
 
-    const buildResult = nativeBuildSqlAndParams(queryParams);
+    try {
+      const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    if (buildResult.error) {
-      if (buildResult.error.cause && buildResult.error.cause === 'User') {
-        throw new UserError(buildResult.error.message);
-      } else {
-        throw new Error(buildResult.error.message);
+      const [query, params, preAggregation] = buildResult;
+      const paramsArray = [...params];
+      if (preAggregation) {
+        this.preAggregations.preAggregationForQuery = preAggregation;
       }
+      return [query, paramsArray];
+    } catch (e) {
+      if (e.name === 'TesseractUserError') {
+        throw new UserError(e.message);
+      }
+      throw e;
     }
-
-    const res = buildResult.result;
-    const [query, params, preAggregation] = res;
-    // FIXME
-    const paramsArray = [...params];
-    if (preAggregation) {
-      this.preAggregations.preAggregationForQuery = preAggregation;
-    }
-    return [query, paramsArray];
   }
 
   // FIXME Temporary solution
@@ -954,15 +951,7 @@ export class BaseQuery {
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    if (buildResult.error) {
-      if (buildResult.error.cause === 'User') {
-        throw new UserError(buildResult.error.message);
-      } else {
-        throw new Error(buildResult.error.message);
-      }
-    }
-
-    const [, , preAggregation] = buildResult.result;
+    const [, , preAggregation] = buildResult;
     return preAggregation;
   }
 
@@ -3233,6 +3222,9 @@ export class BaseQuery {
         }
         if (symbol.case) {
           return this.renderDimensionCase(symbol, cubeName);
+        } else if (symbol.type === 'switch') {
+          // Dimension of type switch is not supported in BaseQuery, return an empty string to make dependency resolution work.
+          return '';
         } else if (symbol.type === 'geo') {
           return this.concatStringsSql([
             this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql, isMemberExpr),
@@ -4211,7 +4203,17 @@ export class BaseQuery {
         time_series_get_range: 'SELECT {{ max_expr }} as {{ quoted_max_name }},\n' +
           '{{ min_expr }} as {{ quoted_min_name }}\n' +
           'FROM {{ from_prepared }}\n' +
-          '{% if filter %}WHERE {{ filter }}{% endif %}'
+          '{% if filter %}WHERE {{ filter }}{% endif %}',
+        calc_groups_join: '{% if original_sql %}{{ original_sql }}\n{% endif %}' +
+        '{% for group in groups  %}' +
+        '{% if original_sql or not loop.first %}CROSS JOIN\n{% endif %}' +
+        '(\n' +
+        '{% for value in group.values  %}' +
+        'SELECT {{ value }} as {{ group.name }}' +
+        '{% if not loop.last %} UNION ALL\n{% endif %}' +
+        '{% endfor %}' +
+        ') AS {{ group.alias }}\n' +
+        '{% endfor %}'
       },
       expressions: {
         column_reference: '{% if table_name %}{{ table_name }}.{% endif %}{{ name }}',
@@ -5063,7 +5065,7 @@ export class BaseQuery {
         return false;
       }
 
-      return dfs(root) ? path.join('.') : null;
+      return (root && dfs(root)) ? path.join('.') : null;
     };
   }
 
@@ -5081,7 +5083,7 @@ export class BaseQuery {
       const [cube, field] = member.split('.');
       if (!cube || !field) return member;
 
-      if (cube === queryJoinRoot.root) {
+      if (cube === queryJoinRoot?.root) {
         return member;
       }
 

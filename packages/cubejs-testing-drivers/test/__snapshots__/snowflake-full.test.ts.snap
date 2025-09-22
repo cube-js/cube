@@ -17959,6 +17959,111 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/snowflake-driver querying SwitchSourceTest: filter by switch dimensions 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "210.980",
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "48.896",
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "18.368",
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "2399.960",
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "71.600",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver querying SwitchSourceTest: full cross join 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "1265.880",
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "293.376",
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "110.208",
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "14399.760",
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSales": "429.600",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver querying SwitchSourceTest: simple cross join 1`] = `
+Array [
+  Object {
+    "SwitchSourceTest.city": "Detroit",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "421.960",
+  },
+  Object {
+    "SwitchSourceTest.city": "Lorain",
+    "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "97.792",
+  },
+  Object {
+    "SwitchSourceTest.city": "Decatur",
+    "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "36.736",
+  },
+  Object {
+    "SwitchSourceTest.city": "Houston",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "4799.920",
+  },
+  Object {
+    "SwitchSourceTest.city": "New York City",
+    "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
+    "SwitchSourceTest.totalSalesA": "143.200",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension 1`] = `
 Array [
   Object {

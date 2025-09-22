@@ -29,12 +29,16 @@ impl QueryPlanner {
             let request = self.request.clone();
             let multiplied_measures_query_planner =
                 MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
-            let multi_stage_query_planner =
-                MultiStageQueryPlanner::new(self.query_tools.clone(), request.clone());
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
             let multiplied_resolver = multiplied_measures_query_planner.plan_queries()?;
-            let (multi_stage_members, multi_stage_refs) =
-                multi_stage_query_planner.plan_queries()?;
+
+            let multi_stage_query_planner =
+                MultiStageQueryPlanner::new(self.query_tools.clone(), request.clone());
+            let (multi_stage_members, multi_stage_refs) = if self.request.allow_multi_stage() {
+                multi_stage_query_planner.plan_queries()?
+            } else {
+                (vec![], vec![])
+            };
 
             let result = full_key_aggregate_planner.plan_logical_plan(
                 multiplied_resolver,

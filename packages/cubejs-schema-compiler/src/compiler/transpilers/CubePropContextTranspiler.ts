@@ -19,6 +19,7 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(orderBy|order_by)\.[0-9]+\.sql$/,
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeShift|time_shift)\.[0-9]+\.(timeDimension|time_dimension)$/,
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(reduceBy|reduce_by|groupBy|group_by|addGroupBy|add_group_by)$/,
+  /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.case\.switch$/,
   /^dimensions\.[_a-zA-Z][_a-zA-Z0-9]*\.(reduceBy|reduce_by|groupBy|group_by|addGroupBy|add_group_by)$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.indexes\.[_a-zA-Z][_a-zA-Z0-9]*\.columns$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensionReference|timeDimension|time_dimension|segments|dimensions|measures|rollups|segmentReferences|dimensionReferences|measureReferences|rollupReferences)$/,
@@ -77,20 +78,37 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     CubePropContextTranspiler.replaceValueWithArrowFunction(resolveSymbol, path.get('value'));
   }
 
-  public static replaceValueWithArrowFunction(resolveSymbol: SymbolResolver, value: NodePath<any>) {
-    const knownIds = CubePropContextTranspiler.collectKnownIdentifiersAndTransform(
-      resolveSymbol,
-      value,
-    );
+  public static replaceValueWithArrowFunction(resolveSymbol: (name: string) => any, value: NodePath<any>) {
+    // If the current value is already an arrow function, update its parameters and keep the body
+    if (t.isArrowFunctionExpression(value.node)) {
+      const bodyPath = value.get('body') as NodePath<any>;
+      const knownIds = CubePropContextTranspiler.collectKnownIdentifiersAndTransform(
+        resolveSymbol,
+        bodyPath,
+      );
 
-    value.replaceWith(
-      t.arrowFunctionExpression(
-        knownIds.map(i => t.identifier(i)),
-        // @todo Replace any with assert expression
-        <any>value.node,
-        false,
-      ),
-    );
+      value.replaceWith(
+        t.arrowFunctionExpression(
+          knownIds.map(i => t.identifier(i)),
+          value.node.body,
+          false,
+        ),
+      );
+    } else {
+      const knownIds = CubePropContextTranspiler.collectKnownIdentifiersAndTransform(
+        resolveSymbol,
+        value,
+      );
+
+      value.replaceWith(
+        t.arrowFunctionExpression(
+          knownIds.map(i => t.identifier(i)),
+          // @todo Replace any with assert expression
+          <any>value.node,
+          false,
+        ),
+      );
+    }
   }
 
   protected sqlAndReferencesFieldVisitor(cubeName: string | null | undefined): TraverseObject {
@@ -100,14 +118,17 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
     return {
       ObjectProperty: (path) => {
-        if (path.node.key.type === 'Identifier' && path.node.key.name === 'joins' && t.isObjectExpression(path.node.value)) {
+        if (((path.node.key.type === 'Identifier' && path.node.key.name === 'joins') ||
+          (path.node.key.type === 'StringLiteral' && path.node.key.value === 'joins'))
+          && t.isObjectExpression(path.node.value)) {
           const fullPath = CubePropContextTranspiler.fullPath(path);
           if (fullPath === 'joins') {
             this.convertJoinsObjectToArray(path);
           }
         }
 
-        if (path.node.key.type === 'Identifier' && transpiledFields.has(path.node.key.name)) {
+        if ((path.node.key.type === 'Identifier' && transpiledFields.has(path.node.key.name)) ||
+          (path.node.key.type === 'StringLiteral' && transpiledFields.has(path.node.key.value))) {
           const fullPath = CubePropContextTranspiler.fullPath(path);
           // eslint-disable-next-line no-restricted-syntax
           for (const p of transpiledFieldsPatterns) {
@@ -156,7 +177,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
   protected static fullPath(path: NodePath): string {
     // @ts-ignore
-    let fp = path?.node?.key?.name || '';
+    let fp = path?.node?.key?.name || path?.node?.key?.value || '';
     let pp: NodePath<t.Node> | null | undefined = path?.parentPath;
     while (pp) {
       if (pp?.parentPath?.node?.type === 'ArrayExpression') {
@@ -167,6 +188,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         // @ts-ignore
         fp = `${pp?.parentPath?.node?.key?.name || '0'}.${fp}`;
         pp = pp?.parentPath?.parentPath;
+        // @ts-ignore
+      } else if (pp?.parentPath?.node?.key?.type === 'StringLiteral') {
+        // @ts-ignore
+        fp = `${pp?.parentPath?.node?.key?.value || '0'}.${fp}`;
+        pp = pp?.parentPath?.parentPath;
       } else break;
     }
 
@@ -176,7 +202,8 @@ export class CubePropContextTranspiler implements TranspilerInterface {
   protected knownIdentifiersInjectVisitor(field: RegExp | string, resolveSymbol: SymbolResolver): TraverseObject {
     return {
       ObjectProperty: (path) => {
-        if (path.node.key.type === 'Identifier' && path.node.key.name.match(field)) {
+        if ((path.node.key.type === 'Identifier' && path.node.key.name.match(field)) ||
+          (path.node.key.type === 'StringLiteral' && path.node.key.value.match(field))) {
           this.transformObjectProperty(path, resolveSymbol);
         }
       }

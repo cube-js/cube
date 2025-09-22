@@ -3,6 +3,59 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
+
+### Features
+
+- **cubesql:** `SET ROLE` changes authentication context ([#9982](https://github.com/cube-js/cube/issues/9982)) ([c1b69cb](https://github.com/cube-js/cube/commit/c1b69cb8bac62ff8b735cbd85402c5a0df2108f9))
+- **cubesql:** add `pg_catalog.pg_collation` table ([#9968](https://github.com/cube-js/cube/issues/9968)) ([9243f4c](https://github.com/cube-js/cube/commit/9243f4c775fdc33299c2066aa5bfcb60bc883416))
+
+## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.3.68](https://github.com/cube-js/cube/compare/v1.3.67...v1.3.68) (2025-09-16)
+
+### Features
+
+- **cubesql:** Print value of the date/time that couldn't be parsed ([#9961](https://github.com/cube-js/cube/issues/9961)) ([b78ae0a](https://github.com/cube-js/cube/commit/b78ae0ab4b71fd34234be22353a7c3afae674cde))
+
+## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
+
+### Bug Fixes
+
+- **cubesql:** Pass window expressions in SQL push down ([#9953](https://github.com/cube-js/cube/issues/9953)) ([a72b200](https://github.com/cube-js/cube/commit/a72b2008a53572c5cbe5f54f203612714852137b))
+
+## [1.3.66](https://github.com/cube-js/cube/compare/v1.3.65...v1.3.66) (2025-09-09)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.3.65](https://github.com/cube-js/cube/compare/v1.3.64...v1.3.65) (2025-09-05)
+
+### Bug Fixes
+
+- **cubesql:** Correctly calculate eclass cost for recursive nodes ([#9947](https://github.com/cube-js/cube/issues/9947)) ([f7f78e2](https://github.com/cube-js/cube/commit/f7f78e29f89e24db09b489e2b080603d539c0163))
+
+## [1.3.64](https://github.com/cube-js/cube/compare/v1.3.63...v1.3.64) (2025-09-03)
+
+### Bug Fixes
+
+- **cubesql:** Fix SQL pushdown `TRUNC` template for Presto ([#9944](https://github.com/cube-js/cube/issues/9944)) ([36c0e95](https://github.com/cube-js/cube/commit/36c0e95a855fef9a53bf6f6869dd8bb1d5f4010d))
+
+### Features
+
+- **cubesql:** Automatically cast literal strings in binary expressions ([#9938](https://github.com/cube-js/cube/issues/9938)) ([67c027b](https://github.com/cube-js/cube/commit/67c027bdce1233ad71c54c88c45316aa65092947))
+
+## [1.3.63](https://github.com/cube-js/cube/compare/v1.3.62...v1.3.63) (2025-09-02)
+
+### Features
+
+- **cubesql:** Add "planningId" param to SQL API planning events ([#9939](https://github.com/cube-js/cube/issues/9939)) ([bc23173](https://github.com/cube-js/cube/commit/bc23173232028ea12b5dc744101226f7e25ce28c))
+
 ## [1.3.62](https://github.com/cube-js/cube/compare/v1.3.61...v1.3.62) (2025-08-29)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

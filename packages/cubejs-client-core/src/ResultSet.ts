@@ -549,7 +549,8 @@ export default class ResultSet<T extends Record<string, any> = any> {
         const series = this.loadResponses.map(
           (loadResponse) => this.timeSeries(
             loadResponse.query.timeDimensions![0],
-            resultIndex, loadResponse.annotation.timeDimensions
+            resultIndex,
+            loadResponse.annotation.timeDimensions
           )
         );
 

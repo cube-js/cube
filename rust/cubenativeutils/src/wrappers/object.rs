@@ -1,5 +1,5 @@
 use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
-use cubesql::CubeError;
+use crate::CubeError;
 
 pub trait NativeObject<IT: InnerTypes>: Clone {
     fn get_context(&self) -> IT::Context;
@@ -12,6 +12,7 @@ pub trait NativeObject<IT: InnerTypes>: Clone {
     fn into_function(self) -> Result<IT::Function, CubeError>;
     fn is_null(&self) -> Result<bool, CubeError>;
     fn is_undefined(&self) -> Result<bool, CubeError>;
+    fn clone_to_context(&self, context: &IT::Context) -> Self;
 }
 
 pub trait NativeType<IT: InnerTypes> {
@@ -59,4 +60,8 @@ pub trait NativeBoolean<IT: InnerTypes>: NativeType<IT> {
 
 pub trait NativeBox<IT: InnerTypes, T: 'static>: NativeType<IT> {
     fn deref_value(&self) -> &T;
+}
+
+pub trait NativeProxy<IT: InnerTypes> {
+    fn get(&self, property_name: &str) -> Result<IT::Object, CubeError>;
 }

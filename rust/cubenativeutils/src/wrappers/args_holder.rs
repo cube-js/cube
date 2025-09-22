@@ -1,4 +1,4 @@
-use cubesql::CubeError;
+use crate::CubeError;
 use serde::Serialize;
 
 pub trait NativeArgsHolder {

@@ -13,8 +13,8 @@ use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::NativeType;
-use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle, NativeStruct};
-use cubenativeutils::{CubeError, CubeErrorCauseType};
+use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle};
+use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -52,38 +52,8 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         })
     }
 
-    pub fn build_sql_and_params(&self) -> NativeObjectHandle<IT> {
-        let build_result = self.build_sql_and_params_impl();
-        let result = self.context.empty_struct().unwrap();
-        match build_result {
-            Ok(res) => {
-                result.set_field("result", res).unwrap();
-            }
-            Err(e) => {
-                let error_descr = self.context.empty_struct().unwrap();
-                let error_cause = match &e.cause {
-                    CubeErrorCauseType::User(_) => "User",
-                    CubeErrorCauseType::Internal(_) => "Internal",
-                };
-                error_descr
-                    .set_field(
-                        "message",
-                        e.message.to_native(self.context.clone()).unwrap(),
-                    )
-                    .unwrap();
-                error_descr
-                    .set_field(
-                        "cause",
-                        error_cause.to_native(self.context.clone()).unwrap(),
-                    )
-                    .unwrap();
-                result
-                    .set_field("error", NativeObjectHandle::new(error_descr.into_object()))
-                    .unwrap();
-            }
-        }
-
-        NativeObjectHandle::new(result.into_object())
+    pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
+        self.build_sql_and_params_impl()
     }
 
     fn build_sql_and_params_impl(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
@@ -96,7 +66,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let is_external = if !used_pre_aggregations.is_empty() {
             used_pre_aggregations
                 .iter()
-                .all(|pre_aggregation| pre_aggregation.external)
+                .all(|pre_aggregation| pre_aggregation.external())
         } else {
             false
         };
@@ -128,8 +98,8 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         if let Some(used_pre_aggregation) = used_pre_aggregations.first() {
             //FIXME We should build this object in Rust
             let pre_aggregation_obj = self.query_tools.base_tools().get_pre_aggregation_by_name(
-                used_pre_aggregation.cube_name.clone(),
-                used_pre_aggregation.name.clone(),
+                used_pre_aggregation.cube_name().clone(),
+                used_pre_aggregation.name().clone(),
             )?;
             res.set(
                 2,

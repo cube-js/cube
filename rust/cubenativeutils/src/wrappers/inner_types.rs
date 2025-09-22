@@ -14,4 +14,5 @@ pub trait InnerTypes: Clone + 'static {
     type Function: NativeFunction<Self>;
     type Number: NativeNumber<Self>;
     type Context: NativeContext<Self>;
+    type FunctionIT: InnerTypes;
 }

@@ -53,9 +53,16 @@ impl SqlCall {
     }
 
     pub fn is_direct_reference(&self, base_tools: Rc<dyn BaseTools>) -> Result<bool, CubeError> {
+        Ok(self.resolve_direct_reference(base_tools)?.is_some())
+    }
+
+    pub fn resolve_direct_reference(
+        &self,
+        base_tools: Rc<dyn BaseTools>,
+    ) -> Result<Option<Rc<MemberSymbol>>, CubeError> {
         let dependencies = self.get_dependencies();
         if dependencies.len() != 1 {
-            return Ok(false);
+            return Ok(None);
         }
 
         let reference_candidate = dependencies[0].clone();
@@ -67,7 +74,62 @@ impl SqlCall {
             .collect::<Result<Vec<_>, _>>()?;
         let eval_result = self.member_sql.call(args)?;
 
-        Ok(eval_result.trim() == reference_candidate.full_name())
+        let res = if eval_result.trim() == reference_candidate.full_name() {
+            Some(reference_candidate.clone())
+        } else {
+            None
+        };
+        Ok(res)
+    }
+
+    pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+        &self,
+        f: &F,
+    ) -> Result<Rc<Self>, CubeError> {
+        let mut result = self.clone();
+        for dep in result.deps.iter_mut() {
+            match dep {
+                Dependency::SymbolDependency(dep) => {
+                    *dep = dep.apply_recursive(f)?;
+                }
+                Dependency::CubeDependency(cube_dep) => {
+                    *cube_dep = self.apply_recursive_to_cube_dep(cube_dep, f)?;
+                }
+                Dependency::TimeDimensionDependency(dep) => {
+                    dep.base_symbol = dep.base_symbol.apply_recursive(f)?;
+                    for (_, granularity) in dep.granularities.iter_mut() {
+                        *granularity = granularity.apply_recursive(f)?;
+                    }
+                }
+                Dependency::ContextDependency(_) => {}
+            }
+        }
+        Ok(Rc::new(result))
+    }
+
+    pub fn apply_recursive_to_cube_dep<
+        F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    >(
+        &self,
+        cube_dep: &CubeDependency,
+        f: &F,
+    ) -> Result<CubeDependency, CubeError> {
+        let mut result = cube_dep.clone();
+        for (_, v) in result.properties.iter_mut() {
+            match v {
+                CubeDepProperty::SymbolDependency(dep) => *dep = dep.apply_recursive(f)?,
+                CubeDepProperty::TimeDimensionDependency(dep) => {
+                    dep.base_symbol = dep.base_symbol.apply_recursive(f)?;
+                    for (_, granularity) in dep.granularities.iter_mut() {
+                        *granularity = granularity.apply_recursive(f)?;
+                    }
+                }
+                CubeDepProperty::CubeDependency(cube_dep) => {
+                    *cube_dep = self.apply_recursive_to_cube_dep(cube_dep, f)?;
+                }
+            };
+        }
+        Ok(result)
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
@@ -114,12 +176,6 @@ impl SqlCall {
                 Dependency::ContextDependency(_) => {}
             }
         }
-    }
-
-    pub fn get_dependent_cubes(&self) -> Vec<String> {
-        let mut deps = Vec::new();
-        self.extract_cube_deps(&mut deps);
-        deps
     }
 
     pub fn extract_cube_deps(&self, result: &mut Vec<String>) {
