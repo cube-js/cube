@@ -1,8 +1,8 @@
 use crate::cross::*;
 use pyo3::exceptions::{PyNotImplementedError, PySystemError};
-use pyo3::ffi;
 use pyo3::prelude::*;
 use pyo3::types::{PyFunction, PyString, PyTuple};
+use pyo3::{ffi, AsPyPointer};
 use std::ffi::c_int;
 
 pub fn python_fn_call_sync(py_fun: &Py<PyFunction>, arguments: Vec<CLRepr>) -> PyResult<CLRepr> {
