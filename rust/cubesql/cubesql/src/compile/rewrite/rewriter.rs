@@ -545,7 +545,7 @@ impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for Increme
             self.current_eclasses.extend(
                 egraph
                     .classes()
-                    .filter(|class| (class.data.iteration_timestamp >= iteration))
+                    .filter(|class| class.data.iteration_timestamp >= iteration)
                     .map(|class| class.id),
             );
         };
