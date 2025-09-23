@@ -311,10 +311,11 @@ export class JoinGraph {
     if (!this.cachedConnectedComponents) {
       let componentId = 1;
       const components = {};
-      R.toPairs(this.nodes).map(nameToConnection => nameToConnection[0]).forEach(node => {
-        this.findConnectedComponent(componentId, node, components);
-        componentId += 1;
-      });
+      Object.entries(this.nodes)
+        .forEach(([node]) => {
+          this.findConnectedComponent(componentId, node, components);
+          componentId += 1;
+        });
       this.cachedConnectedComponents = components;
     }
     return this.cachedConnectedComponents;
@@ -323,9 +324,8 @@ export class JoinGraph {
   protected findConnectedComponent(componentId: number, node: string, components: Record<string, number>): void {
     if (!components[node]) {
       components[node] = componentId;
-      R.toPairs(this.undirectedNodes[node])
-        .map(connectedNodeNames => connectedNodeNames[0])
-        .forEach(connectedNode => {
+      Object.entries(this.undirectedNodes[node])
+        .forEach(([connectedNode]) => {
           this.findConnectedComponent(componentId, connectedNode, components);
         });
     }
