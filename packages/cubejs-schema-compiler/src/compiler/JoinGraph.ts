@@ -43,7 +43,7 @@ export class JoinGraph {
 
   private edges: Record<string, JoinEdge>;
 
-  private builtJoins: Record<string, FinishedJoinTree>;
+  private readonly builtJoins: Record<string, FinishedJoinTree>;
 
   private graph: Graph | null;
 
