@@ -114,7 +114,10 @@ impl MetaContext {
         }
     }
 
-    pub fn data_source_for_member_name(&self, member: &str) -> Result<DataSource, DataSourceError> {
+    pub fn data_source_for_member_name(
+        &self,
+        member: &str,
+    ) -> Result<DataSource<'_>, DataSourceError> {
         if self.is_synthetic_field(member) {
             return Ok(DataSource::Unrestricted);
         }
@@ -128,7 +131,7 @@ impl MetaContext {
     pub fn data_source_for_member_names<'mem>(
         &self,
         members: impl IntoIterator<Item = &'mem str>,
-    ) -> Result<DataSource, DataSourceError> {
+    ) -> Result<DataSource<'_>, DataSourceError> {
         members
             .into_iter()
             .map(|member| self.data_source_for_member_name(member))

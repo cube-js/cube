@@ -52,7 +52,7 @@ impl TimestampValue {
             .as_ref()
             .unwrap()
             .parse::<Tz>()
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+            .map_err(|err| io::Error::other(err.to_string()))?;
         let ndt = self.to_naive_datetime();
         Ok(tz.from_utc_datetime(&ndt))
     }
@@ -134,8 +134,7 @@ impl ToProtocolValue for TimestampValue {
         let n = ndt
             .signed_duration_since(pg_base_date_epoch())
             .num_microseconds()
-            .ok_or(Error::new(
-                io::ErrorKind::Other,
+            .ok_or(Error::other(
                 "Unable to extract number of seconds from timestamp",
             ))?;
 

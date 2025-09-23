@@ -173,7 +173,7 @@ impl DimensionSubqueryPlanner {
         self.sub_query_dims.is_empty()
     }
 
-    pub fn dimensions_refs(&self) -> Ref<HashMap<String, QualifiedColumnName>> {
+    pub fn dimensions_refs(&self) -> Ref<'_, HashMap<String, QualifiedColumnName>> {
         self.dimensions_refs.borrow()
     }
 }
