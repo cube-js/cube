@@ -267,13 +267,13 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         })
     }
 
-    /* fn filter_goup_fn<CIT: InnerTypes>(
+    fn filter_goup_fn<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
         proxy_state: ProxyStateWeak,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
-        context_holder.make_function(move |function_context| {
-        }
-    } */
+        context_holder.make_vararg_function(move |function_context, args| {});
+        todo!()
+    }
 
     fn filter_params_filter<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
