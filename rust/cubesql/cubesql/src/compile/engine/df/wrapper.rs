@@ -137,17 +137,17 @@ fn extract_group_type_from_groupping_set(
         match expr {
             Expr::GroupingSet(groupping_set) => match groupping_set {
                 GroupingSet::Rollup(exprs) => {
-                    result.extend(
-                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Rollup, id)))
-                            .take(exprs.len()),
-                    );
+                    result.extend(std::iter::repeat_n(
+                        Some(GroupingSetDesc::new(GroupingSetType::Rollup, id)),
+                        exprs.len(),
+                    ));
                     id += 1;
                 }
                 GroupingSet::Cube(exprs) => {
-                    result.extend(
-                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Cube, id)))
-                            .take(exprs.len()),
-                    );
+                    result.extend(std::iter::repeat_n(
+                        Some(GroupingSetDesc::new(GroupingSetType::Cube, id)),
+                        exprs.len(),
+                    ));
                     id += 1;
                 }
                 GroupingSet::GroupingSets(_) => {
