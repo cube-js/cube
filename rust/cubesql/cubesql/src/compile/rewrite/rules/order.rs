@@ -16,9 +16,10 @@ use crate::{
             order_replacer, projection, referenced_columns, rewrite,
             rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
             sort, sort_exp, sort_exp_empty_tail, sort_expr, sort_projection_pullup_replacer,
-            sort_projection_pushdown_replacer, transforming_rewrite, ColumnExprColumn,
-            LogicalPlanLanguage, OrderAsc, OrderMember, OrderReplacerColumnNameToMember,
-            ProjectionAlias, SortExprAsc, SortProjectionPushdownReplacerColumnToExpr,
+            sort_projection_pushdown_replacer, transforming_chain_rewrite, transforming_rewrite,
+            ColumnExprColumn, LogicalPlanLanguage, OrderAsc, OrderMember,
+            OrderReplacerColumnNameToMember, ProjectionAlias, SortExprAsc,
+            SortProjectionPushdownReplacerColumnToExpr,
         },
     },
     config::ConfigObj,
@@ -87,21 +88,19 @@ impl RewriteRules for OrderRules {
             ),
             // TODO: refactor this rule to `push-down-sort-projection`,
             // possibly adjust cost function to penalize Limit-...-Sort plan
-            transforming_rewrite(
+            transforming_chain_rewrite(
                 "push-down-limit-sort-projection",
-                limit(
-                    "?skip",
-                    "?fetch",
-                    sort(
-                        "?sort_expr",
-                        projection(
-                            "?projection_expr",
-                            "?input",
-                            "?projection_alias",
-                            "?projection_split",
-                        ),
+                limit("?skip", "?fetch", sort("?sort_expr", "?projection")),
+                vec![(
+                    // Avoid recursion when projection input is self
+                    "?projection",
+                    projection(
+                        "?projection_expr",
+                        "?input",
+                        "?projection_alias",
+                        "?projection_split",
                     ),
-                ),
+                )],
                 projection(
                     "?projection_expr",
                     limit(

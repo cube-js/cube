@@ -17737,4 +17737,45 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_push_down_limit_sort_projection_recursion() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                customer_gender AS "customer_gender",
+                SUM(sumPrice) AS "SUM(KibanaSampleDataEcommerce.sumPrice)"
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 3
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    "desc".to_string(),
+                ]]),
+                limit: Some(3),
+                ..Default::default()
+            }
+        )
+    }
 }
