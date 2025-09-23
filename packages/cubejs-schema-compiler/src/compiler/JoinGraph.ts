@@ -186,7 +186,7 @@ export class JoinGraph {
     return this.builtJoins[key];
   }
 
-  protected cubeFromPath(cubePath) {
+  protected cubeFromPath(cubePath: string | string[]): string {
     if (Array.isArray(cubePath)) {
       return cubePath[cubePath.length - 1];
     }
