@@ -20,9 +20,7 @@ describe('SQL Generation', () => {
 
     cube(\`visitors_create_dates\`, {
       sql: \`
-      select id AS create_date_id, created_at from visitors WHERE \${SECURITY_CONTEXT.source.filter('source')} AND
-      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
-      \`,
+      select id AS create_date_id, created_at from visitors       \`,
 
       rewriteQueries: true,
 
@@ -48,8 +46,7 @@ describe('SQL Generation', () => {
 
     cube(\`visitors\`, {
       sql: \`
-      select * from visitors WHERE \${SECURITY_CONTEXT.source.filter('source')} AND
-      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
+      select * from visitors
       \`,
 
       rewriteQueries: true,
@@ -478,8 +475,6 @@ describe('SQL Generation', () => {
       select visitor_checkins.* from visitor_checkins left join visitors on visitor_checkins.visitor_id = visitors.id WHERE
       \${FILTER_PARAMS.visitor_checkins.created_at.filter('visitor_checkins.created_at')} AND
       \${FILTER_GROUP(FILTER_PARAMS.visitor_checkins.created_at.filter("(visitor_checkins.created_at - INTERVAL '3 DAY')"), FILTER_PARAMS.visitor_checkins.source.filter('visitor_checkins.source'))}
-      AND \${SECURITY_CONTEXT.source.filter('visitors.source')} AND
-      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`visitors.source in (\${sourceArray.join(',')})\`)}
 
       \`,
       sql_alias: \`vc\`,
@@ -906,7 +901,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     })
     `);
 
-  it('simple join', async () => {
+  it('simple join 1', async () => {
     await compiler.compile();
 
     console.log(joinGraph.buildJoin(['visitor_checkins', 'visitors']));

@@ -22,6 +22,7 @@ use std::{
     cell::RefCell,
     rc::{Rc, Weak},
 };
+use tokio::sync::mpsc::error::SendTimeoutError;
 
 pub struct ContextHolder<C: Context<'static>> {
     context: Weak<RefCell<ContextWrapper<C>>>,
@@ -49,6 +50,61 @@ impl<C: Context<'static>> ContextHolder<C> {
                 "Call to neon context outside of its lifetime".to_string(),
             ))
         }
+    }
+
+    fn proxy_get_trap<
+        Ret: NativeSerialize<NeonInnerTypes<FunctionContext<'static>>>,
+        F: Fn(
+                NativeContextHolder<NeonInnerTypes<FunctionContext<'static>>>,
+                NativeObjectHandle<NeonInnerTypes<FunctionContext<'static>>>,
+                String,
+            ) -> Result<Option<Ret>, CubeError>
+            + 'static,
+    >(
+        &self,
+        get_fn: F,
+    ) -> Result<Handle<'static, JsFunction>, CubeError> {
+        self.with_context(|cx| {
+            let func = JsFunction::new(cx, move |cx| {
+                neon_run_with_guarded_lifetime(cx, |func_context| {
+                    let (target, prop, string_prop) =
+                        func_context.with_context(|func_cx| -> Result<_, CubeError> {
+                            let target = func_cx.argument::<JsObject>(0)?;
+                            let prop = func_cx.argument::<JsValue>(1)?;
+                            let string_prop =
+                                if let Ok(string_prop) = prop.downcast::<JsString, _>(func_cx) {
+                                    Some(string_prop.value(func_cx))
+                                } else {
+                                    None
+                                };
+                            Ok((target, prop, string_prop))
+                        })??;
+
+                    if let Some(string_prop) = string_prop {
+                        let neon_target = NeonObject::new(func_context.clone(), target)?;
+                        if let Some(res) =
+                            get_fn(func_context.clone().into(), neon_target.into(), string_prop)?
+                        {
+                            return res.to_native(func_context.clone().into());
+                        }
+                    }
+                    let res = func_context.with_context(|func_cx| -> Result<_, CubeError> {
+                        let reflect = func_cx.global::<JsObject>("Reflect")?;
+                        let null = func_cx.null();
+                        let reflect_get = reflect.get::<JsFunction, _, _>(func_cx, "get")?;
+                        let reflect_res = reflect_get.call(
+                            func_cx,
+                            null,
+                            vec![target.upcast::<JsValue>(), prop.upcast::<JsValue>()],
+                        )?;
+                        Ok(reflect_res)
+                    })??;
+
+                    Ok(NativeObjectHandle::new(NeonObject::new(func_context, res)?))
+                })
+            })?;
+            Ok(func)
+        })?
     }
 }
 
@@ -118,6 +174,79 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
             })??
             .into_neon_object(self.clone())?;
         obj.into_function()
+    }
+    fn make_vararg_function<
+        Rt: NativeSerialize<NeonInnerTypes<FunctionContext<'static>>>,
+        F: Fn(
+                NativeContextHolder<NeonInnerTypes<FunctionContext<'static>>>,
+                Vec<NativeObjectHandle<NeonInnerTypes<FunctionContext<'static>>>>,
+            ) -> Result<Rt, CubeError>
+            + 'static,
+    >(
+        &self,
+        f: F,
+    ) -> Result<NeonFunction<C>, CubeError> {
+        let f = Rc::new(f);
+        let obj = self.with_context(|cx| {
+            let func = JsFunction::new(cx, move |cx| {
+                neon_run_with_guarded_lifetime(cx, |function_context| {
+                    let args = function_context
+                        .with_context(|cx| -> Result<_, CubeError> {
+                            let mut args = vec![];
+                            for i in 0..cx.len() {
+                                args.push(cx.argument::<JsValue>(i)?);
+                            }
+                            Ok(args)
+                        })??
+                        .into_iter()
+                        .map(|arg| -> Result<_, CubeError> {
+                            Ok(NativeObjectHandle::new(NeonObject::new(
+                                function_context.clone(),
+                                arg,
+                            )?))
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                    let context_holder: NativeContextHolder<
+                        NeonInnerTypes<FunctionContext<'static>>,
+                    > = function_context.clone().into();
+                    let res = f(context_holder.clone(), args)?;
+                    res.to_native(context_holder.clone())
+                })
+            });
+        });
+        todo!()
+    }
+    fn make_proxy<
+        Ret: NativeSerialize<NeonInnerTypes<FunctionContext<'static>>>,
+        F: Fn(
+                NativeContextHolder<NeonInnerTypes<FunctionContext<'static>>>,
+                NativeObjectHandle<NeonInnerTypes<FunctionContext<'static>>>,
+                String,
+            ) -> Result<Option<Ret>, CubeError>
+            + 'static,
+    >(
+        &self,
+        target: Option<NativeObjectHandle<NeonInnerTypes<C>>>,
+        get_fn: F,
+    ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
+        let get_trap = self.proxy_get_trap(get_fn)?;
+        let target = if let Some(target) = target {
+            target
+        } else {
+            NativeObjectHandle::new(self.empty_struct()?.into_object())
+        };
+        let neon_target = target.object_ref().get_js_value()?;
+        let res = self.with_context(|cx| -> Result<_, CubeError> {
+            let proxy = cx.global::<JsFunction>("Proxy")?;
+            let handler = JsObject::new(cx);
+            handler.set(cx, "get", get_trap)?;
+            Ok(proxy.construct(cx, vec![neon_target, handler.upcast::<JsValue>()])?)
+        })??;
+
+        let res = NativeObjectHandle::new(NeonObject::new(self.clone(), res)?);
+
+        Ok(res)
     }
 }
 

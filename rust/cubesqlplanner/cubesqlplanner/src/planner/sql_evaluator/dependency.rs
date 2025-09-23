@@ -5,8 +5,9 @@ use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 #[derive(Clone, Debug)]
 pub enum CubeDepProperty {
@@ -74,11 +75,24 @@ impl<'a> DependenciesBuilder<'a> {
         }
     }
 
+    fn new_build_develop(
+        &self,
+        cube_name: String,
+        member_sql: Rc<dyn MemberSql>,
+    ) -> Result<(), CubeError> {
+        let args = member_sql.args_names();
+        Ok(())
+    }
+
     pub fn build(
         mut self,
         cube_name: String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<Dependency>, CubeError> {
+        println!("!!!! =====================");
+        let test = member_sql.into_template_sql()?;
+        println!("!!!! test: {:?}", test);
+        self.new_build_develop(cube_name.clone(), member_sql.clone())?;
         let call_deps = if member_sql.need_deps_resolve() {
             self.cube_evaluator
                 .resolve_symbols_call_deps(cube_name.clone(), member_sql.clone())?

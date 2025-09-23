@@ -20,6 +20,30 @@ pub trait NativeContext<IT: InnerTypes>: Clone {
         &self,
         f: F,
     ) -> Result<IT::Function, CubeError>;
+    fn make_vararg_function<
+        Rt: NativeSerialize<IT::FunctionIT>,
+        F: Fn(
+                NativeContextHolder<IT::FunctionIT>,
+                Vec<NativeObjectHandle<IT::FunctionIT>>,
+            ) -> Result<Rt, CubeError>
+            + 'static,
+    >(
+        &self,
+        f: F,
+    ) -> Result<IT::Function, CubeError>;
+    fn make_proxy<
+        Ret: NativeSerialize<IT::FunctionIT>,
+        F: Fn(
+                NativeContextHolder<IT::FunctionIT>,
+                NativeObjectHandle<IT::FunctionIT>,
+                String,
+            ) -> Result<Option<Ret>, CubeError>
+            + 'static,
+    >(
+        &self,
+        target: Option<NativeObjectHandle<IT>>,
+        get_fn: F,
+    ) -> Result<NativeObjectHandle<IT>, CubeError>;
 }
 
 pub trait NativeContextHolderRef: 'static {
@@ -76,6 +100,34 @@ impl<IT: InnerTypes> NativeContextHolder<IT> {
     ) -> Result<IT::Function, CubeError> {
         self.context.make_function(f)
     }
+    pub fn make_vararg_function<
+        Rt: NativeSerialize<IT::FunctionIT>,
+        F: Fn(
+                NativeContextHolder<IT::FunctionIT>,
+                Vec<NativeObjectHandle<IT::FunctionIT>>,
+            ) -> Result<Rt, CubeError>
+            + 'static,
+    >(
+        &self,
+        f: F,
+    ) -> Result<IT::Function, CubeError> {
+        self.context.make_vararg_function(f)
+    }
+    pub fn make_proxy<
+        Ret: NativeSerialize<IT::FunctionIT>,
+        F: Fn(
+                NativeContextHolder<IT::FunctionIT>,
+                NativeObjectHandle<IT::FunctionIT>,
+                String,
+            ) -> Result<Option<Ret>, CubeError>
+            + 'static,
+    >(
+        &self,
+        target: Option<NativeObjectHandle<IT>>,
+        get_fn: F,
+    ) -> Result<NativeObjectHandle<IT>, CubeError> {
+        self.context.make_proxy(target, get_fn)
+    }
 }
 
 impl<IT> NativeContextHolderRef for NativeContextHolder<IT>
@@ -86,46 +138,4 @@ where
     fn as_any(&self) -> &dyn Any {
         self
     }
-}
-
-pub fn proxy<
-    IT: InnerTypes,
-    Ret: NativeSerialize<IT::FunctionIT>,
-    F: Fn(
-            NativeContextHolder<IT::FunctionIT>,
-            NativeObjectHandle<IT::FunctionIT>,
-            String,
-        ) -> Result<Option<Ret>, CubeError>
-        + 'static,
->(
-    context: NativeContextHolder<IT>,
-    target: Option<NativeObjectHandle<IT>>,
-    get_fn: F,
-) -> Result<NativeObjectHandle<IT>, CubeError> {
-    let get_trap = context.make_function(
-        move |context: NativeContextHolder<IT::FunctionIT>,
-              target: NativeObjectHandle<IT::FunctionIT>,
-              prop: NativeObjectHandle<IT::FunctionIT>|
-              -> Result<NativeObjectHandle<IT::FunctionIT>, CubeError> {
-            if let Ok(string_prop) = prop.to_string() {
-                let string_prop = string_prop.value()?;
-                if let Some(result) = get_fn(context.clone(), target.clone(), string_prop)? {
-                    return result.to_native(context);
-                }
-            }
-            let reflect = context.global("Reflect")?.into_struct()?;
-            let reflect_get = reflect.get_field("get")?.into_function()?;
-            reflect_get.call(vec![target, prop])
-        },
-    )?;
-
-    let proxy = context.global("Proxy")?.into_function()?;
-    let target = if let Some(target) = target {
-        target
-    } else {
-        NativeObjectHandle::new(context.empty_struct()?.into_object())
-    };
-    let handler = context.empty_struct()?;
-    handler.set_field("get", NativeObjectHandle::new(get_trap.into_object()))?;
-    proxy.construct(vec![target, NativeObjectHandle::new(handler.into_object())])
 }

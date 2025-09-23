@@ -1,4 +1,4 @@
-use super::dependecy::{
+use super::dependency::{
     ContextSymbolDep, CubeDepProperty, CubeDependency, Dependency, TimeDimensionDependency,
 };
 use super::sql_nodes::SqlNode;

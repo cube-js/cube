@@ -87,7 +87,10 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
                 Struct => JsObject => ObjectNeonTypeHolder,
             });
 
-            Err(CubeError::internal(format!("Unsupported JsValue",)))
+            Err(CubeError::internal(format!(
+                "Unsupported JsValue: {}",
+                value.to_string(cx)?.value(cx)
+            )))
         })?
     }
     pub fn from_typed<T: Upcast<C>>(typed_holder: T) -> Self {
