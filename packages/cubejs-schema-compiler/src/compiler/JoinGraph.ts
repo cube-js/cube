@@ -158,17 +158,6 @@ export class JoinGraph {
       });
   }
 
-  protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {
-    if (!cube.joins) {
-      return {};
-    }
-
-    return cube.joins.reduce((acc, join) => {
-      acc[join.name] = 1;
-      return acc;
-    }, {} as Record<string, 1>);
-  }
-
   public buildJoin(cubesToJoin: JoinHints): FinishedJoinTree | null {
     if (!cubesToJoin.length) {
       return null;
