@@ -144,7 +144,7 @@ impl CLRepr {
         })
     }
 
-    fn into_py_dict_impl(obj: CLReprObject, py: Python) -> Result<&PyDict, PyErr> {
+    fn into_py_dict_impl(obj: CLReprObject, py: Python<'_>) -> Result<&PyDict, PyErr> {
         let r = PyDict::new(py);
 
         for (k, v) in obj.into_iter() {
@@ -213,7 +213,7 @@ impl CLRepr {
         })
     }
 
-    pub fn into_py_dict(self, py: Python) -> Result<&PyDict, PyErr> {
+    pub fn into_py_dict(self, py: Python<'_>) -> Result<&PyDict, PyErr> {
         Ok(match self {
             CLRepr::Object(obj) => Self::into_py_dict_impl(obj, py)?,
             other => {
