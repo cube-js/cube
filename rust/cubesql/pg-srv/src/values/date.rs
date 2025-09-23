@@ -5,7 +5,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, BytesMut};
 use chrono::NaiveDate;
 use std::backtrace::Backtrace;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 pub type DateValue = NaiveDate;
 
