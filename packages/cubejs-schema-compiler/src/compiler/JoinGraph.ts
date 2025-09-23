@@ -170,7 +170,8 @@ export class JoinGraph {
         .sort((a, b) => a.joins.length - b.joins.length)[0];
 
       if (!join) {
-        throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
+        const errCubes = cubesToJoin.map(v => `'${v}'`).join(', ');
+        throw new UserError(`Can't find join path to join ${errCubes}`);
       }
 
       this.builtJoins[key] = Object.assign(join, {
