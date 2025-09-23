@@ -43,7 +43,7 @@ export class JoinGraph {
 
   private edges: Record<string, JoinEdge>;
 
-  private builtJoins: Record<string, FinishedJoinTree>;
+  private readonly builtJoins: Record<string, FinishedJoinTree>;
 
   private graph: Graph | null;
 
@@ -60,7 +60,7 @@ export class JoinGraph {
     this.graph = null;
   }
 
-  public compile(cubes: unknown, errorReporter: ErrorReporter): void {
+  public compile(_cubes: unknown, errorReporter: ErrorReporter): void {
     this.edges = Object.fromEntries(
       this.cubeEvaluator.cubeList
         .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
@@ -176,7 +176,8 @@ export class JoinGraph {
         .sort((a, b) => a.joins.length - b.joins.length)[0];
 
       if (!join) {
-        throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
+        const errCubes = cubesToJoin.map(v => `'${v}'`).join(', ');
+        throw new UserError(`Can't find join path to join ${errCubes}`);
       }
 
       this.builtJoins[key] = Object.assign(join, {
