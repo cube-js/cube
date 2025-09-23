@@ -27,9 +27,9 @@ use async_stream::stream;
 
 #[derive(Debug)]
 pub struct Cursor {
-    pub query: ast::Statement,
+    pub query: Box<ast::Statement>,
     // WITH HOLD specifies that the cursor can continue to be used after the transaction that created it successfully commits.
-    // WITHOUT HOLD specifies that the cursor cannot be used outside of the transaction that created it.
+    // WITHOUT HOLD specifies that the cursor cannot be used outside the transaction that created it.
     pub hold: bool,
     // What format will be used for Cursor
     pub format: protocol::Format,
@@ -37,7 +37,7 @@ pub struct Cursor {
 
 #[derive(Debug)]
 pub enum PreparedStatement {
-    // Postgres allows to define prepared statement on empty query: "",
+    // Postgres allows defining a prepared statement on an empty query: "",
     // then it requires special handling in the protocol
     Empty {
         /// Prepared statement can be declared from SQL or protocol (Parser)
@@ -49,10 +49,10 @@ pub enum PreparedStatement {
         /// Prepared statement can be declared from SQL or protocol (Parser)
         from_sql: bool,
         created: DateTime<Utc>,
-        query: ast::Statement,
+        query: Box<ast::Statement>,
         parameters: protocol::ParameterDescription,
-        /// Fields which will be returned to the client, It can be None if server doesnt return any field
-        /// for example BEGIN
+        /// Fields which will be returned to the client; It can be None if the server doesn't return any field,
+        /// for example, BEGIN
         description: Option<protocol::RowDescription>,
         span_id: Option<Arc<SpanId>>,
     },
@@ -107,7 +107,7 @@ impl PreparedStatement {
             .into()),
             PreparedStatement::Query { query, .. } => {
                 let binder = PostgresStatementParamsBinder::new(values);
-                let mut statement = query.clone();
+                let mut statement = query.as_ref().clone();
                 binder.bind(&mut statement)?;
 
                 Ok(statement)
