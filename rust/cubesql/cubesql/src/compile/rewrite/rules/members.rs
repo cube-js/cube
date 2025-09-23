@@ -2708,7 +2708,7 @@ impl MemberRules {
                             let Some(left_cube) = left_join_hints
                                 .iter()
                                 .filter(|hint| !hint.is_empty())
-                                .last()
+                                .next_back()
                                 .and_then(|hint| hint.last())
                                 .or_else(|| left_alias_to_cube.first().map(|(_, cube)| cube))
                                 .cloned()
