@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
+
+**Note:** Version bump only for package cubejs-cli
+
 ## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
 
 **Note:** Version bump only for package cubejs-cli
