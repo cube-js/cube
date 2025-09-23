@@ -2983,7 +2983,7 @@ impl FilterRules {
                         subst,
                         &meta_context,
                         alias_to_cube_var,
-                        &[column.clone()],
+                        std::slice::from_ref(column),
                         members_var,
                         &aliases,
                     ) else {
