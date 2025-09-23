@@ -60,7 +60,7 @@ export class JoinGraph {
     this.graph = null;
   }
 
-  public compile(cubes: unknown, errorReporter: ErrorReporter): void {
+  public compile(_cubes: unknown, errorReporter: ErrorReporter): void {
     this.edges = Object.fromEntries(
       this.cubeEvaluator.cubeList
         .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
