@@ -75,12 +75,26 @@ describe('Python Configuration Loading', () => {
   });
 
   benchmarkSuite('Function Execution', {
-    'checkAuth - sync version': async () => {
+    'checkAuth - sync version (sequential)': async () => {
       await configPy.checkAuth!({ requestId: 'sync-bench' }, 'SYNC_TOKEN');
     },
 
-    'checkAuth - async version': async () => {
+    // It should help to identify any potential issues with GIL
+    'checkAuth - sync version (parallel 50x)': async () => {
+      await Promise.all(
+          Array.from({ length: 50 }, () => configPy.checkAuth!({ requestId: 'sync-bench' }, 'SYNC_TOKEN'))
+      );
+    },
+
+    'checkAuth - async version (sequential)': async () => {
       await configAsyncPy.checkAuth!({ requestId: 'async-bench' }, 'ASYNC_TOKEN');
+    },
+
+    // It should help to identify any potential issues with GIL
+    'checkAuth - async version (parallel 50x)': async () => {
+      await Promise.all(
+          Array.from({ length: 50 }, () => configAsyncPy.checkAuth!({ requestId: 'async-bench' }, 'ASYNC_TOKEN'))
+      );
     },
 
     'extendContext - sync version': async () => {
@@ -89,7 +103,7 @@ describe('Python Configuration Loading', () => {
       });
     },
 
-    'extendContext - async version': async () => {
+    'extendContext - async version (sequential)': async () => {
       await configAsyncPy.extendContext!({
         securityContext: { sub: '1234567890', iat: 1516239022, user_id: 42 }
       });
@@ -100,7 +114,7 @@ describe('Python Configuration Loading', () => {
       await configPy.queryRewrite!(testQuery, {});
     },
 
-    'queryRewrite - async version': async () => {
+    'queryRewrite - async version (sequential)': async () => {
       const testQuery = { str: 'string', int_number: 1, bool_true: true };
       await configAsyncPy.queryRewrite!(testQuery, {});
     },
