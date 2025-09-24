@@ -71,6 +71,8 @@ export interface TableCSVData extends DownloadTableBase {
 
   csvDelimiter?: string;
 
+  csvDisableQouting?: boolean;
+
   /**
    * The CSV file escape symbol.
    */

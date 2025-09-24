@@ -738,19 +738,31 @@ impl SqlService for SqlServiceImpl {
                         _ => Err(CubeError::user(format!("Bad delimiter {}", option.value))),
                     })?;
 
+                let disable_quoting = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "disable_quoting")
+                    .map_or(Ok(false), |option| match &option.value {
+                        Value::Boolean(value) => Ok(*value),
+                        _ => Err(CubeError::user(format!(
+                            "Bad disable_quoting flag (expected boolean) {}",
+                            option.value
+                        ))),
+                    })?;
+
                 if let Some(delimiter) = delimiter {
+                    let quote = if disable_quoting { None } else { Some('"') };
                     import_format = match import_format {
                         ImportFormat::CSV => ImportFormat::CSVOptions {
                             delimiter: Some(delimiter),
                             has_header: true,
                             escape: None,
-                            quote: None,
+                            quote,
                         },
                         ImportFormat::CSVNoHeader => ImportFormat::CSVOptions {
                             delimiter: Some(delimiter),
                             has_header: false,
                             escape: None,
-                            quote: None,
+                            quote,
                         },
                         ImportFormat::CSVOptions {
                             has_header,
