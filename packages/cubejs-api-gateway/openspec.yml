@@ -143,6 +143,8 @@ components:
             $ref: "#/components/schemas/V1CubeMetaDimensionGranularity"
         meta:
           type: "object"
+        format:
+          $ref: "#/components/schemas/V1CubeMetaDimensionFormat"
     V1CubeMetaMeasure:
       type: "object"
       required:
@@ -163,6 +165,8 @@ components:
           type: "string"
         meta:
           type: "object"
+        format:
+          $ref: "#/components/schemas/V1CubeMetaMeasureFormat"
         aliasMember:
           description: "When measure is defined in View, it keeps the original path: Cube.measure"
           type: "string"
@@ -263,6 +267,21 @@ components:
       enum:
         - "cube"
         - "view"
+    V1CubeMetaMeasureFormat:
+      type: "string"
+      description: Format of measure
+      enum:
+        - "percent"
+        - "currency"
+    V1CubeMetaDimensionFormat:
+      type: "string"
+      description: Format of dimension
+      enum:
+        - "imageUrl"
+        - "id"
+        - "link"
+        - "percent"
+        - "currency"
     V1MetaResponse:
       type: "object"
       properties:
