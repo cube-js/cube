@@ -314,33 +314,66 @@ class ApiGateway {
      *************************************************************** */
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      let cacheMode: CacheMode | undefined;
+
+      // TODO: Drop this fallback to renewQuery when it will be removed
+      if (req.query.cache !== undefined) {
+        cacheMode = req.query.cache;
+      } else if (req.query.query?.renewQuery !== undefined) {
+        cacheMode = req.query.query.renewQuery === true
+          ? 'must-revalidate'
+          : 'stale-if-slow';
+      }
+
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.query.queryType,
-        cacheMode: req.query.cache,
+        cacheMode,
       });
     }));
 
     const jsonParser = bodyParser.json({ limit: '1mb' });
     app.post(`${this.basePath}/v1/load`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+      let cacheMode: CacheMode | undefined;
+
+      // TODO: Drop this fallback to renewQuery when it will be removed
+      if (req.query.cache !== undefined) {
+        cacheMode = req.body.cache;
+      } else if (req.body.query?.renewQuery !== undefined) {
+        cacheMode = req.body.query.renewQuery === true
+          ? 'must-revalidate'
+          : 'stale-if-slow';
+      }
+
       await this.load({
         query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.body.queryType,
-        cacheMode: req.body.cache,
+        cacheMode,
       });
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      let cacheMode: CacheMode | undefined;
+
+      // TODO: Drop this fallback to renewQuery when it will be removed
+      if (req.query.cache !== undefined) {
+        cacheMode = req.query.cache;
+      } else if (req.query.query?.renewQuery !== undefined) {
+        cacheMode = req.query.query.renewQuery === true
+          ? 'must-revalidate'
+          : 'stale-if-slow';
+      }
+
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.query.queryType,
-        cacheMode: req.query.cache,
+        cacheMode,
       });
     }));
 
