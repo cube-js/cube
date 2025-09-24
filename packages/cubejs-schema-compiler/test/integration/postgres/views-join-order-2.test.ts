@@ -48,7 +48,7 @@ cube('A', {
   dimensions: {
     id: {
       sql: \`id\`,
-      type: \`string\`,
+      type: \`number\`,
       primaryKey: true,
     },
     name: {
@@ -60,7 +60,7 @@ cube('A', {
 
 cube('B', {
   sql: \`
-    SELECT 2 id, 'b'::text as "name"\`,
+    SELECT 2 id, 1 fk, 'b'::text as "name"\`,
   joins: {
     A: {
       relationship: \`many_to_one\`,
@@ -75,7 +75,7 @@ cube('B', {
   dimensions: {
     id: {
       sql: \`id\`,
-      type: \`string\`,
+      type: \`number\`,
       primaryKey: true,
     },
     name: {
@@ -84,7 +84,7 @@ cube('B', {
     },
     fk: {
       sql: \`fk\`,
-      type: \`string\`,
+      type: \`number\`,
     },
   },
 });
@@ -95,7 +95,7 @@ cube('E', {
   dimensions: {
     id: {
       sql: \`id\`,
-      type: \`string\`,
+      type: \`number\`,
       primaryKey: true,
     },
     name: {
@@ -125,7 +125,7 @@ cube('D', {
   dimensions: {
     id: {
       sql: \`id\`,
-      type: \`string\`,
+      type: \`number\`,
       primaryKey: true,
     },
     name: {
@@ -134,11 +134,15 @@ cube('D', {
     },
     fk: {
       sql: \`fk\`,
-      type: \`string\`,
+      type: \`number\`,
     },
     bFk: {
       sql: \`b_fk\`,
-      type: \`string\`,
+      type: \`number\`,
+    },
+    eFk: {
+      sql: \`e_fk\`,
+      type: \`number\`,
     },
   },
 });
