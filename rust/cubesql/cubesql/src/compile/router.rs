@@ -132,6 +132,20 @@ impl QueryRouter {
                     CommandCompletion::Rollback,
                 ))
             }
+            (ast::Statement::Savepoint { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Savepoint,
+                ))
+            }
+            (ast::Statement::Release { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Release,
+                ))
+            }
             (ast::Statement::Discard { object_type }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Cursors + Portals
                 self.state.clear_prepared_statements().await;
