@@ -24,6 +24,7 @@
     "unit": "jest --forceExit",
     "test:unit": "yarn run unit",
     "test:cargo": "cargo test",
+    "bench": "jest --config jest-bench.config.js --forceExit",
     "lint": "eslint test/ js/ --ext .ts",
     "lint:fix": "eslint --fix test/ js/ --ext .ts"
   },
@@ -39,6 +40,7 @@
     "@types/node": "^20",
     "cargo-cp-artifact": "^0.1.9",
     "jest": "^29",
+    "jest-bench": "^29",
     "pg": "^8.11.3",
     "typescript": "~5.2.2",
     "uuid": "^8.3.2"
