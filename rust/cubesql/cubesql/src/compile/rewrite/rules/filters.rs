@@ -37,7 +37,7 @@ use chrono::{
         Numeric::{Day, Hour, Minute, Month, Second, Year},
         Pad::Zero,
     },
-    DateTime, Datelike, Days, Duration, Months, NaiveDateTime, Timelike, Weekday,
+    DateTime, Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, Timelike, Weekday,
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -1685,8 +1685,9 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
-                self.transform_filter_extract_year_equals(
+                self.transform_filter_extract_year_month_equals(
                     "?year",
+                    None,
                     "?column",
                     "?alias_to_cube",
                     "?members",
@@ -1715,13 +1716,133 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
-                self.transform_filter_extract_year_equals(
+                self.transform_filter_extract_year_month_equals(
                     "?year",
+                    None,
                     "?column",
                     "?alias_to_cube",
                     "?members",
                     "?member",
                     "?values",
+                    "?filter_aliases",
+                ),
+            ),
+            // TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) = 3
+            // AND TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) = 2019
+            transforming_rewrite(
+                "extract-trunc-year-and-month-equals",
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            self.fun_expr(
+                                "Trunc",
+                                vec![self.fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("month"), column_expr("?column")],
+                                )],
+                            ),
+                            "=",
+                            literal_expr("?month"),
+                        ),
+                        "AND",
+                        binary_expr(
+                            self.fun_expr(
+                                "Trunc",
+                                vec![self.fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("year"), column_expr("?column")],
+                                )],
+                            ),
+                            "=",
+                            literal_expr("?year"),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                self.transform_filter_extract_year_month_equals(
+                    "?year",
+                    Some("?month"),
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?member",
+                    "?values",
+                    "?filter_aliases",
+                ),
+            ),
+            // When the filter set above is paired with other filters, it needs to be
+            // regrouped for the above rewrite rule to match
+            rewrite(
+                "extract-trunc-year-and-month-equals-regroup-binary",
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            "?expr",
+                            "AND",
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("month"), column_expr("?column")],
+                                    )],
+                                ),
+                                "=",
+                                literal_expr("?month"),
+                            ),
+                        ),
+                        "AND",
+                        binary_expr(
+                            self.fun_expr(
+                                "Trunc",
+                                vec![self.fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("year"), column_expr("?column")],
+                                )],
+                            ),
+                            "=",
+                            literal_expr("?year"),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        "?expr",
+                        "AND",
+                        binary_expr(
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("month"), column_expr("?column")],
+                                    )],
+                                ),
+                                "=",
+                                literal_expr("?month"),
+                            ),
+                            "AND",
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("year"), column_expr("?column")],
+                                    )],
+                                ),
+                                "=",
+                                literal_expr("?year"),
+                            ),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
                     "?filter_aliases",
                 ),
             ),
@@ -3576,9 +3697,10 @@ impl FilterRules {
         }
     }
 
-    fn transform_filter_extract_year_equals(
+    fn transform_filter_extract_year_month_equals(
         &self,
         year_var: &'static str,
+        month_var: Option<&'static str>,
         column_var: &'static str,
         alias_to_cube_var: &'static str,
         members_var: &'static str,
@@ -3587,6 +3709,7 @@ impl FilterRules {
         filter_aliases_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let year_var = var!(year_var);
+        let month_var = month_var.map(|var| var!(var));
         let column_var = var!(column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let members_var = var!(members_var);
@@ -3595,70 +3718,117 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            let years: Vec<ScalarValue> = var_iter!(egraph[subst[year_var]], LiteralExprValue)
-                .cloned()
-                .collect();
-            if years.is_empty() {
-                return false;
-            }
-            let aliases_es: Vec<Vec<(String, String)>> =
-                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
-                    .cloned()
-                    .collect();
-            for year in years {
-                for aliases in aliases_es.iter() {
+            let Some(year) =
+                var_iter!(egraph[subst[year_var]], LiteralExprValue).find_map(|year| {
                     let year = match year {
-                        ScalarValue::Int64(Some(year)) => year,
-                        ScalarValue::Int32(Some(year)) => year as i64,
-                        ScalarValue::Float64(Some(year)) if (1000.0..=9999.0).contains(&year) => {
+                        ScalarValue::Int64(Some(year)) => *year,
+                        ScalarValue::Int32(Some(year)) => *year as i64,
+                        ScalarValue::Float64(Some(year)) if (1000.0..=9999.0).contains(year) => {
                             year.round() as i64
                         }
                         ScalarValue::Utf8(Some(ref year_str)) if year_str.len() == 4 => {
                             if let Ok(year) = year_str.parse::<i64>() {
                                 year
                             } else {
-                                continue;
+                                return None;
                             }
                         }
-                        _ => continue,
+                        _ => return None,
                     };
-
                     if !(1000..=9999).contains(&year) {
+                        return None;
+                    }
+                    Some(year as i32)
+                })
+            else {
+                return false;
+            };
+
+            let month = if let Some(month_var) = month_var {
+                let month =
+                    var_iter!(egraph[subst[month_var]], LiteralExprValue).find_map(|month| {
+                        let month = match month {
+                            ScalarValue::Int64(Some(month)) => *month,
+                            ScalarValue::Int32(Some(month)) => *month as i64,
+                            ScalarValue::Float64(Some(month)) if (1.0..=12.0).contains(month) => {
+                                month.round() as i64
+                            }
+                            ScalarValue::Utf8(Some(ref month_str))
+                                if (1..=2).contains(&month_str.len()) =>
+                            {
+                                if let Ok(month) = month_str.parse::<i64>() {
+                                    month
+                                } else {
+                                    return None;
+                                }
+                            }
+                            _ => return None,
+                        };
+                        if !(1..=12).contains(&month) {
+                            return None;
+                        }
+                        Some(month as u32)
+                    });
+                if month.is_none() {
+                    return false;
+                }
+                month
+            } else {
+                None
+            };
+
+            let last_day = {
+                let month = month.unwrap_or(12);
+                let next_month = if month == 12 { 1 } else { month + 1 };
+                let next_month_year = if month == 12 { year + 1 } else { year };
+                let Some(next_month_first_date) =
+                    NaiveDate::from_ymd_opt(next_month_year, next_month, 1)
+                else {
+                    return false;
+                };
+                let Some(last_day_date) = next_month_first_date.checked_sub_days(Days::new(1))
+                else {
+                    return false;
+                };
+                last_day_date.day()
+            };
+
+            let aliases_es: Vec<Vec<(String, String)>> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es.iter() {
+                if let Some((member_name, cube)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_var,
+                    members_var,
+                    &aliases,
+                ) {
+                    if !cube.contains_member(&member_name) {
                         continue;
                     }
 
-                    if let Some((member_name, cube)) = Self::filter_member_name(
-                        egraph,
-                        subst,
-                        &meta_context,
-                        alias_to_cube_var,
-                        column_var,
-                        members_var,
-                        &aliases,
-                    ) {
-                        if !cube.contains_member(&member_name) {
-                            continue;
-                        }
+                    subst.insert(
+                        member_var,
+                        egraph.add(LogicalPlanLanguage::FilterMemberMember(FilterMemberMember(
+                            member_name.to_string(),
+                        ))),
+                    );
 
-                        subst.insert(
-                            member_var,
-                            egraph.add(LogicalPlanLanguage::FilterMemberMember(
-                                FilterMemberMember(member_name.to_string()),
-                            )),
-                        );
+                    let date_range_start = format!("{}-{:0>2}-01", year, month.unwrap_or(1));
+                    let date_range_end =
+                        format!("{}-{:0>2}-{}", year, month.unwrap_or(12), last_day);
+                    subst.insert(
+                        values_var,
+                        egraph.add(LogicalPlanLanguage::FilterMemberValues(FilterMemberValues(
+                            vec![date_range_start, date_range_end],
+                        ))),
+                    );
 
-                        subst.insert(
-                            values_var,
-                            egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                                FilterMemberValues(vec![
-                                    format!("{}-01-01", year),
-                                    format!("{}-12-31", year),
-                                ]),
-                            )),
-                        );
-
-                        return true;
-                    }
+                    return true;
                 }
             }
 
