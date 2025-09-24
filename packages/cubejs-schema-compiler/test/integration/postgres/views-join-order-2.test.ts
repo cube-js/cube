@@ -60,14 +60,14 @@ cube('A', {
 
 cube('B', {
   sql: \`
-    SELECT 2 id, 'b'::text as "name"\`,
+    SELECT 2 id, 4 as fk_e, 'b'::text as "name"\`,
   joins: {
     A: {
       relationship: \`many_to_one\`,
       sql: \`\${CUBE.fk} = \${A.id}\`,
     },
     E: {
-      sql: \`\${CUBE.name} = \${E.id}\`,
+      sql: \`\${CUBE}.fk_e = \${E.id}\`,
       relationship: \`many_to_one\`,
     },
   },
