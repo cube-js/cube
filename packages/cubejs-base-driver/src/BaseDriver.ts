@@ -786,7 +786,7 @@ export abstract class BaseDriver implements DriverInterface {
       if (!list.Contents) {
         return [];
       } else {
-        const csvFile = await Promise.all(
+        const csvFiles = await Promise.all(
           list.Contents.map(async (file) => {
             const command = new GetObjectCommand({
               Bucket: bucketName,
@@ -795,7 +795,7 @@ export abstract class BaseDriver implements DriverInterface {
             return getSignedUrl(storage, command, { expiresIn: 3600 });
           })
         );
-        return csvFile;
+        return csvFiles;
       }
     }
 
@@ -818,16 +818,17 @@ export abstract class BaseDriver implements DriverInterface {
     const bucket = storage.bucket(bucketName);
     const [files] = await bucket.getFiles({ prefix: `${tableName}/` });
     if (files.length) {
-      const csvFile = await Promise.all(files.map(async (file) => {
+      const csvFiles = await Promise.all(files.map(async (file) => {
         const [url] = await file.getSignedUrl({
           action: 'read',
           expires: new Date(new Date().getTime() + 60 * 60 * 1000)
         });
         return url;
       }));
-      return csvFile;
+
+      return csvFiles;
     } else {
-      return [];
+      throw new Error('No CSV files were obtained from the bucket');
     }
   }
 
@@ -921,6 +922,10 @@ export abstract class BaseDriver implements DriverInterface {
         const sas = await getSas(blob.name, starts, expires);
         csvFiles.push(`${url}/${container}/${blob.name}?${sas}`);
       }
+    }
+
+    if (csvFiles.length === 0) {
+      throw new Error('No CSV files were obtained from the bucket');
     }
 
     return csvFiles;
