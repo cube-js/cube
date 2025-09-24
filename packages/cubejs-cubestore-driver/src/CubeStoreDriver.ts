@@ -299,8 +299,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       if (tableData.csvDelimiter) {
         options.delimiter = tableData.csvDelimiter;
       }
-      if (tableData.csvDisableQouting) {
-        options.disableQuoting = tableData.csvDisableQouting;
+      if (tableData.csvDisableQuoting) {
+        options.disableQuoting = tableData.csvDisableQuoting;
       }
       options.files = files;
     }
