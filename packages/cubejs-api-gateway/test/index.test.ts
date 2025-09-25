@@ -384,8 +384,7 @@ describe('API Gateway', () => {
               limit: 10000,
               dimensions: [],
               timeDimensions: [],
-              queryType: 'regularQuery',
-              cache: 'stale-if-slow',
+              queryType: 'regularQuery'
             }
           ],
           queryOrder: [{ id: 'desc' }],
@@ -397,8 +396,7 @@ describe('API Gateway', () => {
             limit: 10000,
             dimensions: [],
             timeDimensions: [],
-            queryType: 'regularQuery',
-            cache: 'stale-if-slow',
+            queryType: 'regularQuery'
           },
           transformedQueries: [null]
         });
@@ -463,8 +461,7 @@ describe('API Gateway', () => {
             limit: 10000,
             dimensions: [],
             timeDimensions: [],
-            queryType: 'regularQuery',
-            cache: 'stale-if-slow',
+            queryType: 'regularQuery'
           }
         ]);
       }
@@ -521,8 +518,7 @@ describe('API Gateway', () => {
               limit: 2,
               dimensions: [],
               timeDimensions: [],
-              queryType: 'regularQuery',
-              cache: 'stale-if-slow',
+              queryType: 'regularQuery'
             }
           ],
           queryOrder: [{ id: 'desc' }],
@@ -534,8 +530,7 @@ describe('API Gateway', () => {
             limit: 2,
             dimensions: [],
             timeDimensions: [],
-            queryType: 'regularQuery',
-            cache: 'stale-if-slow',
+            queryType: 'regularQuery'
           },
           transformedQueries: [null]
         });
@@ -569,8 +564,7 @@ describe('API Gateway', () => {
               limit: 10000,
               dimensions: [],
               timeDimensions: [],
-              queryType: 'regularQuery',
-              cache: 'stale-if-slow',
+              queryType: 'regularQuery'
             }
           ],
           queryOrder: [{ id: 'desc' }],
@@ -583,8 +577,7 @@ describe('API Gateway', () => {
             limit: 10000,
             dimensions: [],
             timeDimensions: [],
-            queryType: 'regularQuery',
-            cache: 'stale-if-slow',
+            queryType: 'regularQuery'
           },
           transformedQueries: [null]
         });
