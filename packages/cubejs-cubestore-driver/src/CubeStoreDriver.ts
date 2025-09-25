@@ -49,6 +49,7 @@ type CreateTableOptions = {
   sourceTable?: any
   sealAt?: string
   delimiter?: string
+  disableQuoting?: boolean
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -109,6 +110,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
     if (options.delimiter) {
       withEntries.push(`delimiter = '${options.delimiter}'`);
+    }
+    if (options.disableQuoting) {
+      withEntries.push(`disable_quoting = true`);
     }
     if (options.buildRangeEnd) {
       withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);
@@ -294,6 +298,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       options.inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';
       if (tableData.csvDelimiter) {
         options.delimiter = tableData.csvDelimiter;
+      }
+      if (tableData.csvDisableQuoting) {
+        options.disableQuoting = tableData.csvDisableQuoting;
       }
       options.files = files;
     }
