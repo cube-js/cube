@@ -314,66 +314,33 @@ class ApiGateway {
      *************************************************************** */
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
-      let cacheMode: CacheMode | undefined;
-
-      // TODO: Drop this fallback to renewQuery when it will be removed
-      if (req.query.cache !== undefined) {
-        cacheMode = req.query.cache;
-      } else if (req.query.query?.renewQuery !== undefined) {
-        cacheMode = req.query.query.renewQuery === true
-          ? 'must-revalidate'
-          : 'stale-if-slow';
-      }
-
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.query.queryType,
-        cacheMode,
+        cacheMode: this.normalizeCacheMode(req.query.query, req.query.cache),
       });
     }));
 
     const jsonParser = bodyParser.json({ limit: '1mb' });
     app.post(`${this.basePath}/v1/load`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
-      let cacheMode: CacheMode | undefined;
-
-      // TODO: Drop this fallback to renewQuery when it will be removed
-      if (req.query.cache !== undefined) {
-        cacheMode = req.body.cache;
-      } else if (req.body.query?.renewQuery !== undefined) {
-        cacheMode = req.body.query.renewQuery === true
-          ? 'must-revalidate'
-          : 'stale-if-slow';
-      }
-
       await this.load({
         query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.body.queryType,
-        cacheMode,
+        cacheMode: this.normalizeCacheMode(req.body.query, req.body.cache),
       });
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
-      let cacheMode: CacheMode | undefined;
-
-      // TODO: Drop this fallback to renewQuery when it will be removed
-      if (req.query.cache !== undefined) {
-        cacheMode = req.query.cache;
-      } else if (req.query.query?.renewQuery !== undefined) {
-        cacheMode = req.query.query.renewQuery === true
-          ? 'must-revalidate'
-          : 'stale-if-slow';
-      }
-
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.query.queryType,
-        cacheMode,
+        cacheMode: this.normalizeCacheMode(req.query.query, req.query.cache),
       });
     }));
 
@@ -618,6 +585,19 @@ class ApiGateway {
 
   protected duration(requestStarted) {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
+  }
+
+  // TODO: Drop this when renewQuery will be removed
+  private normalizeCacheMode(query, cache: string): CacheMode {
+    if (cache !== undefined) {
+      return cache as CacheMode;
+    } else if (query?.renewQuery !== undefined) {
+      return query.renewQuery === true
+        ? 'must-revalidate'
+        : 'stale-if-slow';
+    }
+
+    return 'stale-if-slow';
   }
 
   private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
