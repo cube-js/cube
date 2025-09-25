@@ -22,6 +22,7 @@ pub type CubeMetaMeasureFormat = cubeclient::models::V1CubeMetaMeasureFormat;
 pub type TransportLoadResponse = cubeclient::models::V1LoadResponse;
 pub type TransportLoadRequestQuery = cubeclient::models::V1LoadRequestQuery;
 pub type TransportLoadRequest = cubeclient::models::V1LoadRequest;
+pub type TransportLoadRequestCacheMode = cubeclient::models::Cache;
 pub type TransportMetaResponse = cubeclient::models::V1MetaResponse;
 pub type TransportError = cubeclient::models::V1Error;
 

@@ -139,6 +139,7 @@ interface Query {
   totalQuery?: boolean;
   order?: any;
   timezone?: string;
+  // @deprecated
   renewQuery?: boolean;
   ungrouped?: boolean;
   responseFormat?: ResultType;
