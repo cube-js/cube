@@ -22,7 +22,6 @@ import {
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
   timeSeriesFromCustomInterval,
-  parseSqlInterval,
   findMinGranularityDimension
 } from '@cubejs-backend/shared';
 
@@ -436,81 +435,32 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
-      const [rootOfJoin, ...allMembersJoinHints] = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
       const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
-      let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(this.join));
+      const allJoinHints = [
+        ...this.queryLevelJoinHints,
+        ...allMembersJoinHints,
+        ...customSubQueryJoinHints,
+      ];
 
-      // One cube may join the other cube via transitive joined cubes,
-      // members from which are referenced in the join `on` clauses.
-      // We need to collect such join hints and push them upfront of the joining one
-      // but only if they don't exist yet. Cause in other case we might affect what
-      // join path will be constructed in join graph.
-      // It is important to use queryLevelJoinHints during the calculation if it is set.
+      const tempJoin = this.joinGraph.buildJoin(allJoinHints);
 
-      const constructJH = () => {
-        const filteredJoinMembersJoinHints = joinMembersJoinHints.filter(m => !allMembersJoinHints.includes(m));
-        return [
-          ...this.queryLevelJoinHints,
-          ...(rootOfJoin ? [rootOfJoin] : []),
-          ...filteredJoinMembersJoinHints,
-          ...allMembersJoinHints,
-          ...customSubQueryJoinHints,
-        ];
-      };
-
-      let prevJoins = this.join;
-      let prevJoinMembersJoinHints = joinMembersJoinHints;
-      let newJoin = this.joinGraph.buildJoin(constructJH());
-
-      const isOrderPreserved = (base, updated) => {
-        const common = base.filter(value => updated.includes(value));
-        const bFiltered = updated.filter(value => common.includes(value));
-
-        return common.every((x, i) => x === bFiltered[i]);
-      };
-
-      const isJoinTreesEqual = (a, b) => {
-        if (!a || !b || a.root !== b.root || a.joins.length !== b.joins.length) {
-          return false;
-        }
-
-        // We don't care about the order of joins on the same level, so
-        // we can compare them as sets.
-        const aJoinsSet = new Set(a.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
-        const bJoinsSet = new Set(b.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
-
-        if (aJoinsSet.size !== bJoinsSet.size) {
-          return false;
-        }
-
-        for (const val of aJoinsSet) {
-          if (!bJoinsSet.has(val)) {
-            return false;
-          }
-        }
-
-        return true;
-      };
-
-      // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
-      let cnt = 0;
-
-      while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoins, newJoin) && cnt < 10000) {
-        prevJoins = newJoin;
-        joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
-        if (!isOrderPreserved(prevJoinMembersJoinHints, joinMembersJoinHints)) {
-          throw new UserError(`Can not construct joins for the query, potential loop detected: ${prevJoinMembersJoinHints.join('->')} vs ${joinMembersJoinHints.join('->')}`);
-        }
-        newJoin = this.joinGraph.buildJoin(constructJH());
-        prevJoinMembersJoinHints = joinMembersJoinHints;
-        cnt++;
+      if (!tempJoin) {
+        this.collectedJoinHints = allJoinHints;
+        return allJoinHints;
       }
 
-      if (cnt >= 10000) {
-        throw new UserError('Can not construct joins for the query, potential loop detected');
-      }
+      const joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(tempJoin));
+      const allJoinHintsFlatten = new Set(allJoinHints.flat());
+      const newCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
 
-      this.collectedJoinHints = R.uniq(constructJH());
+      this.collectedJoinHints = [
+        ...this.queryLevelJoinHints,
+        tempJoin.root,
+        ...newCollectedHints,
+        ...allMembersJoinHints,
+        ...customSubQueryJoinHints,
+      ];
     }
     return this.collectedJoinHints;
   }
