@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+### Features
+
+- Expose format field for measures/dimensions in meta ([#9998](https://github.com/cube-js/cube/issues/9998)) ([51ec263](https://github.com/cube-js/cube/commit/51ec2638892272be48325bdaca931f6d1c239714))
+
 ## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

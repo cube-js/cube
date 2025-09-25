@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+### Bug Fixes
+
+- **cubesql:** Add missing aggregate expressions for `ORDER BY` clause ([#9990](https://github.com/cube-js/cube/issues/9990)) ([24d1177](https://github.com/cube-js/cube/commit/24d1177a5a64c9cddc2157775ab7de105ff35987))
+
+### Features
+
+- **cubesql:** Support `SAVEPOINT`, `ROLLBACK TO`, `RELEASE` ([#9992](https://github.com/cube-js/cube/issues/9992)) ([2788b6d](https://github.com/cube-js/cube/commit/2788b6daed3297f755aa234b46971bb3556164fb))
+
 ## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
 
 ### Bug Fixes

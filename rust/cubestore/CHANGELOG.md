@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+### Bug Fixes
+
+- **cubestore:** Disable quoting in csv parser for Athena ([#9997](https://github.com/cube-js/cube/issues/9997)) ([5cefd96](https://github.com/cube-js/cube/commit/5cefd96e71e2e16bfbeda75e1be5c72552414a4a))
+
 ## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
