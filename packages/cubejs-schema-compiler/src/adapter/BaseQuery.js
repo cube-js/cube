@@ -498,9 +498,11 @@ export class BaseQuery {
       while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoins, newJoin) && cnt < 10000) {
         prevJoins = newJoin;
         joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
+
         if (!isOrderPreserved(prevJoinMembersJoinHints, joinMembersJoinHints)) {
           throw new UserError(`Can not construct joins for the query, potential loop detected: ${prevJoinMembersJoinHints.join('->')} vs ${joinMembersJoinHints.join('->')}`);
         }
+
         newJoin = this.joinGraph.buildJoin(constructJH());
         prevJoinMembersJoinHints = joinMembersJoinHints;
         cnt++;
