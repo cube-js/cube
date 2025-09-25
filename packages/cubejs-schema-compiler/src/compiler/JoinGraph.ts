@@ -1,3 +1,4 @@
+import R from 'ramda';
 import Graph from 'node-dijkstra';
 import { UserError } from './UserError';
 
@@ -200,6 +201,8 @@ export class JoinGraph {
   }
 
   protected buildJoinTreeForRoot(root: JoinHint, cubesToJoin: JoinHints): JoinTree | null {
+    const self = this;
+
     const { graph } = this;
     if (graph === null) {
       // JoinGraph was not compiled
@@ -213,86 +216,67 @@ export class JoinGraph {
       }
       root = newRoot;
     }
-
-    // Flatten all target cubes from cubesToJoin hints
-    const targetCubes = new Set<string>();
-    for (const joinHint of cubesToJoin) {
-      if (Array.isArray(joinHint)) {
-        joinHint.forEach(cube => targetCubes.add(cube));
-      } else {
-        targetCubes.add(joinHint);
+    const nodesJoined = {};
+    const result = cubesToJoin.map(joinHints => {
+      if (!Array.isArray(joinHints)) {
+        joinHints = [joinHints];
       }
+      let prevNode = root;
+      return joinHints.filter(toJoin => toJoin !== prevNode).map(toJoin => {
+        if (nodesJoined[toJoin]) {
+          prevNode = toJoin;
+          return { joins: [] };
+        }
+
+        const path = graph.path(prevNode, toJoin);
+        if (!path) {
+          return null;
+        }
+        if (!Array.isArray(path)) {
+          // Unexpected object return from graph, it should do so only when path cost was requested
+          return null;
+        }
+
+        const foundJoins = self.joinsByPath(path);
+        prevNode = toJoin;
+        nodesJoined[toJoin] = true;
+        return { cubes: path, joins: foundJoins };
+      });
+    }).reduce((a, b) => a.concat(b), [])
+      // @ts-ignore
+      .reduce((joined, res) => {
+        if (!res || !joined) {
+          return null;
+        }
+        const indexedPairs = R.compose<
+          Array<JoinEdge>,
+          Array<[number, JoinEdge]>
+        >(
+          R.addIndex(R.map)((j, i) => [i + joined.joins.length, j])
+        );
+        return {
+          joins: [...joined.joins, ...indexedPairs(res.joins)],
+        };
+      }, { joins: [] });
+
+    if (!result) {
+      return null;
     }
 
-    // Remove root from targets if it exists
-    targetCubes.delete(root);
-
-    if (targetCubes.size === 0) {
-      return { joins: [], root };
-    }
-
-    /**
-     * We actually need not a list of joins between all requested nodes but
-     * a minimal spanning tree that covers all the requested nodes.
-     * Ideally it should be done via Steiner Tree Algorythm.
-     * But Steiner Tree is an NP-hard problem. So we use a
-     * Greedy algorithm with coverage tracking which is an approximate
-     * method for solving Steiner tree problems that is frequently used
-     * in cases when we need to connect only the necessary nodes with
-     * the minimum number of edges.
-     */
-    const coveredNodes = new Set<string>([root]);
-    const resultJoins: JoinEdge[] = [];
-    const remainingTargets = new Set(targetCubes);
-
-    while (remainingTargets.size > 0) {
-      let bestPath: string[] | null = null;
-      let bestTarget: string | null = null;
-
-      // Find the shortest path from any covered node to any remaining target
-      for (const coveredNode of coveredNodes) {
-        for (const target of remainingTargets) {
-          const path = graph.path(coveredNode, target);
-          if (path && Array.isArray(path)) {
-            if (bestPath === null || path.length < bestPath.length) {
-              bestPath = path;
-              bestTarget = target;
-            }
-          }
-        }
-      }
-
-      if (!bestPath || !bestTarget) {
-        // Cannot reach remaining targets
-        return null;
-      }
-
-      // Add only the new edges from the path (skip already covered nodes)
-      const pathJoins = this.joinsByPath(bestPath);
-      let startIndex = 0;
-
-      // Find the first uncovered node in the path
-      for (let i = 0; i < bestPath.length; i++) {
-        if (coveredNodes.has(bestPath[i])) {
-          startIndex = i;
-        } else {
-          break;
-        }
-      }
-
-      // Add edges and nodes from first uncovered node onwards
-      for (let i = startIndex; i < bestPath.length - 1; i++) {
-        if (!coveredNodes.has(bestPath[i + 1])) {
-          resultJoins.push(pathJoins[i]);
-          coveredNodes.add(bestPath[i + 1]);
-        }
-      }
-
-      remainingTargets.delete(bestTarget);
-    }
-
+    const pairsSortedByIndex: (joins: [number, JoinEdge][]) => JoinEdge[] =
+      R.compose<
+        Array<[number, JoinEdge]>,
+        Array<[number, JoinEdge]>,
+        Array<JoinEdge>,
+        Array<JoinEdge>
+      >(
+        R.uniq,
+        R.map(([_, join]: [number, JoinEdge]) => join),
+        R.sortBy(([index]: [number, JoinEdge]) => index)
+      );
     return {
-      joins: resultJoins,
+      // @ts-ignore
+      joins: pairsSortedByIndex(result.joins),
       root
     };
   }
@@ -327,11 +311,7 @@ export class JoinGraph {
   }
 
   protected joinsByPath(path: string[]): JoinEdge[] {
-    const result: JoinEdge[] = [];
-    for (let i = 0; i < path.length - 1; i++) {
-      result.push(this.edges[`${path[i]}-${path[i + 1]}`]);
-    }
-    return result;
+    return R.range(0, path.length - 1).map(i => this.edges[`${path[i]}-${path[i + 1]}`]);
   }
 
   public connectedComponents(): Record<string, number> {
