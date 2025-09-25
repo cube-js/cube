@@ -3,11 +3,15 @@ src/lib.rs
 src/models/mod.rs
 src/models/v1_cube_meta.rs
 src/models/v1_cube_meta_dimension.rs
+src/models/v1_cube_meta_dimension_format.rs
 src/models/v1_cube_meta_dimension_granularity.rs
+src/models/v1_cube_meta_dimension_link_format.rs
+src/models/v1_cube_meta_dimension_simple_format.rs
 src/models/v1_cube_meta_folder.rs
 src/models/v1_cube_meta_hierarchy.rs
 src/models/v1_cube_meta_join.rs
 src/models/v1_cube_meta_measure.rs
+src/models/v1_cube_meta_measure_format.rs
 src/models/v1_cube_meta_nested_folder.rs
 src/models/v1_cube_meta_segment.rs
 src/models/v1_cube_meta_type.rs

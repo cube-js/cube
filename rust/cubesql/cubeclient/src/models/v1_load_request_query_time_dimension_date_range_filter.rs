@@ -1,14 +1,15 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct V1LoadRequestQueryTimeDimensionDateRangeFilter {
-}
+pub struct V1LoadRequestQueryTimeDimensionDateRangeFilter {}
 
 impl V1LoadRequestQueryTimeDimensionDateRangeFilter {
     pub fn new() -> V1LoadRequestQueryTimeDimensionDateRangeFilter {
-        V1LoadRequestQueryTimeDimensionDateRangeFilter {
-        }
+        V1LoadRequestQueryTimeDimensionDateRangeFilter {}
     }
 }
-
-
+impl Default for V1LoadRequestQueryTimeDimensionDateRangeFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
