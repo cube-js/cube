@@ -110,6 +110,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_csv_no_header_and_delimiter",
             create_table_with_csv_no_header_and_delimiter,
         ),
+        t(
+            "create_table_with_csv_no_header_and_quotes",
+            create_table_with_csv_no_header_and_quotes,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -2245,6 +2249,54 @@ async fn create_table_with_csv_no_header_and_delimiter(service: Box<dyn SqlClien
         .unwrap();
     let _ = service
         .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header', delimiter = '^A', disable_quoting = true) LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![
+                TableValue::String("\"apple".to_string()),
+                TableValue::Int(31)
+            ],
+            vec![
+                TableValue::String("\"orange\" orange".to_string()),
+                TableValue::Int(4)
+            ],
+            vec![
+                TableValue::String("a\"pp\"le".to_string()),
+                TableValue::Int(12)
+            ],
+            vec![
+                TableValue::String("a\"pple".to_string()),
+                TableValue::Int(32)
+            ],
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)],
+        ]
+    );
+}
+
+async fn create_table_with_csv_no_header_and_quotes(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        \"\"\"apple\",31
+        \"a\"\"pple\",32
+        \"a\"\"pp\"\"le\",12
+        apple,2
+        banana,3
+        \"\"\"orange\"\" orange\",4
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header', delimiter = ',', disable_quoting = false) LOCATION '{}'", path).as_str())
         .await
         .unwrap();
     let result = service
