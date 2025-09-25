@@ -1,0 +1,51 @@
+# Arrowflight SQL JDBC
+
+[Arrow Flight SQL][arrowflight-sql] is a protocol for interacting with SQL databases using the Arrow in-memory format and the Flight RPC framework.
+We provide an integration of cubejs with such a database using the [Arrow Flight SQL JDBC Driver](https://arrow.apache.org/docs/java/flight_sql_jdbc_driver.html)
+
+Examples of products supporting Arrow Flight SQL:
+- [Dremio][dremio]
+- [Apache Doris][apache-doris]
+- [Clickhouse][clickhouse]
+- [Spice.ai][spiceai]
+- [InfluxDB][influxdb]
+
+## Prerequisites
+
+- [A JDK installation][gh-cubejs-jdbc-install]
+- The [JDBC URL][arrowflight-sql-jdbc-driver] for the [Arrowflight][arrowflight-sql] database
+
+## Setup
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=flightsql-jdbc
+# CUBEJS_DB_NAME is optional
+CUBEJS_DB_NAME=default
+CUBEJS_DB_HOST=localhost
+CUBEJS_DB_PORT=50051
+```
+
+## Environment Variables
+
+| Environment Variable                          | Description                                                                                                                                                  | Possible Values                                      |
+|-----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|
+| `CUBEJS_DB_TYPE`                              | The Cube.js database type                                                                                                                                    | flightsql-jdbc                                       |
+| `CUBEJS_JDBC_URL`                             | The URL for the JDBC connection for full control of the settings. If not set default to jdbc:arrow-flight-sql://CUBEJS_DB_HOST:CUBEJS_DB_PORT/CUBEJS_DB_NAME | A valid Arrow flight JDBC URL                        |
+| `CUBEJS_DB_NAME`                              | The name of the database to connect to, default to 'default'                                                                                                 | A valid database name                                |
+| `CUBEJS_DB_HOST`                              | The database host                                                                                                                                            | A valid database host                                |
+| `CUBEJS_DB_PORT`                              | The database port, default to 50051                                                                                                                          | A valid port                                         |
+| `CUBEJS_FLIGHT_SQL_API_KEY`                   | The database API key, default to ''                                                                                                                          | A valid API key                                      |
+| `CUBEJS_FLIGHT_SQL_USE_ENCRYPTION`            | Whether to use TLS or not, default to false                                                                                                                  | 'true' or 'false'                                    |
+| `CUBEJS_FLIGHT_SQL_DISABLE_CERT_VERIFICATION` | Whether to disable certificate validation or not when TLS is used, default to true                                                                           | 'true' or 'false'                                    |
+
+
+[arrowflight-sql]: https://arrow.apache.org/docs/java/flight_sql.html
+[arrowflight-sql-jdbc-driver]: https://arrow.apache.org/docs/java/flight_sql_jdbc_driver.html
+[gh-cubejs-jdbc-install]: https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
+[dremio]: https://docs.dremio.com/current/client-applications/drivers/arrow-flight-sql-jdbc-driver
+[apache-doris]: https://doris.apache.org/docs/3.0/db-connect/arrow-flight-sql-connect
+[clickhouse]: https://clickhouse.com/docs/interfaces/arrowflight
+[spiceai]: https://spiceai.org/docs/api/jdbc
+[influxdb]: https://docs.influxdata.com/influxdb3/cloud-dedicated/reference/client-libraries/flight/java-flightsql

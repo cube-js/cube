@@ -177,6 +177,7 @@ export class ServerContainer {
 
     const deepsToIgnore = [
       '@cubejs-backend/databricks-jdbc-driver',
+      '@cubejs-backend/flightsql-jdbc-driver',
     ];
 
     if (manifest.dependencies) {

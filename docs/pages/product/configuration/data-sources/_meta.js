@@ -1,4 +1,5 @@
 module.exports = {
+  "arrowflight-sql": "Arrow flight SQL",
   "aws-athena": "Amazon Athena",
   "aws-redshift": "Amazon Redshift",
   "pinot": "Apache Pinot",
