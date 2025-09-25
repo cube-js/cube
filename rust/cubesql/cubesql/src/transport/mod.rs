@@ -14,6 +14,9 @@ pub type CubeMetaNestedFolder = cubeclient::models::V1CubeMetaNestedFolder;
 pub type CubeMetaNestedFolderMember = cubeclient::models::V1CubeMetaNestedFolderMember;
 pub type CubeMetaHierarchy = cubeclient::models::V1CubeMetaHierarchy;
 pub type CubeMetaDimensionFormat = cubeclient::models::V1CubeMetaDimensionFormat;
+pub type CubeMetaDimensionSimpleFormat = cubeclient::models::V1CubeMetaDimensionSimpleFormat;
+pub type CubeMetaDimensionLinkFormat = cubeclient::models::V1CubeMetaDimensionLinkFormat;
+pub type CubeMetaDimensionLinkFormatType = cubeclient::models::V1CubeMetaDimensionLinkFormatType;
 pub type CubeMetaMeasureFormat = cubeclient::models::V1CubeMetaMeasureFormat;
 // Request/Response
 pub type TransportLoadResponse = cubeclient::models::V1LoadResponse;

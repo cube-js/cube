@@ -11,36 +11,29 @@
 use crate::models;
 use serde::{Deserialize, Serialize};
 
-/// V1CubeMetaDimensionFormat : Format of dimension
-/// Format of dimension
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+/// V1CubeMetaDimensionFormat : Format of dimension - can be either a simple string format or an object with link configuration
+/// Format of dimension - can be either a simple string format or an object with link configuration
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[serde(untagged)]
 pub enum V1CubeMetaDimensionFormat {
-    #[serde(rename = "imageUrl")]
-    ImageUrl,
-    #[serde(rename = "id")]
-    Id,
-    #[serde(rename = "link")]
-    Link,
-    #[serde(rename = "percent")]
-    Percent,
-    #[serde(rename = "currency")]
-    Currency,
-}
-
-impl std::fmt::Display for V1CubeMetaDimensionFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::ImageUrl => write!(f, "imageUrl"),
-            Self::Id => write!(f, "id"),
-            Self::Link => write!(f, "link"),
-            Self::Percent => write!(f, "percent"),
-            Self::Currency => write!(f, "currency"),
-        }
-    }
+    V1CubeMetaDimensionSimpleFormat(models::V1CubeMetaDimensionSimpleFormat),
+    V1CubeMetaDimensionLinkFormat(Box<models::V1CubeMetaDimensionLinkFormat>),
 }
 
 impl Default for V1CubeMetaDimensionFormat {
-    fn default() -> V1CubeMetaDimensionFormat {
-        Self::ImageUrl
+    fn default() -> Self {
+        Self::V1CubeMetaDimensionSimpleFormat(Default::default())
+    }
+}
+/// Type of the format (must be 'link')
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub enum Type {
+    #[serde(rename = "link")]
+    Link,
+}
+
+impl Default for Type {
+    fn default() -> Type {
+        Self::Link
     }
 }

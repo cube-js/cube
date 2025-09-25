@@ -5,6 +5,8 @@ src/models/v1_cube_meta.rs
 src/models/v1_cube_meta_dimension.rs
 src/models/v1_cube_meta_dimension_format.rs
 src/models/v1_cube_meta_dimension_granularity.rs
+src/models/v1_cube_meta_dimension_link_format.rs
+src/models/v1_cube_meta_dimension_simple_format.rs
 src/models/v1_cube_meta_folder.rs
 src/models/v1_cube_meta_hierarchy.rs
 src/models/v1_cube_meta_join.rs
