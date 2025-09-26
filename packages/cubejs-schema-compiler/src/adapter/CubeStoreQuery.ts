@@ -150,7 +150,7 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public escapeColumnName(name) {
-    return `\`${name}\``;
+    return `\`${name.replaceAll('`', '``')}\``;
   }
 
   public seriesSql(timeDimension) {
