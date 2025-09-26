@@ -437,6 +437,8 @@ export class BaseQuery {
   get allJoinHints() {
     if (!this.collectedJoinHints) {
       const [rootOfJoin, ...allMembersJoinHints] = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      const allMembersHintsFlattened = [rootOfJoin, ...allMembersJoinHints].flat();
+      const originalQueryMembersJoinPredecessors = this.buildPredecessors(allMembersHintsFlattened);
       const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
       let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(this.join));
 
@@ -448,7 +450,7 @@ export class BaseQuery {
       // It is important to use queryLevelJoinHints during the calculation if it is set.
 
       const constructJH = () => {
-        const filteredJoinMembersJoinHints = joinMembersJoinHints.filter(m => !allMembersJoinHints.includes(m));
+        const filteredJoinMembersJoinHints = joinMembersJoinHints.filter(m => !allMembersJoinHints.includes(m) && m !== allMembersHintsFlattened[0]);
         return [
           ...this.queryLevelJoinHints,
           ...(rootOfJoin ? [rootOfJoin] : []),
@@ -458,15 +460,36 @@ export class BaseQuery {
         ];
       };
 
-      let prevJoins = this.join;
-      let prevJoinMembersJoinHints = joinMembersJoinHints;
+      let prevJoin = this.join;
       let newJoin = this.joinGraph.buildJoin(constructJH());
 
-      const isOrderPreserved = (base, updated) => {
-        const common = base.filter(value => updated.includes(value));
-        const bFiltered = updated.filter(value => common.includes(value));
+      const isOrderPreserved = (updatedJoinHints) => {
+        for (let i = 0, l = updatedJoinHints.length; i < l; i++) {
+          const predecessors = originalQueryMembersJoinPredecessors[updatedJoinHints[i]];
 
-        return common.every((x, i) => x === bFiltered[i]);
+          if (predecessors?.length > 0) {
+            const predLen = predecessors.length;
+
+            let predIdx = 0;
+            let joinHintIdx = 0;
+
+            while (joinHintIdx < i && predIdx < predLen) {
+              if (updatedJoinHints[joinHintIdx] === predecessors[predIdx]) {
+                joinHintIdx++;
+                predIdx++;
+              } else {
+                joinHintIdx++;
+              }
+            }
+
+            if (predIdx < predLen) {
+              // We still have a must be present predecessor for current hint
+              return [false, `${updatedJoinHints[i]} <-> ${predecessors[predIdx]}`];
+            }
+          }
+        }
+
+        return [true, ''];
       };
 
       const isJoinTreesEqual = (a, b) => {
@@ -495,16 +518,17 @@ export class BaseQuery {
       // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
       let cnt = 0;
 
-      while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoins, newJoin) && cnt < 10000) {
-        prevJoins = newJoin;
+      while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000) {
+        prevJoin = newJoin;
         joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
+        newJoin = this.joinGraph.buildJoin(constructJH());
 
-        if (!isOrderPreserved(prevJoinMembersJoinHints, joinMembersJoinHints)) {
-          throw new UserError(`Can not construct joins for the query, potential loop detected: ${prevJoinMembersJoinHints.join('->')} vs ${joinMembersJoinHints.join('->')}`);
+        const [isOrdered, msg] = isOrderPreserved([allMembersHintsFlattened[0], ...joinMembersJoinHints]);
+
+        if (!isOrdered) {
+          throw new UserError(`Can not construct joins for the query, potential loop detected around ${msg}`);
         }
 
-        newJoin = this.joinGraph.buildJoin(constructJH());
-        prevJoinMembersJoinHints = joinMembersJoinHints;
         cnt++;
       }
 
@@ -538,6 +562,51 @@ export class BaseQuery {
           .map(m => [m.unescapedAliasName(), `${m.dimension}.${m.granularity}`])
       )
     );
+  }
+
+  /**
+   * @private
+   * @param {Array<string>} arr
+   * @returns {{}|any}
+   */
+  buildPredecessors(arr) {
+    if (!arr || arr.length === 0) return {};
+
+    const root = arr[0];
+
+    // the first position of each unique element
+    const firstPos = new Map();
+    for (let i = 0; i < arr.length; i++) {
+      if (!firstPos.has(arr[i])) firstPos.set(arr[i], i);
+    }
+
+    const result = {};
+
+    for (const [elem, idx] of firstPos.entries()) {
+      if (elem === root) {
+        result[elem] = [];
+      } else {
+        // finding the nearest root on the left <<
+        const seen = new Set();
+        const path = [];
+
+        for (let j = idx - 1; j >= 0; j--) {
+          const v = arr[j];
+          if (!seen.has(v)) {
+            seen.add(v);
+            path.push(v);
+          }
+          if (v === root) {
+            break;
+          }
+        }
+
+        path.reverse();
+        result[elem] = path;
+      }
+    }
+
+    return result;
   }
 
   initUngrouped() {
