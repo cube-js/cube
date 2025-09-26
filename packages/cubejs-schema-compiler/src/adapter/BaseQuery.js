@@ -518,10 +518,14 @@ export class BaseQuery {
       // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
       let cnt = 0;
 
-      while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000) {
+      while (newJoin?.joins.length > 0 && cnt < 10000) {
         prevJoin = newJoin;
         joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
         newJoin = this.joinGraph.buildJoin(constructJH());
+
+        if (isJoinTreesEqual(prevJoin, newJoin)) {
+          break;
+        }
 
         const [isOrdered, msg] = isOrderPreserved([allMembersHintsFlattened[0], ...joinMembersJoinHints]);
 
