@@ -1,4 +1,3 @@
-import R from 'ramda';
 import Graph from 'node-dijkstra';
 import { UserError } from './UserError';
 
@@ -43,7 +42,7 @@ export class JoinGraph {
 
   private edges: Record<string, JoinEdge>;
 
-  private builtJoins: Record<string, FinishedJoinTree>;
+  private readonly builtJoins: Record<string, FinishedJoinTree>;
 
   private graph: Graph | null;
 
@@ -60,50 +59,56 @@ export class JoinGraph {
     this.graph = null;
   }
 
-  public compile(cubes: unknown, errorReporter: ErrorReporter): void {
-    this.edges = R.compose<
-        Array<CubeDefinition>,
-        Array<CubeDefinition>,
-        Array<[string, JoinEdge][]>,
-        Array<[string, JoinEdge]>,
-        Record<string, JoinEdge>
-    >(
-      R.fromPairs,
-      R.unnest,
-      R.map((v: CubeDefinition): [string, JoinEdge][] => this.buildJoinEdges(v, errorReporter.inContext(`${v.name} cube`))),
-      R.filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
-    )(this.cubeEvaluator.cubeList);
+  public compile(_cubes: unknown, errorReporter: ErrorReporter): void {
+    this.edges = Object.fromEntries(
+      this.cubeEvaluator.cubeList
+        .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
+        .flatMap((v: CubeDefinition): [string, JoinEdge][] => this.buildJoinEdges(
+          v, errorReporter.inContext(`${v.name} cube`)
+        ))
+    );
 
-    // This requires @types/ramda@0.29 or newer
-    // @ts-ignore
-    this.nodes = R.compose<
-        Record<string, JoinEdge>,
-        Array<[string, JoinEdge]>,
-        Array<JoinEdge>,
-        Record<string, Array<JoinEdge> | undefined>,
-        Record<string, Record<string, 1>>
-    >(
-      // This requires @types/ramda@0.29 or newer
-      // @ts-ignore
-      R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.to, 1]))),
-      R.groupBy((join: JoinEdge) => join.from),
-      R.map(v => v[1]),
-      R.toPairs
-    // @ts-ignore
-    )(this.edges);
+    const grouped: Record<string, JoinEdge[]> = {};
 
-    // @ts-ignore
-    this.undirectedNodes = R.compose(
-      // @ts-ignore
-      R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.from, 1]))),
-      // @ts-ignore
-      R.groupBy(join => join.to),
-      R.unnest,
-      // @ts-ignore
-      R.map(v => [v[1], { from: v[1].to, to: v[1].from }]),
-      R.toPairs
-    // @ts-ignore
-    )(this.edges);
+    for (const join of Object.values(this.edges)) {
+      if (!grouped[join.from]) {
+        grouped[join.from] = [];
+      }
+      grouped[join.from].push(join);
+    }
+
+    this.nodes = Object.fromEntries(
+      Object.entries(grouped).map(([from, edges]) => [
+        from,
+        Object.fromEntries(edges.map((join) => [join.to, 1])),
+      ])
+    );
+
+    const undirectedNodesGrouped: Record<string, JoinEdge[]> = {};
+
+    for (const join of Object.values(this.edges)) {
+      const reverseJoin: JoinEdge = {
+        join: join.join,
+        from: join.to,
+        to: join.from,
+        originalFrom: join.originalFrom,
+        originalTo: join.originalTo,
+      };
+
+      for (const e of [join, reverseJoin]) {
+        if (!undirectedNodesGrouped[e.to]) {
+          undirectedNodesGrouped[e.to] = [];
+        }
+        undirectedNodesGrouped[e.to].push(e);
+      }
+    }
+
+    this.undirectedNodes = Object.fromEntries(
+      Object.entries(undirectedNodesGrouped).map(([to, joins]) => [
+        to,
+        Object.fromEntries(joins.map(join => [join.from, 1]))
+      ])
+    );
 
     this.graph = new Graph(this.nodes);
   }
@@ -158,57 +163,36 @@ export class JoinGraph {
       });
   }
 
-  protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {
-    if (!cube.joins) {
-      return {};
-    }
-
-    return cube.joins.reduce((acc, join) => {
-      acc[join.name] = 1;
-      return acc;
-    }, {} as Record<string, 1>);
-  }
-
   public buildJoin(cubesToJoin: JoinHints): FinishedJoinTree | null {
     if (!cubesToJoin.length) {
       return null;
     }
     const key = JSON.stringify(cubesToJoin);
     if (!this.builtJoins[key]) {
-      const join = R.pipe<
-          JoinHints,
-          Array<JoinTree | null>,
-          Array<JoinTree>,
-          Array<JoinTree>
-      >(
-        R.map(
-          (cube: JoinHint): JoinTree | null => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))
-        ),
-        // @ts-ignore
-        R.filter(R.identity),
-        R.sortBy((joinTree: JoinTree) => joinTree.joins.length)
-      // @ts-ignore
-      )(cubesToJoin)[0];
+      const join = cubesToJoin
+        .map((cube: JoinHint): JoinTree | null => this.buildJoinTreeForRoot(cube, cubesToJoin.filter(c => c !== cube)))
+        .filter((jt): jt is JoinTree => Boolean(jt))
+        .sort((a, b) => a.joins.length - b.joins.length)[0];
 
       if (!join) {
-        throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
+        const errCubes = cubesToJoin.map(v => `'${v}'`).join(', ');
+        throw new UserError(`Can't find join path to join ${errCubes}`);
       }
 
       this.builtJoins[key] = Object.assign(join, {
-        multiplicationFactor: R.compose<
-          JoinHints,
-          Array<[string, boolean]>,
-          Record<string, boolean>
-        >(
-          R.fromPairs,
-          R.map(v => [this.cubeFromPath(v), this.findMultiplicationFactorFor(this.cubeFromPath(v), join.joins)])
-        )(cubesToJoin)
+        multiplicationFactor: Object.fromEntries(
+          cubesToJoin.map((v) => {
+            const cubeName = this.cubeFromPath(v);
+            const factor = this.findMultiplicationFactorFor(cubeName, join.joins);
+            return [cubeName, factor];
+          })
+        )
       });
     }
     return this.builtJoins[key];
   }
 
-  protected cubeFromPath(cubePath) {
+  protected cubeFromPath(cubePath: string | string[]): string {
     if (Array.isArray(cubePath)) {
       return cubePath[cubePath.length - 1];
     }
@@ -216,8 +200,6 @@ export class JoinGraph {
   }
 
   protected buildJoinTreeForRoot(root: JoinHint, cubesToJoin: JoinHints): JoinTree | null {
-    const self = this;
-
     const { graph } = this;
     if (graph === null) {
       // JoinGraph was not compiled
@@ -231,67 +213,86 @@ export class JoinGraph {
       }
       root = newRoot;
     }
-    const nodesJoined = {};
-    const result = cubesToJoin.map(joinHints => {
-      if (!Array.isArray(joinHints)) {
-        joinHints = [joinHints];
+
+    // Flatten all target cubes from cubesToJoin hints
+    const targetCubes = new Set<string>();
+    for (const joinHint of cubesToJoin) {
+      if (Array.isArray(joinHint)) {
+        joinHint.forEach(cube => targetCubes.add(cube));
+      } else {
+        targetCubes.add(joinHint);
       }
-      let prevNode = root;
-      return joinHints.filter(toJoin => toJoin !== prevNode).map(toJoin => {
-        if (nodesJoined[toJoin]) {
-          prevNode = toJoin;
-          return { joins: [] };
-        }
-
-        const path = graph.path(prevNode, toJoin);
-        if (!path) {
-          return null;
-        }
-        if (!Array.isArray(path)) {
-          // Unexpected object return from graph, it should do so only when path cost was requested
-          return null;
-        }
-
-        const foundJoins = self.joinsByPath(path);
-        prevNode = toJoin;
-        nodesJoined[toJoin] = true;
-        return { cubes: path, joins: foundJoins };
-      });
-    }).reduce((a, b) => a.concat(b), [])
-      // @ts-ignore
-      .reduce((joined, res) => {
-        if (!res || !joined) {
-          return null;
-        }
-        const indexedPairs = R.compose<
-          Array<JoinEdge>,
-          Array<[number, JoinEdge]>
-        >(
-          R.addIndex(R.map)((j, i) => [i + joined.joins.length, j])
-        );
-        return {
-          joins: [...joined.joins, ...indexedPairs(res.joins)],
-        };
-      }, { joins: [] });
-
-    if (!result) {
-      return null;
     }
 
-    const pairsSortedByIndex: (joins: [number, JoinEdge][]) => JoinEdge[] =
-      R.compose<
-        Array<[number, JoinEdge]>,
-        Array<[number, JoinEdge]>,
-        Array<JoinEdge>,
-        Array<JoinEdge>
-      >(
-        R.uniq,
-        R.map(([_, join]: [number, JoinEdge]) => join),
-        R.sortBy(([index]: [number, JoinEdge]) => index)
-      );
+    // Remove root from targets if it exists
+    targetCubes.delete(root);
+
+    if (targetCubes.size === 0) {
+      return { joins: [], root };
+    }
+
+    /**
+     * We actually need not a list of joins between all requested nodes but
+     * a minimal spanning tree that covers all the requested nodes.
+     * Ideally it should be done via Steiner Tree Algorythm.
+     * But Steiner Tree is an NP-hard problem. So we use a
+     * Greedy algorithm with coverage tracking which is an approximate
+     * method for solving Steiner tree problems that is frequently used
+     * in cases when we need to connect only the necessary nodes with
+     * the minimum number of edges.
+     */
+    const coveredNodes = new Set<string>([root]);
+    const resultJoins: JoinEdge[] = [];
+    const remainingTargets = new Set(targetCubes);
+
+    while (remainingTargets.size > 0) {
+      let bestPath: string[] | null = null;
+      let bestTarget: string | null = null;
+
+      // Find the shortest path from any covered node to any remaining target
+      for (const coveredNode of coveredNodes) {
+        for (const target of remainingTargets) {
+          const path = graph.path(coveredNode, target);
+          if (path && Array.isArray(path)) {
+            if (bestPath === null || path.length < bestPath.length) {
+              bestPath = path;
+              bestTarget = target;
+            }
+          }
+        }
+      }
+
+      if (!bestPath || !bestTarget) {
+        // Cannot reach remaining targets
+        return null;
+      }
+
+      // Add only the new edges from the path (skip already covered nodes)
+      const pathJoins = this.joinsByPath(bestPath);
+      let startIndex = 0;
+
+      // Find the first uncovered node in the path
+      for (let i = 0; i < bestPath.length; i++) {
+        if (coveredNodes.has(bestPath[i])) {
+          startIndex = i;
+        } else {
+          break;
+        }
+      }
+
+      // Add edges and nodes from first uncovered node onwards
+      for (let i = startIndex; i < bestPath.length - 1; i++) {
+        if (!coveredNodes.has(bestPath[i + 1])) {
+          resultJoins.push(pathJoins[i]);
+          coveredNodes.add(bestPath[i + 1]);
+        }
+      }
+
+      remainingTargets.delete(bestTarget);
+    }
+
     return {
-      // @ts-ignore
-      joins: pairsSortedByIndex(result.joins),
+      joins: resultJoins,
       root
     };
   }
@@ -326,17 +327,22 @@ export class JoinGraph {
   }
 
   protected joinsByPath(path: string[]): JoinEdge[] {
-    return R.range(0, path.length - 1).map(i => this.edges[`${path[i]}-${path[i + 1]}`]);
+    const result: JoinEdge[] = [];
+    for (let i = 0; i < path.length - 1; i++) {
+      result.push(this.edges[`${path[i]}-${path[i + 1]}`]);
+    }
+    return result;
   }
 
   public connectedComponents(): Record<string, number> {
     if (!this.cachedConnectedComponents) {
       let componentId = 1;
       const components = {};
-      R.toPairs(this.nodes).map(nameToConnection => nameToConnection[0]).forEach(node => {
-        this.findConnectedComponent(componentId, node, components);
-        componentId += 1;
-      });
+      Object.entries(this.nodes)
+        .forEach(([node]) => {
+          this.findConnectedComponent(componentId, node, components);
+          componentId += 1;
+        });
       this.cachedConnectedComponents = components;
     }
     return this.cachedConnectedComponents;
@@ -345,9 +351,8 @@ export class JoinGraph {
   protected findConnectedComponent(componentId: number, node: string, components: Record<string, number>): void {
     if (!components[node]) {
       components[node] = componentId;
-      R.toPairs(this.undirectedNodes[node])
-        .map(connectedNodeNames => connectedNodeNames[0])
-        .forEach(connectedNode => {
+      Object.entries(this.undirectedNodes[node])
+        .forEach(([connectedNode]) => {
           this.findConnectedComponent(componentId, connectedNode, components);
         });
     }
