@@ -1,5 +1,4 @@
-import { mount } from '@vue/test-utils';
-import flushPromises from 'flush-promises';
+import { mount, flushPromises } from '@vue/test-utils';
 import { h } from 'vue';
 
 import QueryRenderer from '../../src/QueryRenderer';
