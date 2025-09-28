@@ -144,7 +144,7 @@ impl ValueObject for ResultWrapper {
         }
     }
 
-    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue, CubeError> {
+    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue<'_>, CubeError> {
         if self.transformed_data.is_none() {
             self.transform_result()?;
         }

@@ -271,8 +271,11 @@ pub enum FieldValue<'a> {
 pub trait ValueObject {
     fn len(&mut self) -> std::result::Result<usize, CubeError>;
 
-    fn get(&mut self, index: usize, field_name: &str)
-        -> std::result::Result<FieldValue, CubeError>;
+    fn get(
+        &mut self,
+        index: usize,
+        field_name: &str,
+    ) -> std::result::Result<FieldValue<'_>, CubeError>;
 }
 
 pub struct JsonValueObject {
@@ -294,7 +297,7 @@ impl ValueObject for JsonValueObject {
         &mut self,
         index: usize,
         field_name: &str,
-    ) -> std::result::Result<FieldValue, CubeError> {
+    ) -> std::result::Result<FieldValue<'_>, CubeError> {
         let Some(as_object) = self.rows[index].as_object() else {
             return Err(CubeError::user(format!(
                 "Unexpected response from Cube, row is not an object: {:?}",

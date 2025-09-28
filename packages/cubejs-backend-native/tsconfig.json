@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "include": [
     "js",
-    "test"
+    "test",
+    "benchmarks"
   ],
   "exclude": [
     "test/snapshotResolver.js"

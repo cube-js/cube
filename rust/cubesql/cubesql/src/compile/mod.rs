@@ -5177,13 +5177,39 @@ ORDER BY
         );
 
         insta::assert_snapshot!(
-            "pg_set_role_show",
+            "pg_set_role_good_user",
             execute_queries_with_flags(
-                vec!["SET ROLE NONE".to_string(), "SHOW ROLE".to_string()],
+                vec!["SET ROLE good_user".to_string(), "SHOW ROLE".to_string()],
                 DatabaseProtocol::PostgreSQL
             )
             .await?
             .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_role_none",
+            execute_queries_with_flags(
+                vec![
+                    "SET ROLE good_user".to_string(),
+                    "SET ROLE NONE".to_string(),
+                    "SHOW ROLE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_role_bad_user",
+            execute_queries_with_flags(
+                vec!["SET ROLE bad_user".to_string()],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await
+            .err()
+            .unwrap()
+            .to_string()
         );
 
         Ok(())
@@ -17694,6 +17720,165 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ..Default::default()
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_pg_collation() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_collation_PG17",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_collation ORDER BY oid".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_push_down_limit_sort_projection_recursion() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                customer_gender AS "customer_gender",
+                SUM(sumPrice) AS "SUM(KibanaSampleDataEcommerce.sumPrice)"
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 3
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    "desc".to_string(),
+                ]]),
+                limit: Some(3),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_order_by_missing_aggr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            GROUP BY customer_gender
+            ORDER BY SUM(sumPrice) DESC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    "desc".to_string(),
+                ]]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_tableau_trunc_extract_year_and_month() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:sumPrice:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE (
+                "KibanaSampleDataEcommerce"."id" != 0
+                AND CAST(TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 2
+                AND CAST(TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 2024
+                AND "KibanaSampleDataEcommerce"."customer_gender" IS NOT NULL
+            )
+            HAVING COUNT(1) > 0
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2024-02-01".to_string(),
+                        "2024-02-29".to_string(),
+                    ])),
+                }]),
+                order: Some(vec![]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.id".to_string()),
+                        operator: Some("notEquals".to_string()),
+                        values: Some(vec!["0".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                        operator: Some("gt".to_string()),
+                        values: Some(vec!["0".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                ]),
                 ..Default::default()
             }
         )

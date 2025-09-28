@@ -200,7 +200,7 @@ impl ValueObject for JsValueObject<'_> {
         Ok(self.handle.len(&mut self.cx) as usize)
     }
 
-    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue, CubeError> {
+    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue<'_>, CubeError> {
         let value = self
             .handle
             .get::<JsObject, _, _>(&mut self.cx, index as u32)

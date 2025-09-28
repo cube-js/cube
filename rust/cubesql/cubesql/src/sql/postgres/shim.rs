@@ -806,7 +806,8 @@ impl AsyncPostgresShim {
                     .cloned()
                     .unwrap_or("db".to_string());
                 self.session.state.set_database(Some(database));
-                self.session.state.set_user(Some(user));
+                self.session.state.set_user(Some(user.clone()));
+                self.session.state.set_original_user(Some(user));
                 self.session.state.set_auth_context(Some(auth_context));
 
                 self.write(protocol::Authentication::new(AuthenticationRequest::Ok))
@@ -1217,7 +1218,7 @@ impl AsyncPostgresShim {
                             PreparedStatement::Query {
                                 from_sql,
                                 created: chrono::offset::Utc::now(),
-                                query,
+                                query: Box::new(query),
                                 parameters: protocol::ParameterDescription::new(parameters),
                                 description,
                                 span_id,
@@ -1478,7 +1479,7 @@ impl AsyncPostgresShim {
                 })?;
 
                 let plan = convert_statement_to_cube_query(
-                    cursor.query.clone(),
+                    cursor.query.as_ref().clone(),
                     meta,
                     self.session.clone(),
                     qtrace,
@@ -1555,7 +1556,7 @@ impl AsyncPostgresShim {
                 .await?;
 
                 let cursor = Cursor {
-                    query: select_stmt,
+                    query: Box::new(select_stmt),
                     hold: hold.unwrap_or(false),
                     format: if binary { Format::Binary } else { Format::Text },
                 };

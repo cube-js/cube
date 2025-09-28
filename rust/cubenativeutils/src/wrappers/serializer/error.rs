@@ -1,4 +1,4 @@
-use cubesql::CubeError;
+use crate::CubeError;
 use serde::{de, ser};
 use std::{fmt, fmt::Display};
 #[derive(Debug)]

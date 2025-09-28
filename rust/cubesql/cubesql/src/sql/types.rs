@@ -129,6 +129,8 @@ impl CommandCompletion {
             CommandCompletion::Prepare => CommandComplete::Plain("PREPARE".to_string()),
             CommandCompletion::Commit => CommandComplete::Plain("COMMIT".to_string()),
             CommandCompletion::Rollback => CommandComplete::Plain("ROLLBACK".to_string()),
+            CommandCompletion::Savepoint => CommandComplete::Plain("SAVEPOINT".to_string()),
+            CommandCompletion::Release => CommandComplete::Plain("RELEASE".to_string()),
             CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),
             CommandCompletion::Use => CommandComplete::Plain("USE".to_string()),
             CommandCompletion::DeclareCursor => {

@@ -394,6 +394,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       types,
       csvNoHeader: true,
       csvDelimiter: '^A',
+      csvDisableQuoting: true,
     };
   }
 

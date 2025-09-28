@@ -72,8 +72,15 @@ impl ImportFormat {
     {
         match self {
             ImportFormat::CSV | ImportFormat::CSVNoHeader | ImportFormat::CSVOptions { .. } => {
+                let (delimiter, disable_quoting) = match self {
+                    ImportFormat::CSV | ImportFormat::CSVNoHeader => (',', false),
+                    ImportFormat::CSVOptions {
+                        delimiter, quote, ..
+                    } => (delimiter.unwrap_or(','), quote.is_none()),
+                };
+
                 let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
-                    Box::pin(CsvLineStream::new(reader));
+                    Box::pin(CsvLineStream::new(reader, disable_quoting));
 
                 let mut header_mapping = match self {
                     ImportFormat::CSVNoHeader
@@ -89,11 +96,6 @@ impl ImportFormat {
                     _ => None,
                 };
 
-                let delimiter = match self {
-                    ImportFormat::CSV | ImportFormat::CSVNoHeader => ',',
-                    ImportFormat::CSVOptions { delimiter, .. } => delimiter.unwrap_or(','),
-                };
-
                 if delimiter as u16 > 255 {
                     return Err(CubeError::user(format!(
                         "Non ASCII delimiters are unsupported: '{}'",
@@ -104,7 +106,8 @@ impl ImportFormat {
                 let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
                     let str = line?;
 
-                    let mut parser = CsvLineParser::new(delimiter as u8, str.as_str());
+                    let mut parser =
+                        CsvLineParser::new(delimiter as u8, disable_quoting, str.as_str());
 
                     if header_mapping.is_none() {
                         let mut mapping = Vec::new();
@@ -310,21 +313,23 @@ fn parse_binary_data(value: &str) -> Result<Vec<u8>, CubeError> {
 
 struct CsvLineParser<'a> {
     delimiter: u8,
+    disable_quoting: bool,
     line: &'a str,
     remaining: &'a str,
 }
 
 impl<'a> CsvLineParser<'a> {
-    fn new(delimiter: u8, line: &'a str) -> Self {
+    fn new(delimiter: u8, disable_quoting: bool, line: &'a str) -> Self {
         Self {
             delimiter,
+            disable_quoting,
             line,
             remaining: line,
         }
     }
 
     fn next_value(&mut self) -> Result<MaybeOwnedStr<'_>, CubeError> {
-        Ok(
+        if !self.disable_quoting {
             if let Some(b'"') = self.remaining.as_bytes().iter().nth(0) {
                 let mut closing_index = None;
                 let mut seen_escapes = false;
@@ -356,19 +361,18 @@ impl<'a> CsvLineParser<'a> {
                     res = MaybeOwnedStr::Borrowed(&self.remaining[0..closing_index])
                 }
                 self.remaining = self.remaining[(closing_index + 1)..].as_ref();
-                res
-            } else {
-                let next_comma = self
-                    .remaining
-                    .as_bytes()
-                    .iter()
-                    .position(|c| *c == self.delimiter)
-                    .unwrap_or(self.remaining.len());
-                let res = &self.remaining[0..next_comma];
-                self.remaining = self.remaining[next_comma..].as_ref();
-                MaybeOwnedStr::Borrowed(res)
-            },
-        )
+                return Ok(res);
+            }
+        }
+        let next_comma = self
+            .remaining
+            .as_bytes()
+            .iter()
+            .position(|c| *c == self.delimiter)
+            .unwrap_or(self.remaining.len());
+        let res = &self.remaining[0..next_comma];
+        self.remaining = self.remaining[next_comma..].as_ref();
+        Ok(MaybeOwnedStr::Borrowed(res))
     }
 
     fn advance(&mut self) -> Result<(), CubeError> {
@@ -385,15 +389,17 @@ pin_project! {
     struct CsvLineStream<R: AsyncBufRead> {
         #[pin]
         reader: R,
+        disable_quoting: bool,
         buf: Vec<u8>,
         in_quotes: bool,
     }
 }
 
 impl<R: AsyncBufRead> CsvLineStream<R> {
-    pub fn new(reader: R) -> Self {
+    pub fn new(reader: R, disable_quoting: bool) -> Self {
         Self {
             reader,
+            disable_quoting,
             buf: Vec::new(),
             in_quotes: false,
         }
@@ -417,38 +423,49 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
                         return Poll::Ready(Some(Err(CubeError::from_error(err))));
                     }
                     Ok(available) => {
-                        if *projected.in_quotes {
-                            let quote_pos = memchr::memchr(b'"', available);
-                            if let Some(i) = quote_pos {
-                                // It consumes every pair of quotes.
-                                // Matching for escapes is unnecessary as it's double "" sequence
-                                *projected.in_quotes = false;
-                                projected.buf.extend_from_slice(&available[..=i]);
-                                (false, i + 1)
-                            } else {
-                                projected.buf.extend_from_slice(available);
-                                (false, available.len())
-                            }
-                        } else {
+                        if *projected.disable_quoting {
                             let new_line_pos = memchr::memchr(b'\n', available);
-                            let quote_pos = memchr::memchr(b'"', available);
-                            let in_quotes = quote_pos.is_some()
-                                && (new_line_pos.is_some() && quote_pos < new_line_pos
-                                    || new_line_pos.is_none());
-                            if in_quotes {
-                                if let Some(i) = quote_pos {
-                                    projected.buf.extend_from_slice(&available[..=i]);
-                                    *projected.in_quotes = in_quotes;
-                                    (false, i + 1)
-                                } else {
-                                    unreachable!()
-                                }
-                            } else if let Some(i) = new_line_pos {
+                            if let Some(i) = new_line_pos {
                                 projected.buf.extend_from_slice(&available[..=i]);
                                 (true, i + 1)
                             } else {
                                 projected.buf.extend_from_slice(available);
                                 (false, available.len())
+                            }
+                        } else {
+                            if *projected.in_quotes {
+                                let quote_pos = memchr::memchr(b'"', available);
+                                if let Some(i) = quote_pos {
+                                    // It consumes every pair of quotes.
+                                    // Matching for escapes is unnecessary as it's double "" sequence
+                                    *projected.in_quotes = false;
+                                    projected.buf.extend_from_slice(&available[..=i]);
+                                    (false, i + 1)
+                                } else {
+                                    projected.buf.extend_from_slice(available);
+                                    (false, available.len())
+                                }
+                            } else {
+                                let new_line_pos = memchr::memchr(b'\n', available);
+                                let quote_pos = memchr::memchr(b'"', available);
+                                let in_quotes = quote_pos.is_some()
+                                    && (new_line_pos.is_some() && quote_pos < new_line_pos
+                                        || new_line_pos.is_none());
+                                if in_quotes {
+                                    if let Some(i) = quote_pos {
+                                        projected.buf.extend_from_slice(&available[..=i]);
+                                        *projected.in_quotes = in_quotes;
+                                        (false, i + 1)
+                                    } else {
+                                        unreachable!()
+                                    }
+                                } else if let Some(i) = new_line_pos {
+                                    projected.buf.extend_from_slice(&available[..=i]);
+                                    (true, i + 1)
+                                } else {
+                                    projected.buf.extend_from_slice(available);
+                                    (false, available.len())
+                                }
                             }
                         }
                     }
