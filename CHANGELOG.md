@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
+
+### Bug Fixes
+
+- Merge measure/dimension's spec for formats ([#10007](https://github.com/cube-js/cube/issues/10007)) ([039f0e1](https://github.com/cube-js/cube/commit/039f0e1d87823dc0e7333a7d44af769b09fc6a5e))
+- packages/cubejs-docker/latest-debian-jdk.Dockerfile to reduce vulnerabilities ([#10003](https://github.com/cube-js/cube/issues/10003)) ([5453581](https://github.com/cube-js/cube/commit/5453581b719713024d958c333318d0b70e21adf0))
+
+### Features
+
+- **docker:** Security upgrade Node.js from 22.18.0 to 22.20.0 ([#10008](https://github.com/cube-js/cube/issues/10008)) ([02e7d4a](https://github.com/cube-js/cube/commit/02e7d4a2c7c8076e7a052fbbbe22bc7c0f07c39b))
+
 ## [1.3.74](https://github.com/cube-js/cube/compare/v1.3.73...v1.3.74) (2025-09-26)
 
 **Note:** Version bump only for package cubejs
