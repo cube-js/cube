@@ -508,6 +508,7 @@ export class PreAggregations {
       allValuesEq1(filterDimensionsSingleValueEqual) ? new Set(filterDimensionsSingleValueEqual?.keys()) : null;
 
     return {
+      joinGraph: query.join,
       sortedDimensions,
       sortedTimeDimensions,
       timeDimensions,
