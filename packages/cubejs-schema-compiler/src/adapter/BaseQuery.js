@@ -22,7 +22,6 @@ import {
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
   timeSeriesFromCustomInterval,
-  parseSqlInterval,
   findMinGranularityDimension
 } from '@cubejs-backend/shared';
 
