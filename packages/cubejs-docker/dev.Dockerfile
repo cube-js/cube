@@ -1,4 +1,4 @@
-FROM node:22.18.0-bookworm-slim AS base
+FROM node:22.20.0-bookworm-slim AS base
 
 ARG IMAGE_VERSION=dev
 
