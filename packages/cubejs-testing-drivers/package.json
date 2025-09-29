@@ -49,6 +49,7 @@
     "snowflake-full": "yarn test-driver -i dist/test/snowflake-full.test.js",
     "snowflake-encrypted-pk-full": "yarn test-driver -i dist/test/snowflake-encrypted-pk-full.test.js",
     "snowflake-export-bucket-s3-full": "yarn test-driver -i dist/test/snowflake-export-bucket-s3-full.test.js",
+    "snowflake-export-bucket-s3-iam-roles-full": "yarn test-driver -i dist/test/snowflake-export-bucket-s3-iam-roles-full.test.js",
     "snowflake-export-bucket-s3-prefix-full": "yarn test-driver -i dist/test/snowflake-export-bucket-s3-prefix-full.test.js",
     "snowflake-export-bucket-azure-full": "yarn test-driver -i dist/test/snowflake-export-bucket-azure-full.test.js",
     "snowflake-export-bucket-azure-prefix-full": "yarn test-driver -i dist/test/snowflake-export-bucket-azure-prefix-full.test.js",
