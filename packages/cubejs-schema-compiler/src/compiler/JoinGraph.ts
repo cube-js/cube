@@ -209,6 +209,8 @@ export class JoinGraph {
       return null;
     }
 
+    const tunedGraph = this.getFixedWeightsGraph([root, ...cubesToJoin]);
+
     if (Array.isArray(root)) {
       const [newRoot, ...additionalToJoin] = root;
       if (additionalToJoin.length > 0) {
@@ -216,6 +218,7 @@ export class JoinGraph {
       }
       root = newRoot;
     }
+
     const nodesJoined = {};
     const result = cubesToJoin.map(joinHints => {
       if (!Array.isArray(joinHints)) {
@@ -228,7 +231,7 @@ export class JoinGraph {
           return { joins: [] };
         }
 
-        const path = graph.path(prevNode, toJoin);
+        const path = tunedGraph.path(prevNode, toJoin);
         if (!path) {
           return null;
         }
@@ -279,6 +282,38 @@ export class JoinGraph {
       joins: pairsSortedByIndex(result.joins),
       root
     };
+  }
+
+  /**
+   * Returns compiled graph with updated weights for view join-hints
+   */
+  protected getFixedWeightsGraph(joinHints: JoinHints): Graph {
+    const PRIORITY_WEIGHT = 20; // Lower weight for preferred paths
+
+    // Create a deep copy of this.nodes to avoid modifying the original
+    const tunedNodes: Record<string, Record<string, number>> = {};
+    for (const [from, destinations] of Object.entries(this.nodes)) {
+      tunedNodes[from] = {};
+      for (const [to, weight] of Object.entries(destinations)) {
+        tunedNodes[from][to] = weight;
+      }
+    }
+
+    // Update weights only for array hints (view join hints)
+    for (const hint of joinHints) {
+      if (Array.isArray(hint) && hint.length > 1) {
+        for (let i = 0; i < hint.length - 1; i++) {
+          const from = hint[i];
+          const to = hint[i + 1];
+
+          if (tunedNodes[from]?.[to] !== undefined) {
+            tunedNodes[from][to] = PRIORITY_WEIGHT;
+          }
+        }
+      }
+    }
+
+    return new Graph(tunedNodes);
   }
 
   protected findMultiplicationFactorFor(cube: string, joins: JoinTreeJoins): boolean {
