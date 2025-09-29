@@ -23,8 +23,8 @@ import {
 import { formatToTimeZone } from 'date-fns-timezone';
 import fs from 'fs/promises';
 import crypto from 'crypto';
-import { HydrationMap, HydrationStream } from './HydrationStream';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
+import { HydrationMap, HydrationStream } from './HydrationStream';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
@@ -397,10 +397,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   ): string[] {
     if (exportBucket.bucketType === 's3') {
       const s3Config = exportBucket as SnowflakeDriverExportAWS;
-      const hasCredentials = s3Config.keyId && s3Config.secretKey;
-      const hasIntegration = s3Config.integrationName;
-      
-      if (!hasCredentials && !hasIntegration) {
+      if (s3Config.integrationName) {
         return emptyKeys.filter(key => key !== 'keyId' && key !== 'secretKey');
       }
     }

@@ -27,7 +27,8 @@
         "environment": {
           "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
           "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs",
-          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-west-1"
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-west-1",
+          "CUBEJS_DB_EXPORT_INTEGRATION": "aws_int"
         }
       }
     },
