@@ -106,8 +106,8 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
 interface SnowflakeDriverExportAWS {
   bucketType: 's3',
   bucketName: string,
-  keyId: string,
-  secretKey: string,
+  keyId?: string,
+  secretKey?: string,
   region: string,
   integrationName?: string,
 }
@@ -328,14 +328,17 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (bucketType === 's3') {
       // integrationName is optional for s3
       const integrationName = getEnv('dbExportIntegration', { dataSource });
+      // keyId and secretKey are optional for s3 if IAM role is used
+      const keyId = getEnv('dbExportBucketAwsKey', { dataSource });
+      const secretKey = getEnv('dbExportBucketAwsSecret', { dataSource });
 
       return {
         bucketType,
         bucketName: getEnv('dbExportBucket', { dataSource }),
-        keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
-        secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
         region: getEnv('dbExportBucketAwsRegion', { dataSource }),
         ...(integrationName !== undefined && { integrationName }),
+        ...(keyId !== undefined && { keyId }),
+        ...(secretKey !== undefined && { secretKey }),
       };
     }
 
@@ -387,6 +390,23 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     );
   }
 
+  private getRequiredExportBucketKeys(
+    exportBucket: SnowflakeDriverExportBucket,
+    emptyKeys: string[]
+  ): string[] {
+    if (exportBucket.bucketType === 's3') {
+      const s3Config = exportBucket as SnowflakeDriverExportAWS;
+      const hasCredentials = s3Config.keyId && s3Config.secretKey;
+      const hasIntegration = s3Config.integrationName;
+      
+      if (!hasCredentials && !hasIntegration) {
+        return emptyKeys.filter(key => key !== 'keyId' && key !== 'secretKey');
+      }
+    }
+    
+    return emptyKeys;
+  }
+
   protected getExportBucket(
     dataSource: string,
   ): SnowflakeDriverExportBucket | undefined {
@@ -402,9 +422,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
       const emptyKeys = Object.keys(exportBucket)
         .filter((key: string) => exportBucket[<keyof SnowflakeDriverExportBucket>key] === undefined);
-      if (emptyKeys.length) {
+      const keysToValidate = this.getRequiredExportBucketKeys(exportBucket, emptyKeys);
+      
+      if (keysToValidate.length) {
         throw new Error(
-          `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyKeys.join(',')}`
+          `Unsupported configuration exportBucket, some configuration keys are empty: ${keysToValidate.join(',')}`
         );
       }
 
