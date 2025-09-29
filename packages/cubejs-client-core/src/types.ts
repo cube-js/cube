@@ -113,6 +113,7 @@ export interface Query {
   offset?: number;
   order?: TQueryOrderObject | TQueryOrderArray;
   timezone?: string;
+  // @deprecated
   renewQuery?: boolean;
   ungrouped?: boolean;
   responseFormat?: 'compact' | 'default';

@@ -161,7 +161,7 @@ accessible for everyone.
 | API scope | REST API endpoints | Accessible by default? |
 | --- | --- | --- |
 | `meta`    | [`/v1/meta`][ref-ref-meta] | ✅ Yes |
-| `data`    | [`/v1/load`][ref-ref-load] | ✅ Yes |
+| `data`    | [`/v1/load`][ref-ref-load], [`/v1/cubesql`][ref-ref-cubesql] | ✅ Yes |
 | `graphql` | `/graphql` | ✅ Yes |
 | `sql`     | [`/v1/sql`][ref-ref-sql] | ✅ Yes |
 | `jobs`    | [`/v1/pre-aggregations/jobs`][ref-ref-paj] | ❌ No |
@@ -248,9 +248,20 @@ should be unique for each separate request. `spanId` should define user
 interaction span such us `Continue wait` retry cycle and it's value shouldn't
 change during one single interaction.
 
-## Troubleshooting
+## Cache control
 
-### `Continue wait`
+[`/v1/load`][ref-ref-load] and [`/v1/cubesql`][ref-ref-cubesql] endpoints of the REST API
+allow to control the cache behavior. The following querying strategies with regards to
+the cache are supported:
+
+| Strategy | Description |
+| --- | --- |
+| `stale-if-slow`         | If [refresh keys][ref-refresh-keys] are up-to-date, returns cached value. If expired, tries to return fresh value from the data source. If the data source query is slow (hits [`Continue wait`](#continue-wait)), returns stale value from cache. |
+| `stale-while-revalidate`| If [refresh keys][ref-refresh-keys] are up-to-date, returns cached value. If expired, returns stale data from cache and updates cache in background. |
+| `must-revalidate`       | If [refresh keys][ref-refresh-keys] are up-to-date, returns cached value. If expired, always waits for fresh value from the data source, even if slow (hits one or more [`Continue wait`](#continue-wait) intervals). |
+| `no-cache`              | Skips [refresh key][ref-refresh-keys] checks. Always returns fresh data from the data source, regardless of cache or query performance. |
+
+## `Continue wait`
 
 If the request takes too long to be processed, the REST API responds with
 `{ "error": "Continue wait" }` and the status code 200.
@@ -295,6 +306,7 @@ warehouse][ref-data-warehouses].
 [ref-ref-load]: /product/apis-integrations/rest-api/reference#base_pathv1load
 [ref-ref-meta]: /product/apis-integrations/rest-api/reference#base_pathv1meta
 [ref-ref-sql]: /product/apis-integrations/rest-api/reference#base_pathv1sql
+[ref-ref-cubesql]: /product/apis-integrations/rest-api/reference#base_pathv1cubesql
 [ref-ref-paj]: /product/apis-integrations/rest-api/reference#base_pathv1pre-aggregationsjobs
 [ref-security-context]: /product/auth/context
 [ref-graphql-api]: /product/apis-integrations/graphql-api
@@ -314,3 +326,4 @@ warehouse][ref-data-warehouses].
 [ref-pre-aggregations]: /product/caching/using-pre-aggregations
 [ref-javascript-sdk]: /product/apis-integrations/javascript-sdk
 [ref-recipe-real-time-data-fetch]: /product/apis-integrations/recipes/real-time-data-fetch
+[ref-refresh-keys]: /product/data-modeling/reference/cube#refresh_key

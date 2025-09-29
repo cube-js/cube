@@ -13,10 +13,11 @@ By default, it's `/cubejs-api`.
 
 Run the query to the REST API and get the results. 
 
-| Parameter   | Description                                                                                                           |
-| ----------- | --------------------------------------------------------------------------------------------------------------------- |
-| `query`     | Either a single URL encoded Cube [Query](/product/apis-integrations/rest-api/query-format), or an array of queries    |
-| `queryType` | If multiple queries are passed in `query` for [data blending][ref-recipes-data-blending], this must be set to `multi` |
+| Parameter   | Description                                                                                                           | Required |
+| ----------- | --------------------------------------------------------------------------------------------------------------------- | --- |
+| `query`     | Either a single URL encoded Cube [Query](/product/apis-integrations/rest-api/query-format), or an array of queries    | ✅ Yes |
+| `queryType` | If multiple queries are passed in `query` for [data blending][ref-recipes-data-blending], this must be set to `multi` | ❌ No |
+| `cache`     | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
 
 Response
 
@@ -319,9 +320,10 @@ This endpoint is part of the [SQL API][ref-sql-api].
 
 </InfoBox>
 
-| Parameter | Description |
-| --- | --- |
-| `query` | The SQL query to run. |
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `query` | The SQL query to run. | ✅ Yes |
+| `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
 
 Response: a stream of newline-delimited JSON objects. The first object contains
 the `schema` property with column names and types. The following objects contain
@@ -640,3 +642,4 @@ Keep-Alive: timeout=5
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api
 [ref-folders]: /product/data-modeling/reference/view#folders
+[ref-cache-control]: /product/apis-integrations/rest-api#cache-control

@@ -33,6 +33,7 @@ pub use self::v1_error::V1Error;
 pub mod v1_load_continue_wait;
 pub use self::v1_load_continue_wait::V1LoadContinueWait;
 pub mod v1_load_request;
+pub use self::v1_load_request::Cache;
 pub use self::v1_load_request::V1LoadRequest;
 pub mod v1_load_request_query;
 pub use self::v1_load_request_query::V1LoadRequestQuery;
