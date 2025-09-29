@@ -14,7 +14,7 @@ pub type CubeMetaNestedFolder = cubeclient::models::V1CubeMetaNestedFolder;
 pub type CubeMetaNestedFolderMember = cubeclient::models::V1CubeMetaNestedFolderMember;
 pub type CubeMetaHierarchy = cubeclient::models::V1CubeMetaHierarchy;
 // Format
-pub type V1CubeMetaFormat = cubeclient::models::V1CubeMetaSimpleFormat;
+pub type V1CubeMetaSimpleFormat = cubeclient::models::V1CubeMetaSimpleFormat;
 pub type CubeMetaLinkFormat = cubeclient::models::V1CubeMetaLinkFormat;
 pub type CubeMetaLinkFormatType = cubeclient::models::V1CubeMetaLinkFormatType;
 pub type CubeMetaFormat = cubeclient::models::V1CubeMetaFormat;
