@@ -139,13 +139,11 @@ fn test_deserialize_dimension_link_format() {
 
     assert_eq!(
         dimension.format,
-        Some(Box::new(
-            V1CubeMetaDimensionFormat::V1CubeMetaDimensionLinkFormat(Box::new(
-                V1CubeMetaDimensionLinkFormat {
-                    label: "View Details".to_string(),
-                    r#type: V1CubeMetaDimensionLinkFormatType::Link,
-                }
-            ))
-        ))
+        Some(Box::new(V1CubeMetaFormat::V1CubeMetaLinkFormat(Box::new(
+            V1CubeMetaLinkFormat {
+                label: "View Details".to_string(),
+                r#type: V1CubeMetaLinkFormatType::Link,
+            }
+        ))))
     );
 }
