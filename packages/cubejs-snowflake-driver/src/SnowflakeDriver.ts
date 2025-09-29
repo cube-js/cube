@@ -753,7 +753,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       // Storage integration export flow takes precedence over direct auth if it is defined
       if (conf.integrationName) {
         optionsToExport.STORAGE_INTEGRATION = conf.integrationName;
-      } else {
+      } else if (conf.keyId && conf.secretKey) {
         optionsToExport.CREDENTIALS = `(AWS_KEY_ID = '${conf.keyId}' AWS_SECRET_KEY = '${conf.secretKey}')`;
       }
     } else if (bucketType === 'gcs') {
@@ -793,14 +793,18 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName);
       const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
+      const s3Config: any = { region };
+      if (keyId && secretKey) {
+        // If access key and secret are provided, use them as credentials
+        // Otherwise, let the SDK use the default credential chain (IRSA, instance profile, etc.)
+        s3Config.credentials = {
+          accessKeyId: keyId,
+          secretAccessKey: secretKey,
+        };
+      }
+
       return this.extractUnloadedFilesFromS3(
-        {
-          credentials: {
-            accessKeyId: keyId,
-            secretAccessKey: secretKey,
-          },
-          region,
-        },
+        s3Config,
         bucketName,
         exportPrefix,
       );
