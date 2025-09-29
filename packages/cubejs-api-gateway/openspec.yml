@@ -276,7 +276,7 @@ components:
         - "number"
         - "imageUrl"
         - "id"
-        - "link"c
+        - "link"
     V1CubeMetaLinkFormat:
       type: "object"
       description: Link format with label and type
