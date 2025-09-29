@@ -28,7 +28,7 @@ pub struct V1CubeMetaMeasure {
     #[serde(rename = "meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<serde_json::Value>,
     #[serde(rename = "format", skip_serializing_if = "Option::is_none")]
-    pub format: Option<models::V1CubeMetaMeasureFormat>,
+    pub format: Option<Box<models::V1CubeMetaFormat>>,
     /// When measure is defined in View, it keeps the original path: Cube.measure
     #[serde(rename = "aliasMember", skip_serializing_if = "Option::is_none")]
     pub alias_member: Option<String>,

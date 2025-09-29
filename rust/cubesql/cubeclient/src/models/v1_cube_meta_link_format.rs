@@ -11,9 +11,9 @@
 use crate::models;
 use serde::{Deserialize, Serialize};
 
-/// V1CubeMetaDimensionLinkFormat : Link format for dimension with label and type
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
-pub struct V1CubeMetaDimensionLinkFormat {
+/// V1CubeMetaLinkFormat : Link format with label and type
+#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
+pub struct V1CubeMetaLinkFormat {
     /// Label for the link
     #[serde(rename = "label")]
     pub label: String,
@@ -22,10 +22,10 @@ pub struct V1CubeMetaDimensionLinkFormat {
     pub r#type: Type,
 }
 
-impl V1CubeMetaDimensionLinkFormat {
-    /// Link format for dimension with label and type
-    pub fn new(label: String, r#type: Type) -> V1CubeMetaDimensionLinkFormat {
-        V1CubeMetaDimensionLinkFormat { label, r#type }
+impl V1CubeMetaLinkFormat {
+    /// Link format with label and type
+    pub fn new(label: String, r#type: Type) -> V1CubeMetaLinkFormat {
+        V1CubeMetaLinkFormat { label, r#type }
     }
 }
 /// Type of the format (must be 'link')
