@@ -17883,4 +17883,72 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_tableau_trunc_extract_year_and_month_rev() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:sumPrice:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE (
+                "KibanaSampleDataEcommerce"."id" != 0
+                AND CAST(TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 2024
+                AND CAST(TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 2
+                AND "KibanaSampleDataEcommerce"."customer_gender" IS NOT NULL
+            )
+            HAVING COUNT(1) > 0
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2024-02-01".to_string(),
+                        "2024-02-29".to_string(),
+                    ])),
+                }]),
+                order: Some(vec![]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.id".to_string()),
+                        operator: Some("notEquals".to_string()),
+                        values: Some(vec!["0".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                        operator: Some("gt".to_string()),
+                        values: Some(vec!["0".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                ]),
+                ..Default::default()
+            }
+        )
+    }
 }
