@@ -13,7 +13,9 @@ pub use self::v1_cube_meta_hierarchy::V1CubeMetaHierarchy;
 pub mod v1_cube_meta_join;
 pub use self::v1_cube_meta_join::V1CubeMetaJoin;
 pub mod v1_cube_meta_link_format;
-pub use self::v1_cube_meta_link_format::{Type as V1CubeMetaLinkFormatType, V1CubeMetaLinkFormat};
+pub use self::v1_cube_meta_link_format::V1CubeMetaLinkFormat;
+// problem with code-gen, let's rename it as re-export
+pub use self::v1_cube_meta_link_format::Type as V1CubeMetaLinkFormatType;
 pub mod v1_cube_meta_measure;
 pub use self::v1_cube_meta_measure::V1CubeMetaMeasure;
 pub mod v1_cube_meta_nested_folder;
