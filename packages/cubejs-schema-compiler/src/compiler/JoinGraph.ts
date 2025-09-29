@@ -36,10 +36,10 @@ export class JoinGraph {
   private readonly cubeEvaluator: CubeEvaluator;
 
   // source node -> destination node -> weight
-  private nodes: Record<string, Record<string, 1>>;
+  private nodes: Record<string, Record<string, number>>;
 
   // source node -> destination node -> weight
-  private undirectedNodes: Record<string, Record<string, 1>>;
+  private undirectedNodes: Record<string, Record<string, number>>;
 
   private edges: Record<string, JoinEdge>;
 
@@ -81,7 +81,7 @@ export class JoinGraph {
     this.nodes = Object.fromEntries(
       Object.entries(grouped).map(([from, edges]) => [
         from,
-        Object.fromEntries(edges.map((join) => [join.to, 1])),
+        Object.fromEntries(edges.map((join) => [join.to, 100])),
       ])
     );
 
@@ -107,7 +107,7 @@ export class JoinGraph {
     this.undirectedNodes = Object.fromEntries(
       Object.entries(undirectedNodesGrouped).map(([to, joins]) => [
         to,
-        Object.fromEntries(joins.map(join => [join.from, 1]))
+        Object.fromEntries(joins.map(join => [join.from, 100]))
       ])
     );
 
