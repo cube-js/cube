@@ -42,6 +42,8 @@ pub mod v1_load_request_query_join_subquery;
 pub use self::v1_load_request_query_join_subquery::V1LoadRequestQueryJoinSubquery;
 pub mod v1_load_request_query_time_dimension;
 pub use self::v1_load_request_query_time_dimension::V1LoadRequestQueryTimeDimension;
+pub mod v1_load_request_query_time_dimension_date_range_filter;
+pub use self::v1_load_request_query_time_dimension_date_range_filter::V1LoadRequestQueryTimeDimensionDateRangeFilter;
 pub mod v1_load_continue_wait;
 pub use self::v1_load_continue_wait::V1LoadContinueWait;
 pub mod v1_load_response;
