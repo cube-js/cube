@@ -24,6 +24,7 @@ import { formatToTimeZone } from 'date-fns-timezone';
 import fs from 'fs/promises';
 import crypto from 'crypto';
 import { HydrationMap, HydrationStream } from './HydrationStream';
+import { S3ClientConfig } from '@aws-sdk/client-s3';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
@@ -793,7 +794,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName);
       const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
-      const s3Config: any = { region };
+      const s3Config: S3ClientConfig = { region };
       if (keyId && secretKey) {
         // If access key and secret are provided, use them as credentials
         // Otherwise, let the SDK use the default credential chain (IRSA, instance profile, etc.)
