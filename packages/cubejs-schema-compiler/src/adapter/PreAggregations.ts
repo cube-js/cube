@@ -733,14 +733,10 @@ export class PreAggregations {
       // no connections in the joinTree between cubes from different datasources
       const dimsToMatch = references.rollups.length > 0 ? references.dimensions : references.fullNameDimensions;
 
-      const dimensionsMatch = (dimensions, doBackAlias) => R.all(
-        d => (
-          doBackAlias ?
-            backAlias(dimsToMatch) :
-            (dimsToMatch)
-        ).indexOf(d) !== -1,
-        dimensions
-      );
+      const dimensionsMatch = (dimensions, doBackAlias) => {
+        const target = doBackAlias ? backAlias(dimsToMatch) : dimsToMatch;
+        return dimensions.every(d => target.includes(d));
+      };
 
       // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
       // no connections in the joinTree between cubes from different datasources
