@@ -180,6 +180,56 @@ This is going to be harmonized in the future.
 
 </InfoBox>
 
+## Formatting
+
+MDX API supports formatting for measures to control how values are displayed in Excel.
+
+### Percent format
+
+You can format measures as percentages using the `percent` format type:
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: ORDERS
+
+    measures:
+      - name: completion_rate
+        sql: "COUNT(CASE WHEN {CUBE}.status = 'completed' THEN 1 END) / COUNT(*)"
+        type: number
+        format: percent
+```
+
+### Currency format
+
+You can format measures as currency using the `currency` format type:
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: ORDERS
+
+    measures:
+      - name: total_revenue
+        sql: "{CUBE}.amount"
+        type: sum
+        format: currency
+```
+
+Currency formatting is locale-aware and responds to the language configuration set via the `CUBE_XMLA_LANGUAGE` environment variable. This variable accepts either [Microsoft LCID (Locale Identifier)][link-lcid] values or language tags. The default value is `1033` (English - United States).
+
+For example, to display currency values using the Netherlands locale (Euro with comma as decimal separator), you can use either:
+
+```bash
+# Using LCID
+CUBE_XMLA_LANGUAGE=1043
+
+# Using language tag
+CUBE_XMLA_LANGUAGE=nl-NL
+```
+
+[link-lcid]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-lcid/70feba9f-294e-491e-b6eb-56532684c37f
+
 ## Authentication and authorization
 
 Authentication and authorization work the same as for the [SQL API](/product/apis-integrations/sql-api/security).
