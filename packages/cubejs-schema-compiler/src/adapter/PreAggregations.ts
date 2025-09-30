@@ -729,18 +729,29 @@ export class PreAggregations {
         }
       }
 
-      // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
-      // no connections in the joinTree between cubes from different datasources
-      const dimsToMatch = references.rollups.length > 0 ? references.dimensions : references.fullNameDimensions;
+      let dimsToMatch: string[];
+      let timeDimsToMatch: PreAggregationTimeDimensionReference[];
+      let dimensionsMatch: (dimensions: string[], doBackAlias: boolean) => boolean;
 
-      const dimensionsMatch = (dimensions, doBackAlias) => {
-        const target = doBackAlias ? backAlias(dimsToMatch) : dimsToMatch;
-        return dimensions.every(d => target.includes(d));
-      };
+      if (references.rollups.length > 0) {
+        // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
+        // no connections in the joinTree between cubes from different datasources
+        dimsToMatch = references.dimensions;
+        timeDimsToMatch = references.timeDimensions;
 
-      // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
-      // no connections in the joinTree between cubes from different datasources
-      const timeDimsToMatch = references.rollups.length > 0 ? references.timeDimensions : references.fullNameTimeDimensions;
+        dimensionsMatch = (dimensions, doBackAlias) => {
+          const target = doBackAlias ? backAlias(dimsToMatch) : dimsToMatch;
+          return dimensions.every(d => target.includes(d));
+        };
+      } else {
+        dimsToMatch = references.fullNameDimensions;
+        timeDimsToMatch = references.fullNameTimeDimensions;
+
+        dimensionsMatch = (dimensions, doBackAlias) => {
+          const target = doBackAlias ? backAlias(dimsToMatch) : dimsToMatch;
+          return dimensions.every(d => target.includes(d));
+        };
+      }
 
       const timeDimensionsMatch = (timeDimensionsList, doBackAlias) => R.allPass(
         timeDimensionsList.map(
