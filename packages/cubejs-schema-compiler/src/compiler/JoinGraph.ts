@@ -36,14 +36,14 @@ export class JoinGraph {
   private readonly cubeEvaluator: CubeEvaluator;
 
   // source node -> destination node -> weight
-  private nodes: Record<string, Record<string, 1>>;
+  private nodes: Record<string, Record<string, number>>;
 
   // source node -> destination node -> weight
-  private undirectedNodes: Record<string, Record<string, 1>>;
+  private undirectedNodes: Record<string, Record<string, number>>;
 
   private edges: Record<string, JoinEdge>;
 
-  private builtJoins: Record<string, FinishedJoinTree>;
+  private readonly builtJoins: Record<string, FinishedJoinTree>;
 
   private graph: Graph | null;
 
@@ -60,50 +60,56 @@ export class JoinGraph {
     this.graph = null;
   }
 
-  public compile(cubes: unknown, errorReporter: ErrorReporter): void {
-    this.edges = R.compose<
-        Array<CubeDefinition>,
-        Array<CubeDefinition>,
-        Array<[string, JoinEdge][]>,
-        Array<[string, JoinEdge]>,
-        Record<string, JoinEdge>
-    >(
-      R.fromPairs,
-      R.unnest,
-      R.map((v: CubeDefinition): [string, JoinEdge][] => this.buildJoinEdges(v, errorReporter.inContext(`${v.name} cube`))),
-      R.filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
-    )(this.cubeEvaluator.cubeList);
+  public compile(_cubes: unknown, errorReporter: ErrorReporter): void {
+    this.edges = Object.fromEntries(
+      this.cubeEvaluator.cubeList
+        .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
+        .flatMap((v: CubeDefinition): [string, JoinEdge][] => this.buildJoinEdges(
+          v, errorReporter.inContext(`${v.name} cube`)
+        ))
+    );
 
-    // This requires @types/ramda@0.29 or newer
-    // @ts-ignore
-    this.nodes = R.compose<
-        Record<string, JoinEdge>,
-        Array<[string, JoinEdge]>,
-        Array<JoinEdge>,
-        Record<string, Array<JoinEdge> | undefined>,
-        Record<string, Record<string, 1>>
-    >(
-      // This requires @types/ramda@0.29 or newer
-      // @ts-ignore
-      R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.to, 1]))),
-      R.groupBy((join: JoinEdge) => join.from),
-      R.map(v => v[1]),
-      R.toPairs
-    // @ts-ignore
-    )(this.edges);
+    const grouped: Record<string, JoinEdge[]> = {};
 
-    // @ts-ignore
-    this.undirectedNodes = R.compose(
-      // @ts-ignore
-      R.map(groupedByFrom => R.fromPairs(groupedByFrom.map(join => [join.from, 1]))),
-      // @ts-ignore
-      R.groupBy(join => join.to),
-      R.unnest,
-      // @ts-ignore
-      R.map(v => [v[1], { from: v[1].to, to: v[1].from }]),
-      R.toPairs
-    // @ts-ignore
-    )(this.edges);
+    for (const join of Object.values(this.edges)) {
+      if (!grouped[join.from]) {
+        grouped[join.from] = [];
+      }
+      grouped[join.from].push(join);
+    }
+
+    this.nodes = Object.fromEntries(
+      Object.entries(grouped).map(([from, edges]) => [
+        from,
+        Object.fromEntries(edges.map((join) => [join.to, 100])),
+      ])
+    );
+
+    const undirectedNodesGrouped: Record<string, JoinEdge[]> = {};
+
+    for (const join of Object.values(this.edges)) {
+      const reverseJoin: JoinEdge = {
+        join: join.join,
+        from: join.to,
+        to: join.from,
+        originalFrom: join.originalFrom,
+        originalTo: join.originalTo,
+      };
+
+      for (const e of [join, reverseJoin]) {
+        if (!undirectedNodesGrouped[e.to]) {
+          undirectedNodesGrouped[e.to] = [];
+        }
+        undirectedNodesGrouped[e.to].push(e);
+      }
+    }
+
+    this.undirectedNodes = Object.fromEntries(
+      Object.entries(undirectedNodesGrouped).map(([to, joins]) => [
+        to,
+        Object.fromEntries(joins.map(join => [join.from, 100]))
+      ])
+    );
 
     this.graph = new Graph(this.nodes);
   }
@@ -158,57 +164,36 @@ export class JoinGraph {
       });
   }
 
-  protected buildJoinNode(cube: CubeDefinition): Record<string, 1> {
-    if (!cube.joins) {
-      return {};
-    }
-
-    return cube.joins.reduce((acc, join) => {
-      acc[join.name] = 1;
-      return acc;
-    }, {} as Record<string, 1>);
-  }
-
   public buildJoin(cubesToJoin: JoinHints): FinishedJoinTree | null {
     if (!cubesToJoin.length) {
       return null;
     }
     const key = JSON.stringify(cubesToJoin);
     if (!this.builtJoins[key]) {
-      const join = R.pipe<
-          JoinHints,
-          Array<JoinTree | null>,
-          Array<JoinTree>,
-          Array<JoinTree>
-      >(
-        R.map(
-          (cube: JoinHint): JoinTree | null => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))
-        ),
-        // @ts-ignore
-        R.filter(R.identity),
-        R.sortBy((joinTree: JoinTree) => joinTree.joins.length)
-      // @ts-ignore
-      )(cubesToJoin)[0];
+      const join = cubesToJoin
+        .map((cube: JoinHint): JoinTree | null => this.buildJoinTreeForRoot(cube, cubesToJoin.filter(c => c !== cube)))
+        .filter((jt): jt is JoinTree => Boolean(jt))
+        .sort((a, b) => a.joins.length - b.joins.length)[0];
 
       if (!join) {
-        throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
+        const errCubes = cubesToJoin.map(v => `'${v}'`).join(', ');
+        throw new UserError(`Can't find join path to join ${errCubes}`);
       }
 
       this.builtJoins[key] = Object.assign(join, {
-        multiplicationFactor: R.compose<
-          JoinHints,
-          Array<[string, boolean]>,
-          Record<string, boolean>
-        >(
-          R.fromPairs,
-          R.map(v => [this.cubeFromPath(v), this.findMultiplicationFactorFor(this.cubeFromPath(v), join.joins)])
-        )(cubesToJoin)
+        multiplicationFactor: Object.fromEntries(
+          cubesToJoin.map((v) => {
+            const cubeName = this.cubeFromPath(v);
+            const factor = this.findMultiplicationFactorFor(cubeName, join.joins);
+            return [cubeName, factor];
+          })
+        )
       });
     }
     return this.builtJoins[key];
   }
 
-  protected cubeFromPath(cubePath) {
+  protected cubeFromPath(cubePath: string | string[]): string {
     if (Array.isArray(cubePath)) {
       return cubePath[cubePath.length - 1];
     }
@@ -224,6 +209,8 @@ export class JoinGraph {
       return null;
     }
 
+    const tunedGraph = this.getFixedWeightsGraph([root, ...cubesToJoin]);
+
     if (Array.isArray(root)) {
       const [newRoot, ...additionalToJoin] = root;
       if (additionalToJoin.length > 0) {
@@ -231,6 +218,7 @@ export class JoinGraph {
       }
       root = newRoot;
     }
+
     const nodesJoined = {};
     const result = cubesToJoin.map(joinHints => {
       if (!Array.isArray(joinHints)) {
@@ -243,7 +231,7 @@ export class JoinGraph {
           return { joins: [] };
         }
 
-        const path = graph.path(prevNode, toJoin);
+        const path = tunedGraph.path(prevNode, toJoin);
         if (!path) {
           return null;
         }
@@ -296,6 +284,38 @@ export class JoinGraph {
     };
   }
 
+  /**
+   * Returns compiled graph with updated weights for view join-hints
+   */
+  protected getFixedWeightsGraph(joinHints: JoinHints): Graph {
+    const PRIORITY_WEIGHT = 20; // Lower weight for preferred paths
+
+    // Create a deep copy of this.nodes to avoid modifying the original
+    const tunedNodes: Record<string, Record<string, number>> = {};
+    for (const [from, destinations] of Object.entries(this.nodes)) {
+      tunedNodes[from] = {};
+      for (const [to, weight] of Object.entries(destinations)) {
+        tunedNodes[from][to] = weight;
+      }
+    }
+
+    // Update weights only for array hints (view join hints)
+    for (const hint of joinHints) {
+      if (Array.isArray(hint) && hint.length > 1) {
+        for (let i = 0; i < hint.length - 1; i++) {
+          const from = hint[i];
+          const to = hint[i + 1];
+
+          if (tunedNodes[from]?.[to] !== undefined) {
+            tunedNodes[from][to] = PRIORITY_WEIGHT;
+          }
+        }
+      }
+    }
+
+    return new Graph(tunedNodes);
+  }
+
   protected findMultiplicationFactorFor(cube: string, joins: JoinTreeJoins): boolean {
     const visited = {};
     const self = this;
@@ -333,10 +353,11 @@ export class JoinGraph {
     if (!this.cachedConnectedComponents) {
       let componentId = 1;
       const components = {};
-      R.toPairs(this.nodes).map(nameToConnection => nameToConnection[0]).forEach(node => {
-        this.findConnectedComponent(componentId, node, components);
-        componentId += 1;
-      });
+      Object.entries(this.nodes)
+        .forEach(([node]) => {
+          this.findConnectedComponent(componentId, node, components);
+          componentId += 1;
+        });
       this.cachedConnectedComponents = components;
     }
     return this.cachedConnectedComponents;
@@ -345,9 +366,8 @@ export class JoinGraph {
   protected findConnectedComponent(componentId: number, node: string, components: Record<string, number>): void {
     if (!components[node]) {
       components[node] = componentId;
-      R.toPairs(this.undirectedNodes[node])
-        .map(connectedNodeNames => connectedNodeNames[0])
-        .forEach(connectedNode => {
+      Object.entries(this.undirectedNodes[node])
+        .forEach(([connectedNode]) => {
           this.findConnectedComponent(componentId, connectedNode, components);
         });
     }
