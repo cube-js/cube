@@ -76,6 +76,7 @@ impl MultiStageMemberQueryPlanner {
             false,
             Rc::new(vec![]),
             true,
+            self.query_properties.disable_external_pre_aggregations(),
         )?;
 
         let simple_query_planer =
@@ -377,6 +378,7 @@ impl MultiStageMemberQueryPlanner {
             false,
             self.query_properties.query_join_hints().clone(),
             false,
+            self.query_properties.disable_external_pre_aggregations(),
         )?;
 
         let query_planner =

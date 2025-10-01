@@ -124,7 +124,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                 self.query_tools.clone(),
                 self.cubestore_support_multistage,
             );
-            if let Some(result) = pre_aggregation_optimizer.try_optimize(plan.clone())? {
+            let disable_external_pre_aggregations =
+                self.request.disable_external_pre_aggregations();
+            if let Some(result) = pre_aggregation_optimizer
+                .try_optimize(plan.clone(), disable_external_pre_aggregations)?
+            {
                 if pre_aggregation_optimizer.get_used_pre_aggregations().len() == 1 {
                     (
                         result,
