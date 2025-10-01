@@ -418,26 +418,6 @@ pub struct Session {
     pub state: Arc<SessionState>,
 }
 
-/// Specific representation of session for MySQL
-#[derive(Debug)]
-pub struct SessionProcessList {
-    pub id: u32,
-    pub user: Option<String>,
-    pub host: String,
-    pub database: Option<String>,
-}
-
-impl From<&Session> for SessionProcessList {
-    fn from(session: &Session) -> Self {
-        Self {
-            id: session.state.connection_id,
-            host: session.state.client_ip.clone(),
-            user: session.state.user(),
-            database: session.state.database(),
-        }
-    }
-}
-
 /// Specific representation of session for PostgreSQL
 #[derive(Debug)]
 pub struct SessionStatActivity {
