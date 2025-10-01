@@ -112,6 +112,8 @@ export class PreAggregations {
 
     return R.pipe(
       R.unnest as (list: any[][]) => any[],
+      // TODO: Move this to somewhere BEFORE pre-agg matching, possibly to rollupMatchResults()
+      // to avoid constly matching and then throwing it away.
       R.filter((agg: FullPreAggregationDescription) => !(disableExternalPreAggregations && agg.external)),
       R.uniqBy(desc => desc.tableName)
     )(preAggregations);
