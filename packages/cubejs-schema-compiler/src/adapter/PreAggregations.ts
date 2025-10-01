@@ -112,10 +112,9 @@ export class PreAggregations {
 
     return R.pipe(
       R.unnest as (list: any[][]) => any[],
+      R.filter((agg: FullPreAggregationDescription) => !(disableExternalPreAggregations && agg.external)),
       R.uniqBy(desc => desc.tableName)
-    )(
-      preAggregations
-    ).filter(agg => !(disableExternalPreAggregations && agg.external));
+    )(preAggregations);
   }
 
   private preAggregationsDescriptionLocal(): FullPreAggregationDescription[] {
