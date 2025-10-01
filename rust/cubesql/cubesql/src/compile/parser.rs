@@ -19,17 +19,6 @@ pub fn parse_sql_to_statements(
     let original_query = query;
 
     log::debug!("Parsing SQL: {}", query);
-    // @todo Support without workarounds
-    // metabase
-    let query = query.replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
-    let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
-    // @todo Implement CONVERT function
-    let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
-    // @todo problem with parser, space in types
-    let query = query.replace("signed integer", "bigint");
-    let query = query.replace("SIGNED INTEGER", "bigint");
-    let query = query.replace("unsigned integer", "bigint");
-    let query = query.replace("UNSIGNED INTEGER", "bigint");
 
     // DBeaver
     let query = query.replace(
