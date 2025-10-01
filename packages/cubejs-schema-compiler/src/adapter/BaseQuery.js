@@ -4009,7 +4009,17 @@ export class BaseQuery {
       const dimensionSql = this.dimensionSql(dimension);
       return `select ${aggFunction}(${this.convertTz(dimensionSql)}) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
     }
-    return null;
+
+    // Handle case that requires joins
+    const subQuery = this.newSubQuery({
+      dimensions: [dimension.dimension],
+      rowLimit: null,
+    });
+
+    const dimensionSql = subQuery.dimensionSql(dimension);
+    const fromClause = subQuery.query();
+
+    return `select ${aggFunction}(${subQuery.convertTz(dimensionSql)}) from ${fromClause}`;
   }
 
   cubeCardinalityQueries() { // TODO collect sub queries
