@@ -198,37 +198,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_select_compound_identifiers() {
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, MEASURE(`KibanaSampleDataEcommerce`.`minPrice`) AS minPrice FROM KibanaSampleDataEcommerce".to_string(), DatabaseProtocol::MySQL
-        ).await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![
-                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                    "KibanaSampleDataEcommerce.minPrice".to_string(),
-                ]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                order: Some(vec![]),
-                ..Default::default()
-            }
-        );
-    }
-
-    #[tokio::test]
     async fn test_select_measure_aggregate_functions() {
         init_testing_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT MAX(maxPrice), MIN(minPrice), AVG(avgPrice) FROM KibanaSampleDataEcommerce"
                 .to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -376,7 +352,7 @@ mod tests {
     async fn test_order_alias_for_measure_default() {
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce ORDER BY cnt".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -455,7 +431,7 @@ mod tests {
             ),
             // test_order_compound_identifier_default
             (
-                "SELECT taxful_total_price FROM `db`.`KibanaSampleDataEcommerce` ORDER BY `KibanaSampleDataEcommerce`.`taxful_total_price`".to_string(),
+                "SELECT taxful_total_price FROM \"public\".\"KibanaSampleDataEcommerce\" ORDER BY \"taxful_total_price\"".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec![]),
                     segments: Some(vec![]),
@@ -523,7 +499,7 @@ mod tests {
             ),
             // test_order_identifer_alias_ident_escape
             (
-                "SELECT taxful_total_price as `alias1` FROM KibanaSampleDataEcommerce ORDER BY `alias1` DESC".to_string(),
+                "SELECT taxful_total_price as \"alias1\" FROM KibanaSampleDataEcommerce ORDER BY \"alias1\" DESC".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec![]),
                     segments: Some(vec![]),
@@ -542,7 +518,7 @@ mod tests {
 
         for (sql, expected_request) in supported_orders.iter() {
             let query_plan =
-                convert_select_to_query_plan(sql.to_string(), DatabaseProtocol::MySQL).await;
+                convert_select_to_query_plan(sql.to_string(), DatabaseProtocol::PostgreSQL).await;
 
             assert_eq!(
                 &query_plan.as_logical_plan().find_cube_scan().request,
@@ -561,7 +537,7 @@ mod tests {
         let query_plan = convert_select_to_query_plan(
             "SELECT DATE(order_date) FROM KibanaSampleDataEcommerce ORDER BY DATE(order_date) DESC"
                 .to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -588,7 +564,7 @@ mod tests {
         let query_plan = convert_select_to_query_plan(
             "SELECT DATE(order_date) FROM KibanaSampleDataEcommerce GROUP BY DATE(order_date) ORDER BY DATE(order_date) DESC"
                 .to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         ).await;
 
         assert_eq!(
@@ -615,7 +591,7 @@ mod tests {
     async fn test_select_all_fields_by_asterisk_limit_100() {
         let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -641,7 +617,7 @@ mod tests {
     async fn test_select_all_fields_by_asterisk_limit_100_offset_50() {
         let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100 OFFSET 50".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -670,7 +646,7 @@ mod tests {
         }
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date, customer_gender FROM KibanaSampleDataEcommerce".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -697,7 +673,7 @@ mod tests {
         }
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date as order_date, customer_gender as customer_gender FROM KibanaSampleDataEcommerce"
-                .to_string(), DatabaseProtocol::MySQL
+                .to_string(), DatabaseProtocol::PostgreSQL
         ).await;
 
         let logical_plan = query_plan.as_logical_plan();
@@ -2639,7 +2615,7 @@ limit
                 },
             ),
             (
-                "SELECT COUNT(*) FROM db.KibanaSampleDataEcommerce".to_string(),
+                "SELECT COUNT(*) FROM \"public\".\"KibanaSampleDataEcommerce\"".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
@@ -2689,7 +2665,7 @@ limit
                 },
             ),
             (
-                "SELECT MAX(`maxPrice`) FROM KibanaSampleDataEcommerce".to_string(),
+                "SELECT MAX(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
                     dimensions: Some(vec![]),
@@ -2702,7 +2678,7 @@ limit
 
         for (input_query, expected_request) in variants.iter() {
             let logical_plan =
-                convert_select_to_query_plan(input_query.clone(), DatabaseProtocol::MySQL)
+                convert_select_to_query_plan(input_query.clone(), DatabaseProtocol::PostgreSQL)
                     .await
                     .as_logical_plan();
 
@@ -2843,16 +2819,11 @@ limit
                 "DATE_TRUNC('year', order_date)".to_string(),
                 "year".to_string(),
             ],
-            // with escaping
-            [
-                "DATE_TRUNC('second', `order_date`)".to_string(),
-                "second".to_string(),
-            ],
         ];
 
         for [subquery, expected_granularity] in supported_granularities.iter() {
             let logical_plan = convert_select_to_query_plan(
-                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery), DatabaseProtocol::MySQL
+                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery), DatabaseProtocol::PostgreSQL
             ).await.as_logical_plan();
 
             assert_eq!(
@@ -2945,7 +2916,7 @@ limit
             (
                 "COUNT(*), DATE(order_date) AS __timestamp".to_string(),
                 // Now replaced with exact date
-                "`KibanaSampleDataEcommerce`.`order_date` >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND `KibanaSampleDataEcommerce`.`order_date` < date('2021-09-07 00:00:00.000000')".to_string(),
+                "order_date >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND order_date < date('2021-09-07 00:00:00.000000')".to_string(),
                 Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
@@ -2959,7 +2930,7 @@ limit
             (
                 "COUNT(*), DATE(order_date) AS order_date".to_string(),
                 // Now replaced with exact date
-                "`KibanaSampleDataEcommerce`.`order_date` >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND `KibanaSampleDataEcommerce`.`order_date` < date('2021-09-07 00:00:00.000000')".to_string(),
+                "order_date >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND order_date < date('2021-09-07 00:00:00.000000')".to_string(),
                 Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
@@ -3044,7 +3015,7 @@ limit
                     ""
                 }
             );
-            let logical_plan = convert_select_to_query_plan(query, DatabaseProtocol::MySQL)
+            let logical_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL)
                 .await
                 .as_logical_plan();
 
@@ -3063,7 +3034,7 @@ limit
                 FROM KibanaSampleDataEcommerce
                 WHERE order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') OR order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')
                 GROUP BY __timestamp"
-            .to_string(), DatabaseProtocol::MySQL
+            .to_string(), DatabaseProtocol::PostgreSQL
         ).await;
 
         assert_eq!(
@@ -3442,7 +3413,7 @@ limit
                 WHERE {}",
                     sql
                 ),
-                DatabaseProtocol::MySQL,
+                DatabaseProtocol::PostgreSQL,
             )
             .await
             .as_logical_plan();
@@ -3514,7 +3485,7 @@ limit
                     sql
                 ),
                 meta.clone(),
-                get_test_session(DatabaseProtocol::MySQL, meta).await,
+                get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
             )
             .await;
 
@@ -3729,7 +3700,7 @@ limit
                 GROUP BY __timestamp",
                     sql
                 ),
-                DatabaseProtocol::MySQL,
+                DatabaseProtocol::PostgreSQL,
             )
             .await
             .as_logical_plan();
@@ -4126,20 +4097,6 @@ limit
     }
 
     #[tokio::test]
-    async fn test_information_schema_tables_mysql() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_tables_mysql",
-            execute_query(
-                "SELECT * FROM information_schema.tables".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_information_role_table_grants_pg() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "information_schema_role_table_grants_postgresql",
@@ -4184,50 +4141,6 @@ limit
                 DatabaseProtocol::PostgreSQL
             )
             .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_schema_columns_mysql() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_columns_mysql",
-            execute_query(
-                "SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_schema_schemata() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_schemata",
-            execute_query(
-                "SELECT * FROM information_schema.schemata".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_schema_stats_for_columns() -> Result<(), CubeError> {
-        // This query is used by metabase for introspection
-        insta::assert_snapshot!(
-            "test_information_schema_stats_for_columns",
-            execute_query("
-            SELECT
-                A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME
-            FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B
-            WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME
-            ORDER BY A.COLUMN_NAME".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         Ok(())
@@ -5058,85 +4971,6 @@ ORDER BY
     }
 
     #[tokio::test]
-    async fn test_performance_schema_variables() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "performance_schema_session_variables",
-            execute_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        insta::assert_snapshot!(
-            "performance_schema_global_variables",
-            execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_schema_collations() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_collations",
-            execute_query(
-                "SELECT * FROM information_schema.collations".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_processlist() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_processlist",
-            execute_query(
-                "SELECT * FROM information_schema.processlist".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_gdata_studio() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "test_gdata_studio",
-            execute_query(
-                // This query I saw in Google Data Studio
-                "/* mysql-connector-java-5.1.49 ( Revision: ad86f36e100e104cd926c6b81c8cab9565750116 ) */
-                SELECT  \
-                    @@session.auto_increment_increment AS auto_increment_increment, \
-                    @@character_set_client AS character_set_client, \
-                    @@character_set_connection AS character_set_connection, \
-                    @@character_set_results AS character_set_results, \
-                    @@character_set_server AS character_set_server, \
-                    @@collation_server AS collation_server, \
-                    @@collation_connection AS collation_connection, \
-                    @@init_connect AS init_connect, \
-                    @@interactive_timeout AS interactive_timeout, \
-                    @@license AS license, \
-                    @@lower_case_table_names AS lower_case_table_names, \
-                    @@max_allowed_packet AS max_allowed_packet, \
-                    @@net_buffer_length AS net_buffer_length, \
-                    @@net_write_timeout AS net_write_timeout, \
-                    @@sql_mode AS sql_mode, \
-                    @@system_time_zone AS system_time_zone, \
-                    @@time_zone AS time_zone, \
-                    @@transaction_isolation AS transaction_isolation, \
-                    @@wait_timeout AS wait_timeout
-                "
-                .to_string(), DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_show_variable() -> Result<(), CubeError> {
         // Postgres escaped with quotes
         insta::assert_snapshot!(
@@ -5249,13 +5083,17 @@ ORDER BY
     async fn test_explain() -> Result<(), CubeError> {
         // SELECT with no tables (inline eval)
         insta::assert_snapshot!(
-            execute_query("EXPLAIN SELECT 1+1;".to_string(), DatabaseProtocol::MySQL).await?
+            execute_query(
+                "EXPLAIN SELECT 1+1;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
         );
 
         insta::assert_snapshot!(
             execute_query(
                 "EXPLAIN VERBOSE SELECT 1+1;".to_string(),
-                DatabaseProtocol::MySQL
+                DatabaseProtocol::PostgreSQL
             )
             .await?
         );
@@ -5263,14 +5101,14 @@ ORDER BY
         // Execute without asserting with fixture, because metrics can change
         execute_query(
             "EXPLAIN ANALYZE SELECT 1+1;".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await?;
 
         // SELECT with table and specific columns
         execute_query(
             "EXPLAIN SELECT count, avgPrice FROM KibanaSampleDataEcommerce;".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await?;
 

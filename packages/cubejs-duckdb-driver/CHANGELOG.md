@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.76](https://github.com/cube-js/cube/compare/v1.3.75...v1.3.76) (2025-10-01)
+
+### Reverts
+
+- **duckdb-driver:** Revert version bump from 1.3.1 to 1.4.0 ([3e12bc9](https://github.com/cube-js/cube/commit/3e12bc937890a104aca5d9b6e7fd1538d333c7c3))
+
 ## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

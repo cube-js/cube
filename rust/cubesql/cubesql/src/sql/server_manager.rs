@@ -2,10 +2,8 @@ use crate::{
     compile::{DatabaseProtocol, DatabaseVariables, DatabaseVariablesToUpdate},
     config::ConfigObj,
     sql::{
-        compiler_cache::CompilerCache,
-        database_variables::{mysql_default_global_variables, postgres_default_global_variables},
-        pg_auth_service::PostgresAuthService,
-        SqlAuthService,
+        compiler_cache::CompilerCache, database_variables::postgres_default_global_variables,
+        pg_auth_service::PostgresAuthService, SqlAuthService,
     },
     transport::TransportService,
     CubeError,
@@ -45,7 +43,6 @@ pub struct ServerManager {
     pub config_obj: Arc<dyn ConfigObj>,
     pub compiler_cache: Arc<dyn CompilerCache>,
     postgres_variables: RwLockSync<DatabaseVariables>,
-    mysql_variables: RwLockSync<DatabaseVariables>,
 }
 
 crate::di_service!(ServerManager, []);
@@ -68,7 +65,6 @@ impl ServerManager {
             config_obj,
             configuration: ServerConfiguration::default(),
             postgres_variables: RwLockSync::new(postgres_default_global_variables()),
-            mysql_variables: RwLockSync::new(mysql_default_global_variables()),
         }
     }
 
@@ -77,10 +73,6 @@ impl ServerManager {
         protocol: DatabaseProtocol,
     ) -> RwLockReadGuard<'_, DatabaseVariables> {
         match protocol {
-            DatabaseProtocol::MySQL => self
-                .mysql_variables
-                .read()
-                .expect("failed to unlock variables for reading"),
             DatabaseProtocol::PostgreSQL => self
                 .postgres_variables
                 .read()
@@ -97,10 +89,6 @@ impl ServerManager {
         protocol: DatabaseProtocol,
     ) -> RwLockWriteGuard<'_, DatabaseVariables> {
         match protocol {
-            DatabaseProtocol::MySQL => self
-                .mysql_variables
-                .write()
-                .expect("failed to unlock variables for reading"),
             DatabaseProtocol::PostgreSQL => self
                 .postgres_variables
                 .write()
