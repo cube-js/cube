@@ -10,7 +10,7 @@
 
 # Cube SQL API
 
-Cube SQL API allows querying Cube via MySQL-compatible SQL.
+Cube SQL API allows querying Cube via PostgreSQL-compatible SQL.
 
 ## License
 
