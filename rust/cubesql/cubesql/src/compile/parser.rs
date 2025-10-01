@@ -1,40 +1,11 @@
 use std::{collections::HashMap, sync::LazyLock};
 
 use regex::Regex;
-use sqlparser::{
-    ast::Statement,
-    dialect::{Dialect, PostgreSqlDialect},
-    parser::Parser,
-};
+use sqlparser::{ast::Statement, dialect::PostgreSqlDialect, parser::Parser};
 
 use super::{qtrace::Qtrace, CompilationError, DatabaseProtocol};
 
 use super::CompilationResult;
-
-#[derive(Debug)]
-pub struct MySqlDialectWithBackTicks {}
-
-impl Dialect for MySqlDialectWithBackTicks {
-    fn is_delimited_identifier_start(&self, ch: char) -> bool {
-        ch == '"' || ch == '`'
-    }
-
-    fn is_identifier_start(&self, ch: char) -> bool {
-        // See https://dev.mysql.com/doc/refman/8.0/en/identifiers.html.
-        // We don't yet support identifiers beginning with numbers, as that
-        // makes it hard to distinguish numeric literals.
-        ch.is_ascii_lowercase()
-            || ch.is_ascii_uppercase()
-            || ch == '_'
-            || ch == '$'
-            || ch == '@'
-            || ('\u{0080}'..='\u{ffff}').contains(&ch)
-    }
-
-    fn is_identifier_part(&self, ch: char) -> bool {
-        self.is_identifier_start(ch) || ch.is_ascii_digit()
-    }
-}
 
 static SIGMA_WORKAROUND: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap()
@@ -224,7 +195,6 @@ pub fn parse_sql_to_statements(
     }
 
     let parse_result = match protocol {
-        DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
         DatabaseProtocol::Extension(_) => unimplemented!(),
     };
@@ -270,58 +240,6 @@ pub fn parse_sql_to_statement(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_no_statements_mysql() {
-        let result = parse_sql_to_statement(
-            &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
-            DatabaseProtocol::MySQL,
-            &mut None,
-        );
-        match result {
-            Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert!(err
-                .to_string()
-                .contains("Invalid query, no statements was specified")),
-        }
-    }
-
-    #[test]
-    fn test_multiple_statements_mysql() {
-        let result = parse_sql_to_statement(
-            &"SELECT NOW(); SELECT NOW();".to_string(),
-            DatabaseProtocol::MySQL,
-            &mut None,
-        );
-        match result {
-            Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert!(err
-                .to_string()
-                .contains("Multiple statements was specified in one query")),
-        }
-    }
-
-    #[test]
-    fn test_single_line_comments_mysql() {
-        let result = parse_sql_to_statement(
-            &"-- 6dcd92a04feb50f14bbcf07c661680ba
-            SELECT DATE(`createdAt`) AS __timestamp,
-                   COUNT(*) AS count
-            FROM db.`Orders`
-            GROUP BY DATE(`createdAt`)
-            ORDER BY count DESC
-            LIMIT 10000
-            -- 6dcd92a04feb50f14bbcf07c661680ba
-        "
-            .to_string(),
-            DatabaseProtocol::MySQL,
-            &mut None,
-        );
-        match result {
-            Ok(_) => {}
-            Err(err) => panic!("{}", err),
-        }
-    }
 
     #[test]
     fn test_no_statements_postgres() {
