@@ -785,10 +785,6 @@ async fn get_test_session_with_config_and_transport(
         config_obj,
     ));
 
-    let db_name = match &protocol {
-        DatabaseProtocol::MySQL => "db",
-        _ => "cubedb",
-    };
     let session_manager = Arc::new(SessionManager::new(server.clone()));
     let session = session_manager
         .create_session(protocol, "127.0.0.1".to_string(), 1234, None)
@@ -796,7 +792,7 @@ async fn get_test_session_with_config_and_transport(
         .unwrap();
 
     // Populate like shims
-    session.state.set_database(Some(db_name.to_string()));
+    session.state.set_database(Some("cubedb".to_string()));
     session.state.set_user(Some("ovr".to_string()));
     session.state.set_original_user(Some("ovr".to_string()));
 
