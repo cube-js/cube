@@ -119,6 +119,8 @@ export async function runEnvironment(
   compose.withEnvironment({
     CUBEJS_TELEMETRY: 'false',
   });
+  compose.withWaitStrategy('cube', Wait.forListeningPorts());
+  compose.withWaitStrategy('store', Wait.forListeningPorts());
 
   Object.keys(fixture.cube.environment).forEach((key) => {
     const val = fixture.cube.environment[key];
