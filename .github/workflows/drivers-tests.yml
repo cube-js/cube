@@ -204,6 +204,10 @@ jobs:
 
   tests:
     runs-on: ubuntu-24.04
+    permissions:
+      id-token: write   # Needed for OIDC+AWS
+      contents: read
+      
     timeout-minutes: 30
     needs: [latest-tag-sha, build]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
@@ -345,6 +349,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.DRIVERS_TESTS_AWS_ROLE_ARN_FOR_SNOWFLAKE }}
           aws-region: us-west-1
+          mask-aws-account-id: true
         if: |
           env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '' && matrix.database == 'snowflake-export-bucket-s3-via-storage-integration-iam-roles'
 
