@@ -207,7 +207,7 @@ jobs:
     permissions:
       id-token: write   # Needed for OIDC+AWS
       contents: read
-      
+
     timeout-minutes: 30
     needs: [latest-tag-sha, build]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
