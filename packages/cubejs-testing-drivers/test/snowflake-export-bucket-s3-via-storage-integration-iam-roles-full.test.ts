@@ -5,5 +5,5 @@ testQueries('snowflake', {
   // cloud storage integration. Please do not turn it on for every integration test!
   includeIncrementalSchemaSuite: false,
   includeHLLSuite: false,
-  extendedEnv: 'export-bucket-s3-iam-roles'
+  extendedEnv: 'export-bucket-s3-via-storage-integration-iam-roles'
 });
