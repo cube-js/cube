@@ -22,6 +22,21 @@
         }
       }
     },
+    "export-bucket-s3-via-storage-integration-iam-roles": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+          "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-west-1",
+          "CUBEJS_DB_EXPORT_INTEGRATION": "DRIVERS_TESTS_PREAGGS_S3",
+          "AWS_REGION": "us-west-1",
+          "AWS_ACCESS_KEY_ID": "${AWS_ACCESS_KEY_ID}",
+          "AWS_SECRET_ACCESS_KEY": "${AWS_SECRET_ACCESS_KEY}",
+          "AWS_SESSION_TOKEN": "${AWS_SESSION_TOKEN}",
+          "AWS_DEFAULT_REGION": "${AWS_DEFAULT_REGION}"
+        }
+      }
+    },
     "export-bucket-azure": {
       "cube": {
         "environment": {
