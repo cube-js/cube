@@ -897,7 +897,8 @@ export class BaseQuery {
       preAggregationQuery: this.options.preAggregationQuery,
       totalQuery: this.options.totalQuery,
       joinHints: this.options.joinHints,
-      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin')
+      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
+      disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
     };
 
     try {
@@ -945,7 +946,8 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
-      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin')
+      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
+      disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
