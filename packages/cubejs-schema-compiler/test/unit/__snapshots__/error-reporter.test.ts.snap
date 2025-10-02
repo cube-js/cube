@@ -1,0 +1,132 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ErrorReporter should deduplicate identical errors and warnings 1`] = `
+Object {
+  "errors": Array [
+    Object {
+      "fileName": "test.js",
+      "message": "Syntax Error: Duplicate error
+> 1 | test content
+    | ^^^ Duplicate error",
+      "plainMessage": "Syntax Error: Duplicate error",
+    },
+  ],
+  "warnings": Array [
+    Object {
+      "fileName": "test.js",
+      "message": "Duplicate warning",
+    },
+  ],
+}
+`;
+
+exports[`ErrorReporter should group and format errors and warnings from different files: grouped-errors-message 1`] = `
+"Compile errors:
+Errors:
+Generic error
+
+config/database.js Errors:
+Connection failed
+
+schema/custom.js Errors:
+Parse error
+
+schema/orders.js Errors:
+Missing required field
+
+schema/products.js Errors:
+Validation error
+
+schema/users.js Errors:
+Syntax Error: Invalid measure definition
+  2 |   sql: \`SELECT * FROM users\`,
+  3 |   measures: {
+> 4 |     count: {
+    |    ^^^^^ Invalid measure definition
+  5 |       type: 'count'
+  6 |     }
+  7 |   }
+"
+`;
+
+exports[`ErrorReporter should group and format errors and warnings from different files: grouped-errors-plain-message 1`] = `
+"schema/users.js Errors:
+Syntax Error: Invalid measure definition
+"
+`;
+
+exports[`ErrorReporter should group and format errors and warnings from different files: warning-logs 1`] = `
+Array [
+  "schema/users.js:
+Warning: Deprecated syntax
+  1 | cube('Users', {
+> 2 |   sql: \`SELECT * FROM users\`,
+    |  ^^^ Deprecated syntax
+  3 |   measures: {
+  4 |     count: {
+  5 |       type: 'count'",
+  "schema/orders.js:
+Consider adding indexes",
+  "schema/analytics.js:
+Performance warning",
+]
+`;
+
+exports[`ErrorReporter should handle addErrors and addWarnings 1`] = `
+Object {
+  "errors": Array [
+    Object {
+      "fileName": "batch.js",
+      "lineNumber": undefined,
+      "message": "Error 1",
+      "position": undefined,
+    },
+    Object {
+      "fileName": "batch.js",
+      "lineNumber": undefined,
+      "message": "Error 2",
+      "position": undefined,
+    },
+    Object {
+      "fileName": "batch.js",
+      "lineNumber": undefined,
+      "message": "Error 3",
+      "position": undefined,
+    },
+  ],
+  "warnings": Array [
+    Object {
+      "fileName": undefined,
+      "message": "Warning 1",
+    },
+    Object {
+      "fileName": undefined,
+      "message": "Warning 2",
+    },
+  ],
+}
+`;
+
+exports[`ErrorReporter should handle errors without fileName at the end 1`] = `
+"Compile errors:
+Errors:
+Generic error without file
+
+fileA.js Errors:
+Error in file A
+
+fileB.js Errors:
+Error in file B
+"
+`;
+
+exports[`ErrorReporter should handle inContext correctly 1`] = `
+Array [
+  Object {
+    "fileName": undefined,
+    "lineNumber": undefined,
+    "message": "Processing Users cube: Test error",
+    "position": undefined,
+  },
+]
+`;
