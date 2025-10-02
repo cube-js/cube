@@ -225,7 +225,7 @@ jobs:
         snowflake
         snowflake-encrypted-pk
         snowflake-export-bucket-s3
-        snowflake-export-bucket-s3-iam-roles
+        snowflake-export-bucket-s3-via-storage-integration-iam-roles
         snowflake-export-bucket-s3-prefix
         snowflake-export-bucket-azure
         snowflake-export-bucket-azure-prefix
@@ -260,7 +260,7 @@ jobs:
           - snowflake
           - snowflake-encrypted-pk
           - snowflake-export-bucket-s3
-          - snowflake-export-bucket-s3-iam-roles
+          - snowflake-export-bucket-s3-via-storage-integration-iam-roles
           - snowflake-export-bucket-s3-prefix
           - snowflake-export-bucket-azure
           - snowflake-export-bucket-azure-prefix
@@ -339,6 +339,14 @@ jobs:
         run: |
           gunzip image.tar.gz
           docker load -i image.tar
+
+      - name: Configure AWS credentials via IRSA
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DRIVERS_TESTS_AWS_ROLE_ARN_FOR_SNOWFLAKE }}
+          aws-region: us-west-1
+        if: |
+          env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '' && matrix.database == 'snowflake-export-bucket-s3-via-storage-integration-iam-roles'
 
       - name: Run tests
         uses: nick-fields/retry@v3
