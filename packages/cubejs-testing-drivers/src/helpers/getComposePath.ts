@@ -27,6 +27,27 @@ export function getComposePath(type: string, fixture: Fixture, isLocal: boolean)
     './package.json:/cube/conf/package.json',
     './model/ecommerce.yaml:/cube/conf/model/ecommerce.yaml',
   ];
+
+  // Add AWS credential mounting for IRSA-enabled tests
+  if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_SESSION_TOKEN) {
+    const awsCredentialsDir = path.resolve(_path, '.aws');
+    fs.ensureDirSync(awsCredentialsDir);
+
+    const credentialsContent = `[default]
+aws_access_key_id = ${process.env.AWS_ACCESS_KEY_ID}
+aws_secret_access_key = ${process.env.AWS_SECRET_ACCESS_KEY}
+aws_session_token = ${process.env.AWS_SESSION_TOKEN}
+`;
+
+    const configContent = `[default]
+region = ${process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-west-1'}
+`;
+
+    fs.writeFileSync(path.resolve(awsCredentialsDir, 'credentials'), credentialsContent);
+    fs.writeFileSync(path.resolve(awsCredentialsDir, 'config'), configContent);
+
+    volumes.push('./.aws:/root/.aws:ro');
+  }
   const compose: any = {
     version: '2.2',
     services: {
@@ -46,6 +67,9 @@ export function getComposePath(type: string, fixture: Fixture, isLocal: boolean)
         image: `cubejs/cubestore:${process.arch === 'arm64' ? 'arm64v8' : 'latest'}`,
         ports: ['3030'],
         restart: 'always',
+        ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_SESSION_TOKEN ? {
+          volumes: ['./.aws:/root/.aws:ro']
+        } : {})
       }
     }
   };
