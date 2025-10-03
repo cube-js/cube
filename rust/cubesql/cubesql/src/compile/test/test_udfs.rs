@@ -267,6 +267,36 @@ async fn test_pg_backend_pid() -> Result<(), CubeError> {
 }
 
 #[tokio::test]
+async fn test_epoch_to_timestamp() -> Result<(), CubeError> {
+    insta::assert_snapshot!(
+        "epoch_to_timestamp_1",
+        execute_query(
+            "SELECT epoch_to_timestamp(1621123456)".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    insta::assert_snapshot!(
+        "epoch_to_timestamp_2",
+        execute_query(
+            "
+                SELECT epoch_to_timestamp(1621123456)
+                UNION ALL
+                SELECT epoch_to_timestamp(1621123456.789)
+                UNION ALL
+                SELECT epoch_to_timestamp(cast(1621123456 as numeric(10)))
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_to_char_udf() -> Result<(), CubeError> {
     insta::assert_snapshot!(
             "to_char_1",
