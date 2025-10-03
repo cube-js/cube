@@ -509,7 +509,18 @@ export class PreAggregations {
     filterDimensionsSingleValueEqual =
       allValuesEq1(filterDimensionsSingleValueEqual) ? new Set(filterDimensionsSingleValueEqual?.keys()) : null;
 
+    // Build reverse query joins map, which is used for
+    // rollupLambda and rollupJoin pre-aggs matching later
+    const joinsMap: Record<string, string> = {};
+    if (query.join) {
+      for (const j of query.join.joins) {
+        joinsMap[j.to] = j.from;
+      }
+    }
+
     return {
+      joinGraphRoot: query.join?.root,
+      joinsMap,
       sortedDimensions,
       sortedTimeDimensions,
       timeDimensions,
@@ -728,22 +739,51 @@ export class PreAggregations {
         }
       }
 
-      // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
-      // no connections in the joinTree between cubes from different datasources
-      const dimsToMatch = references.rollups.length > 0 ? references.dimensions : references.fullNameDimensions;
+      let dimsToMatch: string[];
+      let timeDimsToMatch: PreAggregationTimeDimensionReference[];
+      let dimensionsMatch: (dimensions: string[], doBackAlias: boolean) => boolean;
 
-      const dimensionsMatch = (dimensions, doBackAlias) => R.all(
-        d => (
-          doBackAlias ?
-            backAlias(dimsToMatch) :
-            (dimsToMatch)
-        ).indexOf(d) !== -1,
-        dimensions
-      );
+      if (references.rollups.length > 0) {
+        // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
+        // no connections in the joinTree between cubes from different datasources
+        // but joinGraph of the query has all the connections, necessary for serving the query,
+        // so we use this information to complete the full paths of members from the root of the query
+        // up to the pre-agg cube.
+        dimsToMatch = references.dimensions;
+        timeDimsToMatch = references.timeDimensions;
 
-      // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
-      // no connections in the joinTree between cubes from different datasources
-      const timeDimsToMatch = references.rollups.length > 0 ? references.timeDimensions : references.fullNameTimeDimensions;
+        const buildPath = (cube: string): string[] => {
+          const path = [cube];
+          const parentMap = transformedQuery.joinsMap;
+          while (parentMap[cube]) {
+            cube = parentMap[cube];
+            path.push(cube);
+          }
+          return path.reverse();
+        };
+
+        dimensionsMatch = (dimensions, doBackAlias) => {
+          let target = doBackAlias ? backAlias(dimsToMatch) : dimsToMatch;
+          target = target.map(dim => {
+            const [cube, field] = dim.split('.');
+            if (cube === transformedQuery.joinGraphRoot) {
+              return dim;
+            }
+            const path = buildPath(cube);
+            return `${path.join('.')}.${field}`;
+          });
+
+          return dimensions.every(d => target.includes(d));
+        };
+      } else {
+        dimsToMatch = references.fullNameDimensions;
+        timeDimsToMatch = references.fullNameTimeDimensions;
+
+        dimensionsMatch = (dimensions, doBackAlias) => {
+          const target = doBackAlias ? backAlias(dimsToMatch) : dimsToMatch;
+          return dimensions.every(d => target.includes(d));
+        };
+      }
 
       const timeDimensionsMatch = (timeDimensionsList, doBackAlias) => R.allPass(
         timeDimensionsList.map(

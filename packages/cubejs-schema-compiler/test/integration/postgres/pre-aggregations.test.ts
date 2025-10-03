@@ -599,7 +599,83 @@ describe('PreAggregations', () => {
         }
       ]
     });
-    `);
+
+    cube('cube_1', {
+      sql: \`SELECT 1 as id, 'dim_1' as dim_1\`,
+
+      joins: {
+        cube_2: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_1} = \${cube_2.dim_1}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_1: {
+          sql: 'dim_1',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        aaa: {
+          dimensions: [
+            dim_1
+          ]
+        },
+        rollupJoin: {
+          type: 'rollupJoin',
+          dimensions: [
+            dim_1,
+            cube_2.dim_1,
+            cube_2.dim_2  // XXX
+          ],
+          rollups: [
+            aaa,
+            cube_2.bbb
+          ]
+        }
+      }
+    });
+
+    cube('cube_2', {
+      sql: \`SELECT 2 as id, 'dim_1' as dim_1, 'dim_2' as dim_2\`,
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_1: {
+          sql: 'dim_1',
+          type: 'string'
+        },
+
+        dim_2: {
+          sql: 'dim_2',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        bbb: {
+          dimensions: [
+            dim_1,
+            dim_2,
+          ]
+        }
+      }
+    });
+
+  `);
 
   it('simple pre-aggregation', async () => {
     await compiler.compile();
@@ -2772,5 +2848,37 @@ describe('PreAggregations', () => {
 
     expect(loadSql[0]).not.toMatch(/GROUP BY/);
     expect(loadSql[0]).toMatch(/THEN 1 END `real_time_lambda_visitors__count`/);
+  });
+
+  it('rollupJoin pre-aggregation', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['cube_1.dim_1', 'cube_2.dim_2'],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect(preAggregationsDescription.length).toBe(2);
+    const aaa = preAggregationsDescription.find(p => p.preAggregationId === 'cube_1.aaa');
+    const bbb = preAggregationsDescription.find(p => p.preAggregationId === 'cube_2.bbb');
+    expect(aaa).toBeDefined();
+    expect(bbb).toBeDefined();
+
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoin');
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [{
+          cube_1__dim_1: 'dim_1',
+          cube_2__dim_2: 'dim_2',
+        }]
+      );
+    });
   });
 });
