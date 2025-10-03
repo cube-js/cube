@@ -575,10 +575,13 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       }`);
     }
 
-    const types = options.query
+    const { types, exportedCount } = options.query
       ? await this.unloadWithSql(tableName, options)
       : await this.unloadWithTable(tableName, options);
-    const csvFile = await this.getCsvFiles(tableName);
+    // Snowflake doesn't produce csv files if no data is exported (no data rows)
+    // so it's important not to call getCsvFiles(), because it checks for empty files list
+    // and throws an error.
+    const csvFile = exportedCount > 0 ? await this.getCsvFiles(tableName) : [];
 
     return {
       exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
@@ -588,37 +591,42 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     };
   }
 
+  private buildBucketUrl(tableName: string): string {
+    const { bucketType } = <SnowflakeDriverExportBucket> this.config.exportBucket;
+
+    let bucketName: string;
+    let exportPrefix: string;
+    let path: string;
+
+    if (bucketType === 'azure') {
+      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
+      const pathArr = path.split('/');
+      bucketName = `${bucketName}/${pathArr[0]}`;
+      exportPrefix = pathArr.length > 1 ? `${pathArr.slice(1).join('/')}/${tableName}` : tableName;
+    } else {
+      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
+      exportPrefix = path ? `${path}/${tableName}` : tableName;
+    }
+
+    return `${bucketType}://${bucketName}/${exportPrefix}/`;
+  }
+
   /**
    * Unload data from a SQL query to an export bucket.
    */
   private async unloadWithSql(
     tableName: string,
     options: UnloadOptions,
-  ): Promise<TableStructure> {
+  ): Promise<{ types: TableStructure, exportedCount: number }> {
     if (!options.query) {
       throw new Error('Unload query is missed.');
     } else {
       const types = await this.queryColumnTypes(options.query.sql, options.query.params);
       const connection = await this.getConnection();
-      const { bucketType } =
-        <SnowflakeDriverExportBucket> this.config.exportBucket;
-
-      let bucketName: string;
-      let exportPrefix: string;
-      let path: string;
-
-      if (bucketType === 'azure') {
-        ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
-        const pathArr = path.split('/');
-        bucketName = `${bucketName}/${pathArr[0]}`;
-        exportPrefix = pathArr.length > 1 ? `${pathArr.slice(1).join('/')}/${tableName}` : tableName;
-      } else {
-        ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
-        exportPrefix = path ? `${path}/${tableName}` : tableName;
-      }
+      const bucketUrl = this.buildBucketUrl(tableName);
 
       const unloadSql = `
-        COPY INTO '${bucketType}://${bucketName}/${exportPrefix}/'
+        COPY INTO '${bucketUrl}'
         FROM (${options.query.sql})
         ${this.exportOptionsClause(options)}`;
       const result = await this.execute<UnloadResponse[]>(
@@ -630,7 +638,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       if (!result) {
         throw new Error('Missing `COPY INTO` query result.');
       }
-      return types;
+      return { types, exportedCount: parseInt(result[0].rows_unloaded, 10) };
     }
   }
 
@@ -661,28 +669,13 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   private async unloadWithTable(
     tableName: string,
     options: UnloadOptions,
-  ): Promise<TableStructure> {
+  ): Promise<{ types: TableStructure, exportedCount: number }> {
     const types = await this.tableColumnTypes(tableName);
     const connection = await this.getConnection();
-    const { bucketType } =
-      <SnowflakeDriverExportBucket> this.config.exportBucket;
-
-    let bucketName: string;
-    let exportPrefix: string;
-    let path: string;
-
-    if (bucketType === 'azure') {
-      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
-      const pathArr = path.split('/');
-      bucketName = `${bucketName}/${pathArr[0]}`;
-      exportPrefix = pathArr.length > 1 ? `${pathArr.slice(1).join('/')}/${tableName}` : tableName;
-    } else {
-      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
-      exportPrefix = path ? `${path}/${tableName}` : tableName;
-    }
+    const bucketUrl = this.buildBucketUrl(tableName);
 
     const unloadSql = `
-      COPY INTO '${bucketType}://${bucketName}/${exportPrefix}/'
+      COPY INTO '${bucketUrl}'
       FROM ${tableName}
       ${this.exportOptionsClause(options)}`;
     const result = await this.execute<UnloadResponse[]>(
@@ -691,10 +684,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       [],
       false,
     );
+
     if (!result) {
       throw new Error('Missing `COPY INTO` query result.');
     }
-    return types;
+
+    return { types, exportedCount: parseInt(result[0].rows_unloaded, 10) };
   }
 
   /**
