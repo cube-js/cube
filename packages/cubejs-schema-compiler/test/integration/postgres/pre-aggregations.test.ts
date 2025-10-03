@@ -599,7 +599,49 @@ describe('PreAggregations', () => {
         }
       ]
     });
-    `);
+
+    cube('cube_pre_agg_proxy_a', {
+      sql: \`SELECT '2025-10-01 12:00:00'::timestamp as starts_at\`,
+
+      dimensions: {
+        starts_at: {
+          sql: \`\${CUBE}.starts_at\`,
+          type: 'time'
+        }
+      }
+    });
+
+    cube('cube_pre_agg_proxy_b', {
+      sql: \`SELECT 'id' as id\`,
+
+      joins: {
+        cube_pre_agg_proxy_a: {
+          relationship: 'one_to_one',
+          sql: '1 = 1'
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: \`\${CUBE}.id\`,
+          type: 'string',
+          primary_key: true
+        },
+
+        terminal_date: {
+          type: 'time',
+          sql: \`\${cube_pre_agg_proxy_a.starts_at}\`
+        }
+      },
+
+      pre_aggregations: {
+        main: {
+          time_dimension: terminal_date,
+          granularity: 'day'
+        }
+      }
+    });
+  `);
 
   it('simple pre-aggregation', async () => {
     await compiler.compile();
@@ -2772,5 +2814,40 @@ describe('PreAggregations', () => {
 
     expect(loadSql[0]).not.toMatch(/GROUP BY/);
     expect(loadSql[0]).toMatch(/THEN 1 END `real_time_lambda_visitors__count`/);
+  });
+
+  it('querying proxied to external cube pre-aggregation time-dimension', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [],
+      dimensions: [],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'cube_pre_agg_proxy_b.terminal_date',
+        granularity: 'day',
+      }],
+      order: [],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+    expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/main/);
+
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [{
+          cube_pre_agg_proxy_b__terminal_date_day: '2025-10-01T00:00:00.000Z',
+        }]
+      );
+    });
   });
 });
