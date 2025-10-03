@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+### Bug Fixes
+
+- **base-driver:** Throw an error when the list of csv files from the bucket is empty ([#9996](https://github.com/cube-js/cube/issues/9996)) ([a8e791c](https://github.com/cube-js/cube/commit/a8e791c1e9c271b63fcf68ba204e875eb3d21fd7))
+- **snowflake-driver:** Add support for IAM roles with IRSA for S3 export buckets ([#10024](https://github.com/cube-js/cube/issues/10024)) ([9ceb2f9](https://github.com/cube-js/cube/commit/9ceb2f94d5deab5fba39faa00e234011c3898710))
+
+### Features
+
+- **schema-compiler:** Pretty print compile errors grouped by files ([#10025](https://github.com/cube-js/cube/issues/10025)) ([0c5c21c](https://github.com/cube-js/cube/commit/0c5c21c4def87cdf9a4b673fde40b034d05d02be))
+
 ## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
 
 ### Bug Fixes

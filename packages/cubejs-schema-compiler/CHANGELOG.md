@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+### Features
+
+- **schema-compiler:** Pretty print compile errors grouped by files ([#10025](https://github.com/cube-js/cube/issues/10025)) ([0c5c21c](https://github.com/cube-js/cube/commit/0c5c21c4def87cdf9a4b673fde40b034d05d02be))
+
 ## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
 
 ### Bug Fixes

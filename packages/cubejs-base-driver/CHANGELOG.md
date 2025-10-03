@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+### Bug Fixes
+
+- **base-driver:** Throw an error when the list of csv files from the bucket is empty ([#9996](https://github.com/cube-js/cube/issues/9996)) ([a8e791c](https://github.com/cube-js/cube/commit/a8e791c1e9c271b63fcf68ba204e875eb3d21fd7))
+
 ## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
 
 **Note:** Version bump only for package @cubejs-backend/base-driver
