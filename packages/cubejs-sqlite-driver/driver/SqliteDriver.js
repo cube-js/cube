@@ -33,7 +33,7 @@ class SqliteDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-    
+
     this.config = {
       database: getEnv('dbName', { dataSource }),
       ...config
