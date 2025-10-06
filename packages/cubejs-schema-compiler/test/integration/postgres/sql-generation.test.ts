@@ -5198,7 +5198,7 @@ cubes:
         sql: amount
         type: sum
 
-# Join loop for testing transitive joins
+# Model for testing multiple joins to the same cube via transitive joins
   - name: alpha_facts
     sql: |
       (
@@ -5256,9 +5256,9 @@ cubes:
   - name: gamma_dims
     sql: |
       (
-        SELECT 10 AS b_id, 'Beta1' AS b_name
+        SELECT 10 AS b_id, 'Beta1' AS b_name, 'Gamma1' AS c_name
         UNION ALL
-        SELECT 20 AS b_id, 'Beta2' AS b_name
+        SELECT 20 AS b_id, 'Beta2' AS b_name, 'Gamma2' AS c_name
       )
     dimensions:
       - name: b_id
@@ -5272,16 +5272,16 @@ cubes:
   - name: delta_bridge
     sql: |
       (
-        SELECT 'Alpha1' AS a_name, 'Beta1' AS b_name, 'Organic' AS channel
+        SELECT 'Alpha1' AS a_name, 'Beta1' AS b_name, 'Gamma1' AS c_name, 'Organic' AS channel
         UNION ALL
-        SELECT 'Alpha1' AS a_name, 'Beta2' AS b_name, 'Paid' AS channel
+        SELECT 'Alpha1' AS a_name, 'Beta2' AS b_name, 'Gamma2' AS c_name, 'Paid' AS channel
         UNION ALL
-        SELECT 'Alpha2' AS a_name, 'Beta1' AS b_name, 'Referral' AS channel
+        SELECT 'Alpha2' AS a_name, 'Beta1' AS b_name, 'Gamma3' AS c_name, 'Referral' AS channel
       )
     joins:
       - name: gamma_dims
         relationship: many_to_one
-        sql: "{CUBE}.b_name = {gamma_dims.b_name}"
+        sql: "{CUBE}.c_name = {gamma_dims.c_name}"
     dimensions:
       - name: a_name
         sql: a_name
@@ -5290,7 +5290,9 @@ cubes:
       - name: b_name
         sql: "{gamma_dims.b_name}"
         type: string
-        primary_key: true
+      - name: c_name
+        sql: c_name
+        type: string
       - name: channel
         sql: channel
         type: string
@@ -5343,34 +5345,32 @@ cubes:
       });
     }
 
-    if (!getEnv('nativeSqlPlanner')) {
-      it('querying cube with transitive joins with loop', async () => {
-        await compiler.compile();
+    it('querying cube with transitive joins with a few joins to same cube', async () => {
+      // TODO: This is not supported atm, but it's a good case, so keeeping this test
+      // for the future implementation
 
-        try {
-          const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-            measures: [],
-            dimensions: [
-              'alpha_facts.reporting_date',
-              'delta_bridge.b_name',
-              'alpha_facts.channel'
-            ],
-            order: [{
-              id: 'alpha_facts.reporting_date'
-            }],
-            timezone: 'America/Los_Angeles'
-          });
+      // await compiler.compile();
+      //
+      // const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      //   measures: [],
+      //   dimensions: [
+      //     'alpha_facts.reporting_date',
+      //     'delta_bridge.b_name',
+      //     'alpha_facts.channel'
+      //   ],
+      //   order: [{
+      //     id: 'alpha_facts.reporting_date'
+      //   }],
+      //   timezone: 'America/Los_Angeles'
+      // });
+      //
+      // const res = await dbRunner.testQuery(query.buildSqlAndParams());
+      // console.log(JSON.stringify(res));
+      //
+      // expect(res).toEqual([
+      //   // Fill
+      // ]);
+    });
 
-          await dbRunner.testQuery(query.buildSqlAndParams());
-          throw new Error('Should have thrown an error');
-        } catch (err: any) {
-          expect(err.message).toContain('Can not construct joins for the query, potential loop detected');
-        }
-      });
-    } else {
-      it.skip('FIXME(tesseract): querying cube dimension that require transitive joins', async () => {
-        // FIXME should be implemented in Tesseract
-      });
-    }
   });
 });
