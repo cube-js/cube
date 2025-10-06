@@ -43,35 +43,29 @@ impl InfoSchemaTableDef for ColumnsInfoSchemaTableDef {
     fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<(Column, TablePath)>>) -> ArrayRef>> {
         vec![
             Box::new(|tables| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     tables
                         .iter()
-                        .map(|(_, row)| row.schema.get_row().get_name().as_str())
-                        .collect::<Vec<_>>(),
+                        .map(|(_, row)| row.schema.get_row().get_name()),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     tables
                         .iter()
-                        .map(|(_, row)| row.table.get_row().get_table_name().as_str())
-                        .collect::<Vec<_>>(),
+                        .map(|(_, row)| row.table.get_row().get_table_name()),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from(
-                    tables
-                        .iter()
-                        .map(|(column, _)| column.get_name().as_str())
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter_values(
+                    tables.iter().map(|(column, _)| column.get_name()),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     tables
                         .iter()
-                        .map(|(column, _)| column.get_column_type().to_string())
-                        .collect::<Vec<_>>(),
+                        .map(|(column, _)| column.get_column_type().to_string()),
                 ))
             }),
         ]

@@ -32,4 +32,7 @@ pub trait PreAggregationDescription {
 
     #[nbridge(field, optional)]
     fn time_dimension_reference(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+
+    #[nbridge(field, optional)]
+    fn rollup_references(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }

@@ -19,7 +19,7 @@ RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLV
     && update-alternatives --install /usr/bin/cc cc /usr/bin/clang-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-$LLVM_VERSION 100;
 
-# https://www.openssl.org/source/old/1.1.1/
+# https://openssl-library.org/source/old/1.1.1/
 ARG OPENSSL_VERSION=1.1.1w
 RUN cd tmp && wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz \
     && cd openssl-${OPENSSL_VERSION} \

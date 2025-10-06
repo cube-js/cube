@@ -1,5 +1,5 @@
 use super::{inner_types::InnerTypes, object::NativeObject};
-use cubesql::CubeError;
+use crate::CubeError;
 
 #[derive(Clone)]
 pub struct NativeObjectHandle<IT: InnerTypes> {

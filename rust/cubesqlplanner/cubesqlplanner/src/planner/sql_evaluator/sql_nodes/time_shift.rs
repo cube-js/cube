@@ -4,7 +4,6 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -43,16 +42,12 @@ impl SqlNode for TimeShiftSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 if !ev.is_reference() && ev.dimension_type() == "time" {
-                    let mut interval = self.shifts.common_time_shift.clone().unwrap_or_default();
                     if let Some(shift) = self.shifts.dimensions_shifts.get(&ev.full_name()) {
-                        interval += &shift.interval;
-                    }
-                    if interval == SqlInterval::default() {
-                        input
-                    } else {
-                        let shift = interval.to_sql();
+                        let shift = shift.interval.clone().unwrap().to_sql(); // Common time shifts should always have an interval
                         let res = templates.add_timestamp_interval(input, shift)?;
                         format!("({})", res)
+                    } else {
+                        input
                     }
                 } else {
                     input

@@ -28,6 +28,8 @@ pub enum CommandCompletion {
     Commit,
     Use,
     Rollback,
+    Savepoint,
+    Release,
     Set,
     Select(u32),
     DeclareCursor,

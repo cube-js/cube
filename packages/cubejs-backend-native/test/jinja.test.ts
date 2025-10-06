@@ -9,8 +9,6 @@ type InitJinjaFn = () => Promise<{
 }>;
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
-// TODO(ovr): Find what is going wrong with parallel tests & python on Linux
-const darwinSuite = process.platform === 'darwin' && !native.isFallbackBuild() ? describe : xdescribe;
 
 const nativeInstance = new native.NativeInstance();
 

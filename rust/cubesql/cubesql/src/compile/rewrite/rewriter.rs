@@ -477,7 +477,7 @@ impl Rewriter {
                 eval_stable_functions,
             ),
             &DateRules::new(config_obj.clone()),
-            &OrderRules::new(),
+            &OrderRules::new(config_obj.clone()),
             &CommonRules::new(config_obj.clone()),
         ];
         let mut rewrites = Vec::new();
@@ -545,7 +545,7 @@ impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for Increme
             self.current_eclasses.extend(
                 egraph
                     .classes()
-                    .filter(|class| (class.data.iteration_timestamp >= iteration))
+                    .filter(|class| class.data.iteration_timestamp >= iteration)
                     .map(|class| class.id),
             );
         };

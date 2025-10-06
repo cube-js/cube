@@ -33,10 +33,10 @@ In the following example, Power BI Desktop is launched under the `cube` user:
 
 ```bash
 # Run Power BI Desktop as the `cube` user
-runas /user:cube "C:\Program Files\Microsoft Power BI Desktop\bin\PBIDesktop.exe"
+runas /netonly /user:cube "C:\Program Files\Microsoft Power BI Desktop\bin\PBIDesktop.exe"
 
 # Run a specific report in Power BI Desktop as the `cube` user 
-runas /user:cube "C:\Program Files\Microsoft Power BI Desktop\bin\PBIDesktop.exe \"C:\Users\Administrator\Desktop\Dashboard.pbix\""
+runas /netonly /user:cube "C:\Program Files\Microsoft Power BI Desktop\bin\PBIDesktop.exe \"C:\Users\Administrator\Desktop\Dashboard.pbix\""
 ```
 
 __This flow should only be used for testing purposes.__ Note that, when Power BI Desktop

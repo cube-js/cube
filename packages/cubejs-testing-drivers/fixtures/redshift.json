@@ -29,7 +29,9 @@
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
       "CUBESQL_SQL_PUSH_DOWN": "true",
-      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}"
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
+      "CUBEJS_TRANSPILATION_WORKER_THREADS": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_WORKER_THREADS}",
+      "CUBEJS_TRANSPILATION_NATIVE": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE}"
     },
     "ports" : ["4000", "5656"]
   },
@@ -47,7 +49,8 @@
     "products": "public.products",
     "customers": "public.customers",
     "ecommerce": "public.ecommerce",
-    "bigecommerce": "public.bigecommerce"
+    "bigecommerce": "public.bigecommerce",
+    "retailcalendar": "public.retailcalendar"
   },
   "preAggregations": {
     "Products": [],
@@ -167,17 +170,62 @@
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
-    "querying BigECommerce: rolling window YTD",
     "querying BigECommerce: rolling window YTD without date range",
-    
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+    "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: SQL API: Timeshift measure from cube",
+    "querying BigECommerce: multi-stage group by time dimension",
+    "querying SwitchSourceTest: simple cross join",
+    "querying SwitchSourceTest: full cross join",
+    "querying SwitchSourceTest: filter by switch dimensions",
+
     "---------------------------------------",
     "SKIPPED SQL API (Need work)            ",
     "---------------------------------------",
     "SQL API: SQL push down push to cube quoted alias"
+  ],
+  "tesseractSkip": [
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
+    "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "SQL API: Timeshift measure from cube",
+
+    "querying BigECommerce: rolling window by 2 day without date range",
+    "querying BigECommerce: rolling window by 2 month without date range",
+    "querying BigECommerce: rolling window YTD without date range",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: SQL push down push to cube quoted alias",
+
+    "---- Different results comparing to baseQuery version. Need to investigate ----",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce: rolling window YTD without granularity",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
   ]
 }

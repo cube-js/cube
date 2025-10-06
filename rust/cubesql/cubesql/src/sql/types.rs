@@ -1,4 +1,4 @@
-use crate::compile::CommandCompletion;
+use crate::{compile::CommandCompletion, CubeError};
 use bitflags::bitflags;
 use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit, TimeUnit};
 use pg_srv::{protocol::CommandComplete, PgTypeId};
@@ -24,6 +24,26 @@ pub enum ColumnType {
 }
 
 impl ColumnType {
+    pub fn from_pg_tid(pg_type_oid: PgTypeId) -> Result<Self, CubeError> {
+        match pg_type_oid {
+            PgTypeId::TEXT | PgTypeId::VARCHAR => Ok(ColumnType::String),
+            PgTypeId::FLOAT8 => Ok(ColumnType::Double),
+            PgTypeId::BOOL => Ok(ColumnType::Boolean),
+            PgTypeId::INT2 => Ok(ColumnType::Int8),
+            PgTypeId::INT4 => Ok(ColumnType::Int32),
+            PgTypeId::INT8 => Ok(ColumnType::Int64),
+            PgTypeId::BYTEA => Ok(ColumnType::Blob),
+            PgTypeId::DATE => Ok(ColumnType::Date(false)),
+            PgTypeId::INTERVAL => Ok(ColumnType::Interval(IntervalUnit::MonthDayNano)),
+            PgTypeId::TIMESTAMP | PgTypeId::TIMESTAMPTZ => Ok(ColumnType::Timestamp),
+            PgTypeId::NUMERIC => Ok(ColumnType::Decimal(38, 10)),
+            _ => Err(CubeError::internal(format!(
+                "Unable to convert PostgreSQL type oid {} to ColumnType",
+                pg_type_oid as u32
+            ))),
+        }
+    }
+
     pub fn to_pg_tid(&self) -> PgTypeId {
         match self {
             ColumnType::Blob => PgTypeId::BYTEA,
@@ -109,6 +129,8 @@ impl CommandCompletion {
             CommandCompletion::Prepare => CommandComplete::Plain("PREPARE".to_string()),
             CommandCompletion::Commit => CommandComplete::Plain("COMMIT".to_string()),
             CommandCompletion::Rollback => CommandComplete::Plain("ROLLBACK".to_string()),
+            CommandCompletion::Savepoint => CommandComplete::Plain("SAVEPOINT".to_string()),
+            CommandCompletion::Release => CommandComplete::Plain("RELEASE".to_string()),
             CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),
             CommandCompletion::Use => CommandComplete::Plain("USE".to_string()),
             CommandCompletion::DeclareCursor => {

@@ -9,28 +9,18 @@ use tokio::sync::Notify;
 
 #[async_trait]
 pub trait MetastoreListener: Send + Sync {
-    async fn wait_for_event(
-        &self,
-        event_fn: Box<dyn Fn(MetaStoreEvent) -> bool + Send + Sync>,
-    ) -> Result<(), CubeError>;
+    async fn wait_for_event(&self, event_fn: MetastoreListenerWaitFun) -> Result<(), CubeError>;
 }
 
+pub type MetastoreListenerWaitFun = Box<dyn Fn(&MetaStoreEvent) -> bool + Send + Sync>;
 pub struct MetastoreListenerImpl {
     event_receiver: Mutex<Receiver<MetaStoreEvent>>,
-    wait_fns: Mutex<
-        Vec<(
-            Arc<Notify>,
-            Box<dyn Fn(MetaStoreEvent) -> bool + Send + Sync>,
-        )>,
-    >,
+    wait_fns: Mutex<Vec<(Arc<Notify>, MetastoreListenerWaitFun)>>,
 }
 
 #[async_trait]
 impl MetastoreListener for MetastoreListenerImpl {
-    async fn wait_for_event(
-        &self,
-        event_fn: Box<dyn Fn(MetaStoreEvent) -> bool + Send + Sync>,
-    ) -> Result<(), CubeError> {
+    async fn wait_for_event(&self, event_fn: MetastoreListenerWaitFun) -> Result<(), CubeError> {
         let notify = Arc::new(Notify::new());
         self.wait_fns.lock().await.push((notify.clone(), event_fn));
         notify.notified().await;
@@ -42,10 +32,7 @@ pub struct MockMetastoreListener;
 
 #[async_trait]
 impl MetastoreListener for MockMetastoreListener {
-    async fn wait_for_event(
-        &self,
-        _event_fn: Box<dyn Fn(MetaStoreEvent) -> bool + Send + Sync>,
-    ) -> Result<(), CubeError> {
+    async fn wait_for_event(&self, _event_fn: MetastoreListenerWaitFun) -> Result<(), CubeError> {
         Ok(())
     }
 }
@@ -67,7 +54,7 @@ impl MetastoreListenerImpl {
     pub async fn run_listener(&self) -> Result<(), CubeError> {
         loop {
             let event = self.event_receiver.lock().await.recv().await?;
-            let res = self.process_event(event.clone()).await;
+            let res = self.process_event(&event).await;
             if let Err(e) = res {
                 error!("Error processing event {:?}: {}", event, e);
             }
@@ -80,7 +67,7 @@ impl MetastoreListenerImpl {
     ) -> Result<(), CubeError> {
         loop {
             let event = self.event_receiver.lock().await.recv().await?;
-            let res = self.process_event(event.clone()).await;
+            let res = self.process_event(&event).await;
             if let Err(e) = res {
                 error!("Error processing event {:?}: {}", event, e);
             }
@@ -90,13 +77,22 @@ impl MetastoreListenerImpl {
         }
     }
 
-    async fn process_event(&self, event: MetaStoreEvent) -> Result<(), CubeError> {
+    async fn process_event(&self, event: &MetaStoreEvent) -> Result<(), CubeError> {
         let mut wait_fns = self.wait_fns.lock().await;
-        let to_notify = wait_fns
-            .extract_if(|(_, wait_fn)| wait_fn(event.clone()))
-            .collect::<Vec<_>>();
+        let mut to_notify = Vec::new();
 
-        for (notify, _) in to_notify {
+        wait_fns.retain(|(notify, wait_fn)| {
+            if wait_fn(event) {
+                to_notify.push(notify.clone());
+                false
+            } else {
+                true
+            }
+        });
+
+        drop(wait_fns);
+
+        for notify in to_notify {
             notify.notify_waiters();
         }
 

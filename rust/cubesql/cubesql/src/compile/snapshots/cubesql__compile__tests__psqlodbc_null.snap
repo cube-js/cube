@@ -1,9 +1,9 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"select NULL, NULL, NULL\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"select NULL, NULL, NULL\".to_string(),\nDatabaseProtocol::PostgreSQL,).await?"
 ---
-+------+-------+-------+
-| NULL | NULL2 | NULL3 |
-+------+-------+-------+
-| NULL | NULL  | NULL  |
-+------+-------+-------+
++------+---------+---------+
+| NULL | NULL__1 | NULL__2 |
++------+---------+---------+
+| NULL | NULL    | NULL    |
++------+---------+---------+

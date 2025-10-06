@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT *\n            FROM pg_locks\n            ORDER BY locktype, database, relation\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++----------+----------+----------+------+-------+------------+---------------+---------+-------+----------+--------------------+-----+------+---------+----------+-----------+
+| locktype | database | relation | page | tuple | virtualxid | transactionid | classid | objid | objsubid | virtualtransaction | pid | mode | granted | fastpath | waitstart |
++----------+----------+----------+------+-------+------------+---------------+---------+-------+----------+--------------------+-----+------+---------+----------+-----------+
++----------+----------+----------+------+-------+------------+---------------+---------+-------+----------+--------------------+-----+------+---------+----------+-----------+

@@ -54,6 +54,8 @@ pub trait WorkerProcessing: Send + Sync + 'static {
     fn is_single_job_process() -> bool;
 
     fn process_titile() -> String;
+
+    fn process_type() -> String;
 }
 
 pub trait ServicesTransport {

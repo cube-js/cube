@@ -409,6 +409,48 @@ describe('index.test', () => {
     });
   });
 
+  describe('CompilerApi validation', () => {
+    test('Should allow both contextToRoles and contextToGroups together', () => {
+      const logger = jest.fn(() => {});
+
+      expect(() => new CompilerApi(
+        repositoryWithoutPreAggregations,
+        async () => 'mysql',
+        {
+          logger,
+          contextToRoles: async () => ['admin'],
+          contextToGroups: async () => ['analytics']
+        }
+      )).not.toThrow();
+    });
+
+    test('Should allow only contextToRoles', () => {
+      const logger = jest.fn(() => {});
+
+      expect(() => new CompilerApi(
+        repositoryWithoutPreAggregations,
+        async () => 'mysql',
+        {
+          logger,
+          contextToRoles: async () => ['admin']
+        }
+      )).not.toThrow();
+    });
+
+    test('Should allow only contextToGroups', () => {
+      const logger = jest.fn(() => {});
+
+      expect(() => new CompilerApi(
+        repositoryWithoutPreAggregations,
+        async () => 'mysql',
+        {
+          logger,
+          contextToGroups: async () => ['analytics']
+        }
+      )).not.toThrow();
+    });
+  });
+
   describe('CompilerApi dataSources method', () => {
     const logger = jest.fn(() => {});
     const compilerApi = new CompilerApi(

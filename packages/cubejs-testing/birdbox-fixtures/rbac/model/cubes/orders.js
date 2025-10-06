@@ -29,7 +29,7 @@ cube('orders', {
     },
   },
 
-  accessPolicy: [
+  access_policy: [
     {
       role: '*',
       memberLevel: {

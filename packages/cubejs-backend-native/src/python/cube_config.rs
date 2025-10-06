@@ -52,6 +52,7 @@ impl CubeConfigPy {
             "context_to_orchestrator_id",
             "context_to_cube_store_router_id",
             "context_to_roles",
+            "context_to_groups",
             "db_type",
             "driver_factory",
             "extend_context",

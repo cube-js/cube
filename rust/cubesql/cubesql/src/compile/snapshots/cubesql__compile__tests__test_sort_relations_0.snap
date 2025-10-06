@@ -7,8 +7,8 @@ expression: "execute_query(\"select pg_class.oid as oid from pg_class order by p
 +-------+
 | 1259  |
 | 18000 |
-| 18019 |
-| 18029 |
-| 18035 |
-| 18245 |
+| 18020 |
+| 18030 |
+| 18036 |
+| 18246 |
 +-------+

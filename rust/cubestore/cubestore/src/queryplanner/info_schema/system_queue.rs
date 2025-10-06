@@ -61,56 +61,47 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                 ))
             }),
             Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from(
+                Arc::new(TimestampNanosecondArray::from_iter_values(
                     items
                         .iter()
-                        .map(|row| row.item.get_row().get_created().timestamp_nanos())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.item.get_row().get_created().timestamp_nanos()),
                 ))
             }),
             Box::new(|items| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     items
                         .iter()
-                        .map(|row| format!("{:?}", row.item.get_row().get_status()))
-                        .collect::<Vec<_>>(),
+                        .map(|row| format!("{:?}", row.item.get_row().get_status())),
                 ))
             }),
             Box::new(|items| {
-                Arc::new(Int64Array::from(
+                Arc::new(Int64Array::from_iter_values(
                     items
                         .iter()
-                        .map(|row| row.item.get_row().get_priority().clone())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.item.get_row().get_priority().clone()),
                 ))
             }),
             Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from(
-                    items
-                        .iter()
-                        .map(|row| {
-                            row.item
-                                .get_row()
-                                .get_heartbeat()
-                                .as_ref()
-                                .map(|v| v.timestamp_nanos())
-                        })
-                        .collect::<Vec<_>>(),
-                ))
+                Arc::new(TimestampNanosecondArray::from_iter(items.iter().map(
+                    |row| {
+                        row.item
+                            .get_row()
+                            .get_heartbeat()
+                            .as_ref()
+                            .map(|v| v.timestamp_nanos())
+                    },
+                )))
             }),
             Box::new(|items| {
-                Arc::new(TimestampNanosecondArray::from(
-                    items
-                        .iter()
-                        .map(|row| {
-                            row.item
-                                .get_row()
-                                .get_orphaned()
-                                .as_ref()
-                                .map(|v| v.timestamp_nanos())
-                        })
-                        .collect::<Vec<_>>(),
-                ))
+                Arc::new(TimestampNanosecondArray::from_iter(items.iter().map(
+                    |row| {
+                        row.item
+                            .get_row()
+                            .get_orphaned()
+                            .as_ref()
+                            .map(|v| v.timestamp_nanos())
+                    },
+                )))
             }),
             Box::new(|items| {
                 Arc::new(StringArray::from_iter(

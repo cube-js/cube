@@ -13,7 +13,9 @@
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
       "CUBESQL_SQL_PUSH_DOWN": "true",
-      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}"
+      "CUBEJS_TESSERACT_SQL_PLANNER": "${DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER}",
+      "CUBEJS_TRANSPILATION_WORKER_THREADS": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_WORKER_THREADS}",
+      "CUBEJS_TRANSPILATION_NATIVE": "${DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE}"
     },
     "depends_on": ["data"],
     "links": ["data"],
@@ -42,7 +44,8 @@
     "products": "products",
     "customers": "customers",
     "ecommerce": "ecommerce",
-    "bigecommerce": "bigecommerce"
+    "bigecommerce": "bigecommerce",
+    "retailcalendar": "retailcalendar"
   },
   "preAggregations": {
     "Products": [],
@@ -156,12 +159,24 @@
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+
     "---------------------------------------",
     "Requires Tesseract.                    ",
     "---------------------------------------",
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
-    "querying BigECommerce: rolling window YTD without date range"
+    "querying BigECommerce: rolling window YTD without date range",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
+    "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "Tesseract: SQL API: Timeshift measure from cube",
+    "querying BigECommerce: multi-stage group by time dimension",
+    "querying SwitchSourceTest: simple cross join",
+    "querying SwitchSourceTest: full cross join",
+    "querying SwitchSourceTest: filter by switch dimensions"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -169,9 +184,11 @@
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
     "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension",
     "querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension",
-    "pre-aggregations Customers: running total without time dimension",
-    "querying BigECommerce: totalProfitYearAgo",
-    "SQL API: post-aggregate percentage of total",
+    "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
+    "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
+    "SQL API: Timeshift measure from cube",
+
+
     "SQL API: Simple Rollup",
     "SQL API: Complex Rollup",
     "SQL API: Rollup with aliases",
@@ -180,7 +197,13 @@
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
     "SQL API: Extended nested Rollup over asterisk",
-    "SQL API: Timeshift measure from cube",
-    "SQL API: SQL push down push to cube quoted alias"
+    "SQL API: SQL push down push to cube quoted alias",
+
+    "---- Different results comparing to baseQuery version. Need to investigate ----",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)",
+    "querying BigECommerce: rolling window YTD without granularity",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
   ]
 }

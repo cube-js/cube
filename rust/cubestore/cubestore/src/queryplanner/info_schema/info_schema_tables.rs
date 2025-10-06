@@ -40,48 +40,38 @@ impl InfoSchemaTableDef for TablesInfoSchemaTableDef {
     fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
         vec![
             Box::new(|tables| {
-                Arc::new(StringArray::from(
-                    tables
-                        .iter()
-                        .map(|row| row.schema.get_row().get_name().as_str())
-                        .collect::<Vec<_>>(),
+                Arc::new(StringArray::from_iter_values(
+                    tables.iter().map(|row| row.schema.get_row().get_name()),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from(
+                Arc::new(StringArray::from_iter_values(
                     tables
                         .iter()
-                        .map(|row| row.table.get_row().get_table_name().as_str())
-                        .collect::<Vec<_>>(),
+                        .map(|row| row.table.get_row().get_table_name()),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(TimestampNanosecondArray::from(
-                    tables
-                        .iter()
-                        .map(|row| {
-                            row.table
-                                .get_row()
-                                .build_range_end()
-                                .as_ref()
-                                .map(|t| t.timestamp_nanos())
-                        })
-                        .collect::<Vec<_>>(),
-                ))
+                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
+                    |row| {
+                        row.table
+                            .get_row()
+                            .build_range_end()
+                            .as_ref()
+                            .map(|t| t.timestamp_nanos())
+                    },
+                )))
             }),
             Box::new(|tables| {
-                Arc::new(TimestampNanosecondArray::from(
-                    tables
-                        .iter()
-                        .map(|row| {
-                            row.table
-                                .get_row()
-                                .seal_at()
-                                .as_ref()
-                                .map(|t| t.timestamp_nanos())
-                        })
-                        .collect::<Vec<_>>(),
-                ))
+                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
+                    |row| {
+                        row.table
+                            .get_row()
+                            .seal_at()
+                            .as_ref()
+                            .map(|t| t.timestamp_nanos())
+                    },
+                )))
             }),
         ]
     }

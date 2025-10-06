@@ -1,20 +1,17 @@
-import { CubeStoreDriver, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 import crypto from 'crypto';
-import { createPromiseLock, pausePromise } from '@cubejs-backend/shared';
+import { createPromiseLock, MethodName, pausePromise } from '@cubejs-backend/shared';
 import { QueueDriverConnectionInterface, QueueDriverInterface, } from '@cubejs-backend/base-driver';
-import { LocalQueueDriver, QueryQueue } from '../../src';
+import { LocalQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
 
-export type QueryQueueTestOptions = {
-  cacheAndQueueDriver?: string,
-  redisPool?: any,
-  cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
+export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver' | 'cubeStoreDriverFactory'> & {
   beforeAll?: () => Promise<void>,
   afterAll?: () => Promise<void>,
 };
 
 function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInterface, counters: any): QueueDriverConnectionInterface {
-  function wrapAsyncMethod(methodName: string): any {
-    return async function (...args) {
+  function wrapAsyncMethod<M extends MethodName<QueueDriverConnectionInterface>>(methodName: M): any {
+    return async (...args: Parameters<QueueDriverConnectionInterface[M]>) => {
       if (!(methodName in counters.methods)) {
         counters.methods[methodName] = {
           started: 1,
@@ -24,7 +21,7 @@ function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInt
         counters.methods[methodName].started++;
       }
 
-      const result = await connection[methodName](...args);
+      const result = await (connection[methodName] as any)(...args);
       counters.methods[methodName].finished++;
 
       return result;
@@ -67,7 +64,7 @@ function patchQueueDriverForTrack(driver: QueueDriverInterface, counters: any): 
   };
 }
 
-export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions = {}) {
+export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions) {
   (async () => {
     if (options.beforeAll) {
       await options.beforeAll();
@@ -118,6 +115,14 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
             return {
               payload: 'a'.repeat(benchSettings.queueResponseSize),
             };
+          },
+          stream: async (_query, _stream) => {
+            throw new Error('streaming handler is not supported for testing');
+          }
+        },
+        cancelHandlers: {
+          query: async (_query) => {
+            console.error('Cancel handler was called for query');
           },
         },
         continueWaitTimeout: 60 * 2,
@@ -176,7 +181,9 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
             // eslint-disable-next-line no-bitwise
             payload: 'a'.repeat(benchSettings.queuePayloadSize)
           }, 1, {
-
+            stageQueryKey: 1,
+            requestId: 'request-id',
+            spanId: 'span-id'
           });
 
           counters.queueResolved++;

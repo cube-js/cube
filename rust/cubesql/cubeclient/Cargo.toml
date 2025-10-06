@@ -9,8 +9,7 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
-serde = "1.0.209"
-serde_derive = "1.0.209"
+serde = { version = "1.0.209", features = ["derive"] }
 serde_json = "^1.0"
 url = "^2.2"
 reqwest-middleware = { version = "0.3.2", features = ["json"] }
@@ -19,6 +18,7 @@ async-trait = "0.1.51"
 tokio = { version = "1.6", features = ["time"] }
 uuid = { version = "1", features = ["v4"] }
 log = "0.4"
+serde_repr = "0.1.20"
 
 [dependencies.reqwest]
 version = "0.12.5"

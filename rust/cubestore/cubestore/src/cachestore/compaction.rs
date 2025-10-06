@@ -362,7 +362,7 @@ mod tests {
         let index = CacheItemRocksIndex::ByPath;
         let key = RowKey::SecondaryIndex(
             CacheItemRocksTable::index_id(index.get_id()),
-            index.key_hash(&row).to_be_bytes().to_vec(),
+            index.key_hash(&row).to_be_bytes(),
             1,
         );
 
@@ -386,7 +386,7 @@ mod tests {
         let index = CacheItemRocksIndex::ByPath;
         let key = RowKey::SecondaryIndex(
             CacheItemRocksTable::index_id(index.get_id()),
-            index.key_hash(&row).to_be_bytes().to_vec(),
+            index.key_hash(&row).to_be_bytes(),
             1,
         );
 
@@ -410,11 +410,11 @@ mod tests {
         let index = CacheItemRocksIndex::ByPath;
         let key = RowKey::SecondaryIndex(
             CacheItemRocksTable::index_id(index.get_id()),
-            index.key_hash(&row).to_be_bytes().to_vec(),
+            index.key_hash(&row).to_be_bytes(),
             1,
         );
 
-        // Indexes with TTL use new format (v2) for indexes, but index migration doesnt skip
+        // Indexes with TTL use a new format (v2) for indexes, but index migration doesn't skip
         // compaction for old rows
         let index_value = RocksSecondaryIndexValue::Hash("kek".as_bytes())
             .to_bytes(RocksSecondaryIndexValueVersion::OnlyHash)

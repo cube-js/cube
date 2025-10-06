@@ -66,8 +66,8 @@ const RESOURCES_LINKS = [
     link: "https://cube.dev/case-studies",
   },
   {
-    label: "Cube Partner Network",
-    link: "https://cube.dev/consulting/cube-partner-network",
+    label: "Consulting Partners",
+    link: "https://cube.dev/consulting/consulting-partners",
   },
 ];
 

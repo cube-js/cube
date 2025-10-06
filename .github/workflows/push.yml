@@ -148,7 +148,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -213,7 +213,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           components: rustfmt
       - name: Cargo test cubeorchestrator
         run: cargo test --manifest-path rust/cubeorchestrator/Cargo.toml -j 4
@@ -237,7 +237,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-01-29
+          toolchain: nightly-2025-08-01
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -276,7 +276,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -323,24 +323,10 @@ jobs:
       fail-fast: false
 
     steps:
-      - name: Maximize build space (disk space limitations)
-        run: |
-          echo "Before"
-          df -h
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^mongodb-.*'
-          sudo apt-get remove -y '^mysql-.*'
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          echo "After"
-          df -h
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Maximize build space
+        uses: ./.github/actions/maximize-build-space
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -411,10 +397,14 @@ jobs:
     strategy:
       matrix:
         node-version: [22.x]
+        # Vertica tests are disabled because around 20.08.2025 someone
+        # totally removed all vertica-ce docker repository from dockerhub.
+        # @see https://github.com/vertica/vertica-containers/issues/64
         db: [
             'athena', 'bigquery', 'snowflake', 'trino',
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
-            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio', 'vertica'
+            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio'
+#            'vertica'
         ]
         use_tesseract_sql_planner: [ false ]
         include:
@@ -434,7 +424,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -535,24 +525,10 @@ jobs:
       fail-fast: false
 
     steps:
-      - name: Maximize build space (disk space limitations)
-        run: |
-          echo "Before"
-          df -h
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^mongodb-.*'
-          sudo apt-get remove -y '^mysql-.*'
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          echo "After"
-          df -h
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Maximize build space
+        uses: ./.github/actions/maximize-build-space
       - name: Download backend-native artifact
         uses: actions/download-artifact@v4
         with:
@@ -668,24 +644,10 @@ jobs:
             tag: tmp-dev
       fail-fast: false
     steps:
-      - name: Maximize build space (disk space limitations)
-        run: |
-          echo "Before"
-          df -h
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^mongodb-.*'
-          sudo apt-get remove -y '^mysql-.*'
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          echo "After"
-          df -h
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Maximize build space
+        uses: ./.github/actions/maximize-build-space
       - name: Download backend-native artifact
         uses: actions/download-artifact@v4
         with:

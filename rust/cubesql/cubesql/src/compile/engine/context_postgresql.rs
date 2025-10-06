@@ -17,16 +17,21 @@ use super::information_schema::postgres::{
     InfoSchemaSqlImplementationInfoProvider as PostgresInfoSchemaSqlImplementationInfoProvider,
     InfoSchemaSqlSizingProvider as PostgresInfoSchemaSqlSizingProvider,
     InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
-    PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
-    PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
-    PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogExtensionProvider,
-    PgCatalogIndexProvider, PgCatalogInheritsProvider, PgCatalogMatviewsProvider,
-    PgCatalogNamespaceProvider, PgCatalogPartitionedTableProvider, PgCatalogProcProvider,
-    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
-    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatUserTablesProvider,
-    PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider, PgCatalogUserProvider, PgCatalogViewsProvider,
-    PgPreparedStatementsProvider,
+    PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogAuthMembersProvider,
+    PgCatalogAvailableExtensionVersionsProvider, PgCatalogCastProvider, PgCatalogClassProvider,
+    PgCatalogCollationProvider, PgCatalogConstraintProvider, PgCatalogDatabaseProvider,
+    PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogEnumProvider,
+    PgCatalogEventTriggerProvider, PgCatalogExtensionProvider, PgCatalogForeignDataWrapperProvider,
+    PgCatalogForeignServerProvider, PgCatalogForeignTableProvider, PgCatalogIndexProvider,
+    PgCatalogInheritsProvider, PgCatalogLanguageProvider, PgCatalogLocksProvider,
+    PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogOperatorProvider,
+    PgCatalogPartitionedTableProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
+    PgCatalogRewriteProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
+    PgCatalogSettingsProvider, PgCatalogShdescriptionProvider, PgCatalogStatActivityProvider,
+    PgCatalogStatUserTablesProvider, PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider,
+    PgCatalogTableProvider, PgCatalogTablespaceProvider, PgCatalogTimezoneAbbrevsProvider,
+    PgCatalogTimezoneNamesProvider, PgCatalogTypeProvider, PgCatalogUserMappingProvider,
+    PgCatalogUserProvider, PgCatalogViewsProvider, PgPreparedStatementsProvider,
 };
 use crate::{
     compile::{
@@ -94,6 +99,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_index".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogClassProvider>() {
             "pg_catalog.pg_class".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogCollationProvider>() {
+            "pg_catalog.pg_collation".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogProcProvider>() {
             "pg_catalog.pg_proc".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogSettingsProvider>() {
@@ -136,6 +143,38 @@ impl DatabaseProtocol {
             "pg_catalog.pg_views".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogStatUserTablesProvider>() {
             "pg_catalog.pg_stat_user_tables".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogShdescriptionProvider>() {
+            "pg_catalog.pg_shdescription".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogLocksProvider>() {
+            "pg_catalog.pg_locks".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogTimezoneNamesProvider>() {
+            "pg_catalog.pg_timezone_names".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogTimezoneAbbrevsProvider>() {
+            "pg_catalog.pg_timezone_abbrevs".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogAuthMembersProvider>() {
+            "pg_catalog.pg_auth_members".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogTablespaceProvider>() {
+            "pg_catalog.pg_tablespace".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogEventTriggerProvider>() {
+            "pg_catalog.pg_event_trigger".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogForeignDataWrapperProvider>() {
+            "pg_catalog.pg_foreign_data_wrapper".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogForeignServerProvider>() {
+            "pg_catalog.pg_foreign_server".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogUserMappingProvider>() {
+            "pg_catalog.pg_user_mapping".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogAvailableExtensionVersionsProvider>() {
+            "pg_catalog.pg_available_extension_versions".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogLanguageProvider>() {
+            "pg_catalog.pg_language".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogCastProvider>() {
+            "pg_catalog.pg_cast".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogForeignTableProvider>() {
+            "pg_catalog.pg_foreign_table".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogOperatorProvider>() {
+            "pg_catalog.pg_operator".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogRewriteProvider>() {
+            "pg_catalog.pg_rewrite".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftPgExternalSchemaProvider>() {
             "pg_catalog.pg_external_schema".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
@@ -340,6 +379,7 @@ impl DatabaseProtocol {
                 "pg_class" => {
                     return Some(Arc::new(PgCatalogClassProvider::new(&context.meta.tables)))
                 }
+                "pg_collation" => return Some(Arc::new(PgCatalogCollationProvider::new())),
                 "pg_proc" => return Some(Arc::new(PgCatalogProcProvider::new())),
                 "pg_settings" => {
                     return Some(Arc::new(PgCatalogSettingsProvider::new(
@@ -401,6 +441,32 @@ impl DatabaseProtocol {
                         &context.meta.tables,
                     )))
                 }
+                "pg_shdescription" => return Some(Arc::new(PgCatalogShdescriptionProvider::new())),
+                "pg_locks" => return Some(Arc::new(PgCatalogLocksProvider::new())),
+                "pg_timezone_names" => {
+                    return Some(Arc::new(PgCatalogTimezoneNamesProvider::new()))
+                }
+                "pg_timezone_abbrevs" => {
+                    return Some(Arc::new(PgCatalogTimezoneAbbrevsProvider::new()))
+                }
+                "pg_auth_members" => return Some(Arc::new(PgCatalogAuthMembersProvider::new())),
+                "pg_tablespace" => return Some(Arc::new(PgCatalogTablespaceProvider::new())),
+                "pg_event_trigger" => return Some(Arc::new(PgCatalogEventTriggerProvider::new())),
+                "pg_foreign_data_wrapper" => {
+                    return Some(Arc::new(PgCatalogForeignDataWrapperProvider::new()))
+                }
+                "pg_foreign_server" => {
+                    return Some(Arc::new(PgCatalogForeignServerProvider::new()))
+                }
+                "pg_user_mapping" => return Some(Arc::new(PgCatalogUserMappingProvider::new())),
+                "pg_available_extension_versions" => {
+                    return Some(Arc::new(PgCatalogAvailableExtensionVersionsProvider::new()))
+                }
+                "pg_language" => return Some(Arc::new(PgCatalogLanguageProvider::new())),
+                "pg_cast" => return Some(Arc::new(PgCatalogCastProvider::new())),
+                "pg_foreign_table" => return Some(Arc::new(PgCatalogForeignTableProvider::new())),
+                "pg_operator" => return Some(Arc::new(PgCatalogOperatorProvider::new())),
+                "pg_rewrite" => return Some(Arc::new(PgCatalogRewriteProvider::new())),
                 "pg_external_schema" => {
                     return Some(Arc::new(RedshiftPgExternalSchemaProvider::new()))
                 }

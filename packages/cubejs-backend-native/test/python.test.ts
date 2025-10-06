@@ -69,6 +69,7 @@ suite('Python Config', () => {
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
       contextToRoles: expect.any(Function),
+      contextToGroups: expect.any(Function),
       scheduledRefreshContexts: expect.any(Function),
       scheduledRefreshTimeZones: expect.any(Function),
     });
@@ -97,6 +98,14 @@ suite('Python Config', () => {
     }
 
     expect(await config.contextToRoles({})).toEqual(['admin']);
+  });
+
+  test('context_to_groups', async () => {
+    if (!config.contextToGroups) {
+      throw new Error('contextToGroups was not defined in config.py');
+    }
+
+    expect(await config.contextToGroups({})).toEqual(['dev', 'analytics']);
   });
 
   test('context_to_api_scopes', async () => {
@@ -243,6 +252,7 @@ darwinSuite('Old Python Config', () => {
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
       contextToRoles: expect.any(Function),
+      contextToGroups: expect.any(Function),
       scheduledRefreshContexts: expect.any(Function),
       scheduledRefreshTimeZones: expect.any(Function),
     });

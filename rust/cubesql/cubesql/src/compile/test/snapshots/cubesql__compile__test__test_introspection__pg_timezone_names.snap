@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT *\n            FROM pg_timezone_names\n            ORDER BY name\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++------+--------+------------------------------------------------+--------+
+| name | abbrev | utc_offset                                     | is_dst |
++------+--------+------------------------------------------------+--------+
+| UTC  | UTC    | 0 years 0 mons 0 days 0 hours 0 mins 0.00 secs | false  |
++------+--------+------------------------------------------------+--------+

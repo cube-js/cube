@@ -84,14 +84,9 @@ export class PrestodbQuery extends BaseQuery {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
-  public subtractInterval(date, interval) {
+  public intervalString(interval: string): string {
     const [intervalValue, intervalUnit] = interval.split(' ');
-    return `${date} - interval '${intervalValue}' ${intervalUnit}`;
-  }
-
-  public addInterval(date, interval) {
-    const [intervalValue, intervalUnit] = interval.split(' ');
-    return `${date} + interval '${intervalValue}' ${intervalUnit}`;
+    return `'${intervalValue}' ${intervalUnit}`;
   }
 
   public seriesSql(timeDimension) {
@@ -127,6 +122,10 @@ export class PrestodbQuery extends BaseQuery {
     return `approx_distinct(${sql})`;
   }
 
+  public supportGeneratedSeriesForCustomTd() {
+    return true;
+  }
+
   protected limitOffsetClause(limit, offset) {
     const limitClause = limit != null ? ` LIMIT ${limit}` : '';
     const offsetClause = offset != null ? ` OFFSET ${offset}` : '';
@@ -137,22 +136,57 @@ export class PrestodbQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.functions.DATEDIFF = 'DATE_DIFF(\'{{ date_part }}\', {{ args[1] }}, {{ args[2] }})';
+    templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.TRUNC = 'TRUNCATE({{ args_concat }})';
     delete templates.functions.PERCENTILECONT;
-    templates.statements.select = 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
-      'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
+    templates.statements.select = '{% if ctes %} WITH \n' +
+          '{{ ctes | join(\',\n\') }}\n' +
+          '{% endif %}' +
+      'SELECT {% if distinct %}DISTINCT {% endif %}{{ select_concat | map(attribute=\'aliased\') | join(\', \') }}  {% if from %}\n' +
+      'FROM (\n  {{ from }}\n) AS {{ from_alias }} {% elif from_prepared %}\n' +
+      'FROM {{ from_prepared }}' +
+      '{% endif %}' +
+      '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +
+      '{% if having %}\nHAVING {{ having }}{% endif %}' +
       '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
       '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}' +
       '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.expressions.timestamp_literal = 'from_iso8601_timestamp(\'{{ value }}\')';
+    // Presto requires concat types to be VARCHAR
+    templates.expressions.binary = '{% if op == \'||\' %}' +
+      '(CAST({{ left }} AS VARCHAR) || CAST({{ right }} AS VARCHAR))' +
+      '{% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
     templates.types.float = 'REAL';
     // Presto intervals have a YearMonth or DayTime type variants, but no universal type
     delete templates.types.interval;
     templates.types.binary = 'VARBINARY';
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
+    templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOLEAN)';
+    templates.tesseract.number_param_cast = 'CAST({{ expr }} AS DOUBLE)';
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %}) ESCAPE \'\\\'';
+    templates.statements.time_series_select = 'SELECT from_iso8601_timestamp(dates.f) date_from, from_iso8601_timestamp(dates.t) date_to \n' +
+    'FROM (\n' +
+    '{% for time_item in seria  %}' +
+    '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
+    '{% if not loop.last %} UNION ALL\n{% endif %}' +
+    '{% endfor %}' +
+    ') AS dates';
+    templates.statements.generated_time_series_select = 'SELECT d AS date_from,\n' +
+    'date_add(\'MILLISECOND\', -1, d + interval {{ granularity }}) AS date_to\n' +
+    'FROM UNNEST(\n' +
+    'SEQUENCE(CAST(from_iso8601_timestamp({{ start }}) AS TIMESTAMP), CAST(from_iso8601_timestamp({{ end }}) AS TIMESTAMP), INTERVAL {{ granularity }})\n' +
+    ') AS dates(d)';
+    templates.statements.generated_time_series_with_cte_range_source = 'SELECT d AS date_from,\n' +
+    'date_add(\'MILLISECOND\', -1, d + interval {{ granularity }}) AS date_to\n' +
+    'FROM {{ range_source }} CROSS JOIN UNNEST(\n' +
+    'SEQUENCE(CAST({{ range_source }}.{{ min_name }} AS TIMESTAMP), CAST({{ range_source }}.{{ max_name }} AS TIMESTAMP), INTERVAL {{ granularity }})\n' +
+    ') AS dates(d)';
     return templates;
   }
 

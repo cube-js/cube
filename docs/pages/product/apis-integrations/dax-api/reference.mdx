@@ -84,11 +84,11 @@ of the DAX documentation.
 
 | Function | <nobr>Unsupported features</nobr> | Caveats |
 | --- | --- | --- |
-| [`ALL`](https://learn.microsoft.com/en-us/dax/all-function-dax) | 2+ arguments | Doesn't clear filter context, silently ignored |
-| [`CALCULATE`](https://learn.microsoft.com/en-us/dax/calculate-function-dax) | Creating a nested filter context | — |
-| [`CALCULATETABLE`](https://learn.microsoft.com/en-us/dax/calculatetable-function-dax) | Creating a nested filter context | — |
+| [`ALL`](https://learn.microsoft.com/en-us/dax/all-function-dax) | — | — |
+| [`CALCULATE`](https://learn.microsoft.com/en-us/dax/calculate-function-dax) | — | Adds to the filter context but does not override it |
+| [`CALCULATETABLE`](https://learn.microsoft.com/en-us/dax/calculatetable-function-dax) | — | — |
 | [`FILTER`](https://learn.microsoft.com/en-us/dax/filter-function-dax) | — | — |
-| [`KEEPFILTERS`](https://learn.microsoft.com/en-us/dax/keepfilters-function-dax) | — | Doesn't modify behavior, silently ignored |
+| [`KEEPFILTERS`](https://learn.microsoft.com/en-us/dax/keepfilters-function-dax) | — | — |
 
 ### Financial functions
 
@@ -139,7 +139,7 @@ of the DAX documentation.
 | [`ISEVEN`](https://learn.microsoft.com/en-us/dax/iseven-function-dax) | — | — |
 | [`ISODD`](https://learn.microsoft.com/en-us/dax/isodd-function-dax) | — | — |
 | [`ISONORAFTER`](https://learn.microsoft.com/en-us/dax/isonorafter-function-dax) | — | — |
-| [`NONVISUAL`](https://learn.microsoft.com/en-us/dax/nonvisual-function-dax) | — | Doesn't modify behavior, silently ignored |
+| [`NONVISUAL`](https://learn.microsoft.com/en-us/dax/nonvisual-function-dax) | — | — |
 | [`USERCULTURE`](https://learn.microsoft.com/en-us/dax/userculture-function-dax) | — | Always returns "en-US" |
 
 ### Logical functions
@@ -270,20 +270,21 @@ of the DAX documentation.
 | [`ADDCOLUMNS`](https://learn.microsoft.com/en-us/dax/addcolumns-function-dax) | Aggregate expressions | — |
 | [`CURRENTGROUP`](https://learn.microsoft.com/en-us/dax/currentgroup-function-dax) | — | — |
 | <nobr>[`DISTINCT`](https://learn.microsoft.com/en-us/dax/distinct-function-dax) (column)</nobr> | — | — |
-| <nobr>[`DISTINCT`](https://learn.microsoft.com/en-us/dax/distinct-table-function-dax) (table)</nobr> | Filter context for table expressions | — |
+| <nobr>[`DISTINCT`](https://learn.microsoft.com/en-us/dax/distinct-table-function-dax) (table)</nobr> | — | — |
 | [`GROUPBY`](https://learn.microsoft.com/en-us/dax/groupby-function-dax) | — | — |
-| [`IGNORE`](https://learn.microsoft.com/en-us/dax/ignore-function-dax) | 2+ arguments | Doesn't modify filter context, silently ignored |
+| [`IGNORE`](https://learn.microsoft.com/en-us/dax/ignore-function-dax) | — | — |
 | [`NATURALINNERJOIN`](https://learn.microsoft.com/en-us/dax/naturalinnerjoin-function-dax) | — | — |
 | [`NATURALLEFTOUTERJOIN`](https://learn.microsoft.com/en-us/dax/naturalleftouterjoin-function-dax) | — | — |
-| [`ROLLUPADDISSUBTOTAL`](https://learn.microsoft.com/en-us/dax/rollupaddissubtotal-function-dax) | `grandtotalFilter` | — |
+| [`ROLLUPADDISSUBTOTAL`](https://learn.microsoft.com/en-us/dax/rollupaddissubtotal-function-dax) | — | — |
 | [`ROLLUPGROUP`](https://learn.microsoft.com/en-us/dax/rollupgroup-function-dax) | — | — |
 | [`ROW`](https://learn.microsoft.com/en-us/dax/row-function-dax) | — | — |
-| [`SELECTCOLUMNS`](https://learn.microsoft.com/en-us/dax/selectcolumns-function-dax) | Optional aliases (currently mandatory) | — |
+| [`SELECTCOLUMNS`](https://learn.microsoft.com/en-us/dax/selectcolumns-function-dax) | — | — |
 | [`SUBSTITUTEWITHINDEX`](https://learn.microsoft.com/en-us/dax/substitutewithindex-function-dax) | — | — |
-| [`SUMMARIZE`](https://learn.microsoft.com/en-us/dax/summarize-function-dax) | Named expressions (aggregations/measures) | — |
+| [`SUMMARIZE`](https://learn.microsoft.com/en-us/dax/summarize-function-dax) | — | — |
 | [`SUMMARIZECOLUMNS`](https://learn.microsoft.com/en-us/dax/summarizecolumns-function-dax) | — | — |
-| [`TOPN`](https://learn.microsoft.com/en-us/dax/topn-function-dax) | Non-literal N value | — |
+| [`TOPN`](https://learn.microsoft.com/en-us/dax/topn-function-dax) | — | Complex N values are planned as `50000` |
 | [`TREATAS`](https://learn.microsoft.com/en-us/dax/treatas-function-dax) | Non-literal tables as table expressions | — |
+| [`UNION`](https://learn.microsoft.com/en-us/dax/union-function-dax) | — | — |
 | [`VALUES`](https://learn.microsoft.com/en-us/dax/values-function-dax) | — | — |
 
 ### Text functions
@@ -329,8 +330,8 @@ No time intelligence functions currently supported.
 
 | Function | <nobr>Unsupported features</nobr> | Caveats |
 | --- | --- | --- |
-| [`GROUPCROSSAPPLY`](https://learn.microsoft.com/en-us/dax/groupcrossapply-function-dax) | — | — |
-| [`SAMPLEAXISWITHLOCALMINMAX`](https://learn.microsoft.com/en-us/dax/sampleaxiswithlocalminmax-function-dax) | — | Silently ignored, returning input table expression |
+| [`GROUPCROSSAPPLY`](https://learn.microsoft.com/en-us/dax/groupcrossapply-function-dax) | — | Ignores filter tables, acts as the `SUMMARIZECOLUMNS` function |
+| [`SAMPLEAXISWITHLOCALMINMAX`](https://learn.microsoft.com/en-us/dax/sampleaxiswithlocalminmax-function-dax) | — | Acts as the `TOPN` function |
 
 
 [ref-dax-api]: /product/apis-integrations/dax-api

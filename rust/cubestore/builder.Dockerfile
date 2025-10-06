@@ -5,8 +5,8 @@ FROM rust:$OS_NAME
 ARG LLVM_VERSION=18
 
 RUN rustup update && \
-    rustup default nightly-2024-01-29 && \
-    rustup component add --toolchain nightly-2024-01-29 rustfmt clippy;
+    rustup default nightly-2025-08-01 && \
+    rustup component add --toolchain nightly-2025-08-01 rustfmt clippy;
 
 RUN apt update \
     && apt upgrade -y \

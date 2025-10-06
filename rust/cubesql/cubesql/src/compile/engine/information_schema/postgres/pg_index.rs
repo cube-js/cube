@@ -37,6 +37,7 @@ struct PgCatalogIndexBuilder {
     indoption: ListBuilder<Int16Builder>,
     indexprs: StringBuilder,
     indpred: StringBuilder,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogIndexBuilder {
@@ -64,6 +65,7 @@ impl PgCatalogIndexBuilder {
             indoption: ListBuilder::new(Int16Builder::new(capacity)),
             indexprs: StringBuilder::new(capacity),
             indpred: StringBuilder::new(capacity),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
@@ -89,6 +91,7 @@ impl PgCatalogIndexBuilder {
             Arc::new(self.indoption.finish()),
             Arc::new(self.indexprs.finish()),
             Arc::new(self.indpred.finish()),
+            Arc::new(self.xmin.finish()),
         ];
 
         columns
@@ -157,6 +160,7 @@ impl TableProvider for PgCatalogIndexProvider {
             ),
             Field::new("indexprs", DataType::Utf8, true),
             Field::new("indpred", DataType::Utf8, true),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 

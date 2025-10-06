@@ -28,6 +28,7 @@ struct PgCatalogDescriptionBuilder {
     objsubid: Int32Builder,
     /// Arbitrary text that serves as the description of this object
     description: StringBuilder,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogDescriptionBuilder {
@@ -39,6 +40,7 @@ impl PgCatalogDescriptionBuilder {
             classoid: UInt32Builder::new(capacity),
             objsubid: Int32Builder::new(capacity),
             description: StringBuilder::new(capacity),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
@@ -47,6 +49,7 @@ impl PgCatalogDescriptionBuilder {
         self.classoid.append_value(PG_CLASS_CLASS_OID).unwrap();
         self.objsubid.append_value(0).unwrap();
         self.description.append_value(description).unwrap();
+        self.xmin.append_value(1).unwrap();
     }
 
     fn add_column(&mut self, table_oid: u32, column_idx: usize, description: impl AsRef<str>) {
@@ -57,6 +60,7 @@ impl PgCatalogDescriptionBuilder {
             .append_value(i32::try_from(column_idx).unwrap() + 1)
             .unwrap();
         self.description.append_value(description).unwrap();
+        self.xmin.append_value(1).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -65,6 +69,7 @@ impl PgCatalogDescriptionBuilder {
             Arc::new(self.classoid.finish()),
             Arc::new(self.objsubid.finish()),
             Arc::new(self.description.finish()),
+            Arc::new(self.xmin.finish()),
         ];
 
         columns
@@ -113,6 +118,7 @@ impl TableProvider for PgCatalogDescriptionProvider {
             Field::new("classoid", DataType::UInt32, false),
             Field::new("objsubid", DataType::Int32, false),
             Field::new("description", DataType::Utf8, false),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 

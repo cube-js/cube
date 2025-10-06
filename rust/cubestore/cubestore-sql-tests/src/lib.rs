@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 #![feature(test)]
 
 pub use crate::benches::cubestore_benches;
@@ -8,7 +7,7 @@ use async_trait::async_trait;
 use cubestore::sql::{QueryPlans, SqlQueryContext, SqlService};
 use cubestore::store::DataFrame;
 use cubestore::CubeError;
-use std::env;
+use std::env::args;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use test::TestFn::DynTestFn;
@@ -66,11 +65,19 @@ pub fn run_sql_tests(
         })
         .collect();
 
-    test::test_main(
-        &env::args().chain(extra_args).collect::<Vec<String>>(),
-        tests,
-        None,
-    );
+    test::test_main(&merge_args(args().collect(), extra_args), tests, None);
+}
+
+fn merge_args(mut base: Vec<String>, extra: Vec<String>) -> Vec<String> {
+    for extra_arg in extra.into_iter() {
+        if let Some((arg_name, _arg_value)) = extra_arg.split_once('=') {
+            base.retain(|a| !a.starts_with(arg_name));
+        }
+
+        base.push(extra_arg.to_string());
+    }
+
+    base
 }
 
 #[async_trait]
@@ -89,5 +96,32 @@ impl SqlClient for Arc<dyn SqlService> {
 
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError> {
         self.as_ref().plan_query(query).await
+    }
+}
+
+#[cfg(test)]
+mod test_helpers {
+    use super::*;
+
+    #[test]
+    fn test_merge_args() {
+        let base = vec![
+            "path/to/executable".to_string(),
+            "--test-threads=1".to_string(),
+        ];
+        let extra = vec![
+            "--test-threads=2".to_string(),
+            "--skip=planning_inplace_aggregate2".to_string(),
+        ];
+
+        let merged = merge_args(base, extra);
+        assert_eq!(
+            merged,
+            vec![
+                "path/to/executable",
+                "--test-threads=2",
+                "--skip=planning_inplace_aggregate2"
+            ]
+        );
     }
 }

@@ -85,7 +85,7 @@ cube(`orders`, {
 ```yaml
 cubes:
   - name: orders
-    sql: >
+    sql: |
       SELECT *
       FROM orders, line_items
       WHERE orders.id = line_items.order_id
@@ -131,8 +131,7 @@ paths.
 <Diagram src="https://ucarecdn.com/bfc3e04a-b690-40bc-a6f8-14a9175fb4fd/" />
 
 Views do **not** define their own members. Instead, they reference cubes by
-specific join paths and include their members. Optionally, you can also group
-members of a view into [folders][ref-ref-folders].
+specific join paths and include their members.
 
 In the example below, we create the `orders` view which includes select members
 from `base_orders`, `products`, and `users` cubes:
@@ -211,6 +210,16 @@ models][ref-dynamic-data-models].
 See the reference documentaton for the full list of view [parameters][ref-views].
 
 </ReferenceBox>
+
+### Folders
+
+Optionally, members of a view can be organized into [folders][ref-ref-folders].
+Each folder would contain a subset of members of the view.
+
+Cube supports both flat and nested folder structures, which can be used with various
+[visualization tools][ref-viz-tools]. If a specific tool does not support nested folders,
+they will be exposed to such a tool as an equivalent flat structure. Check [APIs &
+Integrations][ref-apis-support] for details on the nested folders support.
 
 ## Dimensions
 
@@ -329,10 +338,10 @@ data types in SQL are mapped to dimension types in the following way:
 
 | Data type in SQL | Dimension type in Cube |
 | --- | --- |
-| `timestamp`, `date`, `time` | [`time`](/product/data-modeling/reference/types-and-formats#time-1) |
-| `text`, `varchar` | [`string`](/product/data-modeling/reference/types-and-formats#string-1) |
-| `integer`, `bigint`, `decimal` | [`number`](/product/data-modeling/reference/types-and-formats#number-1) |
-| `boolean` | [`boolean`](/product/data-modeling/reference/types-and-formats#boolean-1) |
+| `timestamp`, `date`, `time` | [`time`](/product/data-modeling/reference/types-and-formats#time) |
+| `text`, `varchar` | [`string`](/product/data-modeling/reference/types-and-formats#string) |
+| `integer`, `bigint`, `decimal` | [`number`](/product/data-modeling/reference/types-and-formats#number) |
+| `boolean` | [`boolean`](/product/data-modeling/reference/types-and-formats#boolean) |
 
 <ReferenceBox>
 
@@ -555,7 +564,7 @@ Consider the following cube:
 ```yaml
 cubes:
   - name: employees
-    sql: >
+    sql: |
       SELECT 1 AS id, 'Ali' AS first_name, 20 AS age, 'Los Gatos' AS city UNION ALL
       SELECT 2 AS id, 'Bob' AS first_name, 30 AS age, 'San Diego' AS city UNION ALL
       SELECT 3 AS id, 'Eve' AS first_name, 40 AS age, 'San Diego' AS city
@@ -690,10 +699,9 @@ cubes:
 
 </CodeTabs>
 
-There are three [types of join relationships][ref-ref-join-types]
-(`one_to_one`, `one_to_many`, and `many_to_one`) and a few [other 
-concepts][ref-working-with-joins] such as the direction of joins and trasitive
-joins pitfalls.
+There are three types of join relationships (`one_to_one`, `one_to_many`, and
+`many_to_one`) and a few [other concepts][ref-working-with-joins] such as the
+direction of joins and transitive joins pitfalls.
 
 <ReferenceBox>
 
@@ -800,7 +808,6 @@ See the reference documentaton for the full list of pre-aggregation
   /product/caching/using-pre-aggregations#partitioning
 [ref-ref-dimension-types]: /product/data-modeling/reference/types-and-formats#dimension-types
 [ref-ref-measure-types]: /product/data-modeling/reference/types-and-formats#measure-types
-[ref-ref-join-types]: /product/data-modeling/reference/joins#relationship
 [ref-schema-ref-sql]: /product/data-modeling/reference/cube#sql
 [ref-schema-ref-sql-table]: /product/data-modeling/reference/cube#sql_table
 [ref-tutorial-incremental-preagg]:
@@ -826,9 +833,9 @@ See the reference documentaton for the full list of pre-aggregation
 [ref-syntax-references]: /product/data-modeling/syntax#references
 [ref-syntax-references-column]: /product/data-modeling/syntax#column
 [ref-calculated-measures]: /product/data-modeling/overview#4-using-calculated-measures
-[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-multitenancy]: /product/configuration/multitenancy
 [ref-pmc]: /product/deployment/cloud/deployment-types#production-multi-cluster
-[ref-ref-time-dimensions]: /product/data-modeling/reference/types-and-formats#time-1
+[ref-ref-time-dimensions]: /product/data-modeling/reference/types-and-formats#time
 [ref-ref-dimension-granularities]: /product/data-modeling/reference/dimensions#granularities
 [ref-ref-primary-key]: /product/data-modeling/reference/dimensions#primary_key
 [ref-custom-granularity-recipe]: /product/data-modeling/recipes/custom-granularity
@@ -842,3 +849,5 @@ See the reference documentaton for the full list of pre-aggregation
 [ref-period-over-period-recipe]: /product/data-modeling/recipes/period-over-period
 [ref-custom-calendar-recipe]: /product/data-modeling/recipes/custom-calendar
 [ref-cube-with-dbt]: /product/data-modeling/recipes/dbt
+[ref-apis-support]: /product/apis-integrations#data-modeling
+[ref-viz-tools]: /product/configuration/visualization-tools

@@ -806,7 +806,8 @@ impl AsyncPostgresShim {
                     .cloned()
                     .unwrap_or("db".to_string());
                 self.session.state.set_database(Some(database));
-                self.session.state.set_user(Some(user));
+                self.session.state.set_user(Some(user.clone()));
+                self.session.state.set_original_user(Some(user));
                 self.session.state.set_auth_context(Some(auth_context));
 
                 self.write(protocol::Authentication::new(AuthenticationRequest::Ok))
@@ -1117,13 +1118,21 @@ impl AsyncPostgresShim {
                     if let Some(qtrace) = qtrace {
                         qtrace.push_statement(&query);
                     }
-                    self.prepare_statement(parse.name, Ok(query), false, qtrace, span_id.clone())
-                        .await?;
+                    self.prepare_statement(
+                        parse.name,
+                        Ok(query),
+                        &parse.param_types,
+                        false,
+                        qtrace,
+                        span_id.clone(),
+                    )
+                    .await?;
                 }
                 Err(err) => {
                     self.prepare_statement(
                         parse.name,
                         Err(parse.query.to_string()),
+                        &parse.param_types,
                         false,
                         qtrace,
                         span_id.clone(),
@@ -1143,6 +1152,7 @@ impl AsyncPostgresShim {
         &mut self,
         name: String,
         query: Result<Statement, String>,
+        param_types: &[u32],
         from_sql: bool,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
@@ -1170,7 +1180,7 @@ impl AsyncPostgresShim {
 
         let (pstmt, result) = match query {
             Ok(query) => {
-                let stmt_finder = PostgresStatementParamsFinder::new();
+                let stmt_finder = PostgresStatementParamsFinder::new(param_types);
                 let parameters: Vec<PgTypeId> = stmt_finder
                     .find(&query)?
                     .into_iter()
@@ -1208,7 +1218,7 @@ impl AsyncPostgresShim {
                             PreparedStatement::Query {
                                 from_sql,
                                 created: chrono::offset::Utc::now(),
-                                query,
+                                query: Box::new(query),
                                 parameters: protocol::ParameterDescription::new(parameters),
                                 description,
                                 span_id,
@@ -1469,7 +1479,7 @@ impl AsyncPostgresShim {
                 })?;
 
                 let plan = convert_statement_to_cube_query(
-                    cursor.query.clone(),
+                    cursor.query.as_ref().clone(),
                     meta,
                     self.session.clone(),
                     qtrace,
@@ -1491,20 +1501,6 @@ impl AsyncPostgresShim {
                 sensitive,
                 hold,
             } => {
-                // TODO: move envs to config
-                let stream_mode = self.session.server.config_obj.stream_mode();
-                if stream_mode {
-                    return Err(ConnectionError::Protocol(
-                        protocol::ErrorResponse::error(
-                            protocol::ErrorCode::FeatureNotSupported,
-                            "DECLARE statement can not be used if CUBESQL_STREAM_MODE == true"
-                                .to_string(),
-                        )
-                        .into(),
-                        span_id.clone(),
-                    ));
-                }
-
                 // The default is to allow scrolling in some cases; this is not the same as specifying SCROLL.
                 if scroll.is_some() {
                     return Err(ConnectionError::Protocol(
@@ -1560,7 +1556,7 @@ impl AsyncPostgresShim {
                 .await?;
 
                 let cursor = Cursor {
-                    query: select_stmt,
+                    query: Box::new(select_stmt),
                     hold: hold.unwrap_or(false),
                     format: if binary { Format::Binary } else { Format::Text },
                 };
@@ -1703,8 +1699,15 @@ impl AsyncPostgresShim {
                     _ => *statement,
                 };
 
-                self.prepare_statement(name.value, Ok(statement), true, qtrace, span_id.clone())
-                    .await?;
+                self.prepare_statement(
+                    name.value,
+                    Ok(statement),
+                    &[],
+                    true,
+                    qtrace,
+                    span_id.clone(),
+                )
+                .await?;
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Prepare);
 

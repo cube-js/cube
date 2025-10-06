@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, ListBuilder, StringBuilder, UInt32Builder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -25,14 +25,14 @@ struct PgNamespace {
     oid: u32,
     nspname: &'static str,
     nspowner: u32,
-    nspacl: &'static str,
 }
 
 struct PgCatalogNamespaceBuilder {
     oid: UInt32Builder,
     nspname: StringBuilder,
     nspowner: UInt32Builder,
-    nspacl: StringBuilder,
+    nspacl: ListBuilder<StringBuilder>,
+    xmin: UInt32Builder,
 }
 
 impl PgCatalogNamespaceBuilder {
@@ -43,7 +43,8 @@ impl PgCatalogNamespaceBuilder {
             oid: UInt32Builder::new(capacity),
             nspname: StringBuilder::new(capacity),
             nspowner: UInt32Builder::new(capacity),
-            nspacl: StringBuilder::new(capacity),
+            nspacl: ListBuilder::new(StringBuilder::new(capacity)),
+            xmin: UInt32Builder::new(capacity),
         }
     }
 
@@ -51,7 +52,8 @@ impl PgCatalogNamespaceBuilder {
         self.oid.append_value(ns.oid).unwrap();
         self.nspname.append_value(ns.nspname).unwrap();
         self.nspowner.append_value(ns.nspowner).unwrap();
-        self.nspacl.append_value(ns.nspacl).unwrap();
+        self.nspacl.append(false).unwrap();
+        self.xmin.append_value(1).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -60,6 +62,7 @@ impl PgCatalogNamespaceBuilder {
             Arc::new(self.nspname.finish()),
             Arc::new(self.nspowner.finish()),
             Arc::new(self.nspacl.finish()),
+            Arc::new(self.xmin.finish()),
         ];
 
         columns
@@ -77,19 +80,16 @@ impl PgCatalogNamespaceProvider {
             oid: PG_NAMESPACE_CATALOG_OID,
             nspname: "pg_catalog",
             nspowner: 10,
-            nspacl: "{test=UC/test,=U/test}",
         });
         builder.add_namespace(&PgNamespace {
             oid: PG_NAMESPACE_PUBLIC_OID,
             nspname: "public",
             nspowner: 10,
-            nspacl: "{test=UC/test,=U/test}",
         });
         builder.add_namespace(&PgNamespace {
             oid: 13000,
             nspname: "information_schema",
             nspowner: 10,
-            nspacl: "{test=UC/test,=U/test}",
         });
 
         Self {
@@ -113,7 +113,12 @@ impl TableProvider for PgCatalogNamespaceProvider {
             Field::new("oid", DataType::UInt32, false),
             Field::new("nspname", DataType::Utf8, false),
             Field::new("nspowner", DataType::UInt32, false),
-            Field::new("nspacl", DataType::Utf8, true),
+            Field::new(
+                "nspacl",
+                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new("xmin", DataType::UInt32, false),
         ]))
     }
 

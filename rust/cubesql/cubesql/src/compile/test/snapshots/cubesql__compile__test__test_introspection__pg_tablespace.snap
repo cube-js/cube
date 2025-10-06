@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT *\n            FROM pg_tablespace\n            ORDER BY oid\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++------+------------+----------+--------+------------+------+
+| oid  | spcname    | spcowner | spcacl | spcoptions | xmin |
++------+------------+----------+--------+------------+------+
+| 1663 | pg_default | 10       | NULL   | NULL       | 1    |
+| 1664 | pg_global  | 10       | NULL   | NULL       | 1    |
++------+------------+----------+--------+------------+------+

@@ -97,7 +97,7 @@ Dedicated infrastructure with CSPS is available in Cube Cloud on the
 
 ## BYOC
 
-With [Bring Your Own Cloud](/product/deployment/cloud/byoc) (BYOC) all the components interacting with private data are deployed on the customer infrastructure 
+With [Bring Your Own Cloud](/product/deployment/cloud/byoc) (BYOC) all the components interacting with private data are deployed on the customer infrastructure
 on a platform of choice (AWS/Azure/GCP) and managed by the Cube Cloud Control Plane via the Cube Cloud Operator.
 
 <SuccessBox>
@@ -115,5 +115,55 @@ BYOC is available in Cube Cloud on the
     width="100%"
   />
 </div>
+
+## Understanding "Cube Cloud Region"
+
+Throughout Cube documentation and when interacting with Cube staff, you may encounter the term **"Cube Cloud Region"** or simply **"Region"**. Understanding this term is crucial for properly configuring and managing your Cube deployments.
+
+### What is a Cube Cloud Region?
+
+A **Cube Cloud Region** refers to a specific cloud infrastructure instance used to host your Cube deployments. While it includes a geographical location component, it encompasses much more than just a physical data center location.
+
+Each Cube Cloud Region is identified by a unique identifier that contains several components:
+- **Cloud provider** (AWS, GCP, or Azure)
+- **Geographical region** (e.g., us-east-1, eu-west-1)
+- **Infrastructure type** (shared, dedicated, or BYOC)
+- **Tenant identifier** (for dedicated infrastructure)
+- **Environment** (e.g., prod, staging)
+
+For example, a region identifier might look like:
+- `aws-us-east-1-shared` for shared infrastructure in AWS US East
+- `aws-us-east-1-t-12345-prod` for dedicated infrastructure with tenant ID 12345
+- `gcp-europe-west1-t-12345-byoc` for a BYOC deployment in GCP Europe
+
+Each region also has a human-readable display name that's visible in the Cube Cloud UI. For dedicated infrastructure regions, these display names typically include the customer name and/or environment name (e.g., "Acme Corp Production (N. Virginia)" or "Acme Corp Staging (Iowa)") to help distinguish between different infrastructure instances.
+
+<Screenshot src="https://lgo0ecceic.ucarecd.net/01212311-b1c5-48ce-80a2-06a923fe4eac/" />
+
+### Not to be confused with...
+
+The term "Cube Cloud Region" should **not** be confused with:
+
+- **Cloud provider regions alone** (like AWS `us-east-1`) - A Cube Cloud Region includes but is not limited to the underlying cloud provider region
+- **Geographical regions** - While geography is a component, the Cube Cloud Region encompasses infrastructure type and tenant isolation as well
+- **Availability zones** - These are subdivisions within cloud provider regions and are handled transparently by Cube Cloud
+
+### Why this matters
+
+Understanding your Cube Cloud Region is important for:
+
+1. **API endpoints**: Your deployment's API endpoints include the region identifier (e.g., `<deployment-id>.<region>.cubecloudapp.dev`)
+2. **Network configuration**: When setting up VPC peering, PrivateLink, or custom domains, you'll need the exact region identifier
+3. **Support requests**: Providing the correct region identifier helps Cube support team quickly locate and assist with your deployment
+4. **Infrastructure planning**: Different region types offer different capabilities (e.g., PrivateLink is only available in dedicated and BYOC regions)
+
+### Finding your region identifier
+
+You can find your Cube Cloud Region identifier in:
+- The Cube Cloud UI deployment settings
+- API endpoint URLs provided in the deployment overview
+- Communication from Cube Cloud support when your infrastructure is provisioned
+
+When in doubt, contact Cube Cloud support with your deployment ID, and they can provide the exact region identifier for your infrastructure.
 
 [ref-dedicated-vpc]: /product/deployment/cloud/vpc

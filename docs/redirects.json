@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/deployment/cloud/byoc/aws",
+    "destination": "/product/deployment/cloud/byoc/aws/deployment",
+    "permanent": true
+  },
+  {
     "source": "/product/apis-integrations/rest-api/real-time-data-fetch",
     "destination": "/product/apis-integrations/recipes/real-time-data-fetch",
     "permanent": true
@@ -1607,6 +1612,11 @@
   {
     "source": "/reference/configuration/config",
     "destination": "/product/configuration/reference/config",
+    "permanent": true
+  },
+  {
+    "source": "/product/deployment/cloud/vpc/azure",
+    "destination": "/product/deployment/cloud/vpc/azure/vpc-peering",
     "permanent": true
   }
 ]

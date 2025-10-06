@@ -1,9 +1,8 @@
-use crate::{compile::rewrite::rules::utils::DatePartToken, sql::shim::ConnectionError};
 use itertools::Itertools;
 use log::trace;
 use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
-    BindValue, PgType,
+    BindValue, PgType, PgTypeId,
 };
 use sqlparser::ast::{
     self, ArrayAgg, Expr, Function, FunctionArg, FunctionArgExpr, Ident, ObjectName, Value,
@@ -12,7 +11,9 @@ use sqlparser::ast::{
 use std::{collections::HashMap, error::Error};
 
 use super::types::ColumnType;
+use crate::sql::shim::ConnectionError;
 
+#[derive(Debug)]
 enum PlaceholderType {
     String,
     Number,
@@ -521,14 +522,16 @@ impl FoundParameter {
 }
 
 #[derive(Debug)]
-pub struct PostgresStatementParamsFinder {
-    parameters: HashMap<String, FoundParameter>,
+pub struct PostgresStatementParamsFinder<'t> {
+    parameters: HashMap<usize, FoundParameter>,
+    types: &'t [u32],
 }
 
-impl PostgresStatementParamsFinder {
-    pub fn new() -> Self {
+impl<'t> PostgresStatementParamsFinder<'t> {
+    pub fn new(types: &'t [u32]) -> Self {
         Self {
             parameters: HashMap::new(),
+            types,
         }
     }
 
@@ -544,7 +547,7 @@ impl PostgresStatementParamsFinder {
     }
 }
 
-impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder {
+impl<'ast, 't> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder<'t> {
     fn visit_value(
         &mut self,
         v: &mut ast::Value,
@@ -554,8 +557,15 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder {
             Value::Placeholder(name) => {
                 let position = self.extract_placeholder_index(&name)?;
 
+                let coltype = self
+                    .types
+                    .get(position)
+                    .and_then(|pg_type_oid| PgTypeId::from_oid(*pg_type_oid))
+                    .and_then(|pg_type| ColumnType::from_pg_tid(pg_type).ok())
+                    .unwrap_or_else(|| pt.to_coltype());
+
                 self.parameters
-                    .insert(position.to_string(), FoundParameter::new(pt.to_coltype()));
+                    .insert(position, FoundParameter::new(coltype));
             }
             _ => {}
         };
@@ -614,6 +624,12 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsBinder {
                     BindValue::Float64(v) => {
                         *value = ast::Value::Number(v.to_string(), *v < 0_f64);
                     }
+                    BindValue::Timestamp(v) => {
+                        *value = ast::Value::SingleQuotedString(v.to_string());
+                    }
+                    BindValue::Date(v) => {
+                        *value = ast::Value::SingleQuotedString(v.to_string());
+                    }
                     BindValue::Null => {
                         *value = ast::Value::Null;
                     }
@@ -650,6 +666,8 @@ impl<'ast> Visitor<'ast, ConnectionError> for StatementPlaceholderReplacer {
         placeholder_type: PlaceholderType,
     ) -> Result<(), ConnectionError> {
         match &value {
+            // NOTE: it does not do any harm if a numeric placeholder is replaced with a string,
+            // this will be handled with Bind anyway
             ast::Value::Placeholder(_) => {
                 *value = match placeholder_type {
                     PlaceholderType::String => {
@@ -703,6 +721,11 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
 
                         *expr = *cast_expr.clone();
                     }
+                    "xid" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::UnsignedInt(None);
+                    }
                     "int2" => {
                         self.visit_expr(&mut *cast_expr)?;
 
@@ -755,17 +778,22 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                             })
                         }
                     }
+                    "\"char\"" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::Text;
+                    }
                     // TODO:
                     _ => (),
                 },
                 ast::DataType::Regclass => match &**cast_expr {
                     Expr::Value(val) => {
                         let str_val = self.parse_value_to_str(&val);
-                        if str_val.is_none() {
+                        let Some(str_val) = str_val else {
                             return Ok(());
-                        }
+                        };
+                        let str_val = str_val.strip_prefix("pg_catalog.").unwrap_or(&str_val);
 
-                        let str_val = str_val.unwrap();
                         for typ in PgType::get_all() {
                             if typ.typname == str_val {
                                 *expr = Expr::Value(Value::Number(typ.typrelid.to_string(), false));
@@ -799,70 +827,6 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                 _ => self.visit_expr(&mut *cast_expr)?,
             }
         };
-
-        Ok(())
-    }
-}
-
-// This approach is limited to literals-in-query, but it's better than nothing
-// It would be simpler to do in rewrite rules, by relying on constant folding, but would require cumbersome top-down extraction
-// TODO remove this if/when DF starts supporting all of PostgreSQL aliases
-#[derive(Debug)]
-pub struct DateTokenNormalizeReplacer {}
-
-impl DateTokenNormalizeReplacer {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
-        let mut result = stmt;
-
-        self.visit_statement(&mut result).unwrap();
-
-        result
-    }
-}
-
-impl<'ast> Visitor<'ast, ConnectionError> for DateTokenNormalizeReplacer {
-    // TODO support EXTRACT normalization after support in sqlparser
-    fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
-        for res in fun.name.0.iter_mut() {
-            self.visit_identifier(res)?;
-        }
-
-        let fn_name = fun.name.to_string().to_lowercase();
-        match (fn_name.as_str(), fun.args.len()) {
-            ("date_trunc", 2) | ("date_part", 2) => {
-                match &mut fun.args[0] {
-                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
-                        Value::SingleQuotedString(token),
-                    ))) => {
-                        if let Ok(parsed) = token.parse::<DatePartToken>() {
-                            *token = parsed.as_str().to_string();
-                        } else {
-                            // Do nothing
-                        };
-                    }
-                    _ => {
-                        // Do nothing
-                    }
-                }
-            }
-            _ => {
-                // Do nothing
-            }
-        }
-
-        self.visit_function_args(&mut fun.args)?;
-        if let Some(over) = &mut fun.over {
-            for res in over.partition_by.iter_mut() {
-                self.visit_expr(res)?;
-            }
-            for order_expr in over.order_by.iter_mut() {
-                self.visit_expr(&mut order_expr.expr)?;
-            }
-        }
 
         Ok(())
     }
@@ -1112,6 +1076,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
 mod tests {
     use super::*;
     use crate::CubeError;
+    use pg_srv::{DateValue, TimestampValue};
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
     fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {
@@ -1293,6 +1258,26 @@ mod tests {
             vec![BindValue::String("test1".to_string())],
         )?;
 
+        // test TimestampValue binding in the WHERE clause
+        run_pg_binder(
+            "SELECT * FROM events WHERE created_at BETWEEN $1 AND $2",
+            "SELECT * FROM events WHERE created_at BETWEEN '2022-04-25T12:38:42.000' AND '2025-08-08T09:30:45.123'",
+            vec![
+                BindValue::Timestamp(TimestampValue::new(1650890322000000000, None)),
+                BindValue::Timestamp(TimestampValue::new(1754645445123456000, None)),
+            ],
+        )?;
+
+        // test DateValue binding in the WHERE clause
+        run_pg_binder(
+            "SELECT * FROM orders WHERE order_date >= $1 AND order_date <= $2",
+            "SELECT * FROM orders WHERE order_date >= '1999-12-31' AND order_date <= '2000-01-01'",
+            vec![
+                BindValue::Date(DateValue::from_ymd_opt(1999, 12, 31).unwrap()),
+                BindValue::Date(DateValue::from_ymd_opt(2000, 1, 1).unwrap()),
+            ],
+        )?;
+
         Ok(())
     }
 
@@ -1302,7 +1287,7 @@ mod tests {
     ) -> Result<(), CubeError> {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
-        let finder = PostgresStatementParamsFinder::new();
+        let finder = PostgresStatementParamsFinder::new(&[]);
         let result = finder.find(&stmts[0]).unwrap();
 
         assert_eq!(result, expected);

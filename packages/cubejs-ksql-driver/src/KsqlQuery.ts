@@ -83,6 +83,10 @@ export class KsqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
+  public partitionInvalidateKeyQueries(_cube: string, _preAggregation: any) {
+    return [];
+  }
+
   public preAggregationStartEndQueries(cube: string, preAggregation: any) {
     if (preAggregation.partitionGranularity) {
       if (!preAggregation.refreshRangeStart) {

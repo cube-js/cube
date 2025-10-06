@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT *\n            FROM pg_available_extension_versions\n            ORDER BY name\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++------+---------+-----------+-----------+---------+-------------+--------+----------+---------+
+| name | version | installed | superuser | trusted | relocatable | schema | requires | comment |
++------+---------+-----------+-----------+---------+-------------+--------+----------+---------+
++------+---------+-----------+-----------+---------+-------------+--------+----------+---------+

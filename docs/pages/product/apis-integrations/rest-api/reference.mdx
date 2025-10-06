@@ -254,7 +254,7 @@ Response
   - `dimensions` - Array of dimensions in this cube/view
   - `hierarchies` - Array of hierarchies in this cube
   - `segments` - Array of segments in this cube/view
-  - `folders` - Array of folders in this view
+  - `folders` and `nestedFolders` - Arrays of flat and nested [folder][ref-folders] structures in this view, respectively
   - `connectedComponent` - An integer representing a join relationship. If the same value is returned for two cubes, then there is
     at least one join path between them.
 
@@ -385,7 +385,7 @@ This endpoint is part of the [Orchestration API][ref-orchestration-api].
 | `action`                   | Use `post` to trigger jobs                                     | ✅       |
 | `selector.contexts`        | Array of objects, each containing a `securityContext`          | ✅       |
 | `selector.timezones`       | Array of timezones                                             | ✅       |
-| `selector.datasources`     | Array of data source names which have pre-aggregations defined | ❌       |
+| `selector.dataSources`     | Array of data source names which have pre-aggregations defined | ❌       |
 | `selector.cubes`           | Array of cube names which contain pre-aggregations             | ❌       |
 | `selector.preAggregations` | Array of pre-aggregation names                                 | ❌       |
 | `selector.dateRange`       | Date Range tuple ['range-date-start', 'range-date-end']        | ❌       |
@@ -634,9 +634,9 @@ Keep-Alive: timeout=5
 [ref-datasources]: /product/configuration/advanced/multiple-data-sources
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-rest-api]: /product/apis-integrations/rest-api
-[ref-data-sources]: /product/configuration/advanced/multiple-data-sources
 [ref-regular-queries]: /product/apis-integrations/queries#regular-query
 [ref-query-wpp]: /product/apis-integrations/queries#query-with-post-processing
 [ref-query-wpd]: /product/apis-integrations/queries#query-with-pushdown
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api
+[ref-folders]: /product/data-modeling/reference/view#folders

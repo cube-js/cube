@@ -1,37 +1,19 @@
 use crate::logical_plan::pretty_print::*;
 use crate::planner::planners::multi_stage::MultiStageAppliedState;
 
-use crate::planner::BaseMember;
-use itertools::Itertools;
-
 impl PrettyPrint for MultiStageAppliedState {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         let details_state = state.new_level();
         result.println(
             &format!(
                 "-time_dimensions: {}",
-                print_symbols(
-                    &self
-                        .time_dimensions()
-                        .iter()
-                        .map(|d| d.member_evaluator())
-                        .collect_vec()
-                )
+                print_symbols(&self.time_dimensions())
             ),
             state,
         );
 
         result.println(
-            &format!(
-                "-dimensions: {}",
-                print_symbols(
-                    &self
-                        .dimensions()
-                        .iter()
-                        .map(|d| d.member_evaluator())
-                        .collect_vec()
-                )
-            ),
+            &format!("-dimensions: {}", print_symbols(&self.dimensions())),
             state,
         );
 
@@ -53,15 +35,18 @@ impl PrettyPrint for MultiStageAppliedState {
         }
 
         result.println("time_shifts:", &state);
-        if let Some(common) = &self.time_shifts().common_time_shift {
-            result.println(&format!("- common: {}", common.to_sql()), &details_state);
-        }
         for (_, time_shift) in self.time_shifts().dimensions_shifts.iter() {
             result.println(
                 &format!(
                     "- {}: {}",
                     time_shift.dimension.full_name(),
-                    time_shift.interval.to_sql()
+                    if let Some(interval) = &time_shift.interval {
+                        interval.to_sql()
+                    } else if let Some(name) = &time_shift.name {
+                        format!("{} (named)", name.to_string())
+                    } else {
+                        "None".to_string()
+                    }
                 ),
                 &details_state,
             );

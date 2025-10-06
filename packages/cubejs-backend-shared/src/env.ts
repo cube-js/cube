@@ -224,6 +224,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('1')
     .asInt(),
   nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool(),
+  nativeSqlPlannerPreAggregations: () => get('CUBEJS_TESSERACT_PRE_AGGREGATIONS').default('false').asBool(),
   nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
     .default('true')
     .asBoolStrict(),
@@ -240,6 +241,9 @@ const variables: Record<string, (...args: any) => any> = {
   transpilationNative: () => get('CUBEJS_TRANSPILATION_NATIVE')
     .default('false')
     .asBoolStrict(),
+  nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
+    .default('')
+    .asString(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -642,6 +646,13 @@ const variables: Record<string, (...args: any) => any> = {
    * Query stream `highWaterMark` value.
    */
   dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
+    .default(8192)
+    .asInt(),
+
+  /**
+   * Max number of elements
+   */
+  usedPreAggregationCacheMaxCount: (): number => get('CUBEJS_USED_PRE_AGG_CACHE_MAX_COUNT')
     .default(8192)
     .asInt(),
 
@@ -1136,6 +1147,32 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Athena AWS Assume Role ARN.
+   */
+  athenaAwsAssumeRoleArn: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_AWS_ATHENA_ASSUME_ROLE_ARN', dataSource)
+    ]
+  ),
+
+  /**
+   * Athena AWS Assume Role External ID.
+   */
+  athenaAwsAssumeRoleExternalId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_AWS_ATHENA_ASSUME_ROLE_EXTERNAL_ID', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * BigQuery Driver                                                 *
    ***************************************************************** */
@@ -1570,6 +1607,19 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Snowflake OAuth token (string).
+   */
+  snowflakeOAuthToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN', dataSource)
+    ]
+  ),
+
+  /**
    * Snowflake OAuth token path.
    */
   snowflakeOAuthTokenPath: ({
@@ -1970,7 +2020,9 @@ const variables: Record<string, (...args: any) => any> = {
   cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
     .default('30')
     .asInt(),
-
+  cubeStoreRollingWindowJoin: () => get('CUBEJS_CUBESTORE_ROLLING_WINDOW_JOIN')
+    .default('false')
+    .asBoolStrict(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
     .asBoolStrict(),
@@ -2070,9 +2122,6 @@ const variables: Record<string, (...args: any) => any> = {
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')
-    .asBoolStrict(),
-  preAggregationsQueueEventsBus: () => get('CUBEJS_PRE_AGGREGATIONS_QUEUE_EVENTS_BUS')
-    .default('false')
     .asBoolStrict(),
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
     .default('true')

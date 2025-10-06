@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT *\n            FROM pg_foreign_server\n            ORDER BY oid\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-----+---------+----------+--------+---------+------------+--------+------------+------+
+| oid | srvname | srvowner | srvfdw | srvtype | srvversion | srvacl | srvoptions | xmin |
++-----+---------+----------+--------+---------+------------+--------+------------+------+
++-----+---------+----------+--------+---------+------------+--------+------------+------+

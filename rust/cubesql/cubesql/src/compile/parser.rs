@@ -1,40 +1,11 @@
 use std::{collections::HashMap, sync::LazyLock};
 
 use regex::Regex;
-use sqlparser::{
-    ast::Statement,
-    dialect::{Dialect, PostgreSqlDialect},
-    parser::Parser,
-};
+use sqlparser::{ast::Statement, dialect::PostgreSqlDialect, parser::Parser};
 
 use super::{qtrace::Qtrace, CompilationError, DatabaseProtocol};
 
 use super::CompilationResult;
-
-#[derive(Debug)]
-pub struct MySqlDialectWithBackTicks {}
-
-impl Dialect for MySqlDialectWithBackTicks {
-    fn is_delimited_identifier_start(&self, ch: char) -> bool {
-        ch == '"' || ch == '`'
-    }
-
-    fn is_identifier_start(&self, ch: char) -> bool {
-        // See https://dev.mysql.com/doc/refman/8.0/en/identifiers.html.
-        // We don't yet support identifiers beginning with numbers, as that
-        // makes it hard to distinguish numeric literals.
-        ch.is_ascii_lowercase()
-            || ch.is_ascii_uppercase()
-            || ch == '_'
-            || ch == '$'
-            || ch == '@'
-            || ('\u{0080}'..='\u{ffff}').contains(&ch)
-    }
-
-    fn is_identifier_part(&self, ch: char) -> bool {
-        self.is_identifier_start(ch) || ch.is_ascii_digit()
-    }
-}
 
 static SIGMA_WORKAROUND: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap()
@@ -48,30 +19,11 @@ pub fn parse_sql_to_statements(
     let original_query = query;
 
     log::debug!("Parsing SQL: {}", query);
-    // @todo Support without workarounds
-    // metabase
-    let query = query.replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
-    let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
-    // @todo Implement CONVERT function
-    let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
-    // @todo problem with parser, space in types
-    let query = query.replace("signed integer", "bigint");
-    let query = query.replace("SIGNED INTEGER", "bigint");
-    let query = query.replace("unsigned integer", "bigint");
-    let query = query.replace("UNSIGNED INTEGER", "bigint");
 
     // DBeaver
     let query = query.replace(
-        "SELECT db.oid,db.* FROM pg_catalog.pg_database db",
-        "SELECT db.oid as _oid,db.* FROM pg_catalog.pg_database db",
-    );
-    let query = query.replace(
-        "SELECT t.oid,t.*,c.relkind",
-        "SELECT t.oid as _oid,t.*,c.relkind",
-    );
-    let query = query.replace(
-        "SELECT n.oid,n.*,d.description FROM",
-        "SELECT n.oid as _oid,n.*,d.description FROM",
+        "LEFT OUTER JOIN pg_depend dep on dep.refobjid = a.attrelid AND dep.deptype = 'i' and dep.refobjsubid = a.attnum and dep.classid = dep.refclassid",
+        "LEFT OUTER JOIN pg_depend dep on dep.refobjid = a.attrelid AND dep.deptype = 'i' and dep.refobjsubid = a.attnum",
     );
 
     // TODO Superset introspection: LEFT JOIN by ANY() is not supported
@@ -181,12 +133,6 @@ pub fn parse_sql_to_statements(
         "WHERE quote_ident(table_schema) IN (current_user, current_schema())",
     );
 
-    // psqlODBC
-    let query = query.replace(
-        "select NULL, NULL, NULL",
-        "select NULL, NULL AS NULL2, NULL AS NULL3",
-    );
-
     // Work around an issue with lowercase table name when queried as uppercase,
     // an uncommon way of casting literals, and skip a few funcs along the way
     let query = query.replace(
@@ -204,12 +150,6 @@ pub fn parse_sql_to_statements(
     let query = query.replace(
         "c.relname AS PARTITION_NAME,",
         "c.relname AS partition_name,",
-    );
-
-    // Work around an issue with NULL, NULL, NULL in SELECT
-    let query = query.replace(
-        "p.proname AS PROCEDURE_NAME, NULL, NULL, NULL, ",
-        "p.proname AS PROCEDURE_NAME, NULL AS NULL, NULL AS NULL2, NULL AS NULL3, ",
     );
 
     // Quicksight workarounds
@@ -236,12 +176,14 @@ pub fn parse_sql_to_statements(
             .to_string()
     };
 
+    // DataGrip CTID workaround
+    let query = query.replace("SELECT t.*, CTID\nFROM ", "SELECT t.*, NULL AS ctid\nFROM ");
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }
 
     let parse_result = match protocol {
-        DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
         DatabaseProtocol::Extension(_) => unimplemented!(),
     };
@@ -287,58 +229,6 @@ pub fn parse_sql_to_statement(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_no_statements_mysql() {
-        let result = parse_sql_to_statement(
-            &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
-            DatabaseProtocol::MySQL,
-            &mut None,
-        );
-        match result {
-            Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert!(err
-                .to_string()
-                .contains("Invalid query, no statements was specified")),
-        }
-    }
-
-    #[test]
-    fn test_multiple_statements_mysql() {
-        let result = parse_sql_to_statement(
-            &"SELECT NOW(); SELECT NOW();".to_string(),
-            DatabaseProtocol::MySQL,
-            &mut None,
-        );
-        match result {
-            Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert!(err
-                .to_string()
-                .contains("Multiple statements was specified in one query")),
-        }
-    }
-
-    #[test]
-    fn test_single_line_comments_mysql() {
-        let result = parse_sql_to_statement(
-            &"-- 6dcd92a04feb50f14bbcf07c661680ba
-            SELECT DATE(`createdAt`) AS __timestamp,
-                   COUNT(*) AS count
-            FROM db.`Orders`
-            GROUP BY DATE(`createdAt`)
-            ORDER BY count DESC
-            LIMIT 10000
-            -- 6dcd92a04feb50f14bbcf07c661680ba
-        "
-            .to_string(),
-            DatabaseProtocol::MySQL,
-            &mut None,
-        );
-        match result {
-            Ok(_) => {}
-            Err(err) => panic!("{}", err),
-        }
-    }
 
     #[test]
     fn test_no_statements_postgres() {

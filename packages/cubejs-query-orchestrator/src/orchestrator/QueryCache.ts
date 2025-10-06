@@ -2,23 +2,23 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import { LRUCache } from 'lru-cache';
 import { pipeline } from 'stream';
-import { getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
+import { AsyncDebounce, getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   BaseDriver,
   InlineTables,
   CacheDriverInterface,
   TableStructure,
-  DriverInterface,
+  DriverInterface, QueryKey,
 } from '@cubejs-backend/base-driver';
 
-import { QueryQueue } from './QueryQueue';
+import { QueryQueue, QueryQueueOptions } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
-import { CacheAndQueryDriverType } from './QueryOrchestrator';
+import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
 
 type QueryOptions = {
   external?: boolean;
@@ -33,6 +33,12 @@ export type QueryWithParams = [
   params: string[],
   options?: QueryOptions
 ];
+
+export type LoadRefreshKeyOptions = {
+  requestId?: string;
+  skipRefreshKeyWaitForRenew?: boolean;
+  dataSource: string
+};
 
 export type Query = {
   requestId?: string;
@@ -109,7 +115,7 @@ export interface QueryCacheOptions {
   }>;
   cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
   continueWaitTimeout?: number;
-  cacheAndQueueDriver?: CacheAndQueryDriverType;
+  cacheAndQueueDriver: CacheAndQueryDriverType;
   maxInMemoryCacheEntries?: number;
   skipExternalCacheAndQueue?: boolean;
 }
@@ -124,10 +130,10 @@ export class QueryCache {
   protected memoryCache: LRUCache<string, CacheEntry>;
 
   public constructor(
-    protected readonly redisPrefix: string,
+    protected readonly cachePrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    public readonly options: QueryCacheOptions = {}
+    public readonly options: QueryCacheOptions
   ) {
     switch (options.cacheAndQueueDriver || 'memory') {
       case 'memory':
@@ -159,11 +165,7 @@ export class QueryCache {
   }
 
   public getKey(catalog: string, key: string): string {
-    if (this.cacheDriver instanceof CubeStoreCacheDriver) {
-      return `${this.redisPrefix}#${catalog}:${key}`;
-    } else {
-      return `${catalog}_${this.redisPrefix}_${key}`;
-    }
+    return `${this.cachePrefix}#${catalog}:${key}`;
   }
 
   /**
@@ -449,9 +451,9 @@ export class QueryCache {
     };
 
     if (!persistent) {
-      return queue.executeInQueue('query', cacheKey, _query, priority, opt);
+      return queue.executeInQueue('query', cacheKey as QueryKey, _query, priority, opt);
     } else {
-      return queue.executeInQueue('stream', cacheKey, {
+      return queue.executeInQueue('stream', cacheKey as QueryKey, {
         ..._query,
         aliasNameToMember,
       }, priority, opt);
@@ -463,7 +465,7 @@ export class QueryCache {
       const queueOptions = await this.options.queueOptions(dataSource);
       if (!this.queue[dataSource]) {
         this.queue[dataSource] = QueryCache.createQueue(
-          `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
+          `SQL_QUERY_${this.cachePrefix}_${dataSource}`,
           () => this.driverFactory(dataSource),
           (client, req) => {
             this.logger('Executing SQL', { ...req });
@@ -531,7 +533,7 @@ export class QueryCache {
   public getExternalQueue() {
     if (!this.externalQueue) {
       this.externalQueue = QueryCache.createQueue(
-        `SQL_QUERY_EXT_${this.redisPrefix}`,
+        `SQL_QUERY_EXT_${this.cachePrefix}`,
         this.options.externalDriverFactory,
         (client, q) => {
           this.logger('Executing SQL', {
@@ -557,13 +559,40 @@ export class QueryCache {
     redisPrefix: string,
     clientFactory: DriverFactory,
     executeFn: (client: BaseDriver, req: any) => any,
-    options: Record<string, any> = {}
+    options: Omit<QueryQueueOptions, 'queryHandlers' | 'cancelHandlers'>
   ): QueryQueue {
     const queue: any = new QueryQueue(redisPrefix, {
-      getQueueEventsBus: options.getQueueEventsBus,
       queryHandlers: {
+        metadata: async (req, _setCancelHandle) => {
+          const client = await clientFactory();
+          const { operation } = req;
+          const params = req.params || {};
+
+          switch (operation) {
+            case MetadataOperationType.GET_SCHEMAS:
+              queue.logger('Getting datasource schemas', { dataSource: req.dataSource, requestId: req.requestId });
+              return client.getSchemas();
+            case MetadataOperationType.GET_TABLES_FOR_SCHEMAS:
+              queue.logger('Getting tables for schemas', {
+                dataSource: req.dataSource,
+                schemaCount: params.schemas?.length || 0,
+                requestId: req.requestId
+              });
+              return client.getTablesForSpecificSchemas(params.schemas);
+            case MetadataOperationType.GET_COLUMNS_FOR_TABLES:
+              queue.logger('Getting columns for tables', {
+                dataSource: req.dataSource,
+                tableCount: params.tables?.length || 0,
+                requestId: req.requestId
+              });
+              return client.getColumnsForSpecificTables(params.tables);
+            default:
+              throw new Error(`Unknown metadata operation: ${operation}`);
+          }
+        },
         query: async (req, setCancelHandle) => {
           const client = await clientFactory();
+
           const resultPromise = executeFn(client, req);
           let handle;
           if (resultPromise.cancel) {
@@ -578,59 +607,65 @@ export class QueryCache {
           }
           return result;
         },
-        stream: async (req, target) => {
-          queue.logger('Streaming SQL', { ...req });
-          await (new Promise((resolve, reject) => {
-            let logged = false;
-            Promise
-              .all([clientFactory()])
-              .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark') }))
-              .then((source) => {
-                const cleanup = async (error) => {
-                  if (source.release) {
-                    const toRelease = source.release;
-                    delete source.release;
-                    await toRelease();
+      },
+      streamHandler: async (req, target) => {
+        queue.logger('Streaming SQL', { ...req });
+        await (new Promise((resolve, reject) => {
+          let logged = false;
+          Promise
+            .all([clientFactory()])
+            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark') }))
+            .then((source) => {
+              const cleanup = async (error) => {
+                if (source.release) {
+                  const toRelease = source.release;
+                  delete source.release;
+                  await toRelease();
+                }
+                if (error && !target.destroyed) {
+                  target.destroy(error);
+                }
+                if (!logged && target.destroyed) {
+                  logged = true;
+                  if (error) {
+                    queue.logger('Streaming done with error', {
+                      query: req.query,
+                      query_values: req.values,
+                      error,
+                    });
+                    reject(error);
+                  } else {
+                    queue.logger('Streaming successfully completed', {
+                      requestId: req.requestId,
+                    });
+                    resolve(req.requestId);
                   }
-                  if (error && !target.destroyed) {
-                    target.destroy(error);
-                  }
-                  if (!logged && target.destroyed) {
-                    logged = true;
-                    if (error) {
-                      queue.logger('Streaming done with error', {
-                        query: req.query,
-                        query_values: req.values,
-                        error,
-                      });
-                      reject(error);
-                    } else {
-                      queue.logger('Streaming successfully completed', {
-                        requestId: req.requestId,
-                      });
-                      resolve(req.requestId);
-                    }
-                  }
-                };
+                }
+              };
 
-                source.rowStream.once('end', () => cleanup(undefined));
-                source.rowStream.once('error', cleanup);
-                source.rowStream.once('close', () => cleanup(undefined));
+              source.rowStream.once('end', () => cleanup(undefined));
+              source.rowStream.once('error', cleanup);
+              source.rowStream.once('close', () => cleanup(undefined));
 
-                target.once('end', () => cleanup(undefined));
-                target.once('error', cleanup);
-                target.once('close', () => cleanup(undefined));
+              target.once('end', () => cleanup(undefined));
+              target.once('error', cleanup);
+              target.once('close', () => cleanup(undefined));
 
-                source.rowStream.pipe(target);
-              })
-              .catch((reason) => {
-                target.emit('error', reason);
-                resolve(reason);
-              });
-          }));
-        },
+              source.rowStream.pipe(target);
+            })
+            .catch((reason) => {
+              target.emit('error', reason);
+              resolve(reason);
+            });
+        }));
       },
       cancelHandlers: {
+        metadata: async (req) => {
+          if (req.cancelHandler && queue.handles[req.cancelHandler]) {
+            await queue.handles[req.cancelHandler].cancel();
+            delete queue.handles[req.cancelHandler];
+          }
+        },
         query: async (req) => {
           if (req.cancelHandler && queue.handles[req.cancelHandler]) {
             await queue.handles[req.cancelHandler].cancel();
@@ -771,30 +806,30 @@ export class QueryCache {
   public loadRefreshKeys(
     cacheKeyQueries: QueryWithParams[],
     expireSecs: number,
-    options: {
-      requestId?: string;
-      skipRefreshKeyWaitForRenew?: boolean;
-      dataSource: string
-    }
+    options: LoadRefreshKeyOptions
   ) {
-    return cacheKeyQueries.map((q) => {
-      const [query, values, queryOptions]: QueryWithParams = Array.isArray(q) ? q : [q, [], {}];
-      return this.cacheQueryResult(
-        query,
-        values,
-        [query, values],
-        expireSecs,
-        {
-          renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
-          renewalKey: q,
-          waitForRenew: !options.skipRefreshKeyWaitForRenew,
-          requestId: options.requestId,
-          dataSource: options.dataSource,
-          useInMemory: true,
-          external: queryOptions?.external,
-        },
-      );
-    });
+    return cacheKeyQueries.map((q) => this.loadRefreshKey(q, expireSecs, options));
+  }
+
+  @AsyncDebounce()
+  public async loadRefreshKey(q: QueryWithParams, expireSecs: number, options: LoadRefreshKeyOptions) {
+    const [query, values, queryOptions]: QueryWithParams = Array.isArray(q) ? q : [q, [], {}];
+
+    return this.cacheQueryResult(
+      query,
+      values,
+      [query, values],
+      expireSecs,
+      {
+        renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
+        renewalKey: q,
+        waitForRenew: !options.skipRefreshKeyWaitForRenew,
+        requestId: options.requestId,
+        dataSource: options.dataSource,
+        useInMemory: true,
+        external: queryOptions?.external,
+      },
+    );
   }
 
   public withLock = <T = any>(

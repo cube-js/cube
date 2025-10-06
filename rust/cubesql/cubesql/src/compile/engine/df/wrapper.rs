@@ -44,7 +44,6 @@ use std::{
     convert::TryInto,
     fmt,
     future::Future,
-    iter,
     pin::Pin,
     result,
     sync::{Arc, LazyLock},
@@ -137,17 +136,17 @@ fn extract_group_type_from_groupping_set(
         match expr {
             Expr::GroupingSet(groupping_set) => match groupping_set {
                 GroupingSet::Rollup(exprs) => {
-                    result.extend(
-                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Rollup, id)))
-                            .take(exprs.len()),
-                    );
+                    result.extend(std::iter::repeat_n(
+                        Some(GroupingSetDesc::new(GroupingSetType::Rollup, id)),
+                        exprs.len(),
+                    ));
                     id += 1;
                 }
                 GroupingSet::Cube(exprs) => {
-                    result.extend(
-                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Cube, id)))
-                            .take(exprs.len()),
-                    );
+                    result.extend(std::iter::repeat_n(
+                        Some(GroupingSetDesc::new(GroupingSetType::Cube, id)),
+                        exprs.len(),
+                    ));
                     id += 1;
                 }
                 GroupingSet::GroupingSets(_) => {
@@ -415,11 +414,16 @@ impl Remapper {
         static NON_ID_REGEX: LazyLock<Regex> =
             LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9_]").unwrap());
 
-        let alias = start_from;
-        let mut truncated_alias = NON_ID_REGEX
-            .replace_all(&alias, "_")
-            .trim_start_matches("_")
-            .to_lowercase();
+        let alias_lower = start_from.clone().to_lowercase();
+        let mut truncated_alias = if alias_lower != "__user" && alias_lower != "__cubejoinfield" {
+            NON_ID_REGEX
+                .replace_all(&alias_lower, "_")
+                .trim_start_matches("_")
+                .to_string()
+        } else {
+            alias_lower
+        };
+
         truncated_alias.truncate(16);
         let mut alias = truncated_alias.clone();
         for i in 1..10000 {
@@ -879,7 +883,7 @@ impl CubeScanWrapperNode {
                     vec![],
                     vec![],
                     vec![],
-                    // TODO
+                    vec![],
                     from_alias.clone().unwrap_or("".to_string()),
                     None,
                     None,
@@ -2013,7 +2017,47 @@ impl WrappedSelectNode {
                 Ok((resulting_sql, sql_query))
             }
             // Expr::GetIndexedField { .. } => {}
-            // Expr::Between { .. } => {}
+            Expr::Between {
+                expr,
+                negated,
+                low,
+                high,
+            } => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries,
+                )
+                .await?;
+                let (low, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *low,
+                    push_to_cube_context,
+                    subqueries,
+                )
+                .await?;
+                let (high, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *high,
+                    push_to_cube_context,
+                    subqueries,
+                )
+                .await?;
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .between_expr(expr, negated, low, high)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for between expr: {}",
+                            e
+                        ))
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
             Expr::Case {
                 expr,
                 when_then_expr,
@@ -3534,7 +3578,7 @@ impl WrappedSelectNode {
             aggregate,
             patch_measures,
             filter,
-            window: _,
+            window,
             order,
         } = columns;
 
@@ -3552,7 +3596,7 @@ impl WrappedSelectNode {
                 group_by.into_iter().map(|(m, _)| m).collect(),
                 group_descs,
                 aggregate.into_iter().map(|(m, _)| m).collect(),
-                // TODO
+                window.into_iter().map(|(m, _)| m).collect(),
                 from_alias.unwrap_or("".to_string()),
                 if !filter.is_empty() {
                     Some(filter.iter().map(|(f, _)| f.expr.to_string()).join(" AND "))
@@ -3779,6 +3823,21 @@ impl<'ctx, 'mem> CollectMembersVisitor<'ctx, 'mem> {
 
         Ok(())
     }
+
+    fn handle_count_rows(&mut self) -> Result<()> {
+        // COUNT(*) references all members in the ungrouped scan node
+        for member in &self.push_to_cube_context.ungrouped_scan_node.member_fields {
+            match member {
+                MemberField::Member(member) => {
+                    self.used_members.insert(member.member.clone());
+                }
+                MemberField::Literal(_) => {
+                    // Do nothing
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
@@ -3786,6 +3845,13 @@ impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
         match expr {
             Expr::Column(ref c) => {
                 self.handle_column(c)?;
+            }
+            Expr::AggregateFunction {
+                fun: AggregateFunction::Count,
+                args,
+                ..
+            } if args.len() == 1 && matches!(args[0], Expr::Literal(_)) => {
+                self.handle_count_rows()?;
             }
             _ => {}
         }
