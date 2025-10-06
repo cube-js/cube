@@ -3,6 +3,233 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+### Bug Fixes
+
+- **base-driver:** Throw an error when the list of csv files from the bucket is empty ([#9996](https://github.com/cube-js/cube/issues/9996)) ([a8e791c](https://github.com/cube-js/cube/commit/a8e791c1e9c271b63fcf68ba204e875eb3d21fd7))
+- **snowflake-driver:** Add support for IAM roles with IRSA for S3 export buckets ([#10024](https://github.com/cube-js/cube/issues/10024)) ([9ceb2f9](https://github.com/cube-js/cube/commit/9ceb2f94d5deab5fba39faa00e234011c3898710))
+
+## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.76](https://github.com/cube-js/cube/compare/v1.3.75...v1.3.76) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.74](https://github.com/cube-js/cube/compare/v1.3.73...v1.3.74) (2025-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.68](https://github.com/cube-js/cube/compare/v1.3.67...v1.3.68) (2025-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.66](https://github.com/cube-js/cube/compare/v1.3.65...v1.3.66) (2025-09-09)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.65](https://github.com/cube-js/cube/compare/v1.3.64...v1.3.65) (2025-09-05)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.64](https://github.com/cube-js/cube/compare/v1.3.63...v1.3.64) (2025-09-03)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.63](https://github.com/cube-js/cube/compare/v1.3.62...v1.3.63) (2025-09-02)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.62](https://github.com/cube-js/cube/compare/v1.3.61...v1.3.62) (2025-08-29)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.61](https://github.com/cube-js/cube/compare/v1.3.60...v1.3.61) (2025-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.60](https://github.com/cube-js/cube/compare/v1.3.59...v1.3.60) (2025-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.59](https://github.com/cube-js/cube/compare/v1.3.58...v1.3.59) (2025-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.58](https://github.com/cube-js/cube/compare/v1.3.57...v1.3.58) (2025-08-25)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.57](https://github.com/cube-js/cube/compare/v1.3.56...v1.3.57) (2025-08-22)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.56](https://github.com/cube-js/cube/compare/v1.3.55...v1.3.56) (2025-08-21)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.55](https://github.com/cube-js/cube/compare/v1.3.54...v1.3.55) (2025-08-19)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.54](https://github.com/cube-js/cube/compare/v1.3.53...v1.3.54) (2025-08-15)
+
+### Features
+
+- **snowflake-driver:** Add queryTag connection parameter ([#9889](https://github.com/cube-js/cube/issues/9889)) ([d0554d6](https://github.com/cube-js/cube/commit/d0554d634ddd815bef1d2f0f33ebf15a885ccd05))
+
+## [1.3.53](https://github.com/cube-js/cube/compare/v1.3.52...v1.3.53) (2025-08-15)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.52](https://github.com/cube-js/cube/compare/v1.3.51...v1.3.52) (2025-08-14)
+
+### Features
+
+- **snowflake-driver:** Upgrade Snowflake Node.js driver to 2.2.0 ([#9880](https://github.com/cube-js/cube/issues/9880)) ([3956b71](https://github.com/cube-js/cube/commit/3956b71259633c60ba95c8c0e979ee49c6d7b6ee))
+
+## [1.3.51](https://github.com/cube-js/cube/compare/v1.3.50...v1.3.51) (2025-08-14)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.50](https://github.com/cube-js/cube/compare/v1.3.49...v1.3.50) (2025-08-13)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.49](https://github.com/cube-js/cube/compare/v1.3.48...v1.3.49) (2025-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.48](https://github.com/cube-js/cube/compare/v1.3.47...v1.3.48) (2025-08-09)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.47](https://github.com/cube-js/cube/compare/v1.3.46...v1.3.47) (2025-08-04)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.46](https://github.com/cube-js/cube/compare/v1.3.45...v1.3.46) (2025-07-31)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.45](https://github.com/cube-js/cube/compare/v1.3.44...v1.3.45) (2025-07-29)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.44](https://github.com/cube-js/cube/compare/v1.3.43...v1.3.44) (2025-07-28)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.43](https://github.com/cube-js/cube/compare/v1.3.42...v1.3.43) (2025-07-24)
+
+### Bug Fixes
+
+- **snowflake-driver:** Set date/timestamp format for exporting data to CSV export bucket ([#9810](https://github.com/cube-js/cube/issues/9810)) ([4c0fef7](https://github.com/cube-js/cube/commit/4c0fef7b068893322f05310b028059ea3dad8986))
+
+## [1.3.42](https://github.com/cube-js/cube/compare/v1.3.41...v1.3.42) (2025-07-23)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.41](https://github.com/cube-js/cube/compare/v1.3.40...v1.3.41) (2025-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.40](https://github.com/cube-js/cube/compare/v1.3.39...v1.3.40) (2025-07-20)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.39](https://github.com/cube-js/cube/compare/v1.3.38...v1.3.39) (2025-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.38](https://github.com/cube-js/cube/compare/v1.3.37...v1.3.38) (2025-07-16)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.37](https://github.com/cube-js/cube/compare/v1.3.36...v1.3.37) (2025-07-14)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.36](https://github.com/cube-js/cube/compare/v1.3.35...v1.3.36) (2025-07-10)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.35](https://github.com/cube-js/cube/compare/v1.3.34...v1.3.35) (2025-07-09)
+
+### Features
+
+- **snowflake-driver:** Introduce CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN env var / config option ([#9752](https://github.com/cube-js/cube/issues/9752)) ([1c66d3e](https://github.com/cube-js/cube/commit/1c66d3eeb8e138e13bef4411f60513de97dc15d4))
+
+## [1.3.34](https://github.com/cube-js/cube/compare/v1.3.33...v1.3.34) (2025-07-04)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.33](https://github.com/cube-js/cube/compare/v1.3.32...v1.3.33) (2025-07-03)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.32](https://github.com/cube-js/cube/compare/v1.3.31...v1.3.32) (2025-07-03)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.31](https://github.com/cube-js/cube/compare/v1.3.30...v1.3.31) (2025-07-02)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.30](https://github.com/cube-js/cube/compare/v1.3.29...v1.3.30) (2025-07-01)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.29](https://github.com/cube-js/cube/compare/v1.3.28...v1.3.29) (2025-07-01)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.28](https://github.com/cube-js/cube/compare/v1.3.27...v1.3.28) (2025-06-30)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.27](https://github.com/cube-js/cube/compare/v1.3.26...v1.3.27) (2025-06-30)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.26](https://github.com/cube-js/cube/compare/v1.3.25...v1.3.26) (2025-06-25)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.3.25](https://github.com/cube-js/cube/compare/v1.3.24...v1.3.25) (2025-06-24)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
 ## [1.3.24](https://github.com/cube-js/cube/compare/v1.3.23...v1.3.24) (2025-06-24)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver

@@ -112,3 +112,44 @@ SELECT
             .unwrap()
     );
 }
+
+#[tokio::test]
+async fn test_date_part_interval() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+        SELECT
+            DATE_PART('day', INTERVAL '1 year 2 month 3 day 4 hour 5 minute 6 second') AS d
+        "#;
+
+    insta::assert_snapshot!(
+        execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn test_numeric_math_scalar() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+        SELECT
+            a % 2::numeric AS m
+        FROM (
+            SELECT
+                5::numeric AS a
+            UNION ALL
+            SELECT
+                3.5::numeric AS a
+        ) AS t
+        "#;
+
+    insta::assert_snapshot!(
+        execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .unwrap()
+    );
+}

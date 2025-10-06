@@ -549,7 +549,8 @@ export default class ResultSet<T extends Record<string, any> = any> {
         const series = this.loadResponses.map(
           (loadResponse) => this.timeSeries(
             loadResponse.query.timeDimensions![0],
-            resultIndex, loadResponse.annotation.timeDimensions
+            resultIndex,
+            loadResponse.annotation.timeDimensions
           )
         );
 
@@ -784,7 +785,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
       [
         ...(normalizedPivotConfig.x).map((key, index): [string, string | number] => [
           key,
-          xValues[index] ?? ''
+          xValues[index]
         ]),
         ...(isMeasuresPresent
           ? yValuesArray.map(([yValues, measure]): [string, string | number] => [

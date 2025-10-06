@@ -14,7 +14,7 @@ import {
   QueryOptions,
   ExternalDriverCompatibilities, TableStructure, TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
-import { getEnv } from '@cubejs-backend/shared';
+import { AsyncDebounce, getEnv } from '@cubejs-backend/shared';
 import { format as formatSql, escape } from 'sqlstring';
 import fetch from 'node-fetch';
 
@@ -49,6 +49,7 @@ type CreateTableOptions = {
   sourceTable?: any
   sealAt?: string
   delimiter?: string
+  disableQuoting?: boolean
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -110,6 +111,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     if (options.delimiter) {
       withEntries.push(`delimiter = '${options.delimiter}'`);
     }
+    if (options.disableQuoting) {
+      withEntries.push(`disable_quoting = true`);
+    }
     if (options.buildRangeEnd) {
       withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);
     }
@@ -158,6 +162,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     });
   }
 
+  @AsyncDebounce()
   public async getTablesQuery(schemaName) {
     return this.query(
       `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
@@ -165,6 +170,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     );
   }
 
+  @AsyncDebounce()
   public async getPrefixTablesQuery(schemaName, tablePrefixes) {
     const prefixWhere = tablePrefixes.map(_ => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
     return this.query(
@@ -292,6 +298,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       options.inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';
       if (tableData.csvDelimiter) {
         options.delimiter = tableData.csvDelimiter;
+      }
+      if (tableData.csvDisableQuoting) {
+        options.disableQuoting = tableData.csvDisableQuoting;
       }
       options.files = files;
     }

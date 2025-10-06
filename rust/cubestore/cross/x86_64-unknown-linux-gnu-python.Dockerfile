@@ -1,10 +1,11 @@
 FROM base
 
 ARG PYTHON_VERSION
+ARG PYTHON_VERSION_SUFFIX
 ARG PYTHON_RELEASE
 
-RUN cd tmp && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz -O - | tar -xz \
-    && cd Python-${PYTHON_VERSION} \
+RUN cd tmp && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX}.tgz -O - | tar -xz \
+    && cd Python-${PYTHON_VERSION}${PYTHON_VERSION_SUFFIX} \
     && ./configure  \
       --enable-shared \
       --with-openssl=/openssl \

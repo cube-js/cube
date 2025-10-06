@@ -37,7 +37,7 @@ fn projection_above_limit(plan: &LogicalPlan) -> Result<LogicalPlan> {
         LogicalPlan::Limit { n, input } => {
             let schema: &Arc<DFSchema> = input.schema();
 
-            let lift_up_result = lift_up_expensive_projections(input, HashSet::new());
+            let lift_up_result = lift_up_expensive_projections(input, ColumnRecorder::default());
             pal_debug!("lift_up_res: {:?}", lift_up_result);
             match lift_up_result {
                 Ok((inner_plan, None)) => Ok(LogicalPlan::Limit {
@@ -107,8 +107,11 @@ fn projection_above_limit(plan: &LogicalPlan) -> Result<LogicalPlan> {
     }
 }
 
+#[derive(Default)]
 struct ColumnRecorder {
-    columns: HashSet<Column>,
+    /// We use indexmap IndexSet because we want iteration order to be deterministic and
+    /// specifically, to match left-to-right insertion order.
+    columns: indexmap::IndexSet<Column>,
 }
 
 impl ExpressionVisitor for ColumnRecorder {
@@ -180,21 +183,16 @@ fn looks_expensive(ex: &Expr) -> Result<bool> {
 
 fn lift_up_expensive_projections(
     plan: &LogicalPlan,
-    used_columns: HashSet<Column>,
+    used_columns: ColumnRecorder,
 ) -> Result<(LogicalPlan, Option<Vec<Expr>>)> {
     match plan {
         LogicalPlan::Sort { expr, input } => {
-            let mut recorder = ColumnRecorder {
-                columns: used_columns,
-            };
+            let mut recorder = used_columns;
             for ex in expr {
                 recorder = ex.accept(recorder)?;
             }
 
-            let used_columns = recorder.columns;
-
-            let (new_input, lifted_projection) =
-                lift_up_expensive_projections(&input, used_columns)?;
+            let (new_input, lifted_projection) = lift_up_expensive_projections(&input, recorder)?;
             pal_debug!(
                 "Sort sees result:\n{:?};;;{:?};;;",
                 new_input,
@@ -213,9 +211,7 @@ fn lift_up_expensive_projections(
             input,
             schema,
         } => {
-            let mut column_recorder = ColumnRecorder {
-                columns: HashSet::new(),
-            };
+            let mut column_recorder = ColumnRecorder::default();
 
             let mut this_projection_exprs = Vec::<usize>::new();
 
@@ -241,7 +237,7 @@ fn lift_up_expensive_projections(
                     already_retained_cols.push((col.clone(), Some(alias.clone())));
                 }
 
-                if used_columns.contains(&field.qualified_column()) {
+                if used_columns.columns.contains(&field.qualified_column()) {
                     pal_debug!(
                         "Expr {}: used_columns contains field {:?}",
                         i,
@@ -510,6 +506,44 @@ mod tests {
         Ok(())
     }
 
+    /// Tests that multiple columns are retained in a deterministic order (and as a nice-to-have,
+    /// they should be in the left-to-right order of appearance).
+    #[test]
+    fn limit_sorted_plan_with_expensive_expr_retaining_multiple_columns() -> Result<()> {
+        let table_scan = test_table_scan_abcd()?;
+
+        let case_expr = when(col("d").eq(lit(3)), col("c") + lit(2)).otherwise(lit(5))?;
+
+        let plan = LogicalPlanBuilder::from(table_scan)
+            .project([
+                col("a").alias("a1"),
+                col("b").alias("b1"),
+                case_expr.alias("c1"),
+            ])?
+            .sort([col("a1").sort(true, true)])?
+            .limit(50)?
+            .build()?;
+
+        let expected = "Limit: 50\
+        \n  Sort: #a1 ASC NULLS FIRST\
+        \n    Projection: #test.a AS a1, #test.b AS b1, CASE WHEN #test.d Eq Int32(3) THEN #test.c Plus Int32(2) ELSE Int32(5) END AS c1\
+        \n      TableScan: test projection=None";
+
+        let formatted = format!("{:?}", plan);
+        assert_eq!(formatted, expected);
+
+        // We are testing that test.d deterministically comes before test.c in the inner Projection.
+        let optimized_expected = "Projection: #a1, #b1, CASE WHEN #test.d Eq Int32(3) THEN #test.c Plus Int32(2) ELSE Int32(5) END AS c1\
+        \n  Limit: 50\
+        \n    Sort: #a1 ASC NULLS FIRST\
+        \n      Projection: #test.a AS a1, #test.b AS b1, #test.d, #test.c\
+        \n        TableScan: test projection=None";
+
+        assert_optimized_plan_eq(&plan, optimized_expected);
+
+        Ok(())
+    }
+
     /// Tests that we re-alias fields in the lifted up projection.
     #[test]
     fn limit_sorted_plan_with_nonaliased_expensive_expr_optimized() -> Result<()> {
@@ -658,5 +692,16 @@ mod tests {
 
     pub fn test_table_scan() -> Result<LogicalPlan> {
         test_table_scan_with_name("test")
+    }
+
+    pub fn test_table_scan_abcd() -> Result<LogicalPlan> {
+        let name = "test";
+        let schema = Schema::new(vec![
+            Field::new("a", DataType::UInt32, false),
+            Field::new("b", DataType::UInt32, false),
+            Field::new("c", DataType::UInt32, false),
+            Field::new("d", DataType::UInt32, false),
+        ]);
+        LogicalPlanBuilder::scan_empty(Some(name), &schema, None)?.build()
     }
 }

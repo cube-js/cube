@@ -162,6 +162,37 @@ describe('transformMetaExtended helpers', () => {
     expect(handledCube).toHaveProperty('dimensions');
   });
 
+  test('transformCube - extends field preservation', () => {
+    const mockCubeDefinitions = {
+      BaseCube: { extends: () => 'BaseCube' },
+      ExtendedCube: { extends: () => 'ExtendedCube' },
+      AnotherCube: { extends: () => 'AnotherCube' },
+      TestCube: { extends: () => 'TestCube' },
+      SampleCube: { extends: () => 'SampleCube' }
+    };
+
+    const mockCubes = [
+      { name: 'BaseCube' },
+      { name: 'ExtendedCube' },
+      { name: 'AnotherCube' },
+      { name: 'TestCube' },
+      { name: 'SampleCube' }
+    ];
+
+    mockCubes.forEach(cube => {
+      const transformedCube = transformCube(cube, mockCubeDefinitions);
+      expect(transformedCube).toBeDefined();
+      expect(transformedCube.extends).toBe(`'${cube.name}'`);
+    });
+
+    // Specific test cases to verify first letter preservation
+    const baseCube = transformCube({ name: 'BaseCube' }, mockCubeDefinitions);
+    expect(baseCube.extends).toBe('\'BaseCube\'');
+
+    const extendedCube = transformCube({ name: 'ExtendedCube' }, mockCubeDefinitions);
+    expect(extendedCube.extends).toBe('\'ExtendedCube\'');
+  });
+
   test('transformDimension', () => {
     const handledDimension = transformDimension(MOCK_USERS_CUBE.dimensions.id, MOCK_USERS_CUBE);
     expect(handledDimension).toBeDefined();
@@ -186,6 +217,30 @@ describe('transformMetaExtended helpers', () => {
     const handledJoins = transformJoins(MOCK_USERS_CUBE.joins);
     expect(handledJoins).toBeDefined();
     expect(handledJoins?.length).toBe(2);
+  });
+
+  test('transformJoins - array format', () => {
+    // Test new array format (after PR #9800)
+    const arrayJoins = [
+      {
+        name: 'PlaygroundUsers',
+        relationship: 'belongsTo',
+        sql: () => `{CUBE}.id = {PlaygroundUsers.anonymous}`,
+      },
+      {
+        name: 'IpEnrich',
+        relationship: 'belongsTo',
+        sql: () => `{CUBE.email} = {IpEnrich.email}`,
+      },
+    ];
+    
+    const handledJoins = transformJoins(arrayJoins);
+    expect(handledJoins).toBeDefined();
+    expect(handledJoins?.length).toBe(2);
+    expect(handledJoins?.[0].name).toBe('PlaygroundUsers');
+    expect(handledJoins?.[1].name).toBe('IpEnrich');
+    expect(handledJoins?.[0].sql).toBe('`{CUBE}.id = {PlaygroundUsers.anonymous}`');
+    expect(handledJoins?.[1].sql).toBe('`{CUBE.email} = {IpEnrich.email}`');
   });
 
   test('transformPreAggregations', () => {

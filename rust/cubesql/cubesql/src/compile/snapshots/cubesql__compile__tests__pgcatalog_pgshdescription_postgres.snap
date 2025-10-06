@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_shdescription\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++--------+----------+-------------+
+| objoid | classoid | description |
++--------+----------+-------------+
++--------+----------+-------------+

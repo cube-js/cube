@@ -8,3 +8,4 @@ downloaded
 cubestore/target
 cubesql/target
 cubestore-sql-tests/data/**
+cubestore/db-tmp

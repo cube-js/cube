@@ -67,7 +67,7 @@ Data model:
 
 cubes:
   - name: orders
-    sql: >
+    sql: |
       SELECT 1 AS id, '2025-01-01'::TIMESTAMP AS time UNION ALL
       SELECT 2 AS id, '2025-01-11'::TIMESTAMP AS time UNION ALL
       SELECT 3 AS id, '2025-01-21'::TIMESTAMP AS time UNION ALL
@@ -136,7 +136,7 @@ Data model:
 ```yaml
 cubes:
   - name: period_to_date
-    sql: >
+    sql: |
       SELECT '2024-01-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
       SELECT '2024-02-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
       SELECT '2024-03-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
@@ -220,7 +220,7 @@ Data model:
 ```yaml
 cubes:
   - name: prior_date
-    sql: >
+    sql: |
       SELECT '2023-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
       SELECT '2023-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
       SELECT '2023-06-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
@@ -350,7 +350,7 @@ Data model:
 ```yaml
 cubes:
   - name: percent_of_total
-    sql: >
+    sql: |
       SELECT 1 AS id, 1000 AS revenue, 'A' AS product, 'USA' AS country UNION ALL
       SELECT 2 AS id, 2000 AS revenue, 'B' AS product, 'USA' AS country UNION ALL
       SELECT 3 AS id, 3000 AS revenue, 'A' AS product, 'Austria' AS country UNION ALL
@@ -417,7 +417,7 @@ Data model:
 ```yaml
 cubes:
   - name: ranking
-    sql: >
+    sql: |
       SELECT 1 AS id, 1000 AS revenue, 'A' AS product, 'USA' AS country UNION ALL
       SELECT 2 AS id, 2000 AS revenue, 'B' AS product, 'USA' AS country UNION ALL
       SELECT 3 AS id, 3000 AS revenue, 'A' AS product, 'Austria' AS country UNION ALL

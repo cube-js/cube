@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly-2024-01-29]
+        rust: [nightly-2025-08-01]
     container:
       image: cubejs/rust-builder:bookworm-llvm-18
     env:
@@ -50,23 +50,21 @@ jobs:
           # We should use a separate key for testing to pass disk space limitations
           shared-key: cubestore-testing
           key: ubuntu-22.04
-      - name: Run cargo fmt cubestore
-        run: |
-          cargo fmt --manifest-path rust/cubestore/cubestore/Cargo.toml -- --check
-      - name: Run cargo fmt cubehll
-        run: |
-          cargo fmt --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
-      - name: Run cargo build
-        run: |
-          cargo build --manifest-path rust/cubestore/Cargo.toml
+      - name: Run cargo fmt
+        run: cargo fmt --check
+        working-directory: rust/cubestore
+      - name: Run cargo check
+        # Re-using test profile to speedup builds
+        run: cargo check --benches --profile test
+        working-directory: rust/cubestore
       - name: Run cargo test
         env:
           # LocalDirRemoteFs expect that std::env::temp_dir and its local dir is on same FS, to use `rename`
           # On Unix it's controlled by TMPDIR
           # When using `container` in GHA checkout will be located in `/__w`, and that's a separate mount from `/tmp`
           TMPDIR: /__w/tmp
-        run: |
-          cargo test --manifest-path rust/cubestore/Cargo.toml
+        run: cargo test -- --test-threads=1
+        working-directory: rust/cubestore
 
   docker-image-latest:
     name: Build only :latest image
@@ -114,7 +112,7 @@ jobs:
           - x86_64-apple-darwin
           - aarch64-apple-darwin
         include:
-          - os: windows-2019
+          - os: windows-2022
             target: x86_64-pc-windows-msvc
             executable_name: cubestored.exe
             strip: true
@@ -229,7 +227,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-01-29
+          toolchain: nightly-2025-08-01
           target: ${{ matrix.target }}
           # override: true # this is by default on
           rustflags: ""

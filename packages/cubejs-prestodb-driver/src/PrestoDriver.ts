@@ -30,8 +30,12 @@ const presto = require('presto-client');
 
 export type PrestoDriverExportBucket = {
   exportBucket?: string,
-  bucketType?: 'gcs',
+  bucketType?: 'gcs' | 's3',
   credentials?: any,
+  accessKeyId?: string,
+  secretAccessKey?: string,
+  exportBucketRegion?: string,
+  exportBucketS3AdvancedFS?: boolean,
   exportBucketCsvEscapeSymbol?: string,
 };
 
@@ -50,7 +54,7 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & {
   queryTimeout?: number;
 };
 
-const SUPPORTED_BUCKET_TYPES = ['gcs'];
+const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
 /**
  * Presto driver class.
  */
@@ -103,13 +107,20 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       ...(authToken ? { custom_auth: `Bearer ${authToken}` } : {}),
       ...(dbPassword ? { basic_auth: { user: dbUser, password: dbPassword } } : {}),
       ssl: this.getSslOptions(dataSource),
-      bucketType: getEnv('dbExportBucketType', { supported: ['gcs'], dataSource }),
+      bucketType: getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
       exportBucket: getEnv('dbExportBucket', { dataSource }),
+      accessKeyId: getEnv('dbExportBucketAwsKey', { dataSource }),
+      secretAccessKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
+      exportBucketRegion: getEnv('dbExportBucketAwsRegion', { dataSource }),
       credentials: getEnv('dbExportGCSCredentials', { dataSource }),
+      queryTimeout: getEnv('dbQueryTimeout', { dataSource }),
       ...config
     };
     this.catalog = this.config.catalog;
-    this.client = new presto.Client(this.config);
+    this.client = new presto.Client({
+      timeout: this.config.queryTimeout,
+      ...this.config,
+    });
   }
 
   public async testConnection(): Promise<void> {
@@ -312,7 +323,12 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
     const { schema, tableName } = this.splitTableFullName(params.tableFullName);
     const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
-    const protocol = bucketType === 'gcs' ? 'gs' : bucketType;
+
+    const protocol = {
+      gcs: 'gs',
+      s3: this.config.exportBucketS3AdvancedFS ? 's3a' : 's3'
+    }[bucketType || 'gcs'];
+
     const externalLocation = `${protocol}://${exportBucket}/${schema}/${tableName}`;
     const withParams = `( external_location = '${externalLocation}', format = 'CSV')`;
     const select = `SELECT ${this.generateTableColumnsForExport(types)} FROM (${params.fromSql})`;
@@ -345,12 +361,23 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
-    const { bucketType, exportBucket, credentials } = this.config;
+    const { bucketType, exportBucket } = this.config;
     const { schema, tableName } = this.splitTableFullName(tableFullName);
 
     switch (bucketType) {
       case 'gcs':
-        return this.extractFilesFromGCS({ credentials }, exportBucket, `${schema}/${tableName}`);
+        return this.extractFilesFromGCS({ credentials: this.config.credentials }, exportBucket, `${schema}/${tableName}`);
+      case 's3':
+        return this.extractUnloadedFilesFromS3({
+          credentials: this.config.accessKeyId && this.config.secretAccessKey
+            ? {
+              accessKeyId: this.config.accessKeyId,
+              secretAccessKey: this.config.secretAccessKey,
+            }
+            : undefined,
+          region: this.config.exportBucketRegion,
+        },
+        exportBucket, `${schema}/${tableName}`);
       default:
         throw new Error(`Unsupported export bucket type: ${bucketType}`);
     }

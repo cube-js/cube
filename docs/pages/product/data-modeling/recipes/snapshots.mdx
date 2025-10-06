@@ -104,7 +104,7 @@ cube(`status_snapshots`, {
 cubes:
   - name: status_snapshots
     extends: statuses
-    sql: >
+    sql: |
       -- Create a range from the earlist date to the latest date
       WITH range AS (
         SELECT date
@@ -204,4 +204,3 @@ Please feel free to check out the
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
 
-[ref-modeling-syntax]: /product/data-modeling/syntax

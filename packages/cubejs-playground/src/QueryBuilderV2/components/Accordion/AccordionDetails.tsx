@@ -95,7 +95,7 @@ export const AccordionDetails = memo(function AccordionDetails(
   useLayoutEffect(() => {
     accordionContentRef.current?.style.setProperty(
       ACCORDION_CONTENT_HEIGHT_VARIABLE,
-      `${accordionContentRef.current.scrollHeight}px`
+      `${accordionContentRef.current?.scrollHeight}px`
     );
   }, [isExpanded]);
 

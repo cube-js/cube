@@ -97,9 +97,11 @@ export class PreAggregationLoadCache {
     const client = preAggregation.external ?
       await this.externalDriverFactory() :
       await this.driverFactory();
+
     if (this.tablePrefixes && client.getPrefixTablesQuery && this.preAggregations.options.skipExternalCacheAndQueue) {
       return client.getPrefixTablesQuery(preAggregation.preAggregationsSchema, this.tablePrefixes);
     }
+
     return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 

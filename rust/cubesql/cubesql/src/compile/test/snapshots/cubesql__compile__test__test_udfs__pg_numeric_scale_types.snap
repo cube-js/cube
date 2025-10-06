@@ -83,6 +83,20 @@ expression: "execute_query(\"\n                SELECT t.oid, information_schema.
 | 6152  | NULL |
 | 6155  | NULL |
 | 6157  | NULL |
+| 10014 | NULL |
+| 10015 | NULL |
+| 10020 | NULL |
+| 10021 | NULL |
+| 10038 | NULL |
+| 10039 | NULL |
+| 10042 | NULL |
+| 10043 | NULL |
+| 10073 | NULL |
+| 10074 | NULL |
+| 10075 | NULL |
+| 10076 | NULL |
+| 10077 | NULL |
+| 10078 | NULL |
 | 12002 | NULL |
 | 12003 | NULL |
 | 12046 | NULL |
@@ -91,12 +105,12 @@ expression: "execute_query(\"\n                SELECT t.oid, information_schema.
 | 13410 | NULL |
 | 18001 | NULL |
 | 18002 | NULL |
-| 18020 | NULL |
 | 18021 | NULL |
-| 18030 | NULL |
+| 18022 | NULL |
 | 18031 | NULL |
-| 18036 | NULL |
+| 18032 | NULL |
 | 18037 | NULL |
-| 18246 | NULL |
+| 18038 | NULL |
 | 18247 | NULL |
+| 18248 | NULL |
 +-------+------+

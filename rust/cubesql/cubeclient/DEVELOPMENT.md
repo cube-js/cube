@@ -22,7 +22,7 @@ openapi-generator generate -i ../../packages/cubejs-api-gateway/openspec.yml -g 
 From repo root
 
 ```sh
-docker run --rm -v ".:/cube" --workdir /cube/rust/cubesql openapitools/openapi-generator-cli:v6.6.0 generate -i ../../packages/cubejs-api-gateway/openspec.yml -g rust -o cubeclient
+docker run --rm -v ".:/cube" --workdir /cube/rust/cubesql openapitools/openapi-generator-cli:v7.14.0 generate -i ../../packages/cubejs-api-gateway/openspec.yml -g rust -o cubeclient
 ```
 
 Take care around Docker on root and files owner and mode

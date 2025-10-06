@@ -14,6 +14,7 @@ pub mod service;
 pub mod session;
 
 // Internal API
+mod date_parser;
 pub mod test;
 
 // Re-export for Public API
@@ -197,37 +198,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_select_compound_identifiers() {
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, MEASURE(`KibanaSampleDataEcommerce`.`minPrice`) AS minPrice FROM KibanaSampleDataEcommerce".to_string(), DatabaseProtocol::MySQL
-        ).await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![
-                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                    "KibanaSampleDataEcommerce.minPrice".to_string(),
-                ]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                order: Some(vec![]),
-                ..Default::default()
-            }
-        );
-    }
-
-    #[tokio::test]
     async fn test_select_measure_aggregate_functions() {
         init_testing_logger();
 
         let query_plan = convert_select_to_query_plan(
             "SELECT MAX(maxPrice), MIN(minPrice), AVG(avgPrice) FROM KibanaSampleDataEcommerce"
                 .to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -375,7 +352,7 @@ mod tests {
     async fn test_order_alias_for_measure_default() {
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce ORDER BY cnt".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -454,7 +431,7 @@ mod tests {
             ),
             // test_order_compound_identifier_default
             (
-                "SELECT taxful_total_price FROM `db`.`KibanaSampleDataEcommerce` ORDER BY `KibanaSampleDataEcommerce`.`taxful_total_price`".to_string(),
+                "SELECT taxful_total_price FROM \"public\".\"KibanaSampleDataEcommerce\" ORDER BY \"taxful_total_price\"".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec![]),
                     segments: Some(vec![]),
@@ -522,7 +499,7 @@ mod tests {
             ),
             // test_order_identifer_alias_ident_escape
             (
-                "SELECT taxful_total_price as `alias1` FROM KibanaSampleDataEcommerce ORDER BY `alias1` DESC".to_string(),
+                "SELECT taxful_total_price as \"alias1\" FROM KibanaSampleDataEcommerce ORDER BY \"alias1\" DESC".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec![]),
                     segments: Some(vec![]),
@@ -541,7 +518,7 @@ mod tests {
 
         for (sql, expected_request) in supported_orders.iter() {
             let query_plan =
-                convert_select_to_query_plan(sql.to_string(), DatabaseProtocol::MySQL).await;
+                convert_select_to_query_plan(sql.to_string(), DatabaseProtocol::PostgreSQL).await;
 
             assert_eq!(
                 &query_plan.as_logical_plan().find_cube_scan().request,
@@ -560,7 +537,7 @@ mod tests {
         let query_plan = convert_select_to_query_plan(
             "SELECT DATE(order_date) FROM KibanaSampleDataEcommerce ORDER BY DATE(order_date) DESC"
                 .to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -587,7 +564,7 @@ mod tests {
         let query_plan = convert_select_to_query_plan(
             "SELECT DATE(order_date) FROM KibanaSampleDataEcommerce GROUP BY DATE(order_date) ORDER BY DATE(order_date) DESC"
                 .to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         ).await;
 
         assert_eq!(
@@ -614,7 +591,7 @@ mod tests {
     async fn test_select_all_fields_by_asterisk_limit_100() {
         let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -625,6 +602,7 @@ mod tests {
                 .request
                 .dimensions,
             Some(vec![
+                "KibanaSampleDataEcommerce.id".to_string(),
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.last_mod".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -639,7 +617,7 @@ mod tests {
     async fn test_select_all_fields_by_asterisk_limit_100_offset_50() {
         let query_plan = convert_select_to_query_plan(
             "SELECT * FROM KibanaSampleDataEcommerce LIMIT 100 OFFSET 50".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -650,6 +628,7 @@ mod tests {
                 .request
                 .dimensions,
             Some(vec![
+                "KibanaSampleDataEcommerce.id".to_string(),
                 "KibanaSampleDataEcommerce.order_date".to_string(),
                 "KibanaSampleDataEcommerce.last_mod".to_string(),
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -667,7 +646,7 @@ mod tests {
         }
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date, customer_gender FROM KibanaSampleDataEcommerce".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
 
@@ -694,7 +673,7 @@ mod tests {
         }
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date as order_date, customer_gender as customer_gender FROM KibanaSampleDataEcommerce"
-                .to_string(), DatabaseProtocol::MySQL
+                .to_string(), DatabaseProtocol::PostgreSQL
         ).await;
 
         let logical_plan = query_plan.as_logical_plan();
@@ -755,6 +734,7 @@ mod tests {
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.id".to_string(),
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.last_mod".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -2635,7 +2615,7 @@ limit
                 },
             ),
             (
-                "SELECT COUNT(*) FROM db.KibanaSampleDataEcommerce".to_string(),
+                "SELECT COUNT(*) FROM \"public\".\"KibanaSampleDataEcommerce\"".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
@@ -2685,7 +2665,7 @@ limit
                 },
             ),
             (
-                "SELECT MAX(`maxPrice`) FROM KibanaSampleDataEcommerce".to_string(),
+                "SELECT MAX(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
                 V1LoadRequestQuery {
                     measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
                     dimensions: Some(vec![]),
@@ -2698,7 +2678,7 @@ limit
 
         for (input_query, expected_request) in variants.iter() {
             let logical_plan =
-                convert_select_to_query_plan(input_query.clone(), DatabaseProtocol::MySQL)
+                convert_select_to_query_plan(input_query.clone(), DatabaseProtocol::PostgreSQL)
                     .await
                     .as_logical_plan();
 
@@ -2839,16 +2819,11 @@ limit
                 "DATE_TRUNC('year', order_date)".to_string(),
                 "year".to_string(),
             ],
-            // with escaping
-            [
-                "DATE_TRUNC('second', `order_date`)".to_string(),
-                "second".to_string(),
-            ],
         ];
 
         for [subquery, expected_granularity] in supported_granularities.iter() {
             let logical_plan = convert_select_to_query_plan(
-                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery), DatabaseProtocol::MySQL
+                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery), DatabaseProtocol::PostgreSQL
             ).await.as_logical_plan();
 
             assert_eq!(
@@ -2941,7 +2916,7 @@ limit
             (
                 "COUNT(*), DATE(order_date) AS __timestamp".to_string(),
                 // Now replaced with exact date
-                "`KibanaSampleDataEcommerce`.`order_date` >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND `KibanaSampleDataEcommerce`.`order_date` < date('2021-09-07 00:00:00.000000')".to_string(),
+                "order_date >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND order_date < date('2021-09-07 00:00:00.000000')".to_string(),
                 Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
@@ -2955,7 +2930,7 @@ limit
             (
                 "COUNT(*), DATE(order_date) AS order_date".to_string(),
                 // Now replaced with exact date
-                "`KibanaSampleDataEcommerce`.`order_date` >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND `KibanaSampleDataEcommerce`.`order_date` < date('2021-09-07 00:00:00.000000')".to_string(),
+                "order_date >= date(date_add(date('2021-09-30 00:00:00.000000'), INTERVAL -30 day)) AND order_date < date('2021-09-07 00:00:00.000000')".to_string(),
                 Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
@@ -3040,7 +3015,7 @@ limit
                     ""
                 }
             );
-            let logical_plan = convert_select_to_query_plan(query, DatabaseProtocol::MySQL)
+            let logical_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL)
                 .await
                 .as_logical_plan();
 
@@ -3059,7 +3034,7 @@ limit
                 FROM KibanaSampleDataEcommerce
                 WHERE order_date >= STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f') OR order_date < STR_TO_DATE('2021-09-07 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')
                 GROUP BY __timestamp"
-            .to_string(), DatabaseProtocol::MySQL
+            .to_string(), DatabaseProtocol::PostgreSQL
         ).await;
 
         assert_eq!(
@@ -3438,7 +3413,7 @@ limit
                 WHERE {}",
                     sql
                 ),
-                DatabaseProtocol::MySQL,
+                DatabaseProtocol::PostgreSQL,
             )
             .await
             .as_logical_plan();
@@ -3510,7 +3485,7 @@ limit
                     sql
                 ),
                 meta.clone(),
-                get_test_session(DatabaseProtocol::MySQL, meta).await,
+                get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
             )
             .await;
 
@@ -3725,7 +3700,7 @@ limit
                 GROUP BY __timestamp",
                     sql
                 ),
-                DatabaseProtocol::MySQL,
+                DatabaseProtocol::PostgreSQL,
             )
             .await
             .as_logical_plan();
@@ -4122,20 +4097,6 @@ limit
     }
 
     #[tokio::test]
-    async fn test_information_schema_tables_mysql() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_tables_mysql",
-            execute_query(
-                "SELECT * FROM information_schema.tables".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_information_role_table_grants_pg() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "information_schema_role_table_grants_postgresql",
@@ -4180,50 +4141,6 @@ limit
                 DatabaseProtocol::PostgreSQL
             )
             .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_schema_columns_mysql() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_columns_mysql",
-            execute_query(
-                "SELECT * FROM information_schema.columns WHERE TABLE_SCHEMA = 'db'".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_schema_schemata() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_schemata",
-            execute_query(
-                "SELECT * FROM information_schema.schemata".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_schema_stats_for_columns() -> Result<(), CubeError> {
-        // This query is used by metabase for introspection
-        insta::assert_snapshot!(
-            "test_information_schema_stats_for_columns",
-            execute_query("
-            SELECT
-                A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME
-            FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B
-            WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME
-            ORDER BY A.COLUMN_NAME".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         Ok(())
@@ -5054,85 +4971,6 @@ ORDER BY
     }
 
     #[tokio::test]
-    async fn test_performance_schema_variables() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "performance_schema_session_variables",
-            execute_query("SELECT * FROM performance_schema.session_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        insta::assert_snapshot!(
-            "performance_schema_global_variables",
-            execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_schema_collations() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_collations",
-            execute_query(
-                "SELECT * FROM information_schema.collations".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_information_processlist() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "information_schema_processlist",
-            execute_query(
-                "SELECT * FROM information_schema.processlist".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_gdata_studio() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "test_gdata_studio",
-            execute_query(
-                // This query I saw in Google Data Studio
-                "/* mysql-connector-java-5.1.49 ( Revision: ad86f36e100e104cd926c6b81c8cab9565750116 ) */
-                SELECT  \
-                    @@session.auto_increment_increment AS auto_increment_increment, \
-                    @@character_set_client AS character_set_client, \
-                    @@character_set_connection AS character_set_connection, \
-                    @@character_set_results AS character_set_results, \
-                    @@character_set_server AS character_set_server, \
-                    @@collation_server AS collation_server, \
-                    @@collation_connection AS collation_connection, \
-                    @@init_connect AS init_connect, \
-                    @@interactive_timeout AS interactive_timeout, \
-                    @@license AS license, \
-                    @@lower_case_table_names AS lower_case_table_names, \
-                    @@max_allowed_packet AS max_allowed_packet, \
-                    @@net_buffer_length AS net_buffer_length, \
-                    @@net_write_timeout AS net_write_timeout, \
-                    @@sql_mode AS sql_mode, \
-                    @@system_time_zone AS system_time_zone, \
-                    @@time_zone AS time_zone, \
-                    @@transaction_isolation AS transaction_isolation, \
-                    @@wait_timeout AS wait_timeout
-                "
-                .to_string(), DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_show_variable() -> Result<(), CubeError> {
         // Postgres escaped with quotes
         insta::assert_snapshot!(
@@ -5173,13 +5011,39 @@ ORDER BY
         );
 
         insta::assert_snapshot!(
-            "pg_set_role_show",
+            "pg_set_role_good_user",
             execute_queries_with_flags(
-                vec!["SET ROLE NONE".to_string(), "SHOW ROLE".to_string()],
+                vec!["SET ROLE good_user".to_string(), "SHOW ROLE".to_string()],
                 DatabaseProtocol::PostgreSQL
             )
             .await?
             .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_role_none",
+            execute_queries_with_flags(
+                vec![
+                    "SET ROLE good_user".to_string(),
+                    "SET ROLE NONE".to_string(),
+                    "SHOW ROLE".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_role_bad_user",
+            execute_queries_with_flags(
+                vec!["SET ROLE bad_user".to_string()],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await
+            .err()
+            .unwrap()
+            .to_string()
         );
 
         Ok(())
@@ -5219,13 +5083,17 @@ ORDER BY
     async fn test_explain() -> Result<(), CubeError> {
         // SELECT with no tables (inline eval)
         insta::assert_snapshot!(
-            execute_query("EXPLAIN SELECT 1+1;".to_string(), DatabaseProtocol::MySQL).await?
+            execute_query(
+                "EXPLAIN SELECT 1+1;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
         );
 
         insta::assert_snapshot!(
             execute_query(
                 "EXPLAIN VERBOSE SELECT 1+1;".to_string(),
-                DatabaseProtocol::MySQL
+                DatabaseProtocol::PostgreSQL
             )
             .await?
         );
@@ -5233,14 +5101,14 @@ ORDER BY
         // Execute without asserting with fixture, because metrics can change
         execute_query(
             "EXPLAIN ANALYZE SELECT 1+1;".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await?;
 
         // SELECT with table and specific columns
         execute_query(
             "EXPLAIN SELECT count, avgPrice FROM KibanaSampleDataEcommerce;".to_string(),
-            DatabaseProtocol::MySQL,
+            DatabaseProtocol::PostgreSQL,
         )
         .await?;
 
@@ -5710,6 +5578,20 @@ ORDER BY
             "pgcatalog_pgextension_postgres",
             execute_query(
                 "SELECT * FROM pg_catalog.pg_extension".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pgshdescription_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgshdescription_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_shdescription".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -8216,6 +8098,7 @@ ORDER BY "source"."str0" ASC
                     "Logs.agentCountApprox".to_string(),
                 ]),
                 dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.id".to_string(),
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.last_mod".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -8401,6 +8284,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
                 ]),
                 dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.id".to_string(),
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.last_mod".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
@@ -9481,7 +9365,105 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_tableau_filter_by_year() {
+    async fn test_filter_date_part_by_year() {
+        init_testing_logger();
+
+        fn assert_expected_result(query_plan: QueryPlan) {
+            assert_eq!(
+                query_plan.as_logical_plan().find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("year".to_string()),
+                        date_range: Some(json!(vec![
+                            "2019-01-01".to_string(),
+                            "2019-12-31".to_string(),
+                        ])),
+                    },]),
+                    order: Some(vec![]),
+                    ..Default::default()
+                }
+            )
+        }
+
+        assert_expected_result(
+            convert_select_to_query_plan(
+                r#"
+            SELECT
+                COUNT(*) AS "count",
+                date_part('YEAR', "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE date_part('YEAR', "KibanaSampleDataEcommerce"."order_date") = 2019
+            GROUP BY 2
+            ;"#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await,
+        );
+
+        // Same as above, but with string literal.
+        assert_expected_result(
+            convert_select_to_query_plan(
+                r#"
+            SELECT
+                COUNT(*) AS "count",
+                date_part('YEAR', "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE date_part('YEAR', "KibanaSampleDataEcommerce"."order_date") = '2019'
+            GROUP BY 2
+            ;"#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_filter_extract_by_year() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019
+            GROUP BY 2
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-01-01".to_string(),
+                        "2019-12-31".to_string(),
+                    ])),
+                },]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_tableau_filter_extract_by_year() {
         init_testing_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -13780,8 +13762,8 @@ ORDER BY "source"."str0" ASC
 
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
-        // check if contains `CAST(EXTRACT(YEAR FROM ..) || .. || .. || ..)`
-        let re = Regex::new(r"CAST.+EXTRACT.+YEAR FROM(.+ \|\|){3}").unwrap();
+        // check if contains `CAST(EXTRACT(year FROM ..) || .. || .. || ..)`
+        let re = Regex::new(r"CAST.+EXTRACT.+year FROM(.+ \|\|){3}").unwrap();
         assert!(re.is_match(&sql));
         // check if contains `LOWER(..) = .. AND LOWER(..) = ..`
         let re = Regex::new(r"LOWER ?\(.+\) = .+ AND .+LOWER ?\(.+\) = .+").unwrap();
@@ -13932,8 +13914,8 @@ ORDER BY "source"."str0" ASC
 
         if Rewriter::sql_push_down_enabled() {
             let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-            assert!(sql.contains("EXTRACT(YEAR"));
-            assert!(sql.contains("EXTRACT(MONTH"));
+            assert!(sql.contains("EXTRACT(year"));
+            assert!(sql.contains("EXTRACT(month"));
 
             let physical_plan = query_plan.as_physical_plan().await.unwrap();
             println!(
@@ -13974,7 +13956,7 @@ ORDER BY "source"."str0" ASC
     async fn test_thoughtspot_pg_extract_day_of_quarter() {
         init_testing_logger();
 
-        let logical_plan = convert_select_to_query_plan(
+        let query_plan = convert_select_to_query_plan(
             r#"
             SELECT
                 (CAST("ta_1"."order_date" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01' AS DATE) + (((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1) - 1) * -1) * INTERVAL '1 month') AS date) + 1) AS "ca_1",
@@ -13988,8 +13970,22 @@ ORDER BY "source"."str0" ASC
             .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-        .await
-        .as_logical_plan();
+        .await;
+        let logical_plan = query_plan.as_logical_plan();
+
+        if Rewriter::sql_push_down_enabled() {
+            let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+            assert!(sql.contains("DATEDIFF(day,"));
+            assert!(sql.contains("EXTRACT(year"));
+            assert!(sql.contains("EXTRACT(month"));
+
+            let physical_plan = query_plan.as_physical_plan().await.unwrap();
+            println!(
+                "Physical plan: {}",
+                displayable(physical_plan.as_ref()).indent()
+            );
+            return;
+        }
 
         assert_eq!(
             logical_plan.find_cube_scan().request,
@@ -15015,7 +15011,7 @@ ORDER BY "source"."str0" ASC
             .find_cube_scan_wrapped_sql()
             .wrapped_sql
             .sql
-            .contains("EXTRACT(MONTH FROM "));
+            .contains("EXTRACT(month FROM "));
     }
 
     #[tokio::test]
@@ -15056,7 +15052,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("order_date"));
-        assert!(sql.contains("EXTRACT(DAY FROM"))
+        assert!(sql.contains("EXTRACT(day FROM"))
     }
 
     #[tokio::test]
@@ -15542,6 +15538,47 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_daterange_filter_literals() -> Result<(), CubeError> {
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            r#"SELECT
+                    DATE_TRUNC('month', order_date) AS order_date,
+                    COUNT(*) AS month_count
+            FROM "KibanaSampleDataEcommerce" ecom
+            WHERE ecom.order_date >= '2025-01-01' and ecom.order_date < '2025-02-01'
+            GROUP BY 1"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_string()),
+                    date_range: Some(json!(vec![
+                        // WHY NOT "2025-01-01T00:00:00.000Z".to_string(), ?
+                        "2025-01-01".to_string(),
+                        "2025-01-31T23:59:59.999Z".to_string()
+                    ])),
+                }]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_time_dimension_range_filter_chain_or() {
         init_testing_logger();
 
@@ -15583,8 +15620,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2019-01-01 00:00:00.0".to_string(),
-                                "2020-01-01 00:00:00.0".to_string(),
+                                "2019-01-01T00:00:00.000Z".to_string(),
+                                "2019-12-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -15593,8 +15630,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2021-01-01 00:00:00.0".to_string(),
-                                "2022-01-01 00:00:00.0".to_string(),
+                                "2021-01-01T00:00:00.000Z".to_string(),
+                                "2021-12-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -16382,7 +16419,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        assert!(sql.contains("EXTRACT(EPOCH"));
+        assert!(sql.contains("EXTRACT(epoch"));
 
         // Databricks
         let query_plan = convert_select_to_query_plan_customized(
@@ -16969,5 +17006,787 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             "Physical plan: {}",
             displayable(physical_plan.as_ref()).indent()
         );
+    }
+
+    #[tokio::test]
+    async fn test_sort_normalize() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                q2.id,
+                q3.id
+            FROM KibanaSampleDataEcommerce q1
+            LEFT JOIN Logs q2 ON q1.__cubeJoinField = q2.__cubeJoinField
+            LEFT JOIN Logs q3 ON q1.__cubeJoinField = q3.__cubeJoinField
+            ORDER BY
+                q2.id,
+                q3.id
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["Logs.id".to_string(),]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                ungrouped: Some(true),
+                join_hints: Some(vec![
+                    vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string()],
+                    vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string()],
+                ]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_push_down_limit_sort_projection() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                "ta_1"."customer_gender" AS "ca_1",
+                DATE_TRUNC('MONTH', CAST("ta_1"."order_date" AS date)) AS "ca_2",
+                COALESCE(sum("ta_1"."sumPrice"), 0) AS "ca_3"
+            FROM
+                "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            WHERE
+                (
+                    "ta_1"."order_date" >= TIMESTAMP '2024-01-01 00:00:00.0'
+                    AND "ta_1"."order_date" < TIMESTAMP '2025-01-01 00:00:00.0'
+                )
+            GROUP BY
+                "ca_1",
+                "ca_2"
+            ORDER BY
+                "ca_2" ASC NULLS LAST
+            LIMIT
+                5000
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: Some(json!(vec![
+                        "2024-01-01T00:00:00.000Z".to_string(),
+                        "2024-12-31T23:59:59.999Z".to_string()
+                    ])),
+                },]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(5000),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_athena_concat_numbers() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || 1 || '-01' AS DATE) AS "ca_1",
+                COALESCE(sum("ta_1"."sumPrice"), 0) AS "ca_2"
+                FROM "ovr"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+                WHERE ((
+                    EXTRACT(DAY FROM "ta_1"."order_date") <= EXTRACT(DAY FROM CURRENT_DATE)
+                    AND EXTRACT(MONTH FROM "ta_1"."order_date") = EXTRACT(MONTH FROM CURRENT_DATE)
+                ))
+                GROUP BY "ca_1"
+                ORDER BY "ca_1" ASC NULLS LAST
+                LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "expressions/binary".to_string(),
+                "{% if op == \'||\' %}(CAST({{ left }} AS VARCHAR) || \
+                    CAST({{ right }} AS VARCHAR))\
+                    {% else %}({{ left }} {{ op }} {{ right }}){% endif %}"
+                    .to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("CAST(1 AS VARCHAR)"));
+    }
+
+    #[tokio::test]
+    async fn test_trino_datediff() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                KibanaSampleDataEcommerce.id,
+                KibanaSampleDataEcommerce.order_date,
+                KibanaSampleDataEcommerce.last_mod,
+                DATEDIFF(
+                    day,
+                    KibanaSampleDataEcommerce.order_date,
+                    KibanaSampleDataEcommerce.last_mod
+                ) as conv_date_diff,
+                COUNT(*)
+            FROM KibanaSampleDataEcommerce
+            WHERE (
+                KibanaSampleDataEcommerce.order_date > cast('2025-01-01T00:00:00.000' as timestamp)
+                    AND KibanaSampleDataEcommerce.order_date < cast('2025-01-01T23:59:59.999' as timestamp)
+                    AND KibanaSampleDataEcommerce.customer_gender = 'test'
+            )
+            GROUP BY 1, 2, 3, 4
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "functions/DATEDIFF".to_string(),
+                "DATE_DIFF('{{ date_part }}', {{ args[1] }}, {{ args[2] }})".to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("DATE_DIFF('day', "));
+    }
+
+    #[tokio::test]
+    async fn test_athena_binary_expr_brackets() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                CAST(
+                    EXTRACT(YEAR FROM "ta_1"."order_date") || '-' ||
+                    ((FLOOR(((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) / NULLIF(3, 0))) * 3) + 1)
+                    || '-01' AS DATE
+                ) AS "ca_1",
+                COALESCE(sum("ta_1"."sumPrice"), 0) AS "ca_2"
+            FROM "ovr"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY "ca_1" ASC NULLS LAST
+            LIMIT 10000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "expressions/binary".to_string(),
+                "{% if op == \'||\' %}(CAST({{ left }} AS VARCHAR) || \
+                    CAST({{ right }} AS VARCHAR))\
+                    {% else %}({{ left }} {{ op }} {{ right }}){% endif %}"
+                    .to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains(" - 1) / 3)"));
+    }
+
+    #[tokio::test]
+    async fn test_athena_date_part_over_age() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                DATE_TRUNC('MONTH', CAST("ta_1"."order_date" AS date)) AS "ca_1",
+                COALESCE(sum("ta_1"."sumPrice"), 0) AS "ca_2",
+                min(CAST(
+                    DATE_PART('year', AGE("ta_1"."order_date", DATE '1970-01-01')) * 12
+                    + DATE_PART('month', AGE("ta_1"."order_date", DATE '1970-01-01'))
+                    AS int
+                )) AS "ca_3",
+                min(
+                    (MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)
+                ) AS "ca_4",
+                min(CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0, 0.0)))) AS "ca_5"
+            FROM "ovr"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY "ca_1" ASC NULLS LAST
+            LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "functions/DATEDIFF".to_string(),
+                "DATE_DIFF('{{ date_part }}', {{ args[1] }}, {{ args[2] }})".to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("DATE_DIFF('month', "));
+    }
+
+    #[tokio::test]
+    async fn test_athena_date_minus_date() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                DATE_TRUNC('week', "ta_1"."order_date") AS "ca_1",
+                COALESCE(sum("ta_1"."sumPrice"), 0) AS "ca_2",
+                min((CEIL((((
+                    CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 1 + 7) - 4
+                ) / NULLIF(7.0, 0.0))) - 1)) AS "ca_3",
+                min(FLOOR(((
+                    EXTRACT(DAY FROM (
+                        ("ta_1"."order_date") + ((4 - (MOD(CAST((
+                            CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3
+                        ) AS numeric), 7) + 1))) * INTERVAL '1 day')) + 6
+                ) / NULLIF(7, 0)))) AS "ca_4",
+                min(
+                    (MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)
+                ) AS "ca_6",
+                min(CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0, 0.0)))) AS "ca_7"
+            FROM "ovr"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY "ca_1" ASC NULLS LAST
+            LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "functions/DATEDIFF".to_string(),
+                "DATE_DIFF('{{ date_part }}', {{ args[1] }}, {{ args[2] }})".to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("DATE_DIFF('day', "));
+    }
+
+    #[tokio::test]
+    async fn test_count_over_joined_cubes() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT COUNT(*)
+            FROM (
+                SELECT
+                    t1.id AS id,
+                    t2.read AS read
+                FROM KibanaSampleDataEcommerce t1
+                LEFT JOIN Logs t2 ON t1.__cubeJoinField = t2.__cubeJoinField
+            ) t
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("COUNT(*)"));
+        assert!(sql.contains("KibanaSampleDataEcommerce"));
+        assert!(sql.contains("Logs"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_where_subquery_sql_push_down_measure_fn() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            WITH top_customers AS (
+                SELECT
+                    KibanaSampleDataEcommerce.id,
+                    MEASURE(KibanaSampleDataEcommerce.sumPrice) AS sum_value
+                FROM KibanaSampleDataEcommerce
+                GROUP BY 1
+                ORDER BY 2 DESC
+                LIMIT 3
+            )
+            SELECT
+                KibanaSampleDataEcommerce.id,
+                MEASURE(KibanaSampleDataEcommerce.sumPrice) AS sum_value
+            FROM KibanaSampleDataEcommerce
+            WHERE KibanaSampleDataEcommerce.id IN (
+                SELECT id FROM top_customers
+            )
+            GROUP BY 1
+            ORDER BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("IN (SELECT"));
+        assert!(sql.contains(r#"\\\"limit\\\": 3\\n"#));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_subquery_inner_context() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE customer_gender IN (
+                SELECT customer_gender
+                FROM KibanaSampleDataEcommerce
+                WHERE KibanaSampleDataEcommerce.order_date > '2025-01-01'
+                GROUP BY 1
+            )
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("2025-01-01"));
+        assert!(sql.contains("customer_gender} IN (SELECT"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_string_literal_auto_cast() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT id
+            FROM KibanaSampleDataEcommerce
+            WHERE
+                LOWER(customer_gender) != 'unknown'
+                AND has_subscription = 'TRUE'
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("${KibanaSampleDataEcommerce.has_subscription} = TRUE"));
+        assert!(!sql.contains("'TRUE'"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_trino_truncate() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            r#"
+            SELECT
+                CAST(TRUNC(EXTRACT(MONTH FROM "k"."order_date")) AS INTEGER) AS "mn:order_date:ok",
+                SUM("k"."sumPrice") AS "sum:sumPrice:ok",
+                DATE_TRUNC('YEAR', CAST("k"."order_date" AS TIMESTAMP)) AS "tyr:order_date:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "k"
+            WHERE (CAST(TRUNC(EXTRACT(YEAR FROM "k"."order_date")) AS INTEGER) IN (2023, 2024))
+            GROUP BY 1, 3
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "functions/TRUNC".to_string(),
+                "TRUNCATE({{ args_concat }})".to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("TRUNCATE(EXTRACT(month FROM "));
+    }
+
+    #[tokio::test]
+    async fn test_top_down_extractor_cache() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                id::integer AS id,
+                customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE id = 5
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.id".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.id".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    ..Default::default()
+                }]),
+                ungrouped: Some(true),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_pg_collation() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_collation_PG17",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_collation ORDER BY oid".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_push_down_limit_sort_projection_recursion() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                customer_gender AS "customer_gender",
+                SUM(sumPrice) AS "SUM(KibanaSampleDataEcommerce.sumPrice)"
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 3
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    "desc".to_string(),
+                ]]),
+                limit: Some(3),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_order_by_missing_aggr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            GROUP BY customer_gender
+            ORDER BY SUM(sumPrice) DESC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    "desc".to_string(),
+                ]]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_tableau_trunc_extract_year_and_month() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:sumPrice:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE (
+                "KibanaSampleDataEcommerce"."id" != 0
+                AND CAST(TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 2
+                AND CAST(TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 2024
+                AND "KibanaSampleDataEcommerce"."customer_gender" IS NOT NULL
+            )
+            HAVING COUNT(1) > 0
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2024-02-01".to_string(),
+                        "2024-02-29".to_string(),
+                    ])),
+                }]),
+                order: Some(vec![]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.id".to_string()),
+                        operator: Some("notEquals".to_string()),
+                        values: Some(vec!["0".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                        operator: Some("gt".to_string()),
+                        values: Some(vec!["0".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                ]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_tableau_trunc_extract_year_and_month_rev() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:sumPrice:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE (
+                "KibanaSampleDataEcommerce"."id" != 0
+                AND CAST(TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 2024
+                AND CAST(TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 2
+                AND "KibanaSampleDataEcommerce"."customer_gender" IS NOT NULL
+            )
+            HAVING COUNT(1) > 0
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2024-02-01".to_string(),
+                        "2024-02-29".to_string(),
+                    ])),
+                }]),
+                order: Some(vec![]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.id".to_string()),
+                        operator: Some("notEquals".to_string()),
+                        values: Some(vec!["0".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                        operator: Some("gt".to_string()),
+                        values: Some(vec!["0".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                ]),
+                ..Default::default()
+            }
+        )
     }
 }

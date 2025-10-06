@@ -51,7 +51,6 @@ impl Hash for dyn DatabaseProtocolDetails {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatabaseProtocol {
-    MySQL,
     PostgreSQL,
     Extension(Arc<dyn DatabaseProtocolDetails>),
 }
@@ -60,7 +59,6 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
     fn get_name(&self) -> &'static str {
         match &self {
             DatabaseProtocol::PostgreSQL => "postgres",
-            DatabaseProtocol::MySQL => "mysql",
             DatabaseProtocol::Extension(ext) => ext.get_name(),
         }
     }
@@ -74,7 +72,6 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
 
     fn support_transactions(&self) -> bool {
         match &self {
-            DatabaseProtocol::MySQL => false,
             DatabaseProtocol::PostgreSQL => true,
             DatabaseProtocol::Extension(ext) => ext.support_transactions(),
         }
@@ -82,12 +79,6 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
 
     fn get_session_default_variables(&self) -> DatabaseVariables {
         match &self {
-            DatabaseProtocol::MySQL => {
-                // TODO(ovr): Should we move it from session?
-                error!("get_session_default_variables was called on MySQL protocol");
-
-                DatabaseVariables::default()
-            }
             DatabaseProtocol::PostgreSQL => {
                 // TODO(ovr): Should we move it from session?
                 error!("get_session_default_variables was called on PostgreSQL protocol");
@@ -108,7 +99,6 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
         tr: datafusion::catalog::TableReference,
     ) -> Option<Arc<dyn datasource::TableProvider>> {
         match self {
-            DatabaseProtocol::MySQL => self.get_mysql_provider(context, tr),
             DatabaseProtocol::PostgreSQL => self.get_postgres_provider(context, tr),
             DatabaseProtocol::Extension(ext) => ext.get_provider(&context, tr),
         }
@@ -119,7 +109,6 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
         table_provider: Arc<dyn datasource::TableProvider>,
     ) -> Result<String, CubeError> {
         match self {
-            DatabaseProtocol::MySQL => self.get_mysql_table_name(table_provider),
             DatabaseProtocol::PostgreSQL => self.get_postgres_table_name(table_provider),
             DatabaseProtocol::Extension(ext) => ext.table_name_by_table_provider(table_provider),
         }

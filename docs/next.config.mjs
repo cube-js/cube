@@ -4,7 +4,7 @@ import remarkFrontmatter from "remark-frontmatter";
 import remarkHtmlKatex from "remark-html-katex";
 import linkEnvironmentVariables from "./plugins/link-environment-variables.mjs";
 
-import redirects from './redirects.json' assert { type: "json" };
+import redirects from './redirects.json' with { type: "json" };
 
 /**
  * @type {import('next').NextConfig}

@@ -1,6 +1,6 @@
 import inlection from 'inflection';
 import moment from 'moment-timezone';
-import { contains, join, map } from 'ramda';
+import { includes, join, map } from 'ramda';
 import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { BaseDimension } from './BaseDimension';
@@ -134,7 +134,7 @@ export class BaseFilter extends BaseDimension {
   }
 
   public isDateOperator(): boolean {
-    return contains(this.camelizeOperator, DATE_OPERATORS);
+    return includes(this.camelizeOperator, DATE_OPERATORS);
   }
 
   public valuesArray() {

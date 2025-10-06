@@ -36,6 +36,7 @@ import {
 } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
+import { fromTemporaryCredentials } from '@aws-sdk/credential-providers';
 import { URL } from 'url';
 
 interface AthenaDriverOptions extends AthenaClientConfig {
@@ -45,6 +46,7 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   workGroup?: string
   catalog?: string
   schema?: string
+  database?: string
   S3OutputLocation?: string
   exportBucket?: string
   pollTimeout?: number
@@ -123,16 +125,37 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       config.secretAccessKey ||
       getEnv('athenaAwsSecret', { dataSource });
 
+    const assumeRoleArn = getEnv('athenaAwsAssumeRoleArn', { dataSource });
+    const assumeRoleExternalId = getEnv('athenaAwsAssumeRoleExternalId', { dataSource });
+
     const { schema, ...restConfig } = config;
 
     this.schema = schema ||
       getEnv('dbName', { dataSource }) ||
       getEnv('dbSchema', { dataSource });
 
+    // Configure credentials based on authentication method
+    let credentials;
+    if (assumeRoleArn) {
+      // Use assume role authentication
+      credentials = fromTemporaryCredentials({
+        params: {
+          RoleArn: assumeRoleArn,
+          ...(assumeRoleExternalId && { ExternalId: assumeRoleExternalId }),
+        },
+        ...(accessKeyId && secretAccessKey && {
+          masterCredentials: { accessKeyId, secretAccessKey },
+        }),
+      });
+    } else if (accessKeyId && secretAccessKey) {
+      // If access key and secret are provided, use them as master credentials
+      // Otherwise, let the SDK use the default credential chain (IRSA, instance profile, etc.)
+      credentials = { accessKeyId, secretAccessKey };
+    }
+
     this.config = {
-      credentials: accessKeyId && secretAccessKey
-        ? { accessKeyId, secretAccessKey }
-        : undefined,
+      // If no credentials are provided, the SDK will use the default chain
+      ...(credentials && { credentials }),
       ...restConfig,
       region:
         config.region ||
@@ -147,6 +170,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       catalog:
         config.catalog ||
         getEnv('athenaAwsCatalog', { dataSource }),
+      database:
+        config.database ||
+        getEnv('dbName', { dataSource }),
       exportBucket:
         config.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
@@ -368,6 +394,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       types,
       csvNoHeader: true,
       csvDelimiter: '^A',
+      csvDisableQuoting: true,
     };
   }
 
@@ -477,7 +504,12 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
       },
-      ...(this.config.catalog != null ? { QueryExecutionContext: { Catalog: this.config.catalog } } : {})
+      ...(this.config.catalog || this.config.database ? {
+        QueryExecutionContext: {
+          Catalog: this.config.catalog,
+          Database: this.config.database
+        }
+      } : {})
     };
     const { QueryExecutionId } = await this.athena.startQueryExecution(request);
     return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };

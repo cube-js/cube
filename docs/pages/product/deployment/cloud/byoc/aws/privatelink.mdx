@@ -1,0 +1,151 @@
+# Private Connectivity with AWS PrivateLink
+
+Cube Cloud BYOC deployments on AWS support private connectivity for Cube API endpoints using AWS PrivateLink. This enables secure, private access to your Cube deployment without exposing endpoints to the public internet.
+
+<SuccessBox>
+
+Private connectivity via AWS PrivateLink is available in Cube Cloud on the
+[Enterprise Premier](https://cube.dev/pricing) product tier with BYOC deployments.
+[Contact us](https://cube.dev/contact) for details.
+
+</SuccessBox>
+
+## Overview
+
+In a private setup, Cube Cloud BYOC deployments can be configured to:
+- Keep HTTP and SQL load balancers private within the BYOC VPC
+- Expose API endpoints through AWS PrivateLink services
+- Enable secure connectivity from your VPCs and corporate networks
+
+This approach ensures that all traffic between your applications and Cube Cloud remains within the AWS network backbone, never traversing the public internet.
+
+## Architecture
+
+With private connectivity enabled, Cube Cloud exposes two AWS PrivateLink services:
+- **HTTP API Service**: For REST API and GraphQL endpoints
+- **SQL API Service**: For PostgreSQL-compatible SQL interface connections
+
+Your Cube deployment APIs are available on dedicated hostnames following this pattern:
+- HTTP API: `<deployment-id>.<byoc-region>.cubecloudapp.dev`
+- SQL API: `<deployment-id>.sql.<byoc-region>.cubecloudapp.dev`
+
+<Screenshot src="https://ucarecdn.com/98e38433-3bb8-4f37-afea-7986170c63be/" />
+
+## Setting up PrivateLink connections
+
+### Step 1: Obtain PrivateLink service details
+
+Contact Cube Cloud support to obtain the PrivateLink service details for your BYOC deployment. You'll receive:
+- HTTP NLB PrivateLink service name
+- SQL NLB PrivateLink service name
+- Your deployment ID and infrastructure region
+
+### Step 2: Create VPC endpoints
+
+In your AWS account, create two VPC endpoints for the Cube Cloud services:
+
+1. Navigate to **AWS Console** → **VPC** → **Endpoints**
+2. Click **Create Endpoint**
+3. For the HTTP API endpoint:
+   - **Service category**: Other endpoint services
+   - **Service name**: Enter the HTTP NLB service name provided by Cube support
+   - **VPC**: Select your target VPC
+   - **Subnets**: Select appropriate subnets
+   - **Security Group**: Create or select a security group allowing HTTPS traffic (port 443)
+4. Repeat for the SQL API endpoint:
+   - Use the SQL NLB service name
+   - Configure security group to allow PostgreSQL traffic (port 5432)
+
+### Step 3: Configure DNS resolution
+
+To enable proper hostname resolution, create a private Route 53 hosted zone:
+
+1. Navigate to **AWS Console** → **Route 53** → **Hosted zones**
+2. Click **Create hosted zone**
+3. Configure the zone:
+   - **Domain name**: `<byoc-region>.cubecloudapp.dev`
+   - **Type**: Private hosted zone
+   - **VPCs**: Associate with your target VPC(s)
+
+<InfoBox>
+
+The `<byoc-region>` placeholder in the domain name should be replaced with the exact region identifier provided by Cube Cloud support. This is **not** the standard AWS region name (like `us-east-1`), but rather a Cube Cloud-specific identifier that uniquely identifies your BYOC infrastructure provisioned.
+
+For example, if Cube Cloud provides you with a region identifier like `aws-us-east-1-t-12345-prod`, you would use that exact string in place of `<byoc-region>`.
+
+</InfoBox>
+
+4. Create the following DNS records in the zone:
+
+   | Record Name | Type | Value |
+   |------------|------|--------|
+   | `*.<byoc-region>.cubecloudapp.dev` | A | Alias to HTTP VPC endpoint |
+   | `*.sql.<byoc-region>.cubecloudapp.dev` | A | Alias to SQL VPC endpoint |
+   | `sql.<byoc-region>.cubecloudapp.dev` | A | Alias to SQL VPC endpoint |
+
+   **Note**: Each BYOC infrastructure provisioning will have a different region identifier. If you provision additional regions in the future, each will require its own private zone with the corresponding region-specific identifier.
+
+### Step 4: Verify connectivity
+
+To test the connection from within your VPC, obtain the test connection commands from the Cube Cloud UI:
+1. Navigate to your deployment in Cube Cloud
+2. Access the connection details section
+3. Use the provided commands to verify HTTP API and SQL connectivity
+
+## Enabling Cube Cloud UI access
+
+The Cube Cloud web interface requires access to live Cube APIs to function properly. In a private setup, these APIs aren't accessible from user browsers by default, which would limit Cube Cloud functionality.
+
+### Solution: Corporate network integration
+
+To enable full Cube Cloud UI functionality, you need to establish PrivateLink endpoints within your corporate network:
+
+1. **Create PrivateLink endpoints in your corporate VPC**: Follow the same process as above, but create the endpoints in a VPC that's accessible from your corporate network
+2. **Configure DNS resolution**: Choose one of these approaches:
+   - **Cube-hosted DNS**: We can host the PrivateLink endpoint IPs in our public DNS records (contact Cube support)
+   - **Corporate DNS override**: If you control DNS resolution within your corporate network, create private DNS overrides similar to the Route 53 configuration
+
+<Screenshot src="https://ucarecdn.com/186b888f-ca1a-487b-aa41-968714ebce2f/" />
+
+## Limitations
+
+### No custom domain support
+
+Cube Cloud's [custom domains feature][custom-domains] is not compatible with PrivateLink connectivity. This limitation exists because:
+
+- Custom domains require automatic SSL certificate provisioning via Let's Encrypt
+- Let's Encrypt uses HTTP-01 challenges that require public internet accessibility
+- PrivateLink endpoints are not accessible from the public internet
+
+If you require custom domains, consider using Cube Cloud's standard public endpoints with appropriate security controls.
+
+## Troubleshooting
+
+### Common issues
+
+**DNS resolution failures**
+- Verify Route 53 hosted zone is associated with the correct VPC
+- Check that DNS records point to the correct VPC endpoints
+- Test resolution using `nslookup` or `dig` from within the VPC
+
+**Connection timeouts**
+- Verify security groups allow traffic on required ports (443 for HTTP, 5432 for SQL)
+- Check that VPC endpoints are in "Available" state
+- Ensure network ACLs aren't blocking traffic
+
+**Certificate errors**
+- Cube Cloud uses valid SSL certificates for `*.cubecloudapp.dev` domains
+- Ensure your client trusts standard certificate authorities
+- For SQL connections, configure your client to use SSL/TLS
+
+### Getting help
+
+For assistance with PrivateLink setup:
+1. Gather the following information:
+   - VPC endpoint IDs
+   - Security group configurations
+   - DNS test results (`nslookup` output)
+   - Any error messages from connection attempts
+2. Contact Cube Cloud support with your deployment ID and collected information
+
+[custom-domains]: /product/deployment/cloud/custom-domains

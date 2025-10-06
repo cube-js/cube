@@ -84,6 +84,7 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY`                    | The content of the private RSA key                                                                                                                  | Content of the private RSA key (encrypted or not)                      |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`               | The path to the private RSA key                                                                                                                     | A valid path to the private RSA key                                    |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`               | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key                     |    ❌    |
+| `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN`                    | The OAuth token                                                                                                                                     | A valid OAuth token (string)                                           |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`               | The path to the valid oauth toket file                                                                                                              | A valid path for the oauth token file                                  |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_HOST`                           | Host address to which the driver should connect                                                                                                     | A valid hostname                                                       |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE` | Whether or not [quoted identifiers should be case insensitive][link-snowflake-quoted-identifiers]. Default is `false`                               | `true`, `false`                                                        |    ❌    |
@@ -132,10 +133,13 @@ Storage][google-cloud-storage] for export bucket functionality.
 
 <InfoBox>
 
-Ensure the AWS credentials are correctly configured in IAM to allow reads and
-writes to the export bucket in S3.
+Ensure proper IAM privileges are configured for S3 bucket reads and writes, using either 
+storage integration or user credentials for Snowflake and either IAM roles/IRSA or user 
+credentials for Cube Store, with mixed configurations supported.
 
 </InfoBox>
+
+Using IAM user credentials for both:
 
 ```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
@@ -144,6 +148,28 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
 CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
 CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 ```
+
+Using a [Storage Integration][snowflake-docs-aws-integration] to write to export buckets and 
+user credentials to read from Cube Store:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_INTEGRATION=aws_int
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+Using a Storage Integration to write to export bucket and IAM role/IRSA to read from Cube Store:**
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_INTEGRATION=aws_int
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
 
 #### Google Cloud Storage
 
@@ -202,6 +228,7 @@ connections are made over HTTPS.
 [snowflake-docs-account-id]:
   https://docs.snowflake.com/en/user-guide/admin-account-identifier.html
 [snowflake-docs-connection-options]: https://docs.snowflake.com/en/developer-guide/node-js/nodejs-driver-options#additional-connection-options
+[snowflake-docs-aws-integration]: https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration
 [snowflake-docs-gcs-integration]:
   https://docs.snowflake.com/en/user-guide/data-load-gcs-config.html
 [snowflake-docs-regions]:

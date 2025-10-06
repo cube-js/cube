@@ -1,9 +1,10 @@
 use crate::cross::clrepr::CLReprObject;
 use crate::cross::{CLRepr, CLReprObjectKind, StringType};
-use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
+use crate::python::utils::PyAnyHelpers;
+use pyo3::exceptions::{PyException, PyNotImplementedError, PyTypeError};
 use pyo3::types::{
-    PyBool, PyComplex, PyDate, PyDict, PyFloat, PyFrame, PyFunction, PyInt, PyList, PySequence,
-    PySet, PyString, PyTraceback, PyTuple,
+    PyBool, PyComplex, PyDate, PyDateTime, PyDelta, PyDict, PyFloat, PyFrame, PyFrozenSet,
+    PyFunction, PyInt, PyList, PySequence, PySet, PyString, PyTraceback, PyTuple,
 };
 use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 
@@ -12,7 +13,7 @@ pub enum PythonRef {
     PyObject(PyObject),
     PyFunction(Py<PyFunction>),
     /// Special type to transfer functions through JavaScript
-    /// In JS it's an external object. It's not the same as Function.
+    /// In JS it's an external object.
     PyExternalFunction(Py<PyFunction>),
 }
 
@@ -87,10 +88,28 @@ impl CLRepr {
             return Err(PyErr::new::<PyTypeError, _>(
                 "Unable to represent PyComplex type as CLR from Python".to_string(),
             ));
+        } else if v.get_type().is_subclass_of::<PyDateTime>()? {
+            return Err(PyErr::new::<PyTypeError, _>(
+                "Unable to represent PyDateTime type as CLR from Python".to_string(),
+            ));
         } else if v.get_type().is_subclass_of::<PyDate>()? {
             return Err(PyErr::new::<PyTypeError, _>(
                 "Unable to represent PyDate type as CLR from Python".to_string(),
             ));
+        } else if v.get_type().is_subclass_of::<PyFrozenSet>()? {
+            let set = v.downcast::<PyFrozenSet>()?;
+
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PyFrozenSet type as CLR from Python, value: {:?}",
+                set
+            )));
+        } else if v.get_type().is_subclass_of::<PyException>()? {
+            let exception = v.downcast::<PyException>()?;
+
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PyException type as CLR from Python, value: {:?}",
+                exception
+            )));
         } else if v.get_type().is_subclass_of::<PyFrame>()? {
             let frame = v.downcast::<PyFrame>()?;
 
@@ -105,22 +124,27 @@ impl CLRepr {
                 "Unable to represent PyTraceback type as CLR from Python, value: {:?}",
                 trb
             )));
+        } else if v.get_type().is_subclass_of::<PyDelta>()? {
+            let delta = v.downcast::<PyDelta>()?;
+
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PyDelta type as CLR from Python, value: {:?}",
+                delta
+            )));
+        } else if v.is_sequence()? {
+            let seq = v.downcast::<PySequence>()?;
+
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PySequence type as CLR from Python, value: {:?}",
+                seq
+            )));
         } else {
-            let is_sequence = unsafe { pyo3::ffi::PySequence_Check(v.as_ptr()) == 1 };
-            if is_sequence {
-                let seq = v.downcast::<PySequence>()?;
-
-                return Err(PyErr::new::<PyTypeError, _>(format!(
-                    "Unable to represent PySequence type as CLR from Python, value: {:?}",
-                    seq
-                )));
-            }
-
+            // Fallback to PyObject, it will lead to throw error in the JS side
             Self::PythonRef(PythonRef::PyObject(v.into()))
         })
     }
 
-    fn into_py_dict_impl(obj: CLReprObject, py: Python) -> Result<&PyDict, PyErr> {
+    fn into_py_dict_impl(obj: CLReprObject, py: Python<'_>) -> Result<&PyDict, PyErr> {
         let r = PyDict::new(py);
 
         for (k, v) in obj.into_iter() {
@@ -189,7 +213,7 @@ impl CLRepr {
         })
     }
 
-    pub fn into_py_dict(self, py: Python) -> Result<&PyDict, PyErr> {
+    pub fn into_py_dict(self, py: Python<'_>) -> Result<&PyDict, PyErr> {
         Ok(match self {
             CLRepr::Object(obj) => Self::into_py_dict_impl(obj, py)?,
             other => {

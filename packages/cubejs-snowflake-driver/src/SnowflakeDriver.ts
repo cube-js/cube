@@ -23,6 +23,7 @@ import {
 import { formatToTimeZone } from 'date-fns-timezone';
 import fs from 'fs/promises';
 import crypto from 'crypto';
+import { S3ClientConfig } from '@aws-sdk/client-s3';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
@@ -106,8 +107,8 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
 interface SnowflakeDriverExportAWS {
   bucketType: 's3',
   bucketName: string,
-  keyId: string,
-  secretKey: string,
+  keyId?: string,
+  secretKey?: string,
   region: string,
   integrationName?: string,
 }
@@ -153,6 +154,7 @@ interface SnowflakeDriverOptions {
   clientSessionKeepAlive?: boolean,
   database?: string,
   authenticator?: string,
+  oauthToken?: string,
   oauthTokenPath?: string,
   token?: string,
   privateKeyPath?: string,
@@ -164,6 +166,7 @@ interface SnowflakeDriverOptions {
   identIgnoreCase?: boolean,
   application: string,
   readOnly?: boolean,
+  queryTag?: string,
 
   /**
    * The export bucket CSV file escape symbol.
@@ -189,7 +192,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns the configurable driver options
    * Note: It returns the unprefixed option names.
-   * In case of using multisources options need to be prefixed manually.
+   * In case of using multi-sources options need to be prefixed manually.
    */
   public static driverEnvVariables() {
     return [
@@ -202,6 +205,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       'CUBEJS_DB_SNOWFLAKE_ROLE',
       'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
       'CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR',
+      'CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN',
       'CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH',
       'CUBEJS_DB_SNOWFLAKE_HOST',
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY',
@@ -286,6 +290,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       username: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       authenticator: getEnv('snowflakeAuthenticator', { dataSource }),
+      oauthToken: getEnv('snowflakeOAuthToken', { dataSource }),
       oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource }),
       privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
       privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
@@ -324,14 +329,17 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (bucketType === 's3') {
       // integrationName is optional for s3
       const integrationName = getEnv('dbExportIntegration', { dataSource });
+      // keyId and secretKey are optional for s3 if IAM role is used
+      const keyId = getEnv('dbExportBucketAwsKey', { dataSource });
+      const secretKey = getEnv('dbExportBucketAwsSecret', { dataSource });
 
       return {
         bucketType,
         bucketName: getEnv('dbExportBucket', { dataSource }),
-        keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
-        secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
         region: getEnv('dbExportBucketAwsRegion', { dataSource }),
         ...(integrationName !== undefined && { integrationName }),
+        ...(keyId !== undefined && { keyId }),
+        ...(secretKey !== undefined && { secretKey }),
       };
     }
 
@@ -383,6 +391,20 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     );
   }
 
+  private getRequiredExportBucketKeys(
+    exportBucket: SnowflakeDriverExportBucket,
+    emptyKeys: string[]
+  ): string[] {
+    if (exportBucket.bucketType === 's3') {
+      const s3Config = exportBucket as SnowflakeDriverExportAWS;
+      if (s3Config.integrationName) {
+        return emptyKeys.filter(key => key !== 'keyId' && key !== 'secretKey');
+      }
+    }
+    
+    return emptyKeys;
+  }
+
   protected getExportBucket(
     dataSource: string,
   ): SnowflakeDriverExportBucket | undefined {
@@ -398,9 +420,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
       const emptyKeys = Object.keys(exportBucket)
         .filter((key: string) => exportBucket[<keyof SnowflakeDriverExportBucket>key] === undefined);
-      if (emptyKeys.length) {
+      const keysToValidate = this.getRequiredExportBucketKeys(exportBucket, emptyKeys);
+      
+      if (keysToValidate.length) {
         throw new Error(
-          `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyKeys.join(',')}`
+          `Unsupported configuration exportBucket, some configuration keys are empty: ${keysToValidate.join(',')}`
         );
       }
 
@@ -423,12 +447,43 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return token.trim();
   }
 
-  private async createConnection() {
-    if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
-      this.config.token = await this.readOAuthToken();
+  private async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
+    const config: Record<string, any> = {
+      account: this.config.account,
+      region: this.config.region,
+      host: this.config.host,
+      application: this.config.application,
+      authenticator: this.config.authenticator,
+      clientSessionKeepAlive: this.config.clientSessionKeepAlive,
+      database: this.config.database,
+      warehouse: this.config.warehouse,
+      role: this.config.role,
+      resultPrefetch: this.config.resultPrefetch,
+    };
+
+    if (this.config.queryTag) {
+      config.queryTag = this.config.queryTag;
     }
 
-    return snowflake.createConnection(this.config);
+    if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
+      config.token = this.config.oauthToken || await this.readOAuthToken();
+    } else if (this.config.authenticator?.toUpperCase() === 'SNOWFLAKE_JWT') {
+      config.username = this.config.username;
+      config.privateKey = this.config.privateKey;
+      config.privateKeyPath = this.config.privateKeyPath;
+      config.privateKeyPass = this.config.privateKeyPass;
+    } else {
+      config.username = this.config.username;
+      config.password = this.config.password;
+    }
+
+    return config as snowflake.ConnectionOptions;
+  }
+
+  private async createConnection() {
+    const config = await this.prepareConnectOptions();
+
+    return snowflake.createConnection(config);
   }
 
   /**
@@ -520,10 +575,13 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       }`);
     }
 
-    const types = options.query
+    const { types, exportedCount } = options.query
       ? await this.unloadWithSql(tableName, options)
       : await this.unloadWithTable(tableName, options);
-    const csvFile = await this.getCsvFiles(tableName);
+    // Snowflake doesn't produce csv files if no data is exported (no data rows)
+    // so it's important not to call getCsvFiles(), because it checks for empty files list
+    // and throws an error.
+    const csvFile = exportedCount > 0 ? await this.getCsvFiles(tableName) : [];
 
     return {
       exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
@@ -533,37 +591,42 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     };
   }
 
+  private buildBucketUrl(tableName: string): string {
+    const { bucketType } = <SnowflakeDriverExportBucket> this.config.exportBucket;
+
+    let bucketName: string;
+    let exportPrefix: string;
+    let path: string;
+
+    if (bucketType === 'azure') {
+      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
+      const pathArr = path.split('/');
+      bucketName = `${bucketName}/${pathArr[0]}`;
+      exportPrefix = pathArr.length > 1 ? `${pathArr.slice(1).join('/')}/${tableName}` : tableName;
+    } else {
+      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
+      exportPrefix = path ? `${path}/${tableName}` : tableName;
+    }
+
+    return `${bucketType}://${bucketName}/${exportPrefix}/`;
+  }
+
   /**
    * Unload data from a SQL query to an export bucket.
    */
   private async unloadWithSql(
     tableName: string,
     options: UnloadOptions,
-  ): Promise<TableStructure> {
+  ): Promise<{ types: TableStructure, exportedCount: number }> {
     if (!options.query) {
       throw new Error('Unload query is missed.');
     } else {
       const types = await this.queryColumnTypes(options.query.sql, options.query.params);
       const connection = await this.getConnection();
-      const { bucketType } =
-        <SnowflakeDriverExportBucket> this.config.exportBucket;
-
-      let bucketName: string;
-      let exportPrefix: string;
-      let path: string;
-
-      if (bucketType === 'azure') {
-        ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
-        const pathArr = path.split('/');
-        bucketName = `${bucketName}/${pathArr[0]}`;
-        exportPrefix = pathArr.length > 1 ? `${pathArr.slice(1).join('/')}/${tableName}` : tableName;
-      } else {
-        ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
-        exportPrefix = path ? `${path}/${tableName}` : tableName;
-      }
+      const bucketUrl = this.buildBucketUrl(tableName);
 
       const unloadSql = `
-        COPY INTO '${bucketType}://${bucketName}/${exportPrefix}/'
+        COPY INTO '${bucketUrl}'
         FROM (${options.query.sql})
         ${this.exportOptionsClause(options)}`;
       const result = await this.execute<UnloadResponse[]>(
@@ -575,7 +638,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       if (!result) {
         throw new Error('Missing `COPY INTO` query result.');
       }
-      return types;
+      return { types, exportedCount: parseInt(result[0].rows_unloaded, 10) };
     }
   }
 
@@ -606,28 +669,13 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   private async unloadWithTable(
     tableName: string,
     options: UnloadOptions,
-  ): Promise<TableStructure> {
+  ): Promise<{ types: TableStructure, exportedCount: number }> {
     const types = await this.tableColumnTypes(tableName);
     const connection = await this.getConnection();
-    const { bucketType } =
-      <SnowflakeDriverExportBucket> this.config.exportBucket;
-
-    let bucketName: string;
-    let exportPrefix: string;
-    let path: string;
-
-    if (bucketType === 'azure') {
-      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
-      const pathArr = path.split('/');
-      bucketName = `${bucketName}/${pathArr[0]}`;
-      exportPrefix = pathArr.length > 1 ? `${pathArr.slice(1).join('/')}/${tableName}` : tableName;
-    } else {
-      ({ bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName));
-      exportPrefix = path ? `${path}/${tableName}` : tableName;
-    }
+    const bucketUrl = this.buildBucketUrl(tableName);
 
     const unloadSql = `
-      COPY INTO '${bucketType}://${bucketName}/${exportPrefix}/'
+      COPY INTO '${bucketUrl}'
       FROM ${tableName}
       ${this.exportOptionsClause(options)}`;
     const result = await this.execute<UnloadResponse[]>(
@@ -636,10 +684,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       [],
       false,
     );
+
     if (!result) {
       throw new Error('Missing `COPY INTO` query result.');
     }
-    return types;
+
+    return { types, exportedCount: parseInt(result[0].rows_unloaded, 10) };
   }
 
   /**
@@ -685,6 +735,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       FILE_FORMAT: '(' +
         'TYPE = CSV, ' +
         'COMPRESSION = GZIP, ' +
+        'DATE_FORMAT = \'YYYY-MM-DD\', ' +
+        'TIMESTAMP_FORMAT = \'YYYY-MM-DD"T"HH24:MI:SS.FF3TZH:TZM\', ' +
         'FIELD_OPTIONALLY_ENCLOSED_BY = \'"\'' +
         ')',
     };
@@ -694,7 +746,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       // Storage integration export flow takes precedence over direct auth if it is defined
       if (conf.integrationName) {
         optionsToExport.STORAGE_INTEGRATION = conf.integrationName;
-      } else {
+      } else if (conf.keyId && conf.secretKey) {
         optionsToExport.CREDENTIALS = `(AWS_KEY_ID = '${conf.keyId}' AWS_SECRET_KEY = '${conf.secretKey}')`;
       }
     } else if (bucketType === 'gcs') {
@@ -734,14 +786,18 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket!.bucketName);
       const exportPrefix = path ? `${path}/${tableName}` : tableName;
 
+      const s3Config: S3ClientConfig = { region };
+      if (keyId && secretKey) {
+        // If access key and secret are provided, use them as credentials
+        // Otherwise, let the SDK use the default credential chain (IRSA, instance profile, etc.)
+        s3Config.credentials = {
+          accessKeyId: keyId,
+          secretAccessKey: secretKey,
+        };
+      }
+
       return this.extractUnloadedFilesFromS3(
-        {
-          credentials: {
-            accessKeyId: keyId,
-            secretAccessKey: secretKey,
-          },
-          region,
-        },
+        s3Config,
         bucketName,
         exportPrefix,
       );

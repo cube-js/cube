@@ -3,11 +3,16 @@ import R from 'ramda';
 import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import {
+  QuerySchemasResult,
+  QueryTablesResult,
+  QueryColumnsResult,
+  QueryKey
+} from '@cubejs-backend/base-driver';
 
-import {QueryCache, QueryBody, TempTable, Query} from './QueryCache';
+import { QueryCache, QueryBody, TempTable, Query, PreAggTableToTempTable, QueryWithParams, CacheKey } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 import { QueryStream } from './QueryStream';
 
 export type CacheAndQueryDriverType = 'memory' | 'cubestore' | /** removed, used for exception */ 'redis';
@@ -16,6 +21,12 @@ export enum DriverType {
   External = 'external',
   Internal = 'internal',
   Cache = 'cache',
+}
+
+export enum MetadataOperationType {
+  GET_SCHEMAS = 'GET_SCHEMAS',
+  GET_TABLES_FOR_SCHEMAS = 'GET_TABLES_FOR_SCHEMAS',
+  GET_COLUMNS_FOR_TABLES = 'GET_COLUMNS_FOR_TABLES'
 }
 
 export interface QueryOrchestratorOptions {
@@ -51,8 +62,6 @@ export class QueryOrchestrator {
   protected readonly preAggregations: PreAggregations;
 
   protected readonly rollupOnlyMode: boolean;
-
-  private queueEventsBus: LocalQueueEventsBus;
 
   protected readonly cacheAndQueueDriver: string;
 
@@ -115,19 +124,8 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        getQueueEventsBus:
-          getEnv('preAggregationsQueueEventsBus') &&
-          this.getQueueEventsBus.bind(this)
       }
     );
-  }
-
-  private getQueueEventsBus() {
-    if (!this.queueEventsBus) {
-      this.queueEventsBus = new LocalQueueEventsBus();
-    }
-
-    return this.queueEventsBus;
   }
 
   /**
@@ -223,28 +221,18 @@ export class QueryOrchestrator {
       };
     }
 
-    const usedPreAggregations = R.pipe(
+    const usedPreAggregations = R.pipe<
+      PreAggTableToTempTable[],
+      Record<string, TempTable>,
+      Record<string, unknown>
+    >(
       R.fromPairs,
-      R.map((pa: TempTable) => ({
+      R.mapObjIndexed((pa: TempTable) => ({
         targetTableName: pa.targetTableName,
         refreshKeyValues: pa.refreshKeyValues,
         lastUpdatedAt: pa.lastUpdatedAt,
       })),
-    )(
-      preAggregationsTablesToTempTables as unknown as [
-        number, // TODO: we actually have a string here
-        {
-          buildRangeEnd: string,
-          lastUpdatedAt: number,
-          queryKey: unknown,
-          refreshKeyValues: [{
-            'refresh_key': string,
-          }][],
-          targetTableName: string,
-          type: string,
-        },
-      ][]
-    );
+    )(preAggregationsTablesToTempTables);
 
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
       throw new Error(
@@ -329,7 +317,7 @@ export class QueryOrchestrator {
 
     if (pendingPreAggregationIndex === -1) {
       const qcQueue = await this.queryCache.getQueue(queryBody.dataSource);
-      return qcQueue.getQueryStage(QueryCache.queryCacheKey(queryBody));
+      return qcQueue.getQueryStage(QueryCache.queryCacheKey(queryBody) as QueryKey);
     }
 
     const preAggregation = queryBody.preAggregations[pendingPreAggregationIndex];
@@ -447,15 +435,111 @@ export class QueryOrchestrator {
     return this.preAggregations.cancelQueriesFromQueue(queryKeys, dataSource);
   }
 
-  public async subscribeQueueEvents(id: string, callback) {
-    return this.getQueueEventsBus().subscribe(id, callback);
-  }
-
-  public async unSubscribeQueueEvents(id: string) {
-    return this.getQueueEventsBus().unsubscribe(id);
-  }
-
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
+  }
+
+  private createMetadataQuery(operation: string, params: Record<string, any>): QueryWithParams {
+    return [
+      `METADATA:${operation}`,
+      // TODO (@MikeNitsenko): Metadata queries need object params like [{ schema, table }]
+      // but QueryWithParams expects string[]. This forces JSON.stringify workaround.
+      [JSON.stringify(params)],
+      { external: false }
+    ];
+  }
+
+  private async queryDataSourceMetadata<T>(
+    operation: MetadataOperationType,
+    params: Record<string, any>,
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      syncJobId?: string;
+      expiration?: number;
+    } = {}
+  ): Promise<T> {
+    const {
+      requestId,
+      syncJobId,
+      expiration = 30 * 24 * 60 * 60,
+    } = options;
+
+    const metadataQuery = this.createMetadataQuery(operation, params);
+    const cacheKey: CacheKey = syncJobId
+      ? [metadataQuery, dataSource, syncJobId]
+      : [metadataQuery, dataSource];
+
+    return this.queryCache.cacheQueryResult(
+      metadataQuery,
+      [],
+      cacheKey,
+      expiration,
+      {
+        requestId,
+        dataSource,
+        forceNoCache: !syncJobId,
+        useInMemory: true,
+      }
+    );
+  }
+
+  /**
+   * Query the data source for available schemas.
+   */
+  public async queryDataSourceSchemas(
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      syncJobId?: string;
+      expiration?: number;
+    } = {}
+  ): Promise<QuerySchemasResult[]> {
+    return this.queryDataSourceMetadata<QuerySchemasResult[]>(
+      MetadataOperationType.GET_SCHEMAS,
+      {},
+      dataSource,
+      options
+    );
+  }
+
+  /**
+   * Query the data source for tables within the specified schemas.
+   */
+  public async queryTablesForSchemas(
+    schemas: QuerySchemasResult[],
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      syncJobId?: string;
+      expiration?: number;
+    } = {}
+  ): Promise<QueryTablesResult[]> {
+    return this.queryDataSourceMetadata<QueryTablesResult[]>(
+      MetadataOperationType.GET_TABLES_FOR_SCHEMAS,
+      { schemas },
+      dataSource,
+      options
+    );
+  }
+
+  /**
+   * Query the data source for columns within the specified tables.
+   */
+  public async queryColumnsForTables(
+    tables: QueryTablesResult[],
+    dataSource: string = 'default',
+    options: {
+      requestId?: string;
+      syncJobId?: string;
+      expiration?: number;
+    } = {}
+  ): Promise<QueryColumnsResult[]> {
+    return this.queryDataSourceMetadata<QueryColumnsResult[]>(
+      MetadataOperationType.GET_COLUMNS_FOR_TABLES,
+      { tables },
+      dataSource,
+      options
+    );
   }
 }

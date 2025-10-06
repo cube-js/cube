@@ -148,6 +148,76 @@ describe('SQL API', () => {
       expect(rows).toBe(ROWS_LIMIT);
     });
 
+    it('streams schema and empty data with LIMIT 0', async () => {
+      const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token,
+        },
+        body: JSON.stringify({
+          query: 'SELECT orderDate FROM ECommerce LIMIT 0;',
+        }),
+      });
+
+      const reader = response.body;
+      let isFirstChunk = true;
+      let schemaReceived = false;
+      let emptyDataReceived = false;
+
+      let data = '';
+      const execute = () => new Promise<void>((resolve, reject) => {
+        const onData = jest.fn((chunk: Buffer) => {
+          const chunkStr = chunk.toString('utf-8');
+          
+          if (isFirstChunk) {
+            isFirstChunk = false;
+            const json = JSON.parse(chunkStr);
+            expect(json.schema).toEqual([
+              {
+                name: 'orderDate',
+                column_type: 'Timestamp',
+              },
+            ]);
+            schemaReceived = true;
+          } else {
+            data += chunkStr;
+            const json = JSON.parse(chunkStr);
+            if (json.data && Array.isArray(json.data) && json.data.length === 0) {
+              emptyDataReceived = true;
+            }
+          }
+        });
+        reader.on('data', onData);
+
+        const onError = jest.fn(() => reject(new Error('Stream error')));
+        reader.on('error', onError);
+
+        const onEnd = jest.fn(() => {
+          resolve();
+        });
+
+        reader.on('end', onEnd);
+      });
+
+      await execute();
+      
+      // Verify schema was sent first
+      expect(schemaReceived).toBe(true);
+      
+      // Verify empty data was sent
+      expect(emptyDataReceived).toBe(true);
+      
+      // Verify no actual rows were returned
+      const dataLines = data.split('\n').filter((it) => it.trim());
+      if (dataLines.length > 0) {
+        const rows = dataLines
+          .map((it) => JSON.parse(it).data?.length || 0)
+          .reduce((a, b) => a + b, 0);
+        expect(rows).toBe(0);
+      }
+    });
+
     describe('sql4sql', () => {
       async function generateSql(query: string, disablePostPprocessing: boolean = false) {
         const response = await fetch(`${birdbox.configuration.apiUrl}/sql`, {

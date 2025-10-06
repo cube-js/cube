@@ -2,6 +2,7 @@ import inflection from 'inflection';
 import R from 'ramda';
 import camelCase from 'camelcase';
 
+import { getEnv } from '@cubejs-backend/shared';
 import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseMeasure } from '../adapter';
@@ -42,6 +43,43 @@ export class CubeToMetaTransformer {
     const cubeTitle = cube.title || this.titleize(cube.name);
 
     const isCubeVisible = this.isVisible(cube, true);
+
+    const flatFolderSeparator = getEnv('nestedFoldersDelimiter');
+    const flatFolders = [];
+
+    const processFolder = (folder, path = [], mergedMembers = []) => {
+      const flatMembers = [];
+      const nestedMembers = folder.includes.map(member => {
+        if (member.type === 'folder') {
+          return processFolder(member, [...path, folder.name], flatMembers);
+        }
+        const memberName = `${cube.name}.${member.name}`;
+        flatMembers.push(memberName);
+
+        return memberName;
+      });
+
+      if (flatFolderSeparator !== '') {
+        flatFolders.push({
+          name: [...path, folder.name].join(flatFolderSeparator),
+          members: flatMembers,
+        });
+      } else if (path.length > 0) {
+        mergedMembers.push(...flatMembers);
+      } else { // We're at the root level
+        flatFolders.push({
+          name: folder.name,
+          members: [...new Set(flatMembers)],
+        });
+      }
+
+      return {
+        name: folder.name,
+        members: nestedMembers,
+      };
+    };
+
+    const nestedFolders = (cube.folders || []).map(f => processFolder(f));
 
     return {
       config: {
@@ -113,10 +151,8 @@ export class CubeToMetaTransformer {
           public: it.public ?? true,
           name: `${cube.name}.${it.name}`,
         })),
-        folders: (cube.folders || []).map((it) => ({
-          name: it.name,
-          members: it.includes.map(member => `${cube.name}.${member.name}`),
-        })),
+        folders: flatFolders,
+        nestedFolders,
       },
     };
   }
@@ -136,7 +172,7 @@ export class CubeToMetaTransformer {
 
     // As for now context works on the cubes level
     return R.filter(
-      (query) => R.contains(query.config.name, context.contextMembers)
+      (query) => R.includes(query.config.name, context.contextMembers)
     )(this.queries);
   }
 
@@ -187,6 +223,7 @@ export class CubeToMetaTransformer {
         measures: drillMembersArray.filter((member) => this.cubeEvaluator.isMeasure(member)),
         dimensions: drillMembersArray.filter((member) => this.cubeEvaluator.isDimension(member)),
       },
+      aliasMember: nameToMetric[1].aliasMember,
       meta: nameToMetric[1].meta
     };
   }

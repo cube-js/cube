@@ -4,6 +4,7 @@ import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import { assertNever } from 'assert-never';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
+import { v4 as uuidv4 } from 'uuid';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import structuredClone from '@ungap/structured-clone';
@@ -262,8 +263,9 @@ class ApiGateway {
         const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig, variables);
         res.json({ jsonQuery });
       } catch (e: any) {
+        const stack = getEnv('devMode') ? e.stack : undefined;
         this.logger('GraphQL to JSON error', {
-          error: (e.stack || e).toString(),
+          error: (stack || e).toString(),
         });
         res.json({ jsonQuery: null });
       }
@@ -1249,8 +1251,10 @@ class ApiGateway {
 
     const queries: Query[] = Array.isArray(query) ? query : [query];
 
+    const queryRewriteId = uuidv4();
     this.log({
       type: 'Query Rewrite',
+      queryRewriteId,
       query
     }, context);
 
@@ -1315,6 +1319,7 @@ class ApiGateway {
 
     this.log({
       type: 'Query Rewrite completed',
+      queryRewriteId,
       normalizedQueries,
       duration: new Date().getTime() - startTime,
       query
@@ -2103,21 +2108,6 @@ class ApiGateway {
     }
   }
 
-  public async subscribeQueueEvents({ context, signedWithPlaygroundAuthSecret, connectionId, res }) {
-    if (this.enforceSecurityChecks && !signedWithPlaygroundAuthSecret) {
-      throw new CubejsHandlerError(
-        403,
-        'Forbidden',
-        'Only for signed with playground auth secret'
-      );
-    }
-    return (await this.getAdapterApi(context)).subscribeQueueEvents(connectionId, res);
-  }
-
-  public async unSubscribeQueueEvents({ context, connectionId }) {
-    return (await this.getAdapterApi(context)).unSubscribeQueueEvents(connectionId);
-  }
-
   public async subscribe({
     query, context, res, subscribe, subscriptionState, queryType, apiType
   }) {
@@ -2232,6 +2222,7 @@ class ApiGateway {
     e, context, query, res, requestStarted
   }: HandleErrorOptions) {
     const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
+    const stack = getEnv('devMode') ? e.stack : undefined;
 
     const plainError = e.plainMessages;
 
@@ -2242,7 +2233,7 @@ class ApiGateway {
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.message, stack: e.stack, requestId, plainError }, { status: e.status });
+      res({ error: e.message, stack, requestId, plainError }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
@@ -2271,7 +2262,7 @@ class ApiGateway {
           type: e.type,
           error: e.message,
           plainError,
-          stack: e.stack,
+          stack,
           requestId
         },
         { status: 400 }
@@ -2280,10 +2271,10 @@ class ApiGateway {
       this.log({
         type: 'Internal Server Error',
         query,
-        error: e.stack || e.toString(),
+        error: stack || e.toString(),
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.toString(), stack: e.stack, requestId, plainError, }, { status: 500 });
+      res({ error: e.toString(), stack, requestId, plainError, }, { status: 500 });
     }
   }
 
@@ -2549,24 +2540,26 @@ class ApiGateway {
     } catch (e: unknown) {
       if (e instanceof CubejsHandlerError) {
         const error = e.originalError || e;
+        const stack = getEnv('devMode') ? error.stack : undefined;
         this.log({
           type: error.message,
           url: req.url,
           token,
-          error: error.stack || error.toString()
+          error: stack || error.toString()
         }, <any>req);
 
         res.status(e.status).json({ error: e.message });
       } else if (e instanceof Error) {
+        const stack = getEnv('devMode') ? e.stack : undefined;
         this.log({
           type: 'Auth Error',
           token,
-          error: e.stack || e.toString()
+          error: stack || e.toString()
         }, <any>req);
 
         res.status(500).json({
           error: e.toString(),
-          stack: e.stack
+          stack,
         });
       }
     }
@@ -2696,10 +2689,11 @@ class ApiGateway {
   };
 
   private logProbeError(e: any, type: string): void {
+    const stack = getEnv('devMode') ? (e as Error).stack : undefined;
     this.log({
       type,
       driverType: e.driverType,
-      error: (e as Error).stack || (e as Error).toString(),
+      error: stack || (e as Error).toString(),
     });
   }
 

@@ -925,9 +925,9 @@ async fn test_case_wrapper_with_system_fields() {
             .wrapped_sql
             .sql
             .contains(
-                "\\\"cubeName\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"user\\\""
+                "\\\"cubeName\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"__user\\\""
             ),
-        r#"SQL contains `\"cubeName\":\"KibanaSampleDataEcommerce\",\"alias\":\"user\"` {}"#,
+        r#"SQL contains `\"cubeName\":\"KibanaSampleDataEcommerce\",\"alias\":\"__user\"` {}"#,
         logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
     );
 
@@ -1876,7 +1876,7 @@ GROUP BY
                         "replaceAggregationType": null,
                         "addFilters": [{
                             "cubeParams": ["MultiTypeCube"],
-                            "sql": "(((CAST(TRUNC(EXTRACT(YEAR FROM ${MultiTypeCube.dim_date0})) AS INTEGER) = 2024) AND (CAST(TRUNC(EXTRACT(MONTH FROM ${MultiTypeCube.dim_date0})) AS INTEGER) <= 11)) = TRUE)"
+                            "sql": "(((CAST(TRUNC(EXTRACT(year FROM ${MultiTypeCube.dim_date0})) AS INTEGER) = 2024) AND (CAST(TRUNC(EXTRACT(month FROM ${MultiTypeCube.dim_date0})) AS INTEGER) <= 11)) = TRUE)"
                         }],
                     },
                     "groupingSet": null,
@@ -1911,4 +1911,41 @@ GROUP BY
             ..Default::default()
         }
     );
+}
+
+#[tokio::test]
+async fn test_wrapper_between() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender
+        FROM KibanaSampleDataEcommerce
+        WHERE
+            KibanaSampleDataEcommerce.customer_gender = customer_gender
+            AND order_date BETWEEN '2024-01-01' AND '2024-12-31'
+        GROUP BY 1
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains("BETWEEN $1 AND $2"));
 }

@@ -346,7 +346,7 @@ impl ExtendedRemoteFs for QueueRemoteFs {
     async fn list_by_page(
         &self,
         remote_prefix: String,
-    ) -> Result<BoxStream<Result<Vec<String>, CubeError>>, CubeError> {
+    ) -> Result<BoxStream<'static, Result<Vec<String>, CubeError>>, CubeError> {
         self.remote_fs.list_by_page(remote_prefix).await
     }
 }

@@ -2062,7 +2062,7 @@ impl MemberRules {
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let member_pushdown_replacer_alias_to_cube_var =
             var!(member_pushdown_replacer_alias_to_cube_var);
-        let column_var = match column_to_search {
+        let column_var = match &column_to_search {
             ColumnToSearch::Var(column_var) => Some(var!(column_var)),
             ColumnToSearch::DefaultCount => None,
         };
@@ -2088,6 +2088,17 @@ impl MemberRules {
             });
 
             for alias_to_cube in alias_to_cubes {
+                // Do not push down COUNT(*) if there are joined cubes
+                if matches!(column_to_search, ColumnToSearch::DefaultCount) {
+                    let joined_cubes = alias_to_cube
+                        .iter()
+                        .map(|(_, cube_name)| cube_name)
+                        .collect::<HashSet<_>>();
+                    if joined_cubes.len() > 1 {
+                        continue;
+                    }
+                }
+
                 let column_iter = match column_var {
                     Some(column_var) => var_iter!(egraph[subst[column_var]], ColumnExprColumn)
                         .cloned()
@@ -2697,7 +2708,7 @@ impl MemberRules {
                             let Some(left_cube) = left_join_hints
                                 .iter()
                                 .filter(|hint| !hint.is_empty())
-                                .last()
+                                .next_back()
                                 .and_then(|hint| hint.last())
                                 .or_else(|| left_alias_to_cube.first().map(|(_, cube)| cube))
                                 .cloned()

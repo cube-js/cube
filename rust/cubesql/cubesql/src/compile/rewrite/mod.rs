@@ -508,6 +508,13 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
         },
+        SortProjectionPushdownReplacer {
+            expr: Arc<Expr>,
+            column_to_expr: Vec<(Column, Expr)>,
+        },
+        SortProjectionPullupReplacer {
+            expr: Arc<Expr>,
+        },
         EventNotification {
             name: String,
             members: Vec<LogicalPlan>,
@@ -1069,7 +1076,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
         egraph: &CubeEGraph,
         eclass: Id,
         limit: usize,
-    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+    ) -> Option<SearchMatches<'_, LogicalPlanLanguage>> {
         let mut matches = SearchMatches {
             substs: vec![],
             eclass,
@@ -1090,7 +1097,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
         egraph: &CubeEGraph,
         eclasses: &mut dyn Iterator<Item = Id>,
         limit: usize,
-    ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
+    ) -> Vec<SearchMatches<'_, LogicalPlanLanguage>> {
         let mut result: Vec<SearchMatches<_>> = vec![];
 
         self.list_pattern
@@ -2236,6 +2243,17 @@ fn join_check_pull_up(expr: impl Display, left: impl Display, right: impl Displa
     format!("(JoinCheckPullUp {expr} {left} {right})")
 }
 
+fn sort_projection_pushdown_replacer(expr: impl Display, column_to_expr: impl Display) -> String {
+    format!(
+        "(SortProjectionPushdownReplacer {} {})",
+        expr, column_to_expr
+    )
+}
+
+fn sort_projection_pullup_replacer(expr: impl Display) -> String {
+    format!("(SortProjectionPullupReplacer {})", expr)
+}
+
 pub fn original_expr_name(egraph: &CubeEGraph, id: Id) -> Option<String> {
     egraph[id]
         .data
@@ -2262,7 +2280,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
         egraph: &CubeEGraph,
         eclasses: &mut dyn Iterator<Item = Id>,
         limit: usize,
-    ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
+    ) -> Vec<SearchMatches<'_, LogicalPlanLanguage>> {
         let matches = self
             .main
             .search_eclasses_with_limit(egraph, eclasses, limit);
@@ -2280,7 +2298,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
         egraph: &CubeEGraph,
         eclass: Id,
         limit: usize,
-    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+    ) -> Option<SearchMatches<'_, LogicalPlanLanguage>> {
         if let Some(m) = self.main.search_eclass_with_limit(egraph, eclass, limit) {
             self.search_match_chained(egraph, m)
         } else {

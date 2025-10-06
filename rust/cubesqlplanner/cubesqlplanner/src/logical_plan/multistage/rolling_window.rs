@@ -1,6 +1,8 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::Granularity;
+use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct MultiStageRegularRollingWindow {
@@ -24,14 +26,17 @@ impl PrettyPrint for MultiStageRegularRollingWindow {
 }
 
 pub struct MultiStageToDateRollingWindow {
-    pub granularity: String,
+    pub granularity_obj: Rc<Granularity>,
 }
 
 impl PrettyPrint for MultiStageToDateRollingWindow {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println("ToDate Rolling Window", state);
         let state = state.new_level();
-        result.println(&format!("granularity: {}", self.granularity), &state);
+        result.println(
+            &format!("granularity: {}", self.granularity_obj.granularity()),
+            &state,
+        );
     }
 }
 
@@ -104,5 +109,32 @@ impl PrettyPrint for MultiStageRollingWindow {
             ),
             &state,
         );
+    }
+}
+
+impl LogicalNode for MultiStageRollingWindow {
+    fn as_plan_node(self: &Rc<Self>) -> PlanNode {
+        PlanNode::MultiStageRollingWindow(self.clone())
+    }
+
+    fn inputs(&self) -> Vec<PlanNode> {
+        vec![] // MultiStageRollingWindow has no inputs
+    }
+
+    fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
+        check_inputs_len(&inputs, 0, self.node_name())?;
+        Ok(self)
+    }
+
+    fn node_name(&self) -> &'static str {
+        "MultiStageRollingWindow"
+    }
+
+    fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
+        if let PlanNode::MultiStageRollingWindow(item) = plan_node {
+            Ok(item)
+        } else {
+            Err(cast_error(&plan_node, "MultiStageRollingWindow"))
+        }
     }
 }

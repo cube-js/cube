@@ -1,19 +1,22 @@
 use std::{
     any::type_name,
+    convert::TryInto,
+    mem::swap,
     sync::{Arc, LazyLock},
     thread,
 };
 
-use chrono::{Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Date32Array, Float64Array, Float64Builder, GenericStringArray, Int32Builder,
-            Int64Array, Int64Builder, IntervalDayTimeBuilder, IntervalMonthDayNanoArray, ListArray,
+            Date32Array, Float64Array, Float64Builder, GenericStringArray, Int32Array,
+            Int32Builder, Int64Array, Int64Builder, IntervalMonthDayNanoArray, ListArray,
             ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
             StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
-            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder, UInt64Builder,
+            TimestampNanosecondArray, TimestampNanosecondBuilder, TimestampSecondArray,
+            UInt32Builder, UInt64Builder,
         },
         compute::{cast, concat},
         datatypes::{
@@ -21,6 +24,7 @@ use datafusion::{
             IntervalDayTimeType, IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType,
             TimeUnit, TimestampNanosecondType, UInt32Type,
         },
+        temporal_conversions::timestamp_ns_to_datetime,
     },
     error::{DataFusionError, Result},
     execution::context::SessionContext,
@@ -90,28 +94,6 @@ pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
 
     create_udf(
         name.as_str(),
-        vec![],
-        Arc::new(DataType::Utf8),
-        Volatility::Immutable,
-        fun,
-    )
-}
-
-// It's the same as current_user UDF, but with another host
-pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
-    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = StringBuilder::new(1);
-        if let Some(user) = &state.user() {
-            builder.append_value(user.clone() + "@127.0.0.1").unwrap();
-        } else {
-            builder.append_null()?;
-        }
-
-        Ok(Arc::new(builder.finish()) as ArrayRef)
-    });
-
-    create_udf(
-        "user",
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
@@ -767,134 +749,6 @@ pub fn create_greatest_udf() -> ScalarUDF {
             vec![DataType::Int64, DataType::UInt64, DataType::Float64],
             Volatility::Immutable,
         ),
-        &return_type,
-        &fun,
-    )
-}
-
-// CONVERT_TZ() converts a datetime value dt from the time zone given by from_tz to the time zone given by to_tz and returns the resulting value.
-pub fn create_convert_tz_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 3);
-
-        let input_dt = &args[0];
-        let from_tz = &args[1];
-        let to_tz = &args[2];
-
-        let (_, input_tz) = match input_dt.data_type() {
-            DataType::Timestamp(unit, tz) => (unit, tz),
-            _ => {
-                return Err(DataFusionError::Execution(format!(
-                    "dt argument must be a Timestamp, actual: {}",
-                    from_tz.data_type()
-                )));
-            }
-        };
-
-        if from_tz.data_type() == &DataType::UInt8 {
-            return Err(DataFusionError::Execution(format!(
-                "from_tz argument must be a Utf8, actual: {}",
-                from_tz.data_type()
-            )));
-        };
-
-        if to_tz.data_type() == &DataType::UInt8 {
-            return Err(DataFusionError::Execution(format!(
-                "to_tz argument must be a Utf8, actual: {}",
-                to_tz.data_type()
-            )));
-        };
-
-        let from_tz = downcast_string_arg!(&from_tz, "from_tz", i32);
-        let to_tz = downcast_string_arg!(&to_tz, "to_tz", i32);
-
-        if from_tz.value(0) != "SYSTEM" || to_tz.value(0) != "+00:00" {
-            return Err(DataFusionError::NotImplemented(format!(
-                "convert_tz is not implemented, it's stub"
-            )));
-        }
-
-        if let Some(tz) = input_tz {
-            if tz != "UTC" {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "convert_tz does not non UTC timezone as input, actual {}",
-                    tz
-                )));
-            };
-        };
-
-        Ok(input_dt.clone())
-    });
-
-    let return_type: ReturnTypeFunction = Arc::new(move |types| {
-        assert!(types.len() == 3);
-
-        Ok(Arc::new(types[0].clone()))
-    });
-
-    ScalarUDF::new(
-        "convert_tz",
-        &Signature::any(3, Volatility::Immutable),
-        &return_type,
-        &fun,
-    )
-}
-
-pub fn create_timediff_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 2);
-
-        let left_dt = &args[0];
-        let right_dt = &args[1];
-
-        let left_date = match left_dt.data_type() {
-            DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-                let arr = downcast_primitive_arg!(left_dt, "left_dt", TimestampNanosecondType);
-                let ts = arr.value(0);
-
-                // NaiveDateTime::from_timestamp(ts, 0)
-                ts
-            }
-            _ => {
-                return Err(DataFusionError::Execution(format!(
-                    "left_dt argument must be a Timestamp, actual: {}",
-                    left_dt.data_type()
-                )));
-            }
-        };
-
-        let right_date = match right_dt.data_type() {
-            DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-                let arr = downcast_primitive_arg!(right_dt, "right_dt", TimestampNanosecondType);
-                arr.value(0)
-            }
-            _ => {
-                return Err(DataFusionError::Execution(format!(
-                    "right_dt argument must be a Timestamp, actual: {}",
-                    right_dt.data_type()
-                )));
-            }
-        };
-
-        let diff = right_date - left_date;
-        if diff != 0 {
-            return Err(DataFusionError::NotImplemented(format!(
-                "timediff is not implemented, it's stub"
-            )));
-        }
-
-        let mut interal_arr = IntervalDayTimeBuilder::new(1);
-        interal_arr.append_value(diff)?;
-
-        Ok(Arc::new(interal_arr.finish()) as ArrayRef)
-    });
-
-    let return_type: ReturnTypeFunction =
-        Arc::new(move |_| Ok(Arc::new(DataType::Interval(IntervalUnit::DayTime))));
-
-    ScalarUDF::new(
-        "timediff",
-        &Signature::any(2, Volatility::Immutable),
         &return_type,
         &fun,
     )
@@ -1872,6 +1726,44 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             }
                             PgTypeId::ARRAYINT8MULTIRANGE => {
                                 format!("int8multirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGAM => {
+                                format!("pg_am{}[]", typemod_str())
+                            }
+                            PgTypeId::PGAM => {
+                                format!("pg_am{}", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGLANGUAGE => {
+                                format!("pg_language{}[]", typemod_str())
+                            }
+                            PgTypeId::PGLANGUAGE => {
+                                format!("pg_language{}", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGEVENTTRIGGER => {
+                                format!("pg_event_trigger{}[]", typemod_str())
+                            }
+                            PgTypeId::PGEVENTTRIGGER => {
+                                format!("pg_event_trigger{}", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGCAST => {
+                                format!("pg_cast{}[]", typemod_str())
+                            }
+                            PgTypeId::PGCAST => format!("pg_cast{}", typemod_str()),
+                            PgTypeId::ARRAYPGEXTENSION => {
+                                format!("pg_extension{}[]", typemod_str())
+                            }
+                            PgTypeId::PGEXTENSION => format!("pg_extension{}", typemod_str()),
+                            PgTypeId::ARRAYPGFOREIGNDATAWRAPPER => {
+                                format!("pg_foreign_data_wrapper{}[]", typemod_str())
+                            }
+                            PgTypeId::PGFOREIGNDATAWRAPPER => {
+                                format!("pg_foreign_data_wrapper{}", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGFOREIGNSERVER => {
+                                format!("pg_foreign_server{}[]", typemod_str())
+                            }
+                            PgTypeId::PGFOREIGNSERVER => {
+                                format!("pg_foreign_server{}", typemod_str())
                             }
                             PgTypeId::ARRAYPGCONSTRAINT => {
                                 format!("pg_constraint{}[]", typemod_str())
@@ -3752,6 +3644,148 @@ pub fn create_pg_get_indexdef_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_age_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| match args.len() {
+        1 => {
+            // Special handling for `AGE(xid)`
+            if args[0].data_type() == &DataType::UInt32 {
+                let xids = downcast_primitive_arg!(args[0], "xid", OidType);
+
+                let result = xids
+                    .iter()
+                    .map(|xid| xid.map(|_| i32::MAX))
+                    .collect::<Int32Array>();
+
+                return Ok(Arc::new(result) as ArrayRef);
+            }
+
+            let older_dates =
+                downcast_primitive_arg!(args[0], "older_date", TimestampNanosecondType);
+            let current_date = Utc::now().date_naive().and_time(NaiveTime::default());
+
+            let result = older_dates
+                .iter()
+                .map(|older_date| {
+                    older_date
+                        .map(|older_date| {
+                            let older_date = timestamp_ns_to_datetime(older_date);
+                            timestamp_difference_to_interval_month_day_nano(
+                                current_date,
+                                older_date,
+                            )
+                        })
+                        .transpose()
+                })
+                .collect::<Result<IntervalMonthDayNanoArray>>()?;
+
+            Ok(Arc::new(result) as ArrayRef)
+        }
+        2 => {
+            let newer_dates =
+                downcast_primitive_arg!(args[0], "newer_date", TimestampNanosecondType);
+            let older_dates =
+                downcast_primitive_arg!(args[1], "older_date", TimestampNanosecondType);
+
+            let result = newer_dates
+                .iter()
+                .zip(older_dates)
+                .map(|dates| match dates {
+                    (Some(newer_date), Some(older_date)) => {
+                        let newer_date = timestamp_ns_to_datetime(newer_date);
+                        let older_date = timestamp_ns_to_datetime(older_date);
+                        timestamp_difference_to_interval_month_day_nano(newer_date, older_date)
+                            .map(Some)
+                    }
+                    _ => Ok(None),
+                })
+                .collect::<Result<IntervalMonthDayNanoArray>>()?;
+
+            Ok(Arc::new(result) as ArrayRef)
+        }
+        _ => Err(DataFusionError::Execution(
+            "AGE function requires 1 or 2 arguments".to_string(),
+        )),
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |dt| {
+        // Special handling for `AGE(xid)` which returns Int32
+        if dt.len() == 1 && dt[0] == DataType::UInt32 {
+            return Ok(Arc::new(DataType::Int32));
+        }
+        Ok(Arc::new(DataType::Interval(IntervalUnit::MonthDayNano)))
+    });
+
+    ScalarUDF::new(
+        "age",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Timestamp(TimeUnit::Nanosecond, None)]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                ]),
+                TypeSignature::Exact(vec![DataType::UInt32]),
+            ],
+            // NOTE: volatility should be `Stable` but we have no access
+            // to `query_execution_start_time`
+            Volatility::Volatile,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+fn timestamp_difference_to_interval_month_day_nano(
+    newer_date: NaiveDateTime,
+    older_date: NaiveDateTime,
+) -> Result<i128> {
+    if newer_date == older_date {
+        return Ok(0);
+    }
+    let mut newer_date = newer_date;
+    let mut older_date = older_date;
+    let reverse = if older_date > newer_date {
+        swap(&mut newer_date, &mut older_date);
+        true
+    } else {
+        false
+    };
+
+    let years = newer_date.year() - older_date.year();
+    let mut months: i32 = (newer_date.month() as i32) - (older_date.month() as i32);
+    months += years * 12;
+    if newer_date.day() < older_date.day()
+        || (newer_date.day() == older_date.day() && newer_date.time() < older_date.time())
+    {
+        months -= 1;
+    }
+
+    let offset_older_date = older_date
+        .checked_add_months(Months::new(months as u32))
+        .ok_or_else(|| DataFusionError::Execution("Cannot add months to date".to_string()))?;
+    let duration = newer_date - offset_older_date;
+    let mut days: i32 = duration
+        .num_days()
+        .try_into()
+        .map_err(|_| DataFusionError::Execution("Cannot convert days to i32".to_string()))?;
+
+    let offset_older_date = offset_older_date
+        .checked_add_days(Days::new(days as u64))
+        .ok_or_else(|| DataFusionError::Execution("Cannot add days to date".to_string()))?;
+    let duration = newer_date - offset_older_date;
+    let mut nanos = duration.num_nanoseconds().ok_or_else(|| {
+        DataFusionError::Execution("Cannot convert duration to nanoseconds".to_string())
+    })?;
+
+    if reverse {
+        months = -months;
+        days = -days;
+        nanos = -nanos;
+    }
+    let result = IntervalMonthDayNanoType::make_value(months, days, nanos);
+    Ok(result)
+}
+
 pub fn create_udf_stub(
     name: &'static str,
     type_signature: TypeSignature,
@@ -3872,6 +3906,138 @@ pub fn create_inet_server_addr_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_pg_get_partkeydef_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let table_oids = downcast_primitive_arg!(args[0], "table_oid", OidType);
+
+        let result = table_oids
+            .iter()
+            .map(|_| None::<String>)
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "pg_get_partkeydef",
+        vec![DataType::UInt32],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_pg_relation_size_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let relids = downcast_primitive_arg!(args[0], "relid", OidType);
+
+        // 8192 is the lowest size for a table that has at least one column
+        // TODO: check if the requested table actually exists
+        let result = relids
+            .iter()
+            .map(|relid| relid.map(|_| 8192))
+            .collect::<PrimitiveArray<Int64Type>>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "pg_relation_size",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::UInt32]),
+                TypeSignature::Exact(vec![DataType::UInt32, DataType::Utf8]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_postmaster_start_time_udf() -> ScalarUDF {
+    let fun_registration_nanos = Utc::now()
+        .timestamp_nanos_opt()
+        .expect("Unable to get current time as nanoseconds");
+
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = TimestampNanosecondBuilder::new(1);
+        builder.append_value(fun_registration_nanos).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+
+    ScalarUDF::new(
+        "pg_postmaster_start_time",
+        &Signature::exact(vec![], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_txid_current_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = Int64Builder::new(1);
+        builder.append_value(1).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "txid_current",
+        &Signature::exact(vec![], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_is_in_recovery_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = BooleanBuilder::new(1);
+        builder.append_value(false).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "pg_is_in_recovery",
+        &Signature::exact(vec![], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_tablespace_location_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let oids = downcast_primitive_arg!(args[0], "oid", OidType);
+        let result = oids.iter().map(|_| Some("")).collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_tablespace_location",
+        &Signature::exact(vec![DataType::UInt32], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     macro_rules! register_fun_stub {
         ($FTYP:ident, $NAME:expr, argc=$ARGC:expr $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {
@@ -3987,13 +4153,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     // NOTE: lack of "rettyp" implies "type of first arg"
     register_fun_stub!(udf, "acosd", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "acosh", tsig = [Float64], rettyp = Float64);
-    register_fun_stub!(
-        udf,
-        "age",
-        tsigs = [[Timestamp], [Timestamp, Timestamp],],
-        rettyp = Interval,
-        vol = Stable
-    );
     register_fun_stub!(udf, "asind", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "asinh", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "atan2", tsig = [Float64, Float64], rettyp = Float64);
@@ -4037,13 +4196,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     register_fun_stub!(udf, "cosh", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "cot", tsig = [Float64], rettyp = Float64);
     register_fun_stub!(udf, "cotd", tsig = [Float64], rettyp = Float64);
-    register_fun_stub!(
-        udf,
-        "current_catalog",
-        argc = 0,
-        rettyp = Utf8,
-        vol = Stable
-    );
     register_fun_stub!(udf, "current_query", argc = 0, rettyp = Utf8, vol = Stable);
     register_fun_stub!(udf, "current_role", argc = 0, rettyp = Utf8, vol = Stable);
     register_fun_stub!(
@@ -4633,13 +4785,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     );
     register_fun_stub!(
         udf,
-        "pg_is_in_recovery",
-        argc = 0,
-        rettyp = Boolean,
-        vol = Volatile
-    );
-    register_fun_stub!(
-        udf,
         "pg_is_wal_replay_paused",
         argc = 0,
         rettyp = Boolean,
@@ -4703,13 +4848,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     );
     register_fun_stub!(
         udf,
-        "pg_postmaster_start_time",
-        argc = 0,
-        rettyp = TimestampTz,
-        vol = Stable
-    );
-    register_fun_stub!(
-        udf,
         "pg_promote",
         tsigs = [[], [Boolean], [Boolean, Int32],],
         rettyp = Boolean,
@@ -4741,13 +4879,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         "pg_relation_filepath",
         tsig = [Regclass],
         rettyp = Utf8,
-        vol = Volatile
-    );
-    register_fun_stub!(
-        udf,
-        "pg_relation_size",
-        tsigs = [[Regclass], [Regclass, Utf8],],
-        rettyp = Int64,
         vol = Volatile
     );
     register_fun_stub!(
@@ -4843,13 +4974,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         tsig = [Regclass],
         rettyp = Int64,
         vol = Volatile
-    );
-    register_fun_stub!(
-        udf,
-        "pg_tablespace_location",
-        tsig = [Oid],
-        rettyp = Utf8,
-        vol = Stable
     );
     register_fun_stub!(
         udf,
@@ -5036,7 +5160,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         vol = Stable
     );
     register_fun_stub!(udf, "trim_scale", tsig = [Float64], rettyp = Float64);
-    register_fun_stub!(udf, "txid_current", argc = 0, rettyp = Int64, vol = Stable);
     register_fun_stub!(
         udf,
         "txid_current_if_assigned",

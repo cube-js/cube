@@ -1,4 +1,5 @@
 use super::utils;
+use crate::compile::date_parser::parse_date_str;
 use crate::{
     compile::rewrite::{
         alias_expr,
@@ -49,6 +50,7 @@ use datafusion::{
 };
 use egg::{Subst, Var};
 use std::{
+    cmp::{max, min},
     collections::HashSet,
     fmt::Display,
     ops::{Index, IndexMut},
@@ -1667,15 +1669,43 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
+            // DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") = 2019
             transforming_rewrite(
                 "extract-year-equals",
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DatePart",
+                            vec![literal_string("year"), column_expr("?column")],
+                        ),
+                        "=",
+                        literal_expr("?year"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                self.transform_filter_extract_year_equals(
+                    "?year",
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?member",
+                    "?values",
+                    "?filter_aliases",
+                ),
+            ),
+            // TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) = 2019
+            transforming_rewrite(
+                "extract-trunc-year-equals",
                 filter_replacer(
                     binary_expr(
                         self.fun_expr(
                             "Trunc",
                             vec![self.fun_expr(
                                 "DatePart",
-                                vec![literal_string("YEAR"), column_expr("?column")],
+                                vec![literal_string("year"), column_expr("?column")],
                             )],
                         ),
                         "=",
@@ -1694,6 +1724,219 @@ impl RewriteRules for FilterRules {
                     "?member",
                     "?values",
                     "?filter_aliases",
+                ),
+            ),
+            // TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) = 2019
+            // AND TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) = 3
+            transforming_rewrite(
+                "extract-date-range-and-trunc-gran-equals",
+                filter_op(
+                    filter_op_filters(
+                        filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                        filter_replacer(
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_expr("?granularity"), column_expr("?column")],
+                                    )],
+                                ),
+                                "=",
+                                literal_expr("?value"),
+                            ),
+                            "?alias_to_cube",
+                            "?members",
+                            "?filter_aliases",
+                        ),
+                    ),
+                    "FilterOpOp:and",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?new_values"),
+                self.transform_filter_extract_date_range_and_trunc_gran_equals(
+                    "?member",
+                    "?values",
+                    "?granularity",
+                    "?column",
+                    "?value",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                    "?new_values",
+                ),
+            ),
+            // When the filter set above is paired with other filters, it needs to be
+            // regrouped for the above rewrite rule to match
+            rewrite(
+                "extract-date-range-and-trunc-regroup-and",
+                filter_op(
+                    filter_op_filters(
+                        filter_op(
+                            filter_op_filters(
+                                "?expr",
+                                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                            ),
+                            "FilterOpOp:and",
+                        ),
+                        filter_replacer(
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_expr("?granularity"), column_expr("?column")],
+                                    )],
+                                ),
+                                "=",
+                                literal_expr("?value"),
+                            ),
+                            "?alias_to_cube",
+                            "?members",
+                            "?filter_aliases",
+                        ),
+                    ),
+                    "FilterOpOp:and",
+                ),
+                filter_op(
+                    filter_op_filters(
+                        "?expr",
+                        filter_op(
+                            filter_op_filters(
+                                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                                filter_replacer(
+                                    binary_expr(
+                                        self.fun_expr(
+                                            "Trunc",
+                                            vec![self.fun_expr(
+                                                "DatePart",
+                                                vec![
+                                                    literal_expr("?granularity"),
+                                                    column_expr("?column"),
+                                                ],
+                                            )],
+                                        ),
+                                        "=",
+                                        literal_expr("?value"),
+                                    ),
+                                    "?alias_to_cube",
+                                    "?members",
+                                    "?filter_aliases",
+                                ),
+                            ),
+                            "FilterOpOp:and",
+                        ),
+                    ),
+                    "FilterOpOp:and",
+                ),
+            ),
+            // The filter set above may be inverted, let's account for that as well
+            rewrite(
+                "extract-date-range-and-trunc-reverse",
+                filter_op(
+                    filter_op_filters(
+                        filter_replacer(
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_expr("?granularity"), column_expr("?column")],
+                                    )],
+                                ),
+                                "=",
+                                literal_expr("?value"),
+                            ),
+                            "?alias_to_cube",
+                            "?members",
+                            "?filter_aliases",
+                        ),
+                        filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                    ),
+                    "FilterOpOp:and",
+                ),
+                filter_op(
+                    filter_op_filters(
+                        filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                        filter_replacer(
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_expr("?granularity"), column_expr("?column")],
+                                    )],
+                                ),
+                                "=",
+                                literal_expr("?value"),
+                            ),
+                            "?alias_to_cube",
+                            "?members",
+                            "?filter_aliases",
+                        ),
+                    ),
+                    "FilterOpOp:and",
+                ),
+            ),
+            rewrite(
+                "extract-date-range-and-trunc-reverse-nested",
+                filter_op(
+                    filter_op_filters(
+                        filter_op(
+                            filter_op_filters(
+                                "?expr",
+                                filter_replacer(
+                                    binary_expr(
+                                        self.fun_expr(
+                                            "Trunc",
+                                            vec![self.fun_expr(
+                                                "DatePart",
+                                                vec![
+                                                    literal_expr("?granularity"),
+                                                    column_expr("?column"),
+                                                ],
+                                            )],
+                                        ),
+                                        "=",
+                                        literal_expr("?value"),
+                                    ),
+                                    "?alias_to_cube",
+                                    "?members",
+                                    "?filter_aliases",
+                                ),
+                            ),
+                            "FilterOpOp:and",
+                        ),
+                        filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                    ),
+                    "FilterOpOp:and",
+                ),
+                filter_op(
+                    filter_op_filters(
+                        filter_op(
+                            filter_op_filters(
+                                "?expr",
+                                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                            ),
+                            "FilterOpOp:and",
+                        ),
+                        filter_replacer(
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_expr("?granularity"), column_expr("?column")],
+                                    )],
+                                ),
+                                "=",
+                                literal_expr("?value"),
+                            ),
+                            "?alias_to_cube",
+                            "?members",
+                            "?filter_aliases",
+                        ),
+                    ),
+                    "FilterOpOp:and",
                 ),
             ),
             transforming_rewrite(
@@ -2954,7 +3197,7 @@ impl FilterRules {
                         subst,
                         &meta_context,
                         alias_to_cube_var,
-                        &[column.clone()],
+                        std::slice::from_ref(column),
                         members_var,
                         &aliases,
                     ) else {
@@ -3578,48 +3821,218 @@ impl FilterRules {
                     .collect();
             for year in years {
                 for aliases in aliases_es.iter() {
-                    if let ScalarValue::Int64(Some(year)) = year {
-                        if !(1000..=9999).contains(&year) {
+                    let year = match year {
+                        ScalarValue::Int64(Some(year)) => year,
+                        ScalarValue::Int32(Some(year)) => year as i64,
+                        ScalarValue::Float64(Some(year)) if (1000.0..=9999.0).contains(&year) => {
+                            year.round() as i64
+                        }
+                        ScalarValue::Utf8(Some(ref year_str)) if year_str.len() == 4 => {
+                            if let Ok(year) = year_str.parse::<i64>() {
+                                year
+                            } else {
+                                continue;
+                            }
+                        }
+                        _ => continue,
+                    };
+
+                    if !(1000..=9999).contains(&year) {
+                        continue;
+                    }
+
+                    if let Some((member_name, cube)) = Self::filter_member_name(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        column_var,
+                        members_var,
+                        &aliases,
+                    ) {
+                        if !cube.contains_member(&member_name) {
                             continue;
                         }
 
-                        if let Some((member_name, cube)) = Self::filter_member_name(
-                            egraph,
-                            subst,
-                            &meta_context,
-                            alias_to_cube_var,
-                            column_var,
-                            members_var,
-                            &aliases,
-                        ) {
-                            if !cube.contains_member(&member_name) {
-                                continue;
-                            }
+                        subst.insert(
+                            member_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                                FilterMemberMember(member_name.to_string()),
+                            )),
+                        );
 
-                            subst.insert(
-                                member_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberMember(
-                                    FilterMemberMember(member_name.to_string()),
-                                )),
-                            );
+                        subst.insert(
+                            values_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                FilterMemberValues(vec![
+                                    format!("{}-01-01", year),
+                                    format!("{}-12-31", year),
+                                ]),
+                            )),
+                        );
 
-                            subst.insert(
-                                values_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                                    FilterMemberValues(vec![
-                                        format!("{}-01-01", year),
-                                        format!("{}-12-31", year),
-                                    ]),
-                                )),
-                            );
-
-                            return true;
-                        }
+                        return true;
                     }
                 }
             }
 
             false
+        }
+    }
+
+    fn transform_filter_extract_date_range_and_trunc_gran_equals(
+        &self,
+        member_var: &'static str,
+        values_var: &'static str,
+        granularity_var: &'static str,
+        column_var: &'static str,
+        value_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+        new_values_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let member_var = var!(member_var);
+        let values_var = var!(values_var);
+        let granularity_var = var!(granularity_var);
+        let column_var = var!(column_var);
+        let value_var = var!(value_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let new_values_var = var!(new_values_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            // Validate that the member name is the same as the passed column
+            let member_names = var_iter!(egraph[subst[member_var]], FilterMemberMember)
+                .cloned()
+                .collect::<Vec<_>>();
+            let aliases_es = var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                .cloned()
+                .collect::<Vec<_>>();
+            let mut equal_member = false;
+            'member: for member in member_names {
+                for aliases in &aliases_es {
+                    let Some((member_name, cube)) = Self::filter_member_name(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        column_var,
+                        members_var,
+                        &aliases,
+                    ) else {
+                        continue;
+                    };
+
+                    if !cube.contains_member(&member_name) {
+                        continue;
+                    }
+
+                    if member_name != member {
+                        continue;
+                    }
+
+                    equal_member = true;
+                    break 'member;
+                }
+            }
+            if !equal_member {
+                return false;
+            }
+
+            // Get the original dates
+            let Some((start_date, end_date)) =
+                var_iter!(egraph[subst[values_var]], FilterMemberValues).find_map(|values| {
+                    if values.len() != 2 {
+                        return None;
+                    }
+                    // Only date formats are supported for now, no timestamps
+                    let start_date = NaiveDate::parse_from_str(&values[0], "%Y-%m-%d").ok()?;
+                    let end_date = NaiveDate::parse_from_str(&values[1], "%Y-%m-%d").ok()?;
+                    Some((start_date, end_date))
+                })
+            else {
+                return false;
+            };
+
+            // Get the new granularity
+            let Some(granularity) = var_iter!(egraph[subst[granularity_var]], LiteralExprValue)
+                .find_map(|granularity| {
+                    if let ScalarValue::Utf8(Some(granularity)) = granularity {
+                        Some(granularity.clone())
+                    } else {
+                        None
+                    }
+                })
+            else {
+                return false;
+            };
+
+            // Get the value for that granularity
+            let Some(value) = var_iter!(egraph[subst[value_var]], LiteralExprValue).find_map(
+                |value| match value {
+                    ScalarValue::Int64(Some(value)) => Some(*value),
+                    ScalarValue::Int32(Some(value)) => Some(*value as i64),
+                    ScalarValue::Float64(Some(value)) if (0.0..=9999.0).contains(value) => {
+                        Some(value.round() as i64)
+                    }
+                    ScalarValue::Utf8(Some(value_str)) => value_str.parse::<i64>().ok(),
+                    _ => None,
+                },
+            ) else {
+                return false;
+            };
+
+            let new_values = match granularity.as_str() {
+                "month" => {
+                    // Check that the range only covers one year
+                    let start_date_year = start_date.year();
+                    if start_date_year != end_date.year() {
+                        return false;
+                    }
+                    // Month value must be valid
+                    if !(1..=12).contains(&value) {
+                        return false;
+                    }
+
+                    // Obtain the new range
+                    let Some(new_start_date) =
+                        NaiveDate::from_ymd_opt(start_date_year, value as u32, 1)
+                    else {
+                        return false;
+                    };
+                    let Some(new_end_date) = new_start_date
+                        .checked_add_months(Months::new(1))
+                        .and_then(|date| date.checked_sub_days(Days::new(1)))
+                    else {
+                        return false;
+                    };
+
+                    // If the resulting range is outside of the original range, we can't merge
+                    // the filters
+                    if new_start_date > end_date || new_end_date < start_date {
+                        return false;
+                    }
+
+                    let new_start_date = max(new_start_date, start_date);
+                    let new_end_date = min(new_end_date, end_date);
+                    vec![
+                        new_start_date.format("%Y-%m-%d").to_string(),
+                        new_end_date.format("%Y-%m-%d").to_string(),
+                    ]
+                }
+                // TODO: handle more granularities
+                _ => return false,
+            };
+
+            subst.insert(
+                new_values_var,
+                egraph.add(LogicalPlanLanguage::FilterMemberValues(FilterMemberValues(
+                    new_values,
+                ))),
+            );
+            true
         }
     }
 
@@ -4568,36 +4981,36 @@ impl FilterRules {
         let date_range_start_op_var = date_range_start_op_var.parse().unwrap();
         let date_range_end_op_var = date_range_end_op_var.parse().unwrap();
         move |egraph, subst| {
-            fn resolve_time_delta(date_var: &String, op: &String) -> String {
+            fn resolve_time_delta(date_var: &String, op: &String) -> Option<String> {
                 if op == "afterDate" {
                     return increment_iso_timestamp_time(date_var);
                 } else if op == "beforeDate" {
                     return decrement_iso_timestamp_time(date_var);
                 } else {
-                    return date_var.clone();
+                    return Some(date_var.clone());
                 }
             }
 
-            fn increment_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
+            fn increment_iso_timestamp_time(date_var: &String) -> Option<String> {
+                let timestamp = parse_date_str(date_var);
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_add_signed(Duration::milliseconds(1)).unwrap(),
                     ),
-                    Err(_) => date_var.clone(),
+                    Err(_) => return None,
                 };
-                return value;
+                return Some(value);
             }
 
-            fn decrement_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
+            fn decrement_iso_timestamp_time(date_var: &String) -> Option<String> {
+                let timestamp = parse_date_str(date_var);
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
                     ),
-                    Err(_) => date_var.clone(),
+                    Err(_) => return None,
                 };
-                return value;
+                return Some(value);
             }
 
             for date_range_start in
@@ -4630,10 +5043,16 @@ impl FilterRules {
                             }
 
                             let mut result = Vec::new();
-                            let resolved_start_date =
-                                resolve_time_delta(&date_range_start[0], date_range_start_op);
-                            let resolved_end_date =
-                                resolve_time_delta(&date_range_end[0], date_range_end_op);
+                            let Some(resolved_start_date) =
+                                resolve_time_delta(&date_range_start[0], date_range_start_op)
+                            else {
+                                return false;
+                            };
+                            let Some(resolved_end_date) =
+                                resolve_time_delta(&date_range_end[0], date_range_end_op)
+                            else {
+                                return false;
+                            };
 
                             if swap_left_and_right {
                                 result.extend(vec![resolved_end_date]);
@@ -5222,12 +5641,7 @@ impl FilterRules {
         let Some(str) = str else {
             return Some(None);
         };
-        let dt = NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S%.f")
-            .or_else(|_| NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S"))
-            .or_else(|_| {
-                NaiveDate::parse_from_str(str, "%Y-%m-%d")
-                    .map(|date| date.and_hms_opt(0, 0, 0).unwrap())
-            });
+        let dt = parse_date_str(str.as_str());
         let Ok(dt) = dt else {
             return None;
         };

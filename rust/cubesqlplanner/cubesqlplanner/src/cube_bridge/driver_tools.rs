@@ -24,12 +24,14 @@ pub trait DriverTools {
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
     fn subtract_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
     fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
+    fn interval_string(&self, interval: String) -> Result<String, CubeError>;
     fn add_timestamp_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
     fn interval_and_minimal_time_unit(&self, interval: String) -> Result<Vec<String>, CubeError>;
     fn hll_init(&self, sql: String) -> Result<String, CubeError>;
     fn hll_merge(&self, sql: String) -> Result<String, CubeError>;
     fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError>;
     fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError>;
+    fn support_generated_series_for_custom_td(&self) -> Result<bool, CubeError>;
     fn date_bin(
         &self,
         interval: String,

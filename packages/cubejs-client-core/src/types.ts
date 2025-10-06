@@ -364,6 +364,7 @@ export type BaseCubeMember = {
   isVisible?: boolean;
   public?: boolean;
   meta?: any;
+  aliasMember?: string;
 };
 
 export type TCubeMeasure = BaseCubeMember & {
@@ -417,6 +418,11 @@ export type TCubeFolder = {
   members: string[];
 };
 
+export type TCubeNestedFolder = {
+  name: string;
+  members: (string | TCubeNestedFolder)[];
+};
+
 export type TCubeHierarchy = {
   name: string;
   title?: string;
@@ -451,6 +457,7 @@ export type Cube = {
   dimensions: TCubeDimension[];
   segments: TCubeSegment[];
   folders: TCubeFolder[];
+  nestedFolders: TCubeNestedFolder[];
   hierarchies: TCubeHierarchy[];
   connectedComponent?: number;
   type?: 'view' | 'cube';

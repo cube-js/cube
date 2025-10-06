@@ -111,7 +111,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -204,6 +204,10 @@ jobs:
 
   tests:
     runs-on: ubuntu-24.04
+    permissions:
+      id-token: write   # Needed for OIDC+AWS
+      contents: read
+
     timeout-minutes: 30
     needs: [latest-tag-sha, build]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
@@ -225,6 +229,7 @@ jobs:
         snowflake
         snowflake-encrypted-pk
         snowflake-export-bucket-s3
+        snowflake-export-bucket-s3-via-storage-integration-iam-roles
         snowflake-export-bucket-s3-prefix
         snowflake-export-bucket-azure
         snowflake-export-bucket-azure-prefix
@@ -259,6 +264,7 @@ jobs:
           - snowflake
           - snowflake-encrypted-pk
           - snowflake-export-bucket-s3
+          - snowflake-export-bucket-s3-via-storage-integration-iam-roles
           - snowflake-export-bucket-s3-prefix
           - snowflake-export-bucket-azure
           - snowflake-export-bucket-azure-prefix
@@ -269,7 +275,15 @@ jobs:
         include:
           - database: postgres
             use_tesseract_sql_planner: true
+          - database: snowflake
+            use_tesseract_sql_planner: true
+          - database: redshift
+            use_tesseract_sql_planner: true
           - database: bigquery-export-bucket-gcs
+            use_tesseract_sql_planner: true
+          - database: athena-export-bucket-s3
+            use_tesseract_sql_planner: true
+          - database: databricks-jdbc
             use_tesseract_sql_planner: true
       fail-fast: false
 
@@ -330,6 +344,15 @@ jobs:
           gunzip image.tar.gz
           docker load -i image.tar
 
+      - name: Configure AWS credentials via IRSA
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DRIVERS_TESTS_AWS_ROLE_ARN_FOR_SNOWFLAKE }}
+          aws-region: us-west-1
+          mask-aws-account-id: true
+        if: |
+          env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '' && matrix.database == 'snowflake-export-bucket-s3-via-storage-integration-iam-roles'
+
       - name: Run tests
         uses: nick-fields/retry@v3
         # It's enough to test for any one secret because they are set all at once or not set all
@@ -337,6 +360,8 @@ jobs:
           (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
           (!contains(env.CLOUD_DATABASES, matrix.database))
         env:
+          DRIVERS_TESTS_CUBEJS_TRANSPILATION_WORKER_THREADS: true
+          DRIVERS_TESTS_CUBEJS_TRANSPILATION_NATIVE: false
           DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.use_tesseract_sql_planner) || matrix.use_tesseract_sql_planner }}
 
           # Athena

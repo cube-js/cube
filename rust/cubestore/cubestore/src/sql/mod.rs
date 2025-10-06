@@ -461,9 +461,23 @@ impl SqlServiceImpl {
                 };
                 Ok(res)
             }
-            _ => Err(CubeError::user(
-                "Explain not supported for selects from system tables".to_string(),
-            )),
+            QueryPlan::Meta(logical_plan) => {
+                if !analyze {
+                    Ok(DataFrame::new(
+                        vec![Column::new(
+                            "logical plan".to_string(),
+                            ColumnType::String,
+                            0,
+                        )],
+                        vec![Row::new(vec![TableValue::String(pp_plan(&logical_plan))])],
+                    ))
+                } else {
+                    Err(CubeError::user(
+                        "EXPLAIN ANALYZE is not supported for selects from system tables"
+                            .to_string(),
+                    ))
+                }
+            }
         }?;
         Ok(Arc::new(res))
     }
@@ -724,19 +738,31 @@ impl SqlService for SqlServiceImpl {
                         _ => Err(CubeError::user(format!("Bad delimiter {}", option.value))),
                     })?;
 
+                let disable_quoting = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "disable_quoting")
+                    .map_or(Ok(false), |option| match &option.value {
+                        Value::Boolean(value) => Ok(*value),
+                        _ => Err(CubeError::user(format!(
+                            "Bad disable_quoting flag (expected boolean) {}",
+                            option.value
+                        ))),
+                    })?;
+
                 if let Some(delimiter) = delimiter {
+                    let quote = if disable_quoting { None } else { Some('"') };
                     import_format = match import_format {
                         ImportFormat::CSV => ImportFormat::CSVOptions {
                             delimiter: Some(delimiter),
                             has_header: true,
                             escape: None,
-                            quote: None,
+                            quote,
                         },
                         ImportFormat::CSVNoHeader => ImportFormat::CSVOptions {
                             delimiter: Some(delimiter),
                             has_header: false,
                             escape: None,
-                            quote: None,
+                            quote,
                         },
                         ImportFormat::CSVOptions {
                             has_header,
@@ -2815,6 +2841,9 @@ mod tests {
 
                 println!("All partitions: {:#?}", partitions);
 
+                // TODO API to wait for all jobs to be completed and all events processed
+                Delay::new(Duration::from_millis(500)).await;
+
                 let plans = service
                     .plan_query("SELECT sum(num) from foo.numbers where num = 50")
                     .await
@@ -3832,6 +3861,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn explain_meta_logical_plan() {
+        Config::run_test("explain_meta_logical_plan", async move |services| {
+            let service = services.sql_service;
+            service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let result = service.exec_query(
+                "EXPLAIN SELECT table_name FROM information_schema.tables WHERE table_schema = 'foo'"
+            ).await.unwrap();
+            assert_eq!(result.len(), 1);
+            assert_eq!(result.get_columns().len(), 1);
+
+            let pp_plan = match &result
+                .get_rows()[0]
+                .values()[0] {
+                TableValue::String(pp_plan) => pp_plan,
+                _ => {assert!(false); ""}
+            };
+            assert_eq!(
+                pp_plan,
+                "Projection, [information_schema.tables.table_name]\
+                \n  Filter\
+                \n    Scan information_schema.tables, source: InfoSchemaTableProvider, fields: [table_schema, table_name]"
+            );
+        }).await;
+    }
+
+    #[tokio::test]
     async fn explain_logical_plan() {
         Config::run_test("explain_logical_plan", async move |services| {
             let service = services.sql_service;
@@ -3865,6 +3921,7 @@ mod tests {
             );
         }).await;
     }
+
     #[tokio::test]
     async fn explain_physical_plan() {
         Config::test("explain_analyze_router").update_config(|mut config| {
@@ -3875,7 +3932,7 @@ mod tests {
         }).start_test(async move |services| {
             let service = services.sql_service;
 
-            Config::test("expalain_analyze_worker_1").update_config(|mut config| {
+            Config::test("explain_analyze_worker_1").update_config(|mut config| {
                 config.worker_bind_address = Some("127.0.0.1:14006".to_string());
                 config.server_name = "127.0.0.1:14006".to_string();
                 config.metastore_remote_address = Some("127.0.0.1:15006".to_string());

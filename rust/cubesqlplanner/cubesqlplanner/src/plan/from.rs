@@ -1,4 +1,5 @@
-use super::{Join, QueryPlan, Schema, Select};
+use super::{CalcGroupsJoin, Join, QueryPlan, Schema, Select};
+use crate::plan::Union;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseCube, VisitorContext};
 use cubenativeutils::CubeError;
@@ -81,6 +82,14 @@ impl SingleAliasedSource {
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
         let sql = self.source.to_sql(templates, context)?;
+        /* if let SingleSource::Subquery(plan) = &self.source {
+            if let QueryPlan::Union(_) = plan.as_ref() {
+                //FIXME CubeStore (at least old cubestore) don't support alias for union
+                if templates.is_external() {
+                    return Ok(sql);
+                }
+            }
+        } */
 
         templates.query_aliased(&sql, &self.alias)
     }
@@ -91,6 +100,7 @@ pub enum FromSource {
     Empty,
     Single(SingleAliasedSource),
     Join(Rc<Join>),
+    CalcGroupsJoin(Rc<CalcGroupsJoin>),
 }
 
 #[derive(Clone)]
@@ -101,6 +111,10 @@ pub struct From {
 impl From {
     pub fn new(source: FromSource) -> Rc<Self> {
         Rc::new(Self { source })
+    }
+
+    pub fn new_empty() -> Rc<Self> {
+        Self::new(FromSource::Empty)
     }
 
     pub fn new_from_cube(cube: Rc<BaseCube>, alias: Option<String>) -> Rc<Self> {
@@ -129,11 +143,22 @@ impl From {
         )))
     }
 
+    pub fn new_from_union(union: Rc<Union>, alias: String) -> Rc<Self> {
+        Self::new(FromSource::Single(SingleAliasedSource::new_from_subquery(
+            Rc::new(QueryPlan::Union(union)),
+            alias,
+        )))
+    }
+
     pub fn new_from_subselect(plan: Rc<Select>, alias: String) -> Rc<Self> {
         Self::new(FromSource::Single(SingleAliasedSource::new_from_subquery(
             Rc::new(QueryPlan::Select(plan)),
             alias,
         )))
+    }
+
+    pub fn new_from_calc_groups_join(join: Rc<CalcGroupsJoin>) -> Rc<Self> {
+        Self::new(FromSource::CalcGroupsJoin(join))
     }
 
     pub fn to_sql(
@@ -144,9 +169,8 @@ impl From {
         let sql = match &self.source {
             FromSource::Empty => format!(""),
             FromSource::Single(source) => source.to_sql(templates, context.clone())?,
-            FromSource::Join(j) => {
-                format!("{}", j.to_sql(templates, context.clone())?)
-            }
+            FromSource::Join(j) => j.to_sql(templates, context.clone())?,
+            FromSource::CalcGroupsJoin(j) => j.to_sql(templates, context.clone())?,
         };
         Ok(sql)
     }

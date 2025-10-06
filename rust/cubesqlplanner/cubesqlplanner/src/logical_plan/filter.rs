@@ -2,6 +2,7 @@ use super::pretty_print::*;
 use crate::plan::{Filter, FilterItem};
 use itertools::Itertools;
 
+#[derive(Default)]
 pub struct LogicalFilter {
     pub dimensions_filters: Vec<FilterItem>,
     pub time_dimensions_filters: Vec<FilterItem>,
@@ -22,6 +23,15 @@ impl LogicalFilter {
             None
         } else {
             Some(Filter { items })
+        }
+    }
+    pub fn measures_filter(&self) -> Option<Filter> {
+        if self.measures_filter.is_empty() {
+            None
+        } else {
+            Some(Filter {
+                items: self.measures_filter.clone(),
+            })
         }
     }
 }

@@ -105,13 +105,14 @@ components:
       required:
         - name
         - title
-        - interval
       properties:
         name:
           type: "string"
         title:
           type: "string"
         interval:
+          type: "string"
+        sql:
           type: "string"
         offset:
           type: "string"
@@ -142,6 +143,8 @@ components:
             $ref: "#/components/schemas/V1CubeMetaDimensionGranularity"
         meta:
           type: "object"
+        format:
+          $ref: "#/components/schemas/V1CubeMetaFormat"
     V1CubeMetaMeasure:
       type: "object"
       required:
@@ -162,6 +165,11 @@ components:
           type: "string"
         meta:
           type: "object"
+        format:
+          $ref: "#/components/schemas/V1CubeMetaFormat"
+        aliasMember:
+          description: "When measure is defined in View, it keeps the original path: Cube.measure"
+          type: "string"
     V1CubeMetaFolder:
       type: "object"
       required:
@@ -174,6 +182,21 @@ components:
           type: array
           items:
             type: "string"
+    V1CubeMetaNestedFolder:
+      type: "object"
+      required:
+        - name
+        - members
+      properties:
+        name:
+          type: "string"
+        members:
+          type: array
+          items:
+            type: "string"
+            oneOf:
+              - type: string
+              - $ref: "#/components/schemas/V1CubeMetaNestedFolder"
     V1CubeMetaHierarchy:
       type: "object"
       required:
@@ -230,6 +253,10 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1CubeMetaFolder"
+        nestedFolders:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1CubeMetaNestedFolder"
         hierarchies:
           type: "array"
           items:
@@ -240,6 +267,35 @@ components:
       enum:
         - "cube"
         - "view"
+    V1CubeMetaSimpleFormat:
+      type: "string"
+      description: Simple format
+      enum:
+        - "percent"
+        - "currency"
+        - "number"
+        - "imageUrl"
+        - "id"
+        - "link"
+    V1CubeMetaLinkFormat:
+      type: "object"
+      description: Link format with label and type
+      properties:
+        label:
+          type: "string"
+          description: Label for the link
+        type:
+          type: "string"
+          enum: ["link"]
+          description: Type of the format (must be 'link')
+      required:
+        - label
+        - type
+    V1CubeMetaFormat:
+      oneOf:
+        - $ref: "#/components/schemas/V1CubeMetaSimpleFormat"
+        - $ref: "#/components/schemas/V1CubeMetaLinkFormat"
+      description: Format of dimension - can be either a simple string format or an object with link configuration
     V1MetaResponse:
       type: "object"
       properties:

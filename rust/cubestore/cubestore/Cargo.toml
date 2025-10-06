@@ -15,7 +15,6 @@ libc = { version = "0.2.97", optional = true }
 
 [dependencies]
 base64 = "0.13.0"
-bumpalo = "3.6.1"
 tokio = { version = "1", features = ["full", "rt"] }
 warp = { version = "0.3.6" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "4388f6712dae5073c2d71d74f64cae2edd418066" }
@@ -53,6 +52,7 @@ lazy_static = "1.4.0"
 mockall = "0.8.1"
 async-std = "0.99"
 async-stream = "0.3.6"
+indexmap = "2.10.0"
 itertools = "0.11.0"
 bigdecimal = { version = "0.2.0", features = ["serde"] }
 # Right now, it's not possible to use the 0.33 release because it has bugs
@@ -74,7 +74,6 @@ tokio-stream = { version = "0.1.15", features=["io-util"] }
 scopeguard = "1.1.0"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
 tempfile = "3.10.1"
-tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
 memchr = "2"
@@ -120,6 +119,16 @@ sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"
+criterion = { version = "0.5.1", features = ["async_tokio", "html_reports"] }
+md5 = "0.8.0"
+
+[[bench]]
+name = "cachestore_queue"
+harness = false
+
+[[bench]]
+name = "metastore"
+harness = false
 
 [features]
 # When enabled, child processes will die whenever parent process exits.

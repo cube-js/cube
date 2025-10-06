@@ -42,6 +42,7 @@ impl QueueItemPayload {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
 pub(crate) enum QueueItemPayloadRocksIndex {}
 
 pub struct QueueItemPayloadRocksTable<'a> {
@@ -80,6 +81,7 @@ rocks_table_new!(
 );
 
 #[derive(Hash, Clone, Debug)]
+#[allow(dead_code)]
 pub enum QueueItemPayloadIndexKey {}
 
 base_rocks_secondary_index!(QueueItemPayload, QueueItemPayloadRocksIndex);

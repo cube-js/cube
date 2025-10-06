@@ -22,7 +22,7 @@ impl TestsRunner {
 
     pub fn register_suite(&mut self, result: AsyncTestConstructorResult) {
         match result {
-            AsyncTestConstructorResult::Sucess(suite) => self.suites.push(suite),
+            AsyncTestConstructorResult::Success(suite) => self.suites.push(suite),
             AsyncTestConstructorResult::Skipped(message) => {
                 println!("Skipped: {}", message)
             }

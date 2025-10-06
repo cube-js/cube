@@ -1,5 +1,406 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Schema Testing Calendar Cubes Valid calendar cubes: customCalendarJsCube 1`] = `
+Object {
+  "accessPolicy": undefined,
+  "allDefinitions": [Function],
+  "calendar": true,
+  "dimensions": Object {
+    "date_val": Object {
+      "ownedByCube": true,
+      "primaryKey": true,
+      "shown": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_month_number": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_month_short_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_quarter_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_week_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_week_end_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_week_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year_month_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year_month_number": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "number",
+    },
+    "fiscal_year_period_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "number",
+    },
+    "retail_date": Object {
+      "granularities": Object {
+        "month": Object {
+          "sql": [Function],
+        },
+        "quarter": Object {
+          "sql": [Function],
+        },
+        "week": Object {
+          "sql": [Function],
+        },
+        "year": Object {
+          "sql": [Function],
+        },
+      },
+      "ownedByCube": true,
+      "sql": [Function],
+      "timeShift": Array [
+        Object {
+          "interval": "1 month",
+          "sql": [Function],
+          "type": "prior",
+        },
+        Object {
+          "name": "retail_date_prev_year",
+          "sql": [Function],
+        },
+        Object {
+          "interval": "2 year",
+          "sql": [Function],
+          "type": "prior",
+        },
+      ],
+      "type": "time",
+    },
+    "retail_date_prev_month": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_date_prev_prev_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_date_prev_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_month_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_month_long_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_quarter_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_in_month": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_year_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_year_end_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_year_week": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+  },
+  "fileName": "custom_calendar.js",
+  "hierarchies": Object {},
+  "joins": Array [],
+  "measures": Object {
+    "count": Object {
+      "ownedByCube": true,
+      "type": "count",
+    },
+  },
+  "name": "custom_calendar_js",
+  "preAggregations": Object {},
+  "rawCubes": [Function],
+  "rawFolders": [Function],
+  "segments": Object {},
+  "sql": [Function],
+}
+`;
+
+exports[`Schema Testing Calendar Cubes Valid calendar cubes: customCalendarYamlCube 1`] = `
+Object {
+  "accessPolicy": undefined,
+  "allDefinitions": [Function],
+  "calendar": true,
+  "dimensions": Object {
+    "date_val": Object {
+      "ownedByCube": true,
+      "primaryKey": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_month_number": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_month_short_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_quarter_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_week_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_week_end_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "fiscal_week_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year_month_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "fiscal_year_month_number": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "number",
+    },
+    "fiscal_year_period_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "number",
+    },
+    "retail_date": Object {
+      "granularities": Object {
+        "fortnight": Object {
+          "interval": "2 week",
+          "origin": "2025-01-01",
+        },
+        "month": Object {
+          "sql": [Function],
+        },
+        "quarter": Object {
+          "sql": [Function],
+        },
+        "week": Object {
+          "sql": [Function],
+        },
+        "year": Object {
+          "sql": [Function],
+        },
+      },
+      "ownedByCube": true,
+      "sql": [Function],
+      "timeShift": Array [
+        Object {
+          "interval": "1 month",
+          "sql": [Function],
+          "type": "prior",
+        },
+        Object {
+          "name": "retail_date_prev_year",
+          "sql": [Function],
+        },
+        Object {
+          "interval": "1 year",
+          "name": "prev_year_named_common_interval",
+          "type": "prior",
+        },
+        Object {
+          "interval": "2 year",
+          "sql": [Function],
+          "type": "prior",
+        },
+      ],
+      "type": "time",
+    },
+    "retail_date_prev_month": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_date_prev_prev_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_date_prev_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_month_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_month_long_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_quarter_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_in_month": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_week_name": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_year": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+    "retail_year_begin_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_year_end_date": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "time",
+    },
+    "retail_year_week": Object {
+      "ownedByCube": true,
+      "sql": [Function],
+      "type": "string",
+    },
+  },
+  "evaluatedHierarchies": Array [
+    Object {
+      "levels": Array [
+        "custom_calendar.fiscal_year",
+        "custom_calendar.fiscal_quarter_year",
+        "custom_calendar.fiscal_month_number",
+      ],
+      "name": "Fiscal_Calendar_Hierarchy",
+      "title": "Fiscal Calendar Hierarchy",
+    },
+    Object {
+      "levels": Array [
+        "custom_calendar.retail_year",
+        "custom_calendar.retail_month_long_name",
+        "custom_calendar.retail_week_name",
+      ],
+      "name": "Retail_Calendar_Hierarchy",
+      "title": "Retail Calendar Hierarchy",
+    },
+  ],
+  "fileName": "custom_calendar.yml",
+  "hierarchies": Object {
+    "Fiscal_Calendar_Hierarchy": Object {
+      "levels": [Function],
+      "title": "Fiscal Calendar Hierarchy",
+    },
+    "Retail_Calendar_Hierarchy": Object {
+      "levels": [Function],
+      "title": "Retail Calendar Hierarchy",
+    },
+  },
+  "joins": Array [],
+  "measures": Object {
+    "count": Object {
+      "ownedByCube": true,
+      "type": "count",
+    },
+  },
+  "name": "custom_calendar",
+  "preAggregations": Object {},
+  "rawCubes": [Function],
+  "rawFolders": [Function],
+  "segments": Object {},
+  "sqlTable": [Function],
+}
+`;
+
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (no additions): accessPolicy 1`] = `
 Array [
   Object {
@@ -184,25 +585,28 @@ Object {
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): joins 1`] = `
-Object {
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): joins 2`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+  Object {
+    "name": "line_items",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.js (with additions): measures 1`] = `
@@ -524,25 +928,28 @@ Object {
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): joins 1`] = `
-Object {
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): joins 2`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+  Object {
+    "name": "line_items",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions): measures 1`] = `
@@ -822,25 +1229,28 @@ Object {
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): joins 1`] = `
-Object {
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): joins 2`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+  Object {
+    "name": "line_items",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.js (with additions): measures 1`] = `
@@ -1162,25 +1572,28 @@ Object {
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): joins 1`] = `
-Object {
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): joins 2`] = `
-Object {
-  "line_items": Object {
-    "relationship": "hasMany",
-    "sql": [Function],
-  },
-  "order_users": Object {
+Array [
+  Object {
+    "name": "order_users",
     "relationship": "belongsTo",
     "sql": [Function],
   },
-}
+  Object {
+    "name": "line_items",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions): measures 1`] = `
@@ -1274,6 +1687,46 @@ Object {
     "sql": [Function],
   },
 }
+`;
+
+exports[`Schema Testing Joins join types (joins as array) 1`] = `
+Array [
+  Object {
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeC",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeD",
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+]
+`;
+
+exports[`Schema Testing Joins join types (joins as object) 1`] = `
+Array [
+  Object {
+    "name": "CubeB",
+    "relationship": "hasOne",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeC",
+    "relationship": "hasMany",
+    "sql": [Function],
+  },
+  Object {
+    "name": "CubeD",
+    "relationship": "belongsTo",
+    "sql": [Function],
+  },
+]
 `;
 
 exports[`Schema Testing Views allows to override \`title\`, \`description\`, \`meta\`, and \`format\` on includes members 1`] = `
@@ -1412,7 +1865,7 @@ Object {
     },
   ],
   "isView": true,
-  "joins": Object {},
+  "joins": Array [],
   "measures": Object {
     "count": Object {
       "aggType": "count",
@@ -1496,6 +1949,7 @@ Object {
   "timeShiftReferences": Array [
     Object {
       "interval": "1 year",
+      "name": undefined,
       "timeDimension": "createdAt",
       "type": "prior",
     },
@@ -1656,6 +2110,7 @@ Array [
       },
     ],
     "name": "folder1",
+    "type": "folder",
   },
   Object {
     "includes": Array [
@@ -1671,6 +2126,7 @@ Array [
       },
     ],
     "name": "folder2",
+    "type": "folder",
   },
 ]
 `;

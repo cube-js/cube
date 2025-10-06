@@ -3,6 +3,242 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.76](https://github.com/cube-js/cube/compare/v1.3.75...v1.3.76) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.74](https://github.com/cube-js/cube/compare/v1.3.73...v1.3.74) (2025-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.68](https://github.com/cube-js/cube/compare/v1.3.67...v1.3.68) (2025-09-16)
+
+### Performance Improvements
+
+- **schema-compiler:** Improve yaml compilation speed ([#9926](https://github.com/cube-js/cube/issues/9926)) ([13eb112](https://github.com/cube-js/cube/commit/13eb1129e5026e05970aa564762f86846d09299b))
+
+## [1.3.67](https://github.com/cube-js/cube/compare/v1.3.66...v1.3.67) (2025-09-09)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.66](https://github.com/cube-js/cube/compare/v1.3.65...v1.3.66) (2025-09-09)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.65](https://github.com/cube-js/cube/compare/v1.3.64...v1.3.65) (2025-09-05)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.64](https://github.com/cube-js/cube/compare/v1.3.63...v1.3.64) (2025-09-03)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.63](https://github.com/cube-js/cube/compare/v1.3.62...v1.3.63) (2025-09-02)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.62](https://github.com/cube-js/cube/compare/v1.3.61...v1.3.62) (2025-08-29)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.61](https://github.com/cube-js/cube/compare/v1.3.60...v1.3.61) (2025-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.60](https://github.com/cube-js/cube/compare/v1.3.59...v1.3.60) (2025-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.59](https://github.com/cube-js/cube/compare/v1.3.58...v1.3.59) (2025-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.58](https://github.com/cube-js/cube/compare/v1.3.57...v1.3.58) (2025-08-25)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.57](https://github.com/cube-js/cube/compare/v1.3.56...v1.3.57) (2025-08-22)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.56](https://github.com/cube-js/cube/compare/v1.3.55...v1.3.56) (2025-08-21)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.55](https://github.com/cube-js/cube/compare/v1.3.54...v1.3.55) (2025-08-19)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.54](https://github.com/cube-js/cube/compare/v1.3.53...v1.3.54) (2025-08-15)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.53](https://github.com/cube-js/cube/compare/v1.3.52...v1.3.53) (2025-08-15)
+
+### Features
+
+- **athena-driver:** export env variables for IAM assume role auth ([#9882](https://github.com/cube-js/cube/issues/9882)) ([3c6fc89](https://github.com/cube-js/cube/commit/3c6fc89dcabe651d83599e7568f571c841ee8bbb))
+
+## [1.3.52](https://github.com/cube-js/cube/compare/v1.3.51...v1.3.52) (2025-08-14)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.51](https://github.com/cube-js/cube/compare/v1.3.50...v1.3.51) (2025-08-14)
+
+### Performance Improvements
+
+- Debounce information schema queries to Cube Store (1.8x) ([#9879](https://github.com/cube-js/cube/issues/9879)) ([6fe6b09](https://github.com/cube-js/cube/commit/6fe6b09ed933660ab73009a2f30b9baf0f147570))
+
+## [1.3.50](https://github.com/cube-js/cube/compare/v1.3.49...v1.3.50) (2025-08-13)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.49](https://github.com/cube-js/cube/compare/v1.3.48...v1.3.49) (2025-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.48](https://github.com/cube-js/cube/compare/v1.3.47...v1.3.48) (2025-08-09)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.47](https://github.com/cube-js/cube/compare/v1.3.46...v1.3.47) (2025-08-04)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.46](https://github.com/cube-js/cube/compare/v1.3.45...v1.3.46) (2025-07-31)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.45](https://github.com/cube-js/cube/compare/v1.3.44...v1.3.45) (2025-07-29)
+
+### Features
+
+- **query-ochestrator:** Reduce number of cache set for used flag ([#9828](https://github.com/cube-js/cube/issues/9828)) ([b9ff371](https://github.com/cube-js/cube/commit/b9ff3714ecdbe058f941ee79a3e6e6e0687e1005))
+
+## [1.3.44](https://github.com/cube-js/cube/compare/v1.3.43...v1.3.44) (2025-07-28)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.43](https://github.com/cube-js/cube/compare/v1.3.42...v1.3.43) (2025-07-24)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.42](https://github.com/cube-js/cube/compare/v1.3.41...v1.3.42) (2025-07-23)
+
+### Bug Fixes
+
+- **query-orchestrator:** Reduce number of refresh key queries ([#9809](https://github.com/cube-js/cube/issues/9809)) ([a6b68f8](https://github.com/cube-js/cube/commit/a6b68f84fac89d2fc710aa3ccd1ef10b741e1fa5))
+
+### Features
+
+- **tesseract:** Lambda rollup support ([#9806](https://github.com/cube-js/cube/issues/9806)) ([eb56169](https://github.com/cube-js/cube/commit/eb56169f5e88424b95b12dda8535cab383ecc541))
+
+## [1.3.41](https://github.com/cube-js/cube/compare/v1.3.40...v1.3.41) (2025-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.40](https://github.com/cube-js/cube/compare/v1.3.39...v1.3.40) (2025-07-20)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.39](https://github.com/cube-js/cube/compare/v1.3.38...v1.3.39) (2025-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.38](https://github.com/cube-js/cube/compare/v1.3.37...v1.3.38) (2025-07-16)
+
+### Features
+
+- **schema-compiler,api-gateway:** Nested folders support ([#9659](https://github.com/cube-js/cube/issues/9659)) ([720f048](https://github.com/cube-js/cube/commit/720f0485c8b11f16eb99490259a881c21b845c73))
+
+## [1.3.37](https://github.com/cube-js/cube/compare/v1.3.36...v1.3.37) (2025-07-14)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.36](https://github.com/cube-js/cube/compare/v1.3.35...v1.3.36) (2025-07-10)
+
+### Features
+
+- **tesseract:** Rolling window with custom granularities without date range ([#9762](https://github.com/cube-js/cube/issues/9762)) ([d81c57d](https://github.com/cube-js/cube/commit/d81c57db80e96a211c1d12a67b06cefd868e111e))
+
+## [1.3.35](https://github.com/cube-js/cube/compare/v1.3.34...v1.3.35) (2025-07-09)
+
+### Features
+
+- **snowflake-driver:** Introduce CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN env var / config option ([#9752](https://github.com/cube-js/cube/issues/9752)) ([1c66d3e](https://github.com/cube-js/cube/commit/1c66d3eeb8e138e13bef4411f60513de97dc15d4))
+
+## [1.3.34](https://github.com/cube-js/cube/compare/v1.3.33...v1.3.34) (2025-07-04)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.33](https://github.com/cube-js/cube/compare/v1.3.32...v1.3.33) (2025-07-03)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.32](https://github.com/cube-js/cube/compare/v1.3.31...v1.3.32) (2025-07-03)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.31](https://github.com/cube-js/cube/compare/v1.3.30...v1.3.31) (2025-07-02)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.30](https://github.com/cube-js/cube/compare/v1.3.29...v1.3.30) (2025-07-01)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.29](https://github.com/cube-js/cube/compare/v1.3.28...v1.3.29) (2025-07-01)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.28](https://github.com/cube-js/cube/compare/v1.3.27...v1.3.28) (2025-06-30)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.27](https://github.com/cube-js/cube/compare/v1.3.26...v1.3.27) (2025-06-30)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.26](https://github.com/cube-js/cube/compare/v1.3.25...v1.3.26) (2025-06-25)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.25](https://github.com/cube-js/cube/compare/v1.3.24...v1.3.25) (2025-06-24)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
 ## [1.3.24](https://github.com/cube-js/cube/compare/v1.3.23...v1.3.24) (2025-06-24)
 
 ### Features

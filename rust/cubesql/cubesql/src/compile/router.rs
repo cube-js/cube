@@ -15,9 +15,8 @@ use crate::{
         auth_service::SqlAuthServiceAuthenticateRequest,
         dataframe,
         statement::{
-            ApproximateCountDistinctVisitor, CastReplacer, DateTokenNormalizeReplacer,
-            RedshiftDatePartReplacer, SensitiveDataSanitizer, ToTimestampReplacer,
-            UdfWildcardArgReplacer,
+            ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
+            SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
         },
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -103,7 +102,9 @@ impl QueryRouter {
                 StatusFlags::empty(),
                 Box::new(dataframe::DataFrame::new(vec![], vec![])),
             )),
-            (ast::Statement::SetRole { role_name, .. }, _) => self.set_role_to_plan(role_name),
+            (ast::Statement::SetRole { role_name, .. }, _) => {
+                self.set_role_to_plan(role_name).await
+            }
             (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values).await
             }
@@ -129,6 +130,20 @@ impl QueryRouter {
                 Ok(QueryPlan::MetaOk(
                     StatusFlags::empty(),
                     CommandCompletion::Rollback,
+                ))
+            }
+            (ast::Statement::Savepoint { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Savepoint,
+                ))
+            }
+            (ast::Statement::Release { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Release,
                 ))
             }
             (ast::Statement::Discard { object_type }, DatabaseProtocol::PostgreSQL) => {
@@ -284,19 +299,24 @@ impl QueryRouter {
         }
     }
 
-    fn set_role_to_plan(
+    async fn set_role_to_plan(
         &self,
         role_name: &Option<ast::Ident>,
     ) -> Result<QueryPlan, CompilationError> {
         let flags = StatusFlags::SERVER_STATE_CHANGED;
-        let role_name = role_name
-            .as_ref()
-            .map(|role_name| role_name.value.clone())
-            .unwrap_or("none".to_string());
-        let variable =
-            DatabaseVariable::system("role".to_string(), ScalarValue::Utf8(Some(role_name)), None);
+        let username = role_name.as_ref().map(|role_name| role_name.value.clone());
+        let Some(to_user) = username.clone().or_else(|| self.state.original_user()) else {
+            return Err(CompilationError::user(
+                "Cannot reset role when original role has not been set".to_string(),
+            ));
+        };
+        self.change_user(to_user).await?;
+        let variable = DatabaseVariable::system(
+            "role".to_string(),
+            ScalarValue::Utf8(Some(username.unwrap_or("none".to_string()))),
+            None,
+        );
         self.state.set_variables(vec![variable]);
-
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set))
     }
 
@@ -304,11 +324,7 @@ impl QueryRouter {
         &self,
         key_values: &Vec<ast::SetVariableKeyValue>,
     ) -> Result<QueryPlan, CompilationError> {
-        let mut flags = StatusFlags::SERVER_STATE_CHANGED;
-
         let mut session_columns_to_update =
-            DatabaseVariablesToUpdate::with_capacity(key_values.len());
-        let mut global_columns_to_update =
             DatabaseVariablesToUpdate::with_capacity(key_values.len());
 
         match self.state.protocol {
@@ -346,69 +362,6 @@ impl QueryRouter {
                     ));
                 }
             }
-            DatabaseProtocol::MySQL => {
-                for key_value in key_values.iter() {
-                    if key_value.key.value.to_lowercase() == "autocommit" {
-                        flags |= StatusFlags::AUTOCOMMIT;
-
-                        break;
-                    }
-
-                    let symbols: Vec<char> = key_value.key.value.chars().collect();
-                    if symbols.len() < 2 {
-                        continue;
-                    }
-
-                    let is_user_defined_var = symbols[0] == '@' && symbols[1] != '@';
-                    let is_global_var =
-                        (symbols[0] == '@' && symbols[1] == '@') || symbols[0] != '@';
-
-                    let value: String = match &key_value.value[0] {
-                        ast::Expr::Identifier(ident) => ident.value.to_string(),
-                        ast::Expr::Value(val) => match val {
-                            ast::Value::SingleQuotedString(single_quoted_str) => {
-                                single_quoted_str.to_string()
-                            }
-                            ast::Value::DoubleQuotedString(double_quoted_str) => {
-                                double_quoted_str.to_string()
-                            }
-                            ast::Value::Number(number, _) => number.to_string(),
-                            _ => {
-                                return Err(CompilationError::user(format!(
-                                    "invalid {} variable format",
-                                    key_value.key.value
-                                )))
-                            }
-                        },
-                        _ => {
-                            return Err(CompilationError::user(format!(
-                                "invalid {} variable format",
-                                key_value.key.value
-                            )))
-                        }
-                    };
-
-                    if is_global_var {
-                        let key = if symbols[0] == '@' {
-                            key_value.key.value[2..].to_lowercase()
-                        } else {
-                            key_value.key.value.to_lowercase()
-                        };
-                        global_columns_to_update.push(DatabaseVariable::system(
-                            key.to_lowercase(),
-                            ScalarValue::Utf8(Some(value.clone())),
-                            None,
-                        ));
-                    } else if is_user_defined_var {
-                        let key = key_value.key.value[1..].to_lowercase();
-                        session_columns_to_update.push(DatabaseVariable::user_defined(
-                            key.to_lowercase(),
-                            ScalarValue::Utf8(Some(value.clone())),
-                            None,
-                        ));
-                    }
-                }
-            }
             DatabaseProtocol::Extension(_) => {
                 log::warn!("set_variable_to_plan is not supported for custom protocol");
             }
@@ -420,11 +373,6 @@ impl QueryRouter {
             });
 
         for v in user_variables {
-            self.reauthenticate_if_needed().await?;
-
-            let auth_context = self.state.auth_context().ok_or(CompilationError::user(
-                "No auth context set but tried to set current user".to_string(),
-            ))?;
             let to_user = match v.value {
                 ScalarValue::Utf8(Some(user)) => user,
                 _ => {
@@ -434,55 +382,67 @@ impl QueryRouter {
                     )))
                 }
             };
-            if self
-                .session_manager
-                .server
-                .transport
-                .can_switch_user_for_session(auth_context.clone(), to_user.clone())
-                .await
-                .map_err(|e| {
-                    CompilationError::internal(format!(
-                        "Error calling can_switch_user_for_session: {}",
-                        e
-                    ))
-                })?
-            {
-                self.state.set_user(Some(to_user.clone()));
-                let sql_auth_request = SqlAuthServiceAuthenticateRequest {
-                    protocol: "postgres".to_string(),
-                    method: "password".to_string(),
-                };
-                let authenticate_response = self
-                    .session_manager
-                    .server
-                    .auth
-                    // TODO do we want to send actual password here?
-                    .authenticate(sql_auth_request, Some(to_user.clone()), None)
-                    .await
-                    .map_err(|e| {
-                        CompilationError::internal(format!("Error calling authenticate: {}", e))
-                    })?;
-                self.state
-                    .set_auth_context(Some(authenticate_response.context));
-            } else {
-                return Err(CompilationError::user(format!(
-                    "{:?} is not allowed to switch to '{}'",
-                    auth_context, to_user
-                )));
-            }
+            self.change_user(to_user).await?;
         }
 
         if !session_columns_to_update.is_empty() {
             self.state.set_variables(session_columns_to_update);
         }
 
-        if !global_columns_to_update.is_empty() {
-            self.session_manager
-                .server
-                .set_variables(global_columns_to_update, self.state.protocol.clone());
+        Ok(QueryPlan::MetaOk(
+            StatusFlags::empty(),
+            CommandCompletion::Set,
+        ))
+    }
+
+    async fn change_user(&self, username: String) -> Result<(), CompilationError> {
+        self.reauthenticate_if_needed().await?;
+
+        let auth_context = self.state.auth_context().ok_or(CompilationError::user(
+            "No auth context set but tried to set current user".to_string(),
+        ))?;
+
+        let can_switch_user = self
+            .session_manager
+            .server
+            .transport
+            .can_switch_user_for_session(auth_context.clone(), username.clone())
+            .await
+            .map_err(|e| {
+                CompilationError::internal(format!(
+                    "Error calling can_switch_user_for_session: {}",
+                    e
+                ))
+            })?;
+        if !can_switch_user {
+            return Err(CompilationError::user(format!(
+                "user '{}' is not allowed to switch to '{}'",
+                auth_context
+                    .user()
+                    .as_ref()
+                    .map(|v| v.as_str())
+                    .unwrap_or("not specified"),
+                username
+            )));
         }
 
-        Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set))
+        self.state.set_user(Some(username.clone()));
+        let sql_auth_request = SqlAuthServiceAuthenticateRequest {
+            protocol: "postgres".to_string(),
+            method: "password".to_string(),
+        };
+        let authenticate_response = self
+            .session_manager
+            .server
+            .auth
+            .authenticate(sql_auth_request, Some(username), None)
+            .await
+            .map_err(|e| {
+                CompilationError::internal(format!("Error calling authenticate: {}", e))
+            })?;
+        self.state
+            .set_auth_context(Some(authenticate_response.context));
+        Ok(())
     }
 
     async fn create_table_to_plan(
@@ -621,7 +581,6 @@ pub fn rewrite_statement(stmt: ast::Statement) -> ast::Statement {
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(stmt);
-    let stmt = DateTokenNormalizeReplacer::new().replace(stmt);
     let stmt = RedshiftDatePartReplacer::new().replace(stmt);
     let stmt = ApproximateCountDistinctVisitor::new().replace(stmt);
 

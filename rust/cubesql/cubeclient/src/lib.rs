@@ -1,13 +1,10 @@
-// Open spec generator generates ToString methods for enums, let's disable clippy rule as quick
-// workaround. TODO: Use new one open spec generator?
-#![allow(clippy::to_string_trait_impl)]
-
-#[macro_use]
-extern crate serde_derive;
+#![allow(unused_imports)]
+#![allow(clippy::too_many_arguments)]
 
 extern crate reqwest;
 extern crate serde;
 extern crate serde_json;
+extern crate serde_repr;
 extern crate url;
 
 pub mod apis;

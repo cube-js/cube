@@ -249,7 +249,7 @@ export class RefreshScheduler {
       // further executions - queues ready
       const concurrencies: number[] = [];
       Object.keys(preaggsQueues).forEach((name) => {
-        concurrencies.push(preaggsQueues[name].concurrency);
+        concurrencies.push(preaggsQueues[name].getConcurrency());
       });
       concurrency = Math.min(...concurrencies);
     }

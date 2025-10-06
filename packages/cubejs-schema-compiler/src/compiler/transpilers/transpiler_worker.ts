@@ -3,6 +3,7 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 
+import { NativeInstance } from '@cubejs-backend/native';
 import { ValidationTranspiler } from './ValidationTranspiler';
 import { ImportExportTranspiler } from './ImportExportTranspiler';
 import { CubeCheckDuplicatePropTranspiler } from './CubeCheckDuplicatePropTranspiler';
@@ -10,6 +11,8 @@ import { CubePropContextTranspiler } from './CubePropContextTranspiler';
 import { ErrorReporter } from '../ErrorReporter';
 import { LightweightSymbolResolver } from './LightweightSymbolResolver';
 import { LightweightNodeCubeDictionary } from './LightweightNodeCubeDictionary';
+import { IIFETranspiler } from './IIFETranspiler';
+import { YamlCompiler } from '../YamlCompiler';
 
 type TransferContent = {
   fileName: string;
@@ -22,15 +25,17 @@ type TransferContent = {
 const cubeDictionary = new LightweightNodeCubeDictionary();
 const cubeSymbols = new LightweightSymbolResolver();
 const errorsReport = new ErrorReporter(null, []);
+const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary, new NativeInstance(), cubeSymbols);
 
 const transpilers = {
   ValidationTranspiler: new ValidationTranspiler(),
   ImportExportTranspiler: new ImportExportTranspiler(),
   CubeCheckDuplicatePropTranspiler: new CubeCheckDuplicatePropTranspiler(),
   CubePropContextTranspiler: new CubePropContextTranspiler(cubeSymbols, cubeDictionary, cubeSymbols),
+  IIFETranspiler: new IIFETranspiler(),
 };
 
-const transpile = (data: TransferContent) => {
+const transpileJs = (data: TransferContent) => {
   cubeDictionary.setCubeNames(data.cubeNames);
   cubeSymbols.setSymbols(data.cubeSymbols);
 
@@ -62,6 +67,22 @@ const transpile = (data: TransferContent) => {
   };
 };
 
+const transpileYaml = (data: TransferContent) => {
+  cubeDictionary.setCubeNames(data.cubeNames);
+  cubeSymbols.setSymbols(data.cubeSymbols);
+
+  errorsReport.inFile(data);
+  const transpiledFile = yamlCompiler.transpileYamlFile(data, errorsReport);
+  errorsReport.exitFile();
+
+  return {
+    content: transpiledFile?.content || '',
+    errors: errorsReport.getErrors(),
+    warnings: errorsReport.getWarnings()
+  };
+};
+
 workerpool.worker({
-  transpile,
+  transpileJs,
+  transpileYaml,
 });

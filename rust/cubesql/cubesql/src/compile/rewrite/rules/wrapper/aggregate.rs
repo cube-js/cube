@@ -17,7 +17,8 @@ use crate::{
             wrapper_pushdown_replacer, wrapper_replacer_context, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, ColumnExprColumn,
             ListType, LiteralExprValue, LogicalPlanData, LogicalPlanLanguage,
-            WrappedSelectPushToCube, WrapperReplacerContextPushToCube,
+            WrappedSelectPushToCube, WrapperReplacerContextAliasToCube,
+            WrapperReplacerContextPushToCube,
         },
     },
     copy_flag,
@@ -26,7 +27,7 @@ use crate::{
 };
 use datafusion::{logical_plan::Column, scalar::ScalarValue};
 use egg::{Subst, Var};
-use std::ops::IndexMut;
+use std::{collections::HashSet, ops::IndexMut};
 
 impl WrapperRules {
     pub fn aggregate_rules(&self, rules: &mut Vec<CubeRewrite>) {
@@ -290,6 +291,7 @@ impl WrapperRules {
                         "?cube_members",
                         "?out_measure_expr",
                         "?out_measure_alias",
+                        "?alias_to_cube",
                     ),
                 )
             },
@@ -607,7 +609,7 @@ impl WrapperRules {
                             ),
                         ),
                         wrapper_pullup_replacer(
-                            wrapped_select_subqueries_empty_tail(),
+                            "?inner_subqueries",
                             wrapper_replacer_context(
                                 "?alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
@@ -733,7 +735,7 @@ impl WrapperRules {
                         ),
                     ),
                     wrapper_pullup_replacer(
-                        wrapped_select_subqueries_empty_tail(),
+                        "?inner_subqueries",
                         wrapper_replacer_context(
                             "?alias_to_cube",
                             "WrapperReplacerContextPushToCube:true",
@@ -1035,6 +1037,7 @@ impl WrapperRules {
         cube_members_var: Var,
         out_expr_var: Var,
         out_alias_var: Var,
+        alias_to_cube_var: Var,
         meta: &MetaContext,
         disable_strict_agg_type_match: bool,
     ) -> bool {
@@ -1042,90 +1045,111 @@ impl WrapperRules {
             return false;
         };
 
-        for fun in fun_name_var
-            .map(|fun_var| {
-                var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
-                    .map(|fun| Some(fun.clone()))
-                    .collect()
-            })
-            .unwrap_or(vec![None])
+        for alias_to_cube in var_iter!(
+            egraph[subst[alias_to_cube_var]],
+            WrapperReplacerContextAliasToCube
+        )
+        .cloned()
+        .collect::<Vec<_>>()
         {
-            for distinct in distinct_var
-                .map(|distinct_var| {
-                    var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
-                        .map(|d| *d)
+            // Do not push down COUNT(*) if there are joined cubes
+            let is_count_rows = column_var.is_none();
+            if is_count_rows {
+                let joined_cubes = alias_to_cube
+                    .iter()
+                    .map(|(_, cube_name)| cube_name)
+                    .collect::<HashSet<_>>();
+                if joined_cubes.len() > 1 {
+                    continue;
+                }
+            }
+
+            for fun in fun_name_var
+                .map(|fun_var| {
+                    var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
+                        .map(|fun| Some(fun.clone()))
                         .collect()
                 })
-                .unwrap_or(vec![false])
+                .unwrap_or(vec![None])
             {
-                let call_agg_type = MemberRules::get_agg_type(fun.as_ref(), distinct);
-
-                let column_iter = if let Some(column_var) = column_var {
-                    var_iter!(egraph[subst[column_var]], ColumnExprColumn)
-                        .cloned()
-                        .collect()
-                } else {
-                    vec![Column::from_name(MemberRules::default_count_measure_name())]
-                };
-
-                if let Some(member_names_to_expr) = &mut egraph
-                    .index_mut(subst[cube_members_var])
-                    .data
-                    .member_name_to_expr
+                for distinct in distinct_var
+                    .map(|distinct_var| {
+                        var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
+                            .map(|d| *d)
+                            .collect()
+                    })
+                    .unwrap_or(vec![false])
                 {
-                    for column in column_iter {
-                        if let Some((&(Some(ref member), _, _), _)) =
-                            LogicalPlanData::do_find_member_by_alias(
-                                member_names_to_expr,
-                                &column.name,
-                            )
-                        {
-                            if let Some(measure) = meta.find_measure_with_name(member) {
-                                let Some(call_agg_type) = &call_agg_type else {
-                                    // call_agg_type is None, rewrite as is
-                                    Self::insert_regular_measure(
-                                        egraph,
-                                        subst,
-                                        column,
-                                        alias,
-                                        out_expr_var,
-                                        out_alias_var,
-                                    );
+                    let call_agg_type = MemberRules::get_agg_type(fun.as_ref(), distinct);
 
-                                    return true;
-                                };
+                    let column_iter = if let Some(column_var) = column_var {
+                        var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                            .cloned()
+                            .collect()
+                    } else {
+                        vec![Column::from_name(MemberRules::default_count_measure_name())]
+                    };
 
-                                if measure
-                                    .is_same_agg_type(call_agg_type, disable_strict_agg_type_match)
-                                {
-                                    Self::insert_regular_measure(
-                                        egraph,
-                                        subst,
-                                        column,
-                                        alias,
-                                        out_expr_var,
-                                        out_alias_var,
-                                    );
+                    if let Some(member_names_to_expr) = &mut egraph
+                        .index_mut(subst[cube_members_var])
+                        .data
+                        .member_name_to_expr
+                    {
+                        for column in column_iter {
+                            if let Some((&(Some(ref member), _, _), _)) =
+                                LogicalPlanData::do_find_member_by_alias(
+                                    member_names_to_expr,
+                                    &column.name,
+                                )
+                            {
+                                if let Some(measure) = meta.find_measure_with_name(member) {
+                                    let Some(call_agg_type) = &call_agg_type else {
+                                        // call_agg_type is None, rewrite as is
+                                        Self::insert_regular_measure(
+                                            egraph,
+                                            subst,
+                                            column,
+                                            alias,
+                                            out_expr_var,
+                                            out_alias_var,
+                                        );
 
-                                    return true;
-                                }
+                                        return true;
+                                    };
 
-                                if measure.allow_replace_agg_type(
-                                    call_agg_type,
-                                    disable_strict_agg_type_match,
-                                ) {
-                                    Self::insert_patch_measure(
-                                        egraph,
-                                        subst,
-                                        column,
-                                        Some(call_agg_type.clone()),
-                                        alias,
-                                        Some(out_expr_var),
-                                        None,
-                                        out_alias_var,
-                                    );
+                                    if measure.is_same_agg_type(
+                                        call_agg_type,
+                                        disable_strict_agg_type_match,
+                                    ) {
+                                        Self::insert_regular_measure(
+                                            egraph,
+                                            subst,
+                                            column,
+                                            alias,
+                                            out_expr_var,
+                                            out_alias_var,
+                                        );
 
-                                    return true;
+                                        return true;
+                                    }
+
+                                    if measure.allow_replace_agg_type(
+                                        call_agg_type,
+                                        disable_strict_agg_type_match,
+                                    ) {
+                                        Self::insert_patch_measure(
+                                            egraph,
+                                            subst,
+                                            column,
+                                            Some(call_agg_type.clone()),
+                                            alias,
+                                            Some(out_expr_var),
+                                            None,
+                                            out_alias_var,
+                                        );
+
+                                        return true;
+                                    }
                                 }
                             }
                         }
@@ -1148,6 +1172,7 @@ impl WrapperRules {
         cube_members_var: &'static str,
         out_expr_var: &'static str,
         out_alias_var: &'static str,
+        alias_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
         let column_var = column_var.map(|v| var!(v));
@@ -1157,6 +1182,7 @@ impl WrapperRules {
         let cube_members_var = var!(cube_members_var);
         let out_expr_var = var!(out_expr_var);
         let out_alias_var = var!(out_alias_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
@@ -1170,6 +1196,7 @@ impl WrapperRules {
                 cube_members_var,
                 out_expr_var,
                 out_alias_var,
+                alias_to_cube_var,
                 &meta,
                 disable_strict_agg_type_match,
             )

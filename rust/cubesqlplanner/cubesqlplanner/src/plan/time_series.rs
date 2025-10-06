@@ -1,5 +1,8 @@
 use super::{Schema, SchemaColumn};
-use crate::planner::{query_tools::QueryTools, sql_templates::PlanSqlTemplates, Granularity};
+use crate::planner::{
+    query_tools::QueryTools, sql_evaluator::MemberSymbol, sql_templates::PlanSqlTemplates,
+    Granularity,
+};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -20,15 +23,15 @@ pub enum TimeSeriesDateRange {
 impl TimeSeries {
     pub fn new(
         query_tools: Rc<QueryTools>,
-        time_dimension_name: String,
+        time_dimension: &Rc<MemberSymbol>,
         date_range: TimeSeriesDateRange,
         granularity: Granularity,
     ) -> Self {
-        let column = SchemaColumn::new(format!("date_from"), Some(time_dimension_name.clone()));
+        let column = SchemaColumn::new(format!("date_from"), Some(time_dimension.clone()));
         let schema = Rc::new(Schema::new(vec![column]));
         Self {
             query_tools,
-            time_dimension_name,
+            time_dimension_name: time_dimension.full_name(),
             granularity,
             date_range,
             schema,
@@ -40,11 +43,9 @@ impl TimeSeries {
     }
 
     pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
-        if templates.supports_generated_time_series()
-            && self.granularity.is_predefined_granularity()
-        {
+        if templates.supports_generated_time_series(self.granularity.is_predefined_granularity())? {
             let interval_description = templates
-                .interval_and_minimal_time_unit(self.granularity.granularity_interval().clone())?;
+                .interval_and_minimal_time_unit(self.granularity.granularity_interval().to_sql())?;
             if interval_description.len() != 2 {
                 return Err(CubeError::internal(
                     "Interval description must have 2 elements".to_string(),
@@ -54,13 +55,23 @@ impl TimeSeries {
             let minimal_time_unit = interval_description[1].clone();
             match &self.date_range {
                 TimeSeriesDateRange::Filter(from_date, to_date) => {
-                    let from_date = format!("'{}'", from_date);
-                    let to_date = format!("'{}'", to_date);
+                    let start = templates.quote_string(from_date)?;
+                    let date_field = templates.quote_identifier("d")?;
+                    let date_from = templates.time_stamp_cast(date_field.clone())?;
+                    let end = templates.quote_string(to_date)?;
+                    let date_to = format!(
+                        "({})",
+                        templates.add_interval(date_from.clone(), interval.clone())?
+                    );
+                    let date_to =
+                        templates.subtract_interval(date_to, "1 millisecond".to_string())?;
 
                     templates.generated_time_series_select(
-                        &from_date,
-                        &to_date,
-                        &interval,
+                        &date_from,
+                        &date_to,
+                        &start,
+                        &end,
+                        &templates.interval_string(interval)?,
                         &self.granularity.granularity_offset(),
                         &minimal_time_unit,
                     )
@@ -72,7 +83,7 @@ impl TimeSeries {
                         &cte_name,
                         &min_date_name,
                         &max_date_name,
-                        &interval,
+                        &templates.interval_string(interval)?,
                         &minimal_time_unit,
                     )
                 }
@@ -98,7 +109,7 @@ impl TimeSeries {
                 )?
             } else {
                 self.query_tools.base_tools().generate_custom_time_series(
-                    self.granularity.granularity_interval().clone(),
+                    self.granularity.granularity_interval().to_sql(),
                     vec![raw_from_date.clone(), raw_to_date.clone()],
                     self.granularity.origin_local_formatted(),
                 )?

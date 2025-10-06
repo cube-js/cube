@@ -1,6 +1,5 @@
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
-use crate::planner::BaseMeasure;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -27,6 +26,11 @@ impl TraversalVisitor for JoinHintsCollector {
         path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
+        if node.is_multi_stage() {
+            //We don't add multi stage members childs to join hints
+            return Ok(None);
+        }
+
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {
@@ -84,11 +88,11 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, 
 }
 
 pub fn collect_join_hints_for_measures(
-    measures: &Vec<Rc<BaseMeasure>>,
+    measures: &Vec<Rc<MemberSymbol>>,
 ) -> Result<Vec<JoinHintItem>, CubeError> {
     let mut visitor = JoinHintsCollector::new();
     for meas in measures.iter() {
-        visitor.apply(&meas.member_evaluator(), &())?;
+        visitor.apply(&meas, &())?;
     }
     let res = visitor.extract_result();
     Ok(res)

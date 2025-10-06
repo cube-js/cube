@@ -173,6 +173,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         request: getEnv('clickhouseCompression', { dataSource }),
       },
       clickhouseSettings: {
+        /// Default Node.js client has a limit for the max size of HTTP headers. In practise, such headers can be extremely large
+        /// Let's disable it, because we don't need them.
+        send_progress_in_http_headers: 0,
         // If ClickHouse user's permissions are restricted with "readonly = 1",
         // change settings queries are not allowed. Thus, "join_use_nulls" setting
         // can not be changed
@@ -268,7 +271,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
           abort_signal: signal,
         });
 
-        if (resultSet.response_headers['x-clickhouse-format'] !== format) {
+        // response_headers['x-clickhouse-format'] is optional, but if it exists,
+        // it should match the requested format.
+        if (resultSet.response_headers['x-clickhouse-format'] && resultSet.response_headers['x-clickhouse-format'] !== format) {
           throw new Error(`Unexpected x-clickhouse-format in response: expected ${format}, received ${resultSet.response_headers['x-clickhouse-format']}`);
         }
 

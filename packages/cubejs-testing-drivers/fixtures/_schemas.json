@@ -258,6 +258,11 @@
           "name": "Customers",
           "relationship": "belongs_to",
           "sql": "{CUBE}.customer_id = {Customers}.customer_id"
+        },
+        {
+          "name": "RetailCalendar",
+          "relationship": "many_to_one",
+          "sql": "{CUBE}.order_date = {RetailCalendar.date_val}"
         }
       ],
       "dimensions": [
@@ -371,6 +376,14 @@
           "type": "sum"
         },
         {
+          "name": "customersCountPrev1Month",
+          "type": "count",
+          "rolling_window": {
+            "trailing": "1 month",
+            "offset": "start"
+          }
+        },
+        {
           "name": "totalProfitYearAgo",
           "type": "number",
           "sql": "{totalProfit}",
@@ -380,6 +393,43 @@
             "interval": "366 day",
             "type": "prior"
           }]
+        },
+        {
+          "name": "totalCountRetailYearAgo",
+          "type": "number",
+          "sql": "{count}",
+          "multi_stage": true,
+          "time_shift": [{
+            "interval": "1 year",
+            "type": "prior"
+          }]
+        },
+        {
+          "name": "totalCountRetailMonthAgo",
+          "type": "number",
+          "sql": "{count}",
+          "multi_stage": true,
+          "time_shift": [{
+            "interval": "1 month",
+            "type": "prior"
+          }]
+        },
+        {
+          "name": "totalCountRetailWeekAgo",
+          "type": "number",
+          "sql": "{count}",
+          "multi_stage": true,
+          "time_shift": [{
+            "interval": "1 week",
+            "type": "prior"
+          }]
+        },
+        {
+          "name": "totalProfitForQuarter",
+          "type": "sum",
+          "sql": "{totalProfit}",
+          "multi_stage": true,
+          "group_by": ["orderDate.quarter"]
         },
         {
           "name": "totalProfitForStatus",
@@ -453,6 +503,177 @@
             "trailing": "2 month"
           }
         }
+      ]
+    },
+    {
+      "name": "RetailCalendar",
+      "calendar": true,
+      "dimensions": [
+        {
+          "name": "date_val",
+          "sql": "date_val",
+          "type": "time",
+          "primary_key": true,
+          "shown": true
+        },
+        {
+          "name": "retail_date",
+          "sql": "date_val",
+          "type": "time",
+          "granularities": [
+            {
+              "name": "week",
+              "sql": "{CUBE}.retail_week_begin_date"
+            },
+            {
+              "name": "quarter",
+              "sql": "{CUBE}.retail_quarter_begin_date"
+            },
+            {
+              "name": "year",
+              "sql": "{CUBE}.retail_year_begin_date"
+            }
+          ],
+          "timeShift": [
+            {
+              "interval": "1 month",
+              "type": "prior",
+              "sql": "{CUBE}.retail_date_prev_month"
+            },
+            {
+              "interval": "1 quarter",
+              "type": "prior",
+              "sql": "{CUBE}.retail_date_prev_quarter"
+            },
+            {
+              "interval": "1 year",
+              "type": "prior",
+              "sql": "{CUBE}.retail_date_prev_year"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "name": "SwitchSourceTest",
+      "dimensions": [
+        {
+          "name": "source",
+          "type": "switch",
+          "values": [
+            "com",
+            "bigCom"
+          ]
+        },
+        {
+          "name": "curr",
+          "type": "switch",
+          "values": [
+            "curr_a",
+            "curr_b"
+          ]
+        },
+        {
+          "name": "orderDate",
+          "multiStage": true,
+          "type": "time",
+          "case": {
+            "switch": "{CUBE.source}",
+            "when": [{
+              "value": "com",
+              "sql": "{ECommerce.orderDate}"
+            },
+            {
+              "value": "bigCom",
+              "sql": "{BigECommerce.orderDate}"
+            }],
+            "else": {
+              "sql": "{BigECommerce.orderDate}"
+            }
+          }
+
+        },
+        {
+          "name": "city",
+          "multiStage": true,
+          "type": "string",
+          "case": {
+            "switch": "{CUBE.source}",
+            "when": [{
+              "value": "com",
+              "sql": "{ECommerce.city}"
+            },
+            {
+              "value": "bigCom",
+              "sql": "{BigECommerce.city}"
+            }],
+            "else": {
+              "sql": "{BigECommerce.city}"
+            }
+          }
+        }
+      ],
+      "measures": [
+        {
+          "name": "totalSalesA",
+          "multiStage": true,
+          "type": "sum",
+          "case": {
+            "switch": "{CUBE.source}",
+            "when": [{
+              "value": "com",
+              "sql": "{ECommerce.totalSales}"
+            },
+            {
+              "value": "bigCom",
+              "sql": "{BigECommerce.totalSales}"
+            }],
+            "else": {
+              "sql": "{BigECommerce.totalSales}"
+            }
+          }
+        },
+        {
+          "name": "totalSalesB",
+          "multiStage": true,
+          "type": "sum",
+          "case": {
+            "switch": "{CUBE.source}",
+            "when": [{
+              "value": "com",
+              "sql": "{ECommerce.totalSales} * 2"
+            },
+            {
+              "value": "bigCom",
+              "sql": "{BigECommerce.totalSales} * 2"
+            }],
+            "else": {
+              "sql": "{BigECommerce.totalSales} * 2"
+            }
+          }
+        },
+        {
+          "name": "totalSales",
+          "multiStage": true,
+          "type": "sum",
+          "case": {
+            "switch": "{CUBE.curr}",
+            "when": [{
+              "value": "curr_a",
+              "sql": "{CUBE.totalSalesA}"
+            },
+            {
+              "value": "curr_b",
+              "sql": "{CUBE.totalSalesB}"
+            }],
+            "else": {
+              "sql": "{CUBE.totalSalesB}"
+            }
+          }
+        }
+
       ]
     }
   ]

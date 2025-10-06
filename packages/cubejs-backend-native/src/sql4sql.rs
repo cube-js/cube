@@ -16,6 +16,7 @@ use crate::auth::NativeSQLAuthContext;
 use crate::config::NodeCubeServices;
 use crate::cubesql_utils::with_session;
 use crate::tokio_runtime_node;
+use crate::utils::NonDebugInRelease;
 
 enum Sql4SqlQueryType {
     Regular,
@@ -208,7 +209,7 @@ pub fn sql4sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let native_auth_ctx = Arc::new(NativeSQLAuthContext {
         user: Some(String::from("unknown")),
         superuser: false,
-        security_context,
+        security_context: NonDebugInRelease::from(security_context),
     });
 
     let (deferred, promise) = cx.promise();

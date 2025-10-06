@@ -37,9 +37,7 @@ async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
 async-trait = "0.1.36"
 cubestore = { path = "../cubestore" }
 flate2 = "1.0.22"
-futures = "0.3.5"
 itertools = "0.9.0"
-lazy_static = "1.4.0"
 log = "0.4.11"
 pretty_assertions = "0.7.1"
 reqwest = { version = "0.12.5", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
@@ -47,13 +45,12 @@ scopeguard = "1.1.0"
 serde = "1.0.115"
 serde_derive = "1.0.115"
 tokio = { version = "1", features = ["full", "rt"] }
-futures-timer = "3.0.2"
 indoc = "1.0"
 tempfile = "3.2.0"
 tar = "0.4.38"
 
 [dev-dependencies]
-criterion = { version = "0.4.0", features = ["async_tokio", "html_reports"] }
+criterion = { version = "0.5.1", features = ["async_tokio", "html_reports"] }
 cuberockstore = { path = "../cuberockstore" }
 
 [[bench]]

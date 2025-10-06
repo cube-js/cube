@@ -9,6 +9,6 @@
     "noImplicitAny": false,
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
+    "baseUrl": "."
   }
 }

@@ -8,14 +8,17 @@ import { JinjaEngine, NativeInstance, PythonCtx } from '@cubejs-backend/native';
 import type { FileContent } from '@cubejs-backend/shared';
 
 import { getEnv } from '@cubejs-backend/shared';
-import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
+import {
+  CubePropContextTranspiler,
+  transpiledFields,
+  transpiledFieldsPatterns,
+  TranspilerCubeResolver, TranspilerSymbolResolver
+} from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
-import { CubeSymbols } from './CubeSymbols';
-import { DataSchemaCompiler } from './DataSchemaCompiler';
 import { nonStringFields } from './CubeValidator';
-import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
+import { CompileContext } from './DataSchemaCompiler';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -25,15 +28,13 @@ type EscapeStateStack = {
 };
 
 export class YamlCompiler {
-  public dataSchemaCompiler: DataSchemaCompiler | null = null;
-
   protected jinjaEngine: JinjaEngine | null = null;
 
   public constructor(
-    private readonly cubeSymbols: CubeSymbols,
-    private readonly cubeDictionary: CubeDictionary,
+    private readonly cubeSymbols: TranspilerSymbolResolver,
+    private readonly cubeDictionary: TranspilerCubeResolver,
     private readonly nativeInstance: NativeInstance,
-    private readonly viewCompiler: CubeSymbols,
+    private readonly viewCompiler: TranspilerSymbolResolver,
   ) {
   }
 
@@ -53,7 +54,7 @@ export class YamlCompiler {
     });
   }
 
-  public async renderTemplate(file: FileContent, compileContext, pythonContext: PythonCtx): Promise<FileContent> {
+  public async renderTemplate(file: FileContent, compileContext: CompileContext, pythonContext: PythonCtx): Promise<FileContent> {
     return {
       fileName: file.fileName,
       content: await this.getJinjaEngine().renderTemplate(file.fileName, compileContext, {
@@ -66,66 +67,58 @@ export class YamlCompiler {
   public async compileYamlWithJinjaFile(
     file: FileContent,
     errorsReport: ErrorReporter,
-    cubes,
-    contexts,
-    exports,
-    asyncModules,
-    toCompile,
-    compiledFiles,
-    compileContext,
+    compileContext: CompileContext,
     pythonContext: PythonCtx
-  ) {
-    const compiledFile = await this.renderTemplate(file, compileContext, pythonContext);
+  ): Promise<FileContent | undefined> {
+    const renderedFile = await this.renderTemplate(file, compileContext, pythonContext);
 
-    return this.compileYamlFile(
-      compiledFile,
-      errorsReport,
-      cubes,
-      contexts,
-      exports,
-      asyncModules,
-      toCompile,
-      compiledFiles
-    );
+    return this.transpileYamlFile(renderedFile, errorsReport);
   }
 
-  public compileYamlFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
+  public transpileYamlFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+  ): FileContent | undefined {
     if (!file.content.trim()) {
       return;
     }
 
-    const yamlObj = YAML.load(file.content);
+    const yamlObj: any = YAML.load(file.content);
     if (!yamlObj) {
       return;
     }
 
+    const transpiledFilesContent: string[] = [];
+
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
-          const transpiledFile = this.transpileAndPrepareJsFile(file, 'cube', { name, ...cube }, errorsReport);
-          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+          const transpiledCube = this.transpileAndPrepareJsFile('cube', { name, ...cube }, errorsReport);
+          transpiledFilesContent.push(transpiledCube);
         });
       } else if (key === 'views') {
         (yamlObj.views || []).forEach(({ name, ...cube }) => {
-          const transpiledFile = this.transpileAndPrepareJsFile(file, 'view', { name, ...cube }, errorsReport);
-          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+          const transpiledView = this.transpileAndPrepareJsFile('view', { name, ...cube }, errorsReport);
+          transpiledFilesContent.push(transpiledView);
         });
       } else {
         errorsReport.error(`Unexpected YAML key: ${key}. Only 'cubes' and 'views' are allowed here.`);
       }
     }
+
+    // eslint-disable-next-line consistent-return
+    return {
+      fileName: file.fileName,
+      content: transpiledFilesContent.join('\n\n'),
+    } as FileContent;
   }
 
-  private transpileAndPrepareJsFile(file, methodFn, cubeObj, errorsReport: ErrorReporter) {
+  private transpileAndPrepareJsFile(methodFn: ('cube' | 'view'), cubeObj, errorsReport: ErrorReporter): string {
     const yamlAst = this.transformYamlCubeObj(cubeObj, errorsReport);
 
     const cubeOrViewCall = t.callExpression(t.identifier(methodFn), [t.stringLiteral(cubeObj.name), yamlAst]);
 
-    const content = babelGenerator(cubeOrViewCall, {}, '').code;
-    return {
-      fileName: file.fileName,
-      content
-    };
+    return babelGenerator(cubeOrViewCall, {}, '').code;
   }
 
   private transformYamlCubeObj(cubeObj, errorsReport: ErrorReporter) {
@@ -135,8 +128,13 @@ export class YamlCompiler {
     cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
     cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
-    cubeObj.joins = this.yamlArrayToObj(cubeObj.joins || [], 'join', errorsReport);
     cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
+
+    cubeObj.joins = cubeObj.joins || []; // For edge cases where joins are not defined/null
+    if (!Array.isArray(cubeObj.joins)) {
+      errorsReport.error('joins must be defined as array');
+      cubeObj.joins = [];
+    }
 
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
@@ -161,6 +159,10 @@ export class YamlCompiler {
                   ast = t.booleanLiteral(code);
                 } else if (typeof code === 'number') {
                   ast = t.numericLiteral(code);
+                } else if (code instanceof Date) {
+                  // Special case when dates are defined in YAML as strings without quotes
+                  // YAML parser treats them as Date objects, but for conversion we need them as strings
+                  ast = this.parsePythonAndTranspileToJs(`f"${this.escapeDoubleQuotes(code.toISOString())}"`, errorsReport);
                 }
               }
               if (ast === null) {
@@ -275,7 +277,7 @@ export class YamlCompiler {
       const pythonParser = new PythonParser(codeString);
       return pythonParser.transpileToJs();
     } catch (e: any) {
-      errorsReport.error(`Can't parse python expression. Most likely this type of syntax isn't supported yet: ${e.message || e}`);
+      errorsReport.error(`Failed to parse Python expression. Most likely this type of syntax isn't supported yet: ${e.message || e}`);
     }
 
     return t.nullLiteral();

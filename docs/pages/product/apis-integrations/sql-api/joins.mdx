@@ -1,10 +1,19 @@
+# Joins in the SQL API
+
 ## Views
 
-The best practice to query joins using SQL API is to use views. This is the preferred way of
-joining as it provides you control over the joining path for complex use cases.
-While BI tools would see the view as a table, in fact, no materialization is done until Cube is queried.
-Whenever Cube view is queried through SQL API, Cube tries to maximize member pushdown so only required parts of the view are materialized at query time.
-Cube also solves fan and chasm traps based on the dimensions selected in the query, so if measure aggregation types are properly set up, you will see correct results in BI tools even though cubes and views are seen just as tables.
+The best practice is to use [views][ref-views] to specify explicit [join
+paths][ref-join-paths] for SQL API queries.
+
+While BI tools would see a view as a table, in fact, no materialization is performed
+until Cube is queried through the SQL API. At the query time, Cube will try to maximize
+member pushdown, so only required parts of the view are materialized at query time.
+
+Cube also solves fan and chasm traps based on the dimensions selected in the query, so
+if measure aggregation types are properly set up, you will see correct results in BI tools
+even though cubes and views are seen just as tables.
+
+Consider the following data model:
 
 <CodeTabs>
 
@@ -33,7 +42,8 @@ view(`orders_users`, {
       includes: ['status', 'count']
     },
     {
-      join_path: orders,
+      join_path: orders.users,
+      prefix: true,
       includes: ['id', 'city', 'state']
     }
   ]
@@ -42,11 +52,12 @@ view(`orders_users`, {
 
 </CodeTabs>
 
-Now, it is possible to get orders count by users city with the following query.
+With this data model, here's how you can get orders count by users' cities:
 
 ```sql
-cube=> SELECT count, city FROM orders_users;
- count |   user_city
+cube=> SELECT MEASURE(count) AS count, users_city FROM orders_users GROUP BY 2;
+
+ count |   users_city
 -------+---------------
   1416 | Los Angeles
   1412 | Seattle
@@ -59,17 +70,18 @@ cube=> SELECT count, city FROM orders_users;
 (8 rows)
 ```
 
-# Joins
+## `CROSS JOIN` and `__cubeJoinField`
 
-The SQL API supports joins through `__cubeJoinField` virtual column, which allows end users to control how specific cubes are joined.
-This is considered advanced functionality, and views should be used where possible.
-Join can also be done through `CROSS JOIN`. Usage
-of `__cubeJoinField` in a join instructs Cube to perform join as it's defined in
-a data model. Cube generates the correct joining conditions for the underlying
-data source.
+The SQL API also supports joins through the `__cubeJoinField` virtual column, which
+allows to control how specific cubes are joined. This is considered an advanced
+functionality, and views should be used where possible. Join can also be done through
+`CROSS JOIN`.
+
+Usage of `CROSS JOIN` or `__cubeJoinField` instructs Cube to perform join as it's defined
+in a data model while using provided cubes as [join hints][ref-join-hints].
 
 For example, the following query joins the `orders` and `products` tables under
-the hood with `orders.product_id = products.id`, exactly the same way as the
+the hood on `orders.product_id = products.id`, exactly the same way as the
 REST API query does:
 
 ```sql
@@ -189,6 +201,10 @@ LIMIT 5;
 (2 rows)
 ```
 
-Please note even if `product_description` is in the inner selection, it isn't
+Please note that, even if `product_description` is in the inner selection, it isn't
 evaluated in the final query as it isn't used in any way.
 
+
+[ref-views]: /product/data-modeling/concepts#views
+[ref-join-paths]: /product/data-modeling/concepts/working-with-joins#join-paths
+[ref-join-hints]: /product/data-modeling/concepts/working-with-joins#join-hints

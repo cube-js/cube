@@ -1,0 +1,13 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            select c.oid,pg_catalog.pg_total_relation_size(c.oid) as total_rel_size,pg_catalog.pg_relation_size(c.oid) as rel_size\n            FROM pg_class c\n            WHERE c.relnamespace=2200\n            ORDER BY c.oid\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-------+----------------+----------+
+| oid   | total_rel_size | rel_size |
++-------+----------------+----------+
+| 18000 | 8192           | 8192     |
+| 18020 | 8192           | 8192     |
+| 18030 | 8192           | 8192     |
+| 18036 | 8192           | 8192     |
+| 18246 | 8192           | 8192     |
++-------+----------------+----------+

@@ -5,7 +5,7 @@ exports[`postgresql-cubestore HTTP Transport Empty partitions: Empty partitions 
 exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension No Granularity: Rolling Mixed With Dimension No Granularity 1`] = `
 Array [
   Object {
-    "visitors.checkinsRollingTotal": "5",
+    "visitors.checkinsRollingTotal": null,
     "visitors.source": "some",
   },
 ]

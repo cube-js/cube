@@ -1,7 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 9284
-expression: "execute_query(\"SELECT * FROM pg_catalog.pg_stats\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_stats\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
 +------------+---------------------------+--------------------+-----------+-----------+-----------+------------+------------------+-------------------+------------------+-------------+-------------------+------------------------+----------------------+
 | schemaname | tablename                 | attname            | inherited | null_frac | avg_width | n_distinct | most_common_vals | most_common_freqs | histogram_bounds | correlation | most_common_elems | most_common_elem_freqs | elem_count_histogram |
@@ -12,6 +11,7 @@ expression: "execute_query(\"SELECT * FROM pg_catalog.pg_stats\".to_string(),\n 
 | public     | KibanaSampleDataEcommerce | minPrice           | false     | 0         | 8         | 0          | NULL             | NULL              | NULL             | NULL        | NULL              | NULL                   | NULL                 |
 | public     | KibanaSampleDataEcommerce | avgPrice           | false     | 0         | 8         | 0          | NULL             | NULL              | NULL             | NULL        | NULL              | NULL                   | NULL                 |
 | public     | KibanaSampleDataEcommerce | countDistinct      | false     | 0         | 8         | 0          | NULL             | NULL              | NULL             | NULL        | NULL              | NULL                   | NULL                 |
+| public     | KibanaSampleDataEcommerce | id                 | false     | 0         | 8         | 0          | NULL             | NULL              | NULL             | NULL        | NULL              | NULL                   | NULL                 |
 | public     | KibanaSampleDataEcommerce | order_date         | false     | 0         | 8         | 0          | NULL             | NULL              | NULL             | NULL        | NULL              | NULL                   | NULL                 |
 | public     | KibanaSampleDataEcommerce | last_mod           | false     | 0         | 8         | 0          | NULL             | NULL              | NULL             | NULL        | NULL              | NULL                   | NULL                 |
 | public     | KibanaSampleDataEcommerce | customer_gender    | false     | 0         | 64        | 0          | NULL             | NULL              | NULL             | NULL        | NULL              | NULL                   | NULL                 |

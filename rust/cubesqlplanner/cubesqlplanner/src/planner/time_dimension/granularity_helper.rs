@@ -1,5 +1,6 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::planner::BaseTimeDimension;
+use crate::planner::sql_evaluator::Compiler;
+use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::Granularity;
 use chrono::prelude::*;
 use chrono_tz::Tz;
@@ -48,28 +49,33 @@ impl GranularityHelper {
     }
 
     pub fn find_dimension_with_min_granularity(
-        dimensions: &Vec<Rc<BaseTimeDimension>>,
-    ) -> Result<Rc<BaseTimeDimension>, CubeError> {
+        dimensions: &Vec<Rc<TimeDimensionSymbol>>,
+    ) -> Result<Rc<TimeDimensionSymbol>, CubeError> {
         if dimensions.is_empty() {
             return Err(CubeError::internal(
                 "No dimensions provided for find_dimension_with_min_granularity".to_string(),
             ));
         }
         let first = Ok(dimensions[0].clone());
-        dimensions.iter().skip(1).fold(first, |acc, d| match acc {
-            Ok(min_dim) => {
-                let min_granularity = Self::min_granularity(
-                    &min_dim.resolved_granularity()?,
-                    &d.resolved_granularity()?,
-                )?;
-                if min_granularity == min_dim.get_granularity() {
-                    Ok(min_dim)
-                } else {
-                    Ok(d.clone())
+        dimensions
+            .iter()
+            .skip(1)
+            .fold(first, |acc, d| -> Result<_, CubeError> {
+                match acc {
+                    Ok(min_dim) => {
+                        let min_granularity = Self::min_granularity(
+                            &min_dim.resolved_granularity()?,
+                            &d.resolved_granularity()?,
+                        )?;
+                        if &min_granularity == min_dim.granularity() {
+                            Ok(min_dim)
+                        } else {
+                            Ok(d.clone())
+                        }
+                    }
+                    Err(e) => Err(e),
                 }
-            }
-            Err(e) => Err(e),
-        })
+            })
     }
 
     pub fn granularity_from_interval(interval: &Option<String>) -> Option<String> {
@@ -93,7 +99,7 @@ impl GranularityHelper {
     }
 
     pub fn granularity_parents(granularity: &str) -> Result<&Vec<String>, CubeError> {
-        if let Some(parents) = Self::standard_granularity_parents().get(granularity) {
+        if let Some(parents) = Self::standard_granularity_hierarchy().get(granularity) {
             Ok(parents)
         } else {
             Err(CubeError::user(format!(
@@ -104,12 +110,12 @@ impl GranularityHelper {
     }
 
     pub fn is_predefined_granularity(granularity: &str) -> bool {
-        Self::standard_granularity_parents().contains_key(granularity)
+        Self::standard_granularity_hierarchy().contains_key(granularity)
     }
 
-    pub fn standard_granularity_parents() -> &'static HashMap<String, Vec<String>> {
+    pub fn standard_granularity_hierarchy() -> &'static HashMap<String, Vec<String>> {
         lazy_static! {
-            static ref STANDARD_GRANULARITIES_PARENTS: HashMap<String, Vec<String>> = {
+            static ref STANDARD_GRANULARITY_HIERARCHIES: HashMap<String, Vec<String>> = {
                 let mut map = HashMap::new();
                 map.insert(
                     "year".to_string(),
@@ -179,7 +185,7 @@ impl GranularityHelper {
                 map
             };
         }
-        &STANDARD_GRANULARITIES_PARENTS
+        &STANDARD_GRANULARITY_HIERARCHIES
     }
 
     pub fn parse_date_time_in_tz(date: &str, timezone: &Tz) -> Result<DateTime<Tz>, CubeError> {
@@ -217,26 +223,34 @@ impl GranularityHelper {
 
     pub fn make_granularity_obj(
         cube_evaluator: Rc<dyn CubeEvaluator>,
-        timezone: Tz,
+        compiler: &mut Compiler,
         cube_name: &String,
         name: &String,
         granularity: Option<String>,
     ) -> Result<Option<Granularity>, CubeError> {
+        let timezone = compiler.timezone();
         let granularity_obj = if let Some(granularity) = &granularity {
-            if !Self::is_predefined_granularity(&granularity) {
-                let path = vec![
-                    cube_name.clone(),
-                    name.clone(),
-                    "granularities".to_string(),
-                    granularity.clone(),
-                ];
-                let granularity_definition = cube_evaluator.resolve_granularity(path)?;
+            let path = vec![
+                cube_name.clone(),
+                name.clone(),
+                "granularities".to_string(),
+                granularity.clone(),
+            ];
+            let granularity_definition = cube_evaluator.resolve_granularity(path)?;
+            let gran_eval_sql = if let Some(gran_sql) = granularity_definition.sql()? {
+                Some(compiler.compile_sql_call(&cube_name, gran_sql)?)
+            } else {
+                None
+            };
+
+            if gran_eval_sql.is_some() || !Self::is_predefined_granularity(&granularity) {
                 Some(Granularity::try_new_custom(
                     timezone.clone(),
                     granularity.clone(),
-                    granularity_definition.origin,
-                    granularity_definition.interval,
-                    granularity_definition.offset,
+                    granularity_definition.static_data().origin.clone(),
+                    granularity_definition.static_data().interval.clone(),
+                    granularity_definition.static_data().offset.clone(),
+                    gran_eval_sql,
                 )?)
             } else {
                 Some(Granularity::try_new_predefined(

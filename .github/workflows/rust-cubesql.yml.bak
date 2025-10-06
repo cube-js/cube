@@ -32,7 +32,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt, clippy
@@ -149,7 +149,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -232,7 +232,7 @@ jobs:
       matrix:
         # We do not need to test under all versions, we do it under linux
         node-version: [22.x]
-        os-version: ["macos-13"]
+        os-version: ["macos-14"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         include:
           - target: x86_64-apple-darwin
@@ -255,7 +255,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -308,8 +308,8 @@ jobs:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
       - name: Tests
-        # We cannot test arm64 on x64
-        if: (matrix.target == 'x86_64-apple-darwin')
+        # We cannot test x64 on arm64
+        if: (matrix.target == 'aarch64-apple-darwin')
         env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
@@ -325,7 +325,7 @@ jobs:
       matrix:
         # We do not need to test under all versions, we do it under linux
         node-version: [22.x]
-        os-version: [windows-2019]
+        os-version: [windows-2022]
         python-version: ["fallback"]
       fail-fast: false
 
@@ -338,7 +338,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt

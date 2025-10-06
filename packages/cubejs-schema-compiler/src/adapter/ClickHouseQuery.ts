@@ -240,6 +240,17 @@ export class ClickHouseQuery extends BaseQuery {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 
+  public dimensionColumns(cubeAlias) {
+    // For the top-level SELECT statement, explicitly set the column alias.
+    // Clickhouse sometimes includes the "q_0" prefix in the column name, and this
+    // leads to errors during the result mapping.
+    if (cubeAlias === 'q_0') {
+      return this.dimensionAliasNames().map(alias => `${cubeAlias}.${alias} ${alias}`);
+    } else {
+      return super.dimensionColumns(cubeAlias);
+    }
+  }
+
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';

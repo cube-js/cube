@@ -327,7 +327,7 @@ impl SparseRepresentation {
         Ok(())
     }
 
-    pub(crate) fn sorted_iterator(sparse_data: Option<&[u8]>) -> DifferenceDecoder {
+    pub(crate) fn sorted_iterator(sparse_data: Option<&[u8]>) -> DifferenceDecoder<'_> {
         return DifferenceDecoder::new(sparse_data.unwrap_or(&[]));
     }
 

@@ -346,7 +346,7 @@ impl ExtendedRemoteFs for S3RemoteFs {
     async fn list_by_page(
         &self,
         remote_prefix: String,
-    ) -> Result<BoxStream<Result<Vec<String>, CubeError>>, CubeError> {
+    ) -> Result<BoxStream<'static, Result<Vec<String>, CubeError>>, CubeError> {
         let path = self.s3_path(&remote_prefix);
         let bucket = self.bucket.load();
         let leading_subpath = self.leading_subpath_regex();
