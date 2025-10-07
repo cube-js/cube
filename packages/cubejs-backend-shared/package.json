@@ -10,7 +10,7 @@
     "watch": "tsc -w",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
-    "unit": "jest --coverage dist/test"
+    "unit": "jest --coverage"
   },
   "files": [
     "README.md",
@@ -32,6 +32,7 @@
     "@types/shelljs": "^0.8.5",
     "@types/throttle-debounce": "^2.1.0",
     "jest": "^29",
+    "ts-jest": "^29",
     "typescript": "~5.2.2"
   },
   "dependencies": {
