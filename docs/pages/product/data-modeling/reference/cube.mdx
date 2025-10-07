@@ -217,7 +217,7 @@ cube(`extended_order_facts`, {
 
 <WarningBox>
 
-Extends does not apply to the `refresh_key` parameter - cubes which extend another and do not declare a `refresh_key` will use the [default for their given engine][ref-cube-refresh-key].
+Extends using non-named cubes will not copy all fields across. For example the `refresh_key` value will not be copied and the default refresh key for the given database will be used (see `refresh_key` below for more details)
 
 </WarningBox>
 
