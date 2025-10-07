@@ -774,6 +774,10 @@ jobs:
       contents: read
       actions: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Install Codecov CLI
         run: |
           curl -Os https://uploader.codecov.io/latest/linux/codecov
