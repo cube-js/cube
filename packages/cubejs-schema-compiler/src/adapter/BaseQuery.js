@@ -436,12 +436,14 @@ export class BaseQuery {
   get allJoinHints() {
     if (!this.collectedJoinHints) {
       const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      const queryJoinMaps = this.queryJoinMap();
       const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
-      const allJoinHints = [
+      const allJoinHints = this.enrichHintsWithJoinMap([
         ...this.queryLevelJoinHints,
         ...allMembersJoinHints,
         ...customSubQueryJoinHints,
-      ];
+      ],
+      queryJoinMaps);
 
       const tempJoin = this.joinGraph.buildJoin(allJoinHints);
 
@@ -454,15 +456,61 @@ export class BaseQuery {
       const allJoinHintsFlatten = new Set(allJoinHints.flat());
       const newCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
 
-      this.collectedJoinHints = [
+      this.collectedJoinHints = this.enrichHintsWithJoinMap([
         ...this.queryLevelJoinHints,
         tempJoin.root,
         ...newCollectedHints,
         ...allMembersJoinHints,
         ...customSubQueryJoinHints,
-      ];
+      ],
+      queryJoinMaps);
     }
     return this.collectedJoinHints;
+  }
+
+  /**
+   * @private
+   * @return { Record<string, string[][]>}
+   */
+  queryJoinMap() {
+    const queryMembers = this.allMembersConcat(false);
+    const joinMaps = {};
+
+    for (const member of queryMembers) {
+      const memberCube = member.cube?.();
+      if (memberCube?.isView && !joinMaps[memberCube.name]) {
+        joinMaps[memberCube.name] = memberCube.joinMap;
+      }
+    }
+
+    return joinMaps;
+  }
+
+  /**
+   * @private
+   * @param { (string|string[])[] } hints
+   * @param { Record<string, string[][]>} joinMap
+   * @return {(string|string[])[]}
+   */
+  enrichHintsWithJoinMap(hints, joinMap) {
+    // Potentially, if joins between views would take place, we need to distinguish
+    // join maps on per view basis.
+    const allPaths = Object.values(joinMap).flat();
+
+    return hints.map(hint => {
+      if (Array.isArray(hint)) {
+        return hint;
+      }
+
+      for (const path of allPaths) {
+        const hintIndex = path.indexOf(hint);
+        if (hintIndex !== -1) {
+          return path.slice(0, hintIndex + 1);
+        }
+      }
+
+      return hint;
+    });
   }
 
   get dataSource() {
