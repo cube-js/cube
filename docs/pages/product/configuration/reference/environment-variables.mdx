@@ -1357,6 +1357,7 @@ Required port to send where collector server accept UDP connections.
 <WarningBox>
 
 If the refresh worker’s throughput isn’t sufficient and the Cube Refresh Worker can’t refresh every partition, Cube will start dropping partitions once the timeout is reached.
+For externally refreshed pre-aggregations, make sure each pre-aggregation is refreshed at least once within the specified timeout period.
 
 </WarningBox>
 
