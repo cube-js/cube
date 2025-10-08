@@ -347,7 +347,6 @@ export class BigqueryQuery extends BaseQuery {
     // DATEADD is being rewritten to DATE_ADD
     templates.functions.DATE_ADD = 'DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
-    templates.functions.DATE = 'TIMESTAMP({{ args_concat }})';
     delete templates.functions.TO_CHAR;
     delete templates.functions.PERCENTILECONT;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
