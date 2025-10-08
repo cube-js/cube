@@ -11,18 +11,18 @@
 use crate::models;
 use serde::{Deserialize, Serialize};
 
-/// V1CubeMetaDimensionFormat : Format of dimension - can be either a simple string format or an object with link configuration
+/// V1CubeMetaFormat : Format of dimension - can be either a simple string format or an object with link configuration
 /// Format of dimension - can be either a simple string format or an object with link configuration
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum V1CubeMetaDimensionFormat {
-    V1CubeMetaDimensionSimpleFormat(models::V1CubeMetaDimensionSimpleFormat),
-    V1CubeMetaDimensionLinkFormat(Box<models::V1CubeMetaDimensionLinkFormat>),
+pub enum V1CubeMetaFormat {
+    V1CubeMetaSimpleFormat(models::V1CubeMetaSimpleFormat),
+    V1CubeMetaLinkFormat(Box<models::V1CubeMetaLinkFormat>),
 }
 
-impl Default for V1CubeMetaDimensionFormat {
+impl Default for V1CubeMetaFormat {
     fn default() -> Self {
-        Self::V1CubeMetaDimensionSimpleFormat(Default::default())
+        Self::V1CubeMetaSimpleFormat(Default::default())
     }
 }
 /// Type of the format (must be 'link')

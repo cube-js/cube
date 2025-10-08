@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+### Bug Fixes
+
+- **base-driver:** Throw an error when the list of csv files from the bucket is empty ([#9996](https://github.com/cube-js/cube/issues/9996)) ([a8e791c](https://github.com/cube-js/cube/commit/a8e791c1e9c271b63fcf68ba204e875eb3d21fd7))
+- **snowflake-driver:** Add support for IAM roles with IRSA for S3 export buckets ([#10024](https://github.com/cube-js/cube/issues/10024)) ([9ceb2f9](https://github.com/cube-js/cube/commit/9ceb2f94d5deab5fba39faa00e234011c3898710))
+
+### Features
+
+- **schema-compiler:** Pretty print compile errors grouped by files ([#10025](https://github.com/cube-js/cube/issues/10025)) ([0c5c21c](https://github.com/cube-js/cube/commit/0c5c21c4def87cdf9a4b673fde40b034d05d02be))
+
+## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
+
+### Bug Fixes
+
+- **cubesql:** Match reverse Tableau year-month extract filter ([#10009](https://github.com/cube-js/cube/issues/10009)) ([d2e67ad](https://github.com/cube-js/cube/commit/d2e67ad8147100825ba2d1a433c17fcaf8d7d8c3))
+- **schema-compiler:** Do not collect disabled external pre-aggregations ([#10014](https://github.com/cube-js/cube/issues/10014)) ([7b2874e](https://github.com/cube-js/cube/commit/7b2874e012c52a00bd07967b13ea3493a92e228d))
+
+## [1.3.76](https://github.com/cube-js/cube/compare/v1.3.75...v1.3.76) (2025-10-01)
+
+### Reverts
+
+- **duckdb-driver:** Revert version bump from 1.3.1 to 1.4.0 ([3e12bc9](https://github.com/cube-js/cube/commit/3e12bc937890a104aca5d9b6e7fd1538d333c7c3))
+
+## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
+
+### Bug Fixes
+
+- Merge measure/dimension's spec for formats ([#10007](https://github.com/cube-js/cube/issues/10007)) ([039f0e1](https://github.com/cube-js/cube/commit/039f0e1d87823dc0e7333a7d44af769b09fc6a5e))
+- packages/cubejs-docker/latest-debian-jdk.Dockerfile to reduce vulnerabilities ([#10003](https://github.com/cube-js/cube/issues/10003)) ([5453581](https://github.com/cube-js/cube/commit/5453581b719713024d958c333318d0b70e21adf0))
+
+### Features
+
+- **docker:** Security upgrade Node.js from 22.18.0 to 22.20.0 ([#10008](https://github.com/cube-js/cube/issues/10008)) ([02e7d4a](https://github.com/cube-js/cube/commit/02e7d4a2c7c8076e7a052fbbbe22bc7c0f07c39b))
+
 ## [1.3.74](https://github.com/cube-js/cube/compare/v1.3.73...v1.3.74) (2025-09-26)
 
 **Note:** Version bump only for package cubejs

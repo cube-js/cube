@@ -68,6 +68,8 @@ pub struct BaseQueryOptionsStatic {
     pub total_query: Option<bool>,
     #[serde(rename = "cubestoreSupportMultistage")]
     pub cubestore_support_multistage: Option<bool>,
+    #[serde(rename = "disableExternalPreAggregations")]
+    pub disable_external_pre_aggregations: bool,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]

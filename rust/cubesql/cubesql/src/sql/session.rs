@@ -15,8 +15,7 @@ use crate::{
         DatabaseVariablesToUpdate,
     },
     sql::{
-        database_variables::{mysql_default_session_variables, postgres_default_session_variables},
-        extended::PreparedStatement,
+        database_variables::postgres_default_session_variables, extended::PreparedStatement,
         temp_tables::TempTableManager,
     },
     transport::LoadRequestMeta,
@@ -37,8 +36,6 @@ impl SessionProperties {
 
 static POSTGRES_DEFAULT_VARIABLES: LazyLock<DatabaseVariables> =
     LazyLock::new(postgres_default_session_variables);
-static MYSQL_DEFAULT_VARIABLES: LazyLock<DatabaseVariables> =
-    LazyLock::new(mysql_default_session_variables);
 
 #[derive(Debug)]
 pub enum TransactionState {
@@ -347,7 +344,6 @@ impl SessionState {
         match guard {
             Some(vars) => vars,
             _ => match &self.protocol {
-                DatabaseProtocol::MySQL => return MYSQL_DEFAULT_VARIABLES.clone(),
                 DatabaseProtocol::PostgreSQL => return POSTGRES_DEFAULT_VARIABLES.clone(),
                 DatabaseProtocol::Extension(ext) => ext.get_session_default_variables(),
             },
@@ -363,7 +359,6 @@ impl SessionState {
         match &*guard {
             Some(vars) => vars.get(name).cloned(),
             _ => match &self.protocol {
-                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).cloned(),
                 DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.get(name).cloned(),
                 DatabaseProtocol::Extension(ext) => ext.get_session_variable_default(name),
             },
@@ -421,26 +416,6 @@ pub struct Session {
     pub server: Arc<ServerManager>,
     // Props for execution queries
     pub state: Arc<SessionState>,
-}
-
-/// Specific representation of session for MySQL
-#[derive(Debug)]
-pub struct SessionProcessList {
-    pub id: u32,
-    pub user: Option<String>,
-    pub host: String,
-    pub database: Option<String>,
-}
-
-impl From<&Session> for SessionProcessList {
-    fn from(session: &Session) -> Self {
-        Self {
-            id: session.state.connection_id,
-            host: session.state.client_ip.clone(),
-            user: session.state.user(),
-            database: session.state.database(),
-        }
-    }
 }
 
 /// Specific representation of session for PostgreSQL

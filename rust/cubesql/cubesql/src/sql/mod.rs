@@ -18,6 +18,6 @@ pub use auth_service::{
 pub use database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR;
 pub use postgres::*;
 pub use server_manager::ServerManager;
-pub use session::{Session, SessionProcessList, SessionProperties, SessionState};
+pub use session::{Session, SessionProperties, SessionState};
 pub use session_manager::SessionManager;
 pub use types::{ColumnFlags, ColumnType};
