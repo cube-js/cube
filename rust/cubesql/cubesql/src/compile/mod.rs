@@ -43,7 +43,7 @@ mod tests {
         },
         CubeError,
     };
-    use chrono::Datelike;
+    use chrono::{Datelike, Duration, Utc};
     use cubeclient::models::{
         V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
         V1LoadResponse, V1LoadResult, V1LoadResultAnnotation,
@@ -11828,7 +11828,7 @@ ORDER BY "source"."str0" ASC
                         "expr": {
                             "type": "SqlFunction",
                             "cubeParams": ["KibanaSampleDataEcommerce"],
-                            "sql": "((${KibanaSampleDataEcommerce.order_date} = DATE('1994-05-01')) OR (${KibanaSampleDataEcommerce.order_date} = DATE('1996-05-03')))",
+                            "sql": "((${KibanaSampleDataEcommerce.order_date} = timestamptz '1994-05-01T00:00:00.000Z') OR (${KibanaSampleDataEcommerce.order_date} = timestamptz '1996-05-03T00:00:00.000Z'))",
                         },
                         "groupingSet": null,
                     }).to_string(),
@@ -12153,7 +12153,7 @@ ORDER BY "source"."str0" ASC
                         "expr": {
                             "type": "SqlFunction",
                             "cubeParams": ["KibanaSampleDataEcommerce"],
-                            "sql": "(DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2 DAY') < DATE('2014-06-02'))",
+                            "sql": "(DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2 DAY') < timestamptz '2014-06-02T00:00:00.000Z')",
                         },
                         "groupingSet": null,
                     }).to_string(),
@@ -12953,6 +12953,9 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
 
+        let today = Utc::now().date_naive();
+        let thirty_days_ago = today - Duration::days(30);
+        let format_str = "%Y-%m-%d";
         assert_eq!(
             logical_plan.find_cube_scan_wrapped_sql().request,
             V1LoadRequestQuery {
@@ -12987,7 +12990,7 @@ ORDER BY "source"."str0" ASC
                         "expr": {
                             "type": "SqlFunction",
                             "cubeParams": ["KibanaSampleDataEcommerce"],
-                            "sql": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= CAST((NOW() + INTERVAL '-30 DAY') AS DATE)) AND (${{KibanaSampleDataEcommerce.order_date}} < CAST(NOW() AS DATE))) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))"),
+                            "sql": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= timestamptz '{}T00:00:00.000Z') AND (${{KibanaSampleDataEcommerce.order_date}} < timestamptz '{}T00:00:00.000Z')) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))", thirty_days_ago.format(format_str), today.format(format_str)),
                         },
                         "groupingSet": null,
                     }).to_string(),

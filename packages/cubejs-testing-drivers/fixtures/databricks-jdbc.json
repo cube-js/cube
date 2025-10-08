@@ -268,8 +268,6 @@
     "SQL API: Nested Rollup",
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "SQL API: Timeshift measure from cube",
