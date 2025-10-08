@@ -18,9 +18,9 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "jest --runInBand --forceExit --coverage --verbose dist/test/unit",
-    "integration": "jest --runInBand --verbose dist/test/integration",
-    "integration:cubestore": "jest --runInBand --verbose dist/test/integration/cubestore",
+    "unit": "jest --runInBand --forceExit --coverage --verbose test/unit",
+    "integration": "jest --runInBand --verbose test/integration",
+    "integration:cubestore": "jest --runInBand --verbose test/integration/cubestore",
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
@@ -43,6 +43,7 @@
     "@types/ramda": "^0.27.32",
     "@types/uuid": "^8.3.0",
     "jest": "^29",
+    "ts-jest": "^29",
     "typescript": "~5.2.2"
   },
   "license": "Apache-2.0",
