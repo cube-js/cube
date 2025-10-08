@@ -1241,9 +1241,13 @@ cubes:
 ### `scheduled_refresh`
 
 To always keep pre-aggregations up-to-date, you can set
-`scheduled_refresh: true`. This option defaults to `true`. If set to `false`,
-pre-aggregations will always be built on-demand. The
-[`refresh_key`][self-refreshkey] is used to determine if there's a need to
+`scheduled_refresh: true`. This option defaults to `true`. 
+In production mode, pre-aggregations with `scheduled_refresh: false` will not be
+built automatically and require external orchestration to trigger their refresh.
+Additionally, any `scheduled_refresh: false` pre-aggregations that were built manually or on-demand will be considered
+stale and orphaned over time, and will be dropped by the refresh worker during
+cleanup processes.
+The [`refresh_key`][self-refreshkey] is used to determine if there's a need to
 update specific pre-aggregations on each scheduled refresh run. For partitioned
 pre-aggregations, `min` and `max` dates for
 [`time_dimension`][self-timedimension] are checked to determine range for the
