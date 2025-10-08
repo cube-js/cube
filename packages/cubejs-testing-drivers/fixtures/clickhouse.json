@@ -236,6 +236,7 @@
     "SKIPPED SQL API (due to inconsistency)",
     "---------------------------------------",
     "Below doesn't work probably due to strict type comparison in ClickHouse, but tests run across all DBs",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
   ]
 }

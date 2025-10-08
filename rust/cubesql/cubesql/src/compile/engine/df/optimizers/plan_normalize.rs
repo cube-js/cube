@@ -33,6 +33,9 @@ use crate::compile::{engine::CubeContext, rewrite::rules::utils::DatePartToken};
 /// - `DATE - DATE` expressions with `DATEDIFF` equivalent
 /// - binary operations between a literal string and an expression
 ///   of a different type to a string casted to that type
+/// - binary operations between a timestamp and a date to a timestamp and timestamp operation
+/// - IN list expressions where expression being tested is `TIMESTAMP`
+///   and values might be `DATE` to values casted to `TIMESTAMP`
 pub struct PlanNormalize<'a> {
     cube_ctx: &'a CubeContext,
 }
@@ -1027,25 +1030,15 @@ fn expr_normalize(
             expr,
             list,
             negated,
-        } => {
-            let expr = Box::new(expr_normalize(
-                optimizer,
-                expr,
-                schema,
-                remapped_columns,
-                optimizer_config,
-            )?);
-            let list = list
-                .iter()
-                .map(|e| expr_normalize(optimizer, e, schema, remapped_columns, optimizer_config))
-                .collect::<Result<Vec<_>>>()?;
-            let negated = *negated;
-            Ok(Expr::InList {
-                expr,
-                list,
-                negated,
-            })
-        }
+        } => in_list_expr_normalize(
+            optimizer,
+            expr,
+            list,
+            *negated,
+            schema,
+            remapped_columns,
+            optimizer_config,
+        ),
 
         Expr::InSubquery {
             expr,
@@ -1198,6 +1191,7 @@ fn grouping_set_normalize(
 /// - `DATE - DATE` expressions with respective `DATEDIFF` function calls
 /// - binary operations between a literal string and an expression
 ///   of a different type to a string casted to that type
+/// - binary operations between a timestamp and a date to a timestamp and timestamp operation
 fn binary_expr_normalize(
     optimizer: &PlanNormalize,
     left: &Expr,
@@ -1246,6 +1240,28 @@ fn binary_expr_normalize(
         ];
         return Ok(Expr::ScalarUDF { fun, args });
     }
+
+    // Check if the expression is `TIMESTAMP <op> DATE` or `DATE <op> TIMESTAMP`
+    // and cast the `DATE` to `TIMESTAMP` to match the types.
+    match (&left_type, &right_type) {
+        (DataType::Timestamp(_, _), DataType::Date32) => {
+            let new_right = evaluate_expr(optimizer, right.cast_to(&left_type, schema)?)?;
+            return Ok(Expr::BinaryExpr {
+                left,
+                op,
+                right: Box::new(new_right),
+            });
+        }
+        (DataType::Date32, DataType::Timestamp(_, _)) => {
+            let new_left = evaluate_expr(optimizer, left.cast_to(&right_type, schema)?)?;
+            return Ok(Expr::BinaryExpr {
+                left: Box::new(new_left),
+                op,
+                right,
+            });
+        }
+        _ => (),
+    };
 
     // Check if one side of the binary expression is a literal string. If that's the case,
     // attempt to cast the string to other type based on the operator and type on the other side.
@@ -1320,6 +1336,55 @@ fn binary_expr_cast_literal(op: &Operator, other_type: &DataType) -> Option<Data
         // String concat allows string on either side, no casting needed
         Operator::StringConcat => None,
     }
+}
+
+/// Recursively normalizes IN list expressions.
+/// Currently this includes replacing:
+/// - IN list expressions where expression being tested is `TIMESTAMP`
+///   and values are `DATE` to values casted to `TIMESTAMP`
+fn in_list_expr_normalize(
+    optimizer: &PlanNormalize,
+    expr: &Expr,
+    list: &[Expr],
+    negated: bool,
+    schema: &DFSchema,
+    remapped_columns: &HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<Expr> {
+    let expr = Box::new(expr_normalize(
+        optimizer,
+        expr,
+        schema,
+        remapped_columns,
+        optimizer_config,
+    )?);
+    let expr_type = expr.get_type(schema)?;
+    let expr_is_timestamp = matches!(expr_type, DataType::Timestamp(_, _));
+    let list = list
+        .iter()
+        .map(|list_expr| {
+            let list_expr_normalized = expr_normalize(
+                optimizer,
+                list_expr,
+                schema,
+                remapped_columns,
+                optimizer_config,
+            )?;
+            if !expr_is_timestamp {
+                return Ok(list_expr_normalized);
+            }
+            let list_expr_type = list_expr_normalized.get_type(schema)?;
+            if !matches!(list_expr_type, DataType::Date32) {
+                return Ok(list_expr_normalized);
+            }
+            evaluate_expr(optimizer, list_expr_normalized.cast_to(&expr_type, schema)?)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(Expr::InList {
+        expr,
+        list,
+        negated,
+    })
 }
 
 /// Evaluates an expression to a constant if possible.
