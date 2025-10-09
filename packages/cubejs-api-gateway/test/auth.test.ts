@@ -679,14 +679,12 @@ describe('test authorization', () => {
       //
     });
 
-    const extendContextMock = jest.fn((req) => {
-      return {
-        securityContext: {
-          ...req.securityContext,
-          extendedField: 'added_by_extend_context',
-        }
-      };
-    });
+    const extendContextMock = jest.fn((req) => ({
+      securityContext: {
+        ...req.securityContext,
+        extendedField: 'added_by_extend_context',
+      }
+    }));
 
     const expectSecurityContext = (securityContext) => {
       expect(securityContext.uid).toEqual(5);
