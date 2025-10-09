@@ -130,102 +130,84 @@ cube('D', {
     `
   );
 
-  if (getEnv('nativeSqlPlanner')) {
-    it('querying A member proxied to leaf D', () => {
-      // TODO: Fix in tesseract
-    });
-  } else {
-    it('querying A member proxied to leaf D', async () => {
-      const [sql, _params] = await dbRunner.runQueryTest({
-        dimensions: [
-          'View.A_id',
-          'View.A_name',
-          'View.A_d_name',
-        ],
-        timeDimensions: [],
-        segments: [],
-        filters: [],
-        total: true,
-      }, transformResultsForTesseractIfNeeded([{
-        view___a_id: 1,
-        view___a_name: 'a',
-        view___a_d_name: 'd3',
-      }]), { compiler, joinGraph, cubeEvaluator });
+  it('querying A member proxied to leaf D', async () => {
+    const [sql, _params] = await dbRunner.runQueryTest({
+      dimensions: [
+        'View.A_id',
+        'View.A_name',
+        'View.A_d_name',
+      ],
+      timeDimensions: [],
+      segments: [],
+      filters: [],
+      total: true,
+    }, transformResultsForTesseractIfNeeded([{
+      view___a_id: 1,
+      view___a_name: 'a',
+      view___a_d_name: 'd3',
+    }]), { compiler, joinGraph, cubeEvaluator });
 
-      expect(sql).toMatch(/AS "b"/);
-      expect(sql).toMatch(/AS "c"/);
-      expect(sql).toMatch(/AS "d"/);
-      expect(sql).toMatch(/ON "a".id = "b".fk/);
-      expect(sql).toMatch(/ON "b".id = "c".fk/);
-      expect(sql).toMatch(/ON "c".id = "d".fk_d/);
-      expect(sql).not.toMatch(/ON "a".id = "d".fk/);
-    });
-  }
+    expect(sql).toMatch(/AS "b"/);
+    expect(sql).toMatch(/AS "c"/);
+    expect(sql).toMatch(/AS "d"/);
+    expect(sql).toMatch(/ON "a".id = "b".fk/);
+    expect(sql).toMatch(/ON "b".id = "c".fk/);
+    expect(sql).toMatch(/ON "c".id = "d".fk_d/);
+    expect(sql).not.toMatch(/ON "a".id = "d".fk/);
+  });
 
-  if (getEnv('nativeSqlPlanner')) {
-    it('querying A member proxied to non-leaf C', () => {
-      // TODO: Fix in tesseract
-    });
-  } else {
-    it('querying A member proxied to non-leaf C', async () => {
-      const [sql, _params] = await dbRunner.runQueryTest({
-        dimensions: [
-          'View.A_id',
-          'View.A_name',
-          'View.A_c_name',
-        ],
-        timeDimensions: [],
-        segments: [],
-        filters: [],
-        total: true,
-      }, transformResultsForTesseractIfNeeded([{
-        view___a_id: 1,
-        view___a_name: 'a',
-        view___a_c_name: 'c1',
-      }]), { compiler, joinGraph, cubeEvaluator });
+  it('querying A member proxied to non-leaf C', async () => {
+    const [sql, _params] = await dbRunner.runQueryTest({
+      dimensions: [
+        'View.A_id',
+        'View.A_name',
+        'View.A_c_name',
+      ],
+      timeDimensions: [],
+      segments: [],
+      filters: [],
+      total: true,
+    }, transformResultsForTesseractIfNeeded([{
+      view___a_id: 1,
+      view___a_name: 'a',
+      view___a_c_name: 'c1',
+    }]), { compiler, joinGraph, cubeEvaluator });
 
-      expect(sql).toMatch(/AS "b"/);
-      expect(sql).toMatch(/AS "c"/);
-      expect(sql).toMatch(/ON "a".id = "b".fk/);
-      expect(sql).toMatch(/ON "b".id = "c".fk/);
-      expect(sql).not.toMatch(/ON "c".id = "d".fk_d/);
-      expect(sql).not.toMatch(/AS "d"/);
-      expect(sql).not.toMatch(/ON "a".id = "c".fk_a/);
-    });
-  }
+    expect(sql).toMatch(/AS "b"/);
+    expect(sql).toMatch(/AS "c"/);
+    expect(sql).toMatch(/ON "a".id = "b".fk/);
+    expect(sql).toMatch(/ON "b".id = "c".fk/);
+    expect(sql).not.toMatch(/ON "c".id = "d".fk_d/);
+    expect(sql).not.toMatch(/AS "d"/);
+    expect(sql).not.toMatch(/ON "a".id = "c".fk_a/);
+  });
 
-  if (getEnv('nativeSqlPlanner')) {
-    it('querying A member proxied to non-leaf C', () => {
-      // TODO: Fix in tesseract
-    });
-  } else {
-    it('querying A member proxied to non-leaf C', async () => {
-      const [sql, _params] = await dbRunner.runQueryTest({
-        dimensions: [
-          'View.A_id',
-          'View.A_name',
-          'View.A_c_name',
-          'View.A_d_name',
-        ],
-        timeDimensions: [],
-        segments: [],
-        filters: [],
-        total: true,
-      }, transformResultsForTesseractIfNeeded([{
-        view___a_id: 1,
-        view___a_name: 'a',
-        view___a_c_name: 'c1',
-        view___a_d_name: 'd3',
-      }]), { compiler, joinGraph, cubeEvaluator });
+  it('querying A member proxied to non-leaf C', async () => {
+    const [sql, _params] = await dbRunner.runQueryTest({
+      dimensions: [
+        'View.A_id',
+        'View.A_name',
+        'View.A_c_name',
+        'View.A_d_name',
+      ],
+      timeDimensions: [],
+      segments: [],
+      filters: [],
+      total: true,
+    }, transformResultsForTesseractIfNeeded([{
+      view___a_id: 1,
+      view___a_name: 'a',
+      view___a_c_name: 'c1',
+      view___a_d_name: 'd3',
+    }]), { compiler, joinGraph, cubeEvaluator });
 
-      expect(sql).toMatch(/AS "b"/);
-      expect(sql).toMatch(/AS "c"/);
-      expect(sql).toMatch(/AS "d"/);
-      expect(sql).toMatch(/ON "a".id = "b".fk/);
-      expect(sql).toMatch(/ON "b".id = "c".fk/);
-      expect(sql).toMatch(/ON "c".id = "d".fk_d/);
-      expect(sql).not.toMatch(/ON "a".id = "c".fk_a/);
-      expect(sql).not.toMatch(/ON "a".id = "d".fk/);
-    });
-  }
+    expect(sql).toMatch(/AS "b"/);
+    expect(sql).toMatch(/AS "c"/);
+    expect(sql).toMatch(/AS "d"/);
+    expect(sql).toMatch(/ON "a".id = "b".fk/);
+    expect(sql).toMatch(/ON "b".id = "c".fk/);
+    expect(sql).toMatch(/ON "c".id = "d".fk_d/);
+    expect(sql).not.toMatch(/ON "a".id = "c".fk_a/);
+    expect(sql).not.toMatch(/ON "a".id = "d".fk/);
+  });
 });
