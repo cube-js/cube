@@ -436,34 +436,80 @@ export class BaseQuery {
   get allJoinHints() {
     if (!this.collectedJoinHints) {
       const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
+      const explicitJoinHintMembers = new Set(allMembersJoinHints.filter(j => Array.isArray(j)).flat());
       const queryJoinMaps = this.queryJoinMap();
       const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
-      const allJoinHints = this.enrichHintsWithJoinMap([
+      let rootOfJoin = allMembersJoinHints[0];
+      const newCollectedHints = [];
+
+      // One cube may join the other cube via transitive joined cubes,
+      // members from which are referenced in the join `on` clauses.
+      // We need to collect such join hints and push them upfront of the joining one
+      // but only if they don't exist yet. Cause in other case we might affect what
+      // join path will be constructed in join graph.
+      // It is important to use queryLevelJoinHints during the calculation if it is set.
+
+      const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
         ...this.queryLevelJoinHints,
-        ...allMembersJoinHints,
-        ...customSubQueryJoinHints,
-      ],
-      queryJoinMaps);
-
-      const tempJoin = this.joinGraph.buildJoin(allJoinHints);
-
-      if (!tempJoin) {
-        this.collectedJoinHints = allJoinHints;
-        return allJoinHints;
-      }
-
-      const joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(tempJoin));
-      const allJoinHintsFlatten = new Set(allJoinHints.flat());
-      const newCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
-
-      this.collectedJoinHints = this.enrichHintsWithJoinMap([
-        ...this.queryLevelJoinHints,
-        tempJoin.root,
+        ...(rootOfJoin ? [rootOfJoin] : []),
         ...newCollectedHints,
         ...allMembersJoinHints,
         ...customSubQueryJoinHints,
       ],
-      queryJoinMaps);
+      queryJoinMaps));
+
+      let prevJoin = null;
+      let newJoin = null;
+
+      const isJoinTreesEqual = (a, b) => {
+        if (!a || !b || a.root !== b.root || a.joins.length !== b.joins.length) {
+          return false;
+        }
+
+        // We don't care about the order of joins on the same level, so
+        // we can compare them as sets.
+        const aJoinsSet = new Set(a.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
+        const bJoinsSet = new Set(b.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
+
+        if (aJoinsSet.size !== bJoinsSet.size) {
+          return false;
+        }
+
+        for (const val of aJoinsSet) {
+          if (!bJoinsSet.has(val)) {
+            return false;
+          }
+        }
+
+        return true;
+      };
+
+      // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
+      let cnt = 0;
+      let newJoinHintsCollectedCnt;
+
+      do {
+        const allJoinHints = constructJH();
+        prevJoin = newJoin;
+        newJoin = this.joinGraph.buildJoin(allJoinHints);
+        const allJoinHintsFlatten = new Set(allJoinHints.flat());
+        const joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
+
+        const iterationCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
+        newJoinHintsCollectedCnt = iterationCollectedHints.length;
+        cnt++;
+        if (newJoin) {
+          rootOfJoin = newJoin.root;
+          // eslint-disable-next-line no-loop-func
+          newCollectedHints.push(...joinMembersJoinHints.filter(j => j !== rootOfJoin && !explicitJoinHintMembers.has(j)));
+        }
+      } while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
+
+      if (cnt >= 10000) {
+        throw new UserError('Can not construct joins for the query, potential loop detected');
+      }
+
+      this.collectedJoinHints = constructJH();
     }
     return this.collectedJoinHints;
   }
