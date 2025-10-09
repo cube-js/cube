@@ -673,4 +673,113 @@ describe('test authorization', () => {
     // no warnings, done on checkAuth/checkAuthMiddleware level
     expect(loggerMock.mock.calls.length).toEqual(0);
   });
+
+  test('extendContext receives securityContext from checkAuth', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const extendContextMock = jest.fn((req) => {
+      return {
+        securityContext: {
+          ...req.securityContext,
+          extendedField: 'added_by_extend_context',
+        }
+      };
+    });
+
+    const expectSecurityContext = (securityContext) => {
+      expect(securityContext.uid).toEqual(5);
+      expect(securityContext.extendedField).toEqual('added_by_extend_context');
+      expect(securityContext.iat).toBeDefined();
+      expect(securityContext.exp).toBeDefined();
+    };
+
+    const handlerMock = jest.fn((req, res) => {
+      expectSecurityContext(req.context.securityContext);
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      extendContext: extendContextMock,
+    });
+
+    const token = generateAuthToken({ uid: 5 });
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(200);
+
+    expect(handlerMock.mock.calls.length).toEqual(1);
+    expect(extendContextMock.mock.calls.length).toEqual(1);
+
+    // should receive securityContext from checkAuth
+    expect(extendContextMock.mock.calls[0][0].securityContext).toMatchObject({
+      uid: 5,
+      iat: expect.any(Number),
+      exp: expect.any(Number),
+    });
+    expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
+  });
+
+  test('extendContext with custom checkAuth returning securityContext', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const checkAuthMock = jest.fn(async (req: Request, auth?: string) => {
+      if (auth) {
+        const decoded = jwt.verify(auth, 'secret') as any;
+        return {
+          security_context: {
+            ...decoded,
+            tenantId: 'tenant_123',
+            customField: 'from_check_auth',
+          }
+        };
+      }
+      return {};
+    });
+
+    const extendContextMock = jest.fn((req) => {
+      // should receive securityContext from checkAuth
+      expect(req.securityContext).toBeDefined();
+      expect(req.securityContext.customField).toEqual('from_check_auth');
+      
+      return {
+        securityContext: {
+          ...req.securityContext,
+          extendedField: 'from_extend_context',
+        }
+      };
+    });
+
+    const handlerMock = jest.fn((req, res) => {
+      expect(req.context.securityContext.customField).toEqual('from_check_auth');
+      expect(req.context.securityContext.extendedField).toEqual('from_extend_context');
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      checkAuth: checkAuthMock,
+      extendContext: extendContextMock,
+    });
+
+    const token = generateAuthToken({ uid: 5 });
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(200);
+
+    expect(checkAuthMock.mock.calls.length).toEqual(1);
+    expect(extendContextMock.mock.calls.length).toEqual(1);
+    expect(handlerMock.mock.calls.length).toEqual(1);
+    expect(extendContextMock.mock.calls[0][0].securityContext).toMatchObject({
+      uid: 5,
+      tenantId: 'tenant_123',
+      customField: 'from_check_auth',
+    });
+  });
 });
