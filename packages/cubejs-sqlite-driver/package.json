@@ -15,7 +15,7 @@
   "typings": "driver/index.d.ts",
   "scripts": {
     "lint": "eslint **/*.js",
-    "test": "jest ./**/*.test.js"
+    "unit": "jest ./**/*.test.js"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "1.3.78",
