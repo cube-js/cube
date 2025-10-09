@@ -5346,7 +5346,7 @@ cubes:
     }
 
     it('querying cube with transitive joins with a few joins to same cube', async () => {
-      // TODO: This is not supported atm, but it's a good case, so keeeping this test
+      // TODO: This is not supported atm, but it's a good case, so keeping this test
       // for the future implementation
 
       // await compiler.compile();
