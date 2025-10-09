@@ -18,6 +18,8 @@ pub struct CubeDefinitionStatic {
     pub is_view: Option<bool>,
     #[serde(rename = "calendar")]
     pub is_calendar: Option<bool>,
+    #[serde(rename = "joinMap")]
+    pub join_map: Option<Vec<Vec<String>>>,
 }
 
 impl CubeDefinitionStatic {
