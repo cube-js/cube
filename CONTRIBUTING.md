@@ -101,10 +101,10 @@ Cube.is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and
 11. Run `yarn link @cubejs-backend/server-core` in your project directory. 
 12. Run `yarn dev` to start your testing project and verify changes.
 
-Instead of running all of the above commands manually you can use the `dev_env_setup.sh` script:
+Instead of running all of the above commands manually you can use the `dev-env.sh` script:
 
 1. Clone the Cube repository, `git clone https://github.com/cube-js/cube`.
-2. Navigate to your working projects directory and run `/path/to/cube/repo/dev_env_setup.sh`. The script will
+2. Navigate to your working projects directory and run `/path/to/cube/repo//dev-env.sh setup`. The script will
    ask you some questions and run all the required commands. In case you decide to create a new testing project,
    it will be created in the current directory (that is why you probably don't want to run this script within 
    cube repo directory).
