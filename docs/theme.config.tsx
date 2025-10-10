@@ -113,8 +113,8 @@ const config: DocsThemeConfig = {
     extraContent: (
       <div>
         <br/>
-        <a target="_blank" href="https://cube.dev/blog/cube-cloud-named-fast-moving-leader-in-gigaoms-2024-sonar-report?utm_source=cube&utm_medium=docs">
-          <img src="https://ucarecdn.com/a16cd6ee-4310-4507-a528-3caeda0777c2/"/>
+        <a target="_blank" href="https://cube.registration.goldcast.io/events/a6a3b4b8-a99f-489a-b740-060182dbce7b?utm_source=cube&utm_medium=docs">
+          <img src="https://lgo0ecceic.ucarecd.net/ec7b82c7-b4b6-4305-a41a-1dbad83c336a/"/>
         </a>
       </div>
     )
