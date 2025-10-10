@@ -49,6 +49,9 @@ describe('Custom Granularities', () => {
             - name: two_weeks_by_friday
               interval: 2 weeks
               origin: '2024-08-23'
+            - name: one_week_by_friday_by_offset
+              interval: 1 week
+              offset: 4 days
             - name: one_hour_by_5min_offset
               interval: 1 hour
               offset: 5 minutes
@@ -564,4 +567,147 @@ describe('Custom Granularities', () => {
     ],
     { joinGraph, cubeEvaluator, compiler }
   ));
+
+  // Query-time offset tests
+  
+  // Test demonstrating day boundaries shifted to 2am-2am
+  it('works with query-time offset shifting day boundary (2am-2am)', async () => {
+    const { compiler: offsetCompiler, joinGraph: offsetJoinGraph, cubeEvaluator: offsetCubeEvaluator } = prepareYamlCompiler(`
+      cubes:
+        - name: events
+          sql: >
+            SELECT *
+            FROM (
+              SELECT 1 as event_id, toDateTime('2024-01-01 00:00:00') as event_time UNION ALL
+              SELECT 2, toDateTime('2024-01-01 01:00:00') UNION ALL
+              SELECT 3, toDateTime('2024-01-01 01:30:00') UNION ALL
+              SELECT 4, toDateTime('2024-01-02 00:00:00') UNION ALL
+              SELECT 5, toDateTime('2024-01-02 01:00:00') UNION ALL
+              SELECT 6, toDateTime('2024-01-02 01:30:00')
+            )
+
+          dimensions:
+            - name: event_id
+              sql: event_id
+              type: number
+              primary_key: true
+
+            - name: eventTime
+              sql: event_time
+              type: time
+
+          measures:
+            - name: count
+              type: count
+    `);
+    
+    await dbRunner.runQueryTest(
+      {
+        measures: ['events.count'],
+        timeDimensions: [{
+          dimension: 'events.eventTime',
+          granularity: 'day',
+          offset: '2 hours',
+          dateRange: ['2024-01-01', '2024-01-03']
+        }],
+        dimensions: [],
+        timezone: 'UTC',
+        order: [['events.eventTime', 'asc']],
+      },
+      [
+        {
+          events__event_time_day: '2023-12-31T02:00:00.000',
+          events__count: '3',
+        },
+        {
+          events__event_time_day: '2024-01-01T02:00:00.000',
+          events__count: '3',
+        },
+      ],
+      { joinGraph: offsetJoinGraph, cubeEvaluator: offsetCubeEvaluator, compiler: offsetCompiler }
+    );
+  });
+
+  // Test demonstrating week boundaries shifted to Wednesday-Wednesday
+  it('works with query-time offset shifting week to start on Wednesday', async () => {
+    const { compiler: weekCompiler, joinGraph: weekJoinGraph, cubeEvaluator: weekCubeEvaluator } = prepareYamlCompiler(`
+      cubes:
+        - name: activities
+          sql: >
+            SELECT *
+            FROM (
+              SELECT 1 as activity_id, toDateTime('2024-01-01 10:00:00') as activity_time UNION ALL
+              SELECT 2, toDateTime('2024-01-02 10:00:00') UNION ALL
+              SELECT 3, toDateTime('2024-01-03 10:00:00') UNION ALL
+              SELECT 4, toDateTime('2024-01-04 10:00:00') UNION ALL
+              SELECT 5, toDateTime('2024-01-08 10:00:00') UNION ALL
+              SELECT 6, toDateTime('2024-01-10 10:00:00')
+            )
+
+          dimensions:
+            - name: activity_id
+              sql: activity_id
+              type: number
+              primary_key: true
+
+            - name: activityTime
+              sql: activity_time
+              type: time
+
+          measures:
+            - name: count
+              type: count
+    `);
+    
+    await dbRunner.runQueryTest(
+      {
+        measures: ['activities.count'],
+        timeDimensions: [{
+          dimension: 'activities.activityTime',
+          granularity: 'week',
+          offset: '2 days',
+          dateRange: ['2024-01-01', '2024-01-15']
+        }],
+        dimensions: [],
+        timezone: 'UTC',
+        order: [['activities.activityTime', 'asc']],
+      },
+      [
+        {
+          activities__activity_time_week: '2024-01-03T00:00:00.000',
+          activities__count: '3',
+        },
+        {
+          activities__activity_time_week: '2024-01-10T00:00:00.000',
+          activities__count: '1',
+        },
+        {
+          activities__activity_time_week: '2023-12-27T00:00:00.000',
+          activities__count: '2',
+        },
+      ],
+      { joinGraph: weekJoinGraph, cubeEvaluator: weekCubeEvaluator, compiler: weekCompiler }
+    );
+  });
+
+  it('rejects query-time offset with custom granularity', async () => {
+    await expect(
+      dbRunner.runQueryTest(
+        {
+          measures: ['orders.count'],
+          timeDimensions: [{
+            dimension: 'orders.createdAt',
+            granularity: 'one_week_by_friday_by_offset',
+            offset: '2 days',
+            dateRange: ['2024-01-01', '2024-02-28']
+          }],
+          dimensions: [],
+          timezone: 'UTC',
+          order: [['orders.createdAt', 'asc']],
+        },
+        [],
+        { joinGraph, cubeEvaluator, compiler }
+      )
+    ).rejects.toThrow('Query-time offset parameter cannot be used with custom granularity');
+  });
 });

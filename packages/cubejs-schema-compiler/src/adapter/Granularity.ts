@@ -34,8 +34,23 @@ export class Granularity {
     this.queryTimezone = query.timezone || 'UTC';
     this.origin = moment.tz(query.timezone).startOf('year'); // Defaults to current year start
 
+    // Query-time offset takes precedence over data model offset
+    const queryTimeOffset = timeDimension.offset;
+
     if (this.predefinedGranularity) {
       this.granularityInterval = `1 ${this.granularity}`;
+      // Support query-time offset for predefined granularities
+      if (queryTimeOffset) {
+        this.fixOriginForWeeksIfNeeded();
+        // Validate offset format
+        try {
+          const parsedOffset = parseSqlInterval(queryTimeOffset);
+          this.granularityOffset = queryTimeOffset;
+          this.origin = addInterval(this.origin, parsedOffset);
+        } catch (e) {
+          throw new Error(`Invalid offset format "${queryTimeOffset}". Expected SQL interval format like "2 hours", "-30 minutes", or "1 day 2 hours"`);
+        }
+      }
     } else {
       const customGranularity = this.query.cacheValue(
         ['customGranularity', timeDimension.dimension, this.granularity],
@@ -51,6 +66,8 @@ export class Granularity {
 
       if (customGranularity.origin) {
         this.origin = moment.tz(customGranularity.origin, query.timezone);
+      } else if (queryTimeOffset) {
+        throw new Error(`Query-time offset parameter cannot be used with custom granularity "${this.granularity}". Offset is only supported with predefined granularities (day, week, month, etc.)`);
       } else if (customGranularity.offset) {
         // Needed because if interval is week-based, offset is expected to be relative to the start of a week
         this.fixOriginForWeeksIfNeeded();
