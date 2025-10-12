@@ -104,6 +104,7 @@ export class PreAggregations {
    * It returns full pre-aggregation object (with keyQueries, previewSql, loadSql, and so on.
    */
   public preAggregationsDescription(): FullPreAggregationDescription[] {
+    const disableExternalPreAggregations = this.query.options?.disableExternalPreAggregations;
     const preAggregations = [this.preAggregationsDescriptionLocal()].concat(
       this.query.subQueryDimensions.map(d => this.query.subQueryDescription(d).subQuery)
         .map(q => q.preAggregations.preAggregationsDescription())
@@ -111,10 +112,11 @@ export class PreAggregations {
 
     return R.pipe(
       R.unnest as (list: any[][]) => any[],
+      // TODO: Move this to somewhere BEFORE pre-agg matching, possibly to rollupMatchResults()
+      // to avoid constly matching and then throwing it away.
+      R.filter((agg: FullPreAggregationDescription) => !(disableExternalPreAggregations && agg.external)),
       R.uniqBy(desc => desc.tableName)
-    )(
-      preAggregations
-    );
+    )(preAggregations);
   }
 
   private preAggregationsDescriptionLocal(): FullPreAggregationDescription[] {

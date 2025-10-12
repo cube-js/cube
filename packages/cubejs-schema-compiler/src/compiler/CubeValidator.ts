@@ -1001,7 +1001,7 @@ export class CubeValidator {
     const result = cube.isView ? viewSchema.validate(cube, options) : cubeSchema.validate(cube, options);
 
     if (result.error != null) {
-      errorReporter.error(formatErrorMessage(result.error), result.error);
+      errorReporter.error(formatErrorMessage(result.error));
     } else {
       this.validCubes.set(cube.name, true);
     }

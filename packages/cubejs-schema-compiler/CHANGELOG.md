@@ -3,6 +3,48 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+### Features
+
+- **schema-compiler:** Pretty print compile errors grouped by files ([#10025](https://github.com/cube-js/cube/issues/10025)) ([0c5c21c](https://github.com/cube-js/cube/commit/0c5c21c4def87cdf9a4b673fde40b034d05d02be))
+
+## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
+
+### Bug Fixes
+
+- **schema-compiler:** Do not collect disabled external pre-aggregations ([#10014](https://github.com/cube-js/cube/issues/10014)) ([7b2874e](https://github.com/cube-js/cube/commit/7b2874e012c52a00bd07967b13ea3493a92e228d))
+
+## [1.3.76](https://github.com/cube-js/cube/compare/v1.3.75...v1.3.76) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.74](https://github.com/cube-js/cube/compare/v1.3.73...v1.3.74) (2025-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix view transpilation for worker_threads and native flows ([#9980](https://github.com/cube-js/cube/issues/9980)) ([333b53d](https://github.com/cube-js/cube/commit/333b53d01b9a0813ea9bace8601be0c0b82534ba))
+
 ## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
 
 ### Features

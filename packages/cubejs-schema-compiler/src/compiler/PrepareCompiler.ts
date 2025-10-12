@@ -77,7 +77,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
 
   const compilerId = uuidv4();
 
-  const compiler = new DataSchemaCompiler(repo, Object.assign({}, {
+  const compiler = new DataSchemaCompiler(repo, {
     cubeNameCompilers: [cubeDictionary],
     preTranspileCubeCompilers: [cubeSymbols, cubeValidator],
     transpilers,
@@ -91,7 +91,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     compilerCache,
     cubeDictionary,
-    cubeSymbols,
+    cubeOnlySymbols: cubeSymbols,
+    cubeAndViewSymbols: viewCompiler,
     extensions: {
       Funnels,
       RefreshKeys,
@@ -102,7 +103,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     nativeInstance,
     yamlCompiler,
     compilerId,
-  }, options));
+    ...options
+  });
 
   return {
     compiler,

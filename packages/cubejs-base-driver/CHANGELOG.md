@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+### Bug Fixes
+
+- **base-driver:** Throw an error when the list of csv files from the bucket is empty ([#9996](https://github.com/cube-js/cube/issues/9996)) ([a8e791c](https://github.com/cube-js/cube/commit/a8e791c1e9c271b63fcf68ba204e875eb3d21fd7))
+
+## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+## [1.3.76](https://github.com/cube-js/cube/compare/v1.3.75...v1.3.76) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+## [1.3.74](https://github.com/cube-js/cube/compare/v1.3.73...v1.3.74) (2025-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+### Bug Fixes
+
+- **cubestore:** Disable quoting in csv parser for Athena ([#9997](https://github.com/cube-js/cube/issues/9997)) ([5cefd96](https://github.com/cube-js/cube/commit/5cefd96e71e2e16bfbeda75e1be5c72552414a4a))
+
+## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
 ## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
 
 **Note:** Version bump only for package @cubejs-backend/base-driver

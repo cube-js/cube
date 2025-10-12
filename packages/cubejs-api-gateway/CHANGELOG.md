@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.76](https://github.com/cube-js/cube/compare/v1.3.75...v1.3.76) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
+
+### Bug Fixes
+
+- Merge measure/dimension's spec for formats ([#10007](https://github.com/cube-js/cube/issues/10007)) ([039f0e1](https://github.com/cube-js/cube/commit/039f0e1d87823dc0e7333a7d44af769b09fc6a5e))
+
+## [1.3.74](https://github.com/cube-js/cube/compare/v1.3.73...v1.3.74) (2025-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+### Features
+
+- Expose format field for measures/dimensions in meta ([#9998](https://github.com/cube-js/cube/issues/9998)) ([51ec263](https://github.com/cube-js/cube/commit/51ec2638892272be48325bdaca931f6d1c239714))
+
+## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.3.70](https://github.com/cube-js/cube/compare/v1.3.69...v1.3.70) (2025-09-19)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
 ## [1.3.69](https://github.com/cube-js/cube/compare/v1.3.68...v1.3.69) (2025-09-17)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

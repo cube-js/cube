@@ -107,6 +107,7 @@ pub struct QueryProperties {
     total_query: bool,
     query_join_hints: Rc<Vec<JoinHintItem>>,
     allow_multi_stage: bool,
+    disable_external_pre_aggregations: bool,
 }
 
 impl QueryProperties {
@@ -405,6 +406,8 @@ impl QueryProperties {
 
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
         let total_query = options.static_data().total_query.unwrap_or(false);
+        let disable_external_pre_aggregations =
+            options.static_data().disable_external_pre_aggregations;
 
         let mut res = Self {
             measures,
@@ -425,6 +428,7 @@ impl QueryProperties {
             total_query,
             query_join_hints,
             allow_multi_stage: true,
+            disable_external_pre_aggregations,
         };
         res.apply_static_filters()?;
         Ok(Rc::new(res))
@@ -448,6 +452,7 @@ impl QueryProperties {
         total_query: bool,
         query_join_hints: Rc<Vec<JoinHintItem>>,
         allow_multi_stage: bool,
+        disable_external_pre_aggregations: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -474,6 +479,7 @@ impl QueryProperties {
             total_query,
             query_join_hints,
             allow_multi_stage,
+            disable_external_pre_aggregations,
         };
         res.apply_static_filters()?;
 
@@ -719,6 +725,10 @@ impl QueryProperties {
 
     pub fn is_pre_aggregation_query(&self) -> bool {
         self.pre_aggregation_query
+    }
+
+    pub fn disable_external_pre_aggregations(&self) -> bool {
+        self.disable_external_pre_aggregations
     }
 
     pub fn all_filters(&self) -> Option<Filter> {

@@ -94,10 +94,7 @@ pub async fn read_contents<Reader: AsyncReadExt + Unpin>(
     // protocol defines length for all types of messages
     let length = reader.read_u32().await?;
     if length < 4 {
-        return Err(Error::new(
-            ErrorKind::Other,
-            "Unexpectedly small (<0) message size",
-        ));
+        return Err(Error::other("Unexpectedly small (<0) message size"));
     }
 
     trace!(

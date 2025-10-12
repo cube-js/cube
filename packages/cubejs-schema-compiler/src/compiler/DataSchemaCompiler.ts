@@ -73,7 +73,8 @@ export type DataSchemaCompilerOptions = {
   nativeInstance: NativeInstance;
   cubeFactory: Function;
   cubeDictionary: CubeDictionary;
-  cubeSymbols: CubeSymbols;
+  cubeOnlySymbols: CubeSymbols;
+  cubeAndViewSymbols: CubeSymbols;
   cubeCompilers?: CompilerInterface[];
   contextCompilers?: CompilerInterface[];
   transpilers?: TranspilerInterface[];
@@ -131,7 +132,9 @@ export class DataSchemaCompiler {
 
   private readonly cubeDictionary: CubeDictionary;
 
-  private readonly cubeSymbols: CubeSymbols;
+  private readonly cubeOnlySymbols: CubeSymbols;
+
+  private readonly cubeAndViewSymbols: CubeSymbols;
 
   // Actually should be something like
   // createCube(cubeDefinition: CubeDefinition): CubeDefinitionExtended
@@ -187,7 +190,8 @@ export class DataSchemaCompiler {
     this.cubeNameCompilers = options.cubeNameCompilers || [];
     this.extensions = options.extensions || {};
     this.cubeDictionary = options.cubeDictionary;
-    this.cubeSymbols = options.cubeSymbols;
+    this.cubeOnlySymbols = options.cubeOnlySymbols;
+    this.cubeAndViewSymbols = options.cubeAndViewSymbols;
     this.cubeFactory = options.cubeFactory;
     this.filesToCompile = options.filesToCompile || [];
     this.omitErrors = options.omitErrors || false;
@@ -531,7 +535,8 @@ export class DataSchemaCompiler {
         // Free unneeded resources
         this.compileV8ContextCache = null;
         this.cubeDictionary.free();
-        this.cubeSymbols.free();
+        this.cubeOnlySymbols.free();
+        this.cubeAndViewSymbols.free();
         return res;
       });
     }
@@ -564,7 +569,9 @@ export class DataSchemaCompiler {
     // which doesn't allow passing any function objects, so we need to sanitize the symbols.
     // Communication with native backend also involves deserialization.
     const cubeSymbols: Record<string, Record<string, boolean>> = Object.fromEntries(
-      Object.entries(this.cubeSymbols.symbols as Record<string, Record<string, any>>)
+      [...Object.entries(this.cubeOnlySymbols.symbols as Record<string, Record<string, any>>),
+        ...Object.entries(this.cubeAndViewSymbols.symbols as Record<string, Record<string, any>>)
+      ]
         .map(
           ([key, value]: [string, Record<string, any>]) => [key, Object.fromEntries(
             Object.keys(value).map((k) => [k, true]),
@@ -624,7 +631,7 @@ export class DataSchemaCompiler {
     return files.map((file, index) => {
       errorsReport.inFile(file);
       if (!res[index]) { // This should not happen in theory but just to be safe
-        errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
+        errorsReport.error('No transpilation result received for the file.');
         return undefined;
       }
       errorsReport.addErrors(res[index].errors, file.fileName);
@@ -651,7 +658,7 @@ export class DataSchemaCompiler {
     return files.map((file, index) => {
       errorsReport.inFile(file);
       if (!res[index]) { // This should not happen in theory but just to be safe
-        errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
+        errorsReport.error('No transpilation result received for the file.');
         return undefined;
       }
       errorsReport.addErrors(res[index].errors, file.fileName);
@@ -730,7 +737,7 @@ export class DataSchemaCompiler {
         const err = e as SyntaxErrorInterface;
         const line = file.content.split('\n')[(err.loc?.start?.line || 1) - 1];
         const spaces = Array(err.loc?.start.column).fill(' ').join('');
-        errorsReport.error(`Syntax error during '${file.fileName}' parsing: ${err.message}:\n${line}\n${spaces}^`);
+        errorsReport.error(`Syntax error during parsing: ${err.message}:\n${line}\n${spaces}^`, file.fileName);
       } else {
         errorsReport.error(e);
       }

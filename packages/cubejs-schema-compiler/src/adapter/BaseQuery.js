@@ -897,27 +897,25 @@ export class BaseQuery {
       preAggregationQuery: this.options.preAggregationQuery,
       totalQuery: this.options.totalQuery,
       joinHints: this.options.joinHints,
-      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin')
+      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
+      disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
     };
 
-    const buildResult = nativeBuildSqlAndParams(queryParams);
+    try {
+      const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    if (buildResult.error) {
-      if (buildResult.error.cause && buildResult.error.cause === 'User') {
-        throw new UserError(buildResult.error.message);
-      } else {
-        throw new Error(buildResult.error.message);
+      const [query, params, preAggregation] = buildResult;
+      const paramsArray = [...params];
+      if (preAggregation) {
+        this.preAggregations.preAggregationForQuery = preAggregation;
       }
+      return [query, paramsArray];
+    } catch (e) {
+      if (e.name === 'TesseractUserError') {
+        throw new UserError(e.message);
+      }
+      throw e;
     }
-
-    const res = buildResult.result;
-    const [query, params, preAggregation] = res;
-    // FIXME
-    const paramsArray = [...params];
-    if (preAggregation) {
-      this.preAggregations.preAggregationForQuery = preAggregation;
-    }
-    return [query, paramsArray];
   }
 
   // FIXME Temporary solution
@@ -948,20 +946,13 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
-      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin')
+      cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
+      disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
-    if (buildResult.error) {
-      if (buildResult.error.cause === 'User') {
-        throw new UserError(buildResult.error.message);
-      } else {
-        throw new Error(buildResult.error.message);
-      }
-    }
-
-    const [, , preAggregation] = buildResult.result;
+    const [, , preAggregation] = buildResult;
     return preAggregation;
   }
 

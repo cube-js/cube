@@ -123,6 +123,7 @@ impl DimensionSubqueryPlanner {
             false,
             Rc::new(vec![]),
             true,
+            self.query_properties.disable_external_pre_aggregations(),
         )?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan()?;
@@ -173,7 +174,7 @@ impl DimensionSubqueryPlanner {
         self.sub_query_dims.is_empty()
     }
 
-    pub fn dimensions_refs(&self) -> Ref<HashMap<String, QualifiedColumnName>> {
+    pub fn dimensions_refs(&self) -> Ref<'_, HashMap<String, QualifiedColumnName>> {
         self.dimensions_refs.borrow()
     }
 }

@@ -148,7 +148,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -213,7 +213,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           components: rustfmt
       - name: Cargo test cubeorchestrator
         run: cargo test --manifest-path rust/cubeorchestrator/Cargo.toml -j 4
@@ -276,7 +276,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -424,7 +424,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.84.1
+          toolchain: 1.90.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -774,6 +774,10 @@ jobs:
       contents: read
       actions: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Install Codecov CLI
         run: |
           curl -Os https://uploader.codecov.io/latest/linux/codecov
