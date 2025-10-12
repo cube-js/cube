@@ -28,7 +28,7 @@ describe('OracleQuery', () => {
     })
     `, { adapter: 'oracle' });
 
-  it('uses to_date with seconds precision and preserves trailing Z', async () => {
+  it('uses TO_TIMESTAMP_TZ with milliseconds precision and preserves trailing Z', async () => {
     await compiler.compile();
 
     const query = new OracleQuery(
@@ -48,7 +48,7 @@ describe('OracleQuery', () => {
 
     const [sql, params] = query.buildSqlAndParams();
 
-    expect(sql).toContain('CAST(TO_TIMESTAMP_TZ(:"?", \'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"\') AS DATE)');
+    expect(sql).toContain('TO_TIMESTAMP_TZ(:"?", \'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"\')');
     expect(params).toEqual(['2024-02-01T00:00:00.000Z', '2024-02-02T23:59:59.999Z']);
   });
 });
