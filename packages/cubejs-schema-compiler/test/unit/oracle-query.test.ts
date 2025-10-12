@@ -49,6 +49,6 @@ describe('OracleQuery', () => {
     const [sql, params] = query.buildSqlAndParams();
 
     expect(sql).toContain('CAST(TO_TIMESTAMP_TZ(:"?", \'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"\') AS DATE)');
-    expect(params).toEqual(['2024-02-01T00:00:00.000Z']);
+    expect(params).toEqual(['2024-02-01T00:00:00.000Z', '2024-02-02T23:59:59.999Z']);
   });
 });
