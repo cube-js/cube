@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@cube-dev/marketing-ui": "0.0.1-beta.22",
+    "@cube-dev/purple-banner": "https://github.com/cubedevinc/purple-banner/releases/download/v2.0.21/cube-dev-purple-banner-2.0.21.tgz",
     "@cubejs-client/core": "^0.32.17",
     "@radix-ui/react-dialog": "^1.0.4",
     "@radix-ui/react-navigation-menu": "^1.1.3",
