@@ -1393,3 +1393,64 @@ fn evaluate_expr(optimizer: &PlanNormalize, expr: Expr) -> Result<Expr> {
     let mut const_evaluator = ConstEvaluator::new(execution_props);
     expr.rewrite(&mut const_evaluator)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compile::test::{
+        get_test_tenant_ctx, rewrite_engine::create_test_postgresql_cube_context,
+    };
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        logical_plan::{col, lit, LogicalPlanBuilder},
+    };
+
+    /// Helper function to create a deeply nested OR expression.
+    /// This creates a chain like: col = 1 OR col = 2 OR col = 3 OR ... OR col = depth
+    fn create_deeply_nested_or_expr(column_name: &str, depth: usize) -> Expr {
+        if depth == 0 {
+            return col(column_name).eq(lit(0i32));
+        }
+
+        let mut expr = col(column_name).eq(lit(0i32));
+
+        for i in 1..depth {
+            expr = expr.or(col(column_name).eq(lit(i as i32)));
+        }
+
+        expr
+    }
+
+    #[tokio::test]
+    async fn test_stack_overflow_deeply_nested_or() -> Result<()> {
+        let meta = get_test_tenant_ctx();
+        let cube_ctx = create_test_postgresql_cube_context(meta)
+            .await
+            .expect("Failed to create cube context");
+
+        // Create a simple table
+        let schema = Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("value", DataType::Int32, true),
+        ]);
+
+        let table_scan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
+            .expect("Failed to create table scan")
+            .build()
+            .expect("Failed to build plan");
+
+        // Create a deeply nested OR expression (should cause stack overflow)
+        let deeply_nested_filter = create_deeply_nested_or_expr("value", 1_000);
+
+        let plan = LogicalPlanBuilder::from(table_scan)
+            .filter(deeply_nested_filter)
+            .expect("Failed to add filter")
+            .build()
+            .expect("Failed to build plan");
+
+        let optimizer = PlanNormalize::new(&cube_ctx);
+        optimizer.optimize(&plan, &OptimizerConfig::new())?;
+
+        Ok(())
+    }
+}
