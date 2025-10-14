@@ -1,10 +1,10 @@
 use super::FullKeyAggregateStrategy;
 use crate::logical_plan::{FullKeyAggregate, LogicalJoin, ResolvedMultipliedMeasures};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::physical_plan_builder::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
+use crate::physical_plan_builder::PushDownBuilderContext;
 use crate::plan::{
     Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, Select, SelectBuilder,
-    SingleAliasedSource, Union,
+    SingleAliasedSource,
 };
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::{MemberSymbol, ReferencesBuilder};
