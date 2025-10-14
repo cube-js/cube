@@ -4249,7 +4249,8 @@ export class BaseQuery {
         between: '{{ expr }} {% if negated %}NOT {% endif %}BETWEEN {{ low }} AND {{ high }}',
       },
       tesseract: {
-        ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}', // May require different overloads in Tesseract than the ilike from expressions used in SQLAPI.
+        // RENE override for ILIKE to work around of performance issues with ILIKE
+        ilike: '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}', // May require different overloads in Tesseract than the ilike from expressions used in SQLAPI.
         series_bounds_cast: '{{ expr }}',
         bool_param_cast: '{{ expr }}',
         number_param_cast: '{{ expr }}',
