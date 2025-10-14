@@ -334,7 +334,7 @@ fn plan_normalize(
                     let exprs = exprs
                         .iter()
                         .map(|expr| {
-                            expr_normalize(
+                            expr_normalize_stacked(
                                 optimizer,
                                 expr,
                                 schema,
@@ -343,7 +343,8 @@ fn plan_normalize(
                             )
                         })
                         .collect::<Result<Vec<_>>>()?;
-                    Partitioning::Hash(exprs.into_iter().map(|e| *e).collect(), *n)
+
+                    Partitioning::Hash(exprs, *n)
                 }
             };
 
@@ -394,7 +395,7 @@ fn plan_normalize(
             let filters = filters
                 .iter()
                 .map(|expr| {
-                    expr_normalize(
+                    expr_normalize_stacked(
                         optimizer,
                         expr,
                         &projected_schema,
@@ -410,7 +411,7 @@ fn plan_normalize(
                 source,
                 projection,
                 projected_schema,
-                filters: filters.into_iter().map(|e| *e).collect(),
+                filters,
                 fetch,
             }))
         }
@@ -477,7 +478,7 @@ fn plan_normalize(
                 .map(|row| {
                     row.iter()
                         .map(|expr| {
-                            expr_normalize(
+                            expr_normalize_stacked(
                                 optimizer,
                                 expr,
                                 schema,
@@ -489,13 +490,7 @@ fn plan_normalize(
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            LogicalPlanBuilder::values(
-                values
-                    .into_iter()
-                    .map(|row| row.into_iter().map(|e| *e).collect())
-                    .collect(),
-            )?
-            .build()
+            LogicalPlanBuilder::values(values)?.build()
         }
 
         LogicalPlan::Explain(Explain {
@@ -544,15 +539,20 @@ fn plan_normalize(
             let new_expr = expr
                 .iter()
                 .map(|expr| {
-                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                    expr_normalize_stacked(
+                        optimizer,
+                        expr,
+                        schema,
+                        remapped_columns,
+                        optimizer_config,
+                    )
                 })
                 .collect::<Result<Vec<_>>>()?;
-            let new_expr_unboxed: Vec<Expr> = new_expr.iter().map(|e| e.as_ref().clone()).collect();
-            let new_schema = build_table_udf_schema(&input, &new_expr_unboxed)?;
+            let new_schema = build_table_udf_schema(&input, &new_expr)?;
 
             for (expr, new_expr) in expr.iter().zip(new_expr.iter()) {
                 let old_name = expr.name(&DFSchema::empty())?;
-                let new_name = new_expr.as_ref().name(&DFSchema::empty())?;
+                let new_name = new_expr.name(&DFSchema::empty())?;
                 if old_name != new_name {
                     let old_column = Column::from_name(old_name);
                     let new_column = Column::from_name(new_name);
@@ -561,7 +561,7 @@ fn plan_normalize(
             }
 
             Ok(LogicalPlan::TableUDFs(TableUDFs {
-                expr: new_expr.into_iter().map(|e| *e).collect(),
+                expr: new_expr,
                 input,
                 schema: new_schema,
             }))
