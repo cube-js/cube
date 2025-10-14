@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.79](https://github.com/cube-js/cube/compare/v1.3.78...v1.3.79) (2025-10-14)
+
+### Bug Fixes
+
+- **cubesql:** Normalize timestamp/date expressions ([#10040](https://github.com/cube-js/cube/issues/10040)) ([7b1a5af](https://github.com/cube-js/cube/commit/7b1a5afe983e5191becb5eabd1381632acab133e))
+
 ## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
 
 ### Features
