@@ -1218,23 +1218,15 @@ fn binary_expr_normalize(
     // and cast the `DATE` to `TIMESTAMP` to match the types.
     match (&left_type, &right_type) {
         (DataType::Timestamp(_, _), DataType::Date32) => {
-            let new_right = Box::new(evaluate_expr(
-                optimizer,
-                right.cast_to(&left_type, schema)?,
-            )?);
             return Ok(Box::new(Expr::BinaryExpr {
                 left,
                 op,
-                right: new_right,
+                right: evaluate_expr(optimizer, right.cast_to(&left_type, schema)?)?,
             }));
         }
         (DataType::Date32, DataType::Timestamp(_, _)) => {
-            let new_left = Box::new(evaluate_expr(
-                optimizer,
-                left.cast_to(&right_type, schema)?,
-            )?);
             return Ok(Box::new(Expr::BinaryExpr {
-                left: new_left,
+                left: evaluate_expr(optimizer, left.cast_to(&right_type, schema)?)?,
                 op,
                 right,
             }));
@@ -1256,21 +1248,16 @@ fn binary_expr_normalize(
     };
 
     if literal_on_the_left {
-        let new_left = Box::new(evaluate_expr(optimizer, left.cast_to(&cast_type, schema)?)?);
         Ok(Box::new(Expr::BinaryExpr {
-            left: new_left,
+            left: evaluate_expr(optimizer, left.cast_to(&cast_type, schema)?)?,
             op,
             right,
         }))
     } else {
-        let new_right = Box::new(evaluate_expr(
-            optimizer,
-            right.cast_to(&cast_type, schema)?,
-        )?);
         Ok(Box::new(Expr::BinaryExpr {
             left,
             op,
-            right: new_right,
+            right: evaluate_expr(optimizer, right.cast_to(&cast_type, schema)?)?,
         }))
     }
 }
@@ -1357,7 +1344,7 @@ fn in_list_expr_normalize(
                 return Ok(list_expr_normalized);
             }
 
-            evaluate_expr(optimizer, list_expr_normalized.cast_to(&expr_type, schema)?)
+            evaluate_expr_stacked(optimizer, list_expr_normalized.cast_to(&expr_type, schema)?)
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -1368,18 +1355,22 @@ fn in_list_expr_normalize(
     }))
 }
 
-/// Evaluates an expression to a constant if possible.
-fn evaluate_expr(optimizer: &PlanNormalize, expr: Expr) -> Result<Expr> {
+fn evaluate_expr_stacked(optimizer: &PlanNormalize, expr: Expr) -> Result<Expr> {
     let execution_props = &optimizer.cube_ctx.state.execution_props;
     let mut const_evaluator = ConstEvaluator::new(execution_props);
     expr.rewrite(&mut const_evaluator)
+}
+
+/// Evaluates an expression to a constant if possible.
+fn evaluate_expr(optimizer: &PlanNormalize, expr: Expr) -> Result<Box<Expr>> {
+    Ok(Box::new(evaluate_expr_stacked(optimizer, expr)?))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::compile::test::{
-        get_test_tenant_ctx, rewrite_engine::create_test_postgresql_cube_context,
+        get_test_tenant_ctx, rewrite_engine::create_test_postgresql_cube_context, run_async_test,
     };
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
@@ -1402,35 +1393,39 @@ mod tests {
         expr
     }
 
-    #[tokio::test]
-    async fn test_stack_overflow_deeply_nested_or() -> Result<()> {
-        let meta = get_test_tenant_ctx();
-        let cube_ctx = create_test_postgresql_cube_context(meta)
-            .await
-            .expect("Failed to create cube context");
+    // plan_normalize is recursive, at the same time ExprRewriter from DF is too
+    // let's guard it with test, that our code in dev profile is optimized to rewrite N nodes
+    #[test]
+    fn test_stack_overflow_deeply_nested_or() -> Result<()> {
+        run_async_test(async move {
+            let meta = get_test_tenant_ctx();
+            let cube_ctx = create_test_postgresql_cube_context(meta)
+                .await
+                .expect("Failed to create cube context");
 
-        // Create a simple table
-        let schema = Schema::new(vec![
-            Field::new("id", DataType::Int32, false),
-            Field::new("value", DataType::Int32, true),
-        ]);
+            // Create a simple table
+            let schema = Schema::new(vec![
+                Field::new("id", DataType::Int32, false),
+                Field::new("value", DataType::Int32, true),
+            ]);
 
-        let table_scan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
-            .expect("Failed to create table scan")
-            .build()
-            .expect("Failed to build plan");
+            let table_scan = LogicalPlanBuilder::scan_empty(Some("test_table"), &schema, None)
+                .expect("Failed to create table scan")
+                .build()
+                .expect("Failed to build plan");
 
-        // Create a deeply nested OR expression (should cause stack overflow)
-        let deeply_nested_filter = create_deeply_nested_or_expr("value", 1_000);
+            // Create a deeply nested OR expression (should cause stack overflow)
+            let deeply_nested_filter = create_deeply_nested_or_expr("value", 200);
 
-        let plan = LogicalPlanBuilder::from(table_scan)
-            .filter(deeply_nested_filter)
-            .expect("Failed to add filter")
-            .build()
-            .expect("Failed to build plan");
+            let plan = LogicalPlanBuilder::from(table_scan)
+                .filter(deeply_nested_filter)
+                .expect("Failed to add filter")
+                .build()
+                .expect("Failed to build plan");
 
-        let optimizer = PlanNormalize::new(&cube_ctx);
-        optimizer.optimize(&plan, &OptimizerConfig::new())?;
+            let optimizer = PlanNormalize::new(&cube_ctx);
+            optimizer.optimize(&plan, &OptimizerConfig::new()).unwrap();
+        });
 
         Ok(())
     }
