@@ -439,7 +439,6 @@ export class BaseQuery {
       const explicitJoinHintMembers = new Set(allMembersJoinHints.filter(j => Array.isArray(j)).flat());
       const queryJoinMaps = this.queryJoinMap();
       const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
-      let rootOfJoin = allMembersJoinHints[0];
       const newCollectedHints = [];
 
       // One cube may join the other cube via transitive joined cubes,
@@ -451,7 +450,6 @@ export class BaseQuery {
 
       const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
         ...this.queryLevelJoinHints,
-        ...(rootOfJoin ? [rootOfJoin] : []),
         ...newCollectedHints,
         ...allMembersJoinHints,
         ...customSubQueryJoinHints,
@@ -499,9 +497,7 @@ export class BaseQuery {
         newJoinHintsCollectedCnt = iterationCollectedHints.length;
         cnt++;
         if (newJoin) {
-          rootOfJoin = newJoin.root;
-          // eslint-disable-next-line no-loop-func
-          newCollectedHints.push(...joinMembersJoinHints.filter(j => j !== rootOfJoin && !explicitJoinHintMembers.has(j)));
+          newCollectedHints.push(...joinMembersJoinHints.filter(j => !explicitJoinHintMembers.has(j)));
         }
       } while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
 
