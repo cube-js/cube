@@ -1040,16 +1040,13 @@ fn expr_normalize(
 
         e @ Expr::QualifiedWildcard { .. } => Ok(Box::new(e.clone())),
 
-        Expr::GroupingSet(grouping_set) => {
-            let grouping_set = grouping_set_normalize(
-                optimizer,
-                grouping_set,
-                schema,
-                remapped_columns,
-                optimizer_config,
-            )?;
-            Ok(Box::new(Expr::GroupingSet(grouping_set)))
-        }
+        Expr::GroupingSet(grouping_set) => grouping_set_normalize(
+            optimizer,
+            grouping_set,
+            schema,
+            remapped_columns,
+            optimizer_config,
+        ),
     }
 }
 
@@ -1112,36 +1109,50 @@ fn grouping_set_normalize(
     schema: &DFSchema,
     remapped_columns: &HashMap<Column, Column>,
     optimizer_config: &OptimizerConfig,
-) -> Result<GroupingSet> {
+) -> Result<Box<Expr>> {
     match grouping_set {
         GroupingSet::Rollup(exprs) => {
             let exprs = exprs
                 .iter()
                 .map(|expr| {
-                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                    expr_normalize_stacked(
+                        optimizer,
+                        expr,
+                        schema,
+                        remapped_columns,
+                        optimizer_config,
+                    )
                 })
                 .collect::<Result<Vec<_>>>()?;
-            Ok(GroupingSet::Rollup(exprs.into_iter().map(|e| *e).collect()))
+
+            Ok(Box::new(Expr::GroupingSet(GroupingSet::Rollup(exprs))))
         }
 
         GroupingSet::Cube(exprs) => {
             let exprs = exprs
                 .iter()
                 .map(|expr| {
-                    expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)
+                    expr_normalize_stacked(
+                        optimizer,
+                        expr,
+                        schema,
+                        remapped_columns,
+                        optimizer_config,
+                    )
                 })
                 .collect::<Result<Vec<_>>>()?;
-            Ok(GroupingSet::Cube(exprs.into_iter().map(|e| *e).collect()))
+
+            Ok(Box::new(Expr::GroupingSet(GroupingSet::Cube(exprs))))
         }
 
         GroupingSet::GroupingSets(exprs) => {
             let exprs = exprs
                 .iter()
                 .map(|exprs| {
-                    Ok(exprs
+                    exprs
                         .iter()
                         .map(|expr| {
-                            expr_normalize(
+                            expr_normalize_stacked(
                                 optimizer,
                                 expr,
                                 schema,
@@ -1149,13 +1160,13 @@ fn grouping_set_normalize(
                                 optimizer_config,
                             )
                         })
-                        .collect::<Result<Vec<_>>>()?
-                        .into_iter()
-                        .map(|e| *e)
-                        .collect())
+                        .collect::<Result<Vec<_>>>()
                 })
                 .collect::<Result<Vec<_>>>()?;
-            Ok(GroupingSet::GroupingSets(exprs))
+
+            Ok(Box::new(Expr::GroupingSet(GroupingSet::GroupingSets(
+                exprs,
+            ))))
         }
     }
 }
