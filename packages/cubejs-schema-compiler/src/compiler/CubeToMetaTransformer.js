@@ -198,7 +198,7 @@ export class CubeToMetaTransformer {
   }
 
   dimensionDataType(dimensionType) {
-    dimensionType == 'switch' ? 'string' : dimensionType;
+    dimensionType === 'switch' ? 'string' : dimensionType;
   }
 
   measureConfig(cubeName, cubeTitle, nameToMetric) {
