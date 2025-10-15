@@ -1029,7 +1029,7 @@ The logging level for Cube.
 | -------------------------------- | ---------------------- | --------------------- |
 | `error`, `info`, `trace`, `warn` | `warn`                 | `warn`                |
 
-See also `CUBESTORE_LOG_LEVEL`.
+See also `CUBESTORE_LOG_LEVEL` and `CUBESQL_LOG_LEVEL`.
 See also the [`logger` configuration option](/product/configuration/reference/config#logger).
 
 ## `CUBEJS_MAX_PARTITIONS_PER_CUBE`
@@ -1297,6 +1297,16 @@ Number of seconds before session's SQL API security context will be invalidated.
 | --------------- | ---------------------- | --------------------- |
 | A valid integer number | `300`                 | `300`                |
 
+## `CUBESQL_LOG_LEVEL`
+
+The logging level for the Cube SQL API.
+
+| Possible Values                           | Default in Development | Default in Production |
+| ----------------------------------------- | ---------------------- | --------------------- |
+| `error`, `info`, `trace`, `warn`, `debug` | `info`                 | `info`                |
+
+See also `CUBEJS_LOG_LEVEL` and `CUBESTORE_LOG_LEVEL`.
+
 ## `CUBEJS_DAX_CREATE_DATE_HIERARCHIES`
 
 If `true`, the DAX API will expose time dimensions as calendar hierarchies.
@@ -1547,7 +1557,7 @@ The logging level for Cube Store.
 | ----------------------------------------- | ---------------------- | --------------------- |
 | `error`, `warn`, `info`, `debug`, `trace` | `error`                | `error`               |
 
-See also `CUBEJS_LOG_LEVEL`.
+See also `CUBEJS_LOG_LEVEL` and `CUBESQL_LOG_LEVEL`.
 
 ## `CUBESTORE_META_ADDR`
 
