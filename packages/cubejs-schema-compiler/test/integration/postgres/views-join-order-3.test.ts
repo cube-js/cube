@@ -139,87 +139,41 @@ view(\`V\`, {
     expect(sql).not.toMatch(/AS "c"/);
   });
 
-  it('correct join for simple view B-dimension', async () => {
-    const [sql, _params] = await dbRunner.runQueryTest({
-      dimensions: ['V.ActivityBalance'],
-      timeDimensions: [],
-      segments: [],
-      filters: [],
-    }, transformResultsForTesseractIfNeeded([{
-      v___activity_balance: 125,
-    }]), { compiler, joinGraph, cubeEvaluator });
+  it('correct join for simple view B-dimension', async () => dbRunner.runQueryTest({
+    dimensions: ['V.ActivityBalance'],
+    timeDimensions: [],
+    segments: [],
+    filters: [],
+  }, transformResultsForTesseractIfNeeded([{
+    v___activity_balance: 125,
+  }]), { compiler, joinGraph, cubeEvaluator }));
 
-    // expect(sql).toMatch(/AS "a"/);
-    // expect(sql).toMatch(/AS "b"/);
-    // expect(sql).toMatch(/AS "d"/);
-    // expect(sql).toMatch(/ON "a".id = "b".id/);
-    // expect(sql).toMatch(/ON "b".id = "d".id/);
-    // expect(sql).not.toMatch(/AS "e"/);
-  });
+  it('correct join for simple view F-dimension', async () => dbRunner.runQueryTest({
+    dimensions: ['V.PlanCode'],
+    timeDimensions: [],
+    segments: [],
+    filters: [],
+  }, transformResultsForTesseractIfNeeded([{
+    v___plan_code: 'PLAN_CODE',
+  }]), { compiler, joinGraph, cubeEvaluator }));
 
-  it('correct join for simple view F-dimension', async () => {
-    const [sql, _params] = await dbRunner.runQueryTest({
-      dimensions: ['V.PlanCode'],
-      timeDimensions: [],
-      segments: [],
-      filters: [],
-    }, transformResultsForTesseractIfNeeded([{
-      v___plan_code: 'PLAN_CODE',
-    }]), { compiler, joinGraph, cubeEvaluator });
+  it('correct join for view F-dimension + B-dimension', async () => dbRunner.runQueryTest({
+    dimensions: ['V.PlanCode', 'V.ActivityBalance'],
+    timeDimensions: [],
+    segments: [],
+    filters: [],
+  }, transformResultsForTesseractIfNeeded([{
+    v___plan_code: 'PLAN_CODE',
+    v___activity_balance: 125,
+  }]), { compiler, joinGraph, cubeEvaluator }));
 
-    // expect(sql).toMatch(/AS "a"/);
-    // expect(sql).toMatch(/AS "c"/);
-    // expect(sql).toMatch(/AS "f"/);
-    // expect(sql).toMatch(/ON "a".id = "c".id/);
-    // expect(sql).toMatch(/ON "c".plan_id = "f".plan_id/);
-    // expect(sql).not.toMatch(/AS "b"/);
-    // expect(sql).not.toMatch(/AS "d"/);
-    // expect(sql).not.toMatch(/AS "e"/);
-  });
-
-  it('correct join for view F-dimension + B-dimension', async () => {
-    const [sql, _params] = await dbRunner.runQueryTest({
-      dimensions: ['V.PlanCode', 'V.ActivityBalance'],
-      timeDimensions: [],
-      segments: [],
-      filters: [],
-    }, transformResultsForTesseractIfNeeded([{
-      v___plan_code: 'PLAN_CODE',
-      v___activity_balance: 125,
-    }]), { compiler, joinGraph, cubeEvaluator });
-
-    // expect(sql).toMatch(/AS "a"/);
-    // expect(sql).toMatch(/AS "c"/);
-    // expect(sql).toMatch(/AS "f"/);
-    // expect(sql).toMatch(/AS "b"/);
-    // expect(sql).toMatch(/AS "d"/);
-    // expect(sql).toMatch(/ON "a".id = "c".id/);
-    // expect(sql).toMatch(/ON "a".id = "b".id/);
-    // expect(sql).toMatch(/ON "c".plan_id = "f".plan_id/);
-    // expect(sql).toMatch(/ON "b".id = "d".id/);
-    // expect(sql).not.toMatch(/AS "e"/);
-  });
-
-  it('correct join for view B-dimension + F-dimension', async () => {
-    const [sql, _params] = await dbRunner.runQueryTest({
-      dimensions: ['V.ActivityBalance', 'V.PlanCode'],
-      timeDimensions: [],
-      segments: [],
-      filters: [],
-    }, transformResultsForTesseractIfNeeded([{
-      v___activity_balance: 125,
-      v___plan_code: 'PLAN_CODE',
-    }]), { compiler, joinGraph, cubeEvaluator });
-
-    // expect(sql).toMatch(/AS "a"/);
-    // expect(sql).toMatch(/AS "c"/);
-    // expect(sql).toMatch(/AS "f"/);
-    // expect(sql).toMatch(/AS "b"/);
-    // expect(sql).toMatch(/AS "d"/);
-    // expect(sql).toMatch(/ON "a".id = "c".id/);
-    // expect(sql).toMatch(/ON "a".id = "b".id/);
-    // expect(sql).toMatch(/ON "c".plan_id = "f".plan_id/);
-    // expect(sql).toMatch(/ON "b".id = "d".id/);
-    // expect(sql).not.toMatch(/AS "e"/);
-  });
+  it('correct join for view B-dimension + F-dimension', async () => dbRunner.runQueryTest({
+    dimensions: ['V.ActivityBalance', 'V.PlanCode'],
+    timeDimensions: [],
+    segments: [],
+    filters: [],
+  }, transformResultsForTesseractIfNeeded([{
+    v___activity_balance: 125,
+    v___plan_code: 'PLAN_CODE',
+  }]), { compiler, joinGraph, cubeEvaluator }));
 });
