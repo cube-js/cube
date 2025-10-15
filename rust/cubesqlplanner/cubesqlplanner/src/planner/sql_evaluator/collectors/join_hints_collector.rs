@@ -27,7 +27,7 @@ impl TraversalVisitor for JoinHintsCollector {
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         if node.is_multi_stage() {
-            //We don't add multi stage members childs to join hints
+            //We don't add multi-stage members childs to join hints
             return Ok(None);
         }
 
@@ -83,8 +83,35 @@ impl TraversalVisitor for JoinHintsCollector {
 pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, CubeError> {
     let mut visitor = JoinHintsCollector::new();
     visitor.apply(node, &())?;
-    let res = visitor.extract_result();
-    Ok(res)
+    let mut collected_hints = visitor.extract_result();
+
+    let join_map = match node.as_ref() {
+        MemberSymbol::Dimension(d) => d.join_map(),
+        MemberSymbol::TimeDimension(d) => d.join_map(),
+        MemberSymbol::Measure(m) => m.join_map(),
+        _ => &None,
+    };
+
+    if let Some(join_map) = join_map {
+        for hint in collected_hints.iter_mut() {
+            match hint {
+                // If hints array has single element, check if it can be enriched with join hints
+                JoinHintItem::Single(hints) => {
+                    for path in join_map.iter() {
+                        if let Some(hint_index) = path.iter().position(|p| p == hints) {
+                            *hint = JoinHintItem::Vector(path[0..=hint_index].to_vec());
+                            break;
+                        }
+                    }
+                }
+                // If hints is an array with multiple elements, it means it already
+                // includes full join hint path
+                JoinHintItem::Vector(_) => {}
+            }
+        }
+    }
+
+    Ok(collected_hints)
 }
 
 pub fn collect_join_hints_for_measures(

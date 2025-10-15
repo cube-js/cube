@@ -1865,6 +1865,7 @@ Object {
     },
   ],
   "isView": true,
+  "joinMap": Array [],
   "joins": Array [],
   "measures": Object {
     "count": Object {
