@@ -181,7 +181,11 @@ impl FullKeyAggregateStrategy for FullJoinFullKeyAggregateStrategy<'_> {
             result = self.full_join(left_query, query, &dimensions)?;
             measures.append(&mut query_measures);
         }
+        let result_query = self.select_over_join_pair(result, &dimensions, &measures, context)?;
 
-        Ok(result)
+        Ok(From::new_from_subselect(
+            result_query,
+            "full_aggregate".to_string(),
+        ))
     }
 }
