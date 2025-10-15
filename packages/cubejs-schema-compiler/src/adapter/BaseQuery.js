@@ -390,8 +390,8 @@ export class BaseQuery {
     const currentContext = this.safeEvaluateSymbolContext();
     if (contextPropNames) {
       const contextKey = {};
-      for (let i = 0; i < contextPropNames.length; i++) {
-        contextKey[contextPropNames[i]] = currentContext[contextPropNames[i]];
+      for (const element of contextPropNames) {
+        contextKey[element] = currentContext[element];
       }
       key = key.concat([JSON.stringify(contextKey)]);
     }
