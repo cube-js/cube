@@ -220,6 +220,7 @@
     "querying BigECommerce: rolling count_distinct_approx window by 2 week",
     "querying BigECommerce: rolling count_distinct_approx window by 2 month",
     "querying BigECommerce: totalProfitYearAgo",
+    "querying BigECommerce: SeveralMultiStageMeasures",
     "SQL API: post-aggregate percentage of total",
     "SQL API: Simple Rollup",
     "SQL API: Rollup over exprs",
