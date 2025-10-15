@@ -141,6 +141,7 @@ pub trait QueryEngine {
             })?;
 
         let mut optimized_plan = plan;
+        println!("INITIAL PLAN:\n{:?}\n", optimized_plan);
         // ctx.optimize(&plan).map_err(|err| {
         //    CompilationError::Internal(format!("Planning optimization error: {}", err))
         // })?;
@@ -160,6 +161,7 @@ pub trait QueryEngine {
                 .optimize(&optimized_plan, &optimizer_config)
                 .unwrap_or(optimized_plan);
         }
+        println!("OPTIMIZED PLAN:\n{:?}\n", optimized_plan);
 
         if let Some(qtrace) = qtrace {
             qtrace.set_optimized_plan(&optimized_plan);
@@ -291,6 +293,7 @@ pub trait QueryEngine {
         }
 
         let rewrite_plan = result?;
+        println!("REWRITTEN PLAN:\n{:?}\n", rewrite_plan);
 
         if let Some(span_id) = span_id.as_ref() {
             if let Some(auth_context) = state.auth_context() {
