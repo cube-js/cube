@@ -76,7 +76,7 @@ pub trait QueryEngine {
         state: Arc<SessionState>,
     ) -> Result<DFSessionContext, CompilationError>;
 
-    fn create_logical_plan(
+    async fn create_logical_plan(
         &self,
         cube_ctx: &CubeContext,
         stmt: &Self::AstStatementType,
@@ -126,6 +126,7 @@ pub trait QueryEngine {
 
         let (plan, metadata) = self
             .create_logical_plan(&cube_ctx, &stmt, span_id.clone(), Some(query_planning_id))
+            .await
             .map_err(|err| {
                 let message = format!("Initial planning error: {}", err,);
                 let meta = Some(HashMap::from([
@@ -567,7 +568,7 @@ impl QueryEngine for SqlQueryEngine {
         Ok(ctx)
     }
 
-    fn create_logical_plan(
+    async fn create_logical_plan(
         &self,
         cube_ctx: &CubeContext,
         stmt: &Self::AstStatementType,
