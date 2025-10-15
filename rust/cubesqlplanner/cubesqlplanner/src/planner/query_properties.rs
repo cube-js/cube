@@ -613,7 +613,7 @@ impl QueryProperties {
                 let join = query_tools
                     .cached_data_mut()
                     .join_by_hints(dimension_and_filter_join_hints_concat.clone(), |hints| {
-                        query_tools.join_graph().build_join(hints)
+                        query_tools.base_tools().join_tree_for_hints(hints)
                     })?;
                 vec![(Vec::new(), join)]
             }
@@ -628,7 +628,7 @@ impl QueryProperties {
                             .into_iter()
                             .chain(dimension_and_filter_join_hints_concat.clone().into_iter())
                             .collect::<Vec<_>>(),
-                        |hints| query_tools.join_graph().build_join(hints),
+                        |hints| query_tools.base_tools().join_tree_for_hints(hints),
                     )?;
                     Ok((vec![m.clone()], join))
                 })

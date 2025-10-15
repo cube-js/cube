@@ -1,4 +1,5 @@
 import YAML from 'js-yaml';
+import { getEnv } from '@cubejs-backend/shared';
 
 interface CreateCubeSchemaOptions {
   name: string,
@@ -767,4 +768,19 @@ export function createJoinedCubesSchema(): string {
       },
     });
   `;
+}
+
+export function transformResultsForTesseractIfNeeded(results: Record<string, any>[]) {
+  if (getEnv('nativeSqlPlanner')) {
+    return results.map(record => {
+      const fixedRecord: Record<string, any> = {};
+      for (const [key, value] of Object.entries(record)) {
+        const fixedKey = key.replace(/___/g, '__');
+        fixedRecord[fixedKey] = value;
+      }
+      return fixedRecord;
+    });
+  }
+
+  return results;
 }
