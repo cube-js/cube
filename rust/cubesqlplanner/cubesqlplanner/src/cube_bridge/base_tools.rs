@@ -1,4 +1,5 @@
 use super::base_query_options::FilterItem;
+use super::join_definition::{JoinDefinition, NativeJoinDefinition};
 use super::driver_tools::{DriverTools, NativeDriverTools};
 use super::filter_group::{FilterGroup, NativeFilterGroup};
 use super::filter_params::{FilterParams, NativeFilterParams};
@@ -14,6 +15,7 @@ use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
+use crate::cube_bridge::join_hints::JoinHintItem;
 
 #[nativebridge::native_bridge]
 pub trait BaseTools {
@@ -53,4 +55,8 @@ pub trait BaseTools {
         cube_name: String,
         name: String,
     ) -> Result<String, CubeError>; //TODO move to rust
+
+    fn join_tree_for_hints(
+        &self,
+        hints: Vec<JoinHintItem>) -> Result<Rc<dyn JoinDefinition>, CubeError>;
 }

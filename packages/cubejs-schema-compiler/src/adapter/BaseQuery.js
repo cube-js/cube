@@ -386,6 +386,53 @@ export class BaseQuery {
     }
   }
 
+  /**
+   * Is used by native
+   * This function follows the same logic as in this.collectJoinHints()
+   * @private
+   * @param {Array<(Array<string> | string)>} hints
+   * @return {import('../compiler/JoinGraph').FinishedJoinTree}
+   */
+  joinTreeForHints(hints) {
+    const explicitJoinHintMembers = new Set(hints.filter(j => Array.isArray(j)).flat());
+    const queryJoinMaps = this.queryJoinMap();
+    const newCollectedHints = [];
+
+    const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
+      ...newCollectedHints,
+      ...hints,
+    ],
+    queryJoinMaps));
+
+    let prevJoin = null;
+    let newJoin = null;
+
+    // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
+    let cnt = 0;
+    let newJoinHintsCollectedCnt;
+
+    do {
+      const allJoinHints = constructJH();
+      prevJoin = newJoin;
+      newJoin = this.joinGraph.buildJoin(allJoinHints);
+      const allJoinHintsFlatten = new Set(allJoinHints.flat());
+      const joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
+
+      const iterationCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
+      newJoinHintsCollectedCnt = iterationCollectedHints.length;
+      cnt++;
+      if (newJoin) {
+        newCollectedHints.push(...joinMembersJoinHints.filter(j => !explicitJoinHintMembers.has(j)));
+      }
+    } while (newJoin?.joins.length > 0 && !this.isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
+
+    if (cnt >= 10000) {
+      throw new UserError('Can not construct joins for the query, potential loop detected');
+    }
+
+    return newJoin;
+  }
+
   cacheValue(key, fn, { contextPropNames, inputProps, cache } = {}) {
     const currentContext = this.safeEvaluateSymbolContext();
     if (contextPropNames) {
@@ -450,7 +497,7 @@ export class BaseQuery {
 
     for (const member of queryMembers) {
       const memberCube = member.cube?.();
-      if (memberCube?.isView && !joinMaps[memberCube.name]) {
+      if (memberCube?.isView && !joinMaps[memberCube.name] && memberCube.joinMap) {
         joinMaps[memberCube.name] = memberCube.joinMap;
       }
     }
