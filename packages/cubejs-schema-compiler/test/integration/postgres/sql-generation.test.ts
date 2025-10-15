@@ -5298,90 +5298,78 @@ cubes:
         type: string
       `);
 
-    if (!getEnv('nativeSqlPlanner')) {
-      it('querying cube dimension that require transitive joins', async () => {
-        await compiler.compile();
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-          measures: [],
-          dimensions: [
-            'test_facts.reporting_date',
-            'test_facts.merchant_sk',
-            'test_facts.product_sk',
-            'test_facts.acquisition_channel'
-          ],
-          order: [{
-            id: 'test_facts.acquisition_channel'
-          }],
-          timezone: 'America/Los_Angeles'
-        });
-
-        const res = await dbRunner.testQuery(query.buildSqlAndParams());
-        console.log(JSON.stringify(res));
-
-        expect(res).toEqual([
-          {
-            test_facts__acquisition_channel: 'Organic',
-            test_facts__merchant_sk: 101,
-            test_facts__product_sk: 201,
-            test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
-          },
-          {
-            test_facts__acquisition_channel: 'Paid',
-            test_facts__merchant_sk: 101,
-            test_facts__product_sk: 202,
-            test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
-          },
-          {
-            test_facts__acquisition_channel: 'Referral',
-            test_facts__merchant_sk: 102,
-            test_facts__product_sk: 201,
-            test_facts__reporting_date: '2023-01-02T00:00:00.000Z',
-          },
-        ]);
+    it('querying cube dimension that require transitive joins', async () => {
+      await compiler.compile();
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: [
+          'test_facts.reporting_date',
+          'test_facts.merchant_sk',
+          'test_facts.product_sk',
+          'test_facts.acquisition_channel'
+        ],
+        order: [{
+          id: 'test_facts.acquisition_channel'
+        }],
+        timezone: 'America/Los_Angeles'
       });
-    } else {
-      it.skip('FIXME(tesseract): querying cube dimension that require transitive joins', async () => {
-        // FIXME should be implemented in Tesseract
+
+      const res = await dbRunner.testQuery(query.buildSqlAndParams());
+      console.log(JSON.stringify(res));
+
+      expect(res).toEqual([
+        {
+          test_facts__acquisition_channel: 'Organic',
+          test_facts__merchant_sk: 101,
+          test_facts__product_sk: 201,
+          test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
+        },
+        {
+          test_facts__acquisition_channel: 'Paid',
+          test_facts__merchant_sk: 101,
+          test_facts__product_sk: 202,
+          test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
+        },
+        {
+          test_facts__acquisition_channel: 'Referral',
+          test_facts__merchant_sk: 102,
+          test_facts__product_sk: 201,
+          test_facts__reporting_date: '2023-01-02T00:00:00.000Z',
+        },
+      ]);
+    });
+
+    it('querying cube with transitive joins with a few joins to the same cube', async () => {
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: [
+          'alpha_facts.reporting_date',
+          'delta_bridge.b_name',
+          'alpha_facts.channel'
+        ],
+        order: [{
+          id: 'alpha_facts.reporting_date'
+        }],
+        timezone: 'America/Los_Angeles'
       });
-    }
 
-    if (!getEnv('nativeSqlPlanner')) {
-      it('querying cube with transitive joins with a few joins to the same cube', async () => {
-        await compiler.compile();
+      const res = await dbRunner.testQuery(query.buildSqlAndParams());
+      console.log(JSON.stringify(res));
 
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-          measures: [],
-          dimensions: [
-            'alpha_facts.reporting_date',
-            'delta_bridge.b_name',
-            'alpha_facts.channel'
-          ],
-          order: [{
-            id: 'alpha_facts.reporting_date'
-          }],
-          timezone: 'America/Los_Angeles'
-        });
-
-        const res = await dbRunner.testQuery(query.buildSqlAndParams());
-        console.log(JSON.stringify(res));
-
-        expect(res).toEqual([
-          {
-            alpha_facts__channel: 'Organic',
-            alpha_facts__reporting_date: '2023-01-01T00:00:00.000Z',
-            delta_bridge__b_name: 'Beta1',
-          },
-          {
-            alpha_facts__channel: 'Paid',
-            alpha_facts__reporting_date: '2023-01-02T00:00:00.000Z',
-            delta_bridge__b_name: 'Beta2',
-          },
-        ]);
-      });
-    } else {
-      it.skip('FIXME(tesseract): querying cube with transitive joins with a few joins to the same cube', async () => {
-        // FIXME should be implemented in Tesseract
-      });
-    }
+      expect(res).toEqual([
+        {
+          alpha_facts__channel: 'Organic',
+          alpha_facts__reporting_date: '2023-01-01T00:00:00.000Z',
+          delta_bridge__b_name: 'Beta1',
+        },
+        {
+          alpha_facts__channel: 'Paid',
+          alpha_facts__reporting_date: '2023-01-02T00:00:00.000Z',
+          delta_bridge__b_name: 'Beta2',
+        },
+      ]);
+    });
   });
 });
