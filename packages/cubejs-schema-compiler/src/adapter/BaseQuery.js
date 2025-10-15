@@ -2583,6 +2583,36 @@ export class BaseQuery {
   }
 
   /**
+   * Just a helper to avoid copy/paste
+   * @private
+   * @param {import('../compiler/JoinGraph').FinishedJoinTree} a
+   * @param {import('../compiler/JoinGraph').FinishedJoinTree} b
+   * @return {boolean}
+   */
+  isJoinTreesEqual(a, b) {
+    if (!a || !b || a.root !== b.root || a.joins.length !== b.joins.length) {
+      return false;
+    }
+
+    // We don't care about the order of joins on the same level, so
+    // we can compare them as sets.
+    const aJoinsSet = new Set(a.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
+    const bJoinsSet = new Set(b.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
+
+    if (aJoinsSet.size !== bJoinsSet.size) {
+      return false;
+    }
+
+    for (const val of aJoinsSet) {
+      if (!bJoinsSet.has(val)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * @private
    * @param {boolean} [excludeTimeDimensions=false]
    * @returns {Array<(Array<string> | string)>}
@@ -2612,29 +2642,6 @@ export class BaseQuery {
     let prevJoin = null;
     let newJoin = null;
 
-    const isJoinTreesEqual = (a, b) => {
-      if (!a || !b || a.root !== b.root || a.joins.length !== b.joins.length) {
-        return false;
-      }
-
-      // We don't care about the order of joins on the same level, so
-      // we can compare them as sets.
-      const aJoinsSet = new Set(a.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
-      const bJoinsSet = new Set(b.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
-
-      if (aJoinsSet.size !== bJoinsSet.size) {
-        return false;
-      }
-
-      for (const val of aJoinsSet) {
-        if (!bJoinsSet.has(val)) {
-          return false;
-        }
-      }
-
-      return true;
-    };
-
     // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
     let cnt = 0;
     let newJoinHintsCollectedCnt;
@@ -2652,7 +2659,7 @@ export class BaseQuery {
       if (newJoin) {
         newCollectedHints.push(...joinMembersJoinHints.filter(j => !explicitJoinHintMembers.has(j)));
       }
-    } while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
+    } while (newJoin?.joins.length > 0 && !this.isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
 
     if (cnt >= 10000) {
       throw new UserError('Can not construct joins for the query, potential loop detected');
