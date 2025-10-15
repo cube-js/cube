@@ -1,4 +1,3 @@
-import { getEnv } from '@cubejs-backend/shared';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 import { transformResultsForTesseractIfNeeded } from '../../unit/utils';
