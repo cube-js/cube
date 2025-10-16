@@ -2107,7 +2107,7 @@ class ApiGateway {
   }
 
   public async subscribe({
-    query, context, res, subscribe, subscriptionState, queryType, apiType, cache
+    query, context, res, subscribe, subscriptionState, queryType, apiType
   }) {
     const requestStarted = new Date();
     try {
@@ -2120,7 +2120,7 @@ class ApiGateway {
       let error: any = null;
 
       if (!subscribe) {
-        await this.load({ query, context, res, queryType, apiType, cacheMode: cache });
+        await this.load({ query, context, res, queryType, apiType });
         return;
       }
 
@@ -2137,7 +2137,6 @@ class ApiGateway {
         },
         queryType,
         apiType,
-        cacheMode: cache,
       });
       const state = await subscriptionState();
       if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
