@@ -599,6 +599,8 @@ class ApiGateway {
         : 'stale-if-slow';
     } else if (!query.cache) {
       query.cacheMode = 'stale-if-slow';
+    } else {
+      query.cacheMode = query.cache;
     }
 
     // TODO: Drop this when renewQuery will be removed
