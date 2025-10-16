@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Builder;
 
-const PACKAGE_JSON: &'static str = std::include_str!("../../../package.json");
+const PACKAGE_JSON: &str = std::include_str!("../../../package.json");
 
 fn main() {
     let package_json: Value = serde_json::from_str(PACKAGE_JSON).unwrap();

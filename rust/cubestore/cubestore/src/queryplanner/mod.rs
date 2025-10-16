@@ -22,6 +22,7 @@ use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod filter_by_key_range;
 pub mod info_schema;
+mod inline_aggregate;
 pub mod merge_sort;
 pub mod metadata_cache;
 pub mod providers;
@@ -310,7 +311,7 @@ impl QueryPlannerImpl {
             .execution
             .dont_parallelize_sort_preserving_merge_exec_inputs = true;
         config.options_mut().execution.batch_size = Self::EXECUTION_BATCH_SIZE;
-        config.options_mut().execution.parquet.split_row_group_reads = true;
+        config.options_mut().execution.parquet.split_row_group_reads = false;
 
         // TODO upgrade DF: build SessionContexts consistently
         let state = Self::minimal_session_state_from_final_config(config)

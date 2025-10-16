@@ -2872,6 +2872,7 @@ mod tests {
                 let mut bools = Vec::new();
                 for i in 0..1000 {
                     bools.push(i % (batch + 1) == 0);
+
                 }
 
                 let values = bools.into_iter().map(|b| format!("({})", b)).join(", ");

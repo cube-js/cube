@@ -100,7 +100,7 @@ impl WorkerProc<WorkerArgs> for WorkerFn {
     ) {
         // Note that Rust's libtest does not consume output in subprocesses.
         // Disable logs to keep output compact.
-        if !std::env::var("CUBESTORE_TEST_LOG_WORKER").is_ok() {
+        if std::env::var("CUBESTORE_TEST_LOG_WORKER").is_err() {
             *cubestore::config::TEST_LOGGING_INITIALIZED.write().await = true;
         }
         Config::test(&test_name)

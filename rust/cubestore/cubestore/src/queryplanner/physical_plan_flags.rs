@@ -8,6 +8,7 @@ use datafusion::physical_plan::{ExecutionPlan, InputOrderMode, PhysicalExpr};
 use serde::Serialize;
 use serde_json::{json, Value};
 
+use crate::queryplanner::inline_aggregate::InlineAggregateExec;
 use crate::queryplanner::query_executor::CubeTableExec;
 
 #[derive(Serialize, Debug)]
@@ -36,7 +37,14 @@ impl PhysicalPlanFlags {
 
     fn physical_plan_flags_fill(p: &dyn ExecutionPlan, flags: &mut PhysicalPlanFlags) {
         let a = p.as_any();
-        if let Some(agg) = a.downcast_ref::<AggregateExec>() {
+        if let Some(agg) = a.downcast_ref::<InlineAggregateExec>() {
+            flags.merge_sort_plan = true;
+
+            // Stop the recursion if we have an optimal plan with groups, otherwise continue to check the children, filters for example
+            if agg.group_expr().expr().len() > 0 && flags.merge_sort_plan {
+                return;
+            }
+        } else if let Some(agg) = a.downcast_ref::<AggregateExec>() {
             let is_final_hash_agg_without_groups = agg.mode() == &AggregateMode::Final
                 && agg.input_order_mode() == &InputOrderMode::Linear
                 && agg.group_expr().expr().len() == 0;

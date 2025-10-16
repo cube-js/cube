@@ -9,7 +9,7 @@ use tempfile::NamedTempFile;
 pub fn write_tmp_file(text: &str) -> Result<NamedTempFile, CubeError> {
     let mut file = NamedTempFile::new()?;
     file.write_all(text.as_bytes())?;
-    return Ok(file);
+    Ok(file)
 }
 
 pub async fn download_and_unzip(url: &str, dataset: &str) -> Result<Box<Path>, CubeError> {
@@ -32,12 +32,12 @@ pub async fn download_and_unzip(url: &str, dataset: &str) -> Result<Box<Path>, C
 ///
 /// We don't use a lib because the first that was tried was broken.
 pub fn recursive_copy_directory(from: &Path, to: &Path) -> Result<(), CubeError> {
-    let mut dir = std::fs::read_dir(from)?;
+    let dir = std::fs::read_dir(from)?;
 
     // This errors if the destination already exists, and that's what we want.
     std::fs::create_dir(to)?;
 
-    while let Some(entry) = dir.next() {
+    for entry in dir {
         let entry = entry?;
         let file_type = entry.file_type()?;
         if file_type.is_dir() {
