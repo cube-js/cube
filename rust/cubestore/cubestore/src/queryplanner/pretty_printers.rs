@@ -28,6 +28,7 @@ use std::sync::Arc;
 
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, Snapshot, WorkerExec};
@@ -43,7 +44,7 @@ use crate::queryplanner::topk::{
     AggregateTopKExec, ClusterAggregateTopKLower, ClusterAggregateTopKUpper,
 };
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider, QueryPlan};
-use crate::streaming::topic_table_provider::TopicTableProvider;
+//use crate::streaming::topic_table_provider::TopicTableProvider;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::joins::{HashJoinExec, SortMergeJoinExec};
@@ -481,8 +482,6 @@ fn pp_source(t: Arc<dyn TableProvider>) -> String {
         .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
     {
         "InfoSchemaQueryCacheTableProvider".to_string()
-    } else if let Some(_) = t.as_any().downcast_ref::<TopicTableProvider>() {
-        "TopicTableProvider".to_string()
     } else {
         panic!("unknown table provider");
     }
@@ -600,6 +599,18 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 AggregateMode::SinglePartitioned => "SinglePartitioned",
             };
             *out += &format!("{}{}Aggregate", strat, mode);
+            if o.show_aggregations {
+                *out += &format!(", aggs: {:?}", agg.aggr_expr())
+            }
+            if let Some(limit) = agg.limit() {
+                *out += &format!(", limit: {}", limit)
+            }
+        } else if let Some(agg) = a.downcast_ref::<InlineAggregateExec>() {
+            let mode = match agg.mode() {
+                InlineAggregateMode::Partial => "Partial",
+                InlineAggregateMode::Final => "Final",
+            };
+            *out += &format!("Inline{}Aggregate", mode);
             if o.show_aggregations {
                 *out += &format!(", aggs: {:?}", agg.aggr_expr())
             }
