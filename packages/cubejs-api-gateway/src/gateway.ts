@@ -592,17 +592,18 @@ class ApiGateway {
   private normalizeQueryCacheMode(query: Query, cacheMode: CacheMode | undefined): Query {
     if (cacheMode !== undefined) {
       query.cacheMode = cacheMode;
-    } else if (!query.cacheMode && query?.renewQuery !== undefined) {
+    } else if (!query.cache && query?.renewQuery !== undefined) {
       // TODO: Drop this when renewQuery will be removed
       query.cacheMode = query.renewQuery === true
         ? 'must-revalidate'
         : 'stale-if-slow';
-    } else if (!query.cacheMode) {
+    } else if (!query.cache) {
       query.cacheMode = 'stale-if-slow';
     }
 
     // TODO: Drop this when renewQuery will be removed
     query.renewQuery = undefined;
+    query.cache = undefined;
 
     return query;
   }
