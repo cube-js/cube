@@ -142,7 +142,8 @@ interface Query {
   timezone?: string;
   // @deprecated
   renewQuery?: boolean;
-  cacheMode?: CacheMode;
+  cacheMode?: CacheMode; // used after query normalization
+  cache?: CacheMode; // Used in public interface
   ungrouped?: boolean;
   responseFormat?: ResultType;
 
