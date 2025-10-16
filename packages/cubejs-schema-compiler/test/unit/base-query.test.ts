@@ -1018,7 +1018,7 @@ describe('SQL Generation', () => {
           sqlTable: 'card2_tbl',
         }),
       ]);
-      await compilers.compiler.compile();
+      await filterParamsCompilers.compiler.compile();
 
       // First query requires a join
       const queryWithJoin = new PostgresQuery(filterParamsCompilers, {
