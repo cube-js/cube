@@ -267,7 +267,8 @@
     "querying BigECommerce: multi-stage group by time dimension",
     "querying SwitchSourceTest: simple cross join",
     "querying SwitchSourceTest: full cross join",
-    "querying SwitchSourceTest: filter by switch dimensions"
+    "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures"
   ],
   "tesseractSkip": [
     "for the Customers.RollingExternal",
