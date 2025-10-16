@@ -103,7 +103,7 @@ export class CubeToMetaTransformer {
           R.map((nameToDimension) => ({
             name: `${cube.name}.${nameToDimension[0]}`,
             title: this.title(cubeTitle, nameToDimension),
-            type: nameToDimension[1].type,
+            type: this.dimensionDataType(nameToDimension[1].type),
             description: nameToDimension[1].description,
             shortTitle: this.title(cubeTitle, nameToDimension, true),
             suggestFilterValues:
@@ -195,6 +195,10 @@ export class CubeToMetaTransformer {
     }
 
     return defaultValue;
+  }
+
+  dimensionDataType(dimensionType) {
+    return dimensionType === 'switch' ? 'string' : dimensionType;
   }
 
   measureConfig(cubeName, cubeTitle, nameToMetric) {
