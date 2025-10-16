@@ -82,9 +82,13 @@ impl MemberField {
 
 #[derive(Debug, Clone, Serialize)]
 pub enum CacheMode {
+    #[serde(rename = "stale-if-slow")]
     StaleIfSlow,
+    #[serde(rename = "stale-while-revalidate")]
     StaleWhileRevalidate,
+    #[serde(rename = "must-revalidate")]
     MustRevalidate,
+    #[serde(rename = "no-cache")]
     NoCache,
 }
 
