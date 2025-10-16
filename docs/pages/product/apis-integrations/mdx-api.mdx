@@ -53,6 +53,15 @@ directly to the upstream data source.
 - If some queries still go to the upstream data source, it should respond with a
 subsecond latency. Consider tuning the concurrency and quotas to achieve that.
 
+### Measure format
+
+The MDX API respects the [`format` parameter][ref-measure-format] of measures so that the
+values are displayed accordingly in Excel, i.e., `percent` formats values as percentages
+and `currency` formats values as monetary values.
+
+Currency formatting is locale-aware and responds to the language configuration set via
+the `CUBE_XMLA_LANGUAGE` environment variable.
+
 ## Using MDX API with Excel
 
 <InfoBox>
@@ -184,7 +193,6 @@ This is going to be harmonized in the future.
 
 Authentication and authorization work the same as for the [SQL API](/product/apis-integrations/sql-api/security).
 
-
 [ref-excel]: /product/configuration/visualization-tools/excel
 [link-mdx]: https://learn.microsoft.com/en-us/analysis-services/multidimensional-models/mdx/multidimensional-model-data-access-analysis-services-multidimensional-data?view=asallproducts-allversions#bkmk_querylang
 [link-pivottable]: https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576
@@ -195,3 +203,4 @@ Authentication and authorization work the same as for the [SQL API](/product/api
 [ref-deployment]: /product/deployment/cloud/deployments
 [ref-pre-aggregations]: /product/caching/using-pre-aggregations
 [ref-rollup-only-mode]: /product/caching/using-pre-aggregations#rollup-only-mode
+[ref-measure-format]: /product/data-modeling/reference/measures#format

@@ -30,6 +30,8 @@ pub struct V1CubeMetaDimension {
     pub granularities: Option<Vec<models::V1CubeMetaDimensionGranularity>>,
     #[serde(rename = "meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<serde_json::Value>,
+    #[serde(rename = "format", skip_serializing_if = "Option::is_none")]
+    pub format: Option<Box<models::V1CubeMetaFormat>>,
 }
 
 impl V1CubeMetaDimension {
@@ -43,6 +45,7 @@ impl V1CubeMetaDimension {
             alias_member: None,
             granularities: None,
             meta: None,
+            format: None,
         }
     }
 }

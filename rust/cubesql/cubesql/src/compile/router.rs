@@ -132,6 +132,20 @@ impl QueryRouter {
                     CommandCompletion::Rollback,
                 ))
             }
+            (ast::Statement::Savepoint { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Savepoint,
+                ))
+            }
+            (ast::Statement::Release { .. }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Real support
+                Ok(QueryPlan::MetaOk(
+                    StatusFlags::empty(),
+                    CommandCompletion::Release,
+                ))
+            }
             (ast::Statement::Discard { object_type }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Cursors + Portals
                 self.state.clear_prepared_statements().await;
@@ -310,11 +324,7 @@ impl QueryRouter {
         &self,
         key_values: &Vec<ast::SetVariableKeyValue>,
     ) -> Result<QueryPlan, CompilationError> {
-        let mut flags = StatusFlags::SERVER_STATE_CHANGED;
-
         let mut session_columns_to_update =
-            DatabaseVariablesToUpdate::with_capacity(key_values.len());
-        let mut global_columns_to_update =
             DatabaseVariablesToUpdate::with_capacity(key_values.len());
 
         match self.state.protocol {
@@ -352,69 +362,6 @@ impl QueryRouter {
                     ));
                 }
             }
-            DatabaseProtocol::MySQL => {
-                for key_value in key_values.iter() {
-                    if key_value.key.value.to_lowercase() == "autocommit" {
-                        flags |= StatusFlags::AUTOCOMMIT;
-
-                        break;
-                    }
-
-                    let symbols: Vec<char> = key_value.key.value.chars().collect();
-                    if symbols.len() < 2 {
-                        continue;
-                    }
-
-                    let is_user_defined_var = symbols[0] == '@' && symbols[1] != '@';
-                    let is_global_var =
-                        (symbols[0] == '@' && symbols[1] == '@') || symbols[0] != '@';
-
-                    let value: String = match &key_value.value[0] {
-                        ast::Expr::Identifier(ident) => ident.value.to_string(),
-                        ast::Expr::Value(val) => match val {
-                            ast::Value::SingleQuotedString(single_quoted_str) => {
-                                single_quoted_str.to_string()
-                            }
-                            ast::Value::DoubleQuotedString(double_quoted_str) => {
-                                double_quoted_str.to_string()
-                            }
-                            ast::Value::Number(number, _) => number.to_string(),
-                            _ => {
-                                return Err(CompilationError::user(format!(
-                                    "invalid {} variable format",
-                                    key_value.key.value
-                                )))
-                            }
-                        },
-                        _ => {
-                            return Err(CompilationError::user(format!(
-                                "invalid {} variable format",
-                                key_value.key.value
-                            )))
-                        }
-                    };
-
-                    if is_global_var {
-                        let key = if symbols[0] == '@' {
-                            key_value.key.value[2..].to_lowercase()
-                        } else {
-                            key_value.key.value.to_lowercase()
-                        };
-                        global_columns_to_update.push(DatabaseVariable::system(
-                            key.to_lowercase(),
-                            ScalarValue::Utf8(Some(value.clone())),
-                            None,
-                        ));
-                    } else if is_user_defined_var {
-                        let key = key_value.key.value[1..].to_lowercase();
-                        session_columns_to_update.push(DatabaseVariable::user_defined(
-                            key.to_lowercase(),
-                            ScalarValue::Utf8(Some(value.clone())),
-                            None,
-                        ));
-                    }
-                }
-            }
             DatabaseProtocol::Extension(_) => {
                 log::warn!("set_variable_to_plan is not supported for custom protocol");
             }
@@ -442,13 +389,10 @@ impl QueryRouter {
             self.state.set_variables(session_columns_to_update);
         }
 
-        if !global_columns_to_update.is_empty() {
-            self.session_manager
-                .server
-                .set_variables(global_columns_to_update, self.state.protocol.clone());
-        }
-
-        Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set))
+        Ok(QueryPlan::MetaOk(
+            StatusFlags::empty(),
+            CommandCompletion::Set,
+        ))
     }
 
     async fn change_user(&self, username: String) -> Result<(), CompilationError> {

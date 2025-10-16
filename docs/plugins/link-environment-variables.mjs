@@ -7,6 +7,7 @@ const isCubeEnvVar = (value) => {
     "CUBEJS_",
     "CUBESTORE_",
     "CUBESQL_",
+    "CUBE_",
   ]
 
   return (

@@ -3,6 +3,71 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.81](https://github.com/cube-js/cube/compare/v1.3.80...v1.3.81) (2025-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.3.80](https://github.com/cube-js/cube/compare/v1.3.79...v1.3.80) (2025-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.3.79](https://github.com/cube-js/cube/compare/v1.3.78...v1.3.79) (2025-10-14)
+
+### Bug Fixes
+
+- **cubesql:** Normalize timestamp/date expressions ([#10040](https://github.com/cube-js/cube/issues/10040)) ([7b1a5af](https://github.com/cube-js/cube/commit/7b1a5afe983e5191becb5eabd1381632acab133e))
+
+### Features
+
+- **cubesql:** PlanNormalize - reduce stack allocations ([#10055](https://github.com/cube-js/cube/issues/10055)) ([619343d](https://github.com/cube-js/cube/commit/619343d0e2962de99786ca47e298ab00afb3d776))
+
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
+
+### Bug Fixes
+
+- **cubesql:** Match reverse Tableau year-month extract filter ([#10009](https://github.com/cube-js/cube/issues/10009)) ([d2e67ad](https://github.com/cube-js/cube/commit/d2e67ad8147100825ba2d1a433c17fcaf8d7d8c3))
+
+## [1.3.76](https://github.com/cube-js/cube/compare/v1.3.75...v1.3.76) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
+
+### Bug Fixes
+
+- Merge measure/dimension's spec for formats ([#10007](https://github.com/cube-js/cube/issues/10007)) ([039f0e1](https://github.com/cube-js/cube/commit/039f0e1d87823dc0e7333a7d44af769b09fc6a5e))
+
+## [1.3.74](https://github.com/cube-js/cube/compare/v1.3.73...v1.3.74) (2025-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+### Bug Fixes
+
+- **cubesql:** Add missing aggregate expressions for `ORDER BY` clause ([#9990](https://github.com/cube-js/cube/issues/9990)) ([24d1177](https://github.com/cube-js/cube/commit/24d1177a5a64c9cddc2157775ab7de105ff35987))
+- **cubesql:** Fix push Limit-Sort down Projection recursion ([#9986](https://github.com/cube-js/cube/issues/9986)) ([bd20e65](https://github.com/cube-js/cube/commit/bd20e6504aac4af590fea41d7bf4ae36692efb5a))
+
+### Features
+
+- **cubesql:** Match Tableau year-month extract filter pair as `inDateRange` ([#9991](https://github.com/cube-js/cube/issues/9991)) ([8398538](https://github.com/cube-js/cube/commit/8398538f7e8995477a5d2b71db7fc20a8fd47d7f))
+- **cubesql:** Support `SAVEPOINT`, `ROLLBACK TO`, `RELEASE` ([#9992](https://github.com/cube-js/cube/issues/9992)) ([2788b6d](https://github.com/cube-js/cube/commit/2788b6daed3297f755aa234b46971bb3556164fb))
+- Expose format field for measures/dimensions in meta ([#9998](https://github.com/cube-js/cube/issues/9998)) ([51ec263](https://github.com/cube-js/cube/commit/51ec2638892272be48325bdaca931f6d1c239714))
+
+## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
+
+### Bug Fixes
+
+- **native:** Catch panic while calling python fn in PyRuntime ([#9988](https://github.com/cube-js/cube/issues/9988)) ([365f9a6](https://github.com/cube-js/cube/commit/365f9a6c4c406b6592cd2266ed95f9a28058a804))
+
+### Features
+
+- Upgrade rust 1.84.1 -> 1.90.0 (stable) ([#9987](https://github.com/cube-js/cube/issues/9987)) ([a94cb60](https://github.com/cube-js/cube/commit/a94cb60205d3c15d939d13fb30f09d071a5e9066))
+
 ## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
 
 ### Features

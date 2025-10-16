@@ -1218,7 +1218,7 @@ impl AsyncPostgresShim {
                             PreparedStatement::Query {
                                 from_sql,
                                 created: chrono::offset::Utc::now(),
-                                query,
+                                query: Box::new(query),
                                 parameters: protocol::ParameterDescription::new(parameters),
                                 description,
                                 span_id,
@@ -1479,7 +1479,7 @@ impl AsyncPostgresShim {
                 })?;
 
                 let plan = convert_statement_to_cube_query(
-                    cursor.query.clone(),
+                    cursor.query.as_ref().clone(),
                     meta,
                     self.session.clone(),
                     qtrace,
@@ -1556,7 +1556,7 @@ impl AsyncPostgresShim {
                 .await?;
 
                 let cursor = Cursor {
-                    query: select_stmt,
+                    query: Box::new(select_stmt),
                     hold: hold.unwrap_or(false),
                     format: if binary { Format::Binary } else { Format::Text },
                 };

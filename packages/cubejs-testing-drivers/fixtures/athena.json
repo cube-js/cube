@@ -163,6 +163,7 @@
     "querying SwitchSourceTest: simple cross join",
     "querying SwitchSourceTest: full cross join",
     "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures",
 
     "---------------------------------------",
     "Custom Granularities                   ",
@@ -198,6 +199,7 @@
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "SQL API: Timeshift measure from cube",
     "querying BigECommerce: multi-stage group by time dimension",
+    "querying BigECommerce: SeveralMultiStageMeasures",
 
     "querying BigECommerce: rolling window by 2 week",
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
@@ -216,8 +218,6 @@
     "querying BigECommerce: rolling window YTD (month + week)",
     "querying BigECommerce: rolling window YTD (month + week + no gran)",
     "querying BigECommerce: rolling window YTD without granularity",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo"
   ]
 }

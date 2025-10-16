@@ -1305,6 +1305,26 @@ If `true`, the DAX API will expose time dimensions as calendar hierarchies.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true` | `true` |
 
+## `CUBE_XMLA_LANGUAGE`
+
+This variable is used to [configure the locale][ref-mdx-api-locale] for the [MDX API][ref-mdx-api]. 
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| Either a [LCID][link-lcid] (numeric) or a language tag (string) | `1033` (English - United States) | `1033` (English - United States) |
+
+For example, to display currency values using the Netherlands locale (euro with comma as decimal separator), you can use either:
+
+```bash
+# LCID
+CUBE_XMLA_LANGUAGE=1043
+
+# Language tag
+CUBE_XMLA_LANGUAGE=nl-NL
+```
+
+[link-lcid]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-lcid/70feba9f-294e-491e-b6eb-56532684c37f
+
 ## `CUBEJS_NESTED_FOLDERS_DELIMITER`
 
 Specifies the delimiter used to flatten the names of nested [folder][ref-folders] in
@@ -1357,6 +1377,7 @@ Required port to send where collector server accept UDP connections.
 <WarningBox>
 
 If the refresh worker’s throughput isn’t sufficient and the Cube Refresh Worker can’t refresh every partition, Cube will start dropping partitions once the timeout is reached.
+For externally refreshed pre-aggregations, make sure each pre-aggregation is refreshed at least once within the specified timeout period.
 
 </WarningBox>
 
@@ -1808,3 +1829,5 @@ The port for a Cube deployment to listen to API connections on.
 [ref-dataviz-tools]: /product/configuration/visualization-tools
 [ref-context-to-app-id]: /product/configuration/reference/config#context_to_app_id
 [ref-environments]: /product/workspace/environments
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-mdx-api-locale]: /product/apis-integrations/mdx-api#measure-format

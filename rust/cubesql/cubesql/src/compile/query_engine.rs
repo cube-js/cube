@@ -15,7 +15,7 @@ use crate::{
                 wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode},
             },
             udf::*,
-            CubeContext, VariablesProvider,
+            CubeContext,
         },
         qtrace::Qtrace,
         rewrite::{
@@ -47,7 +47,6 @@ use datafusion::{
     },
     physical_plan::planner::DefaultPhysicalPlanner,
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
-    variable::VarType,
 };
 use uuid::Uuid;
 
@@ -77,10 +76,12 @@ pub trait QueryEngine {
         state: Arc<SessionState>,
     ) -> Result<DFSessionContext, CompilationError>;
 
-    fn create_logical_plan(
+    async fn create_logical_plan(
         &self,
         cube_ctx: &CubeContext,
         stmt: &Self::AstStatementType,
+        span_id: Option<Arc<SpanId>>,
+        query_planning_id: Option<Uuid>,
     ) -> Result<(LogicalPlan, Self::PlanMetadataType), DataFusionError>;
 
     fn sanitize_statement(&self, stmt: &Self::AstStatementType) -> Self::AstStatementType;
@@ -123,18 +124,21 @@ pub trait QueryEngine {
         let ctx = self.create_session_ctx(state.clone())?;
         let cube_ctx = self.create_cube_ctx(state.clone(), meta.clone(), ctx.clone())?;
 
-        let (plan, metadata) = self.create_logical_plan(&cube_ctx, &stmt).map_err(|err| {
-            let message = format!("Initial planning error: {}", err,);
-            let meta = Some(HashMap::from([
-                ("query".to_string(), stmt.to_string()),
-                (
-                    "sanitizedQuery".to_string(),
-                    self.sanitize_statement(&stmt).to_string(),
-                ),
-            ]));
+        let (plan, metadata) = self
+            .create_logical_plan(&cube_ctx, &stmt, span_id.clone(), Some(query_planning_id))
+            .await
+            .map_err(|err| {
+                let message = format!("Initial planning error: {}", err,);
+                let meta = Some(HashMap::from([
+                    ("query".to_string(), stmt.to_string()),
+                    (
+                        "sanitizedQuery".to_string(),
+                        self.sanitize_statement(&stmt).to_string(),
+                    ),
+                ]));
 
-            CompilationError::internal(message).with_meta(meta)
-        })?;
+                CompilationError::internal(message).with_meta(meta)
+            })?;
 
         let mut optimized_plan = plan;
         // ctx.optimize(&plan).map_err(|err| {
@@ -451,27 +455,8 @@ impl QueryEngine for SqlQueryEngine {
             .retain(|r| r.name() != "projection_push_down");
         let mut ctx = DFSessionContext::with_state(df_state);
 
-        if state.protocol == DatabaseProtocol::MySQL {
-            let system_variable_provider =
-                VariablesProvider::new(state.clone(), self.session_manager.server.clone());
-            let user_defined_variable_provider =
-                VariablesProvider::new(state.clone(), self.session_manager.server.clone());
-
-            ctx.register_variable(VarType::System, Arc::new(system_variable_provider));
-            ctx.register_variable(
-                VarType::UserDefined,
-                Arc::new(user_defined_variable_provider),
-            );
-        }
-
         // udf
-        if state.protocol == DatabaseProtocol::MySQL {
-            ctx.register_udf(create_version_udf("8.0.25".to_string()));
-            ctx.register_udf(create_db_udf("database".to_string(), state.clone()));
-            ctx.register_udf(create_db_udf("schema".to_string(), state.clone()));
-            ctx.register_udf(create_current_user_udf(state.clone(), "current_user", true));
-            ctx.register_udf(create_user_udf(state.clone()));
-        } else if state.protocol == DatabaseProtocol::PostgreSQL {
+        if state.protocol == DatabaseProtocol::PostgreSQL {
             ctx.register_udf(create_version_udf(
                 "PostgreSQL 14.2 on x86_64-cubesql".to_string(),
             ));
@@ -495,8 +480,6 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udf(create_if_udf());
         ctx.register_udf(create_least_udf());
         ctx.register_udf(create_greatest_udf());
-        ctx.register_udf(create_convert_tz_udf());
-        ctx.register_udf(create_timediff_udf());
         ctx.register_udf(create_time_format_udf());
         ctx.register_udf(create_locate_udf());
         ctx.register_udf(create_date_udf());
@@ -585,10 +568,12 @@ impl QueryEngine for SqlQueryEngine {
         Ok(ctx)
     }
 
-    fn create_logical_plan(
+    async fn create_logical_plan(
         &self,
         cube_ctx: &CubeContext,
         stmt: &Self::AstStatementType,
+        _span_id: Option<Arc<SpanId>>,
+        _query_planning_id: Option<Uuid>,
     ) -> Result<(LogicalPlan, Self::PlanMetadataType), DataFusionError> {
         let df_query_planner = SqlToRel::new_with_options(cube_ctx, true);
         let plan =

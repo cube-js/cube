@@ -270,7 +270,7 @@ This technique, together with multi-router Cube Store approach, allows you to ac
 
 In general, it's better to lean towards less partitions, as long as you are satisfied with query speed.
 
-For optimal _querying performance_, partitions should be small enough so that the Cube Store workers can process them in less than 100 milliseconds. 
+For optimal _querying performance_, partitions should be small enough so that a Cube Store worker can read (scan) a partition in less than 100 milliseconds. 
 The best way to optimize this is to start from a relatively large partition (e.g., yearly or no partition at all if data permits), 
 check what the [flame graph][ref-flame-graph] in Query History shows, then iterate as needed.
 

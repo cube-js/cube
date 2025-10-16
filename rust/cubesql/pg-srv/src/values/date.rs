@@ -5,7 +5,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, BytesMut};
 use chrono::NaiveDate;
 use std::backtrace::Backtrace;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 pub type DateValue = NaiveDate;
 
@@ -21,13 +21,10 @@ impl ToProtocolValue for DateValue {
             .signed_duration_since(pg_base_date_epoch().date())
             .num_days();
         if n > (i32::MAX as i64) {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!(
-                    "value too large to store in the binary format (i32), actual: {}",
-                    n
-                ),
-            )
+            return Err(Error::other(format!(
+                "value too large to store in the binary format (i32), actual: {}",
+                n
+            ))
             .into());
         }
 

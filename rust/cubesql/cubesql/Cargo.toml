@@ -4,20 +4,20 @@ version = "0.28.0"
 authors = ["Cube Dev, Inc."]
 edition = "2018"
 license = "Apache-2.0"
-description = "SQL API for Cube as proxy over MySQL protocol"
+description = "SQL API for Cube as proxy over PostgreSQL protocol"
 documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "0ba29ac12e2b13444bd536e1cbe4f73411383521", default-features = false, features = [
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "19a0adaa43745a3facfe67be406dcb488fad7a9c", default-features = false, features = [
     "regex_expressions",
     "unicode_expressions",
 ] }
 thiserror = "2"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "e14d5bf45367edd8679cbc15ccee56693da8e4fb" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "16f051486de78a23a0ff252155dd59fc2d35497d" }
 base64 = "0.13.0"
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }

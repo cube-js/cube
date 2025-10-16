@@ -406,10 +406,14 @@ impl PreAggregationsCompiler {
 
     pub fn compile_all_pre_aggregations(
         &mut self,
+        disable_external_pre_aggregations: bool,
     ) -> Result<Vec<Rc<CompiledPreAggregation>>, CubeError> {
         let mut result = Vec::new();
         for (name, _) in self.descriptions.clone().iter() {
-            result.push(self.compile_pre_aggregation(&name)?);
+            let pre_aggregation = self.compile_pre_aggregation(name)?;
+            if !(disable_external_pre_aggregations && pre_aggregation.external == Some(true)) {
+                result.push(pre_aggregation);
+            }
         }
         Ok(result)
     }

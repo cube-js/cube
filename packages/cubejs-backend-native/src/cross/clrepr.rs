@@ -43,7 +43,7 @@ impl CLReprObject {
         self.0.insert(key, value)
     }
 
-    pub fn iter(&self) -> Iter<String, CLRepr> {
+    pub fn iter(&self) -> Iter<'_, String, CLRepr> {
         self.0.iter()
     }
 

@@ -279,6 +279,10 @@ impl SelectBuilder {
         self.ctes = ctes;
     }
 
+    pub fn from(&self) -> &Rc<From> {
+        &self.from
+    }
+
     pub fn make_cube_references(from: Rc<From>) -> HashMap<String, String> {
         let mut refs = HashMap::new();
         match &from.source {

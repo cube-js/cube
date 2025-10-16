@@ -1,0 +1,180 @@
+docs:
+- changed-files:
+  - any-glob-to-any-file: docs/*
+
+# Data source drivers
+data source driver:
+- changed-files:
+  - any-glob-to-any-file: packages/*-driver/**/*
+
+cubejs-jdbc-driver:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-databricks-jdbc-driver/**/*
+
+# Individual driver labels
+driver:athena:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-athena-driver/**/*
+
+driver:bigquery:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-bigquery-driver/**/*
+
+driver:clickhouse:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-clickhouse-driver/**/*
+
+driver:crate:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-crate-driver/**/*
+
+driver:databricks:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-databricks-jdbc-driver/**/*
+
+driver:dremio:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-dremio-driver/**/*
+
+driver:druid:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-druid-driver/**/*
+
+driver:duckdb:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-duckdb-driver/**/*
+
+driver:elasticsearch:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-elasticsearch-driver/**/*
+
+driver:firebolt:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-firebolt-driver/**/*
+
+driver:hive:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-hive-driver/**/*
+
+driver:materialize:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-materialize-driver/**/*
+
+driver:mongodb:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-mongobi-driver/**/*
+
+driver:mssql:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-mssql-driver/**/*
+
+driver:mysql:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-mysql-driver/**/*
+
+driver:mysql-aurora-serverless:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-mysql-aurora-serverless-driver/**/*
+
+driver:oracle:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-oracle-driver/**/*
+
+driver:pinot:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-pinot-driver/**/*
+
+driver:postgres:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-postgres-driver/**/*
+
+driver:prestodb:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-prestodb-driver/**/*
+
+driver:questdb:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-questdb-driver/**/*
+
+driver:redshift:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-redshift-driver/**/*
+
+driver:snowflake:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-snowflake-driver/**/*
+
+driver:sqlite:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-sqlite-driver/**/*
+
+driver:trino:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-trino-driver/**/*
+
+# Client libraries
+client:core:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-client-core/**/*
+
+client:react:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-client-react/**/*
+
+client:vue:
+- changed-files:
+  - any-glob-to-any-file:
+    - packages/cubejs-client-vue/**/*
+    - packages/cubejs-client-vue3/**/*
+
+client:ngx:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-client-ngx/**/*
+
+client:playground:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-playground/**/*
+
+# Cubestore
+cube store:
+- changed-files:
+  - any-glob-to-any-file: rust/cubestore/**/*
+
+# Languages
+javascript:
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*.js'
+    - '**/*.jsx'
+    - '**/*.ts'
+    - '**/*.tsx'
+    - '**/*.mjs'
+    - '**/*.cjs'
+
+python:
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*.py'
+    - '**/*.pyi'
+    - '**/*.pyx'
+
+rust:
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*.rs'
+    - '**/*.toml'
+    - rust/**/*
+
+backend:cli:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-cli/**/*
+
+# Dependencies
+dependencies:
+- changed-files:
+  - any-glob-to-all-files:
+    - '**/package.json'
+    - '**/package-lock.json'
+    - '**/yarn.lock'
+    - '**/Cargo.toml'
+    - '**/Cargo.lock'

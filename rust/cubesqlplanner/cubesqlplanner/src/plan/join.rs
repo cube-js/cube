@@ -296,6 +296,7 @@ pub struct Join {
     pub joins: Vec<JoinItem>,
 }
 
+#[derive(Clone, PartialEq, Eq)]
 pub enum JoinType {
     Inner,
     Left,

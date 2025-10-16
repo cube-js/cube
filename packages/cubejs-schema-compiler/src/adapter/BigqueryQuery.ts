@@ -347,7 +347,6 @@ export class BigqueryQuery extends BaseQuery {
     // DATEADD is being rewritten to DATE_ADD
     templates.functions.DATE_ADD = 'DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
-    templates.functions.DATE = 'TIMESTAMP({{ args_concat }})';
     delete templates.functions.TO_CHAR;
     delete templates.functions.PERCENTILECONT;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
@@ -368,7 +367,6 @@ export class BigqueryQuery extends BaseQuery {
     templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
     templates.types.binary = 'BYTES';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
-    templates.join_types.full = 'FULL';
     templates.statements.time_series_select = 'SELECT DATETIME(TIMESTAMP(f)) date_from, DATETIME(TIMESTAMP(t)) date_to \n' +
     'FROM (\n' +
     '{% for time_item in seria  %}' +

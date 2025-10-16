@@ -3,6 +3,56 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.81](https://github.com/cube-js/cube/compare/v1.3.80...v1.3.81) (2025-10-16)
+
+### Features
+
+- **tesseract:** Full outer join support ([#10057](https://github.com/cube-js/cube/issues/10057)) ([a315737](https://github.com/cube-js/cube/commit/a3157376815d71ed2e37805c9d7dff61ded3c665))
+
+## [1.3.80](https://github.com/cube-js/cube/compare/v1.3.79...v1.3.80) (2025-10-15)
+
+### Features
+
+- **schema-compiler:** Use views join maps and hints for query joins construction ([#10039](https://github.com/cube-js/cube/issues/10039)) ([f556b62](https://github.com/cube-js/cube/commit/f556b62691c473490c7f27b7ac759c2ffb89d2ff))
+
+## [1.3.79](https://github.com/cube-js/cube/compare/v1.3.78...v1.3.79) (2025-10-14)
+
+### Bug Fixes
+
+- **cubesql:** Normalize timestamp/date expressions ([#10040](https://github.com/cube-js/cube/issues/10040)) ([7b1a5af](https://github.com/cube-js/cube/commit/7b1a5afe983e5191becb5eabd1381632acab133e))
+
+## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
+
+### Features
+
+- **schema-compiler:** Pretty print compile errors grouped by files ([#10025](https://github.com/cube-js/cube/issues/10025)) ([0c5c21c](https://github.com/cube-js/cube/commit/0c5c21c4def87cdf9a4b673fde40b034d05d02be))
+
+## [1.3.77](https://github.com/cube-js/cube/compare/v1.3.76...v1.3.77) (2025-10-01)
+
+### Bug Fixes
+
+- **schema-compiler:** Do not collect disabled external pre-aggregations ([#10014](https://github.com/cube-js/cube/issues/10014)) ([7b2874e](https://github.com/cube-js/cube/commit/7b2874e012c52a00bd07967b13ea3493a92e228d))
+
+## [1.3.76](https://github.com/cube-js/cube/compare/v1.3.75...v1.3.76) (2025-10-01)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.75](https://github.com/cube-js/cube/compare/v1.3.74...v1.3.75) (2025-09-29)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.74](https://github.com/cube-js/cube/compare/v1.3.73...v1.3.74) (2025-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.73](https://github.com/cube-js/cube/compare/v1.3.72...v1.3.73) (2025-09-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.72](https://github.com/cube-js/cube/compare/v1.3.71...v1.3.72) (2025-09-23)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
 ## [1.3.71](https://github.com/cube-js/cube/compare/v1.3.70...v1.3.71) (2025-09-22)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

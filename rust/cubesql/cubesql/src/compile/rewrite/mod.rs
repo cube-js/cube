@@ -1076,7 +1076,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
         egraph: &CubeEGraph,
         eclass: Id,
         limit: usize,
-    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+    ) -> Option<SearchMatches<'_, LogicalPlanLanguage>> {
         let mut matches = SearchMatches {
             substs: vec![],
             eclass,
@@ -1097,7 +1097,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
         egraph: &CubeEGraph,
         eclasses: &mut dyn Iterator<Item = Id>,
         limit: usize,
-    ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
+    ) -> Vec<SearchMatches<'_, LogicalPlanLanguage>> {
         let mut result: Vec<SearchMatches<_>> = vec![];
 
         self.list_pattern
@@ -2280,7 +2280,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
         egraph: &CubeEGraph,
         eclasses: &mut dyn Iterator<Item = Id>,
         limit: usize,
-    ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
+    ) -> Vec<SearchMatches<'_, LogicalPlanLanguage>> {
         let matches = self
             .main
             .search_eclasses_with_limit(egraph, eclasses, limit);
@@ -2298,7 +2298,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
         egraph: &CubeEGraph,
         eclass: Id,
         limit: usize,
-    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+    ) -> Option<SearchMatches<'_, LogicalPlanLanguage>> {
         if let Some(m) = self.main.search_eclass_with_limit(egraph, eclass, limit) {
             self.search_match_chained(egraph, m)
         } else {

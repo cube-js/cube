@@ -631,7 +631,7 @@ export class DataSchemaCompiler {
     return files.map((file, index) => {
       errorsReport.inFile(file);
       if (!res[index]) { // This should not happen in theory but just to be safe
-        errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
+        errorsReport.error('No transpilation result received for the file.');
         return undefined;
       }
       errorsReport.addErrors(res[index].errors, file.fileName);
@@ -658,7 +658,7 @@ export class DataSchemaCompiler {
     return files.map((file, index) => {
       errorsReport.inFile(file);
       if (!res[index]) { // This should not happen in theory but just to be safe
-        errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
+        errorsReport.error('No transpilation result received for the file.');
         return undefined;
       }
       errorsReport.addErrors(res[index].errors, file.fileName);
@@ -736,8 +736,8 @@ export class DataSchemaCompiler {
       if (e.toString().indexOf('SyntaxError') !== -1) {
         const err = e as SyntaxErrorInterface;
         const line = file.content.split('\n')[(err.loc?.start?.line || 1) - 1];
-        const spaces = Array(err.loc?.start.column).fill(' ').join('');
-        errorsReport.error(`Syntax error during '${file.fileName}' parsing: ${err.message}:\n${line}\n${spaces}^`);
+        const spaces = Array(err.loc?.start?.column).fill(' ').join('') || '';
+        errorsReport.error(`Syntax error during parsing: ${err.message}:\n${line}\n${spaces}^`, file.fileName);
       } else {
         errorsReport.error(e);
       }
