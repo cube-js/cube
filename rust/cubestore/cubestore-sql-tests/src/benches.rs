@@ -16,10 +16,10 @@ pub type BenchState = dyn Any + Send + Sync;
 
 #[async_trait]
 pub trait Bench: Send + Sync {
-    fn config(self: &Self, prefix: &str) -> (String, Config);
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError>;
+    fn config(&self, prefix: &str) -> (String, Config);
+    async fn setup(&'life0 self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError>;
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         state: Arc<BenchState>,
     ) -> Result<(), CubeError>;
@@ -30,12 +30,12 @@ fn config_name(prefix: &str, name: &str) -> String {
 }
 
 pub fn cubestore_benches() -> Vec<Arc<dyn Bench>> {
-    return vec![
+    vec![
         Arc::new(SimpleBench {}),
         Arc::new(ParquetMetadataCacheBench {}),
         Arc::new(CacheSetGetBench {}),
         Arc::new(QueueListBench::new(16 * 1024)),
-    ];
+    ]
 }
 
 pub struct SimpleBenchState {
@@ -44,20 +44,20 @@ pub struct SimpleBenchState {
 pub struct SimpleBench;
 #[async_trait]
 impl Bench for SimpleBench {
-    fn config(self: &Self, prefix: &str) -> (String, Config) {
+    fn config(&self, prefix: &str) -> (String, Config) {
         let name = config_name(prefix, "simple");
         let config = Config::test(name.as_str());
         (name, config)
     }
 
-    async fn setup(self: &Self, _services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+    async fn setup(&'life0 self, _services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
         Ok(Arc::new(SimpleBenchState {
             query: "SELECT 23".to_string(),
         }))
     }
 
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         state: Arc<BenchState>,
     ) -> Result<(), CubeError> {
@@ -80,7 +80,7 @@ impl Bench for SimpleBench {
 pub struct ParquetMetadataCacheBench;
 #[async_trait]
 impl Bench for ParquetMetadataCacheBench {
-    fn config(self: &Self, prefix: &str) -> (String, Config) {
+    fn config(&self, prefix: &str) -> (String, Config) {
         let name = config_name(prefix, "parquet_metadata_cache");
         let config = Config::test(name.as_str()).update_config(|mut c| {
             c.partition_split_threshold = 10_000_000;
@@ -94,7 +94,7 @@ impl Bench for ParquetMetadataCacheBench {
         (name, config)
     }
 
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+    async fn setup(&'life0 self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
         let dataset_path = download_and_unzip(
             "https://github.com/cube-js/testing-fixtures/raw/master/github-commits.tar.gz",
             "github-commits",
@@ -112,7 +112,7 @@ impl Bench for ParquetMetadataCacheBench {
             .await?;
 
         // Wait for all pending (compaction) jobs to finish.
-        wait_for_all_jobs(&services).await?;
+        wait_for_all_jobs(services).await?;
 
         let state = Arc::new(());
 
@@ -123,7 +123,7 @@ impl Bench for ParquetMetadataCacheBench {
     }
 
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         _state: Arc<BenchState>,
     ) -> Result<(), CubeError> {
@@ -147,13 +147,13 @@ impl Bench for ParquetMetadataCacheBench {
 pub struct CacheSetGetBench;
 #[async_trait]
 impl Bench for CacheSetGetBench {
-    fn config(self: &Self, prefix: &str) -> (String, Config) {
+    fn config(&self, prefix: &str) -> (String, Config) {
         let name = config_name(prefix, "cache_set_get");
         let config = Config::test(name.as_str()).update_config(|c| c);
         (name, config)
     }
 
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+    async fn setup(&'life0 self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
         services
             .sql_service
             .exec_query("CACHE SET TTL 600 'my_key' 'my_value'")
@@ -164,7 +164,7 @@ impl Bench for CacheSetGetBench {
     }
 
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         _state: Arc<BenchState>,
     ) -> Result<(), CubeError> {
@@ -192,13 +192,13 @@ impl QueueListBench {
 
 #[async_trait]
 impl Bench for crate::benches::QueueListBench {
-    fn config(self: &Self, prefix: &str) -> (String, Config) {
+    fn config(&self, prefix: &str) -> (String, Config) {
         let name = config_name(prefix, "queue_list_bench");
         let config = Config::test(name.as_str()).update_config(|c| c);
         (name, config)
     }
 
-    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+    async fn setup(&'life0 self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
         for i in 1..5_001 {
             services
                 .sql_service
@@ -216,7 +216,7 @@ impl Bench for crate::benches::QueueListBench {
     }
 
     async fn bench(
-        self: &Self,
+        &'life0 self,
         services: &CubeServices,
         _state: Arc<BenchState>,
     ) -> Result<(), CubeError> {

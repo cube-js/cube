@@ -1,5 +1,6 @@
 mod check_memory;
 mod distributed_partial_aggregate;
+mod inline_aggregate_rewriter;
 pub mod rewrite_plan;
 pub mod rolling_optimizer;
 mod trace_data_loaded;
@@ -10,6 +11,7 @@ use crate::queryplanner::optimizations::distributed_partial_aggregate::{
     add_limit_to_workers, ensure_partition_merge, push_aggregate_to_workers,
     replace_suboptimal_merge_sorts,
 };
+use crate::queryplanner::optimizations::inline_aggregate_rewriter::replace_with_inline_aggregate;
 use crate::queryplanner::planning::CubeExtensionPlanner;
 use crate::queryplanner::pretty_printers::{pp_phys_plan_ext, PPOptions};
 use crate::queryplanner::rolling::RollingWindowPlanner;
@@ -141,6 +143,10 @@ fn pre_optimize_physical_plan(
     let p = rewrite_physical_plan(p, &mut |p| ensure_partition_merge_with_acceptable_parent(p))?;
     // Handles the root node case
     let p = ensure_partition_merge(p)?;
+
+    // Replace sorted AggregateExec with InlineAggregateExec for better performance
+    let p = rewrite_physical_plan(p, &mut |p| replace_with_inline_aggregate(p))?;
+
     Ok(p)
 }
 

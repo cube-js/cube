@@ -36,16 +36,16 @@ pub const MAX_BUCKETS: u32 = 65536;
 impl HllInstance {
     pub fn new(num_buckets: u32) -> Result<HllInstance> {
         assert!(num_buckets <= MAX_BUCKETS);
-        return Ok(HllInstance::Sparse(SparseHll::new(index_bit_length(
+        Ok(HllInstance::Sparse(SparseHll::new(index_bit_length(
             num_buckets,
-        )?)?));
+        )?)?))
     }
 
     pub fn num_buckets(&self) -> u32 {
-        return match self {
+        match self {
             Sparse(s) => number_of_buckets(s.index_bit_len),
             Dense(d) => number_of_buckets(d.index_bit_len),
-        };
+        }
     }
 
     /// Callers must check that `num_buckets()` is the same for `self` and `other`.
@@ -61,10 +61,10 @@ impl HllInstance {
     }
 
     pub fn index_bit_len(&self) -> u8 {
-        return match self {
+        match self {
             Sparse(s) => s.index_bit_len,
             Dense(d) => d.index_bit_len,
-        };
+        }
     }
 
     /// Returns true iff `self.make_dense_if_necessary` has to be run.
@@ -75,15 +75,15 @@ impl HllInstance {
                 l.merge_with(r);
                 // We need the make this call, but borrow checker won't let us use `self` here.
                 // self.make_dense_if_necessary();
-                return true;
+                true
             }
             (Dense(l), Sparse(r)) => {
                 l.merge_with_sparse(r);
-                return false;
+                false
             }
             (l, Dense(r)) => {
                 l.ensure_dense().merge_with(r);
-                return false;
+                false
             }
         }
     }
@@ -122,7 +122,7 @@ impl HllInstance {
                     "Cannot read HLL with undefined encoding".to_string(),
                 ))
             }
-            n if 1 <= n && n <= 4 => n,
+            n if (1..=4).contains(&n) => n,
             n => {
                 return Err(HllError::new(format!(
                     "Unknown HLL encoding ordinal: {}",
@@ -131,7 +131,7 @@ impl HllInstance {
             }
         };
         let reg_width = 1 + ((data[1] & 0b11100000) >> 5);
-        if reg_width < 1 || 6 < reg_width {
+        if !(1..=6).contains(&reg_width) {
             return Err(HllError::new(format!(
                 "Register width must be between 1 and 6, got {}",
                 reg_width
@@ -139,7 +139,7 @@ impl HllInstance {
         }
         let log_num_buckets = data[1] & 0b00011111;
         // Note: the upper limit in storage spec is 31, but our implementation is limited to 16.
-        if log_num_buckets < 4 || 16 < log_num_buckets {
+        if !(4..=16).contains(&log_num_buckets) {
             return Err(HllError::new(format!(
                 "Log2m must be between 4 and 16, got {}",
                 log_num_buckets
@@ -158,7 +158,7 @@ impl HllInstance {
                         data.len()
                     )));
                 }
-                return HllInstance::new(num_buckets);
+                HllInstance::new(num_buckets)
             }
             ENC_EXPLICIT => {
                 if data.len() % 8 != 0 {
@@ -216,11 +216,11 @@ impl HllInstance {
                     values.push(zeroes as u8);
                 }
 
-                return Ok(HllInstance::Sparse(SparseHll::new_from_indices_and_values(
+                Ok(HllInstance::Sparse(SparseHll::new_from_indices_and_values(
                     log_num_buckets,
                     indices,
                     &values,
-                )?));
+                )?))
             }
             ENC_SPARSE => {
                 let mut cursor = BitCursor::new(data);
@@ -231,11 +231,11 @@ impl HllInstance {
                     indices.push((e >> reg_width) as u32);
                     values.push((e & ((1 << reg_width) - 1)) as u8);
                 }
-                return Ok(HllInstance::Sparse(SparseHll::new_from_indices_and_values(
+                Ok(HllInstance::Sparse(SparseHll::new_from_indices_and_values(
                     log_num_buckets,
                     indices,
                     &values,
-                )?));
+                )?))
             }
             ENC_FULL => {
                 let expected_bits = num_buckets * reg_width as u32;
@@ -253,10 +253,10 @@ impl HllInstance {
                 for _ in 0..num_buckets {
                     values.push(cursor.read_bits(reg_width as usize).unwrap() as u8)
                 }
-                return Ok(HllInstance::Dense(DenseHll::new_from_entries(
+                Ok(HllInstance::Dense(DenseHll::new_from_entries(
                     log_num_buckets,
                     values,
-                )?));
+                )?))
             }
             enc => panic!("Unhandled encoding ordinal {}", enc),
         }
@@ -306,19 +306,19 @@ impl HllInstance {
         if data.is_empty() {
             return Err(HllError::new("hll input data is empty"));
         }
-        return match data[0] {
+        match data[0] {
             TAG_SPARSE_V2 => Ok(HllInstance::Sparse(SparseHll::read(&data[1..])?)),
             TAG_DENSE_V1 => Ok(HllInstance::Dense(DenseHll::read_v1(&data[1..])?)),
             TAG_DENSE_V2 => Ok(HllInstance::Dense(DenseHll::read(&data[1..])?)),
             _ => Err(HllError::new(format!("invalid hll format tag {}", data[0]))),
-        };
+        }
     }
 
     pub fn write(&self) -> Vec<u8> {
-        return match self {
+        match self {
             Sparse(s) => s.write(),
             Dense(s) => s.write(),
-        };
+        }
     }
 
     fn ensure_dense(&mut self) -> &mut DenseHll {
@@ -379,10 +379,10 @@ impl SparseHll {
 
     pub fn new(index_bit_len: u8) -> Result<SparseHll> {
         SparseHll::is_valid_bit_len(index_bit_len)?;
-        return Ok(SparseHll {
+        Ok(SparseHll {
             index_bit_len,
             entries: Vec::with_capacity(1),
-        });
+        })
     }
 
     fn new_from_indices_and_values(
@@ -419,8 +419,7 @@ impl SparseHll {
         }
 
         // Sort by bucket index.
-        entries
-            .sort_unstable_by(|l, r| (l >> (32 - index_bit_len)).cmp(&(r >> (32 - index_bit_len))));
+        entries.sort_unstable_by_key(|l| l >> (32 - index_bit_len));
 
         Ok(SparseHll {
             index_bit_len,
@@ -442,10 +441,10 @@ impl SparseHll {
         if c.position() != data.len() as u64 {
             return Err(HllError::new("input is too big"));
         }
-        return Ok(SparseHll {
+        Ok(SparseHll {
             index_bit_len,
             entries,
-        });
+        })
     }
 
     pub fn write(&self) -> Vec<u8> {
@@ -459,7 +458,7 @@ impl SparseHll {
         for e in &self.entries {
             r.write_u32::<LittleEndian>(*e).unwrap();
         }
-        return r;
+        r
     }
 
     pub fn cardinality(&self) -> u64 {
@@ -468,7 +467,7 @@ impl SparseHll {
         // while in the sparse regime.
         let total_buckets = number_of_buckets(SparseHll::EXTENDED_PREFIX_BITS);
         let zero_buckets = total_buckets - self.entries.len() as u32;
-        return linear_counting(zero_buckets, total_buckets).round() as u64;
+        linear_counting(zero_buckets, total_buckets).round() as u64
     }
 
     pub fn merge_with(&mut self, o: &SparseHll) {
@@ -479,11 +478,11 @@ impl SparseHll {
         // TODO: this can panic if Sparse HLL had too much precision.
         let mut d = DenseHll::new(self.index_bit_len);
         self.each_bucket(|bucket, zeros| d.insert(bucket, zeros));
-        return d;
+        d
     }
 
     fn estimate_in_memory_size(&self) -> usize {
-        return size_of::<SparseHll>() + 32 * self.entries.capacity();
+        size_of::<SparseHll>() + 32 * self.entries.capacity()
     }
 
     fn each_bucket<F>(&self, mut f: F)
@@ -555,27 +554,27 @@ impl SparseHll {
         }
 
         result.resize(index, 0);
-        return result;
+        result
     }
 
     fn encode_entry(bucket_index: u32, value: u8) -> u32 {
-        return (bucket_index << SparseHll::VALUE_BITS) | value as u32;
+        (bucket_index << SparseHll::VALUE_BITS) | value as u32
     }
 
     fn decode_bucket_value(entry: u32) -> u8 {
-        return (entry & SparseHll::VALUE_MASK) as u8;
+        (entry & SparseHll::VALUE_MASK) as u8
     }
 
     fn decode_bucket_index(entry: u32) -> u32 {
-        return SparseHll::decode_bucket_index_with_bit_len(SparseHll::EXTENDED_PREFIX_BITS, entry);
+        SparseHll::decode_bucket_index_with_bit_len(SparseHll::EXTENDED_PREFIX_BITS, entry)
     }
 
     fn decode_bucket_index_with_bit_len(index_bit_len: u8, entry: u32) -> u32 {
-        return entry >> (32 - index_bit_len);
+        entry >> (32 - index_bit_len)
     }
 
     fn is_valid_bit_len(index_bit_len: u8) -> Result<()> {
-        if 1 <= index_bit_len && index_bit_len <= SparseHll::EXTENDED_PREFIX_BITS {
+        if (1..=SparseHll::EXTENDED_PREFIX_BITS).contains(&index_bit_len) {
             Ok(())
         } else {
             Err(HllError::new(format!(
@@ -615,15 +614,15 @@ impl DenseHll {
     pub fn new(index_bit_len: u8) -> DenseHll {
         DenseHll::is_valid_bit_len(index_bit_len).unwrap();
 
-        let num_buckets = number_of_buckets(index_bit_len) as u32;
-        return DenseHll {
+        let num_buckets = number_of_buckets(index_bit_len);
+        DenseHll {
             index_bit_len,
             baseline: 0,
             baseline_count: num_buckets,
             deltas: vec![0; (num_buckets * DenseHll::BITS_PER_BUCKET / 8) as usize],
             overflow_buckets: Vec::new(),
             overflow_values: Vec::new(),
-        };
+        }
     }
 
     pub fn new_from_entries(index_bit_len: u8, values: Vec<u8>) -> Result<DenseHll> {
@@ -674,9 +673,9 @@ impl DenseHll {
 
     pub fn read_v1(_data: &[u8]) -> Result<DenseHll> {
         // TODO: implement this for completeness. Airlift can read Dense HLL in V1 format.
-        return Err(HllError::new(
+        Err(HllError::new(
             "reading of v1 dense sketches is not implemented",
-        ));
+        ))
     }
 
     pub fn read(data: &[u8]) -> Result<DenseHll> {
@@ -725,14 +724,14 @@ impl DenseHll {
             }
         }
 
-        return Ok(DenseHll {
+        Ok(DenseHll {
             index_bit_len,
             baseline,
             baseline_count,
             deltas,
             overflow_buckets,
             overflow_values,
-        });
+        })
     }
 
     pub fn write(&self) -> Vec<u8> {
@@ -753,7 +752,7 @@ impl DenseHll {
             r.write_u16::<LittleEndian>(e.try_into().unwrap()).unwrap();
         }
         r.extend_from_slice(&of_values);
-        return r;
+        r
     }
 
     pub fn cardinality(&self) -> u64 {
@@ -774,7 +773,7 @@ impl DenseHll {
         }
 
         let estimate = (alpha(self.index_bit_len) * num_buckets as f64 * num_buckets as f64) / sum;
-        return self.correct_bias(estimate).round() as u64;
+        self.correct_bias(estimate).round() as u64
     }
 
     pub fn merge_with_sparse(&mut self, other: &SparseHll) {
@@ -819,14 +818,14 @@ impl DenseHll {
                 if delta1 == DenseHll::MAX_DELTA {
                     overflow_entry = self.find_overflow_entry(bucket);
                     if let Some(oe) = overflow_entry {
-                        value1 += self.overflow_values[oe] as u8;
+                        value1 += self.overflow_values[oe];
                     }
                 } else {
                     overflow_entry = None
                 }
 
                 if delta2 == DenseHll::MAX_DELTA {
-                    value2 += other.get_overflow(bucket) as u8;
+                    value2 += other.get_overflow(bucket);
                 }
 
                 let new_value = max(value1, value2);
@@ -843,7 +842,7 @@ impl DenseHll {
                 bucket += 1;
             }
 
-            self.deltas[i] = new_slot as u8;
+            self.deltas[i] = new_slot;
         }
 
         self.baseline = new_baseline as u8;
@@ -919,15 +918,14 @@ impl DenseHll {
 
             bias = (((raw_estimate - x0) * (y1 - y0)) / (x1 - x0)) + y0;
         }
-        return raw_estimate - bias;
+        raw_estimate - bias
     }
 
     fn find_overflow_entry(&self, bucket: u32) -> Option<usize> {
-        return self
-            .overflow_buckets
+        self.overflow_buckets
             .iter()
             .find_position(|x| **x == bucket)
-            .map(|x| x.0);
+            .map(|x| x.0)
     }
 
     fn adjust_baseline_if_needed(&mut self) {
@@ -987,7 +985,7 @@ impl DenseHll {
         } else if let Some(oe) = overflow_entry {
             self.remove_overflow(oe);
         }
-        return delta as u8;
+        delta
     }
 
     fn add_overflow(&mut self, bucket: u32, overflow: u8) {
@@ -1020,7 +1018,7 @@ impl DenseHll {
         if delta == DenseHll::MAX_DELTA as u32 {
             delta += self.get_overflow(bucket) as u32;
         }
-        return self.baseline as u32 + delta;
+        self.baseline as u32 + delta
     }
 
     fn get_overflow(&self, bucket: u32) -> u8 {
@@ -1029,41 +1027,41 @@ impl DenseHll {
                 return self.overflow_values[i];
             }
         }
-        return 0;
+        0
     }
 
     fn get_delta(&self, bucket: u32) -> u8 {
-        return DenseHll::get_delta_impl(&self.deltas, bucket);
+        DenseHll::get_delta_impl(&self.deltas, bucket)
     }
 
     fn get_delta_impl(deltas: &[u8], bucket: u32) -> u8 {
         let slot = DenseHll::bucket_to_slot(bucket) as usize;
-        return (deltas[slot] >> DenseHll::shift_for_bucket(bucket)) & DenseHll::BUCKET_MASK;
+        (deltas[slot] >> DenseHll::shift_for_bucket(bucket)) & DenseHll::BUCKET_MASK
     }
 
     fn set_delta(&mut self, bucket: u32, value: u8) {
         let slot = DenseHll::bucket_to_slot(bucket) as usize;
 
         // clear the old value
-        let clear_mask = (DenseHll::BUCKET_MASK << DenseHll::shift_for_bucket(bucket)) as u8;
+        let clear_mask = DenseHll::BUCKET_MASK << DenseHll::shift_for_bucket(bucket);
         self.deltas[slot] &= !clear_mask;
 
         // set the new value
-        let set_mask = (value << DenseHll::shift_for_bucket(bucket)) as u8;
+        let set_mask = value << DenseHll::shift_for_bucket(bucket);
         self.deltas[slot] |= set_mask;
     }
 
     fn bucket_to_slot(bucket: u32) -> u32 {
-        return bucket >> 1;
+        bucket >> 1
     }
 
     fn shift_for_bucket(bucket: u32) -> u32 {
         // ((1 - bucket) % 2) * BITS_PER_BUCKET
-        return ((!bucket) & 1) << 2;
+        ((!bucket) & 1) << 2
     }
 
     fn is_valid_bit_len(index_bit_len: u8) -> Result<()> {
-        if 1 <= index_bit_len && index_bit_len <= 16 {
+        if (1..=16).contains(&index_bit_len) {
             Ok(())
         } else {
             Err(HllError::new(format!(
@@ -1079,7 +1077,7 @@ impl DenseHll {
         // to dense representation can happen at different points.
 
         // note: we don't take into account overflow entries since their number can vary.
-        return size_of::<DenseHll>() + /*deltas*/8 * number_of_buckets(index_bit_len) as usize / 2;
+        size_of::<DenseHll>() + /*deltas*/8 * number_of_buckets(index_bit_len) as usize / 2
     }
 
     /// Unlike airlift, we provide a copy of the overflow_bucket to to the reference semantics.
@@ -1114,7 +1112,7 @@ impl DenseHll {
             }
         }
 
-        return (of_buckets, of_values);
+        (of_buckets, of_values)
     }
 
     #[allow(dead_code)]
@@ -1186,7 +1184,7 @@ fn search(raw_estimate: f64, estimate_curve: &[f64]) -> i32 {
         }
     }
 
-    return -(low as i32 + 1);
+    -(low as i32 + 1)
 }
 
 fn index_bit_length(n: u32) -> Result<u8> {
@@ -1199,36 +1197,36 @@ fn index_bit_length(n: u32) -> Result<u8> {
 
 #[allow(dead_code)]
 fn compute_index(hash: u64, index_bit_len: u8) -> u32 {
-    return (hash >> (64 - index_bit_len)) as u32;
+    (hash >> (64 - index_bit_len)) as u32
 }
 
 fn compute_value(hash: u64, index_bit_len: u8) -> u8 {
-    return number_of_leading_zeros(hash, index_bit_len) + 1;
+    number_of_leading_zeros(hash, index_bit_len) + 1
 }
 
 #[allow(dead_code)]
 fn number_of_leading_zeros(hash: u64, index_bit_len: u8) -> u8 {
     // place a 1 in the LSB to preserve the original number of leading zeros if the hash happens to be 0.
     let value = (hash << index_bit_len) | (1 << (index_bit_len - 1));
-    return value.leading_zeros() as u8;
+    value.leading_zeros() as u8
 }
 
 fn number_of_buckets(index_bit_len: u8) -> u32 {
-    return 1 << index_bit_len;
+    1 << index_bit_len
 }
 
 fn alpha(index_bit_len: u8) -> f64 {
-    return match index_bit_len {
+    match index_bit_len {
         4 => 0.673,
         5 => 0.697,
         6 => 0.709,
         _ => 0.7213 / (1. + 1.079 / number_of_buckets(index_bit_len) as f64),
-    };
+    }
 }
 
 fn linear_counting(zero_buckets: u32, total_buckets: u32) -> f64 {
     let total_f = total_buckets as f64;
-    return total_f * (total_f / (zero_buckets as f64)).ln();
+    total_f * (total_f / (zero_buckets as f64)).ln()
 }
 
 // const TAG_SPARSE_V1: u8 = 0; // Unsupported.
@@ -1273,7 +1271,7 @@ impl BitCursor<'_> {
                 self.bit_pos = 0;
             }
         }
-        return Some(r);
+        Some(r)
     }
 }
 
@@ -1754,10 +1752,10 @@ mod tests {
 
     impl TestingHll {
         pub fn new(index_bit_len: u8) -> TestingHll {
-            return TestingHll {
+            TestingHll {
                 index_bit_length: index_bit_len,
                 buckets: vec![0; number_of_buckets(index_bit_len) as usize],
-            };
+            }
         }
 
         pub fn insert_hash(&mut self, hash: u64) {
@@ -1768,7 +1766,7 @@ mod tests {
         }
 
         pub fn buckets(&self) -> &[u32] {
-            return &self.buckets;
+            &self.buckets
         }
     }
 }
