@@ -189,6 +189,7 @@ const querySchema = Joi.object().keys({
   total: Joi.boolean(),
   // @deprecated
   renewQuery: Joi.boolean(),
+  cacheMode: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
   subqueryJoins: Joi.array().items(subqueryJoin),

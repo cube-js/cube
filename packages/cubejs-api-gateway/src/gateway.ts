@@ -52,7 +52,9 @@ import {
   PreAggJob,
   PreAggJobStatusItem,
   PreAggJobStatusResponse,
-  SqlApiRequest, MetaResponseResultFn,
+  SqlApiRequest,
+  MetaResponseResultFn,
+  RequestQuery,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -319,7 +321,7 @@ class ApiGateway {
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.query.queryType,
-        cacheMode: this.normalizeCacheMode(req.query.query, req.query.cache),
+        cacheMode: req.query.cache,
       });
     }));
 
@@ -330,7 +332,7 @@ class ApiGateway {
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.body.queryType,
-        cacheMode: this.normalizeCacheMode(req.body.query, req.body.cache),
+        cacheMode: req.body.cache,
       });
     }));
 
@@ -340,7 +342,7 @@ class ApiGateway {
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.query.queryType,
-        cacheMode: this.normalizeCacheMode(req.query.query, req.query.cache),
+        cacheMode: req.query.cache,
       });
     }));
 
@@ -587,17 +589,22 @@ class ApiGateway {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
   }
 
-  // TODO: Drop this when renewQuery will be removed
-  private normalizeCacheMode(query, cache: string): CacheMode {
-    if (cache !== undefined) {
-      return cache as CacheMode;
-    } else if (query?.renewQuery !== undefined) {
-      return query.renewQuery === true
+  private normalizeQueryCacheMode(query: Query, cacheMode: CacheMode | undefined): Query {
+    if (cacheMode !== undefined) {
+      query.cacheMode = cacheMode;
+    } else if (!query.cacheMode && query?.renewQuery !== undefined) {
+      // TODO: Drop this when renewQuery will be removed
+      query.cacheMode = query.renewQuery === true
         ? 'must-revalidate'
         : 'stale-if-slow';
+    } else if (!query.cacheMode) {
+      query.cacheMode = 'stale-if-slow';
     }
 
-    return 'stale-if-slow';
+    // TODO: Drop this when renewQuery will be removed
+    query.renewQuery = undefined;
+
+    return query;
   }
 
   private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
@@ -1224,8 +1231,11 @@ class ApiGateway {
     context: RequestContext,
     persistent = false,
     memberExpressions: boolean = false,
+    cacheMode?: CacheMode,
   ): Promise<[QueryType, NormalizedQuery[], NormalizedQuery[]]> {
     let query = this.parseQueryParam(inputQuery);
+    query = Array.isArray(query) ? query.map(q => this.normalizeQueryCacheMode(q, cacheMode))
+      : this.normalizeQueryCacheMode(query, cacheMode);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {
@@ -1309,13 +1319,13 @@ class ApiGateway {
       type: 'Query Rewrite completed',
       queryRewriteId,
       normalizedQueries,
-      duration: new Date().getTime() - startTime,
+      duration: Date.now() - startTime,
       query
     }, context);
 
     normalizedQueries = normalizedQueries.map(q => remapToQueryAdapterFormat(q));
 
-    if (normalizedQueries.find((currentQuery) => !currentQuery)) {
+    if (normalizedQueries.some((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
     }
 
@@ -1660,14 +1670,13 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
-    cacheMode: CacheMode = 'stale-if-slow',
   ): Promise<ResultWrapper> {
     const queries: QueryBody[] = [{
       ...sqlQuery,
       query: sqlQuery.sql[0],
       values: sqlQuery.sql[1],
       renewQuery: normalizedQuery.renewQuery,
-      cacheMode,
+      cacheMode: normalizedQuery.cacheMode,
       requestId: context.requestId,
       context,
       persistent: false,
@@ -1691,7 +1700,7 @@ class ApiGateway {
         query: totalQuery.sql[0],
         values: totalQuery.sql[1],
         renewQuery: normalizedTotal.renewQuery,
-        cacheMode,
+        cacheMode: normalizedTotal.cacheMode,
         requestId: context.requestId,
         context
       });
@@ -1851,6 +1860,7 @@ class ApiGateway {
       context,
       res,
       apiType = 'rest',
+      cacheMode,
       ...props
     } = request;
     const requestStarted = new Date();
@@ -1872,7 +1882,7 @@ class ApiGateway {
       }, context);
 
       const [queryType, normalizedQueries] =
-        await this.getNormalizedQueries(query, context);
+        await this.getNormalizedQueries(query, context, false, false, cacheMode);
 
       if (
         queryType !== QueryTypeEnum.REGULAR_QUERY &&
@@ -1905,7 +1915,6 @@ class ApiGateway {
             context,
             normalizedQuery,
             sqlQueries[index],
-            props.cacheMode,
           );
 
           const annotation = prepareAnnotation(
@@ -1967,6 +1976,7 @@ class ApiGateway {
     const {
       context,
       res,
+      cacheMode,
     } = request;
     const requestStarted = new Date();
 
@@ -1981,7 +1991,7 @@ class ApiGateway {
       }
 
       const [queryType, normalizedQueries] =
-        await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions);
+        await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions, cacheMode);
 
       const compilerApi = await this.getCompilerApi(context);
       let metaConfigResult = await compilerApi.metaConfig(request.context, {
@@ -2099,7 +2109,7 @@ class ApiGateway {
   }
 
   public async subscribe({
-    query, context, res, subscribe, subscriptionState, queryType, apiType
+    query, context, res, subscribe, subscriptionState, queryType, apiType, cacheMode
   }) {
     const requestStarted = new Date();
     try {
@@ -2112,7 +2122,7 @@ class ApiGateway {
       let error: any = null;
 
       if (!subscribe) {
-        await this.load({ query, context, res, queryType, apiType });
+        await this.load({ query, context, res, queryType, apiType, cacheMode });
         return;
       }
 
@@ -2129,6 +2139,7 @@ class ApiGateway {
         },
         queryType,
         apiType,
+        cacheMode,
       });
       const state = await subscriptionState();
       if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
@@ -2159,7 +2170,7 @@ class ApiGateway {
     };
   }
 
-  protected parseQueryParam(query): Query | Query[] {
+  protected parseQueryParam(query: RequestQuery | 'undefined'): Query | Query[] {
     if (!query || query === 'undefined') {
       throw new UserError('Query param is required');
     }

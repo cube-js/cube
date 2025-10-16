@@ -120,11 +120,17 @@ type BaseRequest = {
   res: ResponseResultFn
 };
 
+type RequestQuery = Record<string, any> | Record<string, any>[] & {
+  renewQuery?: boolean;
+  cacheMode?: CacheMode;
+  cache?: CacheMode;
+};
+
 /**
  * Data query HTTP request parameters map data type.
  */
 type QueryRequest = BaseRequest & {
-  query: Record<string, any> | Record<string, any>[];
+  query: RequestQuery;
   queryType?: RequestType;
   apiType?: ApiType;
   resType?: ResultType
@@ -221,6 +227,7 @@ export {
   ResponseResultFn,
   MetaResponseResultFn,
   BaseRequest,
+  RequestQuery,
   QueryRequest,
   PreAggsJobsRequest,
   PreAggsSelector,
