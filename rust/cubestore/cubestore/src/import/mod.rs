@@ -36,7 +36,7 @@ use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
-use crate::streaming::StreamingService;
+//use crate::streaming::StreamingService;
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::columns_vec_buffer_size;
@@ -517,7 +517,7 @@ crate::di_service!(MockImportService, [ImportService]);
 
 pub struct ImportServiceImpl {
     meta_store: Arc<dyn MetaStore>,
-    streaming_service: Arc<dyn StreamingService>,
+    //streaming_service: Arc<dyn StreamingService>,
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     config_obj: Arc<dyn ConfigObj>,
@@ -530,7 +530,7 @@ crate::di_service!(ImportServiceImpl, [ImportService]);
 impl ImportServiceImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
-        streaming_service: Arc<dyn StreamingService>,
+        //streaming_service: Arc<dyn StreamingService>,
         chunk_store: Arc<dyn ChunkDataStore>,
         remote_fs: Arc<dyn RemoteFs>,
         config_obj: Arc<dyn ConfigObj>,
@@ -539,7 +539,7 @@ impl ImportServiceImpl {
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
-            streaming_service,
+            //streaming_service,
             chunk_store,
             remote_fs,
             config_obj,
@@ -823,13 +823,13 @@ impl ImportService for ImportServiceImpl {
                 table, location
             )));
         }
-        if Table::is_stream_location(location) {
+        /* if Table::is_stream_location(location) {
             self.streaming_service.stream_table(table, location).await?;
-        } else {
-            self.do_import(&table, *format, location, data_loaded_size.clone())
-                .await?;
-            self.drop_temp_uploads(&location).await?;
-        }
+        } else { */
+        self.do_import(&table, *format, location, data_loaded_size.clone())
+            .await?;
+        self.drop_temp_uploads(&location).await?;
+        //}
 
         Ok(())
     }
@@ -840,11 +840,11 @@ impl ImportService for ImportServiceImpl {
         location: &str,
     ) -> Result<(), CubeError> {
         let table = self.meta_store.get_table_by_id(table_id).await?;
-        if Table::is_stream_location(location) {
+        /* if Table::is_stream_location(location) {
             self.streaming_service
                 .validate_table_location(table, location)
                 .await?;
-        }
+        } */
         Ok(())
     }
 
