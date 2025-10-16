@@ -10,7 +10,7 @@ describe('Switch Dimension', () => {
       path.join(process.cwd(), '/test/unit/fixtures/switch-dimension.yml'),
       'utf8'
     );
-    const { metaTransformer, compiler }  = prepareYamlCompiler(modelContent);
+    const { metaTransformer, compiler } = prepareYamlCompiler(modelContent);
     await compiler.compile();
 
     const cube = metaTransformer.cubes[0];
