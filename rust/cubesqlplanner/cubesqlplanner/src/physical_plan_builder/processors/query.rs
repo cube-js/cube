@@ -137,17 +137,14 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         select_builder.set_ctes(ctes);
         context_factory.set_ungrouped(logical_plan.modifers().ungrouped);
 
-        for member in logical_plan.schema().all_dimensions() {
-            references_builder.resolve_references_for_member(
-                member.clone(),
-                &None,
-                context_factory.render_references_mut(),
+        for dimension in logical_plan.schema().all_dimensions() {
+            self.builder.process_query_dimension(
+                dimension,
+                &references_builder,
+                &mut select_builder,
+                &mut context_factory,
+                &context,
             )?;
-            if context.measure_subquery {
-                select_builder.add_projection_member_without_schema(member, None);
-            } else {
-                select_builder.add_projection_member(member, None);
-            }
         }
 
         for (measure, exists) in self
