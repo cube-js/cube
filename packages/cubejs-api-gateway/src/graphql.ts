@@ -426,9 +426,11 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
             if (granularityName === 'value') {
               dimensions.push(key);
             } else {
+              const offsetArg = getArgumentValue(granularityNode, 'offset', infos.variableValues);
               timeDimensions.push({
                 dimension: key,
                 granularity: granularityName,
+                ...(offsetArg ? { offset: offsetArg } : null),
                 ...(dateRangeFilters[key] ? {
                   dateRange: dateRangeFilters[key],
                 } : null)

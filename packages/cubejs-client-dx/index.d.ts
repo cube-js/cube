@@ -25,6 +25,9 @@ declare module "@cubejs-client/core" {
 
   export interface TimeDimensionBase {
     dimension: IntrospectedTimeDimensionName;
+    granularity?: TimeDimensionGranularity;
+    dateRange?: DateRange;
+    offset?: string;
   }
 
   export interface BinaryFilter {

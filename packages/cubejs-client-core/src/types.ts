@@ -41,6 +41,7 @@ export interface TimeDimensionBase {
   dimension: string;
   granularity?: TimeDimensionGranularity;
   dateRange?: DateRange;
+  offset?: string;
 }
 
 export interface TimeDimensionComparison extends TimeDimensionBase {
