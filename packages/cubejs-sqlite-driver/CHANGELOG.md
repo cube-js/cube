@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.81](https://github.com/cube-js/cube/compare/v1.3.80...v1.3.81) (2025-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/sqlite-driver
+
+## [1.3.80](https://github.com/cube-js/cube/compare/v1.3.79...v1.3.80) (2025-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/sqlite-driver
+
+## [1.3.79](https://github.com/cube-js/cube/compare/v1.3.78...v1.3.79) (2025-10-14)
+
+### Bug Fixes
+
+- **sqlite-driver:** Use pragma_table_info to fetch table columns ([#10031](https://github.com/cube-js/cube/issues/10031)) ([070e6e0](https://github.com/cube-js/cube/commit/070e6e0d016537af293e3dc7ec02791072ccba42))
+
 ## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
 
 **Note:** Version bump only for package @cubejs-backend/sqlite-driver

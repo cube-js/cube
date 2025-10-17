@@ -175,6 +175,13 @@ impl TimeDimensionSymbol {
         self.base_symbol.cube_name()
     }
 
+    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+        match self.base_symbol.as_ref() {
+            MemberSymbol::Dimension(d) => d.join_map(),
+            _ => &None,
+        }
+    }
+
     pub fn is_multi_stage(&self) -> bool {
         self.base_symbol.is_multi_stage()
     }

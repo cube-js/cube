@@ -230,6 +230,7 @@
     "querying SwitchSourceTest: simple cross join",
     "querying SwitchSourceTest: full cross join",
     "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures",
 
     "---------------------------------------",
     "Custom Granularities                   ",
@@ -274,6 +275,7 @@
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: SQL API: Timeshift measure from cube",
+    "querying BigECommerce: SeveralMultiStageMeasures",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying ECommerce: dimensions",

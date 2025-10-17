@@ -736,7 +736,7 @@ export class DataSchemaCompiler {
       if (e.toString().indexOf('SyntaxError') !== -1) {
         const err = e as SyntaxErrorInterface;
         const line = file.content.split('\n')[(err.loc?.start?.line || 1) - 1];
-        const spaces = Array(err.loc?.start.column).fill(' ').join('');
+        const spaces = Array(err.loc?.start?.column).fill(' ').join('') || '';
         errorsReport.error(`Syntax error during parsing: ${err.message}:\n${line}\n${spaces}^`, file.fileName);
       } else {
         errorsReport.error(e);
