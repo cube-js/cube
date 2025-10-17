@@ -32,6 +32,10 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             context,
         )?;
 
+        if context.dimensions_query {
+            return Ok(keys_query);
+        }
+
         let keys_query_alias = format!("keys");
 
         let mut join_builder =
