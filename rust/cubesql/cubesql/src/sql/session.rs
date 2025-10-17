@@ -9,6 +9,7 @@ use std::{
 use tokio_util::sync::CancellationToken;
 
 use super::{server_manager::ServerManager, session_manager::SessionManager, AuthContextRef};
+use crate::compile::engine::df::scan::CacheMode;
 use crate::{
     compile::{
         DatabaseProtocol, DatabaseProtocolDetails, DatabaseVariable, DatabaseVariables,
@@ -89,6 +90,8 @@ pub struct SessionState {
     pub statements: RWLockAsync<HashMap<String, PreparedStatement>>,
 
     auth_context_expiration: Duration,
+
+    pub cache_mode: RwLockSync<Option<CacheMode>>,
 }
 
 impl SessionState {
@@ -120,6 +123,7 @@ impl SessionState {
             query: RwLockSync::new(QueryState::None),
             statements: RWLockAsync::new(HashMap::new()),
             auth_context_expiration,
+            cache_mode: RwLockSync::new(None),
         }
     }
 

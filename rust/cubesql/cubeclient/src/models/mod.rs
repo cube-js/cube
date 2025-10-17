@@ -29,6 +29,7 @@ pub use self::v1_cube_meta_type::V1CubeMetaType;
 pub mod v1_error;
 pub use self::v1_error::V1Error;
 pub mod v1_load_request;
+pub use self::v1_load_request::Cache;
 pub use self::v1_load_request::V1LoadRequest;
 pub mod v1_load_request_query;
 pub use self::v1_load_request_query::V1LoadRequestQuery;

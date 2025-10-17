@@ -484,6 +484,13 @@ components:
       properties:
         queryType:
           type: "string"
+        cache:
+          type: "string"
+          enum:
+            - stale-if-slow
+            - stale-while-revalidate
+            - must-revalidate
+            - no-cache
         query:
           type: "object"
           $ref: "#/components/schemas/V1LoadRequestQuery"

@@ -377,6 +377,7 @@ describe('API Gateway', () => {
           queryType: 'regularQuery',
           normalizedQueries: [
             {
+              cacheMode: 'stale-if-slow',
               measures: ['Foo.bar'],
               timezone: 'UTC',
               filters: [],
@@ -389,6 +390,7 @@ describe('API Gateway', () => {
           ],
           queryOrder: [{ id: 'desc' }],
           pivotQuery: {
+            cacheMode: 'stale-if-slow',
             measures: ['Foo.bar'],
             timezone: 'UTC',
             filters: [],
@@ -436,6 +438,7 @@ describe('API Gateway', () => {
       (res) => {
         expect(res.body.normalizedQueries).toStrictEqual([
           {
+            cacheMode: 'stale-if-slow',
             measures: ['Foo.bar'],
             timezone: 'UTC',
             filters: [{
@@ -511,6 +514,7 @@ describe('API Gateway', () => {
           queryType: 'regularQuery',
           normalizedQueries: [
             {
+              cacheMode: 'stale-if-slow',
               measures: ['Foo.bar'],
               timezone: 'UTC',
               filters: [],
@@ -523,6 +527,7 @@ describe('API Gateway', () => {
           ],
           queryOrder: [{ id: 'desc' }],
           pivotQuery: {
+            cacheMode: 'stale-if-slow',
             measures: ['Foo.bar'],
             timezone: 'UTC',
             filters: [],
@@ -556,6 +561,7 @@ describe('API Gateway', () => {
           queryType: 'regularQuery',
           normalizedQueries: [
             {
+              cacheMode: 'stale-if-slow',
               measures: ['Foo.bar'],
               order: [{ id: 'Foo.bar', desc: true }],
               timezone: 'UTC',
@@ -569,6 +575,7 @@ describe('API Gateway', () => {
           ],
           queryOrder: [{ id: 'desc' }],
           pivotQuery: {
+            cacheMode: 'stale-if-slow',
             measures: ['Foo.bar'],
             order: [{ id: 'Foo.bar', desc: true }],
             timezone: 'UTC',

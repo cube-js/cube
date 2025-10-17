@@ -41,17 +41,6 @@ The default value is `false`.
 - `timezone`: A [time zone][ref-time-zone] for your query. You can set the
 desired time zone in the [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database)
 format, e.g., `America/Los_Angeles`.
-- `renewQuery`: If `renewQuery` is set to `true`, Cube will renew all
-  [`refreshKey`][ref-schema-ref-preaggs-refreshkey] for queries and query
-  results in the foreground. However, if the
-  [`refreshKey`][ref-schema-ref-preaggs-refreshkey] (or
-  [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every]) doesn't
-  indicate that there's a need for an update this setting has no effect. The
-  default value is `false`.
-  > **NOTE**: Cube provides only eventual consistency guarantee. Using a small
-  > [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every] value together
-  > with `renewQuery` to achieve immediate consistency can lead to endless
-  > refresh loops and overall system instability.
 - `ungrouped`: If set to `true`, Cube will run an [ungrouped
 query][ref-ungrouped-query].
 - `joinHints`: Query-time [join hints][ref-join-hints], provided as an array of
