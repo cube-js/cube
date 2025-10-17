@@ -1,0 +1,28 @@
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: number
+        sql: number
+        type: number
+
+      - name: currency
+        type: switch
+        values:
+          - USD
+          - EUR
+          - GBP
+
+      - name: status
+        sql: status
+        type: string
