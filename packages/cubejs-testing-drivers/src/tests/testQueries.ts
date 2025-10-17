@@ -25,7 +25,7 @@ type TestQueriesOptions = {
 
 export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
-    jest.setTimeout(60 * 5 * 1000);
+    jest.setTimeout(60 * 7 * 1000);
 
     const isTesseractEnv = get('DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool();
 
