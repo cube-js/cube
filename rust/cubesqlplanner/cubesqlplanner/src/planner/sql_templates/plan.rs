@@ -162,7 +162,6 @@ impl PlanSqlTemplates {
             format!("")
         };
 
-
         // For strange reasons, the javascript snake caser used in cube
         // changes first UPPERCASE letter to "_lowercase", prepending "_"
         // This is weird, but to be compatible we have to add it too.
