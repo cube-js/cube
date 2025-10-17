@@ -15659,6 +15659,99 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/snowflake-driver querying BigECommerce: SeveralMultiStageMeasures 1`] = `
+Array [
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": "2",
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": "2",
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": "5",
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": "1",
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": "7",
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": "5",
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": null,
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": null,
+    "BigECommerce.totalCountRetailMonthAgo": "7",
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": "6",
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": null,
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": "4",
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": "6",
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": "9",
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": "4",
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+  Object {
+    "BigECommerce.count": "7",
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.percentageOfTotalForStatus": "100",
+    "BigECommerce.totalCountRetailMonthAgo": "9",
+    "BigECommerce.totalProfitYearAgo": null,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver querying BigECommerce: filtering with possible casts 1`] = `
 Array [
   Object {

@@ -8,11 +8,12 @@ import "@/styles/images.css";
 import "katex/dist/katex.min.css";
 import "@cube-dev/marketing-ui/dist/index.css";
 
+import PurpleBanner from '@cube-dev/purple-banner';
 import localFont from "next/font/local";
 import { Inter } from "next/font/google";
 import { SearchProvider } from "@cube-dev/marketing-ui";
 import { useRouter } from 'next/router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export const SourceCodePro = localFont({
   src: "../fonts/SourceCodePro-Regular.woff2",
@@ -65,6 +66,11 @@ type Props = { origin: string | null };
 
 export default function MyApp({ origin, Component, pageProps }: AppProps & Props) {
   const router = useRouter()
+  const [pbVisible, setPbVisible] = useState(false)
+
+  useEffect(() => {
+    requestAnimationFrame(() => setPbVisible(true))
+  }, [])
 
   // Track page views
   useEffect(() => {
@@ -97,8 +103,31 @@ export default function MyApp({ origin, Component, pageProps }: AppProps & Props
           --font-mono: ${JetBrainsMono.style.fontFamily};
           --font-code: ${SourceCodePro.style.fontFamily};
           --cube-font: ${CeraPro.style.fontFamily};
+          --purple-banner-font: ${CeraPro.style.fontFamily};
+        }
+        .pb-wrapper {
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.3s linear;
+          will-change: max-height;
+        }
+        .pb-wrapper--visible {
+          max-height: 100px;
+        }
+        @media (max-width: 796px) {
+          .pb-wrapper--visible {
+            max-height: 160px;
+          }
         }
       `}</style>
+
+      <div className={pbVisible ? 'pb-wrapper pb-wrapper--visible' : 'pb-wrapper'}>
+        <PurpleBanner
+          utmSource="cube.dev"
+          debugMode={process.env.NEXT_PUBLIC_SHOW_PURPLE_BANNER === 'true'}
+        />
+      </div>
+
       <Component {...pageProps} />
     </SearchProvider>
   );

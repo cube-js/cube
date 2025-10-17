@@ -76,10 +76,12 @@ pub trait QueryEngine {
         state: Arc<SessionState>,
     ) -> Result<DFSessionContext, CompilationError>;
 
-    fn create_logical_plan(
+    async fn create_logical_plan(
         &self,
         cube_ctx: &CubeContext,
         stmt: &Self::AstStatementType,
+        span_id: Option<Arc<SpanId>>,
+        query_planning_id: Option<Uuid>,
     ) -> Result<(LogicalPlan, Self::PlanMetadataType), DataFusionError>;
 
     fn sanitize_statement(&self, stmt: &Self::AstStatementType) -> Self::AstStatementType;
@@ -122,18 +124,21 @@ pub trait QueryEngine {
         let ctx = self.create_session_ctx(state.clone())?;
         let cube_ctx = self.create_cube_ctx(state.clone(), meta.clone(), ctx.clone())?;
 
-        let (plan, metadata) = self.create_logical_plan(&cube_ctx, &stmt).map_err(|err| {
-            let message = format!("Initial planning error: {}", err,);
-            let meta = Some(HashMap::from([
-                ("query".to_string(), stmt.to_string()),
-                (
-                    "sanitizedQuery".to_string(),
-                    self.sanitize_statement(&stmt).to_string(),
-                ),
-            ]));
+        let (plan, metadata) = self
+            .create_logical_plan(&cube_ctx, &stmt, span_id.clone(), Some(query_planning_id))
+            .await
+            .map_err(|err| {
+                let message = format!("Initial planning error: {}", err,);
+                let meta = Some(HashMap::from([
+                    ("query".to_string(), stmt.to_string()),
+                    (
+                        "sanitizedQuery".to_string(),
+                        self.sanitize_statement(&stmt).to_string(),
+                    ),
+                ]));
 
-            CompilationError::internal(message).with_meta(meta)
-        })?;
+                CompilationError::internal(message).with_meta(meta)
+            })?;
 
         let mut optimized_plan = plan;
         // ctx.optimize(&plan).map_err(|err| {
@@ -563,10 +568,12 @@ impl QueryEngine for SqlQueryEngine {
         Ok(ctx)
     }
 
-    fn create_logical_plan(
+    async fn create_logical_plan(
         &self,
         cube_ctx: &CubeContext,
         stmt: &Self::AstStatementType,
+        _span_id: Option<Arc<SpanId>>,
+        _query_planning_id: Option<Uuid>,
     ) -> Result<(LogicalPlan, Self::PlanMetadataType), DataFusionError> {
         let df_query_planner = SqlToRel::new_with_options(cube_ctx, true);
         let plan =
