@@ -361,6 +361,31 @@ describe('SQL Generation', () => {
           type: 'string',
           sql: 'source'
         },
+        // dimensions for testing letter cases
+        my_favorite_source: {
+          type: 'string',
+          sql: 'source'
+        },
+        My_favorite_source: {
+          type: 'string',
+          sql: 'source'
+        },
+        MY_favorite_source: {
+          type: 'string',
+          sql: 'source'
+        },
+        My_Favorite_Source: {
+          type: 'string',
+          sql: 'source'
+        },
+        MY_Favorite_SOURCE: {
+          type: 'string',
+          sql: 'source'
+        },
+        MY_FAVORITE_SOURCE: {
+          type: 'string',
+          sql: 'source'
+        },
         created_at: {
           type: 'time',
           sql: 'created_at',
@@ -5371,5 +5396,55 @@ cubes:
         },
       ]);
     });
+  });
+
+  it('Checking member name letter cases', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [],
+      dimensions: [
+        'visitors.my_favorite_source',
+        'visitors.My_favorite_source',
+        'visitors.MY_favorite_source',
+        'visitors.My_Favorite_Source',
+        'visitors.MY_Favorite_SOURCE',
+        'visitors.MY_FAVORITE_SOURCE',
+      ],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    });
+
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+
+    expect(res).toEqual([
+      {
+        visitors___m_y__f_a_v_o_r_i_t_e__s_o_u_r_c_e: null,
+        visitors___m_y__favorite__s_o_u_r_c_e: null,
+        visitors___m_y_favorite_source: null,
+        visitors___my__favorite__source: null,
+        visitors___my_favorite_source: null,
+        visitors__my_favorite_source: null,
+      },
+      {
+        visitors___m_y__f_a_v_o_r_i_t_e__s_o_u_r_c_e: 'google',
+        visitors___m_y__favorite__s_o_u_r_c_e: 'google',
+        visitors___m_y_favorite_source: 'google',
+        visitors___my__favorite__source: 'google',
+        visitors___my_favorite_source: 'google',
+        visitors__my_favorite_source: 'google',
+      },
+      {
+        visitors___m_y__f_a_v_o_r_i_t_e__s_o_u_r_c_e: 'some',
+        visitors___m_y__favorite__s_o_u_r_c_e: 'some',
+        visitors___m_y_favorite_source: 'some',
+        visitors___my__favorite__source: 'some',
+        visitors___my_favorite_source: 'some',
+        visitors__my_favorite_source: 'some',
+      },
+    ]);
   });
 });
