@@ -12,6 +12,8 @@ export class OrchestratorStorage {
     });
   }
 
+  protected readonly initializers: Map<string, Promise<OrchestratorApi>> = new Map();
+
   public has(orchestratorId: string) {
     return this.storage.has(orchestratorId);
   }
@@ -22,6 +24,29 @@ export class OrchestratorStorage {
 
   public set(orchestratorId: string, orchestratorApi: OrchestratorApi) {
     return this.storage.set(orchestratorId, orchestratorApi);
+  }
+
+  public async getOrInit(orchestratorId: string, init: () => Promise<OrchestratorApi>): Promise<OrchestratorApi> {
+    if (this.storage.has(orchestratorId)) {
+      return this.storage.get(orchestratorId);
+    }
+
+    if (this.initializers.has(orchestratorId)) {
+      return this.initializers.get(orchestratorId);
+    }
+
+    try {
+      const initPromise = init();
+      this.initializers.set(orchestratorId, initPromise);
+
+      const instance = await initPromise;
+
+      this.storage.set(orchestratorId, instance);
+
+      return instance;
+    } finally {
+      this.initializers.delete(orchestratorId);
+    }
   }
 
   public clear() {
