@@ -912,6 +912,21 @@ impl QueryProperties {
                 }
             }
         }
+        result.multi_stage_measures = result
+            .multi_stage_measures
+            .into_iter()
+            .unique_by(|itm| itm.full_name())
+            .collect();
+        result.regular_measures = result
+            .regular_measures
+            .into_iter()
+            .unique_by(|itm| itm.full_name())
+            .collect();
+        result.multiplied_measures = result
+            .multiplied_measures
+            .into_iter()
+            .unique_by(|itm| itm.measure.full_name())
+            .collect();
 
         Ok(result)
     }
