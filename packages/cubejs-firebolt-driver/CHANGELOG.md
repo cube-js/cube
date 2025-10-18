@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.81](https://github.com/cube-js/cube/compare/v1.3.80...v1.3.81) (2025-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/firebolt-driver
+
+## [1.3.80](https://github.com/cube-js/cube/compare/v1.3.79...v1.3.80) (2025-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/firebolt-driver
+
+## [1.3.79](https://github.com/cube-js/cube/compare/v1.3.78...v1.3.79) (2025-10-14)
+
+### Features
+
+- **firebolt-driver:** Pass CUBEJS_DB_QUERY_TIMEOUT to Firebolt driver ([#10043](https://github.com/cube-js/cube/issues/10043)) ([b46565b](https://github.com/cube-js/cube/commit/b46565b0d41ec8c3cfd7caf0a51dc5ee89d1df90))
+
 ## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
 
 **Note:** Version bump only for package @cubejs-backend/firebolt-driver

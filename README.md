@@ -1,3 +1,7 @@
+![]()
+<p align="center">
+  <a href="https://cube.registration.goldcast.io/events/a6a3b4b8-a99f-489a-b740-060182dbce7b"><img src="https://lgo0ecceic.ucarecd.net/cd698180-3d96-4644-9c9e-daf299ecf3ea/" alt="Agentic Analytics Summit" width="100%"></a>
+</p>
 <p align="center">
   <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube/master/docs/content/cube-logo-with-bg.png" alt="Cube — Semantic Layer for Data Applications" width="300px"></a>
 </p>
@@ -9,7 +13,7 @@
 [![GitHub Actions](https://github.com/cube-js/cube/workflows/Build/badge.svg)](https://github.com/cube-js/cube/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube is the universal semantic layer for modern data applications.__ Born in the cloud era, Cube represents the next evolution of OLAP technology, helping data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
+__Cube Core is an open-source semantic layer and LookML alternative.__ It can be used by data professionals to access data from modern data stores, organize it into consistent definitions, and deliver it to every application. Cube Core is headless and comes with multiple APIs for embedded analytics and BI: REST, GraphQL and SQL. If you are looking for a fully integrated platform, similar to Looker, check out our commercial product - [Cube](https://cube.dev).
 
 <img
   src="https://ucarecdn.com/8d945f29-e9eb-4e7f-9e9e-29ae7074e195/"

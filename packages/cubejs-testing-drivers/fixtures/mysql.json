@@ -152,6 +152,7 @@
     "querying SwitchSourceTest: simple cross join",
     "querying SwitchSourceTest: full cross join",
     "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures",
 
     "---------------------------------------",
     "Custom Granularities                   ",

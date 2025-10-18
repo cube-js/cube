@@ -258,6 +258,10 @@ impl DimensionSymbol {
         &self.definition
     }
 
+    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+        self.cube.join_map()
+    }
+
     pub fn name(&self) -> &String {
         &self.name
     }
