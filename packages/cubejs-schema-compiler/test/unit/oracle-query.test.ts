@@ -351,4 +351,448 @@ describe('OracleQuery', () => {
     expect(sql).toMatch(/ADD_MONTHS/i);
     expect(sql).not.toMatch(/interval '1 year'/i);
   });
+
+  describe('addInterval', () => {
+    it('adds year interval using ADD_MONTHS', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 year');
+      expect(result).toBe('ADD_MONTHS(my_date, 12)');
+    });
+
+    it('adds multiple years using ADD_MONTHS', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '3 year');
+      expect(result).toBe('ADD_MONTHS(my_date, 36)');
+    });
+
+    it('adds month interval using ADD_MONTHS', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 month');
+      expect(result).toBe('ADD_MONTHS(my_date, 1)');
+    });
+
+    it('adds multiple months using ADD_MONTHS', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '6 month');
+      expect(result).toBe('ADD_MONTHS(my_date, 6)');
+    });
+
+    it('adds quarter interval using ADD_MONTHS', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 quarter');
+      expect(result).toBe('ADD_MONTHS(my_date, 3)');
+    });
+
+    it('adds multiple quarters using ADD_MONTHS', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '4 quarter');
+      expect(result).toBe('ADD_MONTHS(my_date, 12)');
+    });
+
+    it('adds day interval using NUMTODSINTERVAL', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 day');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(1, \'DAY\')');
+    });
+
+    it('adds multiple days using NUMTODSINTERVAL', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '7 day');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(7, \'DAY\')');
+    });
+
+    it('adds hour interval using NUMTODSINTERVAL', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 hour');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(1, \'HOUR\')');
+    });
+
+    it('adds multiple hours using NUMTODSINTERVAL', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '24 hour');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(24, \'HOUR\')');
+    });
+
+    it('adds minute interval using NUMTODSINTERVAL', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 minute');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(1, \'MINUTE\')');
+    });
+
+    it('adds multiple minutes using NUMTODSINTERVAL', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '30 minute');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(30, \'MINUTE\')');
+    });
+
+    it('adds second interval using NUMTODSINTERVAL', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 second');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(1, \'SECOND\')');
+    });
+
+    it('adds multiple seconds using NUMTODSINTERVAL', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '45 second');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(45, \'SECOND\')');
+    });
+
+    it('combines year and month into single ADD_MONTHS', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 year 6 month');
+      expect(result).toBe('ADD_MONTHS(my_date, 18)');
+    });
+
+    it('combines quarter and month into single ADD_MONTHS', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '2 quarter 3 month');
+      expect(result).toBe('ADD_MONTHS(my_date, 9)');
+    });
+
+    it('combines year, quarter, and month into single ADD_MONTHS', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '2 year 1 quarter 2 month');
+      expect(result).toBe('ADD_MONTHS(my_date, 29)');
+    });
+
+    it('combines day and hour intervals', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 day 2 hour');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(1, \'DAY\') + NUMTODSINTERVAL(2, \'HOUR\')');
+    });
+
+    it('combines hour, minute, and second intervals', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 hour 30 minute 45 second');
+      expect(result).toBe('my_date + NUMTODSINTERVAL(1, \'HOUR\') + NUMTODSINTERVAL(30, \'MINUTE\') + NUMTODSINTERVAL(45, \'SECOND\')');
+    });
+
+    it('combines month-based and day-based intervals', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 year 2 day 3 hour');
+      expect(result).toBe('ADD_MONTHS(my_date, 12) + NUMTODSINTERVAL(2, \'DAY\') + NUMTODSINTERVAL(3, \'HOUR\')');
+    });
+
+    it('combines all interval types', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('my_date', '1 year 2 quarter 3 month 4 day 5 hour 6 minute 7 second');
+      expect(result).toBe('ADD_MONTHS(my_date, 21) + NUMTODSINTERVAL(4, \'DAY\') + NUMTODSINTERVAL(5, \'HOUR\') + NUMTODSINTERVAL(6, \'MINUTE\') + NUMTODSINTERVAL(7, \'SECOND\')');
+    });
+
+    it('handles complex date expressions', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.addInterval('TRUNC(my_date)', '1 month');
+      expect(result).toBe('ADD_MONTHS(TRUNC(my_date), 1)');
+    });
+  });
+
+  describe('subtractInterval', () => {
+    it('subtracts year interval using ADD_MONTHS with negative value', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 year');
+      expect(result).toBe('ADD_MONTHS(my_date, -12)');
+    });
+
+    it('subtracts multiple years using ADD_MONTHS with negative value', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '3 year');
+      expect(result).toBe('ADD_MONTHS(my_date, -36)');
+    });
+
+    it('subtracts month interval using ADD_MONTHS with negative value', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 month');
+      expect(result).toBe('ADD_MONTHS(my_date, -1)');
+    });
+
+    it('subtracts multiple months using ADD_MONTHS with negative value', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '6 month');
+      expect(result).toBe('ADD_MONTHS(my_date, -6)');
+    });
+
+    it('subtracts quarter interval using ADD_MONTHS with negative value', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 quarter');
+      expect(result).toBe('ADD_MONTHS(my_date, -3)');
+    });
+
+    it('subtracts multiple quarters using ADD_MONTHS with negative value', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '4 quarter');
+      expect(result).toBe('ADD_MONTHS(my_date, -12)');
+    });
+
+    it('subtracts day interval using NUMTODSINTERVAL subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 day');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(1, \'DAY\')');
+    });
+
+    it('subtracts multiple days using NUMTODSINTERVAL subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '7 day');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(7, \'DAY\')');
+    });
+
+    it('subtracts hour interval using NUMTODSINTERVAL subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 hour');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(1, \'HOUR\')');
+    });
+
+    it('subtracts multiple hours using NUMTODSINTERVAL subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '24 hour');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(24, \'HOUR\')');
+    });
+
+    it('subtracts minute interval using NUMTODSINTERVAL subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 minute');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(1, \'MINUTE\')');
+    });
+
+    it('subtracts multiple minutes using NUMTODSINTERVAL subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '30 minute');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(30, \'MINUTE\')');
+    });
+
+    it('subtracts second interval using NUMTODSINTERVAL subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 second');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(1, \'SECOND\')');
+    });
+
+    it('subtracts multiple seconds using NUMTODSINTERVAL subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '45 second');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(45, \'SECOND\')');
+    });
+
+    it('combines year and month into single ADD_MONTHS with negative value', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 year 6 month');
+      expect(result).toBe('ADD_MONTHS(my_date, -18)');
+    });
+
+    it('combines quarter and month into single ADD_MONTHS with negative value', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '2 quarter 3 month');
+      expect(result).toBe('ADD_MONTHS(my_date, -9)');
+    });
+
+    it('combines year, quarter, and month into single ADD_MONTHS with negative value', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '2 year 1 quarter 2 month');
+      expect(result).toBe('ADD_MONTHS(my_date, -29)');
+    });
+
+    it('combines day and hour intervals with subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 day 2 hour');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(1, \'DAY\') - NUMTODSINTERVAL(2, \'HOUR\')');
+    });
+
+    it('combines hour, minute, and second intervals with subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 hour 30 minute 45 second');
+      expect(result).toBe('my_date - NUMTODSINTERVAL(1, \'HOUR\') - NUMTODSINTERVAL(30, \'MINUTE\') - NUMTODSINTERVAL(45, \'SECOND\')');
+    });
+
+    it('combines month-based and day-based intervals with subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 year 2 day 3 hour');
+      expect(result).toBe('ADD_MONTHS(my_date, -12) - NUMTODSINTERVAL(2, \'DAY\') - NUMTODSINTERVAL(3, \'HOUR\')');
+    });
+
+    it('combines all interval types with subtraction', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('my_date', '1 year 2 quarter 3 month 4 day 5 hour 6 minute 7 second');
+      expect(result).toBe('ADD_MONTHS(my_date, -21) - NUMTODSINTERVAL(4, \'DAY\') - NUMTODSINTERVAL(5, \'HOUR\') - NUMTODSINTERVAL(6, \'MINUTE\') - NUMTODSINTERVAL(7, \'SECOND\')');
+    });
+
+    it('handles complex date expressions', async () => {
+      await compiler.compile();
+      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      });
+      const result = query.subtractInterval('TRUNC(my_date)', '1 month');
+      expect(result).toBe('ADD_MONTHS(TRUNC(my_date), -1)');
+    });
+  });
 });
