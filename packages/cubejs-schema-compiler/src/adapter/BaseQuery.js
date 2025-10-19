@@ -3857,6 +3857,11 @@ export class BaseQuery {
    * @return {string}
    */
   dimensionTimeGroupedColumn(dimension, granularity) {
+    // Handle case when granularity is not specified (e.g., time dimension used only for filtering)
+    if (!granularity) {
+      return this.timeGroupedColumn(null, dimension);
+    }
+
     let dtDate;
 
     // Interval is aligned with natural calendar, so we can use DATE_TRUNC

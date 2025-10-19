@@ -305,4 +305,50 @@ describe('OracleQuery', () => {
     expect(sql).toMatch(/GROUP BY.*"visitors"\.source/i);
     expect(sql).not.toMatch(/GROUP BY\s+\d+/);
   });
+
+  it('handles time dimension without granularity in filter', async () => {
+    await compiler.compile();
+
+    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        dateRange: ['2020-01-01', '2020-12-31']
+        // No granularity specified - used only for filtering
+      }],
+      timezone: 'UTC'
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    const sql = queryAndParams[0];
+
+    // Key test: no GROUP BY on time dimension when granularity is missing
+    expect(sql).not.toMatch(/GROUP BY.*created_at/i);
+  });
+
+  it('uses Oracle-specific interval arithmetic', async () => {
+    await compiler.compile();
+
+    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.thisPeriod',
+        'visitors.priorPeriod'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'year',
+        dateRange: ['2020-01-01', '2022-12-31']
+      }],
+      timezone: 'UTC'
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    const sql = queryAndParams[0];
+
+    // Key test: Oracle uses ADD_MONTHS, not PostgreSQL interval syntax
+    expect(sql).toMatch(/ADD_MONTHS/i);
+    expect(sql).not.toMatch(/interval '1 year'/i);
+  });
 });
