@@ -266,18 +266,8 @@ fn plan_normalize(
             let on = on
                 .iter()
                 .map(|(left_column, right_column)| {
-                    let left_column = column_normalize(
-                        optimizer,
-                        left_column,
-                        remapped_columns,
-                        optimizer_config,
-                    )?;
-                    let right_column = column_normalize(
-                        optimizer,
-                        right_column,
-                        &right_remapped_columns,
-                        optimizer_config,
-                    )?;
+                    let left_column = column_normalize(left_column, remapped_columns)?;
+                    let right_column = column_normalize(right_column, &right_remapped_columns)?;
                     Ok((left_column, right_column))
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -595,6 +585,7 @@ fn expr_normalize_stacked(
 }
 
 /// Recursively normalizes expressions.
+#[inline(never)]
 fn expr_normalize(
     optimizer: &PlanNormalize,
     expr: &Expr,
@@ -603,27 +594,34 @@ fn expr_normalize(
     optimizer_config: &OptimizerConfig,
 ) -> Result<Box<Expr>> {
     match expr {
+        e @ Expr::ScalarVariable(..) => Ok(Box::new(e.clone())),
+        e @ Expr::Literal(..) => Ok(Box::new(e.clone())),
         Expr::Alias(expr, alias) => {
             let expr = expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)?;
             let alias = alias.clone();
             Ok(Box::new(Expr::Alias(expr, alias)))
         }
-
         Expr::OuterColumn(data_type, column) => {
             let data_type = data_type.clone();
-            let column = column_normalize(optimizer, column, remapped_columns, optimizer_config)?;
+            let column = column_normalize(column, remapped_columns)?;
             Ok(Box::new(Expr::OuterColumn(data_type, column)))
         }
-
         Expr::Column(column) => {
-            let column = column_normalize(optimizer, column, remapped_columns, optimizer_config)?;
+            let column = column_normalize(column, remapped_columns)?;
             Ok(Box::new(Expr::Column(column)))
         }
+        Expr::Cast { expr, data_type } => {
+            let expr = expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)?;
+            let data_type = data_type.clone();
+            Ok(Box::new(Expr::Cast { expr, data_type }))
+        }
+        Expr::TryCast { expr, data_type } => {
+            let expr = expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)?;
+            let data_type = data_type.clone();
+            Ok(Box::new(Expr::TryCast { expr, data_type }))
+        }
 
-        e @ Expr::ScalarVariable(..) => Ok(Box::new(e.clone())),
-
-        e @ Expr::Literal(..) => Ok(Box::new(e.clone())),
-
+        // Deep nested node, use as a hot path
         Expr::BinaryExpr { left, op, right } => binary_expr_normalize(
             optimizer,
             left,
@@ -633,6 +631,58 @@ fn expr_normalize(
             remapped_columns,
             optimizer_config,
         ),
+        // Deep nested node, use as a hot path
+        Expr::InList {
+            expr,
+            list,
+            negated,
+        } => in_list_expr_normalize(
+            optimizer,
+            expr,
+            list,
+            *negated,
+            schema,
+            remapped_columns,
+            optimizer_config,
+        ),
+
+        // See expr_normalize_cold_path, for explanation.
+        other => {
+            expr_normalize_cold_path(optimizer, other, schema, remapped_columns, optimizer_config)
+        }
+    }
+}
+
+/// Cold path for expression normalization, handling less common expression variants.
+///
+/// This function is separated from `expr_normalize` to reduce stack usage in the hot path.
+/// When matching on the large `Expr` enum, LLVM pre-allocates stack space for all variants'
+/// temporaries in a single function. This results in ~13KB of stack allocations (215 alloca
+/// instructions) per call in release mode. By splitting the enum match into hot and cold paths
+/// with `#[inline(never)]`, we ensure that common queries only pay the cost of the hot path
+/// (~1.5KB with 29 allocations), while rare expression types are handled here.
+///
+/// This optimization is critical for deeply nested expressions, as it reduces stack usage
+/// by ~87% for typical queries, preventing stack overflow on recursive expression trees.
+#[inline(never)]
+fn expr_normalize_cold_path(
+    optimizer: &PlanNormalize,
+    expr: &Expr,
+    schema: &DFSchema,
+    remapped_columns: &HashMap<Column, Column>,
+    optimizer_config: &OptimizerConfig,
+) -> Result<Box<Expr>> {
+    match expr {
+        // These nodes are used in the hot path
+        Expr::Alias(..) => unreachable!("Alias in a cold path"),
+        Expr::OuterColumn(..) => unreachable!("OuterColumn in a cold path"),
+        Expr::Column(..) => unreachable!("Column in a cold path"),
+        Expr::ScalarVariable(..) => unreachable!("ScalarVariable in a cold path"),
+        Expr::Literal(..) => unreachable!("Literal in a cold path"),
+        Expr::BinaryExpr { .. } => unreachable!("BinaryExpr in a cold path"),
+        Expr::InList { .. } => unreachable!("InList in a cold path"),
+        Expr::Cast { .. } => unreachable!("Cast in a cold path"),
+        Expr::TryCast { .. } => unreachable!("TryCast in a cold path"),
 
         Expr::AnyExpr {
             left,
@@ -810,18 +860,6 @@ fn expr_normalize(
             }))
         }
 
-        Expr::Cast { expr, data_type } => {
-            let expr = expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)?;
-            let data_type = data_type.clone();
-            Ok(Box::new(Expr::Cast { expr, data_type }))
-        }
-
-        Expr::TryCast { expr, data_type } => {
-            let expr = expr_normalize(optimizer, expr, schema, remapped_columns, optimizer_config)?;
-            let data_type = data_type.clone();
-            Ok(Box::new(Expr::TryCast { expr, data_type }))
-        }
-
         Expr::Sort {
             expr,
             asc,
@@ -837,18 +875,14 @@ fn expr_normalize(
             }))
         }
 
-        Expr::ScalarFunction { fun, args } => {
-            let (fun, args) = scalar_function_normalize(
-                optimizer,
-                fun,
-                args,
-                schema,
-                remapped_columns,
-                optimizer_config,
-            )?;
-
-            Ok(Box::new(Expr::ScalarFunction { fun, args }))
-        }
+        Expr::ScalarFunction { fun, args } => scalar_function_normalize(
+            optimizer,
+            fun,
+            args,
+            schema,
+            remapped_columns,
+            optimizer_config,
+        ),
 
         Expr::ScalarUDF { fun, args } => {
             let fun = Arc::clone(fun);
@@ -1001,20 +1035,6 @@ fn expr_normalize(
             Ok(Box::new(Expr::AggregateUDF { fun, args }))
         }
 
-        Expr::InList {
-            expr,
-            list,
-            negated,
-        } => in_list_expr_normalize(
-            optimizer,
-            expr,
-            list,
-            *negated,
-            schema,
-            remapped_columns,
-            optimizer_config,
-        ),
-
         Expr::InSubquery {
             expr,
             subquery,
@@ -1051,12 +1071,8 @@ fn expr_normalize(
 }
 
 /// Normalizes columns, taking remapped columns into account.
-fn column_normalize(
-    _optimizer: &PlanNormalize,
-    column: &Column,
-    remapped_columns: &HashMap<Column, Column>,
-    _optimizer_config: &OptimizerConfig,
-) -> Result<Column> {
+#[inline(always)]
+fn column_normalize(column: &Column, remapped_columns: &HashMap<Column, Column>) -> Result<Column> {
     if let Some(new_column) = remapped_columns.get(column) {
         return Ok(new_column.clone());
     }
@@ -1073,7 +1089,7 @@ fn scalar_function_normalize(
     schema: &DFSchema,
     remapped_columns: &HashMap<Column, Column>,
     optimizer_config: &OptimizerConfig,
-) -> Result<(BuiltinScalarFunction, Vec<Expr>)> {
+) -> Result<Box<Expr>> {
     let fun = fun.clone();
     let mut args = args
         .iter()
@@ -1099,7 +1115,7 @@ fn scalar_function_normalize(
         }
     }
 
-    Ok((fun, args))
+    Ok(Box::new(Expr::ScalarFunction { fun, args }))
 }
 
 /// Recursively normalizes grouping sets.
@@ -1177,6 +1193,7 @@ fn grouping_set_normalize(
 /// - binary operations between a literal string and an expression
 ///   of a different type to a string casted to that type
 /// - binary operations between a timestamp and a date to a timestamp and timestamp operation
+#[inline(never)]
 fn binary_expr_normalize(
     optimizer: &PlanNormalize,
     left: &Expr,
@@ -1313,6 +1330,7 @@ fn binary_expr_cast_literal(op: &Operator, other_type: &DataType) -> Option<Data
 /// Currently this includes replacing:
 /// - IN list expressions where expression being tested is `TIMESTAMP`
 ///   and values are `DATE` to values casted to `TIMESTAMP`
+#[inline(never)]
 fn in_list_expr_normalize(
     optimizer: &PlanNormalize,
     expr: &Expr,
@@ -1362,6 +1380,7 @@ fn evaluate_expr_stacked(optimizer: &PlanNormalize, expr: Expr) -> Result<Expr> 
 }
 
 /// Evaluates an expression to a constant if possible.
+#[inline(never)]
 fn evaluate_expr(optimizer: &PlanNormalize, expr: Expr) -> Result<Box<Expr>> {
     Ok(Box::new(evaluate_expr_stacked(optimizer, expr)?))
 }
@@ -1414,8 +1433,8 @@ mod tests {
                 .build()
                 .expect("Failed to build plan");
 
-            // Create a deeply nested OR expression (should cause stack overflow)
-            let deeply_nested_filter = create_deeply_nested_or_expr("value", 200);
+            // Create a deeply nested OR expression
+            let deeply_nested_filter = create_deeply_nested_or_expr("value", 500);
 
             let plan = LogicalPlanBuilder::from(table_scan)
                 .filter(deeply_nested_filter)
