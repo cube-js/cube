@@ -37,7 +37,8 @@ use chrono::{
         Numeric::{Day, Hour, Minute, Month, Second, Year},
         Pad::Zero,
     },
-    DateTime, Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, Timelike, Weekday,
+    DateTime, Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, TimeZone, Timelike, Utc,
+    Weekday,
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -52,6 +53,7 @@ use egg::{Subst, Var};
 use std::{
     cmp::{max, min},
     collections::HashSet,
+    convert::TryInto,
     fmt::Display,
     ops::{Index, IndexMut},
     sync::Arc,
@@ -2943,6 +2945,274 @@ impl RewriteRules for FilterRules {
                     "?output_date_range",
                 ),
             ),
+            // Tableau year/month: YEAR * 100 + MONTH IN (...)
+            transforming_rewrite(
+                "tableau-year-month-in-number",
+                filter_replacer(
+                    inlist_expr(
+                        binary_expr(
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("year"), "?date_expr".to_string()],
+                                    )],
+                                ),
+                                "*",
+                                literal_int(100),
+                            ),
+                            "+",
+                            self.fun_expr(
+                                "Trunc",
+                                vec![self.fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("month"), "?date_expr".to_string()],
+                                )],
+                            ),
+                        ),
+                        "?list",
+                        "?negated",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    inlist_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec![literal_string("month"), "?date_expr".to_string()],
+                        ),
+                        "?new_list",
+                        "?negated",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_tableau_year_month_in_number("?list", "?new_list", false),
+            ),
+            // Tableau year/month: YEAR * 100 + MONTH = ...
+            // Rule above is reused
+            rewrite(
+                "tableau-year-month-eq-number",
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("year"), "?date_expr".to_string()],
+                                    )],
+                                ),
+                                "*",
+                                literal_int(100),
+                            ),
+                            "+",
+                            self.fun_expr(
+                                "Trunc",
+                                vec![self.fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("month"), "?date_expr".to_string()],
+                                )],
+                            ),
+                        ),
+                        "=",
+                        "?value",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    inlist_expr(
+                        binary_expr(
+                            binary_expr(
+                                self.fun_expr(
+                                    "Trunc",
+                                    vec![self.fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("year"), "?date_expr".to_string()],
+                                    )],
+                                ),
+                                "*",
+                                literal_int(100),
+                            ),
+                            "+",
+                            self.fun_expr(
+                                "Trunc",
+                                vec![self.fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("month"), "?date_expr".to_string()],
+                                )],
+                            ),
+                        ),
+                        inlist_expr_list(vec!["?value"], self.config_obj.push_down_pull_up_split()),
+                        "InListExprNegated:false",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            // Tableau year/month/day: YEAR * 10000 + MONTH * 100 + DAY IN (...)
+            transforming_rewrite(
+                "tableau-year-month-day-in-number",
+                filter_replacer(
+                    inlist_expr(
+                        binary_expr(
+                            binary_expr(
+                                binary_expr(
+                                    self.fun_expr(
+                                        "Trunc",
+                                        vec![self.fun_expr(
+                                            "DatePart",
+                                            vec![literal_string("year"), "?date_expr".to_string()],
+                                        )],
+                                    ),
+                                    "*",
+                                    literal_int(10000),
+                                ),
+                                "+",
+                                binary_expr(
+                                    self.fun_expr(
+                                        "Trunc",
+                                        vec![self.fun_expr(
+                                            "DatePart",
+                                            vec![literal_string("month"), "?date_expr".to_string()],
+                                        )],
+                                    ),
+                                    "*",
+                                    literal_int(100),
+                                ),
+                            ),
+                            "+",
+                            self.fun_expr(
+                                "Trunc",
+                                vec![self.fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("day"), "?date_expr".to_string()],
+                                )],
+                            ),
+                        ),
+                        "?list",
+                        "?negated",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    inlist_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec![literal_string("day"), "?date_expr".to_string()],
+                        ),
+                        "?new_list",
+                        "?negated",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_tableau_year_month_in_number("?list", "?new_list", true),
+            ),
+            // Tableau year/month/day: YEAR * 10000 + MONTH * 100 + DAY = ...
+            // Rule above is reused
+            rewrite(
+                "tableau-year-month-day-eq-number",
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            binary_expr(
+                                binary_expr(
+                                    self.fun_expr(
+                                        "Trunc",
+                                        vec![self.fun_expr(
+                                            "DatePart",
+                                            vec![literal_string("year"), "?date_expr".to_string()],
+                                        )],
+                                    ),
+                                    "*",
+                                    literal_int(10000),
+                                ),
+                                "+",
+                                binary_expr(
+                                    self.fun_expr(
+                                        "Trunc",
+                                        vec![self.fun_expr(
+                                            "DatePart",
+                                            vec![literal_string("month"), "?date_expr".to_string()],
+                                        )],
+                                    ),
+                                    "*",
+                                    literal_int(100),
+                                ),
+                            ),
+                            "+",
+                            self.fun_expr(
+                                "Trunc",
+                                vec![self.fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("day"), "?date_expr".to_string()],
+                                )],
+                            ),
+                        ),
+                        "=",
+                        "?value",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    inlist_expr(
+                        binary_expr(
+                            binary_expr(
+                                binary_expr(
+                                    self.fun_expr(
+                                        "Trunc",
+                                        vec![self.fun_expr(
+                                            "DatePart",
+                                            vec![literal_string("year"), "?date_expr".to_string()],
+                                        )],
+                                    ),
+                                    "*",
+                                    literal_int(10000),
+                                ),
+                                "+",
+                                binary_expr(
+                                    self.fun_expr(
+                                        "Trunc",
+                                        vec![self.fun_expr(
+                                            "DatePart",
+                                            vec![literal_string("month"), "?date_expr".to_string()],
+                                        )],
+                                    ),
+                                    "*",
+                                    literal_int(100),
+                                ),
+                            ),
+                            "+",
+                            self.fun_expr(
+                                "Trunc",
+                                vec![self.fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("day"), "?date_expr".to_string()],
+                                )],
+                            ),
+                        ),
+                        inlist_expr_list(vec!["?value"], self.config_obj.push_down_pull_up_split()),
+                        "InListExprNegated:false",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
         ];
         if self.config_obj.push_down_pull_up_split() {
             rules.push(list_rewrite(
@@ -5550,7 +5820,7 @@ impl FilterRules {
                         dts.push(last_value);
                     }
 
-                    let format = "%Y-%m-%d %H:%M:%S%.3f";
+                    let format = "%Y-%m-%dT%H:%M:%S%.3fZ";
                     let dts = dts
                         .into_iter()
                         .map(|(dt, new_dt)| {
@@ -5621,6 +5891,53 @@ impl FilterRules {
         }
     }
 
+    fn transform_tableau_year_month_in_number(
+        &self,
+        list_var: &'static str,
+        new_list_var: &'static str,
+        has_day: bool,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let list_var = var!(list_var);
+        let new_list_var = var!(new_list_var);
+        move |egraph, subst| {
+            let Some(list) = &egraph[subst[list_var]].data.constant_in_list else {
+                return false;
+            };
+
+            let mut new_values = vec![];
+            for literal in list {
+                let Some(timestamp_nanos_opt) = Self::number_to_timestamp_nanos(literal, has_day)
+                else {
+                    // One of the values cannot be converted, cancel the rule
+                    return false;
+                };
+                if let Some(timestamp_nanos) = timestamp_nanos_opt {
+                    let scalar = ScalarValue::TimestampNanosecond(Some(timestamp_nanos), None);
+                    new_values.push(scalar);
+                }
+            }
+            if new_values.is_empty() {
+                // No valid values after conversion, cancel the rule
+                return false;
+            }
+
+            let ids = new_values
+                .into_iter()
+                .map(|literal| {
+                    let value = egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                        LiteralExprValue(literal),
+                    ));
+                    egraph.add(LogicalPlanLanguage::LiteralExpr([value]))
+                })
+                .collect::<Vec<_>>();
+            subst.insert(
+                new_list_var,
+                egraph.add(LogicalPlanLanguage::InListExprList(ids)),
+            );
+            true
+        }
+    }
+
     // The outer Option's purpose is to signal when the type is incorrect
     // or parsing couldn't interpret the value as a NativeDateTime.
     // The inner Option is None when the ScalarValue is None.
@@ -5646,6 +5963,49 @@ impl FilterRules {
             return None;
         };
         Some(Some(dt))
+    }
+
+    // The outer Option's purpose is to signal when the type is incorrect
+    // or parsing couldn't interpret the value as a date. This leads to the rule
+    // being cancelled.
+    //
+    // The inner Option is None when the value is syntaxically correct
+    // but the date value is invalid. This leads to the rule skipping this value only.
+    fn number_to_timestamp_nanos(value: &ScalarValue, has_day: bool) -> Option<Option<i64>> {
+        let ScalarValue::Int64(value) = value else {
+            // Only Int64 types are supported
+            return None;
+        };
+
+        let Some(value) = value else {
+            // NULL values will never match with IN
+            return Some(None);
+        };
+
+        // Cancel on conversion errors
+        let year = if has_day {
+            *value / 10000
+        } else {
+            *value / 100
+        }
+        .try_into()
+        .ok()?;
+        let month = if has_day {
+            (*value / 100) % 100
+        } else {
+            *value % 100
+        }
+        .try_into()
+        .ok()?;
+        let day = if has_day { *value % 100 } else { 1 }.try_into().ok()?;
+        let Some(date) = NaiveDate::from_ymd_opt(year, month, day) else {
+            // Date is invalid, skip this value
+            return Some(None);
+        };
+
+        let datetime = date.and_hms_opt(0, 0, 0)?;
+        let timestamp_nanos = Utc.from_utc_datetime(&datetime).timestamp_nanos_opt()?;
+        Some(Some(timestamp_nanos))
     }
 
     fn naive_datetime_to_range_by_granularity(
