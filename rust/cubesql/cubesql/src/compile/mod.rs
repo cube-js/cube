@@ -9466,39 +9466,40 @@ ORDER BY "source"."str0" ASC
     async fn test_filter_extract_by_year_and_quarter() {
         init_testing_logger();
 
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT
-                COUNT(*) AS "count",
-                EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
-            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
-            WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019 AND EXTRACT(QUARTER FROM "KibanaSampleDataEcommerce"."order_date") = 2
-            GROUP BY 2
-            ;"#
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await
-            .as_logical_plan();
+        async fn assert_quarter_result(quarter: i32, start_date: &str, end_date: &str) {
+            let query_plan = convert_select_to_query_plan(
+                format!(r#"
+                SELECT COUNT(*) AS "count",
+                       EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+                FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019
+                  AND EXTRACT(QUARTER FROM "KibanaSampleDataEcommerce"."order_date") = {}
+                GROUP BY 2
+                "#, quarter),
+                DatabaseProtocol::PostgreSQL,
+            ).await;
 
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec![]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("year".to_string()),
-                    date_range: Some(json!(vec![
-                        "2019-04-01".to_string(),
-                        "2019-06-31".to_string(),
-                    ])),
-                },]),
-                order: Some(vec![]),
-                ..Default::default()
-            }
-        )
+            assert_eq!(
+                query_plan.as_logical_plan().find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("year".to_string()),
+                        date_range: Some(json!(vec![start_date, end_date])),
+                    },]),
+                    order: Some(vec![]),
+                    ..Default::default()
+                }
+            )
+        }
+
+        assert_quarter_result(1, "2019-01-01", "2019-03-31").await;
+        assert_quarter_result(2, "2019-04-01", "2019-06-30").await;
+        assert_quarter_result(3, "2019-07-01", "2019-09-30").await;
+        assert_quarter_result(4, "2019-10-01", "2019-12-31").await;
     }
 
     #[tokio::test]

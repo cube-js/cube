@@ -1803,7 +1803,7 @@ impl RewriteRules for FilterRules {
                     "?new_values",
                 ),
             ),
-            // TODO: Introduce rule to unwrap TRUNC(EXTRACT(?granularity FROM ?column_expr))
+            // TODO: Introduce new rule to unwrap TRUNC(EXTRACT(?granularity FROM ?column_expr)) -> EXTRACT(?granularity FROM ?column_expr)
             // When the filter set above is paired with other filters, it needs to be
             // regrouped for the above rewrite rule to match
             rewrite(
@@ -1868,7 +1868,7 @@ impl RewriteRules for FilterRules {
                     "FilterOpOp:and",
                 ),
             ),
-            // TODO: Introduce rule to unwrap TRUNC(EXTRACT(?granularity FROM ?column_expr))
+            // TODO: Introduce new rule to unwrap TRUNC(EXTRACT(?granularity FROM ?column_expr)) -> EXTRACT(?granularity FROM ?column_expr)
             // The filter set above may be inverted, let's account for that as well
             rewrite(
                 "extract-date-range-and-trunc-reverse",
@@ -1917,7 +1917,7 @@ impl RewriteRules for FilterRules {
                     "FilterOpOp:and",
                 ),
             ),
-            // TODO: Introduce rule to unwrap TRUNC(EXTRACT(?granularity FROM ?column_expr))
+            // TODO: Introduce new rule to unwrap TRUNC(EXTRACT(?granularity FROM ?column_expr)) -> EXTRACT(?granularity FROM ?column_expr)
             rewrite(
                 "extract-date-range-and-trunc-reverse-nested",
                 filter_op(
