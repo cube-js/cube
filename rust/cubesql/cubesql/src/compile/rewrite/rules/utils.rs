@@ -790,12 +790,6 @@ pub fn try_merge_range_with_date_part(
             Some((new_start_date, new_end_date))
         }
         "quarter" | "qtr" => {
-            // Check that the range only covers one year
-            let start_date_year = start_date.year();
-            if start_date_year != end_date.year() {
-                return None;
-            }
-
             // Quarter value must be valid
             if !(1..=4).contains(&value) {
                 return None;
@@ -804,8 +798,7 @@ pub fn try_merge_range_with_date_part(
             let quarter_start_month = (value - 1) * 3 + 1;
 
             // Obtain the new range
-            let new_start_date =
-                NaiveDate::from_ymd_opt(start_date_year, quarter_start_month as u32, 1)?;
+            let new_start_date = NaiveDate::from_ymd_opt(year, quarter_start_month as u32, 1)?;
 
             let new_end_date = new_start_date
                 .checked_add_months(Months::new(3))
