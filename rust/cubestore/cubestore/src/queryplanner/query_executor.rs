@@ -486,7 +486,7 @@ impl QueryExecutorImpl {
             .with_target_partitions(2)
             .with_prefer_existing_sort(true)
             .with_round_robin_repartition(false);
-        config.options_mut().execution.parquet.split_row_group_reads = true;
+        config.options_mut().execution.parquet.split_row_group_reads = false;
         config.options_mut().optimizer.prefer_hash_join = false;
         // Redundant with the commented CoalesceBatches::new() line in `Self::optimizer_rules`
         config.options_mut().execution.coalesce_batches = false;
@@ -1178,6 +1178,7 @@ impl ExecutionPlan for CubeTableExec {
         mut partition: usize,
         context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
+        println!("!!! Table exec: {}, {}", self.partition_execs.len(), partition);
         let exec = self
             .partition_execs
             .iter()

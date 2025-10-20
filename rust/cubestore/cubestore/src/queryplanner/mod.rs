@@ -30,6 +30,7 @@ mod rolling;
 mod test_utils;
 pub mod udf_xirr;
 pub mod udfs;
+mod inline_aggregate;
 
 use crate::cachestore::CacheStore;
 use crate::config::injection::DIService;
@@ -310,7 +311,7 @@ impl QueryPlannerImpl {
             .execution
             .dont_parallelize_sort_preserving_merge_exec_inputs = true;
         config.options_mut().execution.batch_size = Self::EXECUTION_BATCH_SIZE;
-        config.options_mut().execution.parquet.split_row_group_reads = true;
+        config.options_mut().execution.parquet.split_row_group_reads = false;
 
         // TODO upgrade DF: build SessionContexts consistently
         let state = Self::minimal_session_state_from_final_config(config)

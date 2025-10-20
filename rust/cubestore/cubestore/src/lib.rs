@@ -44,7 +44,7 @@ pub mod scheduler;
 pub mod shared;
 pub mod sql;
 pub mod store;
-pub mod streaming;
+//pub mod streaming;
 pub mod sys;
 pub mod table;
 pub mod telemetry;

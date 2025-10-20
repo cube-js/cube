@@ -28,10 +28,10 @@ cubezetasketch = { path = "../cubezetasketch" }
 cubedatasketches = { path = "../cubedatasketches" }
 cubeshared = { path = "../../cubeshared" }
 cuberpc = { path = "../cuberpc" }
-datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-46.0.1", features = ["serde"] }
-datafusion-datasource = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-46.0.1" }
-datafusion-proto = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-46.0.1" }
-datafusion-proto-common = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-46.0.1" }
+datafusion = { path = "/Users/war/cube_projects/new_cube/arrow-datafusion/datafusion/core/", features = ["serde"] }
+datafusion-datasource = { path = "/Users/war/cube_projects/new_cube/arrow-datafusion/datafusion/datasource/" }
+datafusion-proto = { path = "/Users/war/cube_projects/new_cube/arrow-datafusion/datafusion/proto/" }
+datafusion-proto-common = { path = "/Users/war/cube_projects/new_cube/arrow-datafusion/datafusion/proto-common/" }
 csv = "1.1.3"
 bytes = "1.6.0"
 serde_json = "1.0.56"
@@ -120,8 +120,8 @@ sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 rdkafka = { version = "0.29.0", features = ["cmake-build"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
-sasl2-sys = { version = "0.1.6", features = ["vendored"] }
+#rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
+#sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"
