@@ -5,11 +5,12 @@ use std::mem::{self, size_of};
 use datafusion::arrow::array::{Array, ArrayRef, RecordBatch};
 use datafusion::arrow::compute::cast;
 use datafusion::arrow::datatypes::{
-    BinaryViewType, DataType, Date32Type, Date64Type, Decimal128Type, Float32Type, Float64Type,
-    Int16Type, Int32Type, Int64Type, Int8Type, Schema, SchemaRef, StringViewType,
-    Time32MillisecondType, Time32SecondType, Time64MicrosecondType, Time64NanosecondType, TimeUnit,
-    TimestampMicrosecondType, TimestampMillisecondType, TimestampNanosecondType,
-    TimestampSecondType, UInt16Type, UInt32Type, UInt64Type, UInt8Type,
+    BinaryType, BinaryViewType, DataType, Date32Type, Date64Type, Decimal128Type, Float32Type,
+    Float64Type, Int16Type, Int32Type, Int64Type, Int8Type, LargeBinaryType, LargeUtf8Type,
+    Schema, SchemaRef, StringViewType, Time32MillisecondType, Time32SecondType,
+    Time64MicrosecondType, Time64NanosecondType, TimeUnit, TimestampMicrosecondType,
+    TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt16Type,
+    UInt32Type, UInt64Type, UInt8Type, Utf8Type,
 };
 use datafusion::dfschema::internal_err;
 use datafusion::dfschema::not_impl_err;
@@ -19,11 +20,22 @@ use datafusion::physical_plan::aggregates::group_values::multi_group_by::{
     ByteGroupValueBuilder, ByteViewGroupValueBuilder, PrimitiveGroupValueBuilder,
 };
 
+use crate::queryplanner::inline_aggregate::column_comparator::ColumnComparator;
+use crate::{
+    instantiate_byte_array_comparator, instantiate_byte_view_comparator,
+    instantiate_primitive_comparator,
+};
+
 pub struct SortedGroupValues {
     /// The output schema
     schema: SchemaRef,
+    /// Group value builders for each grouping column
     group_values: Vec<Box<dyn GroupColumn>>,
+    /// Column comparators for detecting group boundaries
+    comparators: Vec<Box<dyn ColumnComparator>>,
+    /// Reusable buffer for row indices (not currently used)
     rows_inds: Vec<usize>,
+    /// Reusable buffer for equality comparison results
     equal_to_results: Vec<bool>,
 }
 
@@ -51,6 +63,7 @@ impl SortedGroupValues {
         Ok(Self {
             schema,
             group_values: vec![],
+            comparators: vec![],
             rows_inds: vec![],
             equal_to_results: vec![],
         })
@@ -59,77 +72,98 @@ impl SortedGroupValues {
     pub fn intern(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> DFResult<()> {
         if self.group_values.is_empty() {
             let mut v = Vec::with_capacity(cols.len());
+            let mut comparators = Vec::with_capacity(cols.len());
 
             for f in self.schema.fields().iter() {
                 let nullable = f.is_nullable();
                 let data_type = f.data_type();
                 match data_type {
                     &DataType::Int8 => {
-                        instantiate_primitive!(v, nullable, Int8Type, data_type)
+                        instantiate_primitive!(v, nullable, Int8Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, Int8Type);
                     }
                     &DataType::Int16 => {
-                        instantiate_primitive!(v, nullable, Int16Type, data_type)
+                        instantiate_primitive!(v, nullable, Int16Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, Int16Type);
                     }
                     &DataType::Int32 => {
-                        instantiate_primitive!(v, nullable, Int32Type, data_type)
+                        instantiate_primitive!(v, nullable, Int32Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, Int32Type);
                     }
                     &DataType::Int64 => {
-                        instantiate_primitive!(v, nullable, Int64Type, data_type)
+                        instantiate_primitive!(v, nullable, Int64Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, Int64Type);
                     }
                     &DataType::UInt8 => {
-                        instantiate_primitive!(v, nullable, UInt8Type, data_type)
+                        instantiate_primitive!(v, nullable, UInt8Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, UInt8Type);
                     }
                     &DataType::UInt16 => {
-                        instantiate_primitive!(v, nullable, UInt16Type, data_type)
+                        instantiate_primitive!(v, nullable, UInt16Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, UInt16Type);
                     }
                     &DataType::UInt32 => {
-                        instantiate_primitive!(v, nullable, UInt32Type, data_type)
+                        instantiate_primitive!(v, nullable, UInt32Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, UInt32Type);
                     }
                     &DataType::UInt64 => {
-                        instantiate_primitive!(v, nullable, UInt64Type, data_type)
+                        instantiate_primitive!(v, nullable, UInt64Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, UInt64Type);
                     }
                     &DataType::Float32 => {
-                        instantiate_primitive!(v, nullable, Float32Type, data_type)
+                        instantiate_primitive!(v, nullable, Float32Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, Float32Type);
                     }
                     &DataType::Float64 => {
-                        instantiate_primitive!(v, nullable, Float64Type, data_type)
+                        instantiate_primitive!(v, nullable, Float64Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, Float64Type);
                     }
                     &DataType::Date32 => {
-                        instantiate_primitive!(v, nullable, Date32Type, data_type)
+                        instantiate_primitive!(v, nullable, Date32Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, Date32Type);
                     }
                     &DataType::Date64 => {
-                        instantiate_primitive!(v, nullable, Date64Type, data_type)
+                        instantiate_primitive!(v, nullable, Date64Type, data_type);
+                        instantiate_primitive_comparator!(comparators, nullable, Date64Type);
                     }
                     &DataType::Time32(t) => match t {
                         TimeUnit::Second => {
-                            instantiate_primitive!(v, nullable, Time32SecondType, data_type)
+                            instantiate_primitive!(v, nullable, Time32SecondType, data_type);
+                            instantiate_primitive_comparator!(comparators, nullable, Time32SecondType);
                         }
                         TimeUnit::Millisecond => {
-                            instantiate_primitive!(v, nullable, Time32MillisecondType, data_type)
+                            instantiate_primitive!(v, nullable, Time32MillisecondType, data_type);
+                            instantiate_primitive_comparator!(comparators, nullable, Time32MillisecondType);
                         }
                         _ => {}
                     },
                     &DataType::Time64(t) => match t {
                         TimeUnit::Microsecond => {
-                            instantiate_primitive!(v, nullable, Time64MicrosecondType, data_type)
+                            instantiate_primitive!(v, nullable, Time64MicrosecondType, data_type);
+                            instantiate_primitive_comparator!(comparators, nullable, Time64MicrosecondType);
                         }
                         TimeUnit::Nanosecond => {
-                            instantiate_primitive!(v, nullable, Time64NanosecondType, data_type)
+                            instantiate_primitive!(v, nullable, Time64NanosecondType, data_type);
+                            instantiate_primitive_comparator!(comparators, nullable, Time64NanosecondType);
                         }
                         _ => {}
                     },
                     &DataType::Timestamp(t, _) => match t {
                         TimeUnit::Second => {
-                            instantiate_primitive!(v, nullable, TimestampSecondType, data_type)
+                            instantiate_primitive!(v, nullable, TimestampSecondType, data_type);
+                            instantiate_primitive_comparator!(comparators, nullable, TimestampSecondType);
                         }
                         TimeUnit::Millisecond => {
-                            instantiate_primitive!(v, nullable, TimestampMillisecondType, data_type)
+                            instantiate_primitive!(v, nullable, TimestampMillisecondType, data_type);
+                            instantiate_primitive_comparator!(comparators, nullable, TimestampMillisecondType);
                         }
                         TimeUnit::Microsecond => {
-                            instantiate_primitive!(v, nullable, TimestampMicrosecondType, data_type)
+                            instantiate_primitive!(v, nullable, TimestampMicrosecondType, data_type);
+                            instantiate_primitive_comparator!(comparators, nullable, TimestampMicrosecondType);
                         }
                         TimeUnit::Nanosecond => {
-                            instantiate_primitive!(v, nullable, TimestampNanosecondType, data_type)
+                            instantiate_primitive!(v, nullable, TimestampNanosecondType, data_type);
+                            instantiate_primitive_comparator!(comparators, nullable, TimestampNanosecondType);
                         }
                     },
                     &DataType::Decimal128(_, _) => {
@@ -139,35 +173,43 @@ impl SortedGroupValues {
                             Decimal128Type,
                             data_type
                         }
+                        instantiate_primitive_comparator!(comparators, nullable, Decimal128Type);
                     }
                     &DataType::Utf8 => {
                         let b = ByteGroupValueBuilder::<i32>::new(OutputType::Utf8);
-                        v.push(Box::new(b) as _)
+                        v.push(Box::new(b) as _);
+                        instantiate_byte_array_comparator!(comparators, nullable, Utf8Type);
                     }
                     &DataType::LargeUtf8 => {
                         let b = ByteGroupValueBuilder::<i64>::new(OutputType::Utf8);
-                        v.push(Box::new(b) as _)
+                        v.push(Box::new(b) as _);
+                        instantiate_byte_array_comparator!(comparators, nullable, LargeUtf8Type);
                     }
                     &DataType::Binary => {
                         let b = ByteGroupValueBuilder::<i32>::new(OutputType::Binary);
-                        v.push(Box::new(b) as _)
+                        v.push(Box::new(b) as _);
+                        instantiate_byte_array_comparator!(comparators, nullable, BinaryType);
                     }
                     &DataType::LargeBinary => {
                         let b = ByteGroupValueBuilder::<i64>::new(OutputType::Binary);
-                        v.push(Box::new(b) as _)
+                        v.push(Box::new(b) as _);
+                        instantiate_byte_array_comparator!(comparators, nullable, LargeBinaryType);
                     }
                     &DataType::Utf8View => {
                         let b = ByteViewGroupValueBuilder::<StringViewType>::new();
-                        v.push(Box::new(b) as _)
+                        v.push(Box::new(b) as _);
+                        instantiate_byte_view_comparator!(comparators, nullable, StringViewType);
                     }
                     &DataType::BinaryView => {
                         let b = ByteViewGroupValueBuilder::<BinaryViewType>::new();
-                        v.push(Box::new(b) as _)
+                        v.push(Box::new(b) as _);
+                        instantiate_byte_view_comparator!(comparators, nullable, BinaryViewType);
                     }
                     dt => return not_impl_err!("{dt} not supported in SortedGroupValues"),
                 }
             }
             self.group_values = v;
+            self.comparators = comparators;
         }
         self.intern_impl(cols, groups)
     }
