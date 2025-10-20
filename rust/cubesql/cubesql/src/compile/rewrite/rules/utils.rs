@@ -769,16 +769,11 @@ pub fn try_merge_range_with_date_part(
             }
 
             // Obtain the new range
-            let Some(new_start_date) = NaiveDate::from_ymd_opt(year, value as u32, 1) else {
-                return None;
-            };
+            let new_start_date = NaiveDate::from_ymd_opt(year, value as u32, 1)?;
 
-            let Some(new_end_date) = new_start_date
+            let new_end_date = new_start_date
                 .checked_add_months(Months::new(1))
-                .and_then(|date| date.checked_sub_days(Days::new(1)))
-            else {
-                return None;
-            };
+                .and_then(|date| date.checked_sub_days(Days::new(1)))?;
 
             // If the resulting range is outside of the original range, we can't merge
             // the filters
@@ -809,18 +804,12 @@ pub fn try_merge_range_with_date_part(
             let quarter_start_month = (value - 1) * 3 + 1;
 
             // Obtain the new range
-            let Some(new_start_date) =
-                NaiveDate::from_ymd_opt(start_date_year, quarter_start_month as u32, 1)
-            else {
-                return None;
-            };
+            let new_start_date =
+                NaiveDate::from_ymd_opt(start_date_year, quarter_start_month as u32, 1)?;
 
-            let Some(new_end_date) = new_start_date
+            let new_end_date = new_start_date
                 .checked_add_months(Months::new(3))
-                .and_then(|date| date.checked_sub_days(Days::new(1)))
-            else {
-                return None;
-            };
+                .and_then(|date| date.checked_sub_days(Days::new(1)))?;
 
             // Paranoid check, If the resulting range is outside of the original range, we can't merge
             // the filters
@@ -848,9 +837,7 @@ pub fn try_merge_range_with_date_part(
             let year = start_date.year();
 
             // Get January 4th of the year (which is always in week 1)
-            let Some(jan_4) = NaiveDate::from_ymd_opt(year, 1, 4) else {
-                return None;
-            };
+            let jan_4 = NaiveDate::from_ymd_opt(year, 1, 4)?;
 
             // Get the Monday of week 1
             let iso_week = jan_4.iso_week();
@@ -869,15 +856,9 @@ pub fn try_merge_range_with_date_part(
             let days_from_week_1 = (value - 1) * 7;
             let week_1_monday = jan_4 - Days::new(jan_4.weekday().num_days_from_monday() as u64);
 
-            let Some(week_start) =
-                week_1_monday.checked_add_days(Days::new(days_from_week_1 as u64))
-            else {
-                return None;
-            };
+            let week_start = week_1_monday.checked_add_days(Days::new(days_from_week_1 as u64))?;
 
-            let Some(week_end) = week_start.checked_add_days(Days::new(6)) else {
-                return None;
-            };
+            let week_end = week_start.checked_add_days(Days::new(6))?;
 
             // Verify this week actually exists in this year (week 53 doesn't always exist)
             if week_start.iso_week().week() != value as u32 {
