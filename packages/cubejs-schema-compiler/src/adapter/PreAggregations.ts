@@ -749,8 +749,15 @@ export class PreAggregations {
         // but joinGraph of the query has all the connections, necessary for serving the query,
         // so we use this information to complete the full paths of members from the root of the query
         // up to the pre-agg cube.
-        dimsToMatch = references.dimensions;
-        timeDimsToMatch = references.timeDimensions;
+        // We use references from the underlying pre-aggregations, filtered with members existing in the root
+        // pre-aggregation itself.
+
+        dimsToMatch = references.rollupsReferences
+          .flatMap(rolRef => rolRef.fullNameDimensions)
+          .filter(d => references.dimensions.some(rd => d.endsWith(rd)));
+        timeDimsToMatch = references.rollupsReferences
+          .flatMap(rolRef => rolRef.fullNameTimeDimensions)
+          .filter(d => references.timeDimensions.some(rd => d.dimension.endsWith(rd.dimension)));
 
         const buildPath = (cube: string): string[] => {
           const path = [cube];
@@ -765,12 +772,12 @@ export class PreAggregations {
         dimensionsMatch = (dimensions, doBackAlias) => {
           let target = doBackAlias ? backAlias(dimsToMatch) : dimsToMatch;
           target = target.map(dim => {
-            const [cube, field] = dim.split('.');
+            const [cube, ...restPath] = dim.split('.');
             if (cube === transformedQuery.joinGraphRoot) {
               return dim;
             }
             const path = buildPath(cube);
-            return `${path.join('.')}.${field}`;
+            return `${path.join('.')}.${restPath.join('.')}`;
           });
 
           return dimensions.every(d => target.includes(d));
@@ -1084,7 +1091,9 @@ export class PreAggregations {
       preAggregationName,
       preAggregation,
       cube,
-      canUsePreAggregation: canUsePreAggregation(references),
+      // For rollupJoin and rollupLambda we need to pass references of the underlying rollups
+      // to canUsePreAggregation fn, which are collected later;
+      canUsePreAggregation: preAggregation.type === 'rollup' ? canUsePreAggregation(references) : false,
       references,
       preAggregationId: `${cube}.${preAggregationName}`
     };
@@ -1102,8 +1111,12 @@ export class PreAggregations {
           );
         }
       );
+      preAggregationsToJoin.forEach(preAgg => {
+        references.rollupsReferences.push(preAgg.references);
+      });
       return {
         ...preAggObj,
+        canUsePreAggregation: canUsePreAggregation(references),
         preAggregationsToJoin,
         rollupJoin: this.buildRollupJoin(preAggObj, preAggregationsToJoin)
       };
@@ -1150,8 +1163,12 @@ export class PreAggregations {
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'dimensions');
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'timeDimensions');
       });
+      referencedPreAggregations.forEach(preAgg => {
+        references.rollupsReferences.push(preAgg.references);
+      });
       return {
         ...preAggObj,
+        canUsePreAggregation: canUsePreAggregation(references),
         referencedPreAggregations,
       };
     } else {
