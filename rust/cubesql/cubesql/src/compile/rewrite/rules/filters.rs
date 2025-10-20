@@ -4057,8 +4057,12 @@ impl FilterRules {
                         return false;
                     }
 
+                    // Preserves existing constraints, for example:
+                    // inDataRange: order_date >= '2019-02-15' AND order_date < '2019-03-10'
+                    // Month filter: EXTRACT(MONTH FROM order_date) = 2 (February)
                     let new_start_date = max(new_start_date, start_date);
                     let new_end_date = min(new_end_date, end_date);
+
                     vec![
                         new_start_date.format("%Y-%m-%d").to_string(),
                         new_end_date.format("%Y-%m-%d").to_string(),
@@ -4098,6 +4102,9 @@ impl FilterRules {
                         return false;
                     }
 
+                    // Preserves existing constraints, for example:
+                    // inDataRange: order_date >= '2019-04-15' AND order_date < '2019-12-31'
+                    // Month filter: EXTRACT(QUARTER FROM order_date) = 2
                     let new_start_date = max(new_start_date, start_date);
                     let new_end_date = min(new_end_date, end_date);
 
