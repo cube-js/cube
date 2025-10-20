@@ -95,6 +95,7 @@ export type PreAggregationReferences = {
   timeDimensions: Array<PreAggregationTimeDimensionReference>,
   fullNameTimeDimensions: Array<PreAggregationTimeDimensionReference>,
   rollups: Array<string>,
+  rollupsReferences: Array<PreAggregationReferences>,
   multipliedMeasures?: Array<string>,
   joinTree?: FinishedJoinTree;
 };
@@ -891,6 +892,7 @@ export class CubeEvaluator extends CubeSymbols {
       fullNameDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
       fullNameMeasures: [], // May be filled in PreAggregations.evaluateAllReferences()
       fullNameTimeDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
+      rollupsReferences: [], // May be filled in PreAggregations.evaluateAllReferences()
     };
   }
 }
