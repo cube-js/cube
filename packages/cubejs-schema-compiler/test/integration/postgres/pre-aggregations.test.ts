@@ -830,6 +830,143 @@ describe('PreAggregations', () => {
         }
       }
     });
+
+    cube('cube_a', {
+      sql: \`SELECT 1 as id, 'dim_a' as dim_a\`,
+
+      joins: {
+        cube_b: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_a} = \${cube_b.dim_a}\`
+        },
+        cube_c: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_a} = \${cube_c.dim_a}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_a: {
+          sql: 'dim_a',
+          type: 'string'
+        },
+
+        dim_b: {
+          sql: 'dim_b',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        aaa_rollup: {
+          dimensions: [
+            dim_a
+          ]
+        },
+        rollupJoinAB: {
+          type: 'rollupJoin',
+          dimensions: [
+            dim_a,
+            cube_b.dim_b,
+            cube_c.dim_c
+          ],
+          rollups: [
+            aaa_rollup,
+            cube_b.bbb_rollup
+          ]
+        }
+      }
+    });
+
+    cube('cube_b', {
+      sql: \`SELECT 2 as id, 'dim_a' as dim_a, 'dim_b' as dim_b\`,
+
+      joins: {
+        cube_c: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_b} = \${cube_c.dim_b}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_a: {
+          sql: 'dim_a',
+          type: 'string'
+        },
+
+        dim_b: {
+          sql: 'dim_b',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        bbb_rollup: {
+          dimensions: [
+            dim_a,
+            dim_b,
+            cube_c.dim_c
+          ]
+        }
+      }
+    });
+
+    cube('cube_c', {
+      sql: \`SELECT 3 as id, 'dim_a' as dim_a, 'dim_b' as dim_b, 'dim_c' as dim_c\`,
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_a: {
+          sql: 'dim_a',
+          type: 'string'
+        },
+
+        dim_b: {
+          sql: 'dim_b',
+          type: 'string'
+        },
+
+        dim_c: {
+          sql: 'dim_c',
+          type: 'string'
+        },
+      }
+    });
+
+    view('view_abc', {
+      cubes: [
+        {
+          join_path: cube_a,
+          includes: ['dim_a']
+        },
+        {
+          join_path: cube_a.cube_b,
+          includes: ['dim_b']
+        },
+        {
+          join_path: cube_a.cube_b.cube_c,
+          includes: ['dim_c']
+        }
+      ]
+    });
+
   `);
 
   it('simple pre-aggregation', async () => {
@@ -3032,6 +3169,41 @@ describe('PreAggregations', () => {
         [{
           cube_1__dim_1: 'dim_1',
           cube_2__dim_2: 'dim_2',
+        }]
+      );
+    });
+  });
+
+  it('rollupJoin pre-aggregation with three cubes', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['cube_x.dim_x', 'cube_y.dim_y', 'cube_z.dim_z'],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect(preAggregationsDescription.length).toBe(3);
+    const xxx = preAggregationsDescription.find(p => p.preAggregationId === 'cube_x.xxx');
+    const yyy = preAggregationsDescription.find(p => p.preAggregationId === 'cube_y.yyy');
+    const zzz = preAggregationsDescription.find(p => p.preAggregationId === 'cube_z.zzz');
+    expect(xxx).toBeDefined();
+    expect(yyy).toBeDefined();
+    expect(zzz).toBeDefined();
+
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoinThreeCubes');
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [{
+          cube_x__dim_x: 'dim_x',
+          cube_y__dim_y: 'dim_y',
+          cube_z__dim_z: 'dim_z',
         }]
       );
     });
