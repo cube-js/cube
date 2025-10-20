@@ -1,3 +1,4 @@
+mod column_comparator;
 mod inline_aggregate_stream;
 mod sorted_group_values;
 use crate::cluster::{
