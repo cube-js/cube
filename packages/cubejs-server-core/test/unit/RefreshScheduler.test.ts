@@ -665,6 +665,7 @@ describe('Refresh Scheduler', () => {
                 measures: ['Foo.count'],
                 timeDimensions: [{ dimension: 'Foo.time', granularity: 'hour' }],
                 rollups: [],
+                rollupsReferences: [],
                 fullNameDimensions: [],
                 fullNameMeasures: [],
                 fullNameTimeDimensions: [],
