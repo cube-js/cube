@@ -131,19 +131,33 @@ pub struct InlineAggregateExec {
     /// expressions from protobuf for final aggregate.
     pub input_schema: SchemaRef,
     cache: PlanProperties,
+    required_input_ordering: Vec<Option<LexRequirement>>,
 }
 
 impl InlineAggregateExec {
+    /// Try to create an InlineAggregateExec from a standard AggregateExec.
+    ///
+    /// Returns None if the aggregate cannot be converted (e.g., not sorted, uses grouping sets).
     pub fn try_new_from_aggregate(aggregate: &AggregateExec) -> Option<Self> {
-        if matches!(aggregate.input_order_mode(), InputOrderMode::Sorted) {
+        // Only convert Sorted aggregates
+        if !matches!(aggregate.input_order_mode(), InputOrderMode::Sorted) {
             return None;
         }
+
+        // Only support Partial and Final modes
         let mode = match aggregate.mode() {
             AggregateMode::Partial => InlineAggregateMode::Partial,
             AggregateMode::Final => InlineAggregateMode::Final,
             _ => return None,
         };
+
         let group_by = aggregate.group_expr().clone();
+
+        // InlineAggregate doesn't support grouping sets (CUBE/ROLLUP/GROUPING SETS)
+        if !group_by.is_single() {
+            return None;
+        }
+
         let aggr_expr = aggregate.aggr_expr().iter().cloned().collect();
         let filter_expr = aggregate.filter_expr().iter().cloned().collect();
         let limit = aggregate.limit().clone();
@@ -151,6 +165,8 @@ impl InlineAggregateExec {
         let schema = aggregate.schema().clone();
         let input_schema = aggregate.input_schema().clone();
         let cache = aggregate.cache().clone();
+        let required_input_ordering = aggregate.required_input_ordering().clone();
+
         Some(Self {
             mode,
             group_by,
@@ -161,7 +177,20 @@ impl InlineAggregateExec {
             schema,
             input_schema,
             cache,
+            required_input_ordering,
         })
+    }
+
+    pub fn mode(&self) -> &InlineAggregateMode {
+        &self.mode
+    }
+
+    pub fn limit(&self) -> Option<usize> {
+        self.limit
+    }
+
+    pub fn aggr_expr(&self) -> &[Arc<AggregateFunctionExpr>] {
+        &self.aggr_expr
     }
 
     pub fn input(&self) -> &Arc<dyn ExecutionPlan> {
@@ -206,7 +235,7 @@ impl ExecutionPlan for InlineAggregateExec {
     }
 
     fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        vec![]
+        self.required_input_ordering.clone()
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
@@ -231,6 +260,7 @@ impl ExecutionPlan for InlineAggregateExec {
             schema: self.schema.clone(),
             input_schema: self.input_schema.clone(),
             cache: self.cache.clone(),
+            required_input_ordering: self.required_input_ordering.clone(),
         };
         Ok(Arc::new(result))
     }
@@ -240,9 +270,8 @@ impl ExecutionPlan for InlineAggregateExec {
         partition: usize,
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
-        /* self.execute_typed(partition, context)
-        .map(|stream| stream.into()) */
-        todo!()
+        let stream = inline_aggregate_stream::InlineAggregateStream::new(self, context, partition)?;
+        Ok(Box::pin(stream))
     }
 
     fn metrics(&self) -> Option<MetricsSet> {

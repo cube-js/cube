@@ -7,6 +7,7 @@ use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::inline_aggregate::sorted_group_values::SortedGroupValues;
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::metadata_cache::{MetadataCacheFactory, NoopParquetMetadataCache};
 use crate::queryplanner::optimizations::{CubeQueryPlanner, PreOptimizeRule};
@@ -50,8 +51,8 @@ use datafusion::dfschema::internal_err;
 use datafusion::dfschema::not_impl_err;
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
-use datafusion::execution::TaskContext;
-use datafusion::logical_expr::{Expr, GroupsAccumulator, LogicalPlan};
+use datafusion::execution::{RecordBatchStream, TaskContext};
+use datafusion::logical_expr::{EmitTo, Expr, GroupsAccumulator, LogicalPlan};
 use datafusion::physical_expr::expressions::Column as DFColumn;
 use datafusion::physical_expr::LexOrdering;
 use datafusion::physical_expr::{self, GroupsAccumulatorAdapter};
@@ -135,6 +136,7 @@ pub(crate) struct InlineAggregateStream {
     input_done: bool,
 
     accumulators: Vec<Box<dyn GroupsAccumulator>>,
+    group_values: SortedGroupValues,
     current_group_indices: Vec<usize>,
 }
 
@@ -189,6 +191,7 @@ impl InlineAggregateStream {
 
         let exec_state = ExecutionState::ReadingInput;
         let current_group_indices = Vec::with_capacity(batch_size);
+        let group_values = SortedGroupValues::try_new(group_schema)?;
 
         Ok(InlineAggregateStream {
             schema: agg_schema,
@@ -201,6 +204,7 @@ impl InlineAggregateStream {
             exec_state,
             batch_size,
             current_group_indices,
+            group_values,
             input_done: false,
         })
     }
@@ -303,144 +307,68 @@ impl Stream for InlineAggregateStream {
     ) -> Poll<Option<Self::Item>> {
         loop {
             match &self.exec_state {
-                ExecutionState::ReadingInput => 'reading_input: {
+                ExecutionState::ReadingInput => {
                     match ready!(self.input.poll_next_unpin(cx)) {
-                        // New batch to aggregate in partial aggregation operator
-                        Some(Ok(batch)) if self.mode == InlineAggregateMode::Partial => {
-                            /* let timer = elapsed_compute.timer();
-                            let input_rows = batch.num_rows();
-
-                            // Do the grouping
-                            self.group_aggregate_batch(batch)?;
-
-                            self.update_skip_aggregation_probe(input_rows);
-
-                            // If we can begin emitting rows, do so,
-                            // otherwise keep consuming input
-                            assert!(!self.input_done);
-
-                            // If the number of group values equals or exceeds the soft limit,
-                            // emit all groups and switch to producing output
-                            if self.hit_soft_group_limit() {
-                                timer.done();
-                                self.set_input_done_and_produce_output()?;
-                                // make sure the exec_state just set is not overwritten below
-                                break 'reading_input;
-                            }
-
-                            if let Some(to_emit) = self.group_ordering.emit_to() {
-                                timer.done();
-                                if let Some(batch) = self.emit(to_emit, false)? {
-
-                                        ExecutionState::ProducingOutput(batch);
-                                };
-                                // make sure the exec_state just set is not overwritten below
-                                break 'reading_input;
-                            }
-
-                            self.emit_early_if_necessary()?;
-
-                            self.switch_to_skip_aggregation()?;
-
-                            timer.done(); */
-                            todo!()
-                        }
-
-                        // New batch to aggregate in terminal aggregation operator
-                        // (Final/FinalPartitioned/Single/SinglePartitioned)
+                        // New input batch to aggregate
                         Some(Ok(batch)) => {
-                            /* let timer = elapsed_compute.timer();
-
-                            // Make sure we have enough capacity for `batch`, otherwise spill
-                            self.spill_previous_if_necessary(&batch)?;
-
-                            // Do the grouping
-
-
-                            // If we can begin emitting rows, do so,
-                            // otherwise keep consuming input
-                            assert!(!self.input_done);
-
-                            // If the number of group values equals or exceeds the soft limit,
-                            // emit all groups and switch to producing output
-                            if self.hit_soft_group_limit() {
-                                timer.done();
-                                self.set_input_done_and_produce_output()?;
-                                // make sure the exec_state just set is not overwritten below
-                                break 'reading_input;
+                            // Aggregate the batch
+                            if let Err(e) = self.group_aggregate_batch(batch) {
+                                return Poll::Ready(Some(Err(e)));
                             }
 
-                            if let Some(to_emit) = self.group_ordering.emit_to() {
-                                timer.done();
-                                if let Some(batch) = self.emit(to_emit, false)? {
-                                    self.exec_state =
-                                        ExecutionState::ProducingOutput(batch);
-                                };
-                                // make sure the exec_state just set is not overwritten below
-                                break 'reading_input;
+                            // Try to emit a batch if we have enough groups
+                            match self.emit_early_if_ready() {
+                                Ok(Some(batch)) => {
+                                    self.exec_state = ExecutionState::ProducingOutput(batch);
+                                }
+                                Ok(None) => {
+                                    // Not enough groups yet, continue reading
+                                }
+                                Err(e) => {
+                                    return Poll::Ready(Some(Err(e)));
+                                }
                             }
-
-                            timer.done(); */
-                            todo!()
                         }
 
-                        // Found error from input stream
+                        // Error from input stream
                         Some(Err(e)) => {
-                            // inner had error, return to caller
                             return Poll::Ready(Some(Err(e)));
                         }
 
-                        // Found end from input stream
+                        // Input stream exhausted - emit all remaining groups
                         None => {
-                            // inner is done, emit all rows and switch to producing output
-                            //self.set_input_done_and_produce_output()?;
-                            todo!()
+                            self.input_done = true;
+
+                            match self.emit(EmitTo::All) {
+                                Ok(Some(batch)) => {
+                                    self.exec_state = ExecutionState::ProducingOutput(batch);
+                                }
+                                Ok(None) => {
+                                    // No groups to emit, we're done
+                                    self.exec_state = ExecutionState::Done;
+                                }
+                                Err(e) => {
+                                    return Poll::Ready(Some(Err(e)));
+                                }
+                            }
                         }
                     }
                 }
 
                 ExecutionState::ProducingOutput(batch) => {
-                    // slice off a part of the batch, if needed
-                    /* let output_batch;
-                    let size = self.batch_size;
-                    (self.exec_state, output_batch) = if batch.num_rows() <= size {
-                        (
-                            if self.input_done {
-                                ExecutionState::Done
-                            }
-                            // In Partial aggregation, we also need to check
-                            // if we should trigger partial skipping
-                            else if self.mode == AggregateMode::Partial
-                                && self.should_skip_aggregation()
-                            {
-                                ExecutionState::SkippingAggregation
-                            } else {
-                                ExecutionState::ReadingInput
-                            },
-                            batch.clone(),
-                        )
+                    let batch = batch.clone();
+
+                    // Determine next state
+                    self.exec_state = if self.input_done {
+                        ExecutionState::Done
                     } else {
-                        // output first batch_size rows
-                        let size = self.batch_size;
-                        let num_remaining = batch.num_rows() - size;
-                        let remaining = batch.slice(size, num_remaining);
-                        let output = batch.slice(0, size);
-                        (ExecutionState::ProducingOutput(remaining), output)
+                        ExecutionState::ReadingInput
                     };
-                    // Empty record batches should not be emitted.
-                    // They need to be treated as  [`Option<RecordBatch>`]es and handled separately
-                    debug_assert!(output_batch.num_rows() > 0);
-                    return Poll::Ready(Some(Ok(
-                        output_batch.record_output(&self.baseline_metrics)
-                    ))); */
-                    todo!()
+
+                    return Poll::Ready(Some(Ok(batch)));
                 }
 
                 ExecutionState::Done => {
-                    // release the memory reservation since sending back output batch itself needs
-                    // some memory reservation, so make some room for it.
-                    /* self.clear_all();
-                    let _ = self.update_memory_reservation(); */
                     return Poll::Ready(None);
                 }
             }
@@ -449,9 +377,69 @@ impl Stream for InlineAggregateStream {
 }
 
 impl InlineAggregateStream {
+    /// Emit groups based on EmitTo strategy.
+    ///
+    /// Returns None if there are no groups to emit.
+    /// Emit groups based on EmitTo strategy.
+    ///
+    /// Returns None if there are no groups to emit.
+    fn emit(&mut self, emit_to: EmitTo) -> DFResult<Option<RecordBatch>> {
+        if self.group_values.is_empty() {
+            return Ok(None);
+        }
+
+        // Get group values arrays
+        let group_arrays = self.group_values.emit(emit_to)?;
+
+        // Get aggregate arrays based on mode
+        let mut aggr_arrays = vec![];
+        for acc in &mut self.accumulators {
+            match self.mode {
+                InlineAggregateMode::Partial => {
+                    // Emit intermediate state
+                    let state = acc.state(emit_to)?;
+                    aggr_arrays.extend(state);
+                }
+                InlineAggregateMode::Final => {
+                    // Emit final aggregated values
+                    aggr_arrays.push(acc.evaluate(emit_to)?);
+                }
+            }
+        }
+
+        // Combine group columns and aggregate columns
+        let mut columns = group_arrays;
+        columns.extend(aggr_arrays);
+
+        let batch = RecordBatch::try_new(Arc::clone(&self.schema), columns)?;
+
+        Ok(Some(batch))
+    }
+
+    /// Check if we have enough groups to emit a batch, keeping the last (potentially incomplete) group.
+    ///
+    /// For sorted aggregation, we emit batches of size batch_size when we have accumulated
+    /// more than batch_size groups. We always keep the last group as it may continue in the next input batch.
+    fn should_emit_early(&self) -> bool {
+        // Need at least (batch_size + 1) groups to emit batch_size and keep 1
+        self.group_values.len() > self.batch_size
+    }
+
+    /// Emit a batch of groups if we have enough accumulated, keeping the last group.
+    ///
+    /// Returns Some(batch) if emitted, None otherwise.
+    fn emit_early_if_ready(&mut self) -> DFResult<Option<RecordBatch>> {
+        if !self.should_emit_early() {
+            return Ok(None);
+        }
+
+        // Emit exactly batch_size groups, keeping the rest (including last incomplete group)
+        self.emit(EmitTo::First(self.batch_size))
+    }
+
     fn group_aggregate_batch(&mut self, batch: RecordBatch) -> DFResult<()> {
         // Evaluate the grouping expressions
-        /* let group_by_values = evaluate_group_by(&self.group_by, &batch)?;
+        let group_by_values = evaluate_group_by(&self.group_by, &batch)?;
 
         // Evaluate the aggregation expressions.
         let input_values = evaluate_many(&self.aggregate_arguments, &batch)?;
@@ -459,48 +447,39 @@ impl InlineAggregateStream {
         // Evaluate the filter expressions, if any, against the inputs
         let filter_values = evaluate_optional(&self.filter_expressions, &batch)?;
 
-        for group_values in &group_by_values {
-            // calculate the group indices for each input row
-            let starting_num_groups = self.group_values.len();
-            self.group_values
-                .intern(group_values, &mut self.current_group_indices)?;
-            let group_indices = &self.current_group_indices;
+        assert_eq!(group_by_values.len(), 1, "Exactly 1 group value required");
+        self.group_values
+            .intern(&group_by_values[0], &mut self.current_group_indices)?;
+        let group_indices = &self.current_group_indices;
 
-            // Update ordering information if necessary
-            /* let total_num_groups = self.group_values.len();
-            if total_num_groups > starting_num_groups {
-                self.group_ordering
-                    .new_groups(group_values, group_indices, total_num_groups)?;
-            } */
+        let total_num_groups = self.group_values.len();
+        // Gather the inputs to call the actual accumulator
+        let t = self
+            .accumulators
+            .iter_mut()
+            .zip(input_values.iter())
+            .zip(filter_values.iter());
 
-            // Gather the inputs to call the actual accumulator
-            let t = self
-                .accumulators
-                .iter_mut()
-                .zip(input_values.iter())
-                .zip(filter_values.iter());
+        for ((acc, values), opt_filter) in t {
+            let opt_filter = opt_filter.as_ref().map(|filter| filter.as_boolean());
 
-            for ((acc, values), opt_filter) in t {
-                let opt_filter = opt_filter.as_ref().map(|filter| filter.as_boolean());
-
-                // Call the appropriate method on each aggregator with
-                // the entire input row and the relevant group indexes
-                match self.mode {
-                    InlineAggregateMode::Partial => {
-                        acc.update_batch(values, group_indices, opt_filter, total_num_groups)?;
+            // Call the appropriate method on each aggregator with
+            // the entire input row and the relevant group indexes
+            match self.mode {
+                InlineAggregateMode::Partial => {
+                    acc.update_batch(values, group_indices, opt_filter, total_num_groups)?;
+                }
+                _ => {
+                    if opt_filter.is_some() {
+                        return internal_err!("aggregate filter should be applied in partial stage, there should be no filter in final stage");
                     }
-                    _ => {
-                        if opt_filter.is_some() {
-                            return internal_err!("aggregate filter should be applied in partial stage, there should be no filter in final stage");
-                        }
 
-                        // if aggregation is over intermediate states,
-                        // use merge
-                        acc.merge_batch(values, group_indices, None, total_num_groups)?;
-                    }
+                    // if aggregation is over intermediate states,
+                    // use merge
+                    acc.merge_batch(values, group_indices, None, total_num_groups)?;
                 }
             }
-        } */
+        }
         Ok(())
     }
 }
@@ -608,4 +587,10 @@ fn evaluate_group_by(
             Ok(group_values)
         })
         .collect()
+}
+
+impl RecordBatchStream for InlineAggregateStream {
+    fn schema(&self) -> SchemaRef {
+        Arc::clone(&self.schema)
+    }
 }

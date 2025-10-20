@@ -274,7 +274,7 @@ impl SortedGroupValues {
         self.group_values[0].len()
     }
 
-    fn emit(&mut self, emit_to: EmitTo) -> DFResult<Vec<ArrayRef>> {
+    pub fn emit(&mut self, emit_to: EmitTo) -> DFResult<Vec<ArrayRef>> {
         let mut output = match emit_to {
             EmitTo::All => {
                 let group_values = mem::take(&mut self.group_values);
