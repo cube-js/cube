@@ -27,82 +27,6 @@ pub struct SortedGroupValues {
     equal_to_results: Vec<bool>,
 }
 
-impl SortedGroupValues {
-    pub fn try_new(schema: SchemaRef) -> DFResult<Self> {
-        Ok(Self {
-            schema,
-            group_values: vec![],
-            rows_inds: vec![],
-            equal_to_results: vec![],
-        })
-    }
-
-    fn intern_impl(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> DFResult<()> {
-        /* let n_rows = cols[0].len();
-        groups.clear();
-
-        if n_rows == 0 {
-            return Ok(());
-        }
-
-        let first_group_idx = self.make_new_group_if_needed(cols, 0);
-        groups.push(first_group_idx);
-
-        if n_rows == 1 {
-            return Ok(());
-        }
-
-        if self.rows_inds.len() < n_rows {
-            let old_len = self.rows_inds.len();
-            self.rows_inds.extend(old_len..n_rows);
-        }
-
-        self.equal_to_results.fill(true);
-        self.equal_to_results.resize(n_rows - 1, true);
-
-        let lhs_rows = &self.rows_inds[0..n_rows - 1];
-        let rhs_rows = &self.rows_inds[1..n_rows];
-        for (col_idx, group_col) in self.group_values.iter().enumerate() {
-            cols[col_idx].vectorized_equal_to(
-                lhs_rows,
-                &cols[col_idx],
-                rhs_rows,
-                &mut self.equal_to_results,
-            );
-        }
-        println!("!!!!! AAAAAAAAAA");
-        let mut current_group_idx = first_group_idx;
-        for i in 0..n_rows - 1 {
-            if !self.equal_to_results[i] {
-                for (col_idx, group_value) in self.group_values.iter_mut().enumerate() {
-                    group_value.append_val(&cols[col_idx], i + 1);
-                }
-                current_group_idx = self.group_values[0].len() - 1;
-            }
-            groups.push(current_group_idx);
-        }
-        println!("!!!!! BBBBBBB");
-        Ok(()) */
-        Ok(())
-    }
-
-    fn make_new_group_if_needed(&mut self, cols: &[ArrayRef], row: usize) -> usize {
-        let new_group_needed = if self.group_values[0].len() == 0 {
-            true
-        } else {
-            self.group_values.iter().enumerate().any(|(i, group_val)| {
-                !group_val.equal_to(self.group_values[0].len() - 1, &cols[i], row)
-            })
-        };
-        if new_group_needed {
-            for (i, group_value) in self.group_values.iter_mut().enumerate() {
-                group_value.append_val(&cols[i], row);
-            }
-        }
-        self.group_values[0].len() - 1
-    }
-}
-
 /// instantiates a [`PrimitiveGroupValueBuilder`] and pushes it into $v
 ///
 /// Arguments:
@@ -122,8 +46,17 @@ macro_rules! instantiate_primitive {
     };
 }
 
-/* impl GroupValues for SortedGroupValues {
-    fn intern(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> Result<()> {
+impl SortedGroupValues {
+    pub fn try_new(schema: SchemaRef) -> DFResult<Self> {
+        Ok(Self {
+            schema,
+            group_values: vec![],
+            rows_inds: vec![],
+            equal_to_results: vec![],
+        })
+    }
+
+    pub fn intern(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> DFResult<()> {
         if self.group_values.is_empty() {
             let mut v = Vec::with_capacity(cols.len());
 
@@ -231,7 +164,7 @@ macro_rules! instantiate_primitive {
                         let b = ByteViewGroupValueBuilder::<BinaryViewType>::new();
                         v.push(Box::new(b) as _)
                     }
-                    dt => return not_impl_err!("{dt} not supported in GroupValuesColumn"),
+                    dt => return not_impl_err!("{dt} not supported in SortedGroupValues"),
                 }
             }
             self.group_values = v;
@@ -239,16 +172,16 @@ macro_rules! instantiate_primitive {
         self.intern_impl(cols, groups)
     }
 
-    fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         let group_values_size: usize = self.group_values.iter().map(|v| v.size()).sum();
         group_values_size
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         if self.group_values.is_empty() {
             return 0;
         }
@@ -256,7 +189,7 @@ macro_rules! instantiate_primitive {
         self.group_values[0].len()
     }
 
-    fn emit(&mut self) -> Result<Vec<ArrayRef>> {
+    pub fn emit(&mut self) -> DFResult<Vec<ArrayRef>> {
         /* let mut output = match emit_to {
             EmitTo::All => {
                 let group_values = mem::take(&mut self.group_values);
@@ -301,4 +234,69 @@ macro_rules! instantiate_primitive {
         self.rows_inds.clear();
         self.equal_to_results.clear();
     }
-} */
+
+    fn intern_impl(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> DFResult<()> {
+        /* let n_rows = cols[0].len();
+        groups.clear();
+
+        if n_rows == 0 {
+            return Ok(());
+        }
+
+        let first_group_idx = self.make_new_group_if_needed(cols, 0);
+        groups.push(first_group_idx);
+
+        if n_rows == 1 {
+            return Ok(());
+        }
+
+        if self.rows_inds.len() < n_rows {
+            let old_len = self.rows_inds.len();
+            self.rows_inds.extend(old_len..n_rows);
+        }
+
+        self.equal_to_results.fill(true);
+        self.equal_to_results.resize(n_rows - 1, true);
+
+        let lhs_rows = &self.rows_inds[0..n_rows - 1];
+        let rhs_rows = &self.rows_inds[1..n_rows];
+        for (col_idx, group_col) in self.group_values.iter().enumerate() {
+            cols[col_idx].vectorized_equal_to(
+                lhs_rows,
+                &cols[col_idx],
+                rhs_rows,
+                &mut self.equal_to_results,
+            );
+        }
+        println!("!!!!! AAAAAAAAAA");
+        let mut current_group_idx = first_group_idx;
+        for i in 0..n_rows - 1 {
+            if !self.equal_to_results[i] {
+                for (col_idx, group_value) in self.group_values.iter_mut().enumerate() {
+                    group_value.append_val(&cols[col_idx], i + 1);
+                }
+                current_group_idx = self.group_values[0].len() - 1;
+            }
+            groups.push(current_group_idx);
+        }
+        println!("!!!!! BBBBBBB");
+        Ok(()) */
+        Ok(())
+    }
+
+    fn make_new_group_if_needed(&mut self, cols: &[ArrayRef], row: usize) -> usize {
+        let new_group_needed = if self.group_values[0].len() == 0 {
+            true
+        } else {
+            self.group_values.iter().enumerate().any(|(i, group_val)| {
+                !group_val.equal_to(self.group_values[0].len() - 1, &cols[i], row)
+            })
+        };
+        if new_group_needed {
+            for (i, group_value) in self.group_values.iter_mut().enumerate() {
+                group_value.append_val(&cols[i], row);
+            }
+        }
+        self.group_values[0].len() - 1
+    }
+}
