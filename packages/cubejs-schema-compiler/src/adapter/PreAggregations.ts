@@ -653,13 +653,13 @@ export class PreAggregations {
      * Determine whether pre-aggregation can be used or not.
      */
     const canUsePreAggregationNotAdditive: CanUsePreAggregationFn = (references: PreAggregationReferences): boolean => {
-      const refTimeDimensions = backAlias(sortTimeDimensions(references.timeDimensions));
       const qryTimeDimensions = references.allowNonStrictDateRangeMatch
         ? transformedQuery.timeDimensions
         : transformedQuery.sortedTimeDimensions;
 
       let dimsToMatch: string[];
       let measToMatch: string[];
+      let timeDimsToMatch: PreAggregationTimeDimensionReference[];
 
       if (references.rollups.length > 0) {
         // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
@@ -673,14 +673,19 @@ export class PreAggregations {
         dimsToMatch = references.rollupsReferences
           .flatMap(rolRef => rolRef.fullNameDimensions)
           .filter(d => references.dimensions.some(rd => d.endsWith(rd)));
+        timeDimsToMatch = references.rollupsReferences
+          .flatMap(rolRef => rolRef.fullNameTimeDimensions)
+          .filter(d => references.timeDimensions.some(rd => d.dimension.endsWith(rd.dimension)));
         measToMatch = references.rollupsReferences
           .flatMap(rolRef => rolRef.fullNameMeasures)
           .filter(m => references.measures.some(rm => m.endsWith(rm)));
       } else {
         dimsToMatch = references.fullNameDimensions;
+        timeDimsToMatch = references.fullNameTimeDimensions;
         measToMatch = references.fullNameMeasures;
       }
 
+      const refTimeDimensions = backAlias(sortTimeDimensions(timeDimsToMatch));
       const backAliasMeasures = backAlias(measToMatch);
       const backAliasDimensions = backAlias(dimsToMatch);
       return ((
@@ -1043,7 +1048,6 @@ export class PreAggregations {
             preAggJoinsJoinHints.concat(this.cubesFromPreAggregation(preAggObj))
           )
         );
-        // const targetJoins = this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(preAggObj)));
         const existingJoins = R.unnest(preAggObjsToJoin.map(
           // TODO join hints?
           p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p)))
