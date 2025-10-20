@@ -1,3 +1,4 @@
+use datafusion::logical_expr::EmitTo;
 use datafusion::physical_plan::aggregates::group_values::multi_group_by::GroupColumn;
 
 use std::mem::{self, size_of};
@@ -6,15 +7,15 @@ use datafusion::arrow::array::{Array, ArrayRef, RecordBatch};
 use datafusion::arrow::compute::cast;
 use datafusion::arrow::datatypes::{
     BinaryType, BinaryViewType, DataType, Date32Type, Date64Type, Decimal128Type, Float32Type,
-    Float64Type, Int16Type, Int32Type, Int64Type, Int8Type, LargeBinaryType, LargeUtf8Type,
-    Schema, SchemaRef, StringViewType, Time32MillisecondType, Time32SecondType,
-    Time64MicrosecondType, Time64NanosecondType, TimeUnit, TimestampMicrosecondType,
-    TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt16Type,
-    UInt32Type, UInt64Type, UInt8Type, Utf8Type,
+    Float64Type, Int16Type, Int32Type, Int64Type, Int8Type, LargeBinaryType, LargeUtf8Type, Schema,
+    SchemaRef, StringViewType, Time32MillisecondType, Time32SecondType, Time64MicrosecondType,
+    Time64NanosecondType, TimeUnit, TimestampMicrosecondType, TimestampMillisecondType,
+    TimestampNanosecondType, TimestampSecondType, UInt16Type, UInt32Type, UInt64Type, UInt8Type,
+    Utf8Type,
 };
 use datafusion::dfschema::internal_err;
 use datafusion::dfschema::not_impl_err;
-use datafusion::error::Result as DFResult;
+use datafusion::error::{DataFusionError, Result as DFResult};
 use datafusion::physical_expr::binary_map::OutputType;
 use datafusion::physical_plan::aggregates::group_values::multi_group_by::{
     ByteGroupValueBuilder, ByteViewGroupValueBuilder, PrimitiveGroupValueBuilder,
@@ -129,41 +130,83 @@ impl SortedGroupValues {
                     &DataType::Time32(t) => match t {
                         TimeUnit::Second => {
                             instantiate_primitive!(v, nullable, Time32SecondType, data_type);
-                            instantiate_primitive_comparator!(comparators, nullable, Time32SecondType);
+                            instantiate_primitive_comparator!(
+                                comparators,
+                                nullable,
+                                Time32SecondType
+                            );
                         }
                         TimeUnit::Millisecond => {
                             instantiate_primitive!(v, nullable, Time32MillisecondType, data_type);
-                            instantiate_primitive_comparator!(comparators, nullable, Time32MillisecondType);
+                            instantiate_primitive_comparator!(
+                                comparators,
+                                nullable,
+                                Time32MillisecondType
+                            );
                         }
                         _ => {}
                     },
                     &DataType::Time64(t) => match t {
                         TimeUnit::Microsecond => {
                             instantiate_primitive!(v, nullable, Time64MicrosecondType, data_type);
-                            instantiate_primitive_comparator!(comparators, nullable, Time64MicrosecondType);
+                            instantiate_primitive_comparator!(
+                                comparators,
+                                nullable,
+                                Time64MicrosecondType
+                            );
                         }
                         TimeUnit::Nanosecond => {
                             instantiate_primitive!(v, nullable, Time64NanosecondType, data_type);
-                            instantiate_primitive_comparator!(comparators, nullable, Time64NanosecondType);
+                            instantiate_primitive_comparator!(
+                                comparators,
+                                nullable,
+                                Time64NanosecondType
+                            );
                         }
                         _ => {}
                     },
                     &DataType::Timestamp(t, _) => match t {
                         TimeUnit::Second => {
                             instantiate_primitive!(v, nullable, TimestampSecondType, data_type);
-                            instantiate_primitive_comparator!(comparators, nullable, TimestampSecondType);
+                            instantiate_primitive_comparator!(
+                                comparators,
+                                nullable,
+                                TimestampSecondType
+                            );
                         }
                         TimeUnit::Millisecond => {
-                            instantiate_primitive!(v, nullable, TimestampMillisecondType, data_type);
-                            instantiate_primitive_comparator!(comparators, nullable, TimestampMillisecondType);
+                            instantiate_primitive!(
+                                v,
+                                nullable,
+                                TimestampMillisecondType,
+                                data_type
+                            );
+                            instantiate_primitive_comparator!(
+                                comparators,
+                                nullable,
+                                TimestampMillisecondType
+                            );
                         }
                         TimeUnit::Microsecond => {
-                            instantiate_primitive!(v, nullable, TimestampMicrosecondType, data_type);
-                            instantiate_primitive_comparator!(comparators, nullable, TimestampMicrosecondType);
+                            instantiate_primitive!(
+                                v,
+                                nullable,
+                                TimestampMicrosecondType,
+                                data_type
+                            );
+                            instantiate_primitive_comparator!(
+                                comparators,
+                                nullable,
+                                TimestampMicrosecondType
+                            );
                         }
                         TimeUnit::Nanosecond => {
                             instantiate_primitive!(v, nullable, TimestampNanosecondType, data_type);
-                            instantiate_primitive_comparator!(comparators, nullable, TimestampNanosecondType);
+                            instantiate_primitive_comparator!(
+                                comparators,
+                                nullable,
+                                TimestampNanosecondType
+                            );
                         }
                     },
                     &DataType::Decimal128(_, _) => {
@@ -231,8 +274,8 @@ impl SortedGroupValues {
         self.group_values[0].len()
     }
 
-    pub fn emit(&mut self) -> DFResult<Vec<ArrayRef>> {
-        /* let mut output = match emit_to {
+    fn emit(&mut self, emit_to: EmitTo) -> DFResult<Vec<ArrayRef>> {
+        let mut output = match emit_to {
             EmitTo::All => {
                 let group_values = mem::take(&mut self.group_values);
                 debug_assert!(self.group_values.is_empty());
@@ -253,7 +296,6 @@ impl SortedGroupValues {
             }
         };
 
-        // TODO: Materialize dictionaries in group keys (#7647)
         for (field, array) in self.schema.fields.iter().zip(&mut output) {
             let expected = field.data_type();
             if let DataType::Dictionary(_, v) = expected {
@@ -267,24 +309,25 @@ impl SortedGroupValues {
             }
         }
 
-        Ok(output) */
-        todo!()
+        Ok(output)
     }
 
     fn clear_shrink(&mut self, batch: &RecordBatch) {
         self.group_values.clear();
+        self.comparators.clear();
         self.rows_inds.clear();
         self.equal_to_results.clear();
     }
 
     fn intern_impl(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> DFResult<()> {
-        /* let n_rows = cols[0].len();
+        let n_rows = cols[0].len();
         groups.clear();
 
         if n_rows == 0 {
             return Ok(());
         }
 
+        // Handle first row - compare with last group or create new group
         let first_group_idx = self.make_new_group_if_needed(cols, 0);
         groups.push(first_group_idx);
 
@@ -292,28 +335,20 @@ impl SortedGroupValues {
             return Ok(());
         }
 
-        if self.rows_inds.len() < n_rows {
-            let old_len = self.rows_inds.len();
-            self.rows_inds.extend(old_len..n_rows);
-        }
-
-        self.equal_to_results.fill(true);
+        // Prepare buffer for vectorized comparison
         self.equal_to_results.resize(n_rows - 1, true);
+        self.equal_to_results[..n_rows - 1].fill(true);
 
-        let lhs_rows = &self.rows_inds[0..n_rows - 1];
-        let rhs_rows = &self.rows_inds[1..n_rows];
-        for (col_idx, group_col) in self.group_values.iter().enumerate() {
-            cols[col_idx].vectorized_equal_to(
-                lhs_rows,
-                &cols[col_idx],
-                rhs_rows,
-                &mut self.equal_to_results,
-            );
+        // Vectorized comparison: compare row[i] with row[i+1] for all columns
+        for (col, comparator) in cols.iter().zip(&self.comparators) {
+            comparator.compare_adjacent(col, &mut self.equal_to_results[..n_rows - 1]);
         }
-        println!("!!!!! AAAAAAAAAA");
+
+        // Build groups based on comparison results
         let mut current_group_idx = first_group_idx;
         for i in 0..n_rows - 1 {
             if !self.equal_to_results[i] {
+                // Group boundary detected - add new group
                 for (col_idx, group_value) in self.group_values.iter_mut().enumerate() {
                     group_value.append_val(&cols[col_idx], i + 1);
                 }
@@ -321,24 +356,35 @@ impl SortedGroupValues {
             }
             groups.push(current_group_idx);
         }
-        println!("!!!!! BBBBBBB");
-        Ok(()) */
+
         Ok(())
     }
 
+    /// Compare the specified row with the last group and create a new group if different.
+    ///
+    /// This is used to handle the first row of a batch, which needs to be compared
+    /// with the last group from the previous batch to detect group boundaries across batches.
+    ///
+    /// Returns the group index for this row.
     fn make_new_group_if_needed(&mut self, cols: &[ArrayRef], row: usize) -> usize {
         let new_group_needed = if self.group_values[0].len() == 0 {
+            // No groups yet - always create first group
             true
         } else {
+            // Compare with last group - if any column differs, need new group
             self.group_values.iter().enumerate().any(|(i, group_val)| {
                 !group_val.equal_to(self.group_values[0].len() - 1, &cols[i], row)
             })
         };
+
         if new_group_needed {
+            // Add new group with values from this row
             for (i, group_value) in self.group_values.iter_mut().enumerate() {
                 group_value.append_val(&cols[i], row);
             }
         }
+
+        // Return index of the group (either newly created or existing last group)
         self.group_values[0].len() - 1
     }
 }
