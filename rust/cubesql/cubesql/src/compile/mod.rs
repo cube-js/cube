@@ -9630,6 +9630,48 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_filter_date_part_by_year_quarter_month_week() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") = 2019
+              AND DATE_PART('quarter', "KibanaSampleDataEcommerce"."order_date") = 2
+              AND DATE_PART('month', "KibanaSampleDataEcommerce"."order_date") = 4
+              AND DATE_PART('week', "KibanaSampleDataEcommerce"."order_date") = 15
+            GROUP BY 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-04-08".to_string(),
+                        "2019-04-14".to_string(),
+                    ])),
+                },]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_tableau_filter_extract_by_year() {
         init_testing_logger();
 
