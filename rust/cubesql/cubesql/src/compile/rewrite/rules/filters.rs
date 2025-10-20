@@ -1,4 +1,4 @@
-use super::utils;
+use super::utils::{self, try_merge_range_with_date_part};
 use crate::compile::date_parser::parse_date_str;
 use crate::{
     compile::rewrite::{
@@ -50,7 +50,6 @@ use datafusion::{
 };
 use egg::{Subst, Var};
 use std::{
-    cmp::{max, min},
     collections::HashSet,
     fmt::Display,
     ops::{Index, IndexMut},
@@ -4025,163 +4024,17 @@ impl FilterRules {
                 return false;
             };
 
-            let new_values = match granularity.as_str() {
-                "month" => {
-                    // Check that the range only covers one year
-                    let start_date_year = start_date.year();
-                    if start_date_year != end_date.year() {
-                        return false;
-                    }
-
-                    // Month value must be valid
-                    if !(1..=12).contains(&value) {
-                        return false;
-                    }
-
-                    // Obtain the new range
-                    let Some(new_start_date) =
-                        NaiveDate::from_ymd_opt(start_date_year, value as u32, 1)
-                    else {
-                        return false;
-                    };
-                    let Some(new_end_date) = new_start_date
-                        .checked_add_months(Months::new(1))
-                        .and_then(|date| date.checked_sub_days(Days::new(1)))
-                    else {
-                        return false;
-                    };
-
-                    // If the resulting range is outside of the original range, we can't merge
-                    // the filters
-                    if new_start_date > end_date || new_end_date < start_date {
-                        return false;
-                    }
-
-                    // Preserves existing constraints, for example:
-                    // inDataRange: order_date >= '2019-02-15' AND order_date < '2019-03-10'
-                    // filter: EXTRACT(MONTH FROM order_date) = 2 (February)
-                    let new_start_date = max(new_start_date, start_date);
-                    let new_end_date = min(new_end_date, end_date);
-
-                    vec![
-                        new_start_date.format("%Y-%m-%d").to_string(),
-                        new_end_date.format("%Y-%m-%d").to_string(),
-                    ]
-                }
-                "quarter" | "qtr" => {
-                    // Check that the range only covers one year
-                    let start_date_year = start_date.year();
-                    if start_date_year != end_date.year() {
-                        return false;
-                    }
-
-                    // Quarter value must be valid
-                    if !(1..=4).contains(&value) {
-                        return false;
-                    }
-
-                    let quarter_start_month = (value - 1) * 3 + 1;
-
-                    // Obtain the new range
-                    let Some(new_start_date) =
-                        NaiveDate::from_ymd_opt(start_date_year, quarter_start_month as u32, 1)
-                    else {
-                        return false;
-                    };
-
-                    let Some(new_end_date) = new_start_date
-                        .checked_add_months(Months::new(3))
-                        .and_then(|date| date.checked_sub_days(Days::new(1)))
-                    else {
-                        return false;
-                    };
-
-                    // Paranoid check, If the resulting range is outside of the original range, we can't merge
-                    // the filters
-                    if new_start_date > end_date || new_end_date < start_date {
-                        return false;
-                    }
-
-                    // Preserves existing constraints, for example:
-                    // inDataRange: order_date >= '2019-04-15' AND order_date < '2019-12-31'
-                    // filter: EXTRACT(QUARTER FROM order_date) = 2
-                    let new_start_date = max(new_start_date, start_date);
-                    let new_end_date = min(new_end_date, end_date);
-
-                    vec![
-                        new_start_date.format("%Y-%m-%d").to_string(),
-                        new_end_date.format("%Y-%m-%d").to_string(),
-                    ]
-                }
-                // Following ISO 8601
-                "week" => {
-                    // Week value must be valid
-                    if !(1..=53).contains(&value) {
-                        return false;
-                    }
-
-                    // For ISO weeks, we need to find the year that contains this week number
-                    // Try with the start_date year first
-                    let year = start_date.year();
-
-                    // Get January 4th of the year (which is always in week 1)
-                    let Some(jan_4) = NaiveDate::from_ymd_opt(year, 1, 4) else {
-                        return false;
-                    };
-
-                    // Get the Monday of week 1
-                    let iso_week = jan_4.iso_week();
-                    let week_1_year = iso_week.year();
-
-                    // Check if we're looking at the right ISO year
-                    // The ISO year might differ from calendar year for dates near year boundaries
-                    if week_1_year != year {
-                        // This can happen when January 1-3 belong to the previous year's last week
-                        // For now, we'll require that the range is within a single ISO year
-                        return false;
-                    }
-
-                    // Calculate the date of Monday of the requested week
-                    // ISO week 1 starts on the Monday of the week containing January 4th
-                    let days_from_week_1 = (value - 1) * 7;
-                    let week_1_monday =
-                        jan_4 - Days::new((jan_4.weekday().num_days_from_monday()) as u64);
-
-                    let Some(week_start) =
-                        week_1_monday.checked_add_days(Days::new(days_from_week_1 as u64))
-                    else {
-                        return false;
-                    };
-
-                    let Some(week_end) = week_start.checked_add_days(Days::new(6)) else {
-                        return false;
-                    };
-
-                    // Verify this week actually exists in this year (week 53 doesn't always exist)
-                    if week_start.iso_week().week() != value as u32 {
-                        return false;
-                    }
-
-                    // Paranoid check, If the resulting range is outside of the original range, we can't merge
-                    // the filters
-                    if week_start > end_date || week_end < start_date {
-                        return false;
-                    }
-
-                    // Preserves existing constraints, for example:
-                    // inDataRange: order_date >= '2019-04-09' AND order_date <= '2019-04-12'
-                    // filter: EXTRACT(WEEK FROM date) = 15
-                    let new_start_date = max(week_start, start_date);
-                    let new_end_date = min(week_end, end_date);
-
-                    vec![
-                        new_start_date.format("%Y-%m-%d").to_string(),
-                        new_end_date.format("%Y-%m-%d").to_string(),
-                    ]
-                }
-                // TODO: handle more granularities
-                _ => return false,
+            // Use the utility function to calculate the date range for the given granularity
+            let Some((new_start_date, new_end_date)) =
+                try_merge_range_with_date_part(start_date, end_date, granularity.as_str(), value)
+            else {
+                return false;
             };
+
+            let new_values = vec![
+                new_start_date.format("%Y-%m-%d").to_string(),
+                new_end_date.format("%Y-%m-%d").to_string(),
+            ];
 
             subst.insert(
                 new_values_var,
