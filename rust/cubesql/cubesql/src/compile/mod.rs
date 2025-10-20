@@ -9463,6 +9463,84 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_filter_extract_by_year_and_quarter() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019 AND EXTRACT(QUARTER FROM "KibanaSampleDataEcommerce"."order_date") = 2
+            GROUP BY 2
+            ;"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await
+            .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-04-01".to_string(),
+                        "2019-06-31".to_string(),
+                    ])),
+                },]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_filter_extract_by_year_and_month() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019 AND EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date") = 2
+            GROUP BY 2
+            ;"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await
+            .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-02-01".to_string(),
+                        "2019-02-28".to_string(),
+                    ])),
+                },]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_tableau_filter_extract_by_year() {
         init_testing_logger();
 
