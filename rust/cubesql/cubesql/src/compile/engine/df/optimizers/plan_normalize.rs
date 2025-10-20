@@ -1433,7 +1433,7 @@ mod tests {
                 .build()
                 .expect("Failed to build plan");
 
-            // Create a deeply nested OR expression (should cause stack overflow)
+            // Create a deeply nested OR expression
             let deeply_nested_filter = create_deeply_nested_or_expr("value", 500);
 
             let plan = LogicalPlanBuilder::from(table_scan)
