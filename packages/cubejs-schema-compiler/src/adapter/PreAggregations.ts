@@ -1414,7 +1414,15 @@ export class PreAggregations {
     if (!preAggregationName) {
       return evaluateReferences();
     }
-    return this.query.cacheValue(['evaluateAllReferences', cube, preAggregationName], evaluateReferences);
+
+    // Using [cube, preAggregationName] alone as cache keys isn’t reliable,
+    // as different queries can build distinct join graphs during pre-aggregation matching.
+    // Because the matching logic compares join subgraphs — particularly for 'rollupJoin' and 'rollupLambda'
+    // pre-aggregations — relying on such keys may cause incorrect results.
+    return this.query.cacheValue(
+      ['evaluateAllReferences', cube, preAggregationName, JSON.stringify(this.query.join)],
+      evaluateReferences
+    );
   }
 
   public originalSqlPreAggregationTable(preAggregationDescription: PreAggregationForCube): string {
