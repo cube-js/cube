@@ -328,4 +328,32 @@ describe('PostgresQuery', () => {
       expect(queryAndParams[0]).toContain('ORDER BY 3 ASC');
     });
   });
+
+  it('uses AS keyword in subquery aliases (regression test)', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count',
+        'visitors.unboundedCount'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2020-01-01', '2020-01-31']
+      }],
+      timezone: 'UTC'
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    const sql = queryAndParams[0];
+
+    // PostgreSQL should use AS keyword for subquery aliases
+    expect(sql).toMatch(/\s+AS\s+q_0\s+/);
+    
+    // Should NOT have pattern ) q_0 (without AS)
+    // This regex checks for closing paren followed by space(s), q_0, space, but NOT preceded by AS
+    const hasAsKeyword = /\s+AS\s+q_0\s+/.test(sql);
+    expect(hasAsKeyword).toBe(true);
+  });
 });
