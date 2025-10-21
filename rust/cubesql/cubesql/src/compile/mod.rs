@@ -9542,6 +9542,136 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_filter_extract_by_year_and_week() {
+        init_testing_logger();
+
+        async fn assert_week_result(week: i32, start_date: &str, end_date: &str) {
+            let query_plan = convert_select_to_query_plan(
+                format!(r#"
+                SELECT COUNT(*) AS "count",
+                       EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+                FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019
+                  AND EXTRACT(WEEK FROM "KibanaSampleDataEcommerce"."order_date") = {}
+                GROUP BY 2
+                "#, week),
+                DatabaseProtocol::PostgreSQL,
+            ).await;
+
+            assert_eq!(
+                query_plan.as_logical_plan().find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("year".to_string()),
+                        date_range: Some(json!(vec![start_date, end_date])),
+                    },]),
+                    order: Some(vec![]),
+                    ..Default::default()
+                }
+            )
+        }
+
+        // Test week 1 (first week of 2019)
+        // In 2019, January 1 is a Tuesday, so ISO week 1 starts on Monday, December 31, 2018
+        // But since our range is constrained to 2019, it should be Jan 1-6
+        assert_week_result(1, "2019-01-01", "2019-01-06").await;
+
+        // Test week 15 (mid-April)
+        // Week 15 of 2019 is April 8-14
+        assert_week_result(15, "2019-04-08", "2019-04-14").await;
+
+        // Test week 52 (end of year)
+        // Week 52 of 2019 is December 23-29
+        assert_week_result(52, "2019-12-23", "2019-12-29").await;
+    }
+
+    #[tokio::test]
+    async fn test_filter_extract_by_year_and_week_with_trunc() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019
+              AND CAST(TRUNC(EXTRACT(WEEK FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 15
+            GROUP BY 2
+            "#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await
+            .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-04-08".to_string(),
+                        "2019-04-14".to_string(),
+                    ])),
+                },]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_filter_date_part_by_year_quarter_month_week() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") = 2019
+              AND DATE_PART('quarter', "KibanaSampleDataEcommerce"."order_date") = 2
+              AND DATE_PART('month', "KibanaSampleDataEcommerce"."order_date") = 4
+              AND DATE_PART('week', "KibanaSampleDataEcommerce"."order_date") = 15
+            GROUP BY 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-04-08".to_string(),
+                        "2019-04-14".to_string(),
+                    ])),
+                },]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_tableau_filter_extract_by_year() {
         init_testing_logger();
 
