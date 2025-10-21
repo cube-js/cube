@@ -3208,4 +3208,72 @@ describe('PreAggregations', () => {
       );
     });
   });
+
+  it('rollupJoin pre-aggregation with nested joins via view (A->B->C)', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['view_abc.dim_a', 'view_abc.dim_b', 'view_abc.dim_c'],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect(preAggregationsDescription.length).toBe(2);
+    const aaa = preAggregationsDescription.find(p => p.preAggregationId === 'cube_a.aaa_rollup');
+    const bbb = preAggregationsDescription.find(p => p.preAggregationId === 'cube_b.bbb_rollup');
+    expect(aaa).toBeDefined();
+    expect(bbb).toBeDefined();
+
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoinAB');
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [{
+          view_abc__dim_a: 'dim_a',
+          view_abc__dim_b: 'dim_b',
+          view_abc__dim_c: 'dim_c',
+        }]
+      );
+    });
+  });
+
+  if (getEnv('nativeSqlPlanner')) {
+    it.skip('FIXME(tesseract): rollupJoin pre-aggregation with nested joins via cube (A->B->C)', () => {
+      // Need to investigate tesseract internals of how pre-aggs members are resolved and how
+      // rollups are used to construct rollupJoins.
+    });
+  } else {
+    it('rollupJoin pre-aggregation with nested joins via cube (A->B->C)', async () => {
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        dimensions: ['cube_a.dim_a', 'cube_b.dim_b', 'cube_c.dim_c'],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: ''
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+      expect(preAggregationsDescription.length).toBe(0);
+
+      expect(query.preAggregations?.preAggregationForQuery).toBeUndefined();
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [{
+            cube_a__dim_a: 'dim_a',
+            cube_b__dim_b: 'dim_b',
+            cube_c__dim_c: 'dim_c',
+          }]
+        );
+      });
+    });
+  }
 });
