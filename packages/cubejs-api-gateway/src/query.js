@@ -172,12 +172,18 @@ const querySchema = Joi.object().keys({
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
     granularity: Joi.string().max(128, 'utf8'), // Custom granularities may have arbitrary names
+    offset: Joi.string().max(128, 'utf8'), // Query-time granularity offset
     dateRange: [
       Joi.array().items(Joi.string()).min(1).max(2),
       Joi.string()
     ],
     compareDateRange: Joi.array()
-  }).oxor('dateRange', 'compareDateRange')),
+  }).oxor('dateRange', 'compareDateRange').custom((value, helpers) => {
+    if (value.offset && !value.granularity) {
+      return helpers.error('any.invalid', { message: 'offset can only be specified when granularity is also specified' });
+    }
+    return value;
+  })),
   order: Joi.alternatives(
     Joi.object().pattern(idOrMemberExpressionName, Joi.valid('asc', 'desc')),
     Joi.array().items(Joi.array().min(2).ordered(idOrMemberExpressionName, Joi.valid('asc', 'desc')))
