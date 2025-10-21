@@ -1,4 +1,4 @@
-use super::utils;
+use super::utils::{self, try_merge_range_with_date_part};
 use crate::compile::date_parser::parse_date_str;
 use crate::{
     compile::rewrite::{
@@ -51,7 +51,6 @@ use datafusion::{
 };
 use egg::{Subst, Var};
 use std::{
-    cmp::{max, min},
     collections::HashSet,
     convert::TryInto,
     fmt::Display,
@@ -4295,97 +4294,17 @@ impl FilterRules {
                 return false;
             };
 
-            let new_values = match granularity.as_str() {
-                "month" => {
-                    // Check that the range only covers one year
-                    let start_date_year = start_date.year();
-                    if start_date_year != end_date.year() {
-                        return false;
-                    }
-
-                    // Month value must be valid
-                    if !(1..=12).contains(&value) {
-                        return false;
-                    }
-
-                    // Obtain the new range
-                    let Some(new_start_date) =
-                        NaiveDate::from_ymd_opt(start_date_year, value as u32, 1)
-                    else {
-                        return false;
-                    };
-                    let Some(new_end_date) = new_start_date
-                        .checked_add_months(Months::new(1))
-                        .and_then(|date| date.checked_sub_days(Days::new(1)))
-                    else {
-                        return false;
-                    };
-
-                    // If the resulting range is outside of the original range, we can't merge
-                    // the filters
-                    if new_start_date > end_date || new_end_date < start_date {
-                        return false;
-                    }
-
-                    // Preserves existing constraints, for example:
-                    // inDataRange: order_date >= '2019-02-15' AND order_date < '2019-03-10'
-                    // Month filter: EXTRACT(MONTH FROM order_date) = 2 (February)
-                    let new_start_date = max(new_start_date, start_date);
-                    let new_end_date = min(new_end_date, end_date);
-
-                    vec![
-                        new_start_date.format("%Y-%m-%d").to_string(),
-                        new_end_date.format("%Y-%m-%d").to_string(),
-                    ]
-                }
-                "quarter" | "qtr" => {
-                    // Check that the range only covers one year
-                    let start_date_year = start_date.year();
-                    if start_date_year != end_date.year() {
-                        return false;
-                    }
-
-                    // Quarter value must be valid (1-4)
-                    if !(1..=4).contains(&value) {
-                        return false;
-                    }
-
-                    let quarter_start_month = (value - 1) * 3 + 1;
-
-                    // Obtain the new range
-                    let Some(new_start_date) =
-                        NaiveDate::from_ymd_opt(start_date_year, quarter_start_month as u32, 1)
-                    else {
-                        return false;
-                    };
-
-                    let Some(new_end_date) = new_start_date
-                        .checked_add_months(Months::new(3))
-                        .and_then(|date| date.checked_sub_days(Days::new(1)))
-                    else {
-                        return false;
-                    };
-
-                    // Paranoid check, If the resulting range is outside of the original range, we can't merge
-                    // the filters
-                    if new_start_date > end_date || new_end_date < start_date {
-                        return false;
-                    }
-
-                    // Preserves existing constraints, for example:
-                    // inDataRange: order_date >= '2019-04-15' AND order_date < '2019-12-31'
-                    // Month filter: EXTRACT(QUARTER FROM order_date) = 2
-                    let new_start_date = max(new_start_date, start_date);
-                    let new_end_date = min(new_end_date, end_date);
-
-                    vec![
-                        new_start_date.format("%Y-%m-%d").to_string(),
-                        new_end_date.format("%Y-%m-%d").to_string(),
-                    ]
-                }
-                // TODO: handle more granularities
-                _ => return false,
+            // Use the utility function to calculate the date range for the given granularity
+            let Some((new_start_date, new_end_date)) =
+                try_merge_range_with_date_part(start_date, end_date, granularity.as_str(), value)
+            else {
+                return false;
             };
+
+            let new_values = vec![
+                new_start_date.format("%Y-%m-%d").to_string(),
+                new_end_date.format("%Y-%m-%d").to_string(),
+            ];
 
             subst.insert(
                 new_values_var,
