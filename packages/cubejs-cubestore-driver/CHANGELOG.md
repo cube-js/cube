@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.82](https://github.com/cube-js/cube/compare/v1.3.81...v1.3.82) (2025-10-21)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
 ## [1.3.81](https://github.com/cube-js/cube/compare/v1.3.80...v1.3.81) (2025-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.82](https://github.com/cube-js/cube/compare/v1.3.81...v1.3.82) (2025-10-21)
+
+### Bug Fixes
+
+- **cube:** Meta type for switch dimension ([#10060](https://github.com/cube-js/cube/issues/10060)) ([b45a1c4](https://github.com/cube-js/cube/commit/b45a1c4673986679d24e13d6bb41f7cf2d72f1df))
+- **schema-compiler:** Oracle use `TO_TIMESTAMP_TZ` for `ISO 8601 with Z` for date and timestamp ([#9970](https://github.com/cube-js/cube/issues/9970)) ([b7018c7](https://github.com/cube-js/cube/commit/b7018c79be4e596b013696ed35a042188935a33e))
+
 ## [1.3.81](https://github.com/cube-js/cube/compare/v1.3.80...v1.3.81) (2025-10-16)
 
 ### Features
