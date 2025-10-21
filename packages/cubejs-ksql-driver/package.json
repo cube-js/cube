@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/ksql-driver",
   "description": "Cube.js ksql database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.3.81",
+  "version": "1.3.82",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -25,9 +25,9 @@
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.3.81",
-    "@cubejs-backend/schema-compiler": "1.3.81",
-    "@cubejs-backend/shared": "1.3.81",
+    "@cubejs-backend/base-driver": "1.3.82",
+    "@cubejs-backend/schema-compiler": "1.3.82",
+    "@cubejs-backend/shared": "1.3.82",
     "async-mutex": "0.3.2",
     "axios": "^1.8.3",
     "kafkajs": "^2.2.3",
@@ -41,7 +41,7 @@
     "extends": "../cubejs-linter"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.3.81",
+    "@cubejs-backend/linter": "1.3.82",
     "typescript": "~5.2.2"
   }
 }
