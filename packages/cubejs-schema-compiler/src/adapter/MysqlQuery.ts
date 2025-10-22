@@ -125,9 +125,16 @@ export class MysqlQuery extends BaseQuery {
       return `'${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' HOUR_SECOND`;
     } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
       return `'${intervalParsed.minute}:${intervalParsed.second}' MINUTE_SECOND`;
+    } else if (intervalParsed.hour && intKeys === 1) {
+      return `${intervalParsed.hour} HOUR`;
+    } else if (intervalParsed.minute && intKeys === 1) {
+      return `${intervalParsed.minute} MINUTE`;
+    } else if (intervalParsed.second && intKeys === 1) {
+      return `${intervalParsed.second} SECOND`;
+    } else if (intervalParsed.millisecond && intKeys === 1) {
+      // MySQL doesn't support MILLISECOND, use MICROSECOND instead (1ms = 1000μs)
+      return `${intervalParsed.millisecond * 1000} MICROSECOND`;
     }
-
-    // No need to support microseconds.
 
     throw new Error(`Cannot transform interval expression "${interval}" to MySQL dialect`);
   }
