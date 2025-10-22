@@ -737,7 +737,7 @@ export class CubeEvaluator extends CubeSymbols {
       throw new UserError(`Not full member name provided: ${path[0]}`);
     }
 
-    return `${path.at(-2)}.${path.at(-1)}`;
+    return path.slice(-2).join('.');
   }
 
   public cubeFromPath(path: string): EvaluatedCube {
