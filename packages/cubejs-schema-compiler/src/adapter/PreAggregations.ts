@@ -1654,8 +1654,7 @@ export class PreAggregations {
 
   private rollupMembers<T extends 'measures' | 'dimensions' | 'timeDimensions'>(preAggregationForQuery: PreAggregationForQuery, type: T): PreAggregationReferences[T] {
     return preAggregationForQuery.preAggregation.type === 'autoRollup' ?
-      // TODO proper types
-      (preAggregationForQuery.preAggregation as any)[type] :
+      preAggregationForQuery.preAggregation[type] :
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation, preAggregationForQuery.preAggregationName)[type];
   }
 
