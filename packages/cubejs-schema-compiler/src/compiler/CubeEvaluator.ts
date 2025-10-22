@@ -731,6 +731,18 @@ export class CubeEvaluator extends CubeSymbols {
     return !!this.evaluatedCubes[cube];
   }
 
+  public memberShortNameFromPath(path: string | string[]): string {
+    if (!Array.isArray(path)) {
+      path = path.split('.');
+    }
+
+    if (path.length < 2) {
+      throw new UserError(`Not full member name provided: ${path[0]}`);
+    }
+
+    return `${path.at(-2)}.${path.at(-1)}`;
+  }
+
   public cubeFromPath(path: string): EvaluatedCube {
     return this.evaluatedCubes[this.cubeNameFromPath(path)];
   }
