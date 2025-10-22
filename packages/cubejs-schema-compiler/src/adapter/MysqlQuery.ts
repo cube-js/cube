@@ -3,20 +3,21 @@ import { getEnv, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
+import { BaseTimeDimension } from './BaseTimeDimension';
 
 const GRANULARITY_TO_INTERVAL = {
-  day: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT00:00:00.000')`,
-  week: (date) => `DATE_FORMAT(DATE_ADD('1900-01-01', INTERVAL TIMESTAMPDIFF(WEEK, '1900-01-01', ${date}) WEEK), '%Y-%m-%dT00:00:00.000')`,
-  hour: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:00:00.000')`,
-  minute: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:00.000')`,
-  second: (date) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:%S.000')`,
-  month: (date) => `DATE_FORMAT(${date}, '%Y-%m-01T00:00:00.000')`,
-  quarter: (date) => `DATE_ADD('1900-01-01', INTERVAL TIMESTAMPDIFF(QUARTER, '1900-01-01', ${date}) QUARTER)`,
-  year: (date) => `DATE_FORMAT(${date}, '%Y-01-01T00:00:00.000')`
+  day: (date: string) => `DATE_FORMAT(${date}, '%Y-%m-%dT00:00:00.000')`,
+  week: (date: string) => `DATE_FORMAT(DATE_ADD('1900-01-01', INTERVAL TIMESTAMPDIFF(WEEK, '1900-01-01', ${date}) WEEK), '%Y-%m-%dT00:00:00.000')`,
+  hour: (date: string) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:00:00.000')`,
+  minute: (date: string) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:00.000')`,
+  second: (date: string) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:%i:%S.000')`,
+  month: (date: string) => `DATE_FORMAT(${date}, '%Y-%m-01T00:00:00.000')`,
+  quarter: (date: string) => `DATE_ADD('1900-01-01', INTERVAL TIMESTAMPDIFF(QUARTER, '1900-01-01', ${date}) QUARTER)`,
+  year: (date: string) => `DATE_FORMAT(${date}, '%Y-01-01T00:00:00.000')`
 };
 
 class MysqlFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
@@ -139,30 +140,30 @@ export class MysqlQuery extends BaseQuery {
     throw new Error(`Cannot transform interval expression "${interval}" to MySQL dialect`);
   }
 
-  public escapeColumnName(name) {
+  public escapeColumnName(name: string): string {
     return `\`${name}\``;
   }
 
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension): string {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
     return `SELECT TIMESTAMP(dates.f) date_from, TIMESTAMP(dates.t) date_to FROM (${values}) AS dates`;
   }
 
-  public concatStringsSql(strings) {
+  public concatStringsSql(strings: string[]): string {
     return `CONCAT(${strings.join(', ')})`;
   }
 
-  public unixTimestampSql() {
+  public unixTimestampSql(): string {
     return 'UNIX_TIMESTAMP()';
   }
 
-  public wrapSegmentForDimensionSelect(sql) {
+  public wrapSegmentForDimensionSelect(sql: string): string {
     return `IF(${sql}, 1, 0)`;
   }
 
-  public preAggregationTableName(cube, preAggregationName, skipSchema) {
+  public preAggregationTableName(cube: string, preAggregationName: string, skipSchema: boolean): string {
     const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
     if (name.length > 64) {
       throw new UserError(`MySQL can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
