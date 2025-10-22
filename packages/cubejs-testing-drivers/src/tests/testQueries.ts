@@ -25,6 +25,8 @@ type TestQueriesOptions = {
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const OP_DELAY = 3000;
+
 export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 7 * 1000);
@@ -129,6 +131,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       try {
         for (const q of queries) {
           await driver.createTableRaw(q);
+          await delay(OP_DELAY);
         }
         console.log(`Creating ${queries.length} fixture tables completed`);
       } catch (e: any) {
@@ -158,7 +161,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
-      await delay(2000);
+      await delay(OP_DELAY);
 
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
@@ -166,7 +169,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
-      await delay(2000);
+      await delay(OP_DELAY);
 
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
@@ -174,7 +177,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
-      await delay(2000);
+      await delay(OP_DELAY);
 
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
@@ -182,7 +185,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
-      await delay(2000);
+      await delay(OP_DELAY);
 
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
@@ -190,7 +193,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
-      await delay(2000);
+      await delay(OP_DELAY);
 
       if (includeHLLSuite) {
         await buildPreaggs(env.cube.port, apiToken, {
@@ -199,7 +202,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           contexts: [{ securityContext: { tenant: 't1' } }],
         });
 
-        await delay(2000);
+        await delay(OP_DELAY);
       }
     });
 
