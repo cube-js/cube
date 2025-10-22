@@ -25,7 +25,7 @@ type TestQueriesOptions = {
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const OP_DELAY = 3000;
+const OP_DELAY = 1000;
 
 export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
@@ -131,7 +131,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       try {
         for (const q of queries) {
           await driver.createTableRaw(q);
-          await delay(OP_DELAY);
+          if (type.includes('redshift')) {
+            await delay(10 * OP_DELAY);
+          }
         }
         console.log(`Creating ${queries.length} fixture tables completed`);
       } catch (e: any) {
