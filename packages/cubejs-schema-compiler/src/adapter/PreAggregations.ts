@@ -1,6 +1,7 @@
 import R from 'ramda';
 
 import { CubeSymbols, PreAggregationDefinition } from '../compiler/CubeSymbols';
+import { FinishedJoinTree, JoinEdge } from '../compiler/JoinGraph';
 import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
 import {
@@ -14,8 +15,6 @@ import { BaseFilter } from './BaseFilter';
 import { BaseGroupFilter } from './BaseGroupFilter';
 import { BaseDimension } from './BaseDimension';
 import { BaseSegment } from './BaseSegment';
-
-export type RollupJoin = any;
 
 export type PartitionTimeDimension = {
   dimension: string;
@@ -45,6 +44,7 @@ export type PreAggregationForQuery = {
   references: PreAggregationReferences;
   preAggregationsToJoin?: PreAggregationForQuery[];
   referencedPreAggregations?: PreAggregationForQuery[];
+  // eslint-disable-next-line no-use-before-define
   rollupJoin?: RollupJoin;
   sqlAlias?: string;
 };
@@ -65,6 +65,18 @@ export type EvaluateReferencesContext = {
 };
 
 export type BaseMember = BaseDimension | BaseMeasure | BaseFilter | BaseGroupFilter | BaseSegment;
+
+export type JoinEdgeWithMembers = JoinEdge & {
+  fromMembers: string[];
+  toMembers: string[];
+};
+
+export type RollupJoinItem = JoinEdgeWithMembers & {
+  fromPreAggObj: PreAggregationForQuery;
+  toPreAggObj: PreAggregationForQuery;
+};
+
+export type RollupJoin = RollupJoinItem[];
 
 export type CanUsePreAggregationFn = (references: PreAggregationReferences) => boolean;
 
@@ -1050,7 +1062,7 @@ export class PreAggregations {
         );
         const existingJoins = R.unnest(preAggObjsToJoin.map(
           // TODO join hints?
-          p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p)))
+          p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p))!)
         ));
         const nonExistingJoins = targetJoins.filter(target => !existingJoins.find(
           existing => existing.originalFrom === target.originalFrom &&
@@ -1088,7 +1100,7 @@ export class PreAggregations {
     return fromPreAggObj[0];
   }
 
-  private resolveJoinMembers(join) {
+  private resolveJoinMembers(join: FinishedJoinTree): JoinEdgeWithMembers[] {
     return join.joins.map(j => {
       const memberPaths = this.query.collectMemberNamesFor(() => this.query.evaluateSql(j.originalFrom, j.join.sql)).map(m => m.split('.'));
       const invalidMembers = memberPaths.filter(m => m[0] !== j.originalFrom && m[0] !== j.originalTo);
@@ -1512,7 +1524,7 @@ export class PreAggregations {
     });
 
     if (preAggregationForQuery.preAggregation.type === 'rollupJoin') {
-      const join = preAggregationForQuery.rollupJoin;
+      const join = preAggregationForQuery.rollupJoin!;
 
       toJoin = [
         sqlAndAlias(join[0].fromPreAggObj),
