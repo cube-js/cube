@@ -180,5 +180,11 @@
     "---------------------------------------",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
+  ],
+  "tesseractSkip": [
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "querying BigECommerce: rolling window YTD (month + week)",
+    "querying BigECommerce: rolling window YTD (month + week + no gran)"
   ]
 }
