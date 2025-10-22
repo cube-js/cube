@@ -89,11 +89,8 @@ export type PreAggregationTimeDimensionReference = {
 export type PreAggregationReferences = {
   allowNonStrictDateRangeMatch?: boolean,
   dimensions: Array<string>,
-  fullNameDimensions: Array<string>,
   measures: Array<string>,
-  fullNameMeasures: Array<string>,
   timeDimensions: Array<PreAggregationTimeDimensionReference>,
-  fullNameTimeDimensions: Array<PreAggregationTimeDimensionReference>,
   rollups: Array<string>,
   rollupsReferences: Array<PreAggregationReferences>,
   multipliedMeasures?: Array<string>,
@@ -901,9 +898,6 @@ export class CubeEvaluator extends CubeSymbols {
       timeDimensions,
       rollups:
         aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences, { originalSorting: true }) || [],
-      fullNameDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
-      fullNameMeasures: [], // May be filled in PreAggregations.evaluateAllReferences()
-      fullNameTimeDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
       rollupsReferences: [], // May be filled in PreAggregations.evaluateAllReferences()
     };
   }
