@@ -29,7 +29,11 @@ const OP_DELAY = 1000;
 
 export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
-    jest.setTimeout(60 * 10 * 1000);
+    if (type.includes('redshift')) {
+      jest.setTimeout(60 * 15 * 1000);
+    } else {
+      jest.setTimeout(60 * 5 * 1000);
+    }
 
     const isTesseractEnv = get('DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool();
 
