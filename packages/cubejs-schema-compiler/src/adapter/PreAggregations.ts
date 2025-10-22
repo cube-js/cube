@@ -92,6 +92,11 @@ export type FullPreAggregationDescription = any;
  */
 export type TransformedQuery = any;
 
+type BuildRollupJoinResult = {
+  rollupJoin: RollupJoin;
+  existingJoins: JoinEdgeWithMembers[];
+};
+
 export class PreAggregations {
   private readonly query: BaseQuery;
 
@@ -521,18 +526,7 @@ export class PreAggregations {
     filterDimensionsSingleValueEqual =
       allValuesEq1(filterDimensionsSingleValueEqual) ? new Set(filterDimensionsSingleValueEqual?.keys()) : null;
 
-    // Build reverse query joins map, which is used for
-    // rollupLambda and rollupJoin pre-aggs matching later
-    const joinsMap: Record<string, string> = {};
-    if (query.join) {
-      for (const j of query.join.joins) {
-        joinsMap[j.to] = j.from;
-      }
-    }
-
     return {
-      joinGraphRoot: query.join?.root,
-      joinsMap,
       sortedDimensions,
       sortedTimeDimensions,
       timeDimensions,
@@ -651,16 +645,6 @@ export class PreAggregations {
         transformedQuery.allBackAliasMembers[r] || r
     ));
 
-    const buildPath = (cube: string): string[] => {
-      const path = [cube];
-      const parentMap = transformedQuery.joinsMap;
-      while (parentMap[cube]) {
-        cube = parentMap[cube];
-        path.push(cube);
-      }
-      return path.reverse();
-    };
-
     /**
      * Determine whether pre-aggregation can be used or not.
      */
@@ -669,37 +653,9 @@ export class PreAggregations {
         ? transformedQuery.timeDimensions
         : transformedQuery.sortedTimeDimensions;
 
-      let dimsToMatch: string[];
-      let measToMatch: string[];
-      let timeDimsToMatch: PreAggregationTimeDimensionReference[];
-
-      if (references.rollups.length > 0) {
-        // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
-        // no connections in the joinTree between cubes from different datasources
-        // but joinGraph of the query has all the connections, necessary for serving the query,
-        // so we use this information to complete the full paths of members from the root of the query
-        // up to the pre-agg cube.
-        // We use references from the underlying pre-aggregations, filtered with members existing in the root
-        // pre-aggregation itself.
-
-        dimsToMatch = references.rollupsReferences
-          .flatMap(rolRef => rolRef.fullNameDimensions)
-          .filter(d => references.dimensions.some(rd => d.endsWith(rd)));
-        timeDimsToMatch = references.rollupsReferences
-          .flatMap(rolRef => rolRef.fullNameTimeDimensions)
-          .filter(d => references.timeDimensions.some(rd => d.dimension.endsWith(rd.dimension)));
-        measToMatch = references.rollupsReferences
-          .flatMap(rolRef => rolRef.fullNameMeasures)
-          .filter(m => references.measures.some(rm => m.endsWith(rm)));
-      } else {
-        dimsToMatch = references.fullNameDimensions;
-        timeDimsToMatch = references.fullNameTimeDimensions;
-        measToMatch = references.fullNameMeasures;
-      }
-
-      const refTimeDimensions = backAlias(sortTimeDimensions(timeDimsToMatch));
-      const backAliasMeasures = backAlias(measToMatch);
-      const backAliasDimensions = backAlias(dimsToMatch);
+      const refTimeDimensions = backAlias(sortTimeDimensions(references.fullNameTimeDimensions));
+      const backAliasMeasures = backAlias(references.fullNameMeasures);
+      const backAliasDimensions = backAlias(references.fullNameDimensions);
       return ((
         transformedQuery.hasNoTimeDimensionsWithoutGranularity
       ) && (
@@ -716,9 +672,9 @@ export class PreAggregations {
         transformedQuery.allFiltersWithinSelectedDimensions &&
         R.equals(backAliasDimensions, transformedQuery.sortedDimensions)
       ) && (
-        R.all(m => backAliasMeasures.indexOf(m) !== -1, transformedQuery.measures) ||
+        R.all(m => backAliasMeasures.includes(m), transformedQuery.measures) ||
         // TODO do we need backAlias here?
-        R.all(m => backAliasMeasures.indexOf(m) !== -1, transformedQuery.leafMeasures)
+        R.all(m => backAliasMeasures.includes(m), transformedQuery.leafMeasures)
       ));
     };
 
@@ -790,36 +746,8 @@ export class PreAggregations {
         }
       }
 
-      let dimsToMatch: string[];
-      let timeDimsToMatch: PreAggregationTimeDimensionReference[];
-
-      if (references.rollups.length > 0) {
-        // In 'rollupJoin' / 'rollupLambda' pre-aggregations fullName members will be empty, because there are
-        // no connections in the joinTree between cubes from different datasources
-        // but joinGraph of the query has all the connections, necessary for serving the query,
-        // so we use this information to complete the full paths of members from the root of the query
-        // up to the pre-agg cube.
-        // We use references from the underlying pre-aggregations, filtered with members existing in the root
-        // pre-aggregation itself.
-
-        dimsToMatch = references.rollupsReferences
-          .flatMap(rolRef => rolRef.fullNameDimensions)
-          .filter(d => references.dimensions.some(rd => d.endsWith(rd)))
-          .map(d => {
-            const [cube, ...restPath] = d.split('.');
-            if (cube === transformedQuery.joinGraphRoot) {
-              return d;
-            }
-            const path = buildPath(cube);
-            return `${path.join('.')}.${restPath.join('.')}`;
-          });
-        timeDimsToMatch = references.rollupsReferences
-          .flatMap(rolRef => rolRef.fullNameTimeDimensions)
-          .filter(d => references.timeDimensions.some(rd => d.dimension.endsWith(rd.dimension)));
-      } else {
-        dimsToMatch = references.fullNameDimensions;
-        timeDimsToMatch = references.fullNameTimeDimensions;
-      }
+      const dimsToMatch = references.fullNameDimensions;
+      const timeDimsToMatch = references.fullNameTimeDimensions;
 
       const dimensionsMatch = (dimensions, doBackAlias) => {
         const target = doBackAlias ? backAlias(dimsToMatch) : dimsToMatch;
@@ -1035,7 +963,7 @@ export class PreAggregations {
   }
 
   // TODO check multiplication factor didn't change
-  private buildRollupJoin(preAggObj: PreAggregationForQuery, preAggObjsToJoin: PreAggregationForQuery[]): RollupJoin {
+  private buildRollupJoin(preAggObj: PreAggregationForQuery, preAggObjsToJoin: PreAggregationForQuery[]): BuildRollupJoinResult {
     return this.query.cacheValue(
       ['buildRollupJoin', JSON.stringify(preAggObj), JSON.stringify(preAggObjsToJoin)],
       () => {
@@ -1055,15 +983,22 @@ export class PreAggregations {
 
           return hints;
         }).flat();
-        const targetJoins = this.resolveJoinMembers(
-          this.query.joinGraph.buildJoin(
-            preAggJoinsJoinHints.concat(this.cubesFromPreAggregation(preAggObj))
-          )
+
+        const builtJoinTree = this.query.joinGraph.buildJoin(
+          preAggJoinsJoinHints.concat(this.cubesFromPreAggregation(preAggObj))
         );
-        const existingJoins = R.unnest(preAggObjsToJoin.map(
-          // TODO join hints?
-          p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p))!)
-        ));
+
+        if (!builtJoinTree) {
+          throw new UserError(`Can't build join tree for pre-aggregation ${preAggObj.cube}.${preAggObj.preAggregationName}`);
+        }
+
+        const targetJoins = this.resolveJoinMembers(builtJoinTree);
+
+        // TODO join hints?
+        const existingJoins = preAggObjsToJoin
+          .map(p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p))!))
+          .flat();
+
         const nonExistingJoins = targetJoins.filter(target => !existingJoins.find(
           existing => existing.originalFrom === target.originalFrom &&
             existing.originalTo === target.originalTo &&
@@ -1073,7 +1008,7 @@ export class PreAggregations {
         if (!nonExistingJoins.length) {
           throw new UserError(`Nothing to join in rollup join. Target joins ${JSON.stringify(targetJoins)} are included in existing rollup joins ${JSON.stringify(existingJoins)}`);
         }
-        return nonExistingJoins.map(join => {
+        const rollupJoin = nonExistingJoins.map(join => {
           const fromPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.fromMembers, join);
           const toPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.toMembers, join);
           return {
@@ -1082,6 +1017,11 @@ export class PreAggregations {
             toPreAggObj
           };
         });
+
+        return {
+          rollupJoin,
+          existingJoins,
+        };
       }
     );
   }
@@ -1142,8 +1082,8 @@ export class PreAggregations {
       preAggregationName,
       preAggregation,
       cube,
-      // For rollupJoin and rollupLambda we need to pass references of the underlying rollups
-      // to canUsePreAggregation fn, which are collected later;
+      // For rollupJoin and rollupLambda we need to enrich references with data
+      // from the underlying rollups which are collected later;
       canUsePreAggregation: preAggregation.type === 'rollup' ? canUsePreAggregation(references) : false,
       references,
       preAggregationId: `${cube}.${preAggregationName}`
@@ -1165,12 +1105,53 @@ export class PreAggregations {
       preAggregationsToJoin.forEach(preAgg => {
         references.rollupsReferences.push(preAgg.references);
       });
-      const canUsePreAggregationResult = canUsePreAggregation(references);
+      const { rollupJoin, existingJoins } = this.buildRollupJoin(preAggObj, preAggregationsToJoin);
+
+      const joinsMap: Record<string, string> = {};
+      for (const j of rollupJoin) {
+        joinsMap[j.to] = j.from;
+      }
+      for (const j of existingJoins) {
+        joinsMap[j.to] = j.from;
+      }
+
+      const buildPath = (cubeName: string): string[] => {
+        const path = [cubeName];
+        const parentMap = joinsMap;
+        while (parentMap[cubeName]) {
+          cubeName = parentMap[cubeName];
+          path.push(cubeName);
+        }
+        return path.reverse();
+      };
+
+      references.fullNameDimensions = references.dimensions.map(d => {
+        const [cubeName, ...restPath] = d.split('.');
+        const path = buildPath(cubeName);
+
+        return `${path.join('.')}.${restPath.join('.')}`;
+      });
+      references.fullNameMeasures = references.measures.map(m => {
+        const [cubeName, ...restPath] = m.split('.');
+        const path = buildPath(cubeName);
+
+        return `${path.join('.')}.${restPath.join('.')}`;
+      });
+      references.fullNameTimeDimensions = references.timeDimensions.map(td => {
+        const [cubeName, ...restPath] = td.dimension.split('.');
+        const path = buildPath(cubeName);
+
+        return {
+          ...td,
+          dimension: `${path.join('.')}.${restPath.join('.')}`,
+        };
+      });
+
       return {
         ...preAggObj,
-        canUsePreAggregation: canUsePreAggregationResult,
+        canUsePreAggregation: canUsePreAggregation(references),
         preAggregationsToJoin,
-        rollupJoin: canUsePreAggregationResult ? this.buildRollupJoin(preAggObj, preAggregationsToJoin) : null,
+        rollupJoin,
       };
     } else if (preAggregation.type === 'rollupLambda') {
       // TODO evaluation optimizations. Should be cached or moved to compile time.
@@ -1217,6 +1198,9 @@ export class PreAggregations {
       });
       referencedPreAggregations.forEach(preAgg => {
         references.rollupsReferences.push(preAgg.references);
+        references.fullNameDimensions.push(...preAgg.references.fullNameDimensions);
+        references.fullNameMeasures.push(...preAgg.references.fullNameMeasures);
+        references.fullNameTimeDimensions.push(...preAgg.references.fullNameTimeDimensions);
       });
       return {
         ...preAggObj,
