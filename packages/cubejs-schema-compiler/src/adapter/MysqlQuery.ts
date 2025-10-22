@@ -171,6 +171,14 @@ export class MysqlQuery extends BaseQuery {
     return name;
   }
 
+  public supportGeneratedSeriesForCustomTd(): boolean {
+    return true;
+  }
+
+  public intervalString(interval: string): string {
+    return this.formatInterval(interval);
+  }
+
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     // PERCENTILE_CONT works but requires PARTITION BY
@@ -188,6 +196,41 @@ export class MysqlQuery extends BaseQuery {
 
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
+
+    templates.statements.time_series_select = 'SELECT TIMESTAMP(dates.f) date_from, TIMESTAMP(dates.t) date_to \n' +
+      'FROM (\n' +
+      '{% for time_item in seria  %}' +
+      '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
+      '{% if not loop.last %} UNION ALL\n{% endif %}' +
+      '{% endfor %}' +
+      ') AS dates';
+
+    templates.statements.generated_time_series_select =
+      'WITH RECURSIVE date_series AS (\n' +
+      '  SELECT TIMESTAMP({{ start }}) AS date_from\n' +
+      '  UNION ALL\n' +
+      '  SELECT DATE_ADD(date_from, INTERVAL {{ granularity }})\n' +
+      '  FROM date_series\n' +
+      '  WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= TIMESTAMP({{ end }})\n' +
+      ')\n' +
+      'SELECT date_from AS date_from,\n' +
+      '       DATE_SUB(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS date_to\n' +
+      'FROM date_series';
+
+    templates.statements.generated_time_series_with_cte_range_source =
+      'WITH RECURSIVE date_series AS (\n' +
+      '  SELECT {{ range_source }}.{{ min_name }} AS date_from,\n' +
+      '         {{ range_source }}.{{ max_name }} AS max_date\n' +
+      '  FROM {{ range_source }}\n' +
+      '  UNION ALL\n' +
+      '  SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}), max_date\n' +
+      '  FROM date_series\n' +
+      '  WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= max_date\n' +
+      ')\n' +
+      'SELECT date_from AS date_from,\n' +
+      '       DATE_SUB(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS date_to\n' +
+      'FROM date_series';
+
     return templates;
   }
 }
