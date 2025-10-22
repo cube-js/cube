@@ -653,9 +653,9 @@ export class PreAggregations {
         ? transformedQuery.timeDimensions
         : transformedQuery.sortedTimeDimensions;
 
-      const refTimeDimensions = backAlias(sortTimeDimensions(references.fullNameTimeDimensions));
-      const backAliasMeasures = backAlias(references.fullNameMeasures);
-      const backAliasDimensions = backAlias(references.fullNameDimensions);
+      const refTimeDimensions = backAlias(sortTimeDimensions(references.timeDimensions));
+      const backAliasMeasures = backAlias(references.measures);
+      const backAliasDimensions = backAlias(references.dimensions);
       return ((
         transformedQuery.hasNoTimeDimensionsWithoutGranularity
       ) && (
@@ -746,11 +746,8 @@ export class PreAggregations {
         }
       }
 
-      const dimsToMatch = references.fullNameDimensions;
-      const timeDimsToMatch = references.fullNameTimeDimensions;
-
       const dimensionsMatch = (dimensions, doBackAlias) => {
-        const target = doBackAlias ? backAlias(dimsToMatch) : dimsToMatch;
+        const target = doBackAlias ? backAlias(references.dimensions) : references.dimensions;
         return dimensions.every(d => target.includes(d));
       };
 
@@ -766,8 +763,8 @@ export class PreAggregations {
         )
       )(
         doBackAlias ?
-          backAlias(sortTimeDimensions(timeDimsToMatch)) :
-          (sortTimeDimensions(timeDimsToMatch))
+          backAlias(sortTimeDimensions(references.timeDimensions)) :
+          (sortTimeDimensions(references.timeDimensions))
       );
 
       if (transformedQuery.ungrouped) {
@@ -1065,8 +1062,8 @@ export class PreAggregations {
 
   private cubesFromPreAggregation(preAggObj: PreAggregationForQuery): string[] {
     return R.uniq(
-      preAggObj.references.measures.map(m => this.query.cubeEvaluator.parsePath('measures', m)).concat(
-        preAggObj.references.dimensions.map(m => this.query.cubeEvaluator.parsePathAnyType(m))
+      preAggObj.references.measures.map(m => this.query.cubeEvaluator.parsePath('measures', this.query.cubeEvaluator.memberShortNameFromPath(m))).concat(
+        preAggObj.references.dimensions.map(m => this.query.cubeEvaluator.parsePathAnyType(this.query.cubeEvaluator.memberShortNameFromPath(m)))
       ).map(p => p[0])
     );
   }
@@ -1125,19 +1122,19 @@ export class PreAggregations {
         return path.reverse();
       };
 
-      references.fullNameDimensions = references.dimensions.map(d => {
+      references.dimensions = references.dimensions.map(d => {
         const [cubeName, ...restPath] = d.split('.');
         const path = buildPath(cubeName);
 
         return `${path.join('.')}.${restPath.join('.')}`;
       });
-      references.fullNameMeasures = references.measures.map(m => {
+      references.measures = references.measures.map(m => {
         const [cubeName, ...restPath] = m.split('.');
         const path = buildPath(cubeName);
 
         return `${path.join('.')}.${restPath.join('.')}`;
       });
-      references.fullNameTimeDimensions = references.timeDimensions.map(td => {
+      references.timeDimensions = references.timeDimensions.map(td => {
         const [cubeName, ...restPath] = td.dimension.split('.');
         const path = buildPath(cubeName);
 
@@ -1198,9 +1195,6 @@ export class PreAggregations {
       });
       referencedPreAggregations.forEach(preAgg => {
         references.rollupsReferences.push(preAgg.references);
-        references.fullNameDimensions.push(...preAgg.references.fullNameDimensions);
-        references.fullNameMeasures.push(...preAgg.references.fullNameMeasures);
-        references.fullNameTimeDimensions.push(...preAgg.references.fullNameTimeDimensions);
       });
       return {
         ...preAggObj,
@@ -1235,7 +1229,7 @@ export class PreAggregations {
       if (typeof member !== 'string') {
         return `${member.dimension.split('.')[1]}.${member.granularity}`;
       } else {
-        return member.split('.')[1];
+        return member.split('.').at(-1)!;
       }
     });
   }
@@ -1386,9 +1380,9 @@ export class PreAggregations {
           // So we store full named members separately and use them in canUsePreAggregation functions.
           references.joinTree = preAggQuery.join;
           const root = references.joinTree?.root || '';
-          references.fullNameMeasures = references.measures.map(m => (m.startsWith(root) ? m : `${root}.${m}`));
-          references.fullNameDimensions = references.dimensions.map(d => (d.startsWith(root) ? d : `${root}.${d}`));
-          references.fullNameTimeDimensions = references.timeDimensions.map(d => ({
+          references.measures = references.measures.map(m => (m.startsWith(root) ? m : `${root}.${m}`));
+          references.dimensions = references.dimensions.map(d => (d.startsWith(root) ? d : `${root}.${d}`));
+          references.timeDimensions = references.timeDimensions.map(d => ({
             dimension: (d.dimension.startsWith(root) ? d.dimension : `${root}.${d.dimension}`),
             granularity: d.granularity,
           }));
