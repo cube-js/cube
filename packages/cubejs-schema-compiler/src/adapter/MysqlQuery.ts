@@ -185,6 +185,9 @@ export class MysqlQuery extends BaseQuery {
     templates.types.timestamp = 'DATETIME';
     delete templates.types.interval;
     templates.types.binary = 'BLOB';
+
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
     return templates;
   }
 }
