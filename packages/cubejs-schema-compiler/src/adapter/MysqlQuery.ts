@@ -188,11 +188,13 @@ export class MysqlQuery extends BaseQuery {
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     delete templates.expressions.ilike;
-    templates.types.string = 'VARCHAR';
+    templates.types.string = 'CHAR';
     templates.types.boolean = 'TINYINT';
     templates.types.timestamp = 'DATETIME';
     delete templates.types.interval;
     templates.types.binary = 'BLOB';
+
+    templates.expressions.concat_strings = 'CONCAT({{ strings | join(\',\' ) }})';
 
     templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE {{ pattern }}';
