@@ -557,7 +557,7 @@ describe('ScaffoldingSchema', () => {
 
   describe('columnType mapping for numeric types', () => {
     it('should map FLOAT types to number', () => {
-      const schemas = {
+      const floatSchemas = {
         public: {
           test: [
             { name: 'float_col', type: 'FLOAT', attributes: [] },
@@ -568,24 +568,24 @@ describe('ScaffoldingSchema', () => {
           ]
         }
       };
-      const schema = new ScaffoldingSchema(schemas);
-      schemas.public.test.forEach(col => {
-        expect(schema['columnType'](col)).toBe('number');
+      const schema = new ScaffoldingSchema(floatSchemas);
+      floatSchemas.public.test.forEach(col => {
+        expect((schema as any).columnType(col)).toBe('number');
       });
     });
 
     it('should map REAL type to number', () => {
-      const schemas = {
+      const realSchemas = {
         public: {
           test: [{ name: 'real_col', type: 'REAL', attributes: [] }]
         }
       };
-      const schema = new ScaffoldingSchema(schemas);
-      expect(schema['columnType'](schemas.public.test[0])).toBe('number');
+      const schema = new ScaffoldingSchema(realSchemas);
+      expect((schema as any).columnType(realSchemas.public.test[0])).toBe('number');
     });
 
     it('should map SERIAL types to number', () => {
-      const schemas = {
+      const serialSchemas = {
         public: {
           test: [
             { name: 'serial_col', type: 'SERIAL', attributes: [] },
@@ -594,14 +594,14 @@ describe('ScaffoldingSchema', () => {
           ]
         }
       };
-      const schema = new ScaffoldingSchema(schemas);
-      schemas.public.test.forEach(col => {
-        expect(schema['columnType'](col)).toBe('number');
+      const schema = new ScaffoldingSchema(serialSchemas);
+      serialSchemas.public.test.forEach(col => {
+        expect((schema as any).columnType(col)).toBe('number');
       });
     });
 
     it('should map MONEY types to number', () => {
-      const schemas = {
+      const moneySchemas = {
         public: {
           test: [
             { name: 'money_col', type: 'MONEY', attributes: [] },
@@ -609,14 +609,14 @@ describe('ScaffoldingSchema', () => {
           ]
         }
       };
-      const schema = new ScaffoldingSchema(schemas);
-      schemas.public.test.forEach(col => {
-        expect(schema['columnType'](col)).toBe('number');
+      const schema = new ScaffoldingSchema(moneySchemas);
+      moneySchemas.public.test.forEach(col => {
+        expect((schema as any).columnType(col)).toBe('number');
       });
     });
 
     it('should map various integer types to number (covered by int keyword)', () => {
-      const schemas = {
+      const intSchemas = {
         public: {
           test: [
             // Standard integer types
@@ -633,14 +633,14 @@ describe('ScaffoldingSchema', () => {
           ]
         }
       };
-      const schema = new ScaffoldingSchema(schemas);
-      schemas.public.test.forEach(col => {
-        expect(schema['columnType'](col)).toBe('number');
+      const schema = new ScaffoldingSchema(intSchemas);
+      intSchemas.public.test.forEach(col => {
+        expect((schema as any).columnType(col)).toBe('number');
       });
     });
 
     it('should be case insensitive for type matching', () => {
-      const schemas = {
+      const caseSchemas = {
         public: {
           test: [
             { name: 'float_lower', type: 'float', attributes: [] },
@@ -649,9 +649,9 @@ describe('ScaffoldingSchema', () => {
           ]
         }
       };
-      const schema = new ScaffoldingSchema(schemas);
-      schemas.public.test.forEach(col => {
-        expect(schema['columnType'](col)).toBe('number');
+      const schema = new ScaffoldingSchema(caseSchemas);
+      caseSchemas.public.test.forEach(col => {
+        expect((schema as any).columnType(col)).toBe('number');
       });
     });
   });
