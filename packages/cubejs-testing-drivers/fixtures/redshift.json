@@ -232,6 +232,10 @@
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying BigECommerce: rolling window YTD (month + week)",
     "querying BigECommerce: rolling window YTD (month + week + no gran)",
-    "querying BigECommerce: rolling window YTD without granularity"
+    "querying BigECommerce: rolling window YTD without granularity",
+
+    "Skipped because are too heavy and leads to Connection terminated unexpectedly or ECONNREFUSED or ECONNRESET",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
+    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
   ]
 }
