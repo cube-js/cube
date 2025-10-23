@@ -388,14 +388,14 @@ export class ScaffoldingSchema {
     if (['time', 'date'].find(t => type.includes(t))) {
       return ColumnType.Time;
     } else if ([
-      'int',      // integer, bigint, smallint, tinyint, mediumint, uint8, uint16, uint32, uint64, uinteger, ubigint, usmallint, hugeint, byteint, etc.
-      'dec',      // decimal
-      'double',   // double, double precision
-      'numb',     // number, numeric, bignumeric
-      'float',    // float, float4, float8, float32, float64, binary_float
-      'real',     // real
-      'serial',   // serial, bigserial, smallserial
-      'money',    // money, smallmoney
+      'int', // integer, bigint, smallint, tinyint, mediumint, uint8, uint16, uint32, uint64, uinteger, ubigint, usmallint, hugeint, byteint, etc.
+      'dec', // decimal
+      'double', // double, double precision
+      'numb', // number, numeric, bignumeric
+      'float', // float, float4, float8, float32, float64, binary_float
+      'real', // real
+      'serial', // serial, bigserial, smallserial
+      'money', // money, smallmoney
     ].find(t => type.includes(t))) {
       // enums are not Numbers
       return ColumnType.Number;
