@@ -18124,4 +18124,50 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_cast_as_date_filter() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                SUM(sumPrice) AS s,
+                CAST(customer_gender AS TEXT) AS g
+            FROM KibanaSampleDataEcommerce
+            WHERE
+                CAST(order_date AS DATE) >= (DATE '2025-07-02')
+                AND CAST(order_date AS DATE) <= (DATE '2025-09-30')
+            GROUP BY 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2025-07-02T00:00:00.000Z".to_string(),
+                        "2025-09-30T23:59:59.999Z".to_string(),
+                    ])),
+                }]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
 }

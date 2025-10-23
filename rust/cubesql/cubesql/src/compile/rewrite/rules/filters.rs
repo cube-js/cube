@@ -2198,6 +2198,32 @@ impl RewriteRules for FilterRules {
                 not_expr(binary_expr("?left", "LIKE", "?right")),
                 binary_expr("?left", "NOT_LIKE", "?right"),
             ),
+            rewrite(
+                "cast-as-date-to-datetrunc-replacer",
+                filter_replacer(
+                    binary_expr(
+                        cast_expr_explicit(column_expr("?column"), DataType::Date32),
+                        "?op",
+                        "?date_expr",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec![literal_string("day"), column_expr("?column")],
+                        ),
+                        "?op",
+                        "?date_expr",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
             transforming_rewrite(
                 "not-like-expr-to-like-negated-expr",
                 not_expr(like_expr(
