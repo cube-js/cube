@@ -967,6 +967,213 @@ describe('PreAggregations', () => {
       ]
     });
 
+    // Models with transitive joins for rollupJoin matching
+    cube('merchant_dims', {
+      sql: \`
+        SELECT 101 AS merchant_sk, 'M1' AS merchant_id
+        UNION ALL
+        SELECT 102 AS merchant_sk, 'M2' AS merchant_id
+      \`,
+
+      dimensions: {
+        merchant_sk: {
+          sql: 'merchant_sk',
+          type: 'number',
+          primary_key: true
+        },
+        merchant_id: {
+          sql: 'merchant_id',
+          type: 'string'
+        }
+      }
+    });
+
+    cube('product_dims', {
+      sql: \`
+        SELECT 201 AS product_sk, 'P1' AS product_id
+        UNION ALL
+        SELECT 202 AS product_sk, 'P2' AS product_id
+      \`,
+
+      dimensions: {
+        product_sk: {
+          sql: 'product_sk',
+          type: 'number',
+          primary_key: true
+        },
+        product_id: {
+          sql: 'product_id',
+          type: 'string'
+        }
+      }
+    });
+
+    cube('merchant_and_product_dims', {
+      sql: \`
+        SELECT 'M1' AS merchant_id, 'P1' AS product_id, 'Organic' AS acquisition_channel, 'SOLD' AS status
+        UNION ALL
+        SELECT 'M1' AS merchant_id, 'P2' AS product_id, 'Paid' AS acquisition_channel, 'PAID' AS status
+        UNION ALL
+        SELECT 'M2' AS merchant_id, 'P1' AS product_id, 'Referral' AS acquisition_channel, 'RETURNED' AS status
+      \`,
+
+      dimensions: {
+        product_id: {
+          sql: 'product_id',
+          type: 'string',
+          primary_key: true
+        },
+        merchant_id: {
+          sql: 'merchant_id',
+          type: 'string',
+          primary_key: true
+        },
+        status: {
+          sql: 'status',
+          type: 'string'
+        },
+        acquisition_channel: {
+          sql: 'acquisition_channel',
+          type: 'string'
+        }
+      },
+
+      pre_aggregations: {
+        bridge_rollup: {
+          dimensions: [
+            merchant_id,
+            product_id,
+            acquisition_channel,
+            status
+          ]
+        }
+      }
+    });
+
+    cube('other_facts', {
+      sql: \`
+        SELECT 1 AS id, 1 AS fact_id, 'OF1' AS fact
+        UNION ALL
+        SELECT 2 AS id, 2 AS fact_id, 'OF2' AS fact
+        UNION ALL
+        SELECT 3 AS id, 3 AS fact_id, 'OF3' AS fact
+      \`,
+
+      dimensions: {
+        other_fact_id: {
+          sql: 'id',
+          type: 'number',
+          primary_key: true
+        },
+        fact_id: {
+          sql: 'fact_id',
+          type: 'number'
+        },
+        fact: {
+          sql: 'fact',
+          type: 'string'
+        }
+      },
+
+      pre_aggregations: {
+        bridge_rollup: {
+          dimensions: [
+            fact_id,
+            fact
+          ]
+        }
+      }
+
+    });
+
+    cube('test_facts', {
+      sql: \`
+        SELECT 1 AS id, 101 AS merchant_sk, 201 AS product_sk, 100 AS amount
+        UNION ALL
+        SELECT 2 AS id, 101 AS merchant_sk, 202 AS product_sk, 150 AS amount
+        UNION ALL
+        SELECT 3 AS id, 102 AS merchant_sk, 201 AS product_sk, 200 AS amount
+      \`,
+
+      joins: {
+        merchant_dims: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.merchant_sk} = \${merchant_dims.merchant_sk}\`
+        },
+        product_dims: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.product_sk} = \${product_dims.product_sk}\`
+        },
+        // Transitive join - depends on merchant_dims and product_dims
+        merchant_and_product_dims: {
+          relationship: 'many_to_one',
+          sql: \`\${merchant_dims.merchant_id} = \${merchant_and_product_dims.merchant_id} AND \${product_dims.product_id} = \${merchant_and_product_dims.product_id}\`
+        },
+        other_facts: {
+          relationship: 'one_to_many',
+          sql: \`\${CUBE.id} = \${other_facts.fact_id}\`
+        },
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'number',
+          primary_key: true
+        },
+        merchant_sk: {
+          sql: 'merchant_sk',
+          type: 'number'
+        },
+        product_sk: {
+          sql: 'product_sk',
+          type: 'number'
+        },
+        acquisition_channel: {
+          sql: \`\${merchant_and_product_dims.acquisition_channel}\`,
+          type: 'string'
+        }
+      },
+
+      measures: {
+        amount_sum: {
+          sql: 'amount',
+          type: 'sum'
+        }
+      },
+
+      pre_aggregations: {
+        facts_rollup: {
+          dimensions: [
+            id,
+            merchant_sk,
+            merchant_dims.merchant_sk,
+            merchant_dims.merchant_id,
+            merchant_and_product_dims.merchant_id,
+            product_sk,
+            product_dims.product_sk,
+            product_dims.product_id,
+            merchant_and_product_dims.product_id,
+            acquisition_channel,
+            merchant_and_product_dims.status
+          ]
+        },
+        rollupJoinTransitive: {
+          type: 'rollupJoin',
+          dimensions: [
+            merchant_sk,
+            product_sk,
+            merchant_and_product_dims.status,
+            other_facts.fact
+          ],
+          rollups: [
+            facts_rollup,
+            other_facts.bridge_rollup
+          ]
+        }
+      }
+    });
+
   `);
 
   it('simple pre-aggregation', async () => {
@@ -3276,4 +3483,58 @@ describe('PreAggregations', () => {
       });
     });
   }
+
+  it('rollupJoin pre-aggregation matching with transitive joins', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: [
+        'test_facts.merchant_sk',
+        'test_facts.product_sk',
+        'merchant_and_product_dims.status',
+        'other_facts.fact'
+      ],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+    // Verify that both rollups are included in the description
+    expect(preAggregationsDescription.length).toBe(2);
+    const factsRollup = preAggregationsDescription.find(p => p.preAggregationId === 'test_facts.facts_rollup');
+    const bridgeRollup = preAggregationsDescription.find(p => p.preAggregationId === 'other_facts.bridge_rollup');
+    expect(factsRollup).toBeDefined();
+    expect(bridgeRollup).toBeDefined();
+
+    // Verify that the rollupJoin pre-aggregation can be used for the query
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoinTransitive');
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual([
+        {
+          merchant_and_product_dims__status: 'SOLD',
+          other_facts__fact: 'OF1',
+          test_facts__merchant_sk: 101,
+          test_facts__product_sk: 201,
+        },
+        {
+          merchant_and_product_dims__status: 'PAID',
+          other_facts__fact: 'OF2',
+          test_facts__merchant_sk: 101,
+          test_facts__product_sk: 202,
+        },
+        {
+          merchant_and_product_dims__status: 'RETURNED',
+          other_facts__fact: 'OF3',
+          test_facts__merchant_sk: 102,
+          test_facts__product_sk: 201,
+        },
+      ]);
+    });
+  });
 });
