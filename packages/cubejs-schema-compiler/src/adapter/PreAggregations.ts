@@ -1045,13 +1045,18 @@ export class PreAggregations {
   }
 
   private resolveJoinMembers(join: FinishedJoinTree): JoinEdgeWithMembers[] {
+    const joinMap = new Set<string>();
+
     return join.joins.map(j => {
+      joinMap.add(j.originalFrom);
+
       const memberPaths = this.query.collectMemberNamesFor(() => this.query.evaluateSql(j.originalFrom, j.join.sql)).map(m => m.split('.'));
-      const invalidMembers = memberPaths.filter(m => m[0] !== j.originalFrom && m[0] !== j.originalTo);
+
+      const invalidMembers = memberPaths.filter(m => !joinMap.has(m[0]) && m[0] !== j.originalTo);
       if (invalidMembers.length) {
         throw new UserError(`Members ${invalidMembers.join(', ')} in join from '${j.originalFrom}' to '${j.originalTo}' doesn't reference join cubes`);
       }
-      const fromMembers = memberPaths.filter(m => m[0] === j.originalFrom).map(m => m.join('.'));
+      const fromMembers = memberPaths.filter(m => joinMap.has(m[0])).map(m => m.join('.'));
       if (!fromMembers.length) {
         throw new UserError(`From members are not found in [${memberPaths.map(m => m.join('.')).join(', ')}] for join ${JSON.stringify(j)}. Please make sure join fields are referencing dimensions instead of columns.`);
       }
@@ -1059,6 +1064,8 @@ export class PreAggregations {
       if (!toMembers.length) {
         throw new UserError(`To members are not found in [${memberPaths.map(m => m.join('.')).join(', ')}] for join ${JSON.stringify(j)}. Please make sure join fields are referencing dimensions instead of columns.`);
       }
+      joinMap.add(j.originalTo);
+
       return {
         ...j,
         fromMembers,
