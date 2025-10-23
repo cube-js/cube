@@ -996,7 +996,11 @@ export class PreAggregations {
 
         // TODO join hints?
         const existingJoins = preAggObjsToJoin
-          .map(p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p))!))
+          .map(p => this.resolveJoinMembers(
+            this.query.joinGraph.buildJoin(
+              this.collectJoinHintsFromRollupReferences(p.references).concat(this.cubesFromPreAggregation(p))
+            )!
+          ))
           .flat();
 
         const nonExistingJoins = targetJoins.filter(target => !existingJoins.find(
