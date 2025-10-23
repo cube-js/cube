@@ -554,4 +554,105 @@ describe('ScaffoldingSchema', () => {
       }
     ]);
   });
+
+  describe('columnType mapping for numeric types', () => {
+    it('should map FLOAT types to number', () => {
+      const schemas = {
+        public: {
+          test: [
+            { name: 'float_col', type: 'FLOAT', attributes: [] },
+            { name: 'float4_col', type: 'FLOAT4', attributes: [] },
+            { name: 'float8_col', type: 'FLOAT8', attributes: [] },
+            { name: 'float32_col', type: 'FLOAT32', attributes: [] },
+            { name: 'float64_col', type: 'FLOAT64', attributes: [] },
+          ]
+        }
+      };
+      const schema = new ScaffoldingSchema(schemas);
+      schemas.public.test.forEach(col => {
+        expect(schema['columnType'](col)).toBe('number');
+      });
+    });
+
+    it('should map REAL type to number', () => {
+      const schemas = {
+        public: {
+          test: [{ name: 'real_col', type: 'REAL', attributes: [] }]
+        }
+      };
+      const schema = new ScaffoldingSchema(schemas);
+      expect(schema['columnType'](schemas.public.test[0])).toBe('number');
+    });
+
+    it('should map SERIAL types to number', () => {
+      const schemas = {
+        public: {
+          test: [
+            { name: 'serial_col', type: 'SERIAL', attributes: [] },
+            { name: 'bigserial_col', type: 'BIGSERIAL', attributes: [] },
+            { name: 'smallserial_col', type: 'SMALLSERIAL', attributes: [] },
+          ]
+        }
+      };
+      const schema = new ScaffoldingSchema(schemas);
+      schemas.public.test.forEach(col => {
+        expect(schema['columnType'](col)).toBe('number');
+      });
+    });
+
+    it('should map MONEY types to number', () => {
+      const schemas = {
+        public: {
+          test: [
+            { name: 'money_col', type: 'MONEY', attributes: [] },
+            { name: 'smallmoney_col', type: 'SMALLMONEY', attributes: [] },
+          ]
+        }
+      };
+      const schema = new ScaffoldingSchema(schemas);
+      schemas.public.test.forEach(col => {
+        expect(schema['columnType'](col)).toBe('number');
+      });
+    });
+
+    it('should map various integer types to number (covered by int keyword)', () => {
+      const schemas = {
+        public: {
+          test: [
+            // Standard integer types
+            { name: 'tinyint_col', type: 'TINYINT', attributes: [] },
+            { name: 'mediumint_col', type: 'MEDIUMINT', attributes: [] },
+            { name: 'hugeint_col', type: 'HUGEINT', attributes: [] },
+            // Unsigned integer types
+            { name: 'uint8_col', type: 'UINT8', attributes: [] },
+            { name: 'uint32_col', type: 'UINT32', attributes: [] },
+            { name: 'uinteger_col', type: 'UINTEGER', attributes: [] },
+            { name: 'ubigint_col', type: 'UBIGINT', attributes: [] },
+            // Other variants
+            { name: 'byteint_col', type: 'BYTEINT', attributes: [] },
+          ]
+        }
+      };
+      const schema = new ScaffoldingSchema(schemas);
+      schemas.public.test.forEach(col => {
+        expect(schema['columnType'](col)).toBe('number');
+      });
+    });
+
+    it('should be case insensitive for type matching', () => {
+      const schemas = {
+        public: {
+          test: [
+            { name: 'float_lower', type: 'float', attributes: [] },
+            { name: 'float_upper', type: 'FLOAT', attributes: [] },
+            { name: 'float_mixed', type: 'Float', attributes: [] },
+          ]
+        }
+      };
+      const schema = new ScaffoldingSchema(schemas);
+      schemas.public.test.forEach(col => {
+        expect(schema['columnType'](col)).toBe('number');
+      });
+    });
+  });
 });
