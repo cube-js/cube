@@ -215,6 +215,12 @@ cube(`extended_order_facts`, {
 })
 ```
 
+<WarningBox>
+
+Extends using non-named cubes will not copy all fields across. For example the `refresh_key` value will not be copied and the default refresh key for the given database will be used (see `refresh_key` below for more details)
+
+</WarningBox>
+
 ### `data_source`
 
 Each cube can have its own `data_source` name to support scenarios where data
