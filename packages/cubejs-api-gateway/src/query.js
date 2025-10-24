@@ -187,7 +187,10 @@ const querySchema = Joi.object().keys({
   limit: Joi.number().integer().strict().min(0),
   offset: Joi.number().integer().strict().min(0),
   total: Joi.boolean(),
+  // @deprecated
   renewQuery: Joi.boolean(),
+  cacheMode: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
+  cache: Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache'),
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
   subqueryJoins: Joi.array().items(subqueryJoin),
@@ -289,13 +292,42 @@ function parseInputMemberExpression(expression) {
 }
 
 /**
+ *
+ * @param {Query} query
+ * @param {CacheMode} cacheMode
+ * @return {Query}
+ */
+function normalizeQueryCacheMode(query, cacheMode) {
+  if (cacheMode !== undefined) {
+    query.cacheMode = cacheMode;
+  } else if (!query.cache && query?.renewQuery !== undefined) {
+    // TODO: Drop this when renewQuery will be removed
+    query.cacheMode = query.renewQuery === true
+      ? 'must-revalidate'
+      : 'stale-if-slow';
+  } else if (!query.cache) {
+    query.cacheMode = 'stale-if-slow';
+  } else {
+    query.cacheMode = query.cache;
+  }
+
+  // TODO: Drop this when renewQuery will be removed
+  query.renewQuery = undefined;
+  query.cache = undefined;
+
+  return query;
+}
+
+/**
  * Normalize incoming network query.
  * @param {Query} query
  * @param {boolean} persistent
+ * @param {CacheMode} [cacheMode]
  * @throws {UserError}
- * @returns {NormalizedQuery}
+ * @returns {import('./types/query').NormalizedQuery}
  */
-const normalizeQuery = (query, persistent) => {
+const normalizeQuery = (query, persistent, cacheMode) => {
+  query = normalizeQueryCacheMode(query);
   const { error } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
