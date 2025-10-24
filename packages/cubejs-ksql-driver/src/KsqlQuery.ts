@@ -52,7 +52,9 @@ export class KsqlQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    // https://docs.confluent.io/platform/current/ksqldb/reference/sql/lexical-structure.html#ksqldb-lexical-structure-identifiers
+    // https://github.com/confluentinc/ksql/blob/84afdf1c2504844a15e02643f796288b8b069073/ksqldb-parser/src/main/antlr4/io/confluent/ksql/parser/SqlBase.g4#L378
+    return `\`${name.replaceAll('`', '``')}\``;
   }
 
   public castToString(sql: string) {

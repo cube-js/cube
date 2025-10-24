@@ -54,7 +54,12 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public escapeColumnName(name) {
-    return `\`${name}\``;
+    // Quoted identifiers must be enclosed by `
+    // Identifiers have the same escape sequences as string literals
+    // https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_identifiers
+    // \` is escape sequence for `
+    // https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#escape_sequences
+    return `\`${name.replaceAll('`', '\\`')}\``;
   }
 
   public timeGroupedColumn(granularity, dimension) {
