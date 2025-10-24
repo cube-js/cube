@@ -23,9 +23,17 @@ type TestQueriesOptions = {
   externalSchemaTests?: boolean,
 };
 
+export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const OP_DELAY = 1000;
+
 export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
-    jest.setTimeout(60 * 5 * 1000);
+    if (type.includes('redshift')) {
+      jest.setTimeout(60 * 15 * 1000);
+    } else {
+      jest.setTimeout(60 * 5 * 1000);
+    }
 
     const isTesseractEnv = get('DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool();
 
@@ -94,6 +102,10 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
             await test(connection);
           } finally {
             await connection.end();
+
+            if (type.includes('redshift')) {
+              await delay(OP_DELAY);
+            }
           }
         });
       }
@@ -127,6 +139,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       try {
         for (const q of queries) {
           await driver.createTableRaw(q);
+          if (type.includes('redshift')) {
+            await delay(10 * OP_DELAY);
+          }
         }
         console.log(`Creating ${queries.length} fixture tables completed`);
       } catch (e: any) {
@@ -156,11 +171,15 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
+      await delay(OP_DELAY);
+
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['ECommerce.SAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
+
+      await delay(OP_DELAY);
 
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
@@ -168,11 +187,15 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
+      await delay(OP_DELAY);
+
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['BigECommerce.TAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
+
+      await delay(OP_DELAY);
 
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
@@ -180,12 +203,16 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
+      await delay(OP_DELAY);
+
       if (includeHLLSuite) {
         await buildPreaggs(env.cube.port, apiToken, {
           timezones: ['UTC'],
           preAggregations: ['BigECommerce.CountByProductExternal'],
           contexts: [{ securityContext: { tenant: 't1' } }],
         });
+
+        await delay(OP_DELAY);
       }
     });
 
