@@ -53,6 +53,29 @@ directly to the upstream data source.
 - If some queries still go to the upstream data source, it should respond with a
 subsecond latency. Consider tuning the concurrency and quotas to achieve that.
 
+### Date hierarchies
+
+By default, the MDX API creates additional hierarchies for all [time dimensions][ref-time-dimensions] and organizing them in a separate folder called "Calendar" for each dimension.
+This creates a Calendar hierarchy structure containing `Year`, `Quarter`, `Month`, `Week`, and `Day` levels, as well as Calendar Quarter of Year and Calendar Year hierarchies.
+
+```
+- Dimension Calendar:
+  - Year
+  - Quarter
+  - Month
+  - Week
+  - Day
+- Dimension Calendar Quarter of Year:
+  - Quarter
+- Dimension Calendar Year
+  - Year
+```
+
+These hierarchies are particularly useful in Excel because they allow you to filter your data without needing to drill down or expand all levels.
+Additionally, you can combine Calendar Year or Calendar Quarter of Year as filters while placing other dimensions on the axis.
+
+You can set the `CUBE_MDX_CREATE_DATE_HIERARCHIES` environment variable to `false` to disable this behavior.
+
 ### Measure format
 
 The MDX API respects the [`format` parameter][ref-measure-format] of measures so that the
@@ -94,7 +117,7 @@ views:
 
 For historical reasons, the syntax shown above differ from how
 [hierarchies][ref-hierarchies] are supposed to be defined in the data model.
-This is going to be harmonized in the future. 
+This is going to be harmonized in the future.
 
 </InfoBox>
 
@@ -185,7 +208,7 @@ views:
 
 For historical reasons, the syntax shown above differ from how
 [folders][ref-folders] are supposed to be defined in the data model.
-This is going to be harmonized in the future. 
+This is going to be harmonized in the future.
 
 </InfoBox>
 
