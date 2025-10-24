@@ -7,6 +7,7 @@
 
 import type { Request as ExpressRequest } from 'express';
 import type { DataResult } from '@cubejs-backend/native';
+import { CacheMode } from '@cubejs-backend/shared';
 import { RequestType, ApiType, ResultType } from './strings';
 import { Query } from './query';
 
@@ -119,11 +120,16 @@ type BaseRequest = {
   res: ResponseResultFn
 };
 
+type RequestQuery = Record<string, any> | Record<string, any>[] & {
+  renewQuery?: boolean;
+  cacheMode?: CacheMode;
+};
+
 /**
  * Data query HTTP request parameters map data type.
  */
 type QueryRequest = BaseRequest & {
-  query: Record<string, any> | Record<string, any>[];
+  query: RequestQuery;
   queryType?: RequestType;
   apiType?: ApiType;
   resType?: ResultType
@@ -133,6 +139,7 @@ type QueryRequest = BaseRequest & {
   memberExpressions?: boolean;
   disableExternalPreAggregations?: boolean;
   disableLimitEnforcing?: boolean;
+  cacheMode?: CacheMode;
 };
 
 type SqlApiRequest = BaseRequest & {
@@ -142,6 +149,7 @@ type SqlApiRequest = BaseRequest & {
   queryKey: any;
   streaming?: boolean;
   memberExpressions?: boolean;
+  cacheMode?: CacheMode;
 };
 
 /**
@@ -218,6 +226,7 @@ export {
   ResponseResultFn,
   MetaResponseResultFn,
   BaseRequest,
+  RequestQuery,
   QueryRequest,
   PreAggsJobsRequest,
   PreAggsSelector,
