@@ -589,27 +589,6 @@ class ApiGateway {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
   }
 
-  private normalizeQueryCacheMode(query: Query, cacheMode: CacheMode | undefined): Query {
-    if (cacheMode !== undefined) {
-      query.cacheMode = cacheMode;
-    } else if (!query.cache && query?.renewQuery !== undefined) {
-      // TODO: Drop this when renewQuery will be removed
-      query.cacheMode = query.renewQuery === true
-        ? 'must-revalidate'
-        : 'stale-if-slow';
-    } else if (!query.cache) {
-      query.cacheMode = 'stale-if-slow';
-    } else {
-      query.cacheMode = query.cache;
-    }
-
-    // TODO: Drop this when renewQuery will be removed
-    query.renewQuery = undefined;
-    query.cache = undefined;
-
-    return query;
-  }
-
   private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
     const isDevMode = getEnv('devMode');
     function visibilityFilter(item) {
@@ -1237,8 +1216,6 @@ class ApiGateway {
     cacheMode?: CacheMode,
   ): Promise<[QueryType, NormalizedQuery[], NormalizedQuery[]]> {
     let query = this.parseQueryParam(inputQuery);
-    query = Array.isArray(query) ? query.map(q => this.normalizeQueryCacheMode(q, cacheMode))
-      : this.normalizeQueryCacheMode(query, cacheMode);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {
@@ -1277,7 +1254,7 @@ class ApiGateway {
       }
 
       return {
-        normalizedQuery: (normalizeQuery(currentQuery, persistent)),
+        normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
         hasExpressionsInQuery
       };
     });
