@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
+
+### Bug Fixes
+
+- **client-react:** isLoading is set to false early ([#10075](https://github.com/cube-js/cube/issues/10075)) ([06afa28](https://github.com/cube-js/cube/commit/06afa28f8c1a06a4e05ba54d9931512749cc42b0))
+- **tesseract:** Fix member name case conversion ([#10064](https://github.com/cube-js/cube/issues/10064)) ([6523074](https://github.com/cube-js/cube/commit/6523074f3e5d1c3537efb3fd1002eb5d79772d85))
+
+### Features
+
+- **api-gateway:** Introduce cache mode option for `/cubesql` API ([#9972](https://github.com/cube-js/cube/issues/9972)) ([7d4ecdc](https://github.com/cube-js/cube/commit/7d4ecdccdf75dbe8c764cf54ad48a25fa4de9443))
+- **cubesql:** Push down `CAST(... AS DATE)` to CubeScan filters ([#10081](https://github.com/cube-js/cube/issues/10081)) ([61a94ef](https://github.com/cube-js/cube/commit/61a94ef9086d79bfcb5a370d2684f9b20b100022))
+- **schema-compiler:** Support time series queries in MySQL dialect in Tesseract ([#10078](https://github.com/cube-js/cube/issues/10078)) ([765cd77](https://github.com/cube-js/cube/commit/765cd7787e2b62abebd1bbdd81bb85567cbff799))
+
 ## [1.3.82](https://github.com/cube-js/cube/compare/v1.3.81...v1.3.82) (2025-10-21)
 
 ### Bug Fixes
