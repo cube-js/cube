@@ -2747,7 +2747,7 @@ export class BaseQuery {
   collectJoinHintsFromMembers(members) {
     return [
       ...members.map(m => m.joinHint).filter(h => h?.length > 0),
-      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers'),
+      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers', this.queryCache),
     ];
   }
 
