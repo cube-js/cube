@@ -1307,7 +1307,7 @@ If `true`, the DAX API will expose time dimensions as calendar hierarchies.
 
 ## `CUBE_XMLA_LANGUAGE`
 
-This variable is used to [configure the locale][ref-mdx-api-locale] for the [MDX API][ref-mdx-api]. 
+This variable is used to [configure the locale][ref-mdx-api-locale] for the [MDX API][ref-mdx-api].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1328,8 +1328,6 @@ CUBE_XMLA_LANGUAGE=nl-NL
 ## `CUBE_MDX_CREATE_DATE_HIERARCHIES`
 
 If `true`, the [MDX API][ref-mdx-api] will automatically create additional hierarchies for all [time dimensions][ref-time-dimensions] and organize them in a separate "Calendar" folder for each dimension.
-
-These hierarchies include a Calendar hierarchy structure containing `Year`, `Quarter`, `Month`, `Week`, and `Day` levels, as well as Calendar Quarter of Year and Calendar Year hierarchies. They allow filtering data in Excel without needing to drill down or expand all levels, and enable combining Calendar Year or Calendar Quarter of Year as filters while placing other dimensions on the axis.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
