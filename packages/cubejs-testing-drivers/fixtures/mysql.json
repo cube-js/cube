@@ -187,6 +187,7 @@
     "---------------------------------------",
     "SKIPPED SQL API (Need work)",
     "---------------------------------------",
+    "SQL API: reuse params",
     "SQL API: Nested Rollup",
     "SQL API: Nested Rollup with aliases",
     "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",

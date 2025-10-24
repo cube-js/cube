@@ -6162,15 +6162,6 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mysql-driver SQL API: reuse params: reuse_params 1`] = `
-Array [
-  Object {
-    "c0": 2020-01-01T00:00:00.000Z,
-    "m0": 17372,
-  },
-]
-`;
-
 exports[`Queries with the @cubejs-backend/mysql-driver SQL API: ungrouped pre-agg: ungrouped_pre_agg 1`] = `
 Array [
   Object {
