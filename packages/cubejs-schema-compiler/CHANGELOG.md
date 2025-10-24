@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
+
+### Bug Fixes
+
+- **tesseract:** Fix member name case conversion ([#10064](https://github.com/cube-js/cube/issues/10064)) ([6523074](https://github.com/cube-js/cube/commit/6523074f3e5d1c3537efb3fd1002eb5d79772d85))
+
+### Features
+
+- **schema-compiler:** Support time series queries in MySQL dialect in Tesseract ([#10078](https://github.com/cube-js/cube/issues/10078)) ([765cd77](https://github.com/cube-js/cube/commit/765cd7787e2b62abebd1bbdd81bb85567cbff799))
+
 ## [1.3.82](https://github.com/cube-js/cube/compare/v1.3.81...v1.3.82) (2025-10-21)
 
 ### Bug Fixes

@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
+
+### Features
+
+- **api-gateway:** Introduce cache mode option for `/cubesql` API ([#9972](https://github.com/cube-js/cube/issues/9972)) ([7d4ecdc](https://github.com/cube-js/cube/commit/7d4ecdccdf75dbe8c764cf54ad48a25fa4de9443))
+- **cubesql:** Push down `CAST(... AS DATE)` to CubeScan filters ([#10081](https://github.com/cube-js/cube/issues/10081)) ([61a94ef](https://github.com/cube-js/cube/commit/61a94ef9086d79bfcb5a370d2684f9b20b100022))
+
 ## [1.3.82](https://github.com/cube-js/cube/compare/v1.3.81...v1.3.82) (2025-10-21)
 
 ### Features

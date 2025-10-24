@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
+
+### Bug Fixes
+
+- **client-react:** isLoading is set to false early ([#10075](https://github.com/cube-js/cube/issues/10075)) ([06afa28](https://github.com/cube-js/cube/commit/06afa28f8c1a06a4e05ba54d9931512749cc42b0))
+
 ## [1.3.82](https://github.com/cube-js/cube/compare/v1.3.81...v1.3.82) (2025-10-21)
 
 **Note:** Version bump only for package @cubejs-client/react
