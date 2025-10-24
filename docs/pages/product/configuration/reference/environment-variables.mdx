@@ -1325,6 +1325,16 @@ CUBE_XMLA_LANGUAGE=nl-NL
 
 [link-lcid]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-lcid/70feba9f-294e-491e-b6eb-56532684c37f
 
+## `CUBE_MDX_CREATE_DATE_HIERARCHIES`
+
+If `true`, the [MDX API][ref-mdx-api] will automatically create additional hierarchies for all [time dimensions][ref-time-dimensions] and organize them in a separate "Calendar" folder for each dimension.
+
+These hierarchies include a Calendar hierarchy structure containing `Year`, `Quarter`, `Month`, `Week`, and `Day` levels, as well as Calendar Quarter of Year and Calendar Year hierarchies. They allow filtering data in Excel without needing to drill down or expand all levels, and enable combining Calendar Year or Calendar Quarter of Year as filters while placing other dimensions on the axis.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
 ## `CUBEJS_NESTED_FOLDERS_DELIMITER`
 
 Specifies the delimiter used to flatten the names of nested [folder][ref-folders] in
@@ -1831,3 +1841,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-environments]: /product/workspace/environments
 [ref-mdx-api]: /product/apis-integrations/mdx-api
 [ref-mdx-api-locale]: /product/apis-integrations/mdx-api#measure-format
+[ref-time-dimensions]: /product/data-modeling/reference/dimensions#time
