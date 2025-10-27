@@ -507,6 +507,34 @@ export class BaseQuery {
 
   /**
    * @private
+   * @param { import('../compiler/JoinGraph').FinishedJoinTree } joinTree
+   * @param { string[] } joinHints
+   * @return { string[][] }
+   */
+  enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
+    const joinsMap = {};
+
+    for (const j of joinTree.joins) {
+      joinsMap[j.to] = j.from;
+    }
+
+    return joinHints.map(jh => {
+      let cubeName = jh;
+      const path = [cubeName];
+      while (joinsMap[cubeName]) {
+        cubeName = joinsMap[cubeName];
+        path.push(cubeName);
+      }
+
+      if (path.length === 1) {
+        return path[0];
+      }
+      return path.reverse();
+    });
+  }
+
+  /**
+   * @private
    * @param { (string|string[])[] } hints
    * @param { Record<string, string[][]>} joinMap
    * @return {(string|string[])[]}
@@ -2669,7 +2697,7 @@ export class BaseQuery {
     const explicitJoinHintMembers = new Set(allMembersJoinHints.filter(j => Array.isArray(j)).flat());
     const queryJoinMaps = this.queryJoinMap();
     const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
-    const newCollectedHints = [];
+    let newCollectedHints = [];
 
     // One cube may join the other cube via transitive joined cubes,
     // members from which are referenced in the join `on` clauses.
@@ -2703,8 +2731,12 @@ export class BaseQuery {
       const iterationCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
       newJoinHintsCollectedCnt = iterationCollectedHints.length;
       cnt++;
-      if (newJoin) {
-        newCollectedHints.push(...joinMembersJoinHints.filter(j => !explicitJoinHintMembers.has(j)));
+      if (newJoin && newJoin.joins.length > 0) {
+        // Even if there is no join tree changes, we still
+        // push correctly ordered join hints, collected from the resolving of members of join tree
+        // upfront the all existing query members. This ensures the correct cube join order
+        // with transitive joins even if they are already presented among query members.
+        newCollectedHints = this.enrichedJoinHintsFromJoinTree(newJoin, joinMembersJoinHints);
       }
     } while (newJoin?.joins.length > 0 && !this.isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
 
