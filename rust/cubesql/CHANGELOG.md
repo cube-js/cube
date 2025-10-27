@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
+
+### Features
+
+- **api-gateway:** Introduce cache mode option for `/cubesql` API ([#9972](https://github.com/cube-js/cube/issues/9972)) ([7d4ecdc](https://github.com/cube-js/cube/commit/7d4ecdccdf75dbe8c764cf54ad48a25fa4de9443))
+- **cubesql:** Push down `CAST(... AS DATE)` to CubeScan filters ([#10081](https://github.com/cube-js/cube/issues/10081)) ([61a94ef](https://github.com/cube-js/cube/commit/61a94ef9086d79bfcb5a370d2684f9b20b100022))
+
+## [1.3.82](https://github.com/cube-js/cube/compare/v1.3.81...v1.3.82) (2025-10-21)
+
+### Features
+
+- **cubesql:** Filter push down for date_part(?upper) AND date_part(?lower) ([#10070](https://github.com/cube-js/cube/issues/10070)) ([bcadbf2](https://github.com/cube-js/cube/commit/bcadbf233a7a875aecf6dcd9c4c17c7150f74dfe))
+- **cubesql:** Filter push down for date_part(?upper) AND date_part('week') ([#10071](https://github.com/cube-js/cube/issues/10071)) ([150a3c5](https://github.com/cube-js/cube/commit/150a3c520b93bbcd8be3bd098d24a3d95187fc14))
+- **cubesql:** PlanNormalize - reduce stack allocations (split by path) ([#10067](https://github.com/cube-js/cube/issues/10067)) ([bc8ff68](https://github.com/cube-js/cube/commit/bc8ff6857785022ecfdd1458f50b0677f3d6c500))
+- **cubesql:** Push down Tableau year-month-day IN number filter to CubeScan ([#10068](https://github.com/cube-js/cube/issues/10068)) ([bc16a5f](https://github.com/cube-js/cube/commit/bc16a5f9137fd88fb5243f356481bbe27a9a5f6b))
+
 ## [1.3.81](https://github.com/cube-js/cube/compare/v1.3.80...v1.3.81) (2025-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

@@ -2,7 +2,13 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import { LRUCache } from 'lru-cache';
 import { pipeline } from 'stream';
-import { AsyncDebounce, getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
+import {
+  AsyncDebounce,
+  getEnv,
+  MaybeCancelablePromise,
+  streamToArray,
+  CacheMode,
+} from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   BaseDriver,
@@ -19,6 +25,23 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType, MetadataOperationType } from './QueryOrchestrator';
+
+export type CacheQueryResultOptions = {
+  renewalThreshold?: number,
+  renewalKey?: any,
+  priority?: number,
+  external?: boolean,
+  requestId?: string,
+  dataSource: string,
+  waitForRenew?: boolean,
+  forceNoCache?: boolean,
+  useInMemory?: boolean,
+  useCsvQuery?: boolean,
+  lambdaTypes?: TableStructure,
+  persistent?: boolean,
+  primaryQuery?: boolean,
+  renewCycle?: boolean,
+};
 
 type QueryOptions = {
   external?: boolean;
@@ -46,7 +69,9 @@ export type Query = {
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
+  // @deprecated
   renewQuery?: boolean;
+  cacheMode?: CacheMode;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
 
@@ -55,8 +80,11 @@ export type QueryBody = {
   persistent?: boolean;
   query?: string;
   values?: string[];
-  continueWait?: boolean;
+  loadRefreshKeysOnly?: boolean;
+  scheduledRefresh?: boolean;
+  // @deprecated
   renewQuery?: boolean;
+  cacheMode?: CacheMode;
   requestId?: string;
   external?: boolean;
   isJob?: boolean;
@@ -202,7 +230,7 @@ export class QueryCache {
       queuePriority = queryBody.queuePriority;
     }
 
-    const forceNoCache = queryBody.forceNoCache || false;
+    const forceNoCache = queryBody.forceNoCache || (queryBody.cacheMode === 'no-cache') || false;
 
     const { values } = queryBody;
 
@@ -252,7 +280,8 @@ export class QueryCache {
       }
     }
 
-    if (queryBody.renewQuery) {
+    // renewQuery has been deprecated, but keeping it for now
+    if (queryBody.cacheMode === 'must-revalidate' || queryBody.renewQuery) {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
       return this.renewQuery(
         query,
@@ -270,7 +299,7 @@ export class QueryCache {
       );
     }
 
-    if (!this.options.backgroundRenew) {
+    if (!this.options.backgroundRenew && queryBody.cacheMode !== 'stale-while-revalidate') {
       const resultPromise = this.renewQuery(
         query,
         values,
@@ -843,22 +872,7 @@ export class QueryCache {
     values: string[],
     cacheKey: CacheKey,
     expiration: number,
-    options: {
-      renewalThreshold?: number,
-      renewalKey?: any,
-      priority?: number,
-      external?: boolean,
-      requestId?: string,
-      dataSource: string,
-      waitForRenew?: boolean,
-      forceNoCache?: boolean,
-      useInMemory?: boolean,
-      useCsvQuery?: boolean,
-      lambdaTypes?: TableStructure,
-      persistent?: boolean,
-      primaryQuery?: boolean,
-      renewCycle?: boolean,
-    }
+    options: CacheQueryResultOptions,
   ) {
     const spanId = crypto.randomBytes(16).toString('hex');
     options = options || { dataSource: 'default' };
