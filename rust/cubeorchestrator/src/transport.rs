@@ -1,4 +1,5 @@
 use crate::query_result_transform::DBResponsePrimitive;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, fmt::Display};
@@ -153,7 +154,7 @@ pub struct QueryTimeDimension {
 
 pub type AliasToMemberMap = HashMap<String, String>;
 
-pub type MembersMap = HashMap<String, String>;
+pub type MembersMap = IndexMap<String, String>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GranularityMeta {
@@ -317,4 +318,4 @@ pub struct TransformDataRequest {
     pub res_type: Option<ResultType>,
 }
 
-pub type JsRawData = Vec<HashMap<String, DBResponsePrimitive>>;
+pub type JsRawData = Vec<IndexMap<String, DBResponsePrimitive>>;

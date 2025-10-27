@@ -3,6 +3,7 @@ use crate::{
     transport::JsRawData,
 };
 use cubeshared::codegen::{root_as_http_message, HttpCommand};
+use indexmap::IndexMap;
 use neon::prelude::Finalize;
 use std::collections::HashMap;
 
@@ -35,7 +36,7 @@ impl std::error::Error for ParseError {}
 pub struct QueryResult {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<DBResponseValue>>,
-    pub columns_pos: HashMap<String, usize>,
+    pub columns_pos: IndexMap<String, usize>,
 }
 
 impl Finalize for QueryResult {}
@@ -45,7 +46,7 @@ impl QueryResult {
         let mut result = QueryResult {
             columns: vec![],
             rows: vec![],
-            columns_pos: HashMap::new(),
+            columns_pos: IndexMap::new(),
         };
 
         let http_message =
@@ -69,7 +70,7 @@ impl QueryResult {
                         return Err(ParseError::ColumnNameNotDefined);
                     }
 
-                    let (columns, columns_pos): (Vec<_>, HashMap<_, _>) = result_set_columns
+                    let (columns, columns_pos): (Vec<_>, IndexMap<_, _>) = result_set_columns
                         .iter()
                         .enumerate()
                         .map(|(index, column_name)| {
@@ -111,13 +112,13 @@ impl QueryResult {
             return Ok(QueryResult {
                 columns: vec![],
                 rows: vec![],
-                columns_pos: HashMap::new(),
+                columns_pos: IndexMap::new(),
             });
         }
 
         let first_row = &js_raw_data[0];
         let columns: Vec<String> = first_row.keys().cloned().collect();
-        let columns_pos: HashMap<String, usize> = columns
+        let columns_pos: IndexMap<String, usize> = columns
             .iter()
             .enumerate()
             .map(|(index, column)| (column.clone(), index))
