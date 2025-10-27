@@ -92,11 +92,6 @@ export type FullPreAggregationDescription = any;
  */
 export type TransformedQuery = any;
 
-type BuildRollupJoinResult = {
-  rollupJoin: RollupJoin;
-  existingJoins: JoinEdgeWithMembers[];
-};
-
 export class PreAggregations {
   private readonly query: BaseQuery;
 
@@ -973,7 +968,7 @@ export class PreAggregations {
   }
 
   // TODO check multiplication factor didn't change
-  private buildRollupJoin(preAggObj: PreAggregationForQuery, preAggObjsToJoin: PreAggregationForQuery[]): BuildRollupJoinResult {
+  private buildRollupJoin(preAggObj: PreAggregationForQuery, preAggObjsToJoin: PreAggregationForQuery[]): RollupJoin {
     return this.query.cacheValue(
       ['buildRollupJoin', JSON.stringify(preAggObj), JSON.stringify(preAggObjsToJoin)],
       () => {
@@ -1013,10 +1008,7 @@ export class PreAggregations {
           };
         });
 
-        return {
-          rollupJoin,
-          existingJoins,
-        };
+        return rollupJoin;
       }
     );
   }
@@ -1107,19 +1099,7 @@ export class PreAggregations {
       preAggregationsToJoin.forEach(preAgg => {
         references.rollupsReferences.push(preAgg.references);
       });
-      const { rollupJoin, existingJoins } = this.buildRollupJoin(preAggObj, preAggregationsToJoin);
-
-      const joinsMap: Record<string, string> = {};
-      for (const j of rollupJoin) {
-        joinsMap[j.to] = j.from;
-      }
-      for (const j of existingJoins) {
-        joinsMap[j.to] = j.from;
-      }
-
-      references.dimensions = this.buildMembersFullName(references.dimensions, joinsMap);
-      references.measures = this.buildMembersFullName(references.measures, joinsMap);
-      references.timeDimensions = this.buildTimeDimensionsFullName(references.timeDimensions, joinsMap);
+      const rollupJoin = this.buildRollupJoin(preAggObj, preAggregationsToJoin);
 
       return {
         ...preAggObj,
