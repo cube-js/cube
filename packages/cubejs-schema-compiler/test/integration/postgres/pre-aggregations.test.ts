@@ -675,8 +675,8 @@ describe('PreAggregations', () => {
           type: 'rollupJoin',
           dimensions: [
             dim_1,
-            cube_2.dim_1,
-            cube_2.dim_2  // XXX
+            CUBE.cube_2.dim_1,
+            CUBE.cube_2.dim_2  // XXX
           ],
           rollups: [
             aaa,
@@ -873,8 +873,8 @@ describe('PreAggregations', () => {
           type: 'rollupJoin',
           dimensions: [
             dim_a,
-            cube_b.dim_b,
-            cube_b.cube_c.dim_c
+            CUBE.cube_b.dim_b,
+            CUBE.cube_b.cube_c.dim_c
           ],
           rollups: [
             aaa_rollup,
@@ -1163,8 +1163,8 @@ describe('PreAggregations', () => {
           dimensions: [
             merchant_sk,
             product_sk,
-            merchant_and_product_dims.status,
-            other_facts.fact
+            CUBE.merchant_and_product_dims.status,
+            CUBE.other_facts.fact
           ],
           rollups: [
             facts_rollup,
