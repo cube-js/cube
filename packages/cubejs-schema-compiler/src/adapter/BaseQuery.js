@@ -432,7 +432,7 @@ export class BaseQuery {
       throw new UserError('Can not construct joins for the query, potential loop detected');
     }
 
-    return newJoin;
+    return this.joinGraph.buildJoin(constructJH());
   }
 
   cacheValue(key, fn, { contextPropNames, inputProps, cache } = {}) {
