@@ -388,12 +388,14 @@ export class BaseQuery {
 
   /**
    * This function follows the same logic as in this.collectJoinHints()
+   * skipQueryJoinMap is used by PreAggregations to build join tree without user's query all members map
    * @public
    * @param {Array<(Array<string> | string)>} hints
+   * @param { boolean } skipQueryJoinMap
    * @return {import('../compiler/JoinGraph').FinishedJoinTree}
    */
-  joinTreeForHints(hints) {
-    const queryJoinMaps = this.queryJoinMap();
+  joinTreeForHints(hints, skipQueryJoinMap = false) {
+    const queryJoinMaps = skipQueryJoinMap ? {} : this.queryJoinMap();
     let newCollectedHints = [];
 
     const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
