@@ -998,7 +998,7 @@ export class PreAggregations {
         if (!nonExistingJoins.length) {
           throw new UserError(`Nothing to join in rollup join. Target joins ${JSON.stringify(targetJoins)} are included in existing rollup joins ${JSON.stringify(existingJoins)}`);
         }
-        const rollupJoin = nonExistingJoins.map(join => {
+        return nonExistingJoins.map(join => {
           const fromPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.fromMembers, join);
           const toPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.toMembers, join);
           return {
@@ -1007,8 +1007,6 @@ export class PreAggregations {
             toPreAggObj
           };
         });
-
-        return rollupJoin;
       }
     );
   }
