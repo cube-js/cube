@@ -874,7 +874,7 @@ describe('PreAggregations', () => {
           dimensions: [
             dim_a,
             cube_b.dim_b,
-            cube_c.dim_c
+            cube_b.cube_c.dim_c
           ],
           rollups: [
             aaa_rollup,
