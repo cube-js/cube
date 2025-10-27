@@ -1401,32 +1401,6 @@ export class PreAggregations {
             for (const j of references.joinTree.joins) {
               joinsMap[j.to] = j.from;
             }
-
-            // As full-path references may be passed to query options,
-            // it is important to sort them based on join tree order,
-            // because full-path names work as explicit join hints,
-            // and JoinGraph will take them as granted in the order of
-            // occurrence. But that might be incorrect for transitive-join cases.
-            const sortMembersByJoinTree = (members: string[]) => {
-              const joinOrder: Record<string, number> = {};
-              joinOrder[references.joinTree!.root] = 0;
-              for (const join of references.joinTree!.joins) {
-                const index = references.joinTree!.joins.indexOf(join);
-                joinOrder[join.to] = index + 1;
-              }
-
-              members.sort((a, b) => {
-                const cubeA = a.split('.')[0];
-                const cubeB = b.split('.')[0];
-                const orderA = joinOrder[cubeA] ?? Infinity;
-                const orderB = joinOrder[cubeB] ?? Infinity;
-
-                return orderA - orderB;
-              });
-            };
-
-            sortMembersByJoinTree(references.dimensions);
-            sortMembersByJoinTree(references.measures);
           }
 
           references.dimensions = this.buildMembersFullName(references.dimensions, joinsMap);
