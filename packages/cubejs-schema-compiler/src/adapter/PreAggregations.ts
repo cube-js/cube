@@ -977,16 +977,9 @@ export class PreAggregations {
     return this.query.cacheValue(
       ['buildRollupJoin', JSON.stringify(preAggObj), JSON.stringify(preAggObjsToJoin)],
       () => {
-        // It's important to build join graph not only using the pre-agg members, but also
-        // taking into account all explicit underlying rollup pre-aggregation joins, because
-        // otherwise the built join tree might differ from the actual pre-aggregation.
-        const preAggJoinsJoinHints = preAggObj.references.rollupsReferences.map(
-          this.collectJoinHintsFromRollupReferences
-        ).flat();
-
-        const builtJoinTree = this.query.joinGraph.buildJoin(
-          preAggJoinsJoinHints.concat(this.cubesFromPreAggregation(preAggObj))
-        );
+        // It's not enough to call buildJoin() directly on cubesFromPreAggregation()
+        // because transitive joins won't be collected in that case.
+        const builtJoinTree = this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(preAggObj), true);
 
         if (!builtJoinTree) {
           throw new UserError(`Can't build join tree for pre-aggregation ${preAggObj.cube}.${preAggObj.preAggregationName}`);
@@ -997,9 +990,7 @@ export class PreAggregations {
         // TODO join hints?
         const existingJoins = preAggObjsToJoin
           .map(p => this.resolveJoinMembers(
-            this.query.joinGraph.buildJoin(
-              this.collectJoinHintsFromRollupReferences(p.references).concat(this.cubesFromPreAggregation(p))
-            )!
+            this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(p), true)
           ))
           .flat();
 
@@ -1074,11 +1065,11 @@ export class PreAggregations {
     });
   }
 
-  private cubesFromPreAggregation(preAggObj: PreAggregationForQuery): string[] {
+  private cubesHintsFromPreAggregation(preAggObj: PreAggregationForQuery): string[][] {
     return R.uniq(
-      preAggObj.references.measures.map(m => this.query.cubeEvaluator.parsePath('measures', this.query.cubeEvaluator.memberShortNameFromPath(m))).concat(
-        preAggObj.references.dimensions.map(m => this.query.cubeEvaluator.parsePathAnyType(this.query.cubeEvaluator.memberShortNameFromPath(m)))
-      ).map(p => p[0])
+      preAggObj.references.measures.concat(
+        preAggObj.references.dimensions
+      ).map(p => p.split('.').slice(0, -1))
     );
   }
 
