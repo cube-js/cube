@@ -5,7 +5,6 @@ use crate::{
 use cubeshared::codegen::{root_as_http_message, HttpCommand};
 use indexmap::IndexMap;
 use neon::prelude::Finalize;
-use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum ParseError {
