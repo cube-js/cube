@@ -669,10 +669,7 @@ export class PreAggregations {
         references.dimensions.length === filterDimensionsSingleValueEqual.size &&
         R.all(d => filterDimensionsSingleValueEqual.has(d), backAliasDimensions) ||
         transformedQuery.allFiltersWithinSelectedDimensions &&
-        // references.dimensions might be reordered because of joinTree join order,
-        // so we need to compare without order here.
-        backAliasDimensions.length === transformedQuery.sortedDimensions.length &&
-        R.equals(new Set(backAliasDimensions), new Set(transformedQuery.sortedDimensions))
+        R.equals(backAliasDimensions, transformedQuery.sortedDimensions)
       ) && (
         R.all(m => backAliasMeasures.includes(m), transformedQuery.measures) ||
         // TODO do we need backAlias here?
