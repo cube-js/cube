@@ -2186,7 +2186,7 @@ mod tests {
             &QueryResult {
                 columns: vec![],
                 rows: vec![],
-                columns_pos: HashMap::new(),
+                columns_pos: IndexMap::new(),
             },
             alias_to_member_name_map,
             annotation,
@@ -2247,7 +2247,7 @@ mod tests {
             &QueryResult {
                 columns: vec![],
                 rows: vec![],
-                columns_pos: HashMap::new(),
+                columns_pos: IndexMap::new(),
             },
             alias_to_member_name_map,
             annotation,
@@ -2319,7 +2319,7 @@ mod tests {
             &QueryResult {
                 columns: vec![],
                 rows: vec![],
-                columns_pos: HashMap::new(),
+                columns_pos: IndexMap::new(),
             },
             alias_to_member_name_map,
             annotation,
