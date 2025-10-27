@@ -387,16 +387,14 @@ export class BaseQuery {
   }
 
   /**
-   * Is used by native
    * This function follows the same logic as in this.collectJoinHints()
-   * @private
+   * @public
    * @param {Array<(Array<string> | string)>} hints
    * @return {import('../compiler/JoinGraph').FinishedJoinTree}
    */
   joinTreeForHints(hints) {
-    const explicitJoinHintMembers = new Set(hints.filter(j => Array.isArray(j)).flat());
     const queryJoinMaps = this.queryJoinMap();
-    const newCollectedHints = [];
+    let newCollectedHints = [];
 
     const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
       ...newCollectedHints,
@@ -421,8 +419,12 @@ export class BaseQuery {
       const iterationCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
       newJoinHintsCollectedCnt = iterationCollectedHints.length;
       cnt++;
-      if (newJoin) {
-        newCollectedHints.push(...joinMembersJoinHints.filter(j => !explicitJoinHintMembers.has(j)));
+      if (newJoin && newJoin.joins.length > 0) {
+        // Even if there is no join tree changes, we still
+        // push correctly ordered join hints, collected from the resolving of members of join tree
+        // upfront the all existing query members. This ensures the correct cube join order
+        // with transitive joins even if they are already presented among query members.
+        newCollectedHints = this.enrichedJoinHintsFromJoinTree(newJoin, joinMembersJoinHints);
       }
     } while (newJoin?.joins.length > 0 && !this.isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
 
@@ -2694,7 +2696,6 @@ export class BaseQuery {
    */
   collectJoinHints(excludeTimeDimensions = false) {
     const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(excludeTimeDimensions));
-    const explicitJoinHintMembers = new Set(allMembersJoinHints.filter(j => Array.isArray(j)).flat());
     const queryJoinMaps = this.queryJoinMap();
     const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
     let newCollectedHints = [];
