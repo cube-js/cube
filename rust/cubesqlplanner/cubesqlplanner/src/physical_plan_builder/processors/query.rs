@@ -1,14 +1,10 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{
-    all_symbols, pretty_print, pretty_print_rc, MultiStageMemberLogicalType, Query, QuerySource,
-};
+use crate::logical_plan::{all_symbols, MultiStageMemberLogicalType, Query, QuerySource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
     CalcGroupItem, CalcGroupsJoin, Cte, Expr, From, MemberExpression, Select, SelectBuilder,
 };
-use crate::planner::sql_evaluator::collectors::{
-    collect_calc_group_dims_from_nodes, has_multi_stage_members,
-};
+use crate::planner::sql_evaluator::collectors::collect_calc_group_dims_from_nodes;
 use crate::planner::sql_evaluator::{get_filtered_values, ReferencesBuilder};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
