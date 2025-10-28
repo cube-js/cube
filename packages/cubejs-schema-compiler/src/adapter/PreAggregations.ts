@@ -1011,7 +1011,7 @@ export class PreAggregations {
     );
   }
 
-  private preAggObjForJoin(preAggObjsToJoin: PreAggregationForQuery[], joinMembers, join): PreAggregationForQuery {
+  private preAggObjForJoin(preAggObjsToJoin: PreAggregationForQuery[], joinMembers: string[], join: JoinEdgeWithMembers): PreAggregationForQuery {
     const fromPreAggObj = preAggObjsToJoin
       .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
     if (!fromPreAggObj.length) {
