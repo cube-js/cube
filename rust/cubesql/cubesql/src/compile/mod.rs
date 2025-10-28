@@ -9463,6 +9463,215 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_filter_extract_by_year_and_quarter() {
+        init_testing_logger();
+
+        async fn assert_quarter_result(quarter: i32, start_date: &str, end_date: &str) {
+            let query_plan = convert_select_to_query_plan(
+                format!(r#"
+                SELECT COUNT(*) AS "count",
+                       EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+                FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019
+                  AND EXTRACT(QUARTER FROM "KibanaSampleDataEcommerce"."order_date") = {}
+                GROUP BY 2
+                "#, quarter),
+                DatabaseProtocol::PostgreSQL,
+            ).await;
+
+            assert_eq!(
+                query_plan.as_logical_plan().find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("year".to_string()),
+                        date_range: Some(json!(vec![start_date, end_date])),
+                    },]),
+                    order: Some(vec![]),
+                    ..Default::default()
+                }
+            )
+        }
+
+        assert_quarter_result(1, "2019-01-01", "2019-03-31").await;
+        assert_quarter_result(2, "2019-04-01", "2019-06-30").await;
+        assert_quarter_result(3, "2019-07-01", "2019-09-30").await;
+        assert_quarter_result(4, "2019-10-01", "2019-12-31").await;
+    }
+
+    #[tokio::test]
+    async fn test_filter_extract_by_year_and_month() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019 AND EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date") = 2
+            GROUP BY 2
+            ;"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await
+            .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-02-01".to_string(),
+                        "2019-02-28".to_string(),
+                    ])),
+                },]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_filter_extract_by_year_and_week() {
+        init_testing_logger();
+
+        async fn assert_week_result(week: i32, start_date: &str, end_date: &str) {
+            let query_plan = convert_select_to_query_plan(
+                format!(r#"
+                SELECT COUNT(*) AS "count",
+                       EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+                FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019
+                  AND EXTRACT(WEEK FROM "KibanaSampleDataEcommerce"."order_date") = {}
+                GROUP BY 2
+                "#, week),
+                DatabaseProtocol::PostgreSQL,
+            ).await;
+
+            assert_eq!(
+                query_plan.as_logical_plan().find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("year".to_string()),
+                        date_range: Some(json!(vec![start_date, end_date])),
+                    },]),
+                    order: Some(vec![]),
+                    ..Default::default()
+                }
+            )
+        }
+
+        // Test week 1 (first week of 2019)
+        // In 2019, January 1 is a Tuesday, so ISO week 1 starts on Monday, December 31, 2018
+        // But since our range is constrained to 2019, it should be Jan 1-6
+        assert_week_result(1, "2019-01-01", "2019-01-06").await;
+
+        // Test week 15 (mid-April)
+        // Week 15 of 2019 is April 8-14
+        assert_week_result(15, "2019-04-08", "2019-04-14").await;
+
+        // Test week 52 (end of year)
+        // Week 52 of 2019 is December 23-29
+        assert_week_result(52, "2019-12-23", "2019-12-29").await;
+    }
+
+    #[tokio::test]
+    async fn test_filter_extract_by_year_and_week_with_trunc() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date") = 2019
+              AND CAST(TRUNC(EXTRACT(WEEK FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 15
+            GROUP BY 2
+            "#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await
+            .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-04-08".to_string(),
+                        "2019-04-14".to_string(),
+                    ])),
+                },]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_filter_date_part_by_year_quarter_month_week() {
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE DATE_PART('year', "KibanaSampleDataEcommerce"."order_date") = 2019
+              AND DATE_PART('quarter', "KibanaSampleDataEcommerce"."order_date") = 2
+              AND DATE_PART('month', "KibanaSampleDataEcommerce"."order_date") = 4
+              AND DATE_PART('week', "KibanaSampleDataEcommerce"."order_date") = 15
+            GROUP BY 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-04-08".to_string(),
+                        "2019-04-14".to_string(),
+                    ])),
+                },]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_tableau_filter_extract_by_year() {
         init_testing_logger();
 
@@ -15685,8 +15894,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("year".to_string()),
                     date_range: Some(json!(vec![
-                        "2019-01-01 00:00:00.000".to_string(),
-                        "2023-12-31 23:59:59.999".to_string()
+                        "2019-01-01T00:00:00.000Z".to_string(),
+                        "2023-12-31T23:59:59.999Z".to_string()
                     ])),
                 }]),
                 order: Some(vec![]),
@@ -15744,8 +15953,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2019-01-01 00:00:00.000".to_string(),
-                                "2019-03-31 23:59:59.999".to_string(),
+                                "2019-01-01T00:00:00.000Z".to_string(),
+                                "2019-03-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -15754,8 +15963,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2020-01-01 00:00:00.000".to_string(),
-                                "2020-03-31 23:59:59.999".to_string(),
+                                "2020-01-01T00:00:00.000Z".to_string(),
+                                "2020-03-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -15764,8 +15973,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2021-01-01 00:00:00.000".to_string(),
-                                "2021-03-31 23:59:59.999".to_string(),
+                                "2021-01-01T00:00:00.000Z".to_string(),
+                                "2021-03-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -15774,8 +15983,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2022-01-01 00:00:00.000".to_string(),
-                                "2022-03-31 23:59:59.999".to_string(),
+                                "2022-01-01T00:00:00.000Z".to_string(),
+                                "2022-03-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -15784,8 +15993,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2023-01-01 00:00:00.000".to_string(),
-                                "2023-03-31 23:59:59.999".to_string(),
+                                "2023-01-01T00:00:00.000Z".to_string(),
+                                "2023-03-31T23:59:59.999Z".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -17788,6 +17997,175 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                         and: None,
                     },
                 ]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_tableau_year_month_in_number() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT("KibanaSampleDataEcommerce"."count") AS "cnt:count:ok",
+                CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT) AS "customer_gender"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE (
+                (
+                    (
+                        CAST(
+                            TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date"))
+                        AS INTEGER) * 100
+                    ) + CAST(
+                        TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date"))
+                        AS INTEGER
+                    )
+                ) IN (202501, 202502, 202503, 202504)
+                AND CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT) = 'value'
+            )
+            GROUP BY 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2025-01-01T00:00:00.000Z".to_string(),
+                        "2025-04-30T23:59:59.999Z".to_string(),
+                    ])),
+                }]),
+                order: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["value".to_string()]),
+                    or: None,
+                    and: None,
+                },]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_tableau_year_month_day_eq_number() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT("KibanaSampleDataEcommerce"."count") AS "cnt:count:ok",
+                CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT) AS "customer_gender"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE (
+                (
+                    (
+                        (
+                            CAST(TRUNC(
+                                EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")
+                            ) AS INTEGER) * 10000
+                        ) + (
+                            CAST(TRUNC(
+                                EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")
+                            ) AS INTEGER) * 100
+                        )
+                    ) + CAST(TRUNC(
+                        EXTRACT(DAY FROM "KibanaSampleDataEcommerce"."order_date")
+                    ) AS INTEGER)
+                ) = 20250218
+            )
+            GROUP BY 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2025-02-18T00:00:00.000Z".to_string(),
+                        "2025-02-18T23:59:59.999Z".to_string(),
+                    ])),
+                }]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_cast_as_date_filter() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                SUM(sumPrice) AS s,
+                CAST(customer_gender AS TEXT) AS g
+            FROM KibanaSampleDataEcommerce
+            WHERE
+                CAST(order_date AS DATE) >= (DATE '2025-07-02')
+                AND CAST(order_date AS DATE) <= (DATE '2025-09-30')
+            GROUP BY 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2025-07-02T00:00:00.000Z".to_string(),
+                        "2025-09-30T23:59:59.999Z".to_string(),
+                    ])),
+                }]),
+                order: Some(vec![]),
                 ..Default::default()
             }
         )

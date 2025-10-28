@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
+import { CacheMode } from '@cubejs-backend/shared';
 import { ResultWrapper } from './ResultWrapper';
 
 export * from './ResultWrapper';
@@ -77,12 +78,13 @@ export interface SqlPayload {
 }
 
 export interface SqlApiLoadPayload {
-  request: Request<LoadRequestMeta>,
-  session: SessionContext,
-  query: any,
-  queryKey: any,
-  sqlQuery: any,
-  streaming: boolean,
+  request: Request<LoadRequestMeta>;
+  session: SessionContext;
+  query: any;
+  queryKey: any;
+  sqlQuery: any;
+  streaming: boolean;
+  cacheMode: CacheMode;
 }
 
 export interface LogLoadEventPayload {
@@ -435,10 +437,10 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdown
   await native.shutdownInterface(instance, shutdownMode);
 };
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any): Promise<void> => {
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow'): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode);
 };
 
 // TODO parse result from native code

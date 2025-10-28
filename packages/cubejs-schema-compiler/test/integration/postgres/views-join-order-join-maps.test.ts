@@ -1,6 +1,5 @@
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
-import { transformResultsForTesseractIfNeeded } from '../../unit/utils';
 
 describe('Views Join Order using join maps', () => {
   jest.setTimeout(200000);
@@ -140,11 +139,11 @@ cube('D', {
       segments: [],
       filters: [],
       total: true,
-    }, transformResultsForTesseractIfNeeded([{
+    }, [{
       view___a_id: 1,
       view___a_name: 'a',
       view___a_d_name: 'd3',
-    }]), { compiler, joinGraph, cubeEvaluator });
+    }], { compiler, joinGraph, cubeEvaluator });
 
     expect(sql).toMatch(/AS "b"/);
     expect(sql).toMatch(/AS "c"/);
@@ -166,11 +165,11 @@ cube('D', {
       segments: [],
       filters: [],
       total: true,
-    }, transformResultsForTesseractIfNeeded([{
+    }, [{
       view___a_id: 1,
       view___a_name: 'a',
       view___a_c_name: 'c1',
-    }]), { compiler, joinGraph, cubeEvaluator });
+    }], { compiler, joinGraph, cubeEvaluator });
 
     expect(sql).toMatch(/AS "b"/);
     expect(sql).toMatch(/AS "c"/);
@@ -193,12 +192,12 @@ cube('D', {
       segments: [],
       filters: [],
       total: true,
-    }, transformResultsForTesseractIfNeeded([{
+    }, [{
       view___a_id: 1,
       view___a_name: 'a',
       view___a_c_name: 'c1',
       view___a_d_name: 'd3',
-    }]), { compiler, joinGraph, cubeEvaluator });
+    }], { compiler, joinGraph, cubeEvaluator });
 
     expect(sql).toMatch(/AS "b"/);
     expect(sql).toMatch(/AS "c"/);

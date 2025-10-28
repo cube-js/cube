@@ -363,7 +363,7 @@ function parseDates(result: any) {
 }
 
 export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: GraphQLResolveInfo) {
-  const { where, limit, offset, timezone, orderBy, renewQuery, ungrouped } = args;
+  const { where, limit, offset, timezone, orderBy, renewQuery, ungrouped, cache } = args;
 
   const measures: string[] = [];
   const dimensions: string[] = [];
@@ -461,6 +461,7 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
     ...(timezone && { timezone }),
     ...(filters.length && { filters }),
     ...(renewQuery && { renewQuery }),
+    ...(cache && { cache }),
     ...(ungrouped && { ungrouped }),
   };
 }
@@ -639,6 +640,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           offset: intArg(),
           timezone: stringArg(),
           renewQuery: booleanArg(),
+          cache: stringArg(),
           ungrouped: booleanArg(),
           orderBy: arg({
             type: 'RootOrderByInput'
@@ -651,6 +653,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             apiGateway.load({
               query,
               queryType: QueryType.REGULAR_QUERY,
+              ...(query.cache ? { cache: query.cache } : {}),
               context: req.context,
               res: async (message) => {
                 if (message.error) {

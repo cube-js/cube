@@ -1380,8 +1380,8 @@ export class BaseQuery {
     const join = R.drop(1, toJoin)
       .map(
         (q, i) => (this.dimensionAliasNames().length ?
-          `INNER JOIN ${this.wrapInParenthesis((q))} as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
-          `, ${this.wrapInParenthesis(q)} as q_${i + 1}`),
+          `INNER JOIN ${this.wrapInParenthesis((q))} ${this.asSyntaxJoin} q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
+          `, ${this.wrapInParenthesis(q)} ${this.asSyntaxJoin} q_${i + 1}`),
       ).join('\n');
 
     const columnsToSelect = this.evaluateSymbolSqlWithContext(
@@ -1410,7 +1410,7 @@ export class BaseQuery {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 
-    return `SELECT ${this.topLimit()}${columnsToSelect} FROM ${this.wrapInParenthesis(toJoin[0])} as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
+    return `SELECT ${this.topLimit()}${columnsToSelect} FROM ${this.wrapInParenthesis(toJoin[0])} ${this.asSyntaxJoin} q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 
   wrapInParenthesis(select) {
@@ -4009,7 +4009,17 @@ export class BaseQuery {
       const dimensionSql = this.dimensionSql(dimension);
       return `select ${aggFunction}(${this.convertTz(dimensionSql)}) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
     }
-    return null;
+
+    // Handle case that requires joins
+    const subQuery = this.newSubQuery({
+      dimensions: [dimension.dimension],
+      rowLimit: null,
+    });
+
+    const dimensionSql = subQuery.dimensionSql(dimension);
+    const fromClause = subQuery.query();
+
+    return `select ${aggFunction}(${subQuery.convertTz(dimensionSql)}) from ${fromClause}`;
   }
 
   cubeCardinalityQueries() { // TODO collect sub queries

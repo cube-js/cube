@@ -1,6 +1,5 @@
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
-import { transformResultsForTesseractIfNeeded } from '../../unit/utils';
 
 describe('Views Join Order 2', () => {
   jest.setTimeout(200000);
@@ -161,7 +160,7 @@ cube('D', {
     total: true,
     renewQuery: false,
     limit: 1
-  }, transformResultsForTesseractIfNeeded([{
+  }, [{
     view___a_id: 1,
     view___a_name: 'a',
     view___b_id: 2,
@@ -170,5 +169,5 @@ cube('D', {
     view___d_name: 'd',
     view___e_id: 4,
     view___e_name: 'e',
-  }]), { compiler, joinGraph, cubeEvaluator }));
+  }], { compiler, joinGraph, cubeEvaluator }));
 });

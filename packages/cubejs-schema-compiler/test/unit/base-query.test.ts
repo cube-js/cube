@@ -1183,7 +1183,7 @@ describe('SQL Generation', () => {
       const utcOffset = moment.tz('America/Los_Angeles').utcOffset() * 60;
       expect(query.everyRefreshKeySql({
         every: '1 hour'
-      })).toEqual(['FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 3600)', false, expect.any(BaseQuery)]);
+      })).toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW())) / 3600)`, false, expect.any(BaseQuery)]);
 
       // Standard syntax (minutes hours day month dow)
       expect(query.everyRefreshKeySql({ every: '0 * * * *', timezone }))
@@ -1277,20 +1277,24 @@ describe('SQL Generation', () => {
     it('cacheKeyQueries for cube with refreshKey.every (source)', async () => {
       await compilers.compiler.compile();
 
+      const timezone = 'America/Los_Angeles';
+      // Calculate UTC offset dynamically to handle DST changes
+      const utcOffset = moment.tz(timezone).utcOffset() * 60;
+
       const query = new PostgresQuery(compilers, {
         measures: [
           'cards.sum'
         ],
         timeDimensions: [],
         filters: [],
-        timezone: 'America/Los_Angeles',
+        timezone,
       });
 
       // Query should not match any pre-aggregation!
       expect(query.cacheKeyQueries()).toEqual([
         [
           // Postgres dialect
-          'SELECT FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
+          `SELECT FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key`,
           [],
           {
             // false, because there is no externalQueryClass
@@ -1304,6 +1308,11 @@ describe('SQL Generation', () => {
     it('cacheKeyQueries for cube with refreshKey.every (external)', async () => {
       await compilers.compiler.compile();
 
+      const timezone = 'Europe/London';
+      // Calculate UTC offset dynamically to handle DST changes
+      const utcOffset = moment.tz(timezone).utcOffset() * 60;
+      const utcOffsetPrefix = utcOffset ? `${utcOffset} + ` : '';
+
       // Query should not match any pre-aggregation!
       const query = new PostgresQuery(compilers, {
         measures: [
@@ -1311,7 +1320,7 @@ describe('SQL Generation', () => {
         ],
         timeDimensions: [],
         filters: [],
-        timezone: 'Europe/London',
+        timezone,
         externalQueryClass: MssqlQuery
       });
 
@@ -1319,7 +1328,7 @@ describe('SQL Generation', () => {
       expect(query.cacheKeyQueries()).toEqual([
         [
           // MSSQL dialect, because externalQueryClass
-          'SELECT FLOOR((3600 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
+          `SELECT FLOOR((${utcOffsetPrefix}DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 600) as refresh_key`,
           [],
           {
             // true, because externalQueryClass
@@ -1337,13 +1346,17 @@ describe('SQL Generation', () => {
     it('preAggregationsDescription for query - refreshKey every (external)', async () => {
       await compilers.compiler.compile();
 
+      const timezone = 'America/Los_Angeles';
+      // Calculate UTC offset dynamically to handle DST changes
+      const utcOffset = moment.tz(timezone).utcOffset() * 60;
+
       const query = new PostgresQuery(compilers, {
         measures: [
           'cards.count'
         ],
         timeDimensions: [],
         filters: [],
-        timezone: 'America/Los_Angeles',
+        timezone,
         externalQueryClass: MssqlQuery
       });
 
@@ -1352,7 +1365,7 @@ describe('SQL Generation', () => {
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
           // MSSQL dialect
-          'SELECT FLOOR((-25200 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) as refresh_key',
+          `SELECT FLOOR((${utcOffset} + DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 3600) as refresh_key`,
           [],
           {
             external: true,
@@ -1395,6 +1408,10 @@ describe('SQL Generation', () => {
     it('preAggregationsDescription for query - refreshKey incremental (timeDimensions range)', async () => {
       await compilers.compiler.compile();
 
+      const timezone = 'Asia/Tokyo';
+      // Calculate UTC offset dynamically to handle any timezone changes
+      const utcOffset = moment.tz(timezone).utcOffset() * 60;
+
       const query = new PostgresQuery(compilers, {
         measures: [
           'cards.min'
@@ -1405,7 +1422,7 @@ describe('SQL Generation', () => {
           dateRange: ['2016-12-30', '2017-01-05']
         }],
         filters: [],
-        timezone: 'Asia/Tokyo',
+        timezone,
         externalQueryClass: MssqlQuery
       });
 
@@ -1413,7 +1430,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((32400 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
+          `SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((${utcOffset} + DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 3600) END as refresh_key`,
           [
             '__TO_PARTITION_RANGE',
           ],
@@ -1479,6 +1496,10 @@ describe('SQL Generation', () => {
     it('refreshKey from cube (source)', async () => {
       await compilers.compiler.compile();
 
+      const timezone = 'America/Los_Angeles';
+      // Calculate UTC offset dynamically to handle DST changes
+      const utcOffset = moment.tz(timezone).utcOffset() * 60;
+
       const query = new PostgresQuery(compilers, {
         measures: [
           'cards.count'
@@ -1489,14 +1510,14 @@ describe('SQL Generation', () => {
           dateRange: ['2016-12-30', '2017-01-05']
         }],
         filters: [],
-        timezone: 'America/Los_Angeles',
+        timezone,
       });
 
       const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
+          `SELECT FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key`,
           [],
           {
             external: false,
@@ -1509,6 +1530,10 @@ describe('SQL Generation', () => {
     it('refreshKey from cube (external)', async () => {
       await compilers.compiler.compile();
 
+      const timezone = 'America/Los_Angeles';
+      // Calculate UTC offset dynamically to handle DST changes
+      const utcOffset = moment.tz(timezone).utcOffset() * 60;
+
       const query = new PostgresQuery(compilers, {
         measures: [
           'cards.count'
@@ -1519,7 +1544,7 @@ describe('SQL Generation', () => {
           dateRange: ['2016-12-30', '2017-01-05']
         }],
         filters: [],
-        timezone: 'America/Los_Angeles',
+        timezone,
         externalQueryClass: MssqlQuery
       });
 
@@ -1527,7 +1552,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT FLOOR((-25200 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
+          `SELECT FLOOR((${utcOffset} + DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())) / 600) as refresh_key`,
           [],
           {
             external: true,
