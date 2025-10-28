@@ -8,7 +8,6 @@ import { aliasSeries } from './utils';
 import {
   DateRegex,
   dayRange,
-  getGranularityDateRange,
   internalDayjs,
   isPredefinedGranularity,
   LocalDateRegex,
@@ -241,13 +240,8 @@ export default class ResultSet<T extends Record<string, any> = any> {
         const [cubeName, dimension, granularity] = member.split('.');
 
         if (granularity !== undefined) {
-          // Use the new helper function that handles both predefined and custom granularities
-          const range = getGranularityDateRange(
-            value,
-            granularity,
-            timeDimensionsAnnotation?.[member],
-            timeDimensionsAnnotation
-          );
+          // dayRange.snapTo now handles both predefined and custom granularities
+          const range = dayRange(value, value, timeDimensionsAnnotation).snapTo(granularity);
 
           const originalTimeDimension = query.timeDimensions?.find((td) => td.dimension);
 

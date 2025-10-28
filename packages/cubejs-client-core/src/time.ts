@@ -109,10 +109,11 @@ export const dayRange = (from: any, to: any, annotations?: Record<string, { gran
       }
 
       if (customGranularity && customGranularity.interval) {
-        // For custom granularities, calculate the range based on interval
+        // For custom granularities, calculate the range for the bucket
         const intervalParsed = parseSqlInterval(customGranularity.interval);
         const intervalStart = internalDayjs(from);
-        const intervalEnd = addInterval(internalDayjs(to), intervalParsed);
+        // End is start + interval - 1 millisecond (to stay within the bucket)
+        const intervalEnd = addInterval(intervalStart, intervalParsed).subtract(1, 'millisecond');
 
         return dayRange(intervalStart, intervalEnd, annotations);
       }
