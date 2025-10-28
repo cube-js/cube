@@ -967,6 +967,60 @@ describe('PreAggregations', () => {
       ]
     });
 
+    // Cube with not full paths in rollupJoin pre-aggregation
+    cube('cube_a_to_fail_pre_agg', {
+      sql: \`SELECT 1 as id, 'dim_a' as dim_a\`,
+
+      joins: {
+        cube_b: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_a} = \${cube_b.dim_a}\`
+        },
+        cube_c: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_a} = \${cube_c.dim_a}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_a: {
+          sql: 'dim_a',
+          type: 'string'
+        },
+
+        dim_b: {
+          sql: 'dim_b',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        aaa_rollup: {
+          dimensions: [
+            dim_a
+          ]
+        },
+        rollupJoinAB: {
+          type: 'rollupJoin',
+          dimensions: [
+            dim_a,
+            cube_b.dim_b,
+            cube_c.dim_c
+          ],
+          rollups: [
+            aaa_rollup,
+            cube_b.bbb_rollup
+          ]
+        }
+      }
+    });
+
     // Models with transitive joins for rollupJoin matching
     cube('merchant_dims', {
       sql: \`
@@ -3537,4 +3591,23 @@ describe('PreAggregations', () => {
       ]);
     });
   });
+
+  if (getEnv('nativeSqlPlanner')) {
+    it.skip('FIXME(tesseract): rollupJoin pre-aggregation with not-full paths should fail', () => {
+      // Need to investigate tesseract internals of how pre-aggs members are resolved and how
+      // rollups are used to construct rollupJoins.
+    });
+  } else {
+    it('rollupJoin pre-aggregation with not-full paths should fail', async () => {
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        dimensions: ['cube_a_to_fail_pre_agg.dim_a', 'cube_b.dim_b', 'cube_c.dim_c'],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: ''
+      });
+
+      expect(() => query.buildSqlAndParams()).toThrow('No rollups found that can be used for rollup join');
+    });
+  }
 });
