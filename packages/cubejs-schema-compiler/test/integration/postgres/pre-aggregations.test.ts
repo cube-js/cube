@@ -641,6 +641,593 @@ describe('PreAggregations', () => {
         }
       }
     });
+
+    cube('cube_1', {
+      sql: \`SELECT 1 as id, 'dim_1' as dim_1\`,
+
+      joins: {
+        cube_2: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_1} = \${cube_2.dim_1}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_1: {
+          sql: 'dim_1',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        aaa: {
+          dimensions: [
+            dim_1
+          ]
+        },
+        rollupJoin: {
+          type: 'rollupJoin',
+          dimensions: [
+            dim_1,
+            CUBE.cube_2.dim_1,
+            CUBE.cube_2.dim_2  // XXX
+          ],
+          rollups: [
+            aaa,
+            cube_2.bbb
+          ]
+        }
+      }
+    });
+
+    cube('cube_2', {
+      sql: \`SELECT 2 as id, 'dim_1' as dim_1, 'dim_2' as dim_2\`,
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_1: {
+          sql: 'dim_1',
+          type: 'string'
+        },
+
+        dim_2: {
+          sql: 'dim_2',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        bbb: {
+          dimensions: [
+            dim_1,
+            dim_2,
+          ]
+        }
+      }
+    });
+
+    cube('cube_x', {
+      sql: \`SELECT 1 as id, 'dim_x' as dim_x\`,
+
+      joins: {
+        cube_y: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_x} = \${cube_y.dim_x}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_x: {
+          sql: 'dim_x',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        xxx: {
+          dimensions: [
+            dim_x
+          ]
+        },
+        rollupJoinThreeCubes: {
+          type: 'rollupJoin',
+          dimensions: [
+            dim_x,
+            cube_y.dim_y,
+            cube_z.dim_z
+          ],
+          rollups: [
+            xxx,
+            cube_y.yyy,
+            cube_z.zzz
+          ]
+        }
+      }
+    });
+
+    cube('cube_y', {
+      sql: \`SELECT 2 as id, 'dim_x' as dim_x, 'dim_y' as dim_y\`,
+
+      joins: {
+        cube_z: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_y} = \${cube_z.dim_y}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_x: {
+          sql: 'dim_x',
+          type: 'string'
+        },
+
+        dim_y: {
+          sql: 'dim_y',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        yyy: {
+          dimensions: [
+            dim_x,
+            dim_y,
+          ]
+        }
+      }
+    });
+
+    cube('cube_z', {
+      sql: \`SELECT 3 as id, 'dim_y' as dim_y, 'dim_z' as dim_z\`,
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_y: {
+          sql: 'dim_y',
+          type: 'string'
+        },
+
+        dim_z: {
+          sql: 'dim_z',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        zzz: {
+          dimensions: [
+            dim_y,
+            dim_z,
+          ]
+        }
+      }
+    });
+
+    cube('cube_a', {
+      sql: \`SELECT 1 as id, 'dim_a' as dim_a\`,
+
+      joins: {
+        cube_b: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_a} = \${cube_b.dim_a}\`
+        },
+        cube_c: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_a} = \${cube_c.dim_a}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_a: {
+          sql: 'dim_a',
+          type: 'string'
+        },
+
+        dim_b: {
+          sql: 'dim_b',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        aaa_rollup: {
+          dimensions: [
+            dim_a
+          ]
+        },
+        rollupJoinAB: {
+          type: 'rollupJoin',
+          dimensions: [
+            dim_a,
+            CUBE.cube_b.dim_b,
+            CUBE.cube_b.cube_c.dim_c
+          ],
+          rollups: [
+            aaa_rollup,
+            cube_b.bbb_rollup
+          ]
+        }
+      }
+    });
+
+    cube('cube_b', {
+      sql: \`SELECT 2 as id, 'dim_a' as dim_a, 'dim_b' as dim_b\`,
+
+      joins: {
+        cube_c: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_b} = \${cube_c.dim_b}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_a: {
+          sql: 'dim_a',
+          type: 'string'
+        },
+
+        dim_b: {
+          sql: 'dim_b',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        bbb_rollup: {
+          dimensions: [
+            dim_a,
+            dim_b,
+            cube_c.dim_c
+          ]
+        }
+      }
+    });
+
+    cube('cube_c', {
+      sql: \`SELECT 3 as id, 'dim_a' as dim_a, 'dim_b' as dim_b, 'dim_c' as dim_c\`,
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_a: {
+          sql: 'dim_a',
+          type: 'string'
+        },
+
+        dim_b: {
+          sql: 'dim_b',
+          type: 'string'
+        },
+
+        dim_c: {
+          sql: 'dim_c',
+          type: 'string'
+        },
+      }
+    });
+
+    view('view_abc', {
+      cubes: [
+        {
+          join_path: cube_a,
+          includes: ['dim_a']
+        },
+        {
+          join_path: cube_a.cube_b,
+          includes: ['dim_b']
+        },
+        {
+          join_path: cube_a.cube_b.cube_c,
+          includes: ['dim_c']
+        }
+      ]
+    });
+
+    // Cube with not full paths in rollupJoin pre-aggregation
+    cube('cube_a_to_fail_pre_agg', {
+      sql: \`SELECT 1 as id, 'dim_a' as dim_a\`,
+
+      joins: {
+        cube_b: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_a} = \${cube_b.dim_a}\`
+        },
+        cube_c: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.dim_a} = \${cube_c.dim_a}\`
+        }
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'string',
+          primary_key: true
+        },
+
+        dim_a: {
+          sql: 'dim_a',
+          type: 'string'
+        },
+
+        dim_b: {
+          sql: 'dim_b',
+          type: 'string'
+        },
+      },
+
+      pre_aggregations: {
+        aaa_rollup: {
+          dimensions: [
+            dim_a
+          ]
+        },
+        rollupJoinAB: {
+          type: 'rollupJoin',
+          dimensions: [
+            dim_a,
+            cube_b.dim_b,
+            cube_c.dim_c
+          ],
+          rollups: [
+            aaa_rollup,
+            cube_b.bbb_rollup
+          ]
+        }
+      }
+    });
+
+    // Models with transitive joins for rollupJoin matching
+    cube('merchant_dims', {
+      sql: \`
+        SELECT 101 AS merchant_sk, 'M1' AS merchant_id
+        UNION ALL
+        SELECT 102 AS merchant_sk, 'M2' AS merchant_id
+      \`,
+
+      dimensions: {
+        merchant_sk: {
+          sql: 'merchant_sk',
+          type: 'number',
+          primary_key: true
+        },
+        merchant_id: {
+          sql: 'merchant_id',
+          type: 'string'
+        }
+      }
+    });
+
+    cube('product_dims', {
+      sql: \`
+        SELECT 201 AS product_sk, 'P1' AS product_id
+        UNION ALL
+        SELECT 202 AS product_sk, 'P2' AS product_id
+      \`,
+
+      dimensions: {
+        product_sk: {
+          sql: 'product_sk',
+          type: 'number',
+          primary_key: true
+        },
+        product_id: {
+          sql: 'product_id',
+          type: 'string'
+        }
+      }
+    });
+
+    cube('merchant_and_product_dims', {
+      sql: \`
+        SELECT 'M1' AS merchant_id, 'P1' AS product_id, 'Organic' AS acquisition_channel, 'SOLD' AS status
+        UNION ALL
+        SELECT 'M1' AS merchant_id, 'P2' AS product_id, 'Paid' AS acquisition_channel, 'PAID' AS status
+        UNION ALL
+        SELECT 'M2' AS merchant_id, 'P1' AS product_id, 'Referral' AS acquisition_channel, 'RETURNED' AS status
+      \`,
+
+      dimensions: {
+        product_id: {
+          sql: 'product_id',
+          type: 'string',
+          primary_key: true
+        },
+        merchant_id: {
+          sql: 'merchant_id',
+          type: 'string',
+          primary_key: true
+        },
+        status: {
+          sql: 'status',
+          type: 'string'
+        },
+        acquisition_channel: {
+          sql: 'acquisition_channel',
+          type: 'string'
+        }
+      },
+
+      pre_aggregations: {
+        bridge_rollup: {
+          dimensions: [
+            merchant_id,
+            product_id,
+            acquisition_channel,
+            status
+          ]
+        }
+      }
+    });
+
+    cube('other_facts', {
+      sql: \`
+        SELECT 1 AS id, 1 AS fact_id, 'OF1' AS fact
+        UNION ALL
+        SELECT 2 AS id, 2 AS fact_id, 'OF2' AS fact
+        UNION ALL
+        SELECT 3 AS id, 3 AS fact_id, 'OF3' AS fact
+      \`,
+
+      dimensions: {
+        other_fact_id: {
+          sql: 'id',
+          type: 'number',
+          primary_key: true
+        },
+        fact_id: {
+          sql: 'fact_id',
+          type: 'number'
+        },
+        fact: {
+          sql: 'fact',
+          type: 'string'
+        }
+      },
+
+      pre_aggregations: {
+        bridge_rollup: {
+          dimensions: [
+            fact_id,
+            fact
+          ]
+        }
+      }
+
+    });
+
+    cube('test_facts', {
+      sql: \`
+        SELECT 1 AS id, 101 AS merchant_sk, 201 AS product_sk, 100 AS amount
+        UNION ALL
+        SELECT 2 AS id, 101 AS merchant_sk, 202 AS product_sk, 150 AS amount
+        UNION ALL
+        SELECT 3 AS id, 102 AS merchant_sk, 201 AS product_sk, 200 AS amount
+      \`,
+
+      joins: {
+        merchant_dims: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.merchant_sk} = \${merchant_dims.merchant_sk}\`
+        },
+        product_dims: {
+          relationship: 'many_to_one',
+          sql: \`\${CUBE.product_sk} = \${product_dims.product_sk}\`
+        },
+        // Transitive join - depends on merchant_dims and product_dims
+        merchant_and_product_dims: {
+          relationship: 'many_to_one',
+          sql: \`\${merchant_dims.merchant_id} = \${merchant_and_product_dims.merchant_id} AND \${product_dims.product_id} = \${merchant_and_product_dims.product_id}\`
+        },
+        other_facts: {
+          relationship: 'one_to_many',
+          sql: \`\${CUBE.id} = \${other_facts.fact_id}\`
+        },
+      },
+
+      dimensions: {
+        id: {
+          sql: 'id',
+          type: 'number',
+          primary_key: true
+        },
+        merchant_sk: {
+          sql: 'merchant_sk',
+          type: 'number'
+        },
+        product_sk: {
+          sql: 'product_sk',
+          type: 'number'
+        },
+        acquisition_channel: {
+          sql: \`\${merchant_and_product_dims.acquisition_channel}\`,
+          type: 'string'
+        }
+      },
+
+      measures: {
+        amount_sum: {
+          sql: 'amount',
+          type: 'sum'
+        }
+      },
+
+      pre_aggregations: {
+        facts_rollup: {
+          dimensions: [
+            id,
+            merchant_sk,
+            merchant_dims.merchant_sk,
+            merchant_dims.merchant_id,
+            merchant_and_product_dims.merchant_id,
+            product_sk,
+            product_dims.product_sk,
+            product_dims.product_id,
+            merchant_and_product_dims.product_id,
+            acquisition_channel,
+            merchant_and_product_dims.status
+          ]
+        },
+        rollupJoinTransitive: {
+          type: 'rollupJoin',
+          dimensions: [
+            merchant_sk,
+            product_sk,
+            CUBE.merchant_and_product_dims.status,
+            CUBE.other_facts.fact
+          ],
+          rollups: [
+            facts_rollup,
+            other_facts.bridge_rollup
+          ]
+        }
+      }
+    });
+
   `);
 
   it('simple pre-aggregation', async () => {
@@ -2816,38 +3403,211 @@ describe('PreAggregations', () => {
     expect(loadSql[0]).toMatch(/THEN 1 END `real_time_lambda_visitors__count`/);
   });
 
-  it('querying proxied to external cube pre-aggregation time-dimension', async () => {
+  it('rollupJoin pre-aggregation', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [],
-      dimensions: [],
+      dimensions: ['cube_1.dim_1', 'cube_2.dim_2'],
       timezone: 'America/Los_Angeles',
-      preAggregationsSchema: '',
-      timeDimensions: [{
-        dimension: 'cube_pre_agg_proxy_b.terminal_date',
-        granularity: 'day',
-      }],
-      order: [],
+      preAggregationsSchema: ''
     });
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
-    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect(preAggregationsDescription.length).toBe(2);
+    const aaa = preAggregationsDescription.find(p => p.preAggregationId === 'cube_1.aaa');
+    const bbb = preAggregationsDescription.find(p => p.preAggregationId === 'cube_2.bbb');
+    expect(aaa).toBeDefined();
+    expect(bbb).toBeDefined();
 
-    expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/main/);
-
-    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
-
-    console.log(JSON.stringify(queries.concat(queryAndParams)));
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoin');
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
         [{
-          cube_pre_agg_proxy_b__terminal_date_day: '2025-10-01T00:00:00.000Z',
+          cube_1__dim_1: 'dim_1',
+          cube_2__dim_2: 'dim_2',
         }]
       );
     });
   });
+
+  it('rollupJoin pre-aggregation with three cubes', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['cube_x.dim_x', 'cube_y.dim_y', 'cube_z.dim_z'],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect(preAggregationsDescription.length).toBe(3);
+    const xxx = preAggregationsDescription.find(p => p.preAggregationId === 'cube_x.xxx');
+    const yyy = preAggregationsDescription.find(p => p.preAggregationId === 'cube_y.yyy');
+    const zzz = preAggregationsDescription.find(p => p.preAggregationId === 'cube_z.zzz');
+    expect(xxx).toBeDefined();
+    expect(yyy).toBeDefined();
+    expect(zzz).toBeDefined();
+
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoinThreeCubes');
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [{
+          cube_x__dim_x: 'dim_x',
+          cube_y__dim_y: 'dim_y',
+          cube_z__dim_z: 'dim_z',
+        }]
+      );
+    });
+  });
+
+  it('rollupJoin pre-aggregation with nested joins via view (A->B->C)', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['view_abc.dim_a', 'view_abc.dim_b', 'view_abc.dim_c'],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect(preAggregationsDescription.length).toBe(2);
+    const aaa = preAggregationsDescription.find(p => p.preAggregationId === 'cube_a.aaa_rollup');
+    const bbb = preAggregationsDescription.find(p => p.preAggregationId === 'cube_b.bbb_rollup');
+    expect(aaa).toBeDefined();
+    expect(bbb).toBeDefined();
+
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoinAB');
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [{
+          view_abc__dim_a: 'dim_a',
+          view_abc__dim_b: 'dim_b',
+          view_abc__dim_c: 'dim_c',
+        }]
+      );
+    });
+  });
+
+  if (getEnv('nativeSqlPlanner')) {
+    it.skip('FIXME(tesseract): rollupJoin pre-aggregation with nested joins via cube (A->B->C)', () => {
+      // Need to investigate tesseract internals of how pre-aggs members are resolved and how
+      // rollups are used to construct rollupJoins.
+    });
+  } else {
+    it('rollupJoin pre-aggregation with nested joins via cube (A->B->C)', async () => {
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        dimensions: ['cube_a.dim_a', 'cube_b.dim_b', 'cube_c.dim_c'],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: ''
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      console.log(queryAndParams);
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      console.log(preAggregationsDescription);
+      expect(preAggregationsDescription.length).toBe(0);
+
+      expect(query.preAggregations?.preAggregationForQuery).toBeUndefined();
+
+      return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+        expect(res).toEqual(
+          [{
+            cube_a__dim_a: 'dim_a',
+            cube_b__dim_b: 'dim_b',
+            cube_c__dim_c: 'dim_c',
+          }]
+        );
+      });
+    });
+  }
+
+  it('rollupJoin pre-aggregation matching with transitive joins', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: [
+        'test_facts.merchant_sk',
+        'test_facts.product_sk',
+        'merchant_and_product_dims.status',
+        'other_facts.fact'
+      ],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+    // Verify that both rollups are included in the description
+    expect(preAggregationsDescription.length).toBe(2);
+    const factsRollup = preAggregationsDescription.find(p => p.preAggregationId === 'test_facts.facts_rollup');
+    const bridgeRollup = preAggregationsDescription.find(p => p.preAggregationId === 'other_facts.bridge_rollup');
+    expect(factsRollup).toBeDefined();
+    expect(bridgeRollup).toBeDefined();
+
+    // Verify that the rollupJoin pre-aggregation can be used for the query
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(query.preAggregations?.preAggregationForQuery?.preAggregationName).toEqual('rollupJoinTransitive');
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual([
+        {
+          merchant_and_product_dims__status: 'SOLD',
+          other_facts__fact: 'OF1',
+          test_facts__merchant_sk: 101,
+          test_facts__product_sk: 201,
+        },
+        {
+          merchant_and_product_dims__status: 'PAID',
+          other_facts__fact: 'OF2',
+          test_facts__merchant_sk: 101,
+          test_facts__product_sk: 202,
+        },
+        {
+          merchant_and_product_dims__status: 'RETURNED',
+          other_facts__fact: 'OF3',
+          test_facts__merchant_sk: 102,
+          test_facts__product_sk: 201,
+        },
+      ]);
+    });
+  });
+
+  if (getEnv('nativeSqlPlanner')) {
+    it.skip('FIXME(tesseract): rollupJoin pre-aggregation with not-full paths should fail', () => {
+      // Need to investigate tesseract internals of how pre-aggs members are resolved and how
+      // rollups are used to construct rollupJoins.
+    });
+  } else {
+    it('rollupJoin pre-aggregation with not-full paths should fail', async () => {
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        dimensions: ['cube_a_to_fail_pre_agg.dim_a', 'cube_b.dim_b', 'cube_c.dim_c'],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: ''
+      });
+
+      expect(() => query.buildSqlAndParams()).toThrow('No rollups found that can be used for a rollup join');
+    });
+  }
 });

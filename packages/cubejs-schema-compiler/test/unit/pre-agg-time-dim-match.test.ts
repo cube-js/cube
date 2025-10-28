@@ -69,9 +69,7 @@ describe('Pre Aggregation by filter match tests', () => {
         granularity: testPreAgg.granularity,
       }],
       rollups: [],
-      fullNameDimensions: [],
-      fullNameMeasures: [],
-      fullNameTimeDimensions: [],
+      rollupsReferences: [],
     };
 
     await compiler.compile();
