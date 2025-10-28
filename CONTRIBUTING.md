@@ -99,7 +99,7 @@ Cube.is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and
 10. Create or choose an existing project for testing. You can generate a new one with 
     [cubejs-cli](https://cube.dev/docs/reference/cli) tool.
 11. Run `yarn link @cubejs-backend/server-core` in your project directory. 
-12. Run `yarn dev` to start your testing project and verify changes.
+12. Run `yarn run dev` to start your testing project and verify changes.
 
 Instead of running all of the above commands manually you can use the `dev-env.sh` script:
 
