@@ -527,6 +527,8 @@ export type ProgressResponse = {
   timeElapsed: number;
 };
 
+// NOTE: This type must be kept in sync with CacheMode in @cubejs-backend/shared (packages/cubejs-backend-shared/src/shared-types.ts)
+// This duplication is intentional as @cubejs-client/core does not depend on @cubejs-backend/shared
 /**
  * Cache mode options for query execution.
  *
