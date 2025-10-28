@@ -256,57 +256,6 @@ export const timeSeriesFromCustomInterval = (from: string, to: string, granulari
 };
 
 /**
- * Returns the date range for a specific granularity bucket containing the given value.
- * Handles both predefined granularities (day, week, month, etc.) and custom granularities.
- *
- * @param value - The date/time value to find the bucket for
- * @param granularity - The granularity name (predefined or custom)
- * @param granularityAnnotation - Optional annotation containing custom granularity metadata (interval, origin, offset)
- * @returns Object with start and end dayjs instances representing the granularity bucket
- */
-export const getGranularityDateRange = (
-  value: any,
-  granularity: string,
-  granularityAnnotation?: { granularity?: Granularity },
-  allAnnotations?: Record<string, { granularity?: Granularity }>
-): { start: dayjs.Dayjs; end: dayjs.Dayjs } => {
-  if (isPredefinedGranularity(granularity)) {
-    // Use existing dayRange.snapTo logic for predefined granularities
-    const range = dayRange(value, value, allAnnotations).snapTo(granularity);
-    return {
-      start: range.start,
-      end: range.end
-    };
-  }
-
-  // Handle custom granularities
-  const customGranularity = granularityAnnotation?.granularity;
-
-  if (customGranularity && customGranularity.interval) {
-    // Parse the interval (e.g., "5 minutes")
-    const intervalParsed = parseSqlInterval(customGranularity.interval);
-
-    // The value is the start of the interval bucket
-    const intervalStart = internalDayjs(value);
-
-    // Calculate the end of the interval bucket
-    // End is start + interval - 1 millisecond
-    const intervalEnd = addInterval(intervalStart, intervalParsed).subtract(1, 'millisecond');
-
-    return {
-      start: intervalStart,
-      end: intervalEnd
-    };
-  }
-
-  // Fallback to point-in-time if no custom granularity metadata found
-  return {
-    start: internalDayjs(value),
-    end: internalDayjs(value)
-  };
-};
-
-/**
  * Returns the lowest time unit for the interval
  */
 export const diffTimeUnitForInterval = (interval: string): string => {
