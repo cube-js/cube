@@ -1380,8 +1380,8 @@ export class BaseQuery {
     const join = R.drop(1, toJoin)
       .map(
         (q, i) => (this.dimensionAliasNames().length ?
-          `INNER JOIN ${this.wrapInParenthesis((q))} as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
-          `, ${this.wrapInParenthesis(q)} as q_${i + 1}`),
+          `INNER JOIN ${this.wrapInParenthesis((q))} ${this.asSyntaxJoin} q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
+          `, ${this.wrapInParenthesis(q)} ${this.asSyntaxJoin} q_${i + 1}`),
       ).join('\n');
 
     const columnsToSelect = this.evaluateSymbolSqlWithContext(
@@ -1410,7 +1410,7 @@ export class BaseQuery {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 
-    return `SELECT ${this.topLimit()}${columnsToSelect} FROM ${this.wrapInParenthesis(toJoin[0])} as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
+    return `SELECT ${this.topLimit()}${columnsToSelect} FROM ${this.wrapInParenthesis(toJoin[0])} ${this.asSyntaxJoin} q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 
   wrapInParenthesis(select) {
