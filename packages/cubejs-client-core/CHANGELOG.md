@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.84](https://github.com/cube-js/cube/compare/v1.3.83...v1.3.84) (2025-10-28)
+
+### Features
+
+- **client-core:** add CacheMode type ([#10091](https://github.com/cube-js/cube/issues/10091)) ([98976e0](https://github.com/cube-js/cube/commit/98976e06872c12efb7c43f900492d99c8f07bc72))
+
 ## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
 
 ### Features

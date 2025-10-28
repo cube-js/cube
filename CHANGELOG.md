@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.84](https://github.com/cube-js/cube/compare/v1.3.83...v1.3.84) (2025-10-28)
+
+### Bug Fixes
+
+- **cube-orchestrator:** Deterministic column sequence in output ([#10086](https://github.com/cube-js/cube/issues/10086)) ([e82fbeb](https://github.com/cube-js/cube/commit/e82fbeb4243db6f8efa25b29a75d1a24dce63079))
+- **cubesql:** Coerce strings with any type in binary expressions ([#10088](https://github.com/cube-js/cube/issues/10088)) ([3164adc](https://github.com/cube-js/cube/commit/3164adc2195ae545ca041489e93c3eb259e9971d))
+- **schema-compiler:** add support for time filters and rolling windows and fix subquery aliasing in Oracle dialect ([#10066](https://github.com/cube-js/cube/issues/10066)) ([56b5c9b](https://github.com/cube-js/cube/commit/56b5c9bf2d33ee07376b38dfcf96e4532ad4dd5a))
+
+### Features
+
+- **client-core:** add CacheMode type ([#10091](https://github.com/cube-js/cube/issues/10091)) ([98976e0](https://github.com/cube-js/cube/commit/98976e06872c12efb7c43f900492d99c8f07bc72))
+- **schema-compiler:** Support joins for proxied time dimensions in pre-aggregations ([#10020](https://github.com/cube-js/cube/issues/10020)) ([aabb3c5](https://github.com/cube-js/cube/commit/aabb3c5b4a0e2c8cf08769a9f4394e0bf966dd3d))
+
 ## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
 
 ### Bug Fixes
