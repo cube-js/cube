@@ -387,16 +387,16 @@ export class BaseQuery {
   }
 
   /**
-   * Is used by native
    * This function follows the same logic as in this.collectJoinHints()
-   * @private
+   * skipQueryJoinMap is used by PreAggregations to build join tree without user's query all members map
+   * @public
    * @param {Array<(Array<string> | string)>} hints
+   * @param { boolean } skipQueryJoinMap
    * @return {import('../compiler/JoinGraph').FinishedJoinTree}
    */
-  joinTreeForHints(hints) {
-    const explicitJoinHintMembers = new Set(hints.filter(j => Array.isArray(j)).flat());
-    const queryJoinMaps = this.queryJoinMap();
-    const newCollectedHints = [];
+  joinTreeForHints(hints, skipQueryJoinMap = false) {
+    const queryJoinMaps = skipQueryJoinMap ? {} : this.queryJoinMap();
+    let newCollectedHints = [];
 
     const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
       ...newCollectedHints,
@@ -421,8 +421,12 @@ export class BaseQuery {
       const iterationCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
       newJoinHintsCollectedCnt = iterationCollectedHints.length;
       cnt++;
-      if (newJoin) {
-        newCollectedHints.push(...joinMembersJoinHints.filter(j => !explicitJoinHintMembers.has(j)));
+      if (newJoin && newJoin.joins.length > 0) {
+        // Even if there is no join tree changes, we still
+        // push correctly ordered join hints, collected from the resolving of members of join tree
+        // upfront the all existing query members. This ensures the correct cube join order
+        // with transitive joins even if they are already presented among query members.
+        newCollectedHints = this.enrichedJoinHintsFromJoinTree(newJoin, joinMembersJoinHints);
       }
     } while (newJoin?.joins.length > 0 && !this.isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
 
@@ -430,7 +434,7 @@ export class BaseQuery {
       throw new UserError('Can not construct joins for the query, potential loop detected');
     }
 
-    return newJoin;
+    return this.joinGraph.buildJoin(constructJH());
   }
 
   cacheValue(key, fn, { contextPropNames, inputProps, cache } = {}) {
@@ -503,6 +507,34 @@ export class BaseQuery {
     }
 
     return joinMaps;
+  }
+
+  /**
+   * @private
+   * @param { import('../compiler/JoinGraph').FinishedJoinTree } joinTree
+   * @param { string[] } joinHints
+   * @return { string[][] }
+   */
+  enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
+    const joinsMap = {};
+
+    for (const j of joinTree.joins) {
+      joinsMap[j.to] = j.from;
+    }
+
+    return joinHints.map(jh => {
+      let cubeName = jh;
+      const path = [cubeName];
+      while (joinsMap[cubeName]) {
+        cubeName = joinsMap[cubeName];
+        path.push(cubeName);
+      }
+
+      if (path.length === 1) {
+        return path[0];
+      }
+      return path.reverse();
+    });
   }
 
   /**
@@ -2666,10 +2698,9 @@ export class BaseQuery {
    */
   collectJoinHints(excludeTimeDimensions = false) {
     const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(excludeTimeDimensions));
-    const explicitJoinHintMembers = new Set(allMembersJoinHints.filter(j => Array.isArray(j)).flat());
     const queryJoinMaps = this.queryJoinMap();
     const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
-    const newCollectedHints = [];
+    let newCollectedHints = [];
 
     // One cube may join the other cube via transitive joined cubes,
     // members from which are referenced in the join `on` clauses.
@@ -2703,8 +2734,12 @@ export class BaseQuery {
       const iterationCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
       newJoinHintsCollectedCnt = iterationCollectedHints.length;
       cnt++;
-      if (newJoin) {
-        newCollectedHints.push(...joinMembersJoinHints.filter(j => !explicitJoinHintMembers.has(j)));
+      if (newJoin && newJoin.joins.length > 0) {
+        // Even if there is no join tree changes, we still
+        // push correctly ordered join hints, collected from the resolving of members of join tree
+        // upfront the all existing query members. This ensures the correct cube join order
+        // with transitive joins even if they are already presented among query members.
+        newCollectedHints = this.enrichedJoinHintsFromJoinTree(newJoin, joinMembersJoinHints);
       }
     } while (newJoin?.joins.length > 0 && !this.isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
 
