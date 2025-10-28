@@ -78,8 +78,9 @@ pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimiti
                     })
                 })
                 .or_else(|_| {
-                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %:z").map(|dt| {
-                        Utc.from_utc_datetime(&dt)
+                    // Parse with timezone offset, e.g. "2025-10-21 14:28:53.542+02"
+                    DateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f%:z").map(|dt| {
+                        dt.with_timezone(&Utc)
                             .format("%Y-%m-%dT%H:%M:%S%.3f")
                             .to_string()
                     })
