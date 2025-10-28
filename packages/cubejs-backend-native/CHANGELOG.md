@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.84](https://github.com/cube-js/cube/compare/v1.3.83...v1.3.84) (2025-10-28)
+
+### Bug Fixes
+
+- **cube-orchestrator:** Deterministic column sequence in output ([#10086](https://github.com/cube-js/cube/issues/10086)) ([e82fbeb](https://github.com/cube-js/cube/commit/e82fbeb4243db6f8efa25b29a75d1a24dce63079))
+- **cubesql:** Coerce strings with any type in binary expressions ([#10088](https://github.com/cube-js/cube/issues/10088)) ([3164adc](https://github.com/cube-js/cube/commit/3164adc2195ae545ca041489e93c3eb259e9971d))
+
 ## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
 
 ### Features
