@@ -56,7 +56,11 @@ export class OracleQuery extends BaseQuery {
    * using forSelect dimensions for grouping
    */
   public groupByClause() {
-    const dimensions = this.forSelect().filter((item: any) => !!item.dimension) as BaseDimension[];
+    // Only include dimensions that have select columns
+    // Time dimensions without granularity return null from selectColumns()
+    const dimensions = this.forSelect().filter((item: any) => (
+      !!item.dimension && item.selectColumns && item.selectColumns()
+    )) as BaseDimension[];
     if (!dimensions.length) {
       return '';
     }

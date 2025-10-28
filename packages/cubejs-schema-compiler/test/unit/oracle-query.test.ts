@@ -324,8 +324,36 @@ describe('OracleQuery', () => {
     const queryAndParams = query.buildSqlAndParams();
     const sql = queryAndParams[0];
 
-    // Key test: no GROUP BY on time dimension when granularity is missing
+    // Time dimensions without granularity should not appear in GROUP BY
     expect(sql).not.toMatch(/GROUP BY.*created_at/i);
+  });
+
+  it('handles time dimension with granularity in SELECT and GROUP BY', async () => {
+    await compiler.compile();
+
+    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2020-01-01', '2020-12-31']
+      }],
+      timezone: 'UTC'
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    const sql = queryAndParams[0];
+
+    // Time dimension with granularity should appear in SELECT with TRUNC
+    expect(sql).toMatch(/TRUNC\(.*created_at/i);
+    
+    // Time dimension with granularity should appear in GROUP BY
+    expect(sql).toMatch(/GROUP BY.*created_at/i);
+    
+    // Should still have WHERE clause for filtering
+    expect(sql).toMatch(/WHERE/i);
   });
 
   it('uses Oracle-specific interval arithmetic', async () => {
