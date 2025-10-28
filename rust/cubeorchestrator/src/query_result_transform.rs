@@ -15,6 +15,7 @@ use std::{
     fmt::Display,
     sync::{Arc, LazyLock},
 };
+use regex::Regex;
 
 pub const COMPARE_DATE_RANGE_FIELD: &str = "compareDateRange";
 pub const COMPARE_DATE_RANGE_SEPARATOR: &str = " - ";
@@ -47,7 +48,11 @@ pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimiti
             )
         }
         DBResponseValue::Primitive(DBResponsePrimitive::String(ref s)) if type_ == "time" => {
-            let formatted = DateTime::parse_from_rfc3339(s)
+            let re = Regex::new(r"([+-]\d{2})$").unwrap();
+            let s_norm = re.replace(s, "$1:00");
+
+
+            let formatted = DateTime::parse_from_rfc3339(s_norm)
                 .map(|dt| dt.with_timezone(&Utc).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
                 .or_else(|_| {
                     NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f").map(|dt| {
@@ -78,9 +83,8 @@ pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimiti
                     })
                 })
                 .or_else(|_| {
-                    // Parse with timezone offset, e.g. "2025-10-21 14:28:53.542+02"
-                    DateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f%:z").map(|dt| {
-                        dt.with_timezone(&Utc)
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %:z").map(|dt| {
+                        Utc.from_utc_datetime(&dt)
                             .format("%Y-%m-%dT%H:%M:%S%.3f")
                             .to_string()
                     })
