@@ -999,8 +999,8 @@ export class PreAggregations {
           throw new UserError(`Nothing to join in rollup join. Target joins ${JSON.stringify(targetJoins)} are included in existing rollup joins ${JSON.stringify(existingJoins)}`);
         }
         return nonExistingJoins.map(join => {
-          const fromPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.fromMembers, join);
-          const toPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.toMembers, join);
+          const fromPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.fromMembers, join, `${preAggObj.cube}.${preAggObj.preAggregationName}`);
+          const toPreAggObj = this.preAggObjForJoin(preAggObjsToJoin, join.toMembers, join, `${preAggObj.cube}.${preAggObj.preAggregationName}`);
           return {
             ...join,
             fromPreAggObj,
@@ -1011,11 +1011,20 @@ export class PreAggregations {
     );
   }
 
-  private preAggObjForJoin(preAggObjsToJoin: PreAggregationForQuery[], joinMembers: string[], join: JoinEdgeWithMembers): PreAggregationForQuery {
+  private preAggObjForJoin(
+    preAggObjsToJoin: PreAggregationForQuery[],
+    joinMembers: string[],
+    join: JoinEdgeWithMembers,
+    rollupJoinPreAggName: string,
+  ): PreAggregationForQuery {
     const fromPreAggObj = preAggObjsToJoin
       .filter(p => joinMembers.every(m => !!p.references.dimensions.find(d => m === d)));
     if (!fromPreAggObj.length) {
-      throw new UserError(`No rollups found that can be used for rollup join: ${JSON.stringify(join)}`);
+      const msg = `No rollups found that can be used for a rollup join from "${
+        join.from}" (fromMembers: ${JSON.stringify(join.fromMembers)}) to "${join.to}" (toMembers: ${
+        JSON.stringify(join.toMembers)}). Check the "${
+        rollupJoinPreAggName}" pre-aggregation definition — you may have forgotten to specify the full dimension paths`;
+      throw new UserError(msg);
     }
     if (fromPreAggObj.length > 1) {
       throw new UserError(

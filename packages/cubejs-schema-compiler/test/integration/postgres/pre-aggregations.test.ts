@@ -3607,7 +3607,7 @@ describe('PreAggregations', () => {
         preAggregationsSchema: ''
       });
 
-      expect(() => query.buildSqlAndParams()).toThrow('No rollups found that can be used for rollup join');
+      expect(() => query.buildSqlAndParams()).toThrow('No rollups found that can be used for a rollup join');
     });
   }
 });
