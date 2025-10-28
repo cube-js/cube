@@ -1317,7 +1317,7 @@ views:
       ],
       { joinGraph, cubeEvaluator, compiler });
     });
-    it('source full switch', async () => {
+    it('source full switch 1', async () => {
       await dbRunner.runQueryTest({
         dimensions: ['source.currency', 'source.product_category'],
         measures: ['source.price'],

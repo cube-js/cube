@@ -11,6 +11,7 @@ use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -153,7 +154,10 @@ impl PhysicalPlanBuilder {
         &self,
         dimension_schema: &Rc<MultiStageDimensionContext>,
         join_builder: &mut JoinBuilder,
+        context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
+        let original_join = join_builder.clone().build();
+        let references_builder = ReferencesBuilder::new(From::new_from_join(original_join));
         let conditions = dimension_schema
             .join_dimensions
             .iter()
@@ -164,7 +168,26 @@ impl PhysicalPlanBuilder {
                     alias_in_cte,
                 ));
 
-                Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))])
+                if let Ok(dimension) = dim.as_dimension() {
+                    if dimension.is_calc_group() {
+                        return Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))]);
+                    }
+                }
+
+                let mut context_factory = context.make_sql_nodes_factory()?;
+                references_builder.resolve_references_for_member(
+                    dim.clone(),
+                    &None,
+                    context_factory.render_references_mut(),
+                )?;
+
+                let visitor_context =
+                    VisitorContext::new(self.query_tools.clone(), &context_factory, None);
+
+                Ok(vec![(
+                    sub_query_ref,
+                    Expr::new_member_with_context(dim.clone(), Rc::new(visitor_context)),
+                )])
             })
             .collect::<Result<Vec<_>, _>>()?;
 

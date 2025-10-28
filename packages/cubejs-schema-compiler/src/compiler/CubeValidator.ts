@@ -715,7 +715,6 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
     }),
     inherit(BaseDimension, {
       multiStage: Joi.boolean().valid(true),
-      type: Joi.any().valid('number').required(),
       sql: Joi.func().required(),
       addGroupBy: Joi.func(),
     }),

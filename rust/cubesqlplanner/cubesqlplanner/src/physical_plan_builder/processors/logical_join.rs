@@ -36,7 +36,9 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         }
 
         let root = logical_join.root().clone().unwrap().cube().clone();
-        if logical_join.joins().is_empty() && logical_join.dimension_subqueries().is_empty() {
+        if logical_join.joins().is_empty() && logical_join.dimension_subqueries().is_empty()
+        //&& multi_stage_dimension.is_none()
+        {
             Ok(From::new_from_cube(
                 root.clone(),
                 Some(root.default_alias_with_prefix(&context.alias_prefix)),
@@ -81,8 +83,11 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 }
             }
             if let Some(multi_stage_dimension) = &multi_stage_dimension {
-                self.builder
-                    .add_multistage_dimension_join(multi_stage_dimension, &mut join_builder)?;
+                self.builder.add_multistage_dimension_join(
+                    multi_stage_dimension,
+                    &mut join_builder,
+                    &context,
+                )?;
             }
             Ok(From::new_from_join(join_builder.build()))
         }

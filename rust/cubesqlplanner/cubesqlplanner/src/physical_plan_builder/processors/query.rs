@@ -76,9 +76,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let from = if let QuerySource::LogicalJoin(_) = logical_plan.source() {
             let all_symbols = all_symbols(&logical_plan.schema(), &logical_plan.filter());
             let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?;
+            println!("!!! calc group len: {}", calc_group_dims.len());
 
             let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
                 let values = get_filtered_values(&dim, &filter);
+                println!("!!!! values len: {}", values.len());
                 CalcGroupItem {
                     symbol: dim,
                     values,

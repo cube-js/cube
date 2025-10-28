@@ -33,6 +33,7 @@ pub struct DimensionSymbol {
     definition: Rc<dyn DimensionDefinition>,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
     is_view: bool,
+    add_group_by: Option<Vec<Rc<MemberSymbol>>>,
     time_shift: Vec<CalendarDimensionTimeShift>,
     time_shift_pk_full_name: Option<String>,
     is_self_time_shift_pk: bool, // If the dimension itself is a primary key and has time shifts, we can not reevaluate itself again while processing time shifts to avoid infinite recursion. So we raise this flag instead.
@@ -56,6 +57,7 @@ impl DimensionSymbol {
         values: Vec<String>,
         case: Option<Case>,
         definition: Rc<dyn DimensionDefinition>,
+        add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         time_shift: Vec<CalendarDimensionTimeShift>,
         time_shift_pk_full_name: Option<String>,
         is_self_time_shift_pk: bool,
@@ -75,6 +77,7 @@ impl DimensionSymbol {
             longitude,
             values,
             definition,
+            add_group_by,
             case,
             is_view,
             time_shift,
@@ -167,6 +170,10 @@ impl DimensionSymbol {
         self.is_sub_query
     }
 
+    pub fn add_group_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
+        &self.add_group_by
+    }
+
     pub fn dimension_type(&self) -> &String {
         &self.dimension_type
     }
@@ -227,6 +234,11 @@ impl DimensionSymbol {
         if let Some(member_sql) = &self.longitude {
             member_sql.extract_symbol_deps(&mut deps);
         }
+        if let Some(add_group_by) = &self.add_group_by {
+            for member_sql in add_group_by {
+                deps.extend(member_sql.get_dependencies().into_iter());
+            }
+        }
         if let Some(case) = &self.case {
             case.extract_symbol_deps(&mut deps);
         }
@@ -246,6 +258,11 @@ impl DimensionSymbol {
         }
         if let Some(case) = &self.case {
             case.extract_symbol_deps_with_path(&mut deps);
+        }
+        if let Some(add_group_by) = &self.add_group_by {
+            for member_sql in add_group_by {
+                deps.extend(member_sql.get_dependencies_with_path().into_iter());
+            }
         }
         deps
     }
@@ -476,6 +493,17 @@ impl SymbolFactory for DimensionSymbolFactory {
             vec![]
         };
 
+        let add_group_by =
+            if let Some(add_group_by) = &definition.static_data().add_group_by_references {
+                let symbols = add_group_by
+                    .iter()
+                    .map(|add_group_by| compiler.add_dimension_evaluator(add_group_by.clone()))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Some(symbols)
+            } else {
+                None
+            };
+
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
 
         //TODO move owned logic to rust
@@ -514,6 +542,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             values,
             case,
             definition,
+            add_group_by,
             time_shift,
             time_shift_pk,
             is_self_time_shift_pk,
