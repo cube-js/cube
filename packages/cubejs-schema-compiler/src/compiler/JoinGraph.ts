@@ -7,7 +7,7 @@ import type { CubeEvaluator, MeasureDefinition } from './CubeEvaluator';
 import type { CubeDefinition, JoinDefinition } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
 
-type JoinEdge = {
+export type JoinEdge = {
   join: JoinDefinition,
   from: string,
   to: string,
