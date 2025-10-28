@@ -2745,9 +2745,15 @@ export class BaseQuery {
   }
 
   collectJoinHintsFromMembers(members) {
+    // Extract cube names from members to make cache key member-cubes-specific
+    const memberCubes = members
+      .map(m => m.cube?.()?.name)
+      .filter(Boolean)
+      .sort();
+
     return [
       ...members.map(m => m.joinHint).filter(h => h?.length > 0),
-      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers'),
+      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), ['collectJoinHintsFromMembers', ...memberCubes]),
     ];
   }
 
