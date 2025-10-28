@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.85](https://github.com/cube-js/cube/compare/v1.3.84...v1.3.85) (2025-10-28)
+
+### Bug Fixes
+
+- **schema-compiler:** Add missing numeric types to scaffolding schema, thanks @XUJiahua ([#10079](https://github.com/cube-js/cube/issues/10079)) ([fa694c3](https://github.com/cube-js/cube/commit/fa694c3b6bbefe02b8aa6d55f0ad6595ddf9f6c2))
+- **schema-compiler:** Fix incorrect cache that affects query joins ([#10084](https://github.com/cube-js/cube/issues/10084)) ([b335c93](https://github.com/cube-js/cube/commit/b335c93bf82e8856a6b79259ba29f59e72c058bc))
+- **schema-compiler:** Fix inherited drill members for views ([#9966](https://github.com/cube-js/cube/issues/9966)) ([558fbb3](https://github.com/cube-js/cube/commit/558fbb3b664968f3456eefd67f21b959473eb6bc))
+- **schema-compiler:** Fix pre-agg matching for 'rollupJoin' / 'rollupLambda' pre-aggregations ([#10017](https://github.com/cube-js/cube/issues/10017)) ([635b45b](https://github.com/cube-js/cube/commit/635b45b88ef5c6ee8ec60b5191ec84960a85fb12))
+
 ## [1.3.84](https://github.com/cube-js/cube/compare/v1.3.83...v1.3.84) (2025-10-28)
 
 ### Bug Fixes
