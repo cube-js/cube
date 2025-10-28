@@ -1849,11 +1849,6 @@ Object {
       "type": "hierarchies",
     },
     Object {
-      "memberPath": "orders.count",
-      "name": "count",
-      "type": "measures",
-    },
-    Object {
       "memberPath": "orders.status",
       "name": "my_beloved_status",
       "type": "dimensions",
@@ -1862,6 +1857,11 @@ Object {
       "memberPath": "orders.created_at",
       "name": "my_beloved_created_at",
       "type": "dimensions",
+    },
+    Object {
+      "memberPath": "orders.count",
+      "name": "count",
+      "type": "measures",
     },
   ],
   "isView": true,
