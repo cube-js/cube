@@ -73,6 +73,17 @@ cubes:
         type: string
         add_group_by: [orders.customerId]
 
+      - name: changeTypeComplex
+        sql: >
+          CASE
+            WHEN {revenueYearAgo} IS NULL THEN 'New'
+            WHEN {revenue} > {revenueYearAgo} THEN 'Grow'
+            ELSE 'Down'
+          END
+        multi_stage: true
+        type: string
+        add_group_by: [orders.customerId]
+
 
     measures:
       - name: count
@@ -183,6 +194,48 @@ cubes:
       },
       {
         orders__change_type: 'Revenue is Grow',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '14100',
+        orders__revenue_year_ago: '11700'
+      },
+    ],
+    { joinGraph, cubeEvaluator, compiler }));
+    it('bucketing with complex bucket dimension', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.changeTypeComplex'],
+      measures: ['orders.revenue', 'orders.revenueYearAgo'],
+      timeDimensions: [
+        {
+          dimension: 'orders.createdAt',
+          granularity: 'year',
+          dateRange: ['2024-01-02T00:00:00', '2026-01-01T00:00:00']
+        }
+      ],
+      timezone: 'UTC',
+      order: [{
+        id: 'orders.changeTypeComplex'
+      }, { id: 'orders.createdAt' }],
+    },
+    [
+      {
+        orders__change_type_complex: 'Down',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '20400',
+        orders__revenue_year_ago: '22800'
+      },
+      {
+        orders__change_type_complex: 'Down',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '17800',
+        orders__revenue_year_ago: '20400'
+      },
+      {
+        orders__change_type_complex: 'Grow',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '11700',
+        orders__revenue_year_ago: '9400'
+      },
+      {
+        orders__change_type_complex: 'Grow',
         orders__created_at_year: '2025-01-01T00:00:00.000Z',
         orders__revenue: '14100',
         orders__revenue_year_ago: '11700'
