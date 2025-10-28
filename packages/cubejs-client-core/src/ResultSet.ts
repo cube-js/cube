@@ -6,11 +6,13 @@ import {
 
 import { aliasSeries } from './utils';
 import {
+  addInterval,
   DateRegex,
   dayRange,
   internalDayjs,
   isPredefinedGranularity,
   LocalDateRegex,
+  parseSqlInterval,
   TIME_SERIES,
   timeSeriesFromCustomInterval
 } from './time';
@@ -215,7 +217,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
     normalizedPivotConfig?.y.forEach((member, currentIndex) => values.push([member, yValues[currentIndex]]));
 
     const { filters: parentFilters = [], segments = [] } = this.query();
-    const { measures } = this.loadResponses[0].annotation;
+    const { measures, timeDimensions: timeDimensionsAnnotation } = this.loadResponses[0].annotation;
     let [, measureName] = values.find(([member]) => member === 'measures') || [];
 
     if (measureName === undefined) {
@@ -240,7 +242,40 @@ export default class ResultSet<T extends Record<string, any> = any> {
         const [cubeName, dimension, granularity] = member.split('.');
 
         if (granularity !== undefined) {
-          const range = dayRange(value, value).snapTo(granularity);
+          let range: { start: dayjs.Dayjs; end: dayjs.Dayjs };
+
+          // Check if this is a custom granularity
+          if (!isPredefinedGranularity(granularity)) {
+            // Get custom granularity metadata from annotations
+            const customGranularity = timeDimensionsAnnotation?.[member]?.granularity;
+
+            if (customGranularity && customGranularity.interval) {
+              // Parse the interval (e.g., "5 minutes")
+              const intervalParsed = parseSqlInterval(customGranularity.interval);
+
+              // The value is the start of the interval bucket
+              const intervalStart = internalDayjs(value);
+
+              // Calculate the end of the interval bucket
+              // End is start + interval - 1 millisecond
+              const intervalEnd = addInterval(intervalStart, intervalParsed).subtract(1, 'millisecond');
+
+              range = {
+                start: intervalStart,
+                end: intervalEnd
+              };
+            } else {
+              // Fallback to point-in-time if no custom granularity metadata found
+              range = {
+                start: internalDayjs(value),
+                end: internalDayjs(value)
+              };
+            }
+          } else {
+            // Use existing logic for predefined granularities
+            range = dayRange(value, value).snapTo(granularity);
+          }
+
           const originalTimeDimension = query.timeDimensions?.find((td) => td.dimension);
 
           let dateRange = [
