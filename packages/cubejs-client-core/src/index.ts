@@ -6,6 +6,7 @@ import ProgressResult from './ProgressResult';
 import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport';
 import RequestError from './RequestError';
 import {
+  CacheMode,
   ExtractTimeMembers,
   LoadResponse,
   MetaResponse,
@@ -107,6 +108,10 @@ export type CubeSqlOptions = LoadMethodOptions & {
    * Query timeout in milliseconds
    */
   timeout?: number;
+  /**
+   * Cache mode for query execution
+   */
+  cache?: CacheMode;
 };
 
 export type CubeSqlSchemaColumn = {
@@ -711,6 +716,7 @@ class CubeApi {
       () => {
         const request = this.request('cubesql', {
           query: sqlQuery,
+          cache: options?.cache,
           method: 'POST',
           signal: options?.signal,
           fetchTimeout: options?.timeout
@@ -768,7 +774,8 @@ class CubeApi {
       fetchTimeout: options?.timeout,
       baseRequestId: uuidv4(),
       params: {
-        query: sqlQuery
+        query: sqlQuery,
+        cache: options?.cache
       }
     });
 
