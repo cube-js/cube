@@ -48,7 +48,7 @@ pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimiti
         }
         DBResponseValue::Primitive(DBResponsePrimitive::String(ref s)) if type_ == "time" => {
             let formatted = DateTime::parse_from_rfc3339(s)
-                .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+                .map(|dt| dt.with_timezone(&Utc).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
                 .or_else(|_| {
                     NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f").map(|dt| {
                         Utc.from_utc_datetime(&dt)
