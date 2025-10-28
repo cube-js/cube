@@ -6,13 +6,12 @@ import {
 
 import { aliasSeries } from './utils';
 import {
-  addInterval,
   DateRegex,
   dayRange,
+  getGranularityDateRange,
   internalDayjs,
   isPredefinedGranularity,
   LocalDateRegex,
-  parseSqlInterval,
   TIME_SERIES,
   timeSeriesFromCustomInterval
 } from './time';
@@ -242,39 +241,13 @@ export default class ResultSet<T extends Record<string, any> = any> {
         const [cubeName, dimension, granularity] = member.split('.');
 
         if (granularity !== undefined) {
-          let range: { start: dayjs.Dayjs; end: dayjs.Dayjs };
-
-          // Check if this is a custom granularity
-          if (!isPredefinedGranularity(granularity)) {
-            // Get custom granularity metadata from annotations
-            const customGranularity = timeDimensionsAnnotation?.[member]?.granularity;
-
-            if (customGranularity && customGranularity.interval) {
-              // Parse the interval (e.g., "5 minutes")
-              const intervalParsed = parseSqlInterval(customGranularity.interval);
-
-              // The value is the start of the interval bucket
-              const intervalStart = internalDayjs(value);
-
-              // Calculate the end of the interval bucket
-              // End is start + interval - 1 millisecond
-              const intervalEnd = addInterval(intervalStart, intervalParsed).subtract(1, 'millisecond');
-
-              range = {
-                start: intervalStart,
-                end: intervalEnd
-              };
-            } else {
-              // Fallback to point-in-time if no custom granularity metadata found
-              range = {
-                start: internalDayjs(value),
-                end: internalDayjs(value)
-              };
-            }
-          } else {
-            // Use existing logic for predefined granularities
-            range = dayRange(value, value).snapTo(granularity);
-          }
+          // Use the new helper function that handles both predefined and custom granularities
+          const range = getGranularityDateRange(
+            value,
+            granularity,
+            timeDimensionsAnnotation?.[member],
+            timeDimensionsAnnotation
+          );
 
           const originalTimeDimension = query.timeDimensions?.find((td) => td.dimension);
 
@@ -504,7 +477,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
       !['hour', 'minute', 'second'].includes(timeDimension.granularity);
 
     const [start, end] = dateRange;
-    const range = dayRange(start, end);
+    const range = dayRange(start, end, annotations);
 
     if (isPredefinedGranularity(timeDimension.granularity)) {
       return TIME_SERIES[timeDimension.granularity](
