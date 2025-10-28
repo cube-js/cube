@@ -105,7 +105,7 @@ cubes:
     `);
 
   if (getEnv('nativeSqlPlanner')) {
-    it('bucketing', async () => dbRunner.runQueryTest({
+    it('simple bucketing', async () => dbRunner.runQueryTest({
       dimensions: ['orders.changeType'],
       measures: ['orders.count', 'orders.revenue'],
       timeDimensions: [
@@ -117,39 +117,75 @@ cubes:
       ],
       timezone: 'UTC',
       order: [{
-        id: 'orders.customerId'
+        id: 'orders.changeType'
       }, { id: 'orders.createdAt' }],
     }, [
       {
-        orders__cagr_1_y: null,
-        orders__date_year: '2022-01-01T00:00:00.000Z',
-        orders__revenue: '5',
-        orders__revenue_1_y_ago: null,
+        orders__change_type: 'Revenue is Down',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__count: '6',
+        orders__revenue: '20400'
       },
       {
-        orders__date_year: '2023-01-01T00:00:00.000Z',
-        orders__revenue: '15',
-        orders__revenue_1_y_ago: '5',
-        orders__cagr_1_y: '2.0000000000000000'
+        orders__change_type: 'Revenue is Down',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__count: '6',
+        orders__revenue: '17800'
       },
       {
-        orders__date_year: '2024-01-01T00:00:00.000Z',
-        orders__revenue: '30',
-        orders__revenue_1_y_ago: '15',
-        orders__cagr_1_y: '1.0000000000000000'
+        orders__change_type: 'Revenue is Grow',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__count: '6',
+        orders__revenue: '11700'
       },
       {
-        orders__date_year: '2025-01-01T00:00:00.000Z',
-        orders__revenue: '5',
-        orders__revenue_1_y_ago: '30',
-        orders__cagr_1_y: '-0.83333333333333333333'
-      },
+        orders__change_type: 'Revenue is Grow',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__count: '6',
+        orders__revenue: '14100'
+      }
+    ],
+    { joinGraph, cubeEvaluator, compiler }));
 
+    it('bucketing with multistage measure', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.changeType'],
+      measures: ['orders.revenue', 'orders.revenueYearAgo'],
+      timeDimensions: [
+        {
+          dimension: 'orders.createdAt',
+          granularity: 'year',
+          dateRange: ['2024-01-02T00:00:00', '2026-01-01T00:00:00']
+        }
+      ],
+      timezone: 'UTC',
+      order: [{
+        id: 'orders.changeType'
+      }, { id: 'orders.createdAt' }],
+    },
+    [
       {
-        orders__cagr_1_y: null,
-        orders__date_year: '2026-01-01T00:00:00.000Z',
-        orders__revenue: null,
-        orders__revenue_1_y_ago: '5',
+        orders__change_type: 'Revenue is Down',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '20400',
+        orders__revenue_year_ago: '22800'
+      },
+      {
+        orders__change_type: 'Revenue is Down',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '17800',
+        orders__revenue_year_ago: '20400'
+      },
+      {
+        orders__change_type: 'Revenue is Grow',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '11700',
+        orders__revenue_year_ago: '9400'
+      },
+      {
+        orders__change_type: 'Revenue is Grow',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '14100',
+        orders__revenue_year_ago: '11700'
       },
     ],
     { joinGraph, cubeEvaluator, compiler }));

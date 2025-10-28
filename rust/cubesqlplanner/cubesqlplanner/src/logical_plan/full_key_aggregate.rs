@@ -9,6 +9,7 @@ pub struct MultiStageSubqueryRef {
     name: String,
     #[builder(default)]
     symbols: Vec<Rc<MemberSymbol>>,
+    schema: Rc<LogicalSchema>,
 }
 
 impl MultiStageSubqueryRef {
@@ -18,6 +19,10 @@ impl MultiStageSubqueryRef {
 
     pub fn symbols(&self) -> &Vec<Rc<MemberSymbol>> {
         &self.symbols
+    }
+
+    pub fn schema(&self) -> &Rc<LogicalSchema> {
+        &self.schema
     }
 }
 

@@ -83,11 +83,12 @@ impl MultiStageQueryPlanner {
                 &mut resolved_multi_stage_dimensions,
             )?;
             if !description.is_multi_stage_dimension() {
-                let result = (
-                    description.alias().clone(),
-                    vec![description.member_node().clone()],
-                );
-                top_level_ctes.push(result)
+                let result = MultiStageSubqueryRef::builder()
+                    .name(description.alias().clone())
+                    .symbols(vec![description.member_node().clone()])
+                    .schema(description.schema().clone())
+                    .build();
+                top_level_ctes.push(Rc::new(result))
             }
         }
 
@@ -103,18 +104,6 @@ impl MultiStageQueryPlanner {
                 Ok(res)
             })
             .collect::<Result<Vec<_>, _>>()?;
-
-        let top_level_ctes = top_level_ctes
-            .iter()
-            .map(|(alias, symbols)| {
-                Rc::new(
-                    MultiStageSubqueryRef::builder()
-                        .name(alias.clone())
-                        .symbols(symbols.clone())
-                        .build(),
-                )
-            })
-            .collect_vec();
 
         Ok((all_queries, top_level_ctes))
     }

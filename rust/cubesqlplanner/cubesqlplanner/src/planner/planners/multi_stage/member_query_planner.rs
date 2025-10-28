@@ -169,10 +169,12 @@ impl MultiStageMemberQueryPlanner {
             time_series_input: MultiStageSubqueryRef::builder()
                 .name(inputs[0].0.clone())
                 .symbols(inputs[0].1.clone())
+                .schema(inputs[0].2.clone())
                 .build(),
             measure_input: MultiStageSubqueryRef::builder()
                 .name(inputs[1].0.clone())
                 .symbols(inputs[1].1.clone())
+                .schema(inputs[1].2.clone())
                 .build(),
             rolling_time_dimension: rolling_window_desc.time_dimension.clone(),
             time_dimension_in_measure_input: rolling_window_desc.base_time_dimension.clone(),
@@ -229,11 +231,12 @@ impl MultiStageMemberQueryPlanner {
         let input_sources = self
             .input_cte_aliases()
             .into_iter()
-            .map(|(name, symbols)| {
+            .map(|(name, symbols, schema)| {
                 Rc::new(
                     MultiStageSubqueryRef::builder()
                         .name(name.clone())
                         .symbols(symbols.clone())
+                        .schema(schema)
                         .build(),
                 )
             })
@@ -301,11 +304,12 @@ impl MultiStageMemberQueryPlanner {
         let input_sources = self
             .input_cte_aliases()
             .into_iter()
-            .map(|(name, symbols)| {
+            .map(|(name, symbols, schema)| {
                 Rc::new(
                     MultiStageSubqueryRef::builder()
                         .name(name.clone())
                         .symbols(symbols.clone())
+                        .schema(schema)
                         .build(),
                 )
             })
@@ -430,12 +434,19 @@ impl MultiStageMemberQueryPlanner {
             .into_rc()
     }
 
-    fn input_cte_aliases(&self) -> Vec<(String, Vec<Rc<MemberSymbol>>)> {
+    fn input_cte_aliases(&self) -> Vec<(String, Vec<Rc<MemberSymbol>>, Rc<LogicalSchema>)> {
         self.description
             .input()
             .iter()
-            .map(|d| (d.alias().clone(), vec![d.member_node().clone()]))
-            .unique_by(|(a, _)| a.clone())
+            .map(|d| {
+                let schema = LogicalSchema::default()
+                    .set_time_dimensions(d.state().time_dimensions().clone())
+                    .set_dimensions(d.state().dimensions().clone())
+                    .set_measures(vec![d.member_node().clone()])
+                    .into_rc();
+                (d.alias().clone(), vec![d.member_node().clone()], schema)
+            })
+            .unique_by(|(a, _, _)| a.clone())
             .collect_vec()
     }
 

@@ -1,4 +1,5 @@
 use super::{MultiStageAppliedState, MultiStageMember};
+use crate::logical_plan::LogicalSchema;
 use crate::planner::sql_evaluator::MemberSymbol;
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -39,6 +40,13 @@ impl MultiStageQueryDescription {
         })
     }
 
+    pub fn schema(&self) -> Rc<LogicalSchema> {
+        LogicalSchema::default()
+            .set_time_dimensions(self.state.time_dimensions().clone())
+            .set_dimensions(self.state.dimensions().clone())
+            .set_measures(vec![self.member_node().clone()])
+            .into_rc()
+    }
     pub fn member_node(&self) -> &Rc<MemberSymbol> {
         &self.member.evaluation_node()
     }

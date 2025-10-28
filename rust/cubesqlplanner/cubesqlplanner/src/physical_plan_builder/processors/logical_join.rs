@@ -36,8 +36,9 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         }
 
         let root = logical_join.root().clone().unwrap().cube().clone();
-        if logical_join.joins().is_empty() && logical_join.dimension_subqueries().is_empty()
-        //&& multi_stage_dimension.is_none()
+        if logical_join.joins().is_empty()
+            && logical_join.dimension_subqueries().is_empty()
+            && multi_stage_dimension.is_none()
         {
             Ok(From::new_from_cube(
                 root.clone(),

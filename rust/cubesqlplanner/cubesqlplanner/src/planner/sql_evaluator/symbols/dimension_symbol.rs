@@ -122,6 +122,10 @@ impl DimensionSymbol {
 
     pub(super) fn replace_case(&self, new_case: Case) -> Rc<DimensionSymbol> {
         let mut new = self.clone();
+        if new_case.is_single_value() {
+            //FIXME - Hack: we don’t treat a single-element case as a multi-stage dimension
+            new.is_multi_stage = false;
+        }
         new.case = Some(new_case);
         Rc::new(new)
     }
