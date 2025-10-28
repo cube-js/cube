@@ -79,6 +79,50 @@ export const isPredefinedGranularity = (granularity: TimeDimensionGranularity): 
 export const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 export const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 
+/**
+ * Parse PostgreSQL-like interval string into object
+ * E.g. '2 years 15 months 100 weeks 99 hours 15 seconds'
+ * Negative units are also supported
+ * E.g. '-2 months 5 days -10 hours'
+ *
+ * TODO: It's copy/paste of parseSqlInterval from @cubejs-backend/shared [time.ts]
+ * It's not referenced to omit imports of moment.js staff.
+ * Probably one day we should choose one implementation and reuse it in other places.
+ */
+export function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
+  const interval: ParsedInterval = {};
+  const parts = intervalStr.split(/\s+/);
+
+  for (let i = 0; i < parts.length; i += 2) {
+    const value = parseInt(parts[i], 10);
+    const unit = parts[i + 1];
+
+    // Remove ending 's' (e.g., 'days' -> 'day')
+    const singularUnit = unit.endsWith('s') ? unit.slice(0, -1) : unit;
+    interval[singularUnit] = value;
+  }
+
+  return interval;
+}
+
+/**
+ * Adds interval to provided date.
+ * TODO: It's copy/paste of addInterval from @cubejs-backend/shared [time.ts]
+ * but operates with dayjs instead of moment.js
+ * @param {dayjs} date
+ * @param interval
+ * @returns {dayjs}
+ */
+export function addInterval(date: dayjs.Dayjs, interval: ParsedInterval): dayjs.Dayjs {
+  let res = date.clone();
+
+  Object.entries(interval).forEach(([key, value]) => {
+    res = res.add(value, key);
+  });
+
+  return res;
+}
+
 export const dayRange = (from: any, to: any, annotations?: Record<string, { granularity?: Granularity }>): DayRange => ({
   by: (value: any) => {
     const results = [];
@@ -125,50 +169,6 @@ export const dayRange = (from: any, to: any, annotations?: Record<string, { gran
   start: internalDayjs(from),
   end: internalDayjs(to),
 });
-
-/**
- * Parse PostgreSQL-like interval string into object
- * E.g. '2 years 15 months 100 weeks 99 hours 15 seconds'
- * Negative units are also supported
- * E.g. '-2 months 5 days -10 hours'
- *
- * TODO: It's copy/paste of parseSqlInterval from @cubejs-backend/shared [time.ts]
- * It's not referenced to omit imports of moment.js staff.
- * Probably one day we should choose one implementation and reuse it in other places.
- */
-export function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
-  const interval: ParsedInterval = {};
-  const parts = intervalStr.split(/\s+/);
-
-  for (let i = 0; i < parts.length; i += 2) {
-    const value = parseInt(parts[i], 10);
-    const unit = parts[i + 1];
-
-    // Remove ending 's' (e.g., 'days' -> 'day')
-    const singularUnit = unit.endsWith('s') ? unit.slice(0, -1) : unit;
-    interval[singularUnit] = value;
-  }
-
-  return interval;
-}
-
-/**
- * Adds interval to provided date.
- * TODO: It's copy/paste of addInterval from @cubejs-backend/shared [time.ts]
- * but operates with dayjs instead of moment.js
- * @param {dayjs} date
- * @param interval
- * @returns {dayjs}
- */
-export function addInterval(date: dayjs.Dayjs, interval: ParsedInterval): dayjs.Dayjs {
-  let res = date.clone();
-
-  Object.entries(interval).forEach(([key, value]) => {
-    res = res.add(value, key);
-  });
-
-  return res;
-}
 
 /**
  * Adds interval to provided date.
