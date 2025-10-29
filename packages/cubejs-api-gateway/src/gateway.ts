@@ -2169,10 +2169,7 @@ class ApiGateway {
   }
 
   public async contextByReq(req: Request, securityContext, requestId: string): Promise<ExtendedRequestContext> {
-    req.securityContext = {
-      ...req.securityContext,
-      ...securityContext,
-    };
+    req.securityContext = securityContext;
     
     const extensions = typeof this.extendContext === 'function' ? await this.extendContext(req) : {};
 
