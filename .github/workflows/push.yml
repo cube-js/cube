@@ -82,8 +82,7 @@ jobs:
     strategy:
       matrix:
         # Current docker version + next LTS
-        # TODO: Add 24 after it's been released
-        node-version: [22.x]
+        node-version: [22.x, 24.x]
         # Don't forget to update build-native-release
         python-version: [3.11]
       fail-fast: false
@@ -416,7 +415,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22.x]
+        node-version: [22.x, 24.x]
         # Vertica tests are disabled because around 20.08.2025 someone
         # totally removed all vertica-ce docker repository from dockerhub.
         # @see https://github.com/vertica/vertica-containers/issues/64
@@ -520,13 +519,16 @@ jobs:
           DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
           DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
       - name: Fix lcov paths
+        if: (matrix.node-version == '24.x')
         run: |
           ./.github/actions/codecov-fix.sh
       - name: Combine all fixed LCOV files
+        if: (matrix.node-version == '24.x')
         run: |
           echo "" > ./combined-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}.lcov
           find ./packages -type f -name lcov.fixed.info -exec cat {} + >> ./combined-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}.lcov || true
       - name: Upload coverage artifact
+        if: (matrix.node-version == '24.x')
         uses: actions/upload-artifact@v4
         with:
           name: coverage-integration-${{ matrix.db }}-${{ matrix.use_tesseract_sql_planner }}
