@@ -63,11 +63,8 @@ jobs:
         node-version: [22.x]
         # Don't forget to update build-native-release
         python-version: [3.11]
-        transpile-worker-threads: [false, true]
       fail-fast: false
 
-    env:
-      CUBEJS_TRANSPILATION_WORKER_THREADS: ${{ matrix.transpile-worker-threads }}
     steps:
       - id: get-tag-out
         run: echo "$OUT"
@@ -121,16 +118,16 @@ jobs:
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - name: Fix lcov paths
-        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
+        if: (matrix.node-version == '22.x')
         run: |
           ./.github/actions/codecov-fix.sh
       - name: Combine all fixed LCOV files
-        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
+        if: (matrix.node-version == '22.x')
         run: |
           echo "" > ./combined-unit.lcov
           find ./packages -type f -name lcov.fixed.info -exec cat {} + >> ./combined-unit.lcov || true
       - name: Upload coverage artifact
-        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
+        if: (matrix.node-version == '22.x')
         uses: actions/upload-artifact@v4
         with:
           name: coverage-unit
