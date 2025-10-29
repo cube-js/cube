@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.5.0](https://github.com/cube-js/cube/compare/v1.4.0...v1.5.0) (2025-10-29)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+# [1.4.0](https://github.com/cube-js/cube/compare/v1.3.86...v1.4.0) (2025-10-29)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.3.86](https://github.com/cube-js/cube/compare/v1.3.85...v1.3.86) (2025-10-29)
+
+### Features
+
+- **tesseract:** Bucketing ([#10095](https://github.com/cube-js/cube/issues/10095)) ([2dacac4](https://github.com/cube-js/cube/commit/2dacac406815285a82ee07d125d8519b93be9f4a))
+
 ## [1.3.85](https://github.com/cube-js/cube/compare/v1.3.84...v1.3.85) (2025-10-28)
 
 ### Bug Fixes

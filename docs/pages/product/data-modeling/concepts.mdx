@@ -42,7 +42,7 @@ metrics-first approaches.
 _Cubes_ represent datasets in Cube and are conceptually similar to [views in
 SQL][wiki-view-sql]. Cubes are usually declared in separate files with one
 cube per file. Typically, a cube points to a single table in
-your database using the [`sql_table` property][ref-schema-ref-sql-table]:
+your [data source][ref-data-sources] using the [`sql_table` property][ref-schema-ref-sql-table]:
 
 <CodeTabs>
 
@@ -104,6 +104,9 @@ Cubes and their members can be further referenced by [views](#views).
 
 Note that cubes support [extension][ref-extending-cubes],
 [polymorphism][ref-polymorphic-cubes], and [data blending][ref-data-blending].
+Custom calendars, such as retail calendars, can be implemented using [calendar
+cubes][ref-calendar-cubes].
+
 Cubes can be defined statically and you can also build [dynamic data
 models][ref-dynamic-data-models].
 
@@ -851,3 +854,5 @@ See the reference documentaton for the full list of pre-aggregation
 [ref-cube-with-dbt]: /product/data-modeling/recipes/dbt
 [ref-apis-support]: /product/apis-integrations#data-modeling
 [ref-viz-tools]: /product/configuration/visualization-tools
+[ref-data-sources]: /product/configuration/data-sources
+[ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes

@@ -157,6 +157,14 @@ impl CaseSwitchDefinition {
         res.remove_unreachable_branches();
         Ok(res)
     }
+
+    pub fn is_single_value(&self) -> bool {
+        let mut values_len = self.items.len();
+        if self.else_sql.is_some() {
+            values_len += 1;
+        }
+        values_len == 1
+    }
     fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         self.switch.extract_symbol_deps(result);
         for itm in self.items.iter() {
@@ -356,5 +364,11 @@ impl Case {
             Case::CaseSwitch(case) => Case::CaseSwitch(case.apply_to_deps(f)?),
         };
         Ok(res)
+    }
+    pub fn is_single_value(&self) -> bool {
+        match self {
+            Case::Case(_) => false,
+            Case::CaseSwitch(case) => case.is_single_value(),
+        }
     }
 }

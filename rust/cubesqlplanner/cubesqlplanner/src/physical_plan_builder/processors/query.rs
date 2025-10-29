@@ -4,9 +4,7 @@ use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::plan::{
     CalcGroupItem, CalcGroupsJoin, Cte, Expr, From, MemberExpression, Select, SelectBuilder,
 };
-use crate::planner::sql_evaluator::collectors::{
-    collect_calc_group_dims_from_nodes, has_multi_stage_members,
-};
+use crate::planner::sql_evaluator::collectors::collect_calc_group_dims_from_nodes;
 use crate::planner::sql_evaluator::{get_filtered_values, ReferencesBuilder};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -62,8 +60,23 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         context.remove_multi_stage_dimensions();
-        for member in logical_plan.schema().all_dimensions() {
-            if has_multi_stage_members(member, true)? {
+
+        //FIXME This is hack but good solution require refactor
+        let resolved_multistage_dimension =
+            if let QuerySource::FullKeyAggregate(fk_source) = logical_plan.source() {
+                if let Some(first_cte_ref) = fk_source.multi_stage_subquery_refs().first() {
+                    first_cte_ref.schema().multi_stage_dimensions()?
+                } else {
+                    vec![]
+                }
+            } else {
+                vec![]
+            };
+        for member in logical_plan.schema().multi_stage_dimensions()? {
+            if resolved_multistage_dimension
+                .iter()
+                .all(|d| d.full_name() != member.full_name())
+            {
                 context.add_multi_stage_dimension(member.full_name());
             }
         }

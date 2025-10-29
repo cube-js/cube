@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.5.0](https://github.com/cube-js/cube/compare/v1.4.0...v1.5.0) (2025-10-29)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+# [1.4.0](https://github.com/cube-js/cube/compare/v1.3.86...v1.4.0) (2025-10-29)
+
+### Bug Fixes
+
+- **cubesql:** Always repartition joins when right side has multiple partitions ([#10105](https://github.com/cube-js/cube/issues/10105)) ([ae32748](https://github.com/cube-js/cube/commit/ae327483caabba974e271fb52f4ccc5fd5fa5789))
+
+## [1.3.86](https://github.com/cube-js/cube/compare/v1.3.85...v1.3.86) (2025-10-29)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
 ## [1.3.85](https://github.com/cube-js/cube/compare/v1.3.84...v1.3.85) (2025-10-28)
 
 **Note:** Version bump only for package @cubejs-backend/native

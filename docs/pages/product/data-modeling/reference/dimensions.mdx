@@ -148,6 +148,42 @@ cube(`products`, {
 })
 ```
 
+### `title`
+
+You can use the `title` parameter to change a dimension's displayed name. By
+default, Cube will humanize your dimension key to create a display name. In
+order to override default behavior, please use the `title` property:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    meta_value: {
+      title: `Size`,
+      sql: `meta_value`,
+      type: `string`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: meta_value
+        title: Size
+        sql: meta_value
+        type: string
+```
+
+</CodeTabs>
+
 ### `description`
 
 This parameter provides a human-readable description of a dimension.
@@ -180,6 +216,42 @@ cubes:
         description: Comments for orders
         sql: comments
         type: string
+```
+
+</CodeTabs>
+
+### `public`
+
+The `public` parameter is used to manage the visibility of a dimension. Valid
+values for `public` are `true` and `false`. When set to `false`, this dimension
+**cannot** be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    comment: {
+      sql: `comment`,
+      type: `string`,
+      public: false
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        sql: comment
+        type: string
+        public: false
 ```
 
 </CodeTabs>
@@ -419,42 +491,6 @@ cubes:
 
 </CodeTabs>
 
-### `public`
-
-The `public` parameter is used to manage the visibility of a dimension. Valid
-values for `public` are `true` and `false`. When set to `false`, this dimension
-**cannot** be queried through the API. Defaults to `true`.
-
-<CodeTabs>
-
-```javascript
-cube(`products`, {
-  // ...
-
-  dimensions: {
-    comment: {
-      sql: `comment`,
-      type: `string`,
-      public: false
-    }
-  }
-})
-```
-
-```yaml
-cubes:
-  - name: products
-    # ...
-
-    dimensions:
-      - name: comment
-        sql: comment
-        type: string
-        public: false
-```
-
-</CodeTabs>
-
 ### `sql`
 
 `sql` is a required parameter. It can take any valid SQL expression depending on
@@ -521,42 +557,6 @@ cubes:
         sql: "{users.count}"
         type: number
         sub_query: true
-```
-
-</CodeTabs>
-
-### `title`
-
-You can use the `title` parameter to change a dimension's displayed name. By
-default, Cube will humanize your dimension key to create a display name. In
-order to override default behavior, please use the `title` property:
-
-<CodeTabs>
-
-```javascript
-cube(`products`, {
-  // ...
-
-  dimensions: {
-    meta_value: {
-      title: `Size`,
-      sql: `meta_value`,
-      type: `string`
-    }
-  }
-})
-```
-
-```yaml
-cubes:
-  - name: products
-    # ...
-
-    dimensions:
-      - name: meta_value
-        title: Size
-        sql: meta_value
-        type: string
 ```
 
 </CodeTabs>
@@ -700,6 +700,193 @@ cube(`orders`, {
 
 </CodeTabs>
 
+#### Calendar cubes
+
+When the `granularities` parameter is used in time dimensions within [calendar
+cubes][ref-calendar-cubes], you can still use it to define custom granularities.
+
+Additionally, you can override the _default granularities_. This can be useful for
+modeling custom calendars, such as fiscal calendars.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: fiscal_calendar
+    calendar: true
+    sql: >
+      SELECT
+        date_key,
+        calendar_date,
+        start_of_month,
+        start_of_quarter,
+        start_of_year
+      FROM calendar_table
+
+    dimensions:
+      - name: date_key
+        sql: date_key
+        type: time
+        primary_key: true
+
+      - name: date
+        sql: calendar_date
+        type: time
+        granularities:
+          - name: month
+            sql: "{CUBE}.start_of_month"
+
+          - name: quarter
+            sql: "{CUBE}.start_of_quarter"
+
+          - name: year
+            sql: "{CUBE}.start_of_year"
+
+```
+
+```javascript
+cube(`fiscal_calendar`, {
+  calendar: true,
+  sql: `
+    SELECT
+      date_key,
+      calendar_date,
+      start_of_month,
+      start_of_quarter,
+      start_of_year
+    FROM calendar_table
+  `,
+
+  dimensions: {
+    date_key: {
+      sql: `date_key`,
+      type: `time`,
+      primary_key: true
+    },
+
+    date: {
+      sql: `calendar_date`,
+      type: `time`,
+      granularities: {
+        month: {
+          sql: `${CUBE}.start_of_month`
+        },
+        quarter: {
+          sql: `${CUBE}.start_of_quarter`
+        },
+        year: {
+          sql: `${CUBE}.start_of_year`
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+### `time_shift`
+
+The `time_shift` parameter allows overriding the time shift behavior for time dimensions
+within [calendar cubes][ref-calendar-cubes]. Such time shifts can be referenced in
+[time-shift measures][ref-time-shift] of other cubes, enabling the use of custom calendars.
+
+The `time_shift` parameter can only be set on _time dimensions_ within _calendar cubes_,
+i.e., cubes where the [`calendar` parameter][ref-cube-calendar] is set to `true`. 
+
+The `time_shift` parameter accepts an array of time shift definitions. Each definition
+can include `time_dimension`, `type`, `interval`, and `name` parameters, similarly to the
+[`time_shift` parameter][ref-measure-time-shift] of time-shift measures. Additionally,
+you can use the `sql` parameter to define a custom time mapping using a SQL expression.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: fiscal_calendar
+    calendar: true
+    sql: >
+      SELECT
+        date_key,
+        calendar_date,
+        fiscal_date_prior_year,
+        fiscal_date_next_quarter
+      FROM calendar_table
+
+    dimensions:
+      - name: date_key
+        sql: date_key
+        type: time
+        primary_key: true
+
+      - name: date
+        sql: calendar_date
+        type: time
+        time_shift:
+          - name: prior_calendar_year
+            type: prior
+            interval: 1 year
+
+          - name: next_calendar_quarter
+            type: next
+            interval: 1 quarter
+
+          - name: prior_fiscal_year
+            sql: "{CUBE}.fiscal_date_prior_year"
+
+          - name: next_fiscal_quarter
+            sql: "{CUBE}.fiscal_date_next_quarter"
+```
+
+```javascript
+cube(`fiscal_calendar`, {
+  calendar: true,
+  sql: `
+    SELECT
+      date_key,
+      calendar_date,
+      fiscal_date_prior_year,
+      fiscal_date_next_quarter
+    FROM calendar_table
+  `,
+
+  dimensions: {
+    date_key: {
+      sql: `date_key`,
+      type: `time`,
+      primary_key: true
+    },
+
+    date: {
+      sql: `calendar_date`,
+      type: `time`,
+      time_shift: [
+        {
+          name: `prior_calendar_year`,
+          type: `prior`,
+          interval: `1 year`
+        },
+        {
+          name: `next_calendar_quarter`,
+          type: `next`,
+          interval: `1 quarter`
+        },
+        {
+          name: `prior_fiscal_year`,
+          sql: `${CUBE}.fiscal_date_prior_year`
+        },
+        {
+          name: `next_fiscal_quarter`,
+          sql: `${CUBE}.fiscal_date_next_quarter`
+        }
+      ]
+    }
+  }
+});
+```
+
+</CodeTabs>
+
 
 [ref-ref-cubes]: /product/data-modeling/reference/cube
 [ref-schema-ref-joins]: /product/data-modeling/reference/joins
@@ -717,3 +904,7 @@ cube(`orders`, {
 [ref-custom-granularity-recipe]: /product/data-modeling/recipes/custom-granularity
 [ref-ref-hierarchies]: /product/data-modeling/reference/hierarchies
 [ref-data-sources]: /product/configuration/data-sources
+[ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes
+[ref-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift
+[ref-cube-calendar]: /product/data-modeling/reference/cube#calendar
+[ref-measure-time-shift]: /product/data-modeling/reference/measures#time_shift

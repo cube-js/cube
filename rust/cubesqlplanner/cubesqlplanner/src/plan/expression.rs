@@ -8,11 +8,22 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct MemberExpression {
     pub member: Rc<MemberSymbol>,
+    pub context: Option<Rc<VisitorContext>>,
 }
 
 impl MemberExpression {
     pub fn new(member: Rc<MemberSymbol>) -> Self {
-        Self { member }
+        Self {
+            member,
+            context: None,
+        }
+    }
+
+    pub fn new_with_context(member: Rc<MemberSymbol>, context: Rc<VisitorContext>) -> Self {
+        Self {
+            member,
+            context: Some(context),
+        }
     }
 
     pub fn to_sql(
@@ -44,6 +55,9 @@ impl Expr {
     pub fn new_member(member: Rc<MemberSymbol>) -> Self {
         Self::Member(MemberExpression::new(member))
     }
+    pub fn new_member_with_context(member: Rc<MemberSymbol>, context: Rc<VisitorContext>) -> Self {
+        Self::Member(MemberExpression::new_with_context(member, context))
+    }
     pub fn new_reference(source: Option<String>, reference: String) -> Self {
         Self::Reference(QualifiedColumnName::new(source, reference))
     }
@@ -54,7 +68,14 @@ impl Expr {
     ) -> Result<String, CubeError> {
         match self {
             Self::Null => Ok(format!("CAST(NULL as integer)")),
-            Self::Member(member) => member.to_sql(templates, context),
+            Self::Member(member) => {
+                let context = if let Some(self_context) = &member.context {
+                    self_context.clone()
+                } else {
+                    context
+                };
+                member.to_sql(templates, context)
+            }
             Self::Reference(reference) => {
                 templates.column_reference(reference.source(), &reference.name())
             }

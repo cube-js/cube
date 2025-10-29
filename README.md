@@ -1,8 +1,5 @@
 ![]()
 <p align="center">
-  <a href="https://cube.registration.goldcast.io/events/a6a3b4b8-a99f-489a-b740-060182dbce7b"><img src="https://lgo0ecceic.ucarecd.net/cd698180-3d96-4644-9c9e-daf299ecf3ea/" alt="Agentic Analytics Summit" width="100%"></a>
-</p>
-<p align="center">
   <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube/master/docs/content/cube-logo-with-bg.png" alt="Cube — Semantic Layer for Data Applications" width="300px"></a>
 </p>
 <br/>

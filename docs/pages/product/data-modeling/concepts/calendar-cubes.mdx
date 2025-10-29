@@ -1,0 +1,467 @@
+# Calendar cubes
+
+_Calendar cubes_ are used to implement custom calendars, such as retail calendars.
+If your data model contains a calendar table, it can be modeled as a calendar cube.
+
+Calendar cubes can be used to [override](#overriding-time-shifts) the default time
+shift behavior of time-shift measures as well as [override](#overriding-granularities)
+the default granularities of time dimensions.
+
+<WarningBox>
+
+Calendar cubes are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. Tesseract is currently in preview. Use the
+`CUBEJS_TESSERACT_SQL_PLANNER` environment variable to enable it.
+
+</WarningBox>
+
+## Configuration
+
+Calendar cubes are [cubes][ref-cubes] where the [`calendar` parameter][ref-cubes-calendar]
+is set to `true`. This indicates that the cube is a calendar cube and allow the use of
+custom time shifts and granularities.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: fiscal_calendar
+    calendar: true
+    sql: >
+      SELECT
+        date_key,
+        calendar_date,
+        start_of_week, start_of_month, start_of_year,
+        week_ago, month_ago, year_ago
+      FROM calendar_table
+    
+    dimensions:
+      - name: date_key
+        sql: date
+        type: time
+        primary_key: true
+
+      - name: date
+        sql: date
+        type: time
+
+        time_shift:
+          - type: prior
+            interval: 1 week
+            sql: "{CUBE}.week_ago"
+
+          - type: prior
+            interval: 1 month
+            sql: "{CUBE}.month_ago"
+
+          - type: prior
+            interval: 1 year
+            sql: "{CUBE}.year_ago"
+        
+        granularities:
+          - name: week
+            sql: "{CUBE}.start_of_week"
+            
+          - name: month
+            sql: "{CUBE}.start_of_month"
+            
+          - name: year
+            sql: "{CUBE}.start_of_year"
+```
+
+```javascript
+cube('fiscal_calendar', {
+  calendar: true,
+  sql: `
+    SELECT
+      date_key,
+      calendar_date,
+      start_of_week, start_of_month, start_of_year,
+      week_ago, month_ago, year_ago
+    FROM calendar_table
+  `,
+
+  dimensions: {
+    date_key: {
+      sql: 'date_key',
+      type: 'time',
+      primary_key: true
+    },
+
+    date: {
+      sql: 'calendar_date',
+      type: 'time',
+
+      time_shift: [
+        { type: 'prior', interval: '1 week', sql: '{CUBE}.week_ago' },
+        { type: 'prior', interval: '1 month', sql: '{CUBE}.month_ago' },
+        { type: 'prior', interval: '1 year', sql: '{CUBE}.year_ago' }
+      ],
+
+      granularities: [
+        { name: 'week', sql: '{CUBE}.start_of_week' },
+        { name: 'month', sql: '{CUBE}.start_of_month' },
+        { name: 'year', sql: '{CUBE}.start_of_year' }
+      ]
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+Calendar cubes are only useful when they are joined with other cubes in the data model.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: sales
+    sql_table: sales_facts
+
+    joins:
+      - name: fiscal_calendar
+        sql: "{CUBE}.date = {fiscal_calendar.date_key}"
+        relationship: many_to_one
+    
+    # ...
+```
+
+```javascript
+cube(`sales`, {
+  sql_table: `sales_facts`,
+
+  joins: {
+    fiscal_calendar: {
+      sql: `${CUBE}.date = ${fiscal_calendar.date_key}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  // ...
+})
+```
+
+</CodeTabs>
+
+## Overriding time shifts
+
+Calendar cubes can be used to override the default time shift behavior of [time-shift
+measures][ref-time-shift]. It can help implement custom time shifts or reuse common time
+shifts across multiple cubes.
+
+By default, a time shift like `prior` + `1 month` will add `INTERVAL '1 month'` to the
+time dimension value in the generated SQL. However, with custom calendars, a more nuanced
+approach is often needed, such as mapping each date to another pre-calculated date from
+the calendar table.
+
+In the following example, the `custom_calendar` cube defines a custom time shift for
+`prior` + `1 month` that uses the `month_ago` column from the calendar table. It also
+defines a custom time shift `my_favorite_time_shift` of type `prior` + the `42 days`
+interval.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: custom_calendar
+    calendar: true
+    sql: >
+      SELECT '2025-01-01' AS date, '2024-12-15' AS month_ago UNION ALL
+      SELECT '2025-02-01' AS date, '2025-01-15' AS month_ago UNION ALL
+      SELECT '2025-03-01' AS date, '2025-02-15' AS month_ago UNION ALL
+      SELECT '2025-04-01' AS date, '2025-03-15' AS month_ago UNION ALL
+      SELECT '2025-05-01' AS date, '2025-04-15' AS month_ago UNION ALL
+      SELECT '2025-06-01' AS date, '2025-05-15' AS month_ago
+    
+    dimensions:
+      - name: date_key
+        sql: "{CUBE}.date::TIMESTAMP"
+        type: time
+        primary_key: true
+
+      - name: date
+        sql: "{CUBE}.date::TIMESTAMP"
+        type: time
+        
+        time_shift:
+          - type: prior
+            interval: 1 month
+            sql: "{CUBE}.month_ago::TIMESTAMP"
+        
+          - type: prior
+            interval: 42 days
+            name: my_favorite_time_shift
+
+  - name: sales
+    sql: >
+      SELECT 1 AS id, 101 AS amount, '2025-01-01'::TIMESTAMP AS date UNION ALL
+      SELECT 2 AS id, 202 AS amount, '2025-02-01'::TIMESTAMP AS date UNION ALL
+      SELECT 3 AS id, 303 AS amount, '2025-03-01'::TIMESTAMP AS date UNION ALL
+      SELECT 4 AS id, 404 AS amount, '2025-04-01'::TIMESTAMP AS date UNION ALL
+      SELECT 5 AS id, 505 AS amount, '2025-05-01'::TIMESTAMP AS date UNION ALL
+      SELECT 6 AS id, 606 AS amount, '2025-06-01'::TIMESTAMP AS date
+
+    joins:
+      - name: custom_calendar
+        sql: "{CUBE}.date = {custom_calendar.date_key}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: total_sales
+        sql: amount
+        type: sum
+
+      - name: total_sales_prior_month
+        sql: "{total_sales}"
+        type: number
+        time_shift:
+          - type: prior
+            interval: 1 month
+
+      - name: total_sales_few_days_ago
+        sql: "{total_sales}"
+        type: number
+        time_shift:
+          - name: my_favorite_time_shift
+```
+
+```javascript
+cube(`custom_calendar`, {
+  calendar: true,
+  sql: `
+    SELECT '2025-01-01' AS date, '2024-12-15' AS month_ago UNION ALL
+    SELECT '2025-02-01' AS date, '2025-01-15' AS month_ago UNION ALL
+    SELECT '2025-03-01' AS date, '2025-02-15' AS month_ago UNION ALL
+    SELECT '2025-04-01' AS date, '2025-03-15' AS month_ago UNION ALL
+    SELECT '2025-05-01' AS date, '2025-04-15' AS month_ago UNION ALL
+    SELECT '2025-06-01' AS date, '2025-05-15' AS month_ago
+  `,
+
+  dimensions: {
+    date_key: {
+      sql: `${CUBE}.date::TIMESTAMP`,
+      type: `time`,
+      primary_key: true
+    },
+
+    date: {
+      sql: `${CUBE}.date::TIMESTAMP`,
+      type: `time`,
+
+      time_shift: [
+        { type: `prior`, interval: `1 month`, sql: `${CUBE}.month_ago::TIMESTAMP` },
+        { type: `prior`, interval: `42 days`, name: `my_favorite_time_shift` }
+      ]
+    }
+  }
+})
+
+cube(`sales`, {
+  sql: `
+    SELECT 1 AS id, 101 AS amount, '2025-01-01'::TIMESTAMP AS date UNION ALL
+    SELECT 2 AS id, 202 AS amount, '2025-02-01'::TIMESTAMP AS date UNION ALL
+    SELECT 3 AS id, 303 AS amount, '2025-03-01'::TIMESTAMP AS date UNION ALL
+    SELECT 4 AS id, 404 AS amount, '2025-04-01'::TIMESTAMP AS date UNION ALL
+    SELECT 5 AS id, 505 AS amount, '2025-05-01'::TIMESTAMP AS date UNION ALL
+    SELECT 6 AS id, 606 AS amount, '2025-06-01'::TIMESTAMP AS date
+  `,
+
+  joins: {
+    custom_calendar: {
+      sql: `${CUBE}.date = ${custom_calendar.date_key}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  measures: {
+    total_sales: {
+      sql: `amount`,
+      type: `sum`
+    },
+
+    total_sales_prior_month: {
+      sql: `{total_sales}`,
+      type: `number`,
+      time_shift: [
+        { type: `prior`, interval: `1 month` }
+      ]
+    },
+
+    total_sales_few_days_ago: {
+      sql: `{total_sales}`,
+      type: `number`,
+      time_shift: [
+        { name: `my_favorite_time_shift` }
+      ]
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+Whe `sales.total_sales_prior_month` and `sales.total_sales_few_days_ago` measures are
+queried together with the `calendar.date` time dimension, the generate SQL will use the
+custom time shifts defined in the `custom_calendar` cube: one with the `month_ago`
+column and another with `INTERVAL '42 days'`.
+
+## Overriding granularities
+
+Calendar cubes can be used to override the default [granularities][ref-granularities] of
+[time dimensions][ref-time-dimension].
+
+By default, SQL functions like `DATE_TRUNC` are used to calculate default granularities,
+such as `day`, `month`, or `year`. However, custom calendars often have different
+definitions for these periods, e.g., a retail calendar might use 4-5-4 week patterns.
+
+Calendar cubes allow you to define custom SQL expressions for each granularity.
+In the following example, the `fiscal_calendar` cube overrides the default `month`
+granularity to the to a pre-calculated `mid_month` column:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: custom_calendar
+    calendar: true
+    sql: >
+      SELECT '2025-01-02' AS date, '2025-01-15' AS mid_month UNION ALL
+      SELECT '2025-02-04' AS date, '2025-02-15' AS mid_month UNION ALL
+      SELECT '2025-03-09' AS date, '2025-03-15' AS mid_month UNION ALL
+      SELECT '2025-04-17' AS date, '2025-04-15' AS mid_month UNION ALL
+      SELECT '2025-05-21' AS date, '2025-05-15' AS mid_month UNION ALL
+      SELECT '2025-06-30' AS date, '2025-06-15' AS mid_month
+    
+    dimensions:
+      - name: date_key
+        sql: date
+        type: time
+        primary_key: true
+
+      - name: date
+        sql: date
+        type: time
+        primary_key: true
+        
+        granularities:
+          - name: month
+            sql: "{CUBE}.mid_month::TIMESTAMP"
+
+  - name: sales
+    sql: >
+      SELECT 1 AS id, 101 AS amount, '2025-01-02'::TIMESTAMP AS date UNION ALL
+      SELECT 2 AS id, 202 AS amount, '2025-02-04'::TIMESTAMP AS date UNION ALL
+      SELECT 3 AS id, 303 AS amount, '2025-03-09'::TIMESTAMP AS date UNION ALL
+      SELECT 4 AS id, 404 AS amount, '2025-04-17'::TIMESTAMP AS date UNION ALL
+      SELECT 5 AS id, 505 AS amount, '2025-05-21'::TIMESTAMP AS date UNION ALL
+      SELECT 6 AS id, 606 AS amount, '2025-06-30'::TIMESTAMP AS date
+
+    joins:
+      - name: custom_calendar
+        sql: "{CUBE}.date = {custom_calendar.date}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+```
+
+```javascript
+cube(`custom_calendar`, {
+  calendar: true,
+  sql: `
+    SELECT '2025-01-02' AS date, '2025-01-15' AS mid_month UNION ALL
+    SELECT '2025-02-04' AS date, '2025-02-15' AS mid_month UNION ALL
+    SELECT '2025-03-09' AS date, '2025-03-15' AS mid_month UNION ALL
+    SELECT '2025-04-17' AS date, '2025-04-15' AS mid_month UNION ALL
+    SELECT '2025-05-21' AS date, '2025-05-15' AS mid_month UNION ALL
+    SELECT '2025-06-30' AS date, '2025-06-15' AS mid_month
+  `,
+
+  dimensions: {
+    date_key: {
+      sql: `date`,
+      type: `time`,
+      primary_key: true
+    },
+
+    date: {
+      sql: `date`,
+      type: `time`,
+      primary_key: true,
+
+      granularities: [
+        { name: `month`, sql: `${CUBE}.mid_month::TIMESTAMP` }
+      ]
+    }
+  }
+})
+
+cube(`sales`, {
+  sql: `
+    SELECT 1 AS id, 101 AS amount, '2025-01-02'::TIMESTAMP AS date UNION ALL
+    SELECT 2 AS id, 202 AS amount, '2025-02-04'::TIMESTAMP AS date UNION ALL
+    SELECT 3 AS id, 303 AS amount, '2025-03-09'::TIMESTAMP AS date UNION ALL
+    SELECT 4 AS id, 404 AS amount, '2025-04-17'::TIMESTAMP AS date UNION ALL
+    SELECT 5 AS id, 505 AS amount, '2025-05-21'::TIMESTAMP AS date UNION ALL
+    SELECT 6 AS id, 606 AS amount, '2025-06-30'::TIMESTAMP AS date
+  `,
+
+  joins: {
+    custom_calendar: {
+      sql: `${CUBE}.date = ${custom_calendar.date}`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  measures: {
+    revenue: {
+      sql: `amount`,
+      type: `sum`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+When querying `sales.revenue` by `custom_calendar.date` with monthly granularity, the
+`mid_month` column will be used instead of the standard `DATE_TRUNC('month', date)`
+expression in the generated SQL.
+
+
+[ref-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift
+[ref-time-dimension]: /product/data-modeling/concepts#time-dimensions
+[ref-granularities]: /product/data-modeling/reference/dimensions#granularities
+[ref-cubes]: /product/data-modeling/reference/cube
+[ref-cubes-calendar]: /product/data-modeling/reference/cube#calendar
