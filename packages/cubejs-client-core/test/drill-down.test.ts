@@ -518,4 +518,125 @@ describe('drill down query', () => {
       timezone: 'UTC',
     });
   });
+
+  it('handles custom granularity with non-aligned origin', () => {
+    const EVALUATION_PERIOD = 5;
+    const NON_ALIGNED_ORIGIN = '2020-08-01T00:02:00.000'; // Origin at 00:02 instead of 00:00
+
+    const customGranularityResponse = {
+      queryType: 'regularQuery',
+      results: [
+        {
+          query: {
+            measures: ['Transactions.count'],
+            timeDimensions: [
+              {
+                dimension: 'Transactions.createdAt',
+                granularity: 'alerting_monitor',
+                dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T01:00:00.000'],
+              },
+            ],
+            filters: [],
+            timezone: 'UTC',
+            order: [],
+            dimensions: [],
+          },
+          data: [
+            {
+              // First bucket starts at 00:02:00 (origin)
+              'Transactions.createdAt.alerting_monitor': '2020-08-01T00:02:00.000',
+              'Transactions.createdAt': '2020-08-01T00:02:00.000',
+              'Transactions.count': 10,
+            },
+            {
+              // Second bucket starts at 00:07:00 (origin + 5 minutes)
+              'Transactions.createdAt.alerting_monitor': '2020-08-01T00:07:00.000',
+              'Transactions.createdAt': '2020-08-01T00:07:00.000',
+              'Transactions.count': 15,
+            },
+            {
+              // Third bucket starts at 00:12:00 (origin + 10 minutes)
+              'Transactions.createdAt.alerting_monitor': '2020-08-01T00:12:00.000',
+              'Transactions.createdAt': '2020-08-01T00:12:00.000',
+              'Transactions.count': 8,
+            },
+          ],
+          annotation: {
+            measures: {
+              'Transactions.count': {
+                title: 'Transactions Count',
+                shortTitle: 'Count',
+                type: 'number',
+                drillMembers: ['Transactions.id', 'Transactions.createdAt'],
+                drillMembersGrouped: {
+                  measures: [],
+                  dimensions: ['Transactions.id', 'Transactions.createdAt'],
+                },
+              },
+            },
+            dimensions: {},
+            segments: {},
+            timeDimensions: {
+              'Transactions.createdAt.alerting_monitor': {
+                title: 'Transaction created at',
+                shortTitle: 'Created at',
+                type: 'time',
+                granularity: {
+                  name: 'alerting_monitor',
+                  title: 'Alerting Monitor',
+                  interval: `${EVALUATION_PERIOD} minutes`,
+                  origin: NON_ALIGNED_ORIGIN,
+                },
+              },
+              'Transactions.createdAt': {
+                title: 'Transaction created at',
+                shortTitle: 'Created at',
+                type: 'time',
+              },
+            },
+          },
+        },
+      ],
+      pivotQuery: {
+        measures: ['Transactions.count'],
+        timeDimensions: [
+          {
+            dimension: 'Transactions.createdAt',
+            granularity: 'alerting_monitor',
+            dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T01:00:00.000'],
+          },
+        ],
+        filters: [],
+        timezone: 'UTC',
+        order: [],
+        dimensions: [],
+      },
+    };
+
+    const resultSet = new ResultSet(customGranularityResponse as any);
+
+    // Test drilling down on the second data point (00:07:00)
+    // Since origin is 00:02:00, the bucket is 00:07:00 - 00:11:59
+    expect(
+      resultSet.drillDown({ xValues: ['2020-08-01T00:07:00.000'] })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Transactions.id', 'Transactions.createdAt'],
+      filters: [
+        {
+          member: 'Transactions.count',
+          operator: 'measureFilter',
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Transactions.createdAt',
+          // Should align to origin: bucket starts at 00:07:00 (origin + 5min)
+          dateRange: ['2020-08-01T00:07:00.000', '2020-08-01T00:11:59.999'],
+        },
+      ],
+      timezone: 'UTC',
+    });
+  });
 });

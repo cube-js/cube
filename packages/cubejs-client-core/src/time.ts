@@ -123,53 +123,6 @@ export function addInterval(date: dayjs.Dayjs, interval: ParsedInterval): dayjs.
   return res;
 }
 
-export const dayRange = (from: any, to: any, annotations?: Record<string, { granularity?: Granularity }>): DayRange => ({
-  by: (value: any) => {
-    const results = [];
-
-    let start = internalDayjs(from);
-    const end = internalDayjs(to);
-
-    while (start.startOf(value).isBefore(end) || start.isSame(end)) {
-      results.push(start);
-      start = start.add(1, value);
-    }
-
-    return results;
-  },
-  snapTo: (value: any): DayRange => {
-    // Check if this is a custom granularity
-    if (!isPredefinedGranularity(value) && annotations) {
-      // Try to find the custom granularity metadata
-      // The annotation key might be in format "Cube.dimension.granularity"
-      // So we need to search through all annotations
-      let customGranularity: Granularity | undefined;
-
-      for (const key of Object.keys(annotations)) {
-        if (key.endsWith(`.${value}`) && annotations[key].granularity) {
-          customGranularity = annotations[key].granularity;
-          break;
-        }
-      }
-
-      if (customGranularity && customGranularity.interval) {
-        // For custom granularities, calculate the range for the bucket
-        const intervalParsed = parseSqlInterval(customGranularity.interval);
-        const intervalStart = internalDayjs(from);
-        // End is start + interval - 1 millisecond (to stay within the bucket)
-        const intervalEnd = addInterval(intervalStart, intervalParsed).subtract(1, 'millisecond');
-
-        return dayRange(intervalStart, intervalEnd, annotations);
-      }
-    }
-
-    // Default behavior for predefined granularities
-    return dayRange(internalDayjs(from).startOf(value), internalDayjs(to).endOf(value), annotations);
-  },
-  start: internalDayjs(from),
-  end: internalDayjs(to),
-});
-
 /**
  * Adds interval to provided date.
  * TODO: It's copy/paste of subtractInterval from @cubejs-backend/shared [time.ts]
@@ -229,6 +182,65 @@ function alignToOrigin(startDate: dayjs.Dayjs, interval: ParsedInterval, origin:
 
   return alignedDate;
 }
+
+export const dayRange = (from: any, to: any, annotations?: Record<string, { granularity?: Granularity }>): DayRange => ({
+  by: (value: any) => {
+    const results = [];
+
+    let start = internalDayjs(from);
+    const end = internalDayjs(to);
+
+    while (start.startOf(value).isBefore(end) || start.isSame(end)) {
+      results.push(start);
+      start = start.add(1, value);
+    }
+
+    return results;
+  },
+  snapTo: (value: any): DayRange => {
+    // Check if this is a custom granularity
+    if (!isPredefinedGranularity(value) && annotations) {
+      // Try to find the custom granularity metadata
+      // The annotation key might be in format "Cube.dimension.granularity"
+      // So we need to search through all annotations
+      let customGranularity: Granularity | undefined;
+
+      for (const key of Object.keys(annotations)) {
+        if (key.endsWith(`.${value}`) && annotations[key].granularity) {
+          customGranularity = annotations[key].granularity;
+          break;
+        }
+      }
+
+      if (customGranularity?.interval) {
+        // For custom granularities, calculate the range for the bucket
+        const intervalParsed = parseSqlInterval(customGranularity.interval);
+        let intervalStart = internalDayjs(from);
+
+        // If custom granularity has an origin, align to it
+        if (customGranularity.origin) {
+          let origin = internalDayjs(customGranularity.origin);
+          if (customGranularity.offset) {
+            origin = addInterval(origin, parseSqlInterval(customGranularity.offset));
+          }
+
+          // Align the value to the origin to find the actual bucket start
+          intervalStart = alignToOrigin(intervalStart, intervalParsed, origin);
+        }
+
+        // End is start + interval - 1 millisecond (to stay within the bucket)
+        const intervalEnd = addInterval(intervalStart, intervalParsed).subtract(1, 'millisecond');
+
+        return dayRange(intervalStart, intervalEnd, annotations);
+      }
+    }
+
+    // Default behavior for predefined granularities
+    return dayRange(internalDayjs(from).startOf(value), internalDayjs(to).endOf(value), annotations);
+  },
+  start: internalDayjs(from),
+  end: internalDayjs(to),
+});
 
 /**
  * Returns the time series points for the custom interval
