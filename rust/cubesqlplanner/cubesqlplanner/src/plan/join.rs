@@ -7,6 +7,7 @@ use lazy_static::lazy_static;
 
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct RegularRollingWindowJoinCondition {
     time_series_source: String,
     trailing_interval: Option<String>,
@@ -90,6 +91,7 @@ impl RegularRollingWindowJoinCondition {
     }
 }
 
+#[derive(Clone)]
 pub struct RollingTotalJoinCondition {
     time_series_source: String,
     time_dimension: Expr,
@@ -116,6 +118,8 @@ impl RollingTotalJoinCondition {
         Ok(result)
     }
 }
+
+#[derive(Clone)]
 pub struct ToDateRollingWindowJoinCondition {
     time_series_source: String,
     granularity: Rc<Granularity>,
@@ -157,6 +161,7 @@ impl ToDateRollingWindowJoinCondition {
     }
 }
 
+#[derive(Clone)]
 pub struct DimensionJoinCondition {
     // AND (... OR ...)
     conditions: Vec<Vec<(Expr, Expr)>>,
@@ -212,6 +217,7 @@ impl DimensionJoinCondition {
     }
 }
 
+#[derive(Clone)]
 pub enum JoinCondition {
     DimensionJoinCondition(DimensionJoinCondition),
     BaseJoinCondition(Rc<dyn BaseJoinCondition>),
@@ -285,6 +291,7 @@ impl JoinCondition {
     }
 }
 
+#[derive(Clone)]
 pub struct JoinItem {
     pub from: SingleAliasedSource,
     pub on: JoinCondition,

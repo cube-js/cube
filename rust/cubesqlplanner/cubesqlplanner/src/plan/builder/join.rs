@@ -5,6 +5,7 @@ use crate::plan::{
 use crate::planner::BaseCube;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct JoinBuilder {
     root: SingleAliasedSource,
     joins: Vec<JoinItem>,
