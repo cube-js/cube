@@ -50,6 +50,42 @@ cubes:
 
 </CodeTabs>
 
+### `title`
+
+You can use the `title` parameter to change a measure’s displayed name. By
+default, Cube will humanize your measure key to create a display name. In order
+to override default behavior, please use the `title` parameter.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    orders_count: {
+      title: `Number of Orders Placed`,
+      sql: `id`,
+      type: `count`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        title: Number of Orders Placed
+        sql: id
+        type: count
+```
+
+</CodeTabs>
+
 ### `description`
 
 This parameter provides a human-readable description of a measure.
@@ -86,14 +122,11 @@ cubes:
 
 </CodeTabs>
 
-### `drill_members`
+### `public`
 
-Using the `drill_members` parameter, you can define a set of [drill
-down][ref-drilldowns] fields for the measure. `drill_members` is defined as an
-array of dimensions. Cube automatically injects dimensions’ names and other
-cubes’ names with dimensions in the context, so you can reference these
-variables in the `drill_members` array. [Learn more about how to define and use
-drill downs][ref-drilldowns].
+The `public` parameter is used to manage the visibility of a measure. Valid
+values for `public` are `true` and `false`. When set to `false`, this measure
+**cannot** be queried through the API. Defaults to `true`.
 
 <CodeTabs>
 
@@ -102,50 +135,10 @@ cube(`orders`, {
   // ...
 
   measures: {
-    revenue: {
-      type: `sum`,
-      sql: `price`,
-      drill_members: [id, price, status, products.name, products.id]
-    }
-  }
-})
-```
-
-```yaml
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: revenue
-        type: sum
-        sql: price
-        drill_members:
-          - id
-          - price
-          - status
-          - products.name
-          - products.id
-```
-
-</CodeTabs>
-
-### `filters`
-
-If you want to add some conditions for a metric's calculation, you should use
-the `filters` parameter. The syntax looks like the following:
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  // ...
-
-  measures: {
-    orders_completed_count: {
+    orders_count: {
       sql: `id`,
       type: `count`,
-      filters: [{ sql: `${CUBE}.status = 'completed'` }]
+      public: false
     }
   }
 })
@@ -157,48 +150,10 @@ cubes:
     # ...
 
     measures:
-      - name: orders_completed_count
+      - name: orders_count
         sql: id
         type: count
-        filters:
-          - sql: "{CUBE}.status = 'completed'"
-```
-
-</CodeTabs>
-
-### `format`
-
-`format` is an optional parameter. It is used to format the output of measures
-in different ways, for example, as currency for `revenue`. Please refer to the
-[Measure Formats][ref-schema-ref-types-formats-measures-formats] for the full
-list of supported formats.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  // ...
-
-  measures: {
-    total: {
-      sql: `amount`,
-      type: `sum`,
-      format: `currency`
-    }
-  }
-})
-```
-
-```yaml
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: total
-        sql: amount
-        type: sum
-        format: currency
+        public: false
 ```
 
 </CodeTabs>
@@ -236,6 +191,120 @@ cubes:
         sql: price
         meta:
           any: value
+```
+
+</CodeTabs>
+
+### `sql`
+
+`sql` is a required parameter. It can take any valid SQL expression depending on
+the `type` of the measure. Please refer to the [Measure Types
+Guide][ref-schema-ref-types-formats-measures-types] for detailed information on
+the corresponding `sql` parameter.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    users_count: {
+      sql: `COUNT(*)`,
+      type: `number`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: users_count
+        sql: "COUNT(*)"
+        type: number
+```
+
+</CodeTabs>
+
+Depending on the measure [type](#type), the `sql` parameter would either:
+* Be skipped (in case of the `count` type).
+* Contain an aggregate function, e.g., `STRING_AGG(string_dimension, ',')`
+(in case of `string`, `time`, `boolean`, and `number` types).
+* Contain a non-aggregated expression that Cube would wrap into an aggregate
+function according to the measure type (in case of the `avg`, `count_distinct`,
+`count_distinct_approx`, `min`, `max`, and `sum` types).
+
+### `filters`
+
+If you want to add some conditions for a metric's calculation, you should use
+the `filters` parameter. The syntax looks like the following:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    orders_completed_count: {
+      sql: `id`,
+      type: `count`,
+      filters: [{ sql: `${CUBE}.status = 'completed'` }]
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_completed_count
+        sql: id
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+```
+
+</CodeTabs>
+
+### `type`
+
+`type` is a required parameter. There are various types that can be assigned to
+a measure. Please refer to the [Measure
+Types][ref-schema-ref-types-formats-measures-types] for the full list of measure
+types.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    orders_count: {
+      sql: `id`,
+      type: `count`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: orders_count
+        sql: id
+        type: count
 ```
 
 </CodeTabs>
@@ -348,173 +417,454 @@ cubes:
 
 </CodeTabs>
 
-### `public`
+### `multi_stage`
 
-The `public` parameter is used to manage the visibility of a measure. Valid
-values for `public` are `true` and `false`. When set to `false`, this measure
-**cannot** be queried through the API. Defaults to `true`.
+The `multi_stage` parameter is used to define measures that are used with [multi-stage
+calculations][ref-multi-stage], e.g., [time-shift measures][ref-time-shift].
 
 <CodeTabs>
 
+```yaml
+cubes:
+  - name: time_shift
+    sql: >
+      SELECT '2024-01-01'::TIMESTAMP AS time, 100 AS revenue UNION ALL
+      SELECT '2024-02-01'::TIMESTAMP AS time, 200 AS revenue UNION ALL
+      SELECT '2024-03-01'::TIMESTAMP AS time, 300 AS revenue UNION ALL
+
+      SELECT '2025-01-01'::TIMESTAMP AS time, 400 AS revenue UNION ALL
+      SELECT '2025-02-01'::TIMESTAMP AS time, 500 AS revenue UNION ALL
+      SELECT '2025-03-01'::TIMESTAMP AS time, 600 AS revenue
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+
+    measures:
+      - name: revenue
+        sql: revenue
+        type: sum
+
+      - name: revenue_prior_year
+        multi_stage: true
+        sql: "{revenue}"
+        type: number
+        time_shift:
+          - time_dimension: time
+            interval: 1 year
+            type: prior
+```
+
 ```javascript
-cube(`orders`, {
-  // ...
+cube(`time_shift`, {
+  sql: `
+    SELECT '2024-01-01'::TIMESTAMP AS time, 100 AS revenue UNION ALL
+    SELECT '2024-02-01'::TIMESTAMP AS time, 200 AS revenue UNION ALL
+    SELECT '2024-03-01'::TIMESTAMP AS time, 300 AS revenue UNION ALL
+
+    SELECT '2025-01-01'::TIMESTAMP AS time, 400 AS revenue UNION ALL
+    SELECT '2025-02-01'::TIMESTAMP AS time, 500 AS revenue UNION ALL
+    SELECT '2025-03-01'::TIMESTAMP AS time, 600 AS revenue
+  `,
+
+  dimensions: {
+    time: {
+      sql: `time`,
+      type: `time`
+    }
+  },
 
   measures: {
-    orders_count: {
+    revenue: {
+      sql: `revenue`,
+      type: `sum`
+    },
+
+    revenue_prior_year: {
+      multi_stage: true,
+      sql: `${revenue}`,
+      type: `number`,
+      time_shift: [
+        {
+          time_dimension: `time`,
+          interval: `1 year`,
+          type: `prior`
+        }
+      ]
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+### `time_shift`
+
+The `time_shift` parameter is used to configure a [time shift][ref-time-shift] for a
+measure. It accepts an array of time shift configurations that consist of `time_dimension`,
+`type`, `interval`, and `name` parameters.
+
+#### `type` and `interval`
+
+These parameters define the time shift direction and size. The `type` can be either
+`prior` (shifting time backwards) or `next` (shifting time forwards).
+The `interval` parameter defines the size of the time shift and has the following format:
+`quantity unit`, e.g., `1 year` or `7 days`.
+
+<CodeTabs>
+
+```yaml
+    measures:
+      - name: revenue
+        sql: revenue
+        type: sum
+
+      - name: revenue_7d_ago
+        multi_stage: true
+        sql: "{revenue}"
+        type: number
+        time_shift:
+          - interval: 7 days
+            type: prior
+
+      - name: revenue_1y_ago
+        multi_stage: true
+        sql: "{revenue}"
+        type: number
+        time_shift:
+          - interval: 1 year
+            type: prior
+```
+
+```javascript
+  measures: {
+    revenue: {
+      sql: `revenue`,
+      type: `sum`
+    },
+
+    revenue_7d_ago: {
+      multi_stage: true,
+      sql: `${revenue}`,
+      type: `number`,
+      time_shift: [
+        {
+          interval: `7 days`,
+          type: `prior`
+        }
+      ]
+    },
+
+    revenue_1y_ago: {
+      multi_stage: true,
+      sql: `${revenue}`,
+      type: `number`,
+      time_shift: [
+        {
+          interval: `1 year`,
+          type: `prior`
+        }
+      ]
+    }
+  }
+```
+
+</CodeTabs>
+
+#### `time_dimension`
+
+The `time_dimension` parameter is used to specify the time dimension for the time shift.
+If it's omitted, Cube will apply the time shift to all time dimensions in the query.
+In this case, only single time shift configuration is allowed in `time_shift`.
+
+If `time_dimension` is specified, the time shift will only happen if the query contains
+this very time dimension. This is useful if you'd like to apply different time shifts to
+different time dimensions or if you want to apply a time shift only when a specific time
+dimension is present in the query.
+
+<CodeTabs>
+
+```yaml
+    measures:
+      - name: revenue
+        sql: revenue
+        type: sum
+
+      - name: lagging_revenue
+        multi_stage: true
+        sql: "{revenue}"
+        type: number
+        time_shift:
+          - time_dimension: purchase_date
+            interval: 3 months
+            type: prior
+
+          - time_dimension: shipping_date
+            interval: 2 months
+            type: prior
+
+          - time_dimension: delivery_date
+            interval: 1 month
+            type: prior
+```
+
+```javascript
+  measures: {
+    revenue: {
+      sql: `revenue`,
+      type: `sum`
+    },
+
+    lagging_revenue: {
+      multi_stage: true,
+      sql: `${revenue}`,
+      type: `number`,
+      time_shift: [
+        {
+          time_dimension: `purchase_date`,
+          interval: `3 months`,
+          type: `prior`
+        },
+        {
+          time_dimension: `shipping_date`,
+          interval: `2 months`,
+          type: `prior`
+        },
+        {
+          time_dimension: `delivery_date`,
+          interval: `1 month`,
+          type: `prior`
+        }
+      ]
+    }
+  }
+```
+
+</CodeTabs>
+
+#### `name`
+
+The `name` parameter is used to reference a _named time shift_ that is defined on a time
+dimension from a [calendar cube][ref-calendar-cubes]. Named time shifts are used in cases
+when different measures use the same time shift configuration (e.g., `prior` + `1 year`)
+but have to be shifted differently depending on the custom calendar.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: sales_calendar
+    calendar: true
+    sql: >
+      SELECT '2025-06-02Z' AS date, '2024-06-01Z' AS mapped_date, '2024-06-03Z' AS mapped_date_alt UNION ALL
+      SELECT '2025-06-03Z' AS date, '2024-06-02Z' AS mapped_date, '2024-06-04Z' AS mapped_date_alt UNION ALL
+      SELECT '2025-06-04Z' AS date, '2024-06-03Z' AS mapped_date, '2024-06-05Z' AS mapped_date_alt UNION ALL
+      SELECT '2025-06-05Z' AS date, '2024-06-04Z' AS mapped_date, '2024-06-06Z' AS mapped_date_alt UNION ALL
+      SELECT '2025-06-06Z' AS date, '2024-06-05Z' AS mapped_date, '2024-06-07Z' AS mapped_date_alt UNION ALL
+      SELECT '2025-06-07Z' AS date, '2024-06-06Z' AS mapped_date, '2024-06-08Z' AS mapped_date_alt UNION ALL
+      SELECT '2025-06-08Z' AS date, '2024-06-07Z' AS mapped_date, '2024-06-09Z' AS mapped_date_alt
+
+    dimensions:
+      - name: date_key
+        sql: "{CUBE}.date::TIMESTAMP"
+        type: time
+        primary_key: true
+
+      - name: date
+        sql: "{CUBE}.date::TIMESTAMP"
+        type: time
+        time_shift:
+          - name: 1_year_prior
+            sql: "{CUBE}.mapped_date::TIMESTAMP"
+
+          - name: 1_year_prior_alternative
+            sql: "{CUBE}.mapped_date_alt::TIMESTAMP"
+
+  - name: sales
+    sql: >
+      SELECT 101 AS id, '2024-06-01Z' AS date, 101 AS amount UNION ALL
+      SELECT 102 AS id, '2024-06-02Z' AS date, 102 AS amount UNION ALL
+      SELECT 103 AS id, '2024-06-03Z' AS date, 103 AS amount UNION ALL
+      SELECT 104 AS id, '2024-06-04Z' AS date, 104 AS amount UNION ALL
+      SELECT 105 AS id, '2024-06-05Z' AS date, 105 AS amount UNION ALL
+      SELECT 106 AS id, '2024-06-06Z' AS date, 106 AS amount UNION ALL
+      SELECT 107 AS id, '2024-06-07Z' AS date, 107 AS amount UNION ALL
+      SELECT 108 AS id, '2024-06-08Z' AS date, 108 AS amount UNION ALL
+      SELECT 109 AS id, '2024-06-09Z' AS date, 109 AS amount UNION ALL
+
+      SELECT 202 AS id, '2025-06-02Z' AS date, 202 AS amount UNION ALL
+      SELECT 203 AS id, '2025-06-03Z' AS date, 203 AS amount UNION ALL
+      SELECT 204 AS id, '2025-06-04Z' AS date, 204 AS amount UNION ALL
+      SELECT 205 AS id, '2025-06-05Z' AS date, 205 AS amount UNION ALL
+      SELECT 206 AS id, '2025-06-06Z' AS date, 206 AS amount UNION ALL
+      SELECT 207 AS id, '2025-06-07Z' AS date, 207 AS amount UNION ALL
+      SELECT 208 AS id, '2025-06-08Z' AS date, 208 AS amount
+
+    joins:
+      - name: sales_calendar
+        sql: "{sales.date} = {sales_calendar.date_key}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: date
+        sql: "{CUBE}.date::TIMESTAMP"
+        type: time
+        public: false
+
+    measures:
+      - name: total_amount
+        sql: amount
+        type: sum
+
+      - name: total_amount_1y_prior
+        multi_stage: true
+        sql: "{total_amount}"
+        type: number
+        time_shift:
+          - name: 1_year_prior
+
+      - name: total_amount_1y_prior_alternative
+        multi_stage: true
+        sql: "{total_amount}"
+        type: number
+        time_shift:
+          - name: 1_year_prior_alternative
+```
+
+```javascript
+cube(`sales_calendar`, {
+  sql: `
+    SELECT '2025-06-02Z' AS date, '2024-06-01Z' AS mapped_date, '2024-06-03Z' AS mapped_date_alt UNION ALL
+    SELECT '2025-06-03Z' AS date, '2024-06-02Z' AS mapped_date, '2024-06-04Z' AS mapped_date_alt UNION ALL
+    SELECT '2025-06-04Z' AS date, '2024-06-03Z' AS mapped_date, '2024-06-05Z' AS mapped_date_alt UNION ALL
+    SELECT '2025-06-05Z' AS date, '2024-06-04Z' AS mapped_date, '2024-06-06Z' AS mapped_date_alt UNION ALL
+    SELECT '2025-06-06Z' AS date, '2024-06-05Z' AS mapped_date, '2024-06-07Z' AS mapped_date_alt UNION ALL
+    SELECT '2025-06-07Z' AS date, '2024-06-06Z' AS mapped_date, '2024-06-08Z' AS mapped_date_alt UNION ALL
+    SELECT '2025-06-08Z' AS date, '2024-06-07Z' AS mapped_date, '2024-06-09Z' AS mapped_date_alt
+  `,
+
+  dimensions: {
+    date_key: {
+      sql: `${CUBE}.date::TIMESTAMP`,
+      type: `time`,
+      primary_key: true
+    },
+
+    date: {
+      sql: `${CUBE}.date::TIMESTAMP`,
+      type: `time`,
+      time_shift: [
+        {
+          name: `1_year_prior`,
+          sql: `${CUBE}.mapped_date::TIMESTAMP`
+        },
+        {
+          name: `1_year_prior_alternative`,
+          sql: `${CUBE}.mapped_date_alt::TIMESTAMP`
+        }
+      ]
+    }
+  }
+})
+
+cube(`sales`, {
+  sql: `
+    SELECT 101 AS id, '2024-06-01Z' AS date, 101 AS amount UNION ALL
+    SELECT 102 AS id, '2024-06-02Z' AS date, 102 AS amount UNION ALL
+    SELECT 103 AS id, '2024-06-03Z' AS date, 103 AS amount UNION ALL
+    SELECT 104 AS id, '2024-06-04Z' AS date, 104 AS amount UNION ALL
+    SELECT 105 AS id, '2024-06-05Z' AS date, 105 AS amount UNION ALL
+    SELECT 106 AS id, '2024-06-06Z' AS date, 106 AS amount UNION ALL
+    SELECT 107 AS id, '2024-06-07Z' AS date, 107 AS amount UNION ALL
+    SELECT 108 AS id, '2024-06-08Z' AS date, 108 AS amount UNION ALL
+    SELECT 109 AS id, '2024-06-09Z' AS date, 109 AS amount UNION ALL
+
+    SELECT 202 AS id, '2025-06-02Z' AS date, 202 AS amount UNION ALL
+    SELECT 203 AS id, '2025-06-03Z' AS date, 203 AS amount UNION ALL
+    SELECT 204 As id, '2025-06-04Z' As date, 204 As amount UNION ALL
+    SELECT 205 As id, '2025-06-05Z' As date, 205 As amount UNION ALL
+    SELECT 206 As id, '2025-06-06Z' As date, 206 As amount UNION ALL
+    SELECT 207 As id, '2025-06-07Z' As date, 207 As amount UNION ALL
+    SELECT 208 As id, '2025-06-08Z' As date, 208 As amount
+  `,
+
+  joins: {
+    sales_calendar: {
+      sql: `${sales}.date = ${sales_calendar}.date_key`,
+      relationship: `many_to_one`
+    }
+  },
+
+  dimensions: {
+    id: {
       sql: `id`,
-      type: `count`,
+      type: `number`,
+      primary_key: true
+    },
+
+    date: {
+      sql: `${CUBE}.date::TIMESTAMP`,
+      type: `time`,
       public: false
     }
-  }
-})
-```
-
-```yaml
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: orders_count
-        sql: id
-        type: count
-        public: false
-```
-
-</CodeTabs>
-
-### `sql`
-
-`sql` is a required parameter. It can take any valid SQL expression depending on
-the `type` of the measure. Please refer to the [Measure Types
-Guide][ref-schema-ref-types-formats-measures-types] for detailed information on
-the corresponding `sql` parameter.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  // ...
-
+  },
+  
   measures: {
-    users_count: {
-      sql: `COUNT(*)`,
-      type: `number`
-    }
-  }
-})
-```
+    total_amount: {
+      sql: `amount`,
+      type: `sum`
+    },
 
-```yaml
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: users_count
-        sql: "COUNT(*)"
-        type: number
-```
-
-</CodeTabs>
-
-Depending on the measure [type](#type), the `sql` parameter would either:
-* Be skipped (in case of the `count` type).
-* Contain an aggregate function, e.g., `STRING_AGG(string_dimension, ',')`
-(in case of `string`, `time`, `boolean`, and `number` types).
-* Contain a non-aggregated expression that Cube would wrap into an aggregate
-function according to the measure type (in case of the `avg`, `count_distinct`,
-`count_distinct_approx`, `min`, `max`, and `sum` types).
-
-### `title`
-
-You can use the `title` parameter to change a measure’s displayed name. By
-default, Cube will humanize your measure key to create a display name. In order
-to override default behavior, please use the `title` parameter.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  // ...
-
-  measures: {
-    orders_count: {
-      title: `Number of Orders Placed`,
-      sql: `id`,
-      type: `count`
-    }
-  }
-})
-```
-
-```yaml
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: orders_count
-        title: Number of Orders Placed
-        sql: id
-        type: count
-```
-
-</CodeTabs>
-
-### `type`
-
-`type` is a required parameter. There are various types that can be assigned to
-a measure. Please refer to the [Measure
-Types][ref-schema-ref-types-formats-measures-types] for the full list of measure
-types.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  // ...
-
-  measures: {
-    orders_count: {
-      sql: `id`,
-      type: `count`
-    }
-  }
-})
-```
-
-```yaml
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: orders_count
-        sql: id
-        type: count
-```
-
-</CodeTabs>
-
-## Calculated measures
-
-In the case where you need to specify a formula for measure calculating with
-other measures, you can compose a formula in `sql`. For example, to calculate
-the conversion of buyers of all users.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  // ...
-
-  measures: {
-    purchases_to_created_account_ratio: {
-      sql: `${purchases} / ${users.count} * 100.0`,
+    total_amount_1y_prior: {
+      multi_stage: true,
+      sql: `${total_amount}`,
       type: `number`,
-      format: `percent`
+      time_shift: [{
+        name: `1_year_prior`
+      }]
+    },
+
+    total_amount_1y_prior_alternative: {
+      multi_stage: true,
+      sql: `${total_amount}`,
+      type: `number`,
+      time_shift: [{
+        name: `1_year_prior_alternative`
+      }]
+    }
+  }
+)
+```
+
+</CodeTabs>
+
+Named time shifts also allow to reuse the same time shift configuration across multiple
+measures and cubes where they are defined.
+
+### `format`
+
+`format` is an optional parameter. It is used to format the output of measures
+in different ways, for example, as currency for `revenue`. Please refer to the
+[Measure Formats][ref-schema-ref-types-formats-measures-formats] for the full
+list of supported formats.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    total: {
+      sql: `amount`,
+      type: `sum`,
+      format: `currency`
     }
   }
 })
@@ -526,16 +876,57 @@ cubes:
     # ...
 
     measures:
-      - name: purchases_to_created_account_ratio
-        sql: "{purchases} / {users.count} * 100.0"
-        type: number
-        format: percent
+      - name: total
+        sql: amount
+        type: sum
+        format: currency
 ```
 
 </CodeTabs>
 
-You can create calculated measures from several joined cubes. In this case, a
-join will be created automatically.
+### `drill_members`
+
+Using the `drill_members` parameter, you can define a set of [drill
+down][ref-drilldowns] fields for the measure. `drill_members` is defined as an
+array of dimensions. Cube automatically injects dimensions’ names and other
+cubes’ names with dimensions in the context, so you can reference these
+variables in the `drill_members` array. [Learn more about how to define and use
+drill downs][ref-drilldowns].
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    revenue: {
+      type: `sum`,
+      sql: `price`,
+      drill_members: [id, price, status, products.name, products.id]
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue
+        type: sum
+        sql: price
+        drill_members:
+          - id
+          - price
+          - status
+          - products.name
+          - products.id
+```
+
+</CodeTabs>
 
 
 [ref-ref-cubes]: /product/data-modeling/reference/cube
@@ -549,3 +940,6 @@ join will be created automatically.
 [ref-apis]: /product/apis-integrations
 [ref-rolling-window]: /product/data-modeling/concepts/multi-stage-calculations#rolling-window
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-multi-stage]: /product/data-modeling/concepts/multi-stage-calculations
+[ref-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift
+[ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes
