@@ -119,8 +119,8 @@ where
                 }
             } else {
                 // Use iterator which handles nulls efficiently
-                let mut iter1 = array.iter();
-                let mut iter2 = array.iter().skip(1);
+                let iter1 = array.iter();
+                let iter2 = array.iter().skip(1);
 
                 for (i, (v1, v2)) in iter1.zip(iter2).enumerate() {
                     if equal_results[i] {
@@ -174,8 +174,8 @@ where
                 }
             } else {
                 // Handle nulls via iterator
-                let mut iter1 = array.iter();
-                let mut iter2 = array.iter().skip(1);
+                let iter1 = array.iter();
+                let iter2 = array.iter().skip(1);
 
                 for (i, (v1, v2)) in iter1.zip(iter2).enumerate() {
                     if equal_results[i] {
