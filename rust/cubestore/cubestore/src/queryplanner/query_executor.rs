@@ -1178,7 +1178,6 @@ impl ExecutionPlan for CubeTableExec {
         mut partition: usize,
         context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        println!("!!! Table exec: {}, {}", self.partition_execs.len(), partition);
         let exec = self
             .partition_execs
             .iter()

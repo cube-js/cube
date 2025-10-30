@@ -20,6 +20,7 @@ use datafusion::physical_expr::binary_map::OutputType;
 use datafusion::physical_plan::aggregates::group_values::multi_group_by::{
     ByteGroupValueBuilder, ByteViewGroupValueBuilder, PrimitiveGroupValueBuilder,
 };
+use datafusion::physical_plan::aggregates::group_values::GroupValues;
 
 use crate::queryplanner::inline_aggregate::column_comparator::ColumnComparator;
 use crate::{
@@ -70,7 +71,78 @@ impl SortedGroupValues {
         })
     }
 
-    pub fn intern(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> DFResult<()> {
+    fn intern_impl(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> DFResult<()> {
+        let n_rows = cols[0].len();
+        groups.clear();
+
+        if n_rows == 0 {
+            return Ok(());
+        }
+
+        // Handle first row - compare with last group or create new group
+        let first_group_idx = self.make_new_group_if_needed(cols, 0);
+        groups.push(first_group_idx);
+
+        if n_rows == 1 {
+            return Ok(());
+        }
+
+        // Prepare buffer for vectorized comparison
+        self.equal_to_results.resize(n_rows - 1, true);
+        self.equal_to_results[..n_rows - 1].fill(true);
+
+        // Vectorized comparison: compare row[i] with row[i+1] for all columns
+        for (col, comparator) in cols.iter().zip(&self.comparators) {
+            comparator.compare_adjacent(col, &mut self.equal_to_results[..n_rows - 1]);
+        }
+
+        // Build groups based on comparison results
+        let mut current_group_idx = first_group_idx;
+        for i in 0..n_rows - 1 {
+            if !self.equal_to_results[i] {
+                // Group boundary detected - add new group
+                for (col_idx, group_value) in self.group_values.iter_mut().enumerate() {
+                    group_value.append_val(&cols[col_idx], i + 1);
+                }
+                current_group_idx = self.group_values[0].len() - 1;
+            }
+            groups.push(current_group_idx);
+        }
+
+        Ok(())
+    }
+
+    /// Compare the specified row with the last group and create a new group if different.
+    ///
+    /// This is used to handle the first row of a batch, which needs to be compared
+    /// with the last group from the previous batch to detect group boundaries across batches.
+    ///
+    /// Returns the group index for this row.
+    fn make_new_group_if_needed(&mut self, cols: &[ArrayRef], row: usize) -> usize {
+        let new_group_needed = if self.group_values[0].len() == 0 {
+            // No groups yet - always create first group
+            true
+        } else {
+            // Compare with last group - if any column differs, need new group
+            self.group_values.iter().enumerate().any(|(i, group_val)| {
+                !group_val.equal_to(self.group_values[0].len() - 1, &cols[i], row)
+            })
+        };
+
+        if new_group_needed {
+            // Add new group with values from this row
+            for (i, group_value) in self.group_values.iter_mut().enumerate() {
+                group_value.append_val(&cols[i], row);
+            }
+        }
+
+        // Return index of the group (either newly created or existing last group)
+        self.group_values[0].len() - 1
+    }
+}
+
+impl GroupValues for SortedGroupValues {
+    fn intern(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> DFResult<()> {
         if self.group_values.is_empty() {
             let mut v = Vec::with_capacity(cols.len());
             let mut comparators = Vec::with_capacity(cols.len());
@@ -257,16 +329,16 @@ impl SortedGroupValues {
         self.intern_impl(cols, groups)
     }
 
-    pub fn size(&self) -> usize {
+    fn size(&self) -> usize {
         let group_values_size: usize = self.group_values.iter().map(|v| v.size()).sum();
         group_values_size
     }
 
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         if self.group_values.is_empty() {
             return 0;
         }
@@ -274,7 +346,7 @@ impl SortedGroupValues {
         self.group_values[0].len()
     }
 
-    pub fn emit(&mut self, emit_to: EmitTo) -> DFResult<Vec<ArrayRef>> {
+    fn emit(&mut self, emit_to: EmitTo) -> DFResult<Vec<ArrayRef>> {
         let mut output = match emit_to {
             EmitTo::All => {
                 let group_values = mem::take(&mut self.group_values);
@@ -317,74 +389,5 @@ impl SortedGroupValues {
         self.comparators.clear();
         self.rows_inds.clear();
         self.equal_to_results.clear();
-    }
-
-    fn intern_impl(&mut self, cols: &[ArrayRef], groups: &mut Vec<usize>) -> DFResult<()> {
-        let n_rows = cols[0].len();
-        groups.clear();
-
-        if n_rows == 0 {
-            return Ok(());
-        }
-
-        // Handle first row - compare with last group or create new group
-        let first_group_idx = self.make_new_group_if_needed(cols, 0);
-        groups.push(first_group_idx);
-
-        if n_rows == 1 {
-            return Ok(());
-        }
-
-        // Prepare buffer for vectorized comparison
-        self.equal_to_results.resize(n_rows - 1, true);
-        self.equal_to_results[..n_rows - 1].fill(true);
-
-        // Vectorized comparison: compare row[i] with row[i+1] for all columns
-        for (col, comparator) in cols.iter().zip(&self.comparators) {
-            comparator.compare_adjacent(col, &mut self.equal_to_results[..n_rows - 1]);
-        }
-
-        // Build groups based on comparison results
-        let mut current_group_idx = first_group_idx;
-        for i in 0..n_rows - 1 {
-            if !self.equal_to_results[i] {
-                // Group boundary detected - add new group
-                for (col_idx, group_value) in self.group_values.iter_mut().enumerate() {
-                    group_value.append_val(&cols[col_idx], i + 1);
-                }
-                current_group_idx = self.group_values[0].len() - 1;
-            }
-            groups.push(current_group_idx);
-        }
-
-        Ok(())
-    }
-
-    /// Compare the specified row with the last group and create a new group if different.
-    ///
-    /// This is used to handle the first row of a batch, which needs to be compared
-    /// with the last group from the previous batch to detect group boundaries across batches.
-    ///
-    /// Returns the group index for this row.
-    fn make_new_group_if_needed(&mut self, cols: &[ArrayRef], row: usize) -> usize {
-        let new_group_needed = if self.group_values[0].len() == 0 {
-            // No groups yet - always create first group
-            true
-        } else {
-            // Compare with last group - if any column differs, need new group
-            self.group_values.iter().enumerate().any(|(i, group_val)| {
-                !group_val.equal_to(self.group_values[0].len() - 1, &cols[i], row)
-            })
-        };
-
-        if new_group_needed {
-            // Add new group with values from this row
-            for (i, group_value) in self.group_values.iter_mut().enumerate() {
-                group_value.append_val(&cols[i], row);
-            }
-        }
-
-        // Return index of the group (either newly created or existing last group)
-        self.group_values[0].len() - 1
     }
 }

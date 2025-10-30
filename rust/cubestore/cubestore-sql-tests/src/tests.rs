@@ -8339,7 +8339,6 @@ async fn assert_limit_pushdown_using_search_string(
         .unwrap();
     match &res.get_rows()[1].values()[2] {
         TableValue::String(s) => {
-            println!("!! plan {}", s);
             if let Some(ind) = expected_index {
                 if s.find(ind).is_none() {
                     return Err(format!(

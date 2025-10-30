@@ -7,7 +7,6 @@ use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
-use crate::queryplanner::inline_aggregate::sorted_group_values::SortedGroupValues;
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::metadata_cache::{MetadataCacheFactory, NoopParquetMetadataCache};
 use crate::queryplanner::optimizations::{CubeQueryPlanner, PreOptimizeRule};
@@ -71,6 +70,7 @@ use datafusion::physical_optimizer::sanity_checker::SanityCheckPlan;
 use datafusion::physical_optimizer::topk_aggregation::TopKAggregation;
 use datafusion::physical_optimizer::update_aggr_exprs::OptimizeAggregateOrder;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;
+use datafusion::physical_plan::aggregates::group_values::GroupValues;
 use datafusion::physical_plan::aggregates::*;
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -108,6 +108,7 @@ use std::time::SystemTime;
 use tarpc::context::current;
 use tracing::{instrument, Instrument};
 
+use super::new_sorted_group_values;
 use super::InlineAggregateExec;
 use super::InlineAggregateMode;
 
@@ -136,7 +137,7 @@ pub(crate) struct InlineAggregateStream {
     input_done: bool,
 
     accumulators: Vec<Box<dyn GroupsAccumulator>>,
-    group_values: SortedGroupValues,
+    group_values: Box<dyn GroupValues>,
     current_group_indices: Vec<usize>,
 }
 
@@ -191,7 +192,7 @@ impl InlineAggregateStream {
 
         let exec_state = ExecutionState::ReadingInput;
         let current_group_indices = Vec::with_capacity(batch_size);
-        let group_values = SortedGroupValues::try_new(group_schema)?;
+        let group_values = new_sorted_group_values(group_schema)?;
 
         Ok(InlineAggregateStream {
             schema: agg_schema,

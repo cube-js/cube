@@ -1,6 +1,11 @@
 mod column_comparator;
 mod inline_aggregate_stream;
 mod sorted_group_values;
+mod sorted_group_values_rows;
+
+pub use sorted_group_values::SortedGroupValues;
+pub use sorted_group_values_rows::SortedGroupValuesRows;
+
 use crate::cluster::{
     pick_worker_by_ids, pick_worker_by_partitions, Cluster, WorkerPlanningParams,
 };
@@ -72,6 +77,7 @@ use datafusion::physical_optimizer::sanity_checker::SanityCheckPlan;
 use datafusion::physical_optimizer::topk_aggregation::TopKAggregation;
 use datafusion::physical_optimizer::update_aggr_exprs::OptimizeAggregateOrder;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;
+use datafusion::physical_plan::aggregates::group_values::GroupValues;
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::execution_plan::{Boundedness, CardinalityEffect, EmissionType};
@@ -308,4 +314,58 @@ impl ExecutionPlan for InlineAggregateExec {
     fn cardinality_effect(&self) -> CardinalityEffect {
         CardinalityEffect::LowerEqual
     }
+}
+
+/// Creates a new [`GroupValues`] implementation optimized for sorted input data
+///
+/// Chooses between:
+/// - [`SortedGroupValues`]: Fast column-based implementation for supported types
+/// - [`SortedGroupValuesRows`]: Row-based fallback for all other types (Boolean, Struct, List, etc.)
+pub fn new_sorted_group_values(schema: SchemaRef) -> DFResult<Box<dyn GroupValues>> {
+    // Check if all fields are supported by the column-based implementation
+    if supported_schema(schema.as_ref()) {
+        Ok(Box::new(SortedGroupValues::try_new(schema)?))
+    } else {
+        Ok(Box::new(SortedGroupValuesRows::try_new(schema)?))
+    }
+}
+
+/// Returns true if the schema is supported by [`SortedGroupValues`] (column-based implementation)
+fn supported_schema(schema: &datafusion::arrow::datatypes::Schema) -> bool {
+    schema
+        .fields()
+        .iter()
+        .map(|f| f.data_type())
+        .all(supported_type)
+}
+
+/// Returns true if the data type is supported by [`SortedGroupValues`]
+///
+/// Types not in this list will use the row-based [`SortedGroupValuesRows`] implementation
+fn supported_type(data_type: &DataType) -> bool {
+    matches!(
+        *data_type,
+        DataType::Int8
+            | DataType::Int16
+            | DataType::Int32
+            | DataType::Int64
+            | DataType::UInt8
+            | DataType::UInt16
+            | DataType::UInt32
+            | DataType::UInt64
+            | DataType::Float32
+            | DataType::Float64
+            | DataType::Decimal128(_, _)
+            | DataType::Utf8
+            | DataType::LargeUtf8
+            | DataType::Binary
+            | DataType::LargeBinary
+            | DataType::Date32
+            | DataType::Date64
+            | DataType::Time32(_)
+            | DataType::Time64(_)
+            | DataType::Timestamp(_, _)
+            | DataType::Utf8View
+            | DataType::BinaryView
+    )
 }
