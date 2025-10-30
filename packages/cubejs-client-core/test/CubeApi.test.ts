@@ -217,6 +217,30 @@ describe('CubeApi with Abort Signal', () => {
     expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(signal);
   });
 
+  test('should pass cache from options to request', async () => {
+    // Mock for this specific test
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+          status: 200,
+          text: () => Promise.resolve('{"results":[]}'),
+          json: () => Promise.resolve({ results: [] })
+        } as any,
+        async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1'
+    });
+
+    await cubeApi.load(
+      { measures: ['Orders.count'] },
+      { cache: "stale-if-slow" }
+    );
+
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.cache).toBe("stale-if-slow");
+  });
+
   test('options signal should override constructor signal', async () => {
     const constructorController = new AbortController();
     const optionsController = new AbortController();
