@@ -130,6 +130,10 @@ export class TimeDimensionMember {
     this.updateTimeDimension(by, { granularity });
   }
 
+  setOffset(by: string | number, offset: string) {
+    this.updateTimeDimension(by, { offset });
+  }
+
   asArray(): any[] {
     return (this.query.asCubeQuery().timeDimensions || []).map((td) => {
       return {

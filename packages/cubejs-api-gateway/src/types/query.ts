@@ -112,6 +112,7 @@ interface QueryTimeDimension {
   dateRange?: string[] | string;
   compareDateRange?: string[];
   granularity?: QueryTimeDimensionGranularity;
+  offset?: string;
 }
 
 type SubqueryJoins = {
