@@ -7,6 +7,14 @@ Calendar cubes can be used to [override](#overriding-time-shifts) the default ti
 shift behavior of time-shift measures as well as [override](#overriding-granularities)
 the default granularities of time dimensions.
 
+<WarningBox>
+
+Calendar cubes are powered by Tesseract, the [next-generation data modeling
+engine][link-tesseract]. Tesseract is currently in preview. Use the
+`CUBEJS_TESSERACT_SQL_PLANNER` environment variable to enable it.
+
+</WarningBox>
+
 ## Configuration
 
 Calendar cubes are [cubes][ref-cubes] where the [`calendar` parameter][ref-cubes-calendar]
