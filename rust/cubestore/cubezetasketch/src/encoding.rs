@@ -29,9 +29,9 @@ pub struct NormalEncoding {
 
 impl NormalEncoding {
     pub fn new(precision: i32) -> NormalEncoding {
-        assert!(1 <= precision && precision <= 63,
+        assert!((1..=63).contains(&precision),
          "valid index and rhoW can only be determined for precisions in the range [1, 63], but got {}", precision);
-        return NormalEncoding { precision };
+        NormalEncoding { precision }
     }
 }
 
@@ -81,13 +81,13 @@ impl SparseEncoding {
         // implementation uses signed or unsigned integers. The upper limit for the normal precision
         // is therefore 31 - RHOW_BITS - 1 (for flag).
         assert!(
-            1 <= normal_precision && normal_precision <= 24,
+            (1..=24).contains(&normal_precision),
             "normal precision must be between 1 and 24 (inclusive), got {}",
             normal_precision
         );
         // While for the sparse precision it is 31 - 1 (for flag).
         assert!(
-            1 <= sparse_precision && sparse_precision <= 30,
+            (1..=30).contains(&sparse_precision),
             "sparse precision must be between 1 and 30 (inclusive), got {}",
             sparse_precision
         );
@@ -98,11 +98,11 @@ impl SparseEncoding {
         // non-rhoW encoded values so that (a) the two values can be distinguished and (b) they will
         // not interleave when sorted numerically.
         let rho_encoded_flag = 1 << max(sparse_precision, normal_precision + Self::RHOW_BITS);
-        return SparseEncoding {
+        SparseEncoding {
             normal_precision,
             sparse_precision,
             rho_encoded_flag,
-        };
+        }
     }
 
     /// Checks whether a sparse encoding is compatible with another.
@@ -124,16 +124,16 @@ impl SparseEncoding {
     pub(crate) fn decode_sparse_index(&self, sparse_value: i32) -> i32 {
         // If the sparse rhoW' is not encoded, then the value consists of just the sparse index.
         if (sparse_value & self.rho_encoded_flag) == 0 {
-            return sparse_value as i32;
+            return sparse_value;
         }
 
         // When the sparse rhoW' is encoded, this indicates that the last sp-p bits of the sparse
         // index were all zero. We return the normal index right zero padded by sp-p bits since the
         // sparse index is just the normal index without the trailing zeros.
-        return ((sparse_value ^ self.rho_encoded_flag) // Strip the encoding flag.
+        ((sparse_value ^ self.rho_encoded_flag) // Strip the encoding flag.
             >> Self::RHOW_BITS) // Strip the rhoW'
         // Shift the normal index to sparse index length.
-        << (self.sparse_precision - self.normal_precision);
+        << (self.sparse_precision - self.normal_precision)
     }
 
     /// Decodes the normal index from an encoded sparse value. See the class Javadoc for details on
@@ -147,7 +147,7 @@ impl SparseEncoding {
 
         // Sparse rhoW' encoded values contain a normal index so we extract it by stripping the flag
         // off the front and the rhoW' off the end.
-        return (sparse_value ^ self.rho_encoded_flag) >> Self::RHOW_BITS;
+        (sparse_value ^ self.rho_encoded_flag) >> Self::RHOW_BITS
     }
 
     /// Decodes the normal *ρ(w)* from an encoded sparse value. See the class Javadoc for
@@ -164,8 +164,7 @@ impl SparseEncoding {
 
         // If the sparse rhoW' was encoded, this tells us that the last sp-p bits of the
         // sparse index where all zero. The normal rhoW is therefore rhoW' + sp - p.
-        return ((sparse_value & Self::RHOW_MASK) + self.sparse_precision - self.normal_precision)
-            as u8;
+        ((sparse_value & Self::RHOW_MASK) + self.sparse_precision - self.normal_precision) as u8
     }
 }
 
@@ -175,9 +174,9 @@ fn compute_rho_w(value: u64, bits: i32) -> u8 {
     let w = value << (64 - bits);
 
     // If the rhoW consists only of zeros, return the maximum length of bits + 1.
-    return if w == 0 {
+    if w == 0 {
         bits as u8 + 1
     } else {
         w.leading_zeros() as u8 + 1
-    };
+    }
 }

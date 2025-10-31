@@ -128,6 +128,6 @@ impl SqlClient for BasicSqlClient {
     }
 
     fn prefix(&self) -> &str {
-        &self.prefix
+        self.prefix
     }
 }

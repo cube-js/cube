@@ -122,11 +122,11 @@ impl FilterWritesSqlClient {
             || q.starts_with("explain ")
             || q.starts_with("queue ");
 
-        return if recognized {
+        if recognized {
             FilterQueryResult::RunQuery
         } else {
             FilterQueryResult::UnrecognizedQueryType
-        };
+        }
     }
 
     /// Uses self's tolerate_next_query atomic bool, and sets it back to false.
