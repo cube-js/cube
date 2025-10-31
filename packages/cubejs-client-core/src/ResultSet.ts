@@ -215,7 +215,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
     normalizedPivotConfig?.y.forEach((member, currentIndex) => values.push([member, yValues[currentIndex]]));
 
     const { filters: parentFilters = [], segments = [] } = this.query();
-    const { measures } = this.loadResponses[0].annotation;
+    const { measures, timeDimensions: timeDimensionsAnnotation } = this.loadResponses[0].annotation;
     let [, measureName] = values.find(([member]) => member === 'measures') || [];
 
     if (measureName === undefined) {
@@ -240,7 +240,9 @@ export default class ResultSet<T extends Record<string, any> = any> {
         const [cubeName, dimension, granularity] = member.split('.');
 
         if (granularity !== undefined) {
-          const range = dayRange(value, value).snapTo(granularity);
+          // dayRange.snapTo now handles both predefined and custom granularities
+          const range = dayRange(value, value, timeDimensionsAnnotation).snapTo(granularity);
+
           const originalTimeDimension = query.timeDimensions?.find((td) => td.dimension);
 
           let dateRange = [
@@ -469,7 +471,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
       !['hour', 'minute', 'second'].includes(timeDimension.granularity);
 
     const [start, end] = dateRange;
-    const range = dayRange(start, end);
+    const range = dayRange(start, end, annotations);
 
     if (isPredefinedGranularity(timeDimension.granularity)) {
       return TIME_SERIES[timeDimension.granularity](
