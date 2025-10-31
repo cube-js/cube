@@ -2210,31 +2210,31 @@ impl Config {
             })
             .await;
 
-        /* self.injector
-        .register_typed::<dyn StreamingService, _, _, _>(async move |i| {
-            StreamingServiceImpl::new(
-                i.get_service_typed().await,
-                i.get_service_typed().await,
-                i.get_service_typed().await,
-                i.get_service_typed().await,
-                i.get_service_typed().await,
-                i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
-                    .await
-                    .cache_factory()
-                    .clone(),
-            )
-        })
-        .await; */
+        self.injector
+            .register_typed::<dyn StreamingService, _, _, _>(async move |i| {
+                StreamingServiceImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                        .await
+                        .cache_factory()
+                        .clone(),
+                )
+            })
+            .await;
 
-        /* self.injector
-        .register_typed::<dyn KsqlClient, _, _, _>(async move |_| KsqlClientImpl::new())
-        .await; */
+        self.injector
+            .register_typed::<dyn KsqlClient, _, _, _>(async move |_| KsqlClientImpl::new())
+            .await;
 
-        /* self.injector
-        .register_typed::<dyn KafkaClientService, _, _, _>(async move |i| {
-            KafkaClientServiceImpl::new(i.get_service_typed().await)
-        })
-        .await; */
+        self.injector
+            .register_typed::<dyn KafkaClientService, _, _, _>(async move |i| {
+                KafkaClientServiceImpl::new(i.get_service_typed().await)
+            })
+            .await;
 
         self.injector
             .register_typed::<dyn ProcessRateLimiter, _, _, _>(async move |_| {

@@ -37,22 +37,22 @@ impl Debug for HLLDataSketch {
 
 impl HLLDataSketch {
     pub fn read(data: &[u8]) -> Result<Self> {
-        return Ok(Self {
+        Ok(Self {
             instance: HLLSketch::deserialize(data)?,
-        });
+        })
     }
 
     pub fn cardinality(&self) -> u64 {
-        return self.instance.estimate().round() as u64;
+        self.instance.estimate().round() as u64
     }
 
     pub fn get_lg_config_k(&self) -> u8 {
-        return self.instance.get_lg_config_k();
+        self.instance.get_lg_config_k()
     }
 
     pub fn write(&self) -> Vec<u8> {
         // TODO(ovr): Better way?
-        self.instance.serialize().as_ref().iter().copied().collect()
+        self.instance.serialize().as_ref().to_vec()
     }
 }
 
@@ -80,13 +80,13 @@ impl HLLUnionDataSketch {
     }
 
     pub fn get_lg_config_k(&self) -> u8 {
-        return self.instance.get_lg_config_k();
+        self.instance.get_lg_config_k()
     }
 
     pub fn write(&self) -> Vec<u8> {
         let sketch = self.instance.sketch(HLLType::HLL_4);
         // TODO(ovr): Better way?
-        sketch.serialize().as_ref().iter().copied().collect()
+        sketch.serialize().as_ref().to_vec()
     }
 
     pub fn merge_with(&mut self, other: HLLDataSketch) -> Result<()> {
@@ -107,6 +107,6 @@ impl HLLUnionDataSketch {
         //
         // This function is supposed to be exact, but it is not exact.
 
-        return 32 + k;
+        32 + k
     }
 }

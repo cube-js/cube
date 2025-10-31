@@ -145,7 +145,7 @@ fn pre_optimize_physical_plan(
     let p = ensure_partition_merge(p)?;
 
     // Replace sorted AggregateExec with InlineAggregateExec for better performance
-    //let p = rewrite_physical_plan(p, &mut |p| replace_with_inline_aggregate(p))?;
+    let p = rewrite_physical_plan(p, &mut |p| replace_with_inline_aggregate(p))?;
 
     Ok(p)
 }

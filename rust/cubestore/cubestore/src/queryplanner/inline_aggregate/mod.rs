@@ -6,108 +6,24 @@ mod sorted_group_values_rows;
 pub use sorted_group_values::SortedGroupValues;
 pub use sorted_group_values_rows::SortedGroupValuesRows;
 
-use crate::cluster::{
-    pick_worker_by_ids, pick_worker_by_partitions, Cluster, WorkerPlanningParams,
-};
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::metastore::multi_index::MultiPartition;
-use crate::metastore::table::Table;
-use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
-use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
-use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
-use crate::queryplanner::metadata_cache::{MetadataCacheFactory, NoopParquetMetadataCache};
-use crate::queryplanner::optimizations::{CubeQueryPlanner, PreOptimizeRule};
-use crate::queryplanner::physical_plan_flags::PhysicalPlanFlags;
-use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
-use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, pp_plan, PPOptions};
-use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
-use crate::queryplanner::trace_data_loaded::DataLoadedSize;
-use crate::store::DataFrame;
-use crate::table::data::rows_to_columns;
-use crate::table::parquet::CubestoreParquetMetadataCache;
-use crate::table::{Row, TableValue, TimestampValue};
-use crate::telemetry::suboptimal_query_plan_event;
-use crate::util::memory::MemoryHandler;
-use crate::{app_metrics, CubeError};
-use async_trait::async_trait;
-use core::fmt;
-use datafusion::arrow::array::{
-    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array,
-    Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
-    TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
-    UInt8Array,
-};
-use datafusion::arrow::compute::SortOptions;
-use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
-use datafusion::arrow::ipc::reader::StreamReader;
-use datafusion::arrow::ipc::writer::StreamWriter;
-use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::catalog::Session;
+use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::common::stats::Precision;
-use datafusion::common::{Statistics, ToDFSchema};
-use datafusion::config::TableParquetOptions;
-use datafusion::datasource::listing::PartitionedFile;
-use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
-use datafusion::datasource::physical_plan::{
-    FileScanConfig, ParquetFileReaderFactory, ParquetSource,
-};
-use datafusion::datasource::{TableProvider, TableType};
-use datafusion::dfschema::{internal_err, not_impl_err};
-use datafusion::error::DataFusionError;
+use datafusion::common::Statistics;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::TaskContext;
-use datafusion::logical_expr::{Expr, LogicalPlan};
-use datafusion::physical_expr;
 use datafusion::physical_expr::aggregate::AggregateFunctionExpr;
-use datafusion::physical_expr::LexOrdering;
-use datafusion::physical_expr::{
-    Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
-};
-use datafusion::physical_optimizer::aggregate_statistics::AggregateStatistics;
-use datafusion::physical_optimizer::combine_partial_final_agg::CombinePartialFinalAggregate;
-use datafusion::physical_optimizer::enforce_sorting::EnforceSorting;
-use datafusion::physical_optimizer::join_selection::JoinSelection;
-use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
-use datafusion::physical_optimizer::limited_distinct_aggregation::LimitedDistinctAggregation;
-use datafusion::physical_optimizer::output_requirements::OutputRequirements;
-use datafusion::physical_optimizer::projection_pushdown::ProjectionPushdown;
-use datafusion::physical_optimizer::sanity_checker::SanityCheckPlan;
-use datafusion::physical_optimizer::topk_aggregation::TopKAggregation;
-use datafusion::physical_optimizer::update_aggr_exprs::OptimizeAggregateOrder;
-use datafusion::physical_optimizer::PhysicalOptimizerRule;
+use datafusion::physical_expr::{Distribution, LexRequirement};
 use datafusion::physical_plan::aggregates::group_values::GroupValues;
-use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
-use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::execution_plan::{Boundedness, CardinalityEffect, EmissionType};
+use datafusion::physical_plan::execution_plan::CardinalityEffect;
 use datafusion::physical_plan::metrics::MetricsSet;
-use datafusion::physical_plan::projection::ProjectionExec;
-use datafusion::physical_plan::sorts::sort::SortExec;
-use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
-use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{aggregates::*, InputOrderMode};
 use datafusion::physical_plan::{
-    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalExpr,
-    PlanProperties, SendableRecordBatchStream,
+    DisplayAs, DisplayFormatType, ExecutionPlan, PhysicalExpr, PlanProperties,
+    SendableRecordBatchStream,
 };
-use datafusion::prelude::{and, SessionConfig, SessionContext};
-use datafusion_datasource::memory::MemorySourceConfig;
-use datafusion_datasource::source::DataSourceExec;
-use futures_util::{stream, StreamExt, TryStreamExt};
-use itertools::Itertools;
-use log::{debug, error, trace, warn};
-use mockall::automock;
-use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Formatter};
-use std::io::Cursor;
-use std::mem::take;
+use std::fmt::Debug;
 use std::sync::Arc;
-use std::time::SystemTime;
-use tracing::{instrument, Instrument};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum InlineAggregateMode {
@@ -201,6 +117,10 @@ impl InlineAggregateExec {
 
     pub fn input(&self) -> &Arc<dyn ExecutionPlan> {
         &self.input
+    }
+
+    pub fn group_expr(&self) -> &PhysicalGroupBy {
+        &self.group_by
     }
 }
 

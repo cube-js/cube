@@ -47,15 +47,15 @@ impl NormalRepresentation {
             )));
         }
 
-        return Ok(NormalRepresentation {
+        Ok(NormalRepresentation {
             encoding: NormalEncoding::new(state.precision),
-        });
+        })
     }
     /**
      * Checks that the precision is valid for a normal representation.
      */
     pub fn check_precision(precision: i32) -> Result<()> {
-        if !(Self::MINIMUM_PRECISION <= precision && precision <= Self::MAXIMUM_PRECISION) {
+        if !(Self::MINIMUM_PRECISION..=Self::MAXIMUM_PRECISION).contains(&precision) {
             return Err(ZetaError::new(format!(
                 "Expected normal precision to be >= {} and <= {} but was {}",
                 Self::MINIMUM_PRECISION,
@@ -63,7 +63,7 @@ impl NormalRepresentation {
                 precision
             )));
         }
-        return Ok(());
+        Ok(())
     }
 
     /// Computes the cardinality estimate according to the algorithm in Figure 6 of the HLL++ paper
@@ -94,7 +94,7 @@ impl NormalRepresentation {
                 "invalid byte in normal encoding: {}",
                 v
             );
-            sum += 1.0 / ((1 as u64) << (v as u64)) as f64;
+            sum += 1.0 / (1_u64 << (v as u64)) as f64;
         }
 
         // Return the LinearCount for small cardinalities where, as explained in the HLL++ paper
@@ -113,7 +113,7 @@ impl NormalRepresentation {
         // Perform bias correction on small estimates. HyperLogLogPlusPlusData only contains bias
         // estimates for small cardinalities and returns 0 for anything else, so the "E < 5m" guard from
         // the HLL++ paper (https://goo.gl/pc916Z) is superfluous here.
-        return (estimate - estimate_bias(estimate, state.precision)).round() as u64;
+        (estimate - estimate_bias(estimate, state.precision)).round() as u64
     }
 
     pub fn merge_with_sparse(
@@ -124,10 +124,10 @@ impl NormalRepresentation {
     ) -> Result<()> {
         self.add_sparse_values(
             state,
-            &other.encoding(),
+            other.encoding(),
             SparseRepresentation::sorted_iterator(other_state.sparse_data.as_deref()),
         )?;
-        return Ok(());
+        Ok(())
     }
 
     /// Merges a HyperLogLog++ sourceData array into a state, downgrading the values from the source
@@ -181,7 +181,7 @@ impl NormalRepresentation {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn ensure_data(state: &mut State) {

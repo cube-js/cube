@@ -1,12 +1,10 @@
 use datafusion::logical_expr::EmitTo;
-use std::mem::{self, size_of};
 
 use datafusion::arrow::array::{Array, ArrayRef, ListArray, RecordBatch, StructArray};
 use datafusion::arrow::compute::cast;
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::arrow::row::{RowConverter, Rows, SortField};
-use datafusion::dfschema::internal_err;
-use datafusion::error::{DataFusionError, Result as DFResult};
+use datafusion::error::Result as DFResult;
 use datafusion::physical_plan::aggregates::group_values::GroupValues;
 
 use std::sync::Arc;
@@ -52,8 +50,7 @@ impl SortedGroupValuesRows {
 
         let starting_rows_capacity = 1000;
         let starting_data_capacity = 64 * starting_rows_capacity;
-        let rows_buffer =
-            row_converter.empty_rows(starting_rows_capacity, starting_data_capacity);
+        let rows_buffer = row_converter.empty_rows(starting_rows_capacity, starting_data_capacity);
 
         Ok(Self {
             schema,
@@ -169,8 +166,7 @@ impl GroupValues for SortedGroupValuesRows {
         // Handle dictionary encoding for output
         for (field, array) in self.schema.fields.iter().zip(&mut output) {
             let expected = field.data_type();
-            *array =
-                dictionary_encode_if_necessary(Arc::<dyn Array>::clone(array), expected)?;
+            *array = dictionary_encode_if_necessary(Arc::<dyn Array>::clone(array), expected)?;
         }
 
         self.group_values = Some(group_values);
@@ -185,10 +181,7 @@ impl GroupValues for SortedGroupValuesRows {
     }
 }
 
-fn dictionary_encode_if_necessary(
-    array: ArrayRef,
-    expected: &DataType,
-) -> DFResult<ArrayRef> {
+fn dictionary_encode_if_necessary(array: ArrayRef, expected: &DataType) -> DFResult<ArrayRef> {
     match (expected, array.data_type()) {
         (DataType::Struct(expected_fields), _) => {
             let struct_array = array.as_any().downcast_ref::<StructArray>().unwrap();

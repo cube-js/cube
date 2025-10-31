@@ -30,7 +30,7 @@ pub struct DifferenceEncoder<'l> {
 
 impl DifferenceEncoder<'_> {
     pub fn new(buf: &mut Vec<u8>) -> DifferenceEncoder {
-        return DifferenceEncoder { buf, last: 0 };
+        DifferenceEncoder { buf, last: 0 }
     }
 
     /// Writes the integer value into the buffer using difference encoding.
@@ -78,7 +78,7 @@ fn read_varint(data: &[u8]) -> Result<(/*result*/ u32, /*bytes read*/ usize)> {
             break;
         }
     }
-    return Ok((result, offset));
+    Ok((result, offset))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -89,7 +89,7 @@ pub struct DifferenceDecoder<'l> {
 
 impl DifferenceDecoder<'_> {
     pub fn new(data: &[u8]) -> DifferenceDecoder {
-        return DifferenceDecoder { data, last: 0 };
+        DifferenceDecoder { data, last: 0 }
     }
 }
 
@@ -104,11 +104,11 @@ impl Iterator for DifferenceDecoder<'_> {
             Ok((n, cnt)) => {
                 self.data = &self.data[cnt..];
                 self.last += n;
-                return Some(Ok(self.last));
+                Some(Ok(self.last))
             }
             Err(e) => {
                 self.data = &[]; // stop on error.
-                return Some(Err(e));
+                Some(Err(e))
             }
         }
     }

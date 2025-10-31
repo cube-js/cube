@@ -103,7 +103,7 @@ impl SparseRepresentation {
 
         // Compute size limits for the encoded sparse data and temporary buffer relative to what the
         // normal representation would require (which is 2^p bytes).
-        if !(state.precision < 31) {
+        if state.precision >= 31 {
             return Err(ZetaError::new(format!(
                 "expected precision < 31, got {}",
                 state.precision
@@ -126,16 +126,16 @@ impl SparseRepresentation {
         }
         // We have no good way of checking whether the data actually contains the given number of
         // elements without decoding the data, which would be inefficient here.
-        return Ok(SparseRepresentation {
+        Ok(SparseRepresentation {
             max_sparse_data_bytes,
             encoding,
             max_buffer_elements,
             buffer: BTreeSet::new(),
-        });
+        })
     }
 
     pub fn encoding(&self) -> &SparseEncoding {
-        return &self.encoding;
+        &self.encoding
     }
 
     fn check_precision(normal_precision: i32, sparse_precision: i32) -> Result<()> {
@@ -150,7 +150,7 @@ impl SparseRepresentation {
                 sparse_precision
             )));
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn cardinality(&mut self, state: &mut State) -> u64 {
@@ -163,7 +163,7 @@ impl SparseRepresentation {
         let num_zeros = buckets - state.sparse_size;
         let estimate = buckets as f64 * (buckets as f64 / num_zeros as f64).ln();
 
-        return estimate.round() as u64;
+        estimate.round() as u64
     }
 
     /// `self` may end up be in the invalid state on error and must not be used further.
@@ -175,7 +175,7 @@ impl SparseRepresentation {
     ) -> Result<Option<NormalRepresentation>> {
         // TODO: Add special case when 'this' is empty and 'other' has only encoded data.
         // In that case, we can just copy over the sparse data without needing to decode and dedupe.
-        return self.add_sparse_values(state, other, other_state);
+        self.add_sparse_values(state, other, other_state)
     }
 
     #[must_use]
@@ -187,7 +187,7 @@ impl SparseRepresentation {
     ) -> Result<Option<NormalRepresentation>> {
         let mut normal = self.normalize(state)?;
         normal.merge_with_normal(state, other, other_state);
-        return Ok(Some(normal));
+        Ok(Some(normal))
     }
 
     fn add_sparse_values(
@@ -224,7 +224,7 @@ impl SparseRepresentation {
             )?;
         }
         // TODO: Merge without risking to grow this representation above its maximum size.
-        return Ok(self.update_representation(state)?);
+        self.update_representation(state)
     }
 
     fn merge_and_set<Iter1, Iter2>(
@@ -318,7 +318,7 @@ impl SparseRepresentation {
             }
         }
         let size = s.size;
-        return Self::set_sparse(state, data, size);
+        Self::set_sparse(state, data, size)
     }
 
     fn set_sparse(state: &mut State, data: Vec<u8>, size: i32) -> Result<()> {
@@ -328,10 +328,10 @@ impl SparseRepresentation {
     }
 
     pub(crate) fn sorted_iterator(sparse_data: Option<&[u8]>) -> DifferenceDecoder {
-        return DifferenceDecoder::new(sparse_data.unwrap_or(&[]));
+        DifferenceDecoder::new(sparse_data.unwrap_or(&[]))
     }
 
-    fn buffer_iterator<'a>(&'a self) -> impl Iterator<Item = Result<u32>> + 'a {
+    fn buffer_iterator(&self) -> impl Iterator<Item = Result<u32>> + '_ {
         self.buffer.iter().map(|v| Ok(*v))
     }
 
@@ -364,7 +364,7 @@ impl SparseRepresentation {
             return Ok(Some(self.normalize(state)?));
         }
 
-        return Ok(None);
+        Ok(None)
     }
 
     /// Convert to `NormalRepresentation`.
@@ -384,7 +384,7 @@ impl SparseRepresentation {
             self.buffer.clear();
         }
 
-        return Ok(representation);
+        Ok(representation)
     }
 
     pub fn requires_compaction(&self) -> bool {
@@ -407,7 +407,7 @@ impl SparseRepresentation {
             self.buffer_iterator(),
         )?;
         self.buffer.clear();
-        return Ok(());
+        Ok(())
     }
 
     /// Allocated size (not including size_of::<Self>).  Must be exact.

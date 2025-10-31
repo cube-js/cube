@@ -1,5 +1,4 @@
 use datafusion::arrow::array::*;
-use datafusion::arrow::buffer::BooleanBuffer;
 use datafusion::arrow::datatypes::*;
 use std::marker::PhantomData;
 

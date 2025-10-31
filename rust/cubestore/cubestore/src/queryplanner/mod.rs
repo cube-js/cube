@@ -22,6 +22,7 @@ use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod filter_by_key_range;
 pub mod info_schema;
+mod inline_aggregate;
 pub mod merge_sort;
 pub mod metadata_cache;
 pub mod providers;
@@ -30,7 +31,6 @@ mod rolling;
 mod test_utils;
 pub mod udf_xirr;
 pub mod udfs;
-mod inline_aggregate;
 
 use crate::cachestore::CacheStore;
 use crate::config::injection::DIService;

@@ -1,112 +1,23 @@
-use crate::cluster::{
-    pick_worker_by_ids, pick_worker_by_partitions, Cluster, WorkerPlanningParams,
-};
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::metastore::multi_index::MultiPartition;
-use crate::metastore::table::Table;
-use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
-use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
-use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
-use crate::queryplanner::metadata_cache::{MetadataCacheFactory, NoopParquetMetadataCache};
-use crate::queryplanner::optimizations::{CubeQueryPlanner, PreOptimizeRule};
-use crate::queryplanner::physical_plan_flags::PhysicalPlanFlags;
-use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
-use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, pp_plan, PPOptions};
-use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
-use crate::queryplanner::trace_data_loaded::DataLoadedSize;
-use crate::store::DataFrame;
-use crate::table::data::rows_to_columns;
-use crate::table::parquet::CubestoreParquetMetadataCache;
-use crate::table::{Row, TableValue, TimestampValue};
-use crate::telemetry::suboptimal_query_plan_event;
-use crate::util::memory::MemoryHandler;
-use crate::{app_metrics, CubeError};
-use async_trait::async_trait;
-use core::fmt;
 use datafusion::arrow::array::AsArray;
-use datafusion::arrow::array::{
-    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array,
-    Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
-    TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
-    UInt8Array,
-};
-use datafusion::arrow::compute::SortOptions;
-use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
-use datafusion::arrow::ipc::reader::StreamReader;
-use datafusion::arrow::ipc::writer::StreamWriter;
+use datafusion::arrow::array::{ArrayRef, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::catalog::Session;
-use datafusion::common::ToDFSchema;
-use datafusion::config::TableParquetOptions;
-use datafusion::datasource::listing::PartitionedFile;
-use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
-use datafusion::datasource::physical_plan::{
-    FileScanConfig, ParquetFileReaderFactory, ParquetSource,
-};
-use datafusion::datasource::{TableProvider, TableType};
 use datafusion::dfschema::internal_err;
 use datafusion::dfschema::not_impl_err;
-use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::{RecordBatchStream, TaskContext};
-use datafusion::logical_expr::{EmitTo, Expr, GroupsAccumulator, LogicalPlan};
+use datafusion::logical_expr::{EmitTo, GroupsAccumulator};
 use datafusion::physical_expr::expressions::Column as DFColumn;
-use datafusion::physical_expr::LexOrdering;
-use datafusion::physical_expr::{self, GroupsAccumulatorAdapter};
-use datafusion::physical_expr::{
-    Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
-};
-use datafusion::physical_optimizer::aggregate_statistics::AggregateStatistics;
-use datafusion::physical_optimizer::combine_partial_final_agg::CombinePartialFinalAggregate;
-use datafusion::physical_optimizer::enforce_sorting::EnforceSorting;
-use datafusion::physical_optimizer::join_selection::JoinSelection;
-use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
-use datafusion::physical_optimizer::limited_distinct_aggregation::LimitedDistinctAggregation;
-use datafusion::physical_optimizer::output_requirements::OutputRequirements;
-use datafusion::physical_optimizer::projection_pushdown::ProjectionPushdown;
-use datafusion::physical_optimizer::sanity_checker::SanityCheckPlan;
-use datafusion::physical_optimizer::topk_aggregation::TopKAggregation;
-use datafusion::physical_optimizer::update_aggr_exprs::OptimizeAggregateOrder;
-use datafusion::physical_optimizer::PhysicalOptimizerRule;
+use datafusion::physical_expr::GroupsAccumulatorAdapter;
 use datafusion::physical_plan::aggregates::group_values::GroupValues;
 use datafusion::physical_plan::aggregates::*;
-use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
-use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
-use datafusion::physical_plan::projection::ProjectionExec;
-use datafusion::physical_plan::sorts::sort::SortExec;
-use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
-use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::udaf::AggregateFunctionExpr;
-use datafusion::physical_plan::{
-    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalExpr,
-    PlanProperties, SendableRecordBatchStream,
-};
-use datafusion::prelude::{and, SessionConfig, SessionContext};
-use datafusion_datasource::memory::MemorySourceConfig;
-use datafusion_datasource::source::DataSourceExec;
+use datafusion::physical_plan::{PhysicalExpr, SendableRecordBatchStream};
 use futures::ready;
-use futures::{
-    stream::{Stream, StreamExt},
-    Future,
-};
-use itertools::Itertools;
-use log::{debug, error, trace, warn};
-use mockall::automock;
-use serde_derive::{Deserialize, Serialize};
-use std::any::Any;
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Formatter};
-use std::io::Cursor;
-use std::mem::take;
+use futures::stream::{Stream, StreamExt};
+use std::fmt::Debug;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::SystemTime;
-use tarpc::context::current;
-use tracing::{instrument, Instrument};
 
 use super::new_sorted_group_values;
 use super::InlineAggregateExec;
@@ -160,12 +71,6 @@ impl InlineAggregateStream {
         // aggregate
         let aggregate_arguments =
             aggregate_expressions(&agg.aggr_expr, &agg.mode, agg_group_by.num_group_exprs())?;
-        // arguments for aggregating spilled data is the same as the one for final aggregation
-        let merging_aggregate_arguments = aggregate_expressions(
-            &agg.aggr_expr,
-            &InlineAggregateMode::Final,
-            agg_group_by.num_group_exprs(),
-        )?;
 
         let filter_expressions = match agg.mode {
             InlineAggregateMode::Partial => agg_filter_expr,
@@ -180,15 +85,6 @@ impl InlineAggregateStream {
             .collect::<DFResult<_>>()?;
 
         let group_schema = agg_group_by.group_schema(&agg.input().schema())?;
-
-        let partial_agg_schema = create_schema(
-            &agg.input().schema(),
-            &agg_group_by,
-            &aggregate_exprs,
-            InlineAggregateMode::Partial,
-        )?;
-
-        let partial_agg_schema = Arc::new(partial_agg_schema);
 
         let exec_state = ExecutionState::ReadingInput;
         let current_group_indices = Vec::with_capacity(batch_size);
@@ -209,36 +105,6 @@ impl InlineAggregateStream {
             input_done: false,
         })
     }
-}
-
-fn create_schema(
-    input_schema: &Schema,
-    group_by: &PhysicalGroupBy,
-    aggr_expr: &[Arc<AggregateFunctionExpr>],
-    mode: InlineAggregateMode,
-) -> DFResult<Schema> {
-    let mut fields = Vec::with_capacity(group_by.num_output_exprs() + aggr_expr.len());
-    fields.extend(group_by.output_fields(input_schema)?);
-
-    match mode {
-        InlineAggregateMode::Partial => {
-            // in partial mode, the fields of the accumulator's state
-            for expr in aggr_expr {
-                fields.extend(expr.state_fields()?.iter().cloned());
-            }
-        }
-        InlineAggregateMode::Final => {
-            // in final mode, the field with the final result of the accumulator
-            for expr in aggr_expr {
-                fields.push(expr.field())
-            }
-        }
-    }
-
-    Ok(Schema::new_with_metadata(
-        fields,
-        input_schema.metadata().clone(),
-    ))
 }
 
 fn aggregate_expressions(

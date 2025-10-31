@@ -1,19 +1,18 @@
 use datafusion::logical_expr::EmitTo;
 use datafusion::physical_plan::aggregates::group_values::multi_group_by::GroupColumn;
 
-use std::mem::{self, size_of};
+use std::mem::{self};
 
 use datafusion::arrow::array::{Array, ArrayRef, RecordBatch};
 use datafusion::arrow::compute::cast;
 use datafusion::arrow::datatypes::{
     BinaryType, BinaryViewType, DataType, Date32Type, Date64Type, Decimal128Type, Float32Type,
-    Float64Type, Int16Type, Int32Type, Int64Type, Int8Type, LargeBinaryType, LargeUtf8Type, Schema,
+    Float64Type, Int16Type, Int32Type, Int64Type, Int8Type, LargeBinaryType, LargeUtf8Type,
     SchemaRef, StringViewType, Time32MillisecondType, Time32SecondType, Time64MicrosecondType,
     Time64NanosecondType, TimeUnit, TimestampMicrosecondType, TimestampMillisecondType,
     TimestampNanosecondType, TimestampSecondType, UInt16Type, UInt32Type, UInt64Type, UInt8Type,
     Utf8Type,
 };
-use datafusion::dfschema::internal_err;
 use datafusion::dfschema::not_impl_err;
 use datafusion::error::{DataFusionError, Result as DFResult};
 use datafusion::physical_expr::binary_map::OutputType;
@@ -384,7 +383,7 @@ impl GroupValues for SortedGroupValues {
         Ok(output)
     }
 
-    fn clear_shrink(&mut self, batch: &RecordBatch) {
+    fn clear_shrink(&mut self, _batch: &RecordBatch) {
         self.group_values.clear();
         self.comparators.clear();
         self.rows_inds.clear();
