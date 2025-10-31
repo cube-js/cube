@@ -588,6 +588,9 @@ describe('SQL Generation', () => {
       }, {
         join_path: 'visitors.visitor_checkins',
         includes: ['visitor_checkins_count', 'id_sum']
+      }, {
+        join_path: 'visitors.visitor_checkins.cards',
+        includes: ['max_id']
       }]
     })
 
@@ -643,6 +646,10 @@ describe('SQL Generation', () => {
       measures: {
         count: {
           type: 'count'
+        },
+        max_id: {
+          type: 'max',
+          sql: 'id'
         }
       },
 
@@ -2310,6 +2317,62 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [{ vc__google_sourced_checkins: '1' }]
+      );
+    });
+  });
+
+  it('multiplied subquery measures', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.id_sum',
+        'visitor_checkins.revenue_per_checkin',
+        'visitors.visitor_revenue'
+      ],
+      dimensions: [
+        'visitors.source',
+        'visitor_checkins.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles'
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [
+          {
+            visitors__source: null,
+            vc__source: null,
+            vc__id_sum: null,
+            vc__revenue_per_checkin: null,
+            visitors__visitor_revenue: null
+          },
+          {
+            visitors__source: 'some',
+            vc__source: null,
+            vc__id_sum: '12',
+            vc__revenue_per_checkin: '75',
+            visitors__visitor_revenue: '300'
+          },
+          {
+            visitors__source: 'google',
+            vc__source: null,
+            vc__id_sum: '6',
+            vc__revenue_per_checkin: null,
+            visitors__visitor_revenue: null
+          },
+          {
+            visitors__source: 'some',
+            vc__source: 'google',
+            vc__id_sum: '3',
+            vc__revenue_per_checkin: '100',
+            visitors__visitor_revenue: '100'
+          }
+        ]
       );
     });
   });
