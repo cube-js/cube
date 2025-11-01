@@ -904,4 +904,68 @@ describe('OracleQuery', () => {
     expect(sql).toMatch(/GROUP BY\s+TRUNC/);
     expect(params).toEqual(['2024-01-01T00:00:00.000Z', '2024-12-31T23:59:59.999Z']);
   });
+
+  it('does not bind generated time series date_from/date_to', async () => {
+    await compiler.compile();
+
+    const query = new OracleQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      {
+        measures: ['visitors.thisPeriod', 'visitors.priorPeriod'],
+        timeDimensions: [
+          {
+            dimension: 'visitors.createdAt',
+            dateRange: ['2023-01-01', '2024-12-31'],
+            granularity: 'year'
+          }
+        ],
+        filters: [
+          { member: 'visitors.source', operator: 'equals', values: ['web'] }
+        ],
+        timezone: 'UTC'
+      }
+    );
+
+    const [sql] = query.buildSqlAndParams();
+
+    // Ensure generated time series columns are not treated as bind params
+    expect(sql).not.toMatch(/:\s*"date_from"/);
+    expect(sql).not.toMatch(/:\s*"date_to"/);
+
+    // Ensure we cast series columns directly via TO_TIMESTAMP_TZ(..., '...FF') without binds
+    expect(sql).toMatch(/TO_TIMESTAMP_TZ\(date_from,\s*'YYYY-MM-DD"T"HH24:MI:SS\.FF'\)/);
+    expect(sql).toMatch(/TO_TIMESTAMP_TZ\(date_to,\s*'YYYY-MM-DD"T"HH24:MI:SS\.FF'\)/);
+  });
+
+  it('uses Z format for bind parameters and no-Z format for column identifiers', async () => {
+    await compiler.compile();
+
+    const query = new OracleQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      {
+        measures: ['visitors.count'],
+        timezone: 'UTC'
+      }
+    );
+
+    // Test direct method calls to verify format selection logic
+    // Bind parameter '?' should use Z format (for ISO 8601 strings with Z)
+    const bindResult = query.dateTimeCast('?');
+    expect(bindResult).toContain('TO_TIMESTAMP_TZ(:"?",');
+    expect(bindResult).toContain('YYYY-MM-DD"T"HH24:MI:SS.FF"Z"');
+
+    // Column identifier should use no-Z format (for VALUES data without Z)
+    const columnResult = query.dateTimeCast('date_from');
+    expect(columnResult).toContain('TO_TIMESTAMP_TZ(date_from,');
+    expect(columnResult).toContain('YYYY-MM-DD"T"HH24:MI:SS.FF');
+    expect(columnResult).not.toContain('"Z"');
+
+    // Verify timeStampCast has same behavior
+    const bindTimestamp = query.timeStampCast('?');
+    expect(bindTimestamp).toContain('YYYY-MM-DD"T"HH24:MI:SS.FF"Z"');
+
+    const columnTimestamp = query.timeStampCast('date_to');
+    expect(columnTimestamp).toContain('YYYY-MM-DD"T"HH24:MI:SS.FF');
+    expect(columnTimestamp).not.toContain('"Z"');
+  });
 });
