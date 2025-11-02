@@ -67,7 +67,10 @@
   },
   "resolutions": {
     "@types/node": "^16",
-    "@types/ramda": "0.27.40"
+    "@types/ramda": "0.27.40",
+    "@octokit/plugin-paginate-rest": "^9.2.2",
+    "parse-url": "^8.1.0",
+    "tar": "^6.2.1"
   },
   "license": "MIT",
   "packageManager": "yarn@1.22.19"
