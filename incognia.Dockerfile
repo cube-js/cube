@@ -1,4 +1,4 @@
-FROM node:18.20.1-bullseye-slim AS base
+FROM node:20.19.5-bullseye-slim AS base
 
 WORKDIR /cube
 
