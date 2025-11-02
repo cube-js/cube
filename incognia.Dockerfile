@@ -1,4 +1,4 @@
-FROM node:20.19.5-bullseye-slim AS base
+FROM node:20.19.5-bookworm-slim AS base
 
 WORKDIR /cube
 
