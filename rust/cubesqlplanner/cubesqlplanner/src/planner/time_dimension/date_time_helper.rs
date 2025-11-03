@@ -1,10 +1,11 @@
 use chrono::{DateTime, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
+use lazy_static::lazy_static;
 use regex::Regex;
+
 pub struct QueryDateTimeHelper {}
 
-use lazy_static::lazy_static;
 lazy_static! {
     static ref DATE_TIME_LOCAL_MS_RE: Regex =
         Regex::new(r"^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$").unwrap();
@@ -12,10 +13,10 @@ lazy_static! {
         Regex::new(r"^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d\d\d\d$").unwrap();
     static ref DATE_RE: Regex = Regex::new(r"^\d\d\d\d-\d\d-\d\d$").unwrap();
 }
+
 impl QueryDateTimeHelper {
     pub fn parse_native_date_time(date: &str) -> Result<NaiveDateTime, CubeError> {
         let formats = &[
-            "%Y-%m-%d",
             "%Y-%m-%d %H:%M:%S",
             "%Y-%m-%dT%H:%M:%S",
             "%Y-%m-%d %H:%M:%S%.f",
@@ -30,6 +31,11 @@ impl QueryDateTimeHelper {
 
         if let Ok(d) = NaiveDate::parse_from_str(date, "%Y-%m-%d") {
             return Ok(d.and_hms_opt(0, 0, 0).unwrap());
+        }
+
+        // Fallback as RFC3339/ISO8601 with 'Z' timezone
+        if let Ok(dt) = DateTime::parse_from_rfc3339(date) {
+            return Ok(dt.naive_utc());
         }
 
         Err(CubeError::user(format!("Can't parse date: '{}'", date)))
@@ -153,6 +159,8 @@ impl QueryDateTimeHelper {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::NaiveDate;
+
     #[test]
     fn test_parse_native_date_time() {
         assert_eq!(
@@ -188,6 +196,21 @@ mod tests {
             NaiveDate::from_ymd_opt(2021, 1, 1)
                 .unwrap()
                 .and_hms_milli_opt(12, 10, 15, 345)
+                .unwrap()
+        );
+        // Test parsing with 'Z' timezone (UTC)
+        assert_eq!(
+            QueryDateTimeHelper::parse_native_date_time("2024-01-01T10:15:00Z").unwrap(),
+            NaiveDate::from_ymd_opt(2024, 1, 1)
+                .unwrap()
+                .and_hms_opt(10, 15, 0)
+                .unwrap()
+        );
+        assert_eq!(
+            QueryDateTimeHelper::parse_native_date_time("2024-01-01T10:15:00.123Z").unwrap(),
+            NaiveDate::from_ymd_opt(2024, 1, 1)
+                .unwrap()
+                .and_hms_milli_opt(10, 15, 0, 123)
                 .unwrap()
         );
     }

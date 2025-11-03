@@ -82,7 +82,8 @@
     "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.1",
     "testcontainers": "^10.28.0",
-    "typescript": "~5.2.2"
+    "typescript": "~5.2.2",
+    "moment": "^2.30.1"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
