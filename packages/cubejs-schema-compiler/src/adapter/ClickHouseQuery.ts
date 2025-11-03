@@ -112,8 +112,8 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public dateTimeCast(value: string, timezone?: string): string {
-    // If a timezone is specified, use toDateTime64 to parse the string AS IF it's in that timezone
-    // This is critical for custom granularity, because timezone should be aligned between origin and source column
+    // This is critical for custom granularity, because timezone should be aligned between origin and source column, otherwise
+    // clickhouse will align the source column to the origin timezone, which will cause an unintended offset.
     if (timezone) {
       // Use precision 3 for milliseconds to match the format 'YYYY-MM-DDTHH:mm:ss.SSS'
       return `toDateTime64(${value}, 3, '${timezone}')`;
