@@ -187,35 +187,38 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
         f: F,
     ) -> Result<NeonFunction<C>, CubeError> {
         let f = Rc::new(f);
-        let obj = self.with_context(|cx| {
-            let func = JsFunction::new(cx, move |cx| {
-                neon_run_with_guarded_lifetime(cx, |function_context| {
-                    let args = function_context
-                        .with_context(|cx| -> Result<_, CubeError> {
-                            let mut args = vec![];
-                            for i in 0..cx.len() {
-                                args.push(cx.argument::<JsValue>(i)?);
-                            }
-                            Ok(args)
-                        })??
-                        .into_iter()
-                        .map(|arg| -> Result<_, CubeError> {
-                            Ok(NativeObjectHandle::new(NeonObject::new(
-                                function_context.clone(),
-                                arg,
-                            )?))
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
+        let obj = self
+            .with_context(|cx| {
+                let func = JsFunction::new(cx, move |cx| {
+                    neon_run_with_guarded_lifetime(cx, |function_context| {
+                        let args = function_context
+                            .with_context(|cx| -> Result<_, CubeError> {
+                                let mut args = vec![];
+                                for i in 0..cx.len() {
+                                    args.push(cx.argument::<JsValue>(i)?);
+                                }
+                                Ok(args)
+                            })??
+                            .into_iter()
+                            .map(|arg| -> Result<_, CubeError> {
+                                Ok(NativeObjectHandle::new(NeonObject::new(
+                                    function_context.clone(),
+                                    arg,
+                                )?))
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
 
-                    let context_holder: NativeContextHolder<
-                        NeonInnerTypes<FunctionContext<'static>>,
-                    > = function_context.clone().into();
-                    let res = f(context_holder.clone(), args)?;
-                    res.to_native(context_holder.clone())
-                })
-            });
-        });
-        todo!()
+                        let context_holder: NativeContextHolder<
+                            NeonInnerTypes<FunctionContext<'static>>,
+                        > = function_context.clone().into();
+                        let res = f(context_holder.clone(), args)?;
+                        res.to_native(context_holder.clone())
+                    })
+                });
+                func
+            })??
+            .into_neon_object(self.clone())?;
+        obj.into_function()
     }
     fn make_proxy<
         Ret: NativeSerialize<NeonInnerTypes<FunctionContext<'static>>>,

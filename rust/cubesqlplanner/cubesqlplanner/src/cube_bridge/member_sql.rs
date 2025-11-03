@@ -271,8 +271,31 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         context_holder: NativeContextHolder<CIT>,
         proxy_state: ProxyStateWeak,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
-        context_holder.make_vararg_function(move |function_context, args| {});
-        todo!()
+        let proxy_state = proxy_state.clone();
+        let result = context_holder.make_vararg_function(move |function_context, args| {
+            let filter_params = args
+                .iter()
+                .map(|arg| -> Result<_, CubeError> {
+                    let member = arg.to_struct()?.get_field("__member")?;
+                    FilterParamsItem::from_native(member.clone())
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| {
+                    CubeError::user(
+                        "FILTER_GROUP expects FILTER_PARAMS args to be passed.".to_string(),
+                    )
+                })?;
+            let filter_group = FilterGroupItem { filter_params };
+            let index = proxy_state.with_state_mut(|state| {
+                let i = state.filter_groups.len();
+                state.filter_groups.push((filter_group, i));
+                i
+            })?;
+
+            let str = format!("{{fg:{}}}", index);
+            Ok(str)
+        })?;
+        Ok(NativeObjectHandle::new(result.into_object()))
     }
 
     fn filter_params_filter<CIT: InnerTypes>(
@@ -288,7 +311,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             column,
         });
         let item_native = item.to_native(context_holder.clone())?;
-        let to_string_fn = context_holder.make_function(move |function_context| {
+        let to_string_fn = context_holder.make_function(move |_| {
             let index = proxy_state.with_state_mut(|state| {
                 let i = state.filter_params.len();
                 state.filter_params.push((item.as_ref().clone(), i));
@@ -385,6 +408,9 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
             let proxy_arg = if arg == "FILTER_PARAMS" {
                 println!("!!! --- filter params");
                 Self::filter_params_proxy(context_holder.clone(), weak_state.clone())?
+            } else if arg == "FILTER_GROUP" {
+                println!("!!! --- filter group");
+                Self::filter_goup_fn(context_holder.clone(), weak_state.clone())?
             } else {
                 println!("!!! --- arg {}", arg);
                 let path = vec![arg];
