@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, LocalResult, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
@@ -17,7 +17,6 @@ lazy_static! {
 impl QueryDateTimeHelper {
     pub fn parse_native_date_time(date: &str) -> Result<NaiveDateTime, CubeError> {
         let formats = &[
-            "%Y-%m-%d",
             "%Y-%m-%d %H:%M:%S",
             "%Y-%m-%dT%H:%M:%S",
             "%Y-%m-%d %H:%M:%S%.f",
@@ -28,6 +27,10 @@ impl QueryDateTimeHelper {
             if let Ok(dt) = NaiveDateTime::parse_from_str(date, format) {
                 return Ok(dt);
             }
+        }
+
+        if let Ok(d) = NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+            return Ok(d.and_hms_opt(0, 0, 0).unwrap());
         }
 
         // Fallback as RFC3339/ISO8601 with 'Z' timezone
