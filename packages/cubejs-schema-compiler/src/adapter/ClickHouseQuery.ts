@@ -63,21 +63,27 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   /**
-   * Returns sql for source expression floored to timestamps aligned with
-   * intervals relative to origin timestamp point.
+   * Returns SQL for source expression floored to timestamps aligned with
+   * intervals relative to the origin timestamp point.
    */
   public dateBin(interval: string, source: string, origin: string): string {
+    // Pass timezone to dateTimeCast to ensure origin is in the same timezone as a source, because ClickHouse aligns
+    // both timestamps internally to the same timezone before computing the difference, causing an unintended offset.
+    const alignedOrigin = this.dateTimeCast(`'${origin}'`, this.timezone);
     const intervalFormatted = this.formatInterval(interval);
     const timeUnit = this.diffTimeUnitForInterval(interval);
     const beginOfTime = 'fromUnixTimestamp(0)';
 
-    return `date_add(${timeUnit},
+    const dateBinResult = `date_add(${timeUnit},
         FLOOR(
-          date_diff(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
+          date_diff(${timeUnit}, ${alignedOrigin}, ${source}) /
           date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted})
         ) * date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted}),
-        ${this.dateTimeCast(`'${origin}'`)}
+        ${alignedOrigin}
     )`;
+
+    // Normalize the result to DateTime64(0) for consistent formatting
+    return `toDateTime64(${dateBinResult}, 0, '${this.timezone}')`;
   }
 
   public subtractInterval(date: string, interval: string): string {
@@ -105,11 +111,17 @@ export class ClickHouseQuery extends BaseQuery {
     return this.dateTimeCast(value);
   }
 
-  public dateTimeCast(value: string): string {
+  public dateTimeCast(value: string, timezone?: string): string {
+    // If a timezone is specified, use toDateTime64 to parse the string AS IF it's in that timezone
+    // This is critical for custom granularity, because timezone should be aligned between origin and source column
+    if (timezone) {
+      // Use precision 3 for milliseconds to match the format 'YYYY-MM-DDTHH:mm:ss.SSS'
+      return `toDateTime64(${value}, 3, '${timezone}')`;
+    }
+
     // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
     // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
     // However parseDateTimeBestEffort works with ISO8601
-    //
     return `parseDateTimeBestEffort(${value})`;
   }
 
