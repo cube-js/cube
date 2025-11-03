@@ -74,16 +74,13 @@ export class ClickHouseQuery extends BaseQuery {
     const timeUnit = this.diffTimeUnitForInterval(interval);
     const beginOfTime = 'fromUnixTimestamp(0)';
 
-    const dateBinResult = `date_add(${timeUnit},
+    return `date_add(${timeUnit},
         FLOOR(
           date_diff(${timeUnit}, ${alignedOrigin}, ${source}) /
           date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted})
         ) * date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted}),
         ${alignedOrigin}
     )`;
-
-    // Normalize the result to DateTime64(0) for consistent formatting
-    return `toDateTime64(${dateBinResult}, 0, '${this.timezone}')`;
   }
 
   public subtractInterval(date: string, interval: string): string {

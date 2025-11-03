@@ -158,7 +158,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  /// TODO: fix date bin calulation... for some reasons it goes from 2023-12-31T23:00:00.000Z
+  /// TODO: fix date bin calculation... for some reason it goes from 2023-12-31T23:00:00.000Z
   xit('works with five_minutes_from_utc_origin custom granularity in Europe/Paris timezone', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.count'],
@@ -188,7 +188,7 @@ describe('Custom Granularities', () => {
     { joinGraph, cubeEvaluator, compiler }
   ));
 
-  /// TODO: fix date bin calulation... for some reasons it goes from 2023-12-31T23:00:00.000Z
+  /// TODO: fix date bin calculation... for some reason it goes from 2023-12-31T23:00:00.000Z
   xit('works with five_minutes_from_local_origin custom granularity in Europe/Paris timezone', async () => dbRunner.runQueryTest(
     {
       measures: ['orders.count'],

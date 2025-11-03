@@ -4,6 +4,8 @@ import { GenericContainer } from 'testcontainers';
 import type { StartedTestContainer } from 'testcontainers';
 import { format as formatSql } from 'sqlstring';
 import { v4 as uuidv4 } from 'uuid';
+import moment from 'moment';
+
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { BaseDbRunner } from '../utils/BaseDbRunner';
 
@@ -210,10 +212,14 @@ export class ClickHouseDbRunner extends BaseDbRunner {
           if (fieldMeta === undefined) {
             throw new Error(`Missing meta for field ${field}`);
           }
-          if (fieldMeta.type.includes('DateTime')) {
+
+          if (fieldMeta.type.includes('DateTime64')) {
+            row[field] = moment.utc(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+          } else if (fieldMeta.type.includes('DateTime') /** Can be DateTime or DateTime('timezone') */) {
             if (typeof value !== 'string') {
               throw new Error(`Unexpected value for ${field}`);
             }
+
             row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
           } else if (fieldMeta.type.includes('Date')) {
             row[field] = `${value}T00:00:00.000`;
