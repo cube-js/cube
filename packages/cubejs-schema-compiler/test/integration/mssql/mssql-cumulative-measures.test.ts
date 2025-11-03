@@ -128,25 +128,25 @@ describe('MSSqlCumulativeMeasures', () => {
     expect(await dbRunner.testQuery(query.buildSqlAndParams())).toEqual([
       {
         visitors__count: 1,
-        visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
+        visitors__created_at_day: new Date('2017-01-02T00:00:00.000Z'),
         visitors__source: 'some',
         visitors__unbounded_count: 1
       },
       {
         visitors__count: 1,
-        visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
+        visitors__created_at_day: new Date('2017-01-04T00:00:00.000Z'),
         visitors__source: 'some',
         visitors__unbounded_count: 2,
       },
       {
         visitors__count: 1,
-        visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+        visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
         visitors__source: 'google',
         visitors__unbounded_count: 1,
       },
       {
         visitors__count: 2,
-        visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
+        visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
         visitors__source: null,
         visitors__unbounded_count: 3,
       }
