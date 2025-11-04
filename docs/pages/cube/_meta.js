@@ -3,5 +3,6 @@ module.exports = {
   workbooks: "Workbooks",
   administration: "Administration",
   embed: "Embed & API",
+  workspace: "Workspace",
   changelog: "Product Updates",
 };

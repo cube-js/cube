@@ -1623,5 +1623,150 @@
     "source": "/product/deployment/cloud/vpc/azure",
     "destination": "/product/deployment/cloud/vpc/azure/vpc-peering",
     "permanent": true
+  },
+  {
+    "source": "/product/workspace/playground",
+    "destination": "/cube/workspace/playground",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/vizard",
+    "destination": "/cube/workspace/vizard",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/data-model",
+    "destination": "/cube/workspace/data-model",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/visual-model",
+    "destination": "/cube/workspace/visual-model",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/saved-reports",
+    "destination": "/cube/workspace/saved-reports",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/rollup-designer",
+    "destination": "/cube/workspace/rollup-designer",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/dev-mode",
+    "destination": "/cube/workspace/dev-mode",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/environments",
+    "destination": "/cube/workspace/environments",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/integrations",
+    "destination": "/cube/workspace/integrations",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sql-runner",
+    "destination": "/cube/workspace/sql-runner",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/query-history",
+    "destination": "/cube/workspace/query-history",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/pre-aggregations",
+    "destination": "/cube/workspace/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/performance",
+    "destination": "/cube/workspace/performance",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring",
+    "destination": "/cube/workspace/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/cloudwatch",
+    "destination": "/cube/workspace/monitoring/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/datadog",
+    "destination": "/cube/workspace/monitoring/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/grafana-cloud",
+    "destination": "/cube/workspace/monitoring/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/new-relic",
+    "destination": "/cube/workspace/monitoring/new-relic",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/monitoring/s3",
+    "destination": "/cube/workspace/monitoring/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/access-control",
+    "destination": "/cube/workspace/access-control",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso",
+    "destination": "/cube/workspace/sso",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso/google-workspace",
+    "destination": "/cube/workspace/sso/google-workspace",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso/microsoft-entra-id",
+    "destination": "/cube/workspace/sso/microsoft-entra-id",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/sso/okta",
+    "destination": "/cube/workspace/sso/okta",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/audit-log",
+    "destination": "/cube/workspace/audit-log",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/encryption-keys",
+    "destination": "/cube/workspace/encryption-keys",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/budgets",
+    "destination": "/cube/workspace/budgets",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/preferences",
+    "destination": "/cube/workspace/preferences",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/recipes/query-history-export",
+    "destination": "/cube/workspace/recipes/query-history-export",
+    "permanent": true
   }
 ]
