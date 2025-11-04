@@ -112,6 +112,15 @@ impl<C: Context<'static> + 'static> NativeObject<NeonInnerTypes<C>> for NeonObje
             root_holder: self.root_holder.clone_to_context(context),
         }
     }
+
+    fn clone_to_function_context(
+        &self,
+        context: &ContextHolder<FunctionContext<'static>>,
+    ) -> NeonObject<FunctionContext<'static>> {
+        NeonObject {
+            root_holder: self.root_holder.clone_to_context(context),
+        }
+    }
 }
 
 impl<C: Context<'static> + 'static> Clone for NeonObject<C> {

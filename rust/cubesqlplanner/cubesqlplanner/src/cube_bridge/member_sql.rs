@@ -312,7 +312,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         };
         let result =
             context_holder.make_vararg_function(move |context, args| -> Result<_, CubeError> {
-                if args.len() == 0 {
+                if args.is_empty() {
                     return Ok("".to_string());
                 }
 
@@ -356,12 +356,33 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                             "".to_string()
                         }
                     }
-                    ParamValue::None => "1 = 1".to_string(),
+                    ParamValue::None => {
+                        if required {
+                            let column_name = String::from_native(column).unwrap_or_default();
+                            return Err(CubeError::user(format!(
+                                "Filter for {} is required",
+                                column_name
+                            )));
+                        }
+                        "1 = 1".to_string()
+                    }
                 };
 
                 Ok(res)
             })?;
-        todo!()
+        Ok(NativeObjectHandle::new(result.into_object()))
+    }
+
+    fn security_context_unsafe_value_fn<CIT: InnerTypes>(
+        context_holder: NativeContextHolder<CIT>,
+        property_value: NativeObjectHandle<CIT>,
+    ) -> Result<NativeObjectHandle<CIT>, CubeError> {
+        let result = context_holder.make_vararg_function(
+            move |context, _| -> Result<NativeObjectHandle<_>, CubeError> {
+                property_value.clone_to_function_context_ref(context.as_holder_ref())
+            },
+        )?;
+        Ok(NativeObjectHandle::new(result.into_object()))
     }
 
     fn security_context_proxy<CIT: InnerTypes>(
@@ -369,11 +390,68 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         proxy_state: ProxyStateWeak,
         base_object: NativeObjectHandle<CIT>,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
-        /* context_holder.make_proxy(
-            Some(base_object),
-            move |inner_context, target, prop| todo!(),
-        ) */
-        todo!()
+        context_holder.make_proxy(Some(base_object), move |inner_context, target, prop| {
+            if &prop == "filter" {
+                println!("!!!! AAAAAAA");
+                return Ok(Some(Self::security_context_filter_fn(
+                    inner_context.clone(),
+                    target.clone(),
+                    false,
+                    proxy_state.clone(),
+                )?));
+            }
+            if &prop == "requiredFilter" {
+                return Ok(Some(Self::security_context_filter_fn(
+                    inner_context.clone(),
+                    target.clone(),
+                    true,
+                    proxy_state.clone(),
+                )?));
+            }
+            if &prop == "unsafeValue" {
+                return Ok(Some(Self::security_context_unsafe_value_fn(
+                    inner_context,
+                    target.clone(),
+                )?));
+            }
+            let target_obj = target.to_struct()?;
+            let property_value = target_obj.get_field(&prop)?;
+            if property_value.to_struct().is_ok() {
+                return Ok(Some(Self::security_context_proxy(
+                    inner_context,
+                    proxy_state.clone(),
+                    property_value,
+                )?));
+            }
+
+            println!("!!!! EEEEEE");
+            let result = inner_context.empty_struct()?;
+            result.set_field(
+                "filter",
+                Self::security_context_filter_fn(
+                    inner_context.clone(),
+                    property_value.clone(),
+                    false,
+                    proxy_state.clone(),
+                )?,
+            )?;
+            result.set_field(
+                "requiredFilter",
+                Self::security_context_filter_fn(
+                    inner_context.clone(),
+                    property_value.clone(),
+                    true,
+                    proxy_state.clone(),
+                )?,
+            )?;
+            result.set_field(
+                "unsafeValue",
+                Self::security_context_unsafe_value_fn(inner_context, target.clone())?,
+            )?;
+            let result = NativeObjectHandle::new(result.into_object());
+            println!("!!!! BBBBBBB");
+            Ok(Some(result))
+        })
     }
     /*
     public static contextSymbolsProxyFrom(symbols: object, allocateParam: (param: unknown) => unknown): object {

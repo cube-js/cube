@@ -119,16 +119,19 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
     define_into_method!(into_function, Function, ObjectNeonTypeHolder<C, JsFunction>, "Object is not the Function object");
     define_into_method!(into_struct, Struct, ObjectNeonTypeHolder<C, JsObject>, "Object is not the Struct object");
 
-    pub fn clone_to_context(&self, context: &ContextHolder<C>) -> Self {
+    pub fn clone_to_context<CC: Context<'static> + 'static>(
+        &self,
+        context: &ContextHolder<CC>,
+    ) -> RootHolder<CC> {
         match self {
-            Self::Null(v) => Self::Null(v.clone_to_context(context)),
-            Self::Undefined(v) => Self::Undefined(v.clone_to_context(context)),
-            Self::Boolean(v) => Self::Boolean(v.clone_to_context(context)),
-            Self::Number(v) => Self::Number(v.clone_to_context(context)),
-            Self::String(v) => Self::String(v.clone_to_context(context)),
-            Self::Array(v) => Self::Array(v.clone_to_context(context)),
-            Self::Function(v) => Self::Function(v.clone_to_context(context)),
-            Self::Struct(v) => Self::Struct(v.clone_to_context(context)),
+            Self::Null(v) => RootHolder::Null(v.clone_to_context(context)),
+            Self::Undefined(v) => RootHolder::Undefined(v.clone_to_context(context)),
+            Self::Boolean(v) => RootHolder::Boolean(v.clone_to_context(context)),
+            Self::Number(v) => RootHolder::Number(v.clone_to_context(context)),
+            Self::String(v) => RootHolder::String(v.clone_to_context(context)),
+            Self::Array(v) => RootHolder::Array(v.clone_to_context(context)),
+            Self::Function(v) => RootHolder::Function(v.clone_to_context(context)),
+            Self::Struct(v) => RootHolder::Struct(v.clone_to_context(context)),
         }
     }
 }

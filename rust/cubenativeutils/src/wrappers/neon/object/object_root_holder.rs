@@ -37,8 +37,11 @@ impl<C: Context<'static> + 'static, V: Object + 'static> ObjectNeonTypeHolder<C,
         })??)
     }
 
-    pub fn clone_to_context(&self, context: &ContextHolder<C>) -> Self {
-        Self {
+    pub fn clone_to_context<CC: Context<'static> + 'static>(
+        &self,
+        context: &ContextHolder<CC>,
+    ) -> ObjectNeonTypeHolder<CC, V> {
+        ObjectNeonTypeHolder {
             context: context.clone(),
             value: self.value.clone(),
         }
