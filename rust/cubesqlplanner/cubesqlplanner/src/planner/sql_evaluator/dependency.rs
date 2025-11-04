@@ -2,6 +2,7 @@ use super::symbols::MemberSymbol;
 use super::Compiler;
 use crate::cube_bridge::evaluator::{CallDep, CubeEvaluator};
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::security_context::SecurityContext;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
@@ -65,13 +66,19 @@ pub enum Dependency {
 pub struct DependenciesBuilder<'a> {
     compiler: &'a mut Compiler,
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    security_context: Rc<dyn SecurityContext>,
 }
 
 impl<'a> DependenciesBuilder<'a> {
-    pub fn new(compiler: &'a mut Compiler, cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
+    pub fn new(
+        compiler: &'a mut Compiler,
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        security_context: Rc<dyn SecurityContext>,
+    ) -> Self {
         DependenciesBuilder {
             compiler,
             cube_evaluator,
+            security_context,
         }
     }
 
@@ -90,7 +97,7 @@ impl<'a> DependenciesBuilder<'a> {
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<Dependency>, CubeError> {
         println!("!!!! =====================");
-        let test = member_sql.into_template_sql()?;
+        let test = member_sql.into_template_sql(self.security_context.clone())?;
         println!("!!!! test: {:?}", test);
         self.new_build_develop(cube_name.clone(), member_sql.clone())?;
         let call_deps = if member_sql.need_deps_resolve() {

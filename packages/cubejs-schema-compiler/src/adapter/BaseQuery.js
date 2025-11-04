@@ -935,6 +935,7 @@ export class BaseQuery {
       timezone: this.options.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
+      securityContext: this.contextSymbols.securityContext,
       order,
       filters: this.options.filters,
       limit: this.options.limit ? this.options.limit.toString() : null,

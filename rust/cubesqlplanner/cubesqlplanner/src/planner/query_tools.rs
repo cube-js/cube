@@ -6,6 +6,7 @@ use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::join_item::JoinItemStatic;
+use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::FilterItem;
 use crate::planner::sql_evaluator::collectors::collect_join_hints;
@@ -107,6 +108,7 @@ impl QueryToolsCachedData {
 pub struct QueryTools {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
+    security_context: Rc<dyn SecurityContext>,
     join_graph: Rc<dyn JoinGraph>,
     templates_render: Rc<dyn SqlTemplatesRender>,
     params_allocator: Rc<RefCell<ParamsAllocator>>,
@@ -118,6 +120,7 @@ pub struct QueryTools {
 impl QueryTools {
     pub fn try_new(
         cube_evaluator: Rc<dyn CubeEvaluator>,
+        security_context: Rc<dyn SecurityContext>,
         base_tools: Rc<dyn BaseTools>,
         join_graph: Rc<dyn JoinGraph>,
         timezone_name: Option<String>,
@@ -134,10 +137,12 @@ impl QueryTools {
         let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
             cube_evaluator.clone(),
             base_tools.clone(),
+            security_context.clone(),
             timezone.clone(),
         )));
         Ok(Rc::new(Self {
             cube_evaluator,
+            security_context,
             base_tools,
             join_graph,
             templates_render,

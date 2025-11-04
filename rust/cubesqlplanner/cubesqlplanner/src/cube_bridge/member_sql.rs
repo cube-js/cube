@@ -4,7 +4,6 @@ use super::{
     security_context::{NativeSecurityContext, SecurityContext},
     sql_utils::{NativeSqlUtils, SqlUtils},
 };
-use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::make_proxy;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
 use cubenativeutils::wrappers::serializer::{
@@ -12,6 +11,7 @@ use cubenativeutils::wrappers::serializer::{
 };
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
+use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeString};
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::HashMap;
@@ -37,10 +37,16 @@ struct FilterGroupItem {
 }
 
 #[derive(Default, Clone, Debug)]
+struct SecutityContextProps {
+    pub values: Vec<String>,
+}
+
+#[derive(Default, Clone, Debug)]
 struct ProxyStateInner {
     pub args: HashMap<Vec<String>, usize>,
     pub filter_params: Vec<(FilterParamsItem, usize)>,
     pub filter_groups: Vec<(FilterGroupItem, usize)>,
+    pub security_context: SecutityContextProps,
 }
 
 struct ProxyState {
@@ -154,7 +160,10 @@ pub trait MemberSql {
     fn args_names(&self) -> &Vec<String>;
     fn need_deps_resolve(&self) -> bool;
     fn as_any(self: Rc<Self>) -> Rc<dyn Any>;
-    fn into_template_sql(&self) -> Result<TemplatedSql, CubeError>;
+    fn into_template_sql(
+        &self,
+        security_context: Rc<dyn SecurityContext>,
+    ) -> Result<TemplatedSql, CubeError>;
 }
 
 pub struct NativeMemberSql<IT: InnerTypes> {
@@ -267,12 +276,147 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         })
     }
 
+    fn process_secutity_context_value(
+        proxy_state: &ProxyStateWeak,
+        value: &String,
+    ) -> Result<String, CubeError> {
+        let index = proxy_state.with_state_mut(|state| {
+            let i = state.security_context.values.len();
+            state.security_context.values.push(value.clone());
+            i
+        })?;
+        Ok(format!("{{sc_value:{}}}", index))
+    }
+
+    fn security_context_filter_fn<CIT: InnerTypes>(
+        context_holder: NativeContextHolder<CIT>,
+        property_value: NativeObjectHandle<CIT>,
+        required: bool,
+        proxy_state: ProxyStateWeak,
+    ) -> Result<NativeObjectHandle<CIT>, CubeError> {
+        enum ParamValue {
+            String(String),
+            StringVec(Vec<String>),
+            None,
+        }
+        let param_value = if let Ok(prop_vec) = Vec::<String>::from_native(property_value.clone()) {
+            ParamValue::StringVec(prop_vec)
+        } else if let Ok(prop) = String::from_native(property_value.clone()) {
+            ParamValue::String(prop)
+        } else if property_value.is_undefined()? || property_value.is_null()? {
+            ParamValue::None
+        } else {
+            return Err(CubeError::user(
+                "Invalid param for security context".to_string(),
+            ));
+        };
+        let result =
+            context_holder.make_vararg_function(move |context, args| -> Result<_, CubeError> {
+                if args.len() == 0 {
+                    return Ok("".to_string());
+                }
+
+                let column = args[0].clone();
+
+                let res = match &param_value {
+                    ParamValue::String(value) => {
+                        let value = Self::process_secutity_context_value(&proxy_state, value)?;
+                        if let Ok(column) = column.to_function() {
+                            let native_value = value.to_native(context.clone())?;
+                            let result = column.call(vec![native_value])?;
+                            if let Ok(result) = result.to_string() {
+                                result.value()?
+                            } else {
+                                "".to_string()
+                            }
+                        } else if let Ok(column) = column.to_string() {
+                            let column_value = column.value()?;
+                            format!("{} = {}", column_value, value)
+                        } else {
+                            "".to_string()
+                        }
+                    }
+                    ParamValue::StringVec(items) => {
+                        let values = items
+                            .iter()
+                            .map(|v| {
+                                Self::process_secutity_context_value(&proxy_state, &v)?
+                                    .to_native(context.clone())
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+
+                        if let Ok(column) = column.to_function() {
+                            let result = column.call(values)?;
+                            if let Ok(result) = result.to_string() {
+                                result.value()?
+                            } else {
+                                "".to_string()
+                            }
+                        } else {
+                            "".to_string()
+                        }
+                    }
+                    ParamValue::None => "1 = 1".to_string(),
+                };
+
+                Ok(res)
+            })?;
+        todo!()
+    }
+
+    fn security_context_proxy<CIT: InnerTypes>(
+        context_holder: NativeContextHolder<CIT>,
+        proxy_state: ProxyStateWeak,
+        base_object: NativeObjectHandle<CIT>,
+    ) -> Result<NativeObjectHandle<CIT>, CubeError> {
+        /* context_holder.make_proxy(
+            Some(base_object),
+            move |inner_context, target, prop| todo!(),
+        ) */
+        todo!()
+    }
+    /*
+    public static contextSymbolsProxyFrom(symbols: object, allocateParam: (param: unknown) => unknown): object {
+      return new Proxy(symbols, {
+        get: (target, name) => {
+          const propValue = target[name];
+          const methods = (paramValue) => ({
+            filter: (column) => {
+              if (paramValue) {
+                const value = Array.isArray(paramValue) ?
+                  paramValue.map(allocateParam) :
+                  allocateParam(paramValue);
+                if (typeof column === 'function') {
+                  return column(value);
+                } else {
+                  return `${column} = ${value}`;
+                }
+              } else {
+                return '1 = 1';
+              }
+            },
+            requiredFilter: (column) => {
+              if (!paramValue) {
+                throw new UserError(`Filter for ${column} is required`);
+              }
+              return methods(paramValue).filter(column);
+            },
+            unsafeValue: () => paramValue
+          });
+          return methods(target)[name] ||
+            typeof propValue === 'object' && propValue !== null && CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam) ||
+            methods(propValue);
+        }
+      });
+    }
+       */
+
     fn filter_goup_fn<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
         proxy_state: ProxyStateWeak,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
         let proxy_state = proxy_state.clone();
-        let result = context_holder.make_vararg_function(move |function_context, args| {
+        let result = context_holder.make_vararg_function(move |_, args| {
             let filter_params = args
                 .iter()
                 .map(|arg| -> Result<_, CubeError> {
@@ -398,7 +542,10 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
         !self.args_names.is_empty()
     }
 
-    fn into_template_sql(&self) -> Result<TemplatedSql, CubeError> {
+    fn into_template_sql(
+        &self,
+        security_context: Rc<dyn SecurityContext>,
+    ) -> Result<TemplatedSql, CubeError> {
         let state = ProxyState::new();
         let weak_state = state.weak();
         let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
@@ -406,13 +553,31 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
         println!("!!!! ============");
         for arg in self.args_names.iter().cloned() {
             let proxy_arg = if arg == "FILTER_PARAMS" {
-                println!("!!! --- filter params");
                 Self::filter_params_proxy(context_holder.clone(), weak_state.clone())?
             } else if arg == "FILTER_GROUP" {
-                println!("!!! --- filter group");
                 Self::filter_goup_fn(context_holder.clone(), weak_state.clone())?
+            } else if arg == "SECURITY_CONTEXT"
+                || arg == "security_context"
+                || arg == "securityContext"
+            {
+                println!("!!! sec context");
+                let context_obj = if let Some(security_context) = security_context
+                    .clone()
+                    .as_any()
+                    .downcast_ref::<NativeSecurityContext<IT>>(
+                ) {
+                    security_context.to_native(context_holder.clone())?
+                } else {
+                    return Err(CubeError::internal(format!(
+                        "Cannot dowcast security_context to native type"
+                    )));
+                };
+                Self::security_context_proxy(
+                    context_holder.clone(),
+                    weak_state.clone(),
+                    context_obj,
+                )?
             } else {
-                println!("!!! --- arg {}", arg);
                 let path = vec![arg];
                 Self::property_proxy(context_holder.clone(), weak_state.clone(), path.clone())?
             };
