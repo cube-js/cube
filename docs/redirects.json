@@ -511,6 +511,16 @@
   },
   {
     "source": "/",
+    "destination": "/cube/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/cube",
+    "destination": "/cube/introduction",
+    "permanent": true
+  },
+  {
+    "source": "/product",
     "destination": "/product/introduction",
     "permanent": true
   },
@@ -781,11 +791,6 @@
   },
   {
     "source": "/schema/reference/cube",
-    "destination": "/product/data-modeling/reference/cube",
-    "permanent": true
-  },
-  {
-    "source": "/cube",
     "destination": "/product/data-modeling/reference/cube",
     "permanent": true
   },

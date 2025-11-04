@@ -1,0 +1,157 @@
+# Embed Dashboard
+
+_Embed dashboards with iframe._
+
+Cube supports embedding dashboards directly into your applications via an iframe. This allows you to display interactive dashboards anywhere in your product or portal.
+
+## Getting Started with Embedding
+
+### 1. Enable Embedding
+
+To enable the embedding feature:
+
+- You must have **admin privileges** in your Cube instance.
+- Go to <Btn>Admin → API → Embed</Btn>
+- Click **Enable Embedding**.
+
+Once enabled, you'll be able to generate embed sessions using your [API key](/cube/embed/api-keys).
+
+### 2. Get Your API Key
+
+To use the embedded dashboard, you need an **[API Key](/cube/embed/api-keys)**:
+
+- Go to <Btn>Access → API Keys</Btn> in your Cube admin panel
+- Generate or copy your existing API key.
+- You'll use this key to authenticate API calls for generating embed sessions.
+
+### 3. Generate an Embed Session
+
+Use the `/api/v1/embed/generate-session` endpoint to create a session for your user. This endpoint will automatically create (insert) or update the external user based on the `externalId` provided.
+
+<WarningBox>
+  Accounts are limited to 10,000 external users. To increase this limit, please
+  contact support.
+</WarningBox>
+
+#### Example (JavaScript)
+
+```javascript
+const API_KEY = "YOUR_API_KEY";
+
+const session = await fetch(
+  "https://your-tenant.cubecloud.dev/api/v1/embed/generate-session",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Access-Token ${API_KEY}",
+    },
+    body: JSON.stringify({
+      externalId: "user@example.com",
+    }),
+  },
+);
+
+const data = await session.json();
+const sessionId = data.sessionId;
+```
+
+### 4. Embedding via iframe
+
+Use the session ID to embed the dashboard UI in your application:
+
+```html
+<iframe
+  title="Dashboard"
+  src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
+  width="100%"
+></iframe>
+```
+
+#### Complete Example
+
+Here's a complete HTML example that demonstrates the full embedding flow:
+
+```html
+<html>
+  <head>
+    <script>
+      (async () => {
+        const API_BASE_URL = "https://your-tenant.cubecloud.dev";
+        const API_KEY = "YOUR_API_KEY";
+        const externalId = "user@example.com";
+
+        const sessionResponse = await fetch(
+          `${API_BASE_URL}/api/v1/embed/generate-session`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Access-Token ${API_KEY}`,
+            },
+            body: JSON.stringify({
+              externalId: externalId,
+            }),
+          },
+        );
+
+        const sessionData = await sessionResponse.json();
+
+        const iframe = document.getElementById("dashboard-iframe");
+        const baseUrl =
+          "https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID";
+        iframe.src = `${baseUrl}?session=${sessionData.sessionId}`;
+      })();
+    </script>
+  </head>
+
+  <body>
+    <iframe
+      id="dashboard-iframe"
+      src=""
+      width="100%"
+      height="800"
+      frameborder="0"
+      allowtransparency="true"
+      allowfullscreen="true"
+    ></iframe>
+  </body>
+</html>
+```
+
+## URL Structure
+
+The dashboard embedding URL follows this pattern:
+
+```
+https://your-tenant.cubecloud.dev/embed/dashboard/{DASHBOARD_PUBLIC_ID}?session={SESSION_ID}
+```
+
+### Parameters
+
+- **DASHBOARD_PUBLIC_ID**: The public ID of the dashboard you want to embed
+- **SESSION_ID**: The session ID obtained from the `/api/v1/embed/generate-session` endpoint
+
+## Security Considerations
+
+- **API Key Security**: Keep your API keys secure and never expose them in client-side code
+- **Session Management**: Sessions are temporary and should be regenerated as needed
+- **HTTPS**: Always use HTTPS in production environments
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Invalid Session ID**: Ensure the session ID is valid and hasn't expired
+2. **Dashboard Not Found**: Verify the dashboard public ID is correct and the dashboard is published
+3. **Authentication Errors**: Check that your API key is valid and has the necessary permissions
+4. **CORS Issues**: Ensure your domain is properly configured for embedding
+
+### Getting Help
+
+If you encounter issues with dashboard embedding:
+
+- Check the browser console for error messages
+- Verify your API key and session generation
+- Ensure the dashboard is published and accessible
+- Contact support if you need assistance with configuration

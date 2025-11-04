@@ -21,14 +21,19 @@ module.exports = {
   //     toc: false,
   //   },
   // },
-  docs: {
-    // type: "page",
-    title: "[Demo] MDX Components",
-    display: "hidden",
+  // docs: {
+  //   // type: "page",
+  //   title: "[Demo] MDX Components",
+  //   display: "hidden",
+  // },
+
+  cube: {
+    type: "page",
+    title: "Cube",
   },
 
   product: {
     type: "page",
-    title: "Documentation",
+    title: "Cube Core",
   },
 };
