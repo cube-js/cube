@@ -54,7 +54,7 @@ const config: DocsThemeConfig = {
   useNextSeoProps: () => {
     return {
       description: "Documentation for Cube, the Semantic Layer for building data apps",
-      titleTemplate: "%s | Cube Docs",
+      titleTemplate: "%s | Cube documentation",
       openGraph: {
         description: "Documentation for Cube, the Semantic Layer for building data apps",
       },
