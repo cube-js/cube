@@ -1,0 +1,56 @@
+FROM node:22-bookworm-slim AS builder
+
+WORKDIR /cube
+
+# Copy only the custom package.json
+COPY custom-package.json package.json
+
+RUN yarn policies set-version v1.22.22
+RUN yarn config set network-timeout 120000 -g
+
+# Install build dependencies for Oracle (node-oracledb needs them)
+RUN apt-get update \
+    && apt-get install -y python3 python3.11 libpython3.11-dev gcc g++ make cmake ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install only Oracle and Postgres drivers
+RUN yarn install --prod && yarn cache clean
+
+# Production stage - minimal runtime
+FROM node:22-bookworm-slim
+
+ARG IMAGE_VERSION=custom
+ENV CUBEJS_DOCKER_IMAGE_VERSION=$IMAGE_VERSION
+ENV CUBEJS_DOCKER_IMAGE_TAG=minimal
+
+# Install runtime dependencies
+# Note: libpython3.11 is needed by @cubejs-backend/native even if not using .py configs
+RUN DEBIAN_FRONTEND=noninteractive \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends libssl3 libpython3.11 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN yarn policies set-version v1.22.22
+
+ENV NODE_ENV=production
+
+WORKDIR /cube
+
+# Copy built node_modules from builder
+COPY --from=builder /cube/node_modules ./node_modules
+COPY --from=builder /cube/package.json ./package.json
+
+# By default Node doesn't search in parent directory from /cube/conf
+ENV NODE_PATH=/cube/conf/node_modules:/cube/node_modules
+ENV PYTHONUNBUFFERED=1
+
+# Create symlinks for CLI tools
+RUN ln -s /cube/node_modules/.bin/cubejs /usr/local/bin/cubejs
+RUN ln -s /cube/node_modules/.bin/cubestore-dev /usr/local/bin/cubestore-dev
+
+WORKDIR /cube/conf
+
+EXPOSE 4000
+
+CMD ["cubejs", "server"]
+

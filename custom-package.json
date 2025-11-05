@@ -1,0 +1,18 @@
+{
+  "name": "cube-minimal",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@cubejs-backend/server": "1.5.1",
+    "@cubejs-backend/oracle-driver": "1.5.1",
+    "@cubejs-backend/postgres-driver": "1.5.1",
+    "cubejs-cli": "1.5.1",
+    "typescript": "~5.2.2"
+  },
+  "resolutions": {
+    "colors": "1.4.0",
+    "form-data": "^4.0.4",
+    "lodash": "^4.17.0"
+  }
+}
+
