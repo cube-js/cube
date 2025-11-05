@@ -55,24 +55,26 @@ subsecond latency. Consider tuning the concurrency and quotas to achieve that.
 
 ### Date hierarchies
 
-By default, the MDX API creates additional hierarchies for all [time dimensions][ref-time-dimensions] and organizing them in a separate folder called "Calendar" for each dimension.
-This creates a Calendar hierarchy structure containing `Year`, `Quarter`, `Month`, `Week`, and `Day` levels, as well as Calendar Quarter of Year and Calendar Year hierarchies.
+By default, the MDX API creates additional hierarchies for all [time dimensions][ref-time-dimensions] and organizes them in a separate folder called "Calendar" for each dimension.
+The following hierarchies are created:
 
 ```
 - Dimension Calendar:
   - Year
   - Quarter
   - Month
-  - Week
   - Day
+- Dimension Calendar Weeks:
+  - Year
+  - Week
 - Dimension Calendar Quarter of Year:
   - Quarter
-- Dimension Calendar Year
+- Dimension Calendar Year:
   - Year
 ```
 
-These hierarchies are particularly useful in Excel because they allow you to filter your data without needing to drill down or expand all levels.
-Additionally, you can combine Calendar Year or Calendar Quarter of Year as filters while placing other dimensions on the axis.
+The **Calendar Quarter of Year** and **Calendar Year** hierarchies are particularly useful in Excel because they allow you to filter your data without needing to drill down or expand all levels.
+You can use them as slicers while placing other dimensions on the axes.
 
 You can set the `CUBE_MDX_CREATE_DATE_HIERARCHIES` environment variable to `false` to disable this behavior.
 
