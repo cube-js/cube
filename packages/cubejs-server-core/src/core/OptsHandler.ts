@@ -686,10 +686,7 @@ export class OptsHandler {
     clone.preAggregationsOptions.externalRefresh =
       clone.preAggregationsOptions.externalRefresh !== undefined
         ? clone.preAggregationsOptions.externalRefresh
-        : (
-          !this.isPreAggsBuilder() ||
-          clone.rollupOnlyMode && !this.configuredForScheduledRefresh()
-        );
+        : !this.isPreAggsBuilder();
 
     clone.preAggregationsOptions.maxPartitions =
       clone.preAggregationsOptions.maxPartitions !== undefined
