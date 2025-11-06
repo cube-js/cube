@@ -111,6 +111,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "cubeshared",
+ "flatbuffers",
  "indexmap",
  "itertools",
  "neon",
