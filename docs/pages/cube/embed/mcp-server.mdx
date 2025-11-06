@@ -1,0 +1,78 @@
+# MCP Server
+
+_Model Context Protocol server for Cube AI agent integration._
+
+The Cube MCP (Model Context Protocol) Server provides seamless integration with AI assistants like Claude Desktop and Cursor, enabling direct chat functionality with Cube's AI agent for analytics and data exploration.
+
+## What is MCP?
+
+Model Context Protocol (MCP) is an open standard that enables AI assistants to securely connect to external data sources and tools. The Cube MCP Server acts as a bridge between your AI assistant and Cube's analytics platform, allowing you to ask data questions directly from your coding environment.
+
+
+## Tools Available
+
+- **chat**: Interactive chat with Cube AI agent for analytics and data exploration with streaming real-time responses
+
+## Installation & Setup
+
+### Prerequisites
+
+Before setting up the MCP server, ensure you have:
+
+- **Admin privileges** in your Cube instance
+- An active Cube tenant
+- Claude Desktop or Cursor installed
+
+### 1. Obtain Required Credentials
+
+You'll need four key pieces of information:
+
+#### CUBE_API_KEY
+
+- Go to <Btn>Admin → API Keys</Btn> to create and manage API keys
+- Create a new API key for your Cube organization  
+- For detailed instructions, see our [API Keys documentation](../api-keys.mdx)
+
+#### CUBE_TENANT_NAME 
+- Your tenant name from the URL (e.g., 'acme' in `https://acme.cubecloud.dev`)
+
+#### CUBE_AGENT_ID
+- Go to <Btn>Admin → Agent → Click on Agent</Btn> to find the Agent ID
+
+#### USER_ID
+- Can be the email address of a registered user in your Cube instance
+- Or any custom unique identifier for unregistered users
+- This helps identify and personalize responses from the AI agent
+
+## Configuration
+
+
+Add the following configuration to your Claude Desktop or Cursor MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "cube-mcp-server": {
+      "command": "npx",
+      "args": ["@cube-dev/mcp-server"],
+      "env": {
+        "CUBE_API_KEY": "your_api_key_here",
+        "CUBE_TENANT_NAME": "your_tenant_name",
+        "CUBE_AGENT_ID": "your_agent_id",
+        "USER_ID": "user@example.com"
+      }
+    }
+  }
+}
+```
+
+## Usage Examples
+
+Once configured, you can interact with Cube's AI agent directly from your AI assistant:
+
+Ask natural language questions about your data:
+
+- "Show me revenue trends for the last 6 months"
+- "What are our top-performing products this quarter?"  
+- "How does customer acquisition compare year-over-year?"
+

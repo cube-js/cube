@@ -1,0 +1,158 @@
+# Agent Rules
+
+_Understanding Agent Rules configuration and behavior in Cube._
+
+Agent Rules in Cube provide a powerful way to customize and control how AI agents behave within specific spaces. Rules act as contextual instructions that guide agents' responses and analysis, ensuring consistent behavior aligned with your business logic and domain expertise.
+
+## Rule Types
+
+### Always Rules
+
+**Always Rules** are automatically applied to every agent interaction within the space, regardless of the specific query or context.
+
+**Use Cases:**
+- Fundamental business definitions and context
+- Consistent calculation methods
+- Default analysis approaches
+- Domain-specific terminology
+
+**Example Always Rules:**
+```
+Sales efficiency is deal size divided by sales cycle length
+```
+
+```
+When analyzing customer data, always consider seasonality patterns from our retail business
+```
+
+```
+Revenue should be calculated using our standard GAAP accounting principles
+```
+
+### Agent Requested Rules
+
+**Agent Requested** rules are conditionally applied when the agent determines they are relevant to the current query or analysis. The agent intelligently selects which rules to use based on the context.
+
+**Use Cases:**
+- Specialized analysis techniques
+- Context-specific guidance
+- Advanced calculation methods
+- Scenario-specific instructions
+
+**Example Agent Requested Rules:**
+```
+If you asked to analyze sales efficiency start with correlation to WSE
+```
+
+```
+For customer segmentation analysis, use RFM methodology (Recency, Frequency, Monetary)
+```
+
+```
+When analyzing marketing performance, compare against industry benchmarks where available
+```
+
+## Best Practices
+
+### Rule Hierarchy and Organization
+
+- **Start with Always rules** for fundamental business context
+- **Use Agent Requested rules** for specialized scenarios
+- **Keep rules specific and actionable** rather than vague
+- **Test rules** with actual queries to ensure they work as expected
+
+### Writing Effective Rules
+
+✅ **Good Rule Examples:**
+- "Customer churn rate should be calculated as customers lost / total customers at start of period"
+- "When analyzing quarterly performance, always compare against same quarter previous year"
+- "For financial analysis, use our fiscal year starting in October"
+
+❌ **Poor Rule Examples:**
+- "Be helpful" (too vague)
+- "Always be accurate" (redundant)
+- "Consider all factors" (too broad)
+
+### Domain-Specific Rules
+
+**E-commerce Example:**
+```
+Always Rule: "Customer lifetime value equals average order value × purchase frequency × customer lifespan"
+Agent Requested: "For cart abandonment analysis, segment by device type and traffic source"
+```
+
+**SaaS Example:**
+```
+Always Rule: "MRR growth rate should exclude one-time charges and setup fees"
+Agent Requested: "When analyzing churn, differentiate between voluntary and involuntary churn"
+```
+
+### Contextual Guidance
+
+Rules should provide context that agents might not inherently understand about your business:
+
+```
+Always Rule: "Our peak season is Q4, with 40% of annual revenue typically occurring in December"
+Agent Requested: "For inventory analysis, consider our 6-week lead time for international suppliers"
+```
+
+## Rule Conflicts and Resolution
+
+### How Cube Handles Conflicting Rules
+
+Based on the rule configuration system, when multiple rules could apply to the same query, the conflict resolution strategy would likely include:
+
+1. **Rule type hierarchy** (specific behavior needs verification)
+2. **Rule specificity** - more specific rules typically override general ones
+3. **Rule order** - the system may consider rule creation order or explicit priority
+4. **Agent decision-making** for complementary vs conflicting guidance
+
+### Example Conflict Scenarios
+
+**Scenario 1: Direct Contradiction**
+```
+Rule A (Always): "Revenue recognition follows monthly billing cycles"
+Rule B (Always): "Revenue should be recognized quarterly"
+
+Resolution: The agent will flag this conflict and may ask for clarification
+```
+
+**Scenario 2: Complementary Rules**
+```
+Rule A (Always): "Sales efficiency is deal size divided by sales cycle length"
+Rule B (Agent Requested): "When analyzing sales efficiency, include pipeline velocity metrics"
+
+Resolution: Both rules work together - B provides additional context to A
+```
+
+**Scenario 3: Specificity Override**
+```
+Rule A (Always): "Use standard deviation for all variance calculations"
+Rule B (Agent Requested): "For customer behavior analysis, use median absolute deviation instead of standard deviation"
+
+Resolution: Rule B takes precedence for customer behavior queries due to higher specificity
+```
+
+### Best Practices for Avoiding Conflicts
+
+1. **Review existing rules** before adding new ones
+2. **Use specific triggers** in Agent Requested rules
+3. **Test rule combinations** with sample queries
+4. **Document rule intentions** clearly
+5. **Regular rule audits** to identify and resolve conflicts
+
+## Current Limitations
+
+### Current State: Space-Level Rules Only, Always Rules Only
+
+- Rules are currently configured at the **Space level**
+- All agents within a space inherit the same set of rules
+- Individual agent customization is not yet available
+
+## Getting Started
+
+1. **Assess Your Use Case**: Identify the key business context and calculations your agents need to understand
+2. **Start Simple**: Begin with 2-3 Always rules covering your most important business definitions
+3. **Add Specificity**: Implement Agent Requested rules for specialized scenarios
+4. **Test and Iterate**: Use real queries to validate rule effectiveness
+5. **Scale Gradually**: Add more rules based on actual usage patterns and feedback
