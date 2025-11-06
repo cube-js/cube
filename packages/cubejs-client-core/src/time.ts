@@ -217,11 +217,16 @@ export const dayRange = (from: any, to: any, annotations?: Record<string, { gran
         const intervalParsed = parseSqlInterval(customGranularity.interval);
         let intervalStart = internalDayjs(from);
 
-        // If custom granularity has an origin, align to it
-        if (customGranularity.origin) {
-          let origin = internalDayjs(customGranularity.origin);
-          if (customGranularity.offset) {
-            origin = addInterval(origin, parseSqlInterval(customGranularity.offset));
+        // origin and offset are mutually exclusive
+        // If either is specified, align to it
+        if (customGranularity.origin || customGranularity.offset) {
+          let origin;
+          if (customGranularity.origin) {
+            // Absolute origin time
+            origin = internalDayjs(customGranularity.origin);
+          } else {
+            // offset is relative to start of year
+            origin = addInterval(internalDayjs().startOf('year'), parseSqlInterval(customGranularity.offset!));
           }
 
           // Align the value to the origin to find the actual bucket start
