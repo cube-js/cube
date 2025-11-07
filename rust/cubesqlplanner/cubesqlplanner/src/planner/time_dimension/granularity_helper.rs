@@ -13,7 +13,6 @@ use std::rc::Rc;
 pub struct GranularityHelper {}
 
 impl GranularityHelper {
-    // TODO implement the aka same logic but with td symbols
     pub fn min_granularity(
         granularity_a: &Option<String>,
         granularity_b: &Option<String>,
@@ -291,6 +290,50 @@ impl GranularityHelper {
                 "Time dimension \"{}\" has no granularity specified",
                 time_dimension.full_name()
             )))
+        }
+    }
+
+    pub fn min_granularity_for_time_dimensions(
+        time_dimension_a: &Rc<TimeDimensionSymbol>,
+        time_dimension_b: &Rc<TimeDimensionSymbol>,
+    ) -> Result<Option<String>, CubeError> {
+        let granularity_a = time_dimension_a.granularity();
+        let granularity_b = time_dimension_b.granularity();
+
+        if let (Some(gran_a), Some(gran_b)) = (granularity_a, granularity_b) {
+            let a_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_a.clone())?;
+            let b_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_b.clone())?;
+
+            let diff_position = a_hierarchy
+                .iter()
+                .zip(b_hierarchy.iter())
+                .find_position(|(a, b)| a != b);
+
+            if let Some((diff_position, _)) = diff_position {
+                if diff_position == 0 {
+                    Err(CubeError::user(format!(
+                        "Can't find common parent for '{}' and '{}'",
+                        gran_a, gran_b
+                    )))
+                } else {
+                    // Return the granularity before the first difference
+                    Ok(Some(a_hierarchy[diff_position - 1].clone()))
+                }
+            } else {
+                // One hierarchy is a prefix of the other or they are identical
+                // Return the last element of the shorter hierarchy
+                if a_hierarchy.len() >= b_hierarchy.len() {
+                    Ok(Some(b_hierarchy.last().unwrap().clone()))
+                } else {
+                    Ok(Some(a_hierarchy.last().unwrap().clone()))
+                }
+            }
+        } else if granularity_a.is_some() {
+            Ok(granularity_a.clone())
+        } else if granularity_b.is_some() {
+            Ok(granularity_b.clone())
+        } else {
+            Ok(None)
         }
     }
 }
