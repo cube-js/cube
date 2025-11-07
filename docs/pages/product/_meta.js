@@ -7,6 +7,7 @@ module.exports = {
   "auth": "Access control",
   "apis-integrations": "APIs & integrations",
   "workspace": "Workspace",
+  "agentic-analytics": "Agentic analytics",
   "deployment": "Deployment",
   "distribution": "Distribution"
 }
