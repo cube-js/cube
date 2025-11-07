@@ -217,6 +217,7 @@ impl<'a> DimensionMatcher<'a> {
                     Ok(MatchState::NotMatched)
                 }
             } else {
+                // TODO implement here or teach GranularityHelper::min_granularity() to process custom granularity
                 Ok(MatchState::NotMatched) //TODO Custom granularities!!!
             }
         } else {

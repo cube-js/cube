@@ -13,6 +13,7 @@ use std::rc::Rc;
 pub struct GranularityHelper {}
 
 impl GranularityHelper {
+    // TODO implement the aka same logic but with td symbols
     pub fn min_granularity(
         granularity_a: &Option<String>,
         granularity_b: &Option<String>,
@@ -63,6 +64,7 @@ impl GranularityHelper {
             .fold(first, |acc, d| -> Result<_, CubeError> {
                 match acc {
                     Ok(min_dim) => {
+                        // TODO: Add support for custom granularities comparison
                         let min_granularity = Self::min_granularity(
                             &min_dim.resolved_granularity()?,
                             &d.resolved_granularity()?,
