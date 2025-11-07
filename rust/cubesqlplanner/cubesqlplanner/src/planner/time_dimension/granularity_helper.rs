@@ -253,4 +253,44 @@ impl GranularityHelper {
         };
         Ok(granularity_obj)
     }
+
+    // Returns the granularity hierarchy for a td granularity.
+    // Note: for custom granularities, returns [...standard_hierarchy_for_min_granularity, granularity_name].
+    // custom granularity is at the end of the array, in BaseQuery.js it's first.
+    pub fn time_dimension_granularity_hierarchy(
+        time_dimension: Rc<TimeDimensionSymbol>,
+    ) -> Result<Vec<String>, CubeError> {
+        let granularity = time_dimension.granularity();
+
+        if let Some(granularity_name) = granularity {
+            if Self::is_predefined_granularity(granularity_name) {
+                Ok(Self::granularity_parents(granularity_name)?.clone())
+            } else {
+                if let Some(granularity_obj) = time_dimension.granularity_obj() {
+                    let min_granularity = granularity_obj.min_granularity()?;
+
+                    if let Some(min_gran) = min_granularity {
+                        let mut standard_hierarchy = Self::granularity_parents(&min_gran)?.clone();
+                        let custom = vec![granularity_name.clone()];
+                        standard_hierarchy.extend(custom.clone());
+                        Ok(standard_hierarchy)
+                    } else {
+                        // Safeguard: if no min_granularity, just return the custom granularity name
+                        Ok(vec![granularity_name.clone()])
+                    }
+                } else {
+                    // No granularity object but has a name - shouldn't happen, but handle gracefully
+                    Err(CubeError::internal(format!(
+                        "Time dimension has granularity '{}' but no granularity object",
+                        granularity_name
+                    )))
+                }
+            }
+        } else {
+            Err(CubeError::internal(format!(
+                "Time dimension \"{}\" has no granularity specified",
+                time_dimension.full_name()
+            )))
+        }
+    }
 }
