@@ -1,0 +1,103 @@
+# Spaces, agents, models
+
+_Understanding the core concepts of Spaces, Agents, and Models in Cube._
+
+Cube is an agentic analytics platform that combines AI agents with semantic data modeling to create intelligent, automated analytics experiences. This guide explains the three fundamental concepts that form the foundation of Cube: **Spaces**, **Agents**, and **Models**.
+
+## Core Concepts
+
+### 1. **Spaces** (Agent Spaces)
+
+**Agent Spaces** are isolated environments where AI agents operate and share context, rules, and [memories][ref-agent-memories]. Think of them as "workspaces" or "projects" that contain everything an agent needs to work effectively.
+
+#### Key Characteristics:
+
+- **Isolation**: Each space is completely isolated from others
+- **Shared Context**: Agents within a space share rules, memories, and configurations
+- **Ownership**: Spaces can be owned by users or shared across teams
+- **Configuration**: Each space has its own settings and behavior rules
+
+#### What Lives in a Space:
+
+- **Agent Rules**: Instructions that guide how agents behave
+- **Memories**: Shared knowledge and past interactions
+- **Certified Queries**: Pre-approved, trusted queries
+- **Context**: Business logic and domain expertise
+
+#### Example Use Cases:
+
+- **Sales Analytics Space**: Contains sales-specific rules, KPIs, and historical analysis
+- **Marketing Space**: Focused on campaign performance, customer segmentation
+- **Finance Space**: Revenue analysis, budgeting, and financial reporting
+
+### 2. **Agents** (AI Agents)
+
+**Agents** are AI-powered assistants that can understand natural language, execute complex tasks, and interact with your data models. They're the "workers" that operate within spaces to help users achieve their analytics goals.
+
+#### Key Characteristics:
+
+- **Intelligent**: Can understand context and make decisions
+- **Tool-Enabled**: Have access to various tools for data manipulation
+- **Memory-Aware**: Can learn from past interactions
+- **Specialized**: Can be configured for specific tasks or domains
+
+#### Agent Capabilities:
+
+- **Data Analysis**: Query and analyze data using natural language
+- **Model Building**: Create and modify semantic models
+- **Report Generation**: Build charts, dashboards, and reports
+- **Code Generation**: Write and modify Cube model files
+- **Workflow Automation**: Execute multi-step analytical processes
+
+#### Memory Modes:
+
+- **User Mode**: Memories are isolated per user
+- **Space Mode**: Memories are shared within the space
+- **Disabled**: No memory is stored
+
+### 3. **Models** (LLM Models)
+
+**LLM Models** (Large Language Models) are the AI engines that power the agents in Cube. They provide the natural language understanding, reasoning, and generation capabilities that make agents intelligent and conversational.
+
+## How They Work Together
+
+### The Cube Workflow:
+
+1. **Setup**: Create a space and configure [agent rules][ref-agent-rules]
+2. **Deploy**: Connect your data source and build semantic models
+3. **Configure**: Select appropriate LLM models for your agents
+4. **Interact**: Users and agents query data using natural language
+5. **Learn**: Agents build memories and improve over time
+6. **Automate**: Agents can execute complex workflows independently
+
+### Example Interaction:
+
+```
+User: "Show me sales performance by region for Q4"
+
+Agent:
+1. Understands the request (sales, region, Q4)
+2. Queries the semantic model for relevant data
+3. Applies business rules from the space
+4. Generates a chart or report
+5. Stores the interaction in memory for future reference
+```
+
+### Space-Agent-Model Relationship:
+
+```
+Space (Sales Analytics)
+├── Rules: "Revenue = quantity × price"
+├── Memories: Past Q4 analyses
+├── Agents:
+│   ├── Sales Analyst Agent (Claude 3.5 Sonnet v2)
+│   └── Report Builder Agent (GPT-4o)
+└── LLM Models:
+    ├── Claude 3.5 Sonnet v2 (Analytical reasoning)
+    ├── Claude 3.7 Sonnet Thinking (Complex analysis)
+    └── GPT-4o (Code generation)
+```
+
+
+[ref-agent-memories]: /product/agentic-analytics/memory-isolation
+[ref-agent-rules]: /product/agentic-analytics/agent-rules
