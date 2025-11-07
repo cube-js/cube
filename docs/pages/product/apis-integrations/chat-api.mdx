@@ -537,7 +537,7 @@ The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The i
 - `uuid` (string): Unique identifier for this query result
 - `vegaSpec` (string): Vega-Lite v5 visualization specification as JSON string (when visualization is generated)
 
-#### Loading All Results
+#### Loading all Results
 
 <WarningBox>
 Query results in cubeSqlApi `toolCall.result.data` are limited to **100 rows** by default. Use `totalRows` to check if more data is available.
@@ -545,9 +545,129 @@ Query results in cubeSqlApi `toolCall.result.data` are limited to **100 rows** b
 
 If you need to load all the data, you need to use `sqlQuery` from the results to make a call to the Cube API.
 
-#### Displaying Charts
+#### Displaying charts
 
-The cubeSqlApi tool call returns `vegaSpec` that can be used to display data. Please note, it doesn't contain data. You need to use data from `toolCall.result.data`.
+The `cubeSqlApi` tool call returns `vegaSpec` that can be used to display data.
+
+Note that it doesn't contain data. You need to use the data from `toolCall.result.data`.
+
+#### Styling charts
+
+When rendering Vega charts, you can apply custom styling to match the look and feel of your application.
+This includes adjusting colors, fonts, and other visual elements.
+
+Here's a configuration example that mimics Cube's default styling: 
+
+```json
+{
+  // Your Vega configuration
+
+  "config": {
+    "background": "#ffffff",
+    "padding": 16,
+    "view": {
+      "stroke": "transparent"
+    },
+    "axis": {
+      "domainColor": "#E0E0E0",
+      "gridColor": "#F5F5F5",
+      "grid": true,
+      "labelFont": "Inter, sans-serif",
+      "labelFontSize": 12,
+      "labelColor": "#43436B",
+      "titleFont": "Inter, sans-serif",
+      "titleFontSize": 12,
+      "titleColor": "#43436B",
+      "titlePadding": 8
+    },
+    "numberFormat": "s",
+    "timeFormat": "%Y-%m",
+    "format": {
+      "number": {
+        "format": "s",
+        "formatType": "number"
+      },
+      "time": {
+        "format": "%Y-%m",
+        "formatType": "time"
+      }
+    },
+    "legend": {
+      "labelFont": "Inter, sans-serif",
+      "titleFont": "Inter, sans-serif",
+      "labelColor": "#43436B",
+      "titleColor": "#43436B",
+      "labelFontSize": 12,
+      "titleFontSize": 12,
+      "titlePadding": 8,
+      "padding": 8
+    },
+    "line": {
+      "strokeWidth": 3,
+      "strokeCap": "round",
+      "point": true
+    },
+    "text": {
+      "color": "#43436B"
+    },
+    "point": {
+      "filled": true,
+      "size": 60
+    },
+    "range": {
+      "category": [
+        "#4E79A7",
+        "#F28E2B",
+        "#E15759",
+        "#76B7B2",
+        "#59A14F",
+        "#EDC948",
+        "#B07AA1",
+        "#FF9DA7",
+        "#9C755F",
+        "#BAB0AC"
+      ],
+      "heatmap": [
+        "#eff6ff",
+        "#1e40af"
+      ]
+    },
+    "scale": {
+      "band": {
+        "padding": 0.1,
+        "round": true
+      },
+      "linear": {
+        "nice": true,
+        "zero": true
+      },
+      "ordinal": {
+        "type": "band",
+        "padding": 0.1
+      },
+      "time": {
+        "type": "utc",
+        "nice": true
+      },
+      "log": {
+        "base": 10,
+        "domain": {
+          "data": "table",
+          "field": "x"
+        },
+        "range": {
+          "data": "table",
+          "field": "y"
+        }
+      },
+      "range": [
+        "#4E79A7",
+        "#F28E2B"
+      ]
+    }
+  }
+}
+```
 
 
 #### Error Handling
