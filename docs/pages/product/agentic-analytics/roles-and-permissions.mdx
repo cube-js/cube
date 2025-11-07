@@ -49,8 +49,14 @@ A Viewer role is planned for future implementation with the following capabiliti
 
 Agents are connected to Semantic Model Deployments and inherit the permission level of the user they are operating under.
 
+Each agent can be configured to use the _Restrict Views_ feature which allows to select the views that are visible to the agent.
+This feature should not be used as a security measure. Configure [data access policies][ref-data-access-policies] instead.
+
 ## Typical Usage Scenarios
 
 - Users: Typically data consumers and analysts
 - Developers: Usually data stewards and data engineers
 - Admin: Typically assigned to data engineers managing the entire Cube instance
+
+
+[ref-data-access-policies]: /product/auth/data-access-policies
