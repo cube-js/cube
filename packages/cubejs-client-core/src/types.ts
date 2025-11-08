@@ -115,6 +115,7 @@ export interface Query {
   timezone?: string;
   // @deprecated
   renewQuery?: boolean;
+  cache?: CacheMode;
   ungrouped?: boolean;
   responseFormat?: 'compact' | 'default';
   total?: boolean;
