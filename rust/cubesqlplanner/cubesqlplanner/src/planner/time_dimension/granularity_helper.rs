@@ -1,7 +1,7 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::planner::sql_evaluator::Compiler;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
-use crate::planner::Granularity;
+use crate::planner::{Granularity, QueryDateTimeHelper};
 use chrono::prelude::*;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -80,16 +80,22 @@ impl GranularityHelper {
 
     pub fn granularity_from_interval(interval: &Option<String>) -> Option<String> {
         if let Some(interval) = interval {
-            if interval.contains("day") {
+            if interval.contains("second") {
+                Some("second".to_string())
+            } else if interval.contains("minute") {
+                Some("minute".to_string())
+            } else if interval.contains("hour") {
+                Some("hour".to_string())
+            } else if interval.contains("day") {
+                Some("day".to_string())
+            } else if interval.contains("week") {
                 Some("day".to_string())
             } else if interval.contains("month") {
                 Some("month".to_string())
+            } else if interval.contains("quarter") {
+                Some("month".to_string())
             } else if interval.contains("year") {
                 Some("year".to_string())
-            } else if interval.contains("week") {
-                Some("week".to_string())
-            } else if interval.contains("hour") {
-                Some("hour".to_string())
             } else {
                 None
             }
@@ -200,25 +206,7 @@ impl GranularityHelper {
     }
 
     pub fn parse_date_time(date: &str) -> Result<NaiveDateTime, CubeError> {
-        let formats = &[
-            "%Y-%m-%d",
-            "%Y-%m-%d %H:%M:%S%.f",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S%.f",
-            "%Y-%m-%dT%H:%M:%S",
-        ];
-
-        for format in formats {
-            if let Ok(dt) = NaiveDateTime::parse_from_str(date, format) {
-                return Ok(dt);
-            }
-        }
-
-        if let Ok(d) = NaiveDate::parse_from_str(date, "%Y-%m-%d") {
-            return Ok(d.and_hms_opt(0, 0, 0).unwrap());
-        }
-
-        Err(CubeError::user(format!("Can't parse date: '{}'", date)))
+        QueryDateTimeHelper::parse_native_date_time(date)
     }
 
     pub fn make_granularity_obj(

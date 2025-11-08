@@ -1298,7 +1298,7 @@ class ApiGateway {
     this.log({
       type: 'Query Rewrite completed',
       queryRewriteId,
-      normalizedQueries,
+      normalizedQueries: normalizedQueries.map(q => this.sanitizeQueryForLogging(q)),
       duration: Date.now() - startTime,
       query
     }, context);
@@ -1631,7 +1631,7 @@ class ApiGateway {
           this.log({
             type: 'Load Request SQL',
             duration: this.duration(loadRequestSQLStarted),
-            query: normalizedQueries[index],
+            query: this.sanitizeQueryForLogging(normalizedQueries[index]),
             sqlQuery
           }, context);
 
@@ -1640,6 +1640,12 @@ class ApiGateway {
       )
     );
     return sqlQueries;
+  }
+
+  private sanitizeQueryForLogging(query: NormalizedQuery): NormalizedQuery {
+    const res: NormalizedQuery = { ...query };
+    delete res.cacheMode;
+    return res;
   }
 
   /**
@@ -2169,6 +2175,8 @@ class ApiGateway {
   }
 
   public async contextByReq(req: Request, securityContext, requestId: string): Promise<ExtendedRequestContext> {
+    req.securityContext = securityContext;
+
     const extensions = typeof this.extendContext === 'function' ? await this.extendContext(req) : {};
 
     return {
@@ -2203,7 +2211,7 @@ class ApiGateway {
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
-        query,
+        query: this.sanitizeQueryForLogging(query),
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
@@ -2211,7 +2219,7 @@ class ApiGateway {
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
-        query,
+        query: this.sanitizeQueryForLogging(query),
         error: e.message,
         duration: this.duration(requestStarted),
       }, context);
@@ -2219,7 +2227,7 @@ class ApiGateway {
     } else if (e.error) {
       this.log({
         type: 'Orchestrator error',
-        query,
+        query: this.sanitizeQueryForLogging(query),
         error: e.error,
         duration: this.duration(requestStarted),
       }, context);
@@ -2227,7 +2235,7 @@ class ApiGateway {
     } else if (e.type === 'UserError') {
       this.log({
         type: e.type,
-        query,
+        query: this.sanitizeQueryForLogging(query),
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);

@@ -665,6 +665,8 @@ describe('index.test', () => {
     });
 
     test(testName || `scheduledRefreshTimer option setRefreshWorker: ${paramsToName})}`, async () => {
+      process.env.NODE_ENV = 'production';
+
       if (setRefreshWorker !== undefined) {
         process.env.CUBEJS_REFRESH_WORKER = setRefreshWorker.toString();
       }

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.1](https://github.com/cube-js/cube/compare/v1.5.0...v1.5.1) (2025-11-04)
+
+### Bug Fixes
+
+- **api-gateway:** Make `securityContext` available to `extendContext`, thanks [@morford-brex](https://github.com/morford-brex) ([#10050](https://github.com/cube-js/cube/issues/10050)) ([5a69f7b](https://github.com/cube-js/cube/commit/5a69f7b2ac0e871f5f247440e1eed9d41b92c8a2))
+
 # [1.5.0](https://github.com/cube-js/cube/compare/v1.4.0...v1.5.0) (2025-10-29)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

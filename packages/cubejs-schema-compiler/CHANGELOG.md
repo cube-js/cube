@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.1](https://github.com/cube-js/cube/compare/v1.5.0...v1.5.1) (2025-11-04)
+
+### Bug Fixes
+
+- **clickhouse-driver:** Respect timezone for origin in custom granula… ([#10110](https://github.com/cube-js/cube/issues/10110)) ([2d1b850](https://github.com/cube-js/cube/commit/2d1b850e58c99d32b4dfeabe654cf0659fae8d44))
+- **tesseract:** Prevent duplicate measures in some cases ([#10065](https://github.com/cube-js/cube/issues/10065)) ([b0b011e](https://github.com/cube-js/cube/commit/b0b011efc14cc6ac4e1ecb204c5e0ffabb57f389))
+
 # [1.5.0](https://github.com/cube-js/cube/compare/v1.4.0...v1.5.0) (2025-10-29)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

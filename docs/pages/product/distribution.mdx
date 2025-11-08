@@ -87,6 +87,23 @@ List of LTS releases:
 | `v1.4.x` | Active | October 29, 2026 |
 | `v1.0.x` | End-of-life | October 29, 2025 |
 
+### Documentation
+
+The documentation at [cube.dev/docs](https://cube.dev/docs) always reflects the
+latest released version.
+
+To obtain the documentation for a specific version:
+* Clone the [GitHub repository](https://github.com/cube-js/cube) at the desired tag.
+* Navigate to the `docs` folder and start a local documentation server.
+* Open [localhost:3000](http://localhost:3000) in your browser.
+
+```sh
+git clone --depth 1 --branch v1.5.0 https://github.com/cube-js/cube.git
+cd cube/docs
+yarn && yarn dev
+open http://localhost:3000
+```
+
 
 [link-repo]: https://github.com/cube-js/cube
 [link-license]: https://github.com/cube-js/cube/blob/master/LICENSE

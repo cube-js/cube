@@ -72,23 +72,26 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
             &references_builder,
             &mut context_factory,
         )?;
-        for member in keys_subquery
-            .schema()
-            .all_dimensions()
-            .chain(keys_subquery.primary_keys_dimensions().iter())
-        {
+        for member in keys_subquery.schema().all_dimensions() {
             let alias = member.alias();
-            /* self.builder.process_calc_group(
-                member,
-                &mut context_factory,
-                &keys_subquery.filter().all_filters(),
-            )?; */
             references_builder.resolve_references_for_member(
                 member.clone(),
                 &None,
                 context_factory.render_references_mut(),
             )?;
             select_builder.add_projection_member(member, Some(alias));
+        }
+
+        if !context.dimensions_query {
+            for member in keys_subquery.primary_keys_dimensions().iter() {
+                let alias = member.alias();
+                references_builder.resolve_references_for_member(
+                    member.clone(),
+                    &None,
+                    context_factory.render_references_mut(),
+                )?;
+                select_builder.add_projection_member(member, Some(alias));
+            }
         }
 
         select_builder.set_distinct();
