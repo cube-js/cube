@@ -257,7 +257,7 @@ impl GranularityHelper {
     // Note: for custom granularities, returns [...standard_hierarchy_for_min_granularity, granularity_name].
     // custom granularity is at the end of the array, in BaseQuery.js it's first.
     pub fn time_dimension_granularity_hierarchy(
-        time_dimension: Rc<TimeDimensionSymbol>,
+        time_dimension: &TimeDimensionSymbol,
     ) -> Result<Vec<String>, CubeError> {
         let granularity = time_dimension.granularity();
 
@@ -294,15 +294,15 @@ impl GranularityHelper {
     }
 
     pub fn min_granularity_for_time_dimensions(
-        time_dimension_a: &Rc<TimeDimensionSymbol>,
-        time_dimension_b: &Rc<TimeDimensionSymbol>,
+        time_dimension_a: &TimeDimensionSymbol,
+        time_dimension_b: &TimeDimensionSymbol,
     ) -> Result<Option<String>, CubeError> {
         let granularity_a = time_dimension_a.granularity();
         let granularity_b = time_dimension_b.granularity();
 
         if let (Some(gran_a), Some(gran_b)) = (granularity_a, granularity_b) {
-            let a_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_a.clone())?;
-            let b_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_b.clone())?;
+            let a_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_a)?;
+            let b_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_b)?;
 
             let diff_position = a_hierarchy
                 .iter()
