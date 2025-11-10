@@ -150,6 +150,10 @@ impl MemberSymbol {
         matches!(self, Self::Dimension(_) | Self::TimeDimension(_))
     }
 
+    pub fn is_cube(&self) -> bool {
+        matches!(self, Self::CubeName(_) | Self::CubeTable(_))
+    }
+
     pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         self: &Rc<Self>,
         f: &F,

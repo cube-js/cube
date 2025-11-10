@@ -1,0 +1,183 @@
+use super::symbols::MemberSymbol;
+use super::Compiler;
+use super::{SqlCallDependency, SqlCallNew};
+use crate::cube_bridge::evaluator::CubeEvaluator;
+use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::security_context::SecurityContext;
+use crate::planner::sql_evaluator::TimeDimensionSymbol;
+use crate::planner::GranularityHelper;
+use cubenativeutils::CubeError;
+use std::rc::Rc;
+
+pub struct SqlCallBuilder<'a> {
+    compiler: &'a mut Compiler,
+    cube_evaluator: Rc<dyn CubeEvaluator>,
+    security_context: Rc<dyn SecurityContext>,
+}
+
+impl<'a> SqlCallBuilder<'a> {
+    pub fn new(
+        compiler: &'a mut Compiler,
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        security_context: Rc<dyn SecurityContext>,
+    ) -> Self {
+        Self {
+            compiler,
+            cube_evaluator,
+            security_context,
+        }
+    }
+
+    pub fn build(
+        mut self,
+        cube_name: &String,
+        member_sql: Rc<dyn MemberSql>,
+    ) -> Result<SqlCallNew, CubeError> {
+        let (template, template_args) =
+            member_sql.compile_template_sql(self.security_context.clone())?;
+
+        let deps = template_args
+            .symbol_paths
+            .iter()
+            .map(|path| self.build_dependency(cube_name, path))
+            .collect::<Result<Vec<_>, _>>()?;
+        let result = SqlCallNew::builder()
+            .template(template)
+            .deps(deps)
+            .filter_params(template_args.filter_params.clone())
+            .filter_groups(template_args.filter_groups.clone())
+            .security_context(template_args.security_context.clone())
+            .build();
+        Ok(result)
+    }
+
+    fn build_dependency(
+        &mut self,
+        current_cube_name: &String,
+        dep_path: &Vec<String>,
+    ) -> Result<SqlCallDependency, CubeError> {
+        assert!(!dep_path.is_empty());
+
+        self.process_dependency_item(current_cube_name, dep_path, vec![])
+            .map_err(|e| CubeError::user(format!("Error in `{}`: {}", dep_path.join("."), e)))
+    }
+
+    fn process_dependency_item(
+        &mut self,
+        current_cube_name: &String,
+        path_tail: &[String],
+        mut processed_path: Vec<String>,
+    ) -> Result<SqlCallDependency, CubeError> {
+        assert!(!path_tail.is_empty());
+        if let Some(cube_name) = self.get_cube_name(&current_cube_name, &path_tail[0])? {
+            if path_tail.len() == 1 {
+                let result = SqlCallDependency {
+                    path: processed_path,
+                    symbol: self.compiler.add_cube_name_evaluator(cube_name)?,
+                };
+                return Ok(result);
+            }
+            if path_tail.len() == 2 && path_tail[1] == "__sql_fn" {
+                let result = SqlCallDependency {
+                    path: processed_path,
+                    symbol: self.compiler.add_cube_table_evaluator(cube_name.clone())?,
+                };
+                return Ok(result);
+            }
+            processed_path.push(current_cube_name.clone());
+            return self.process_dependency_item(&cube_name, &path_tail[1..], processed_path);
+        }
+
+        let member_symbol = self.build_evaluator(&current_cube_name, &path_tail[0])?;
+        if let Ok(dimension) = member_symbol.as_dimension() {
+            if dimension.dimension_type() == "time" && path_tail.len() == 2 {
+                let granularity = &path_tail[1];
+                if let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
+                    self.cube_evaluator.clone(),
+                    self.compiler,
+                    &current_cube_name,
+                    &path_tail[0],
+                    Some(granularity.clone()),
+                )? {
+                    let time_dim_symbol =
+                        MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+                            member_symbol,
+                            Some(granularity.clone()),
+                            Some(granularity_obj),
+                            None,
+                        ));
+                    let result = SqlCallDependency {
+                        path: processed_path,
+                        symbol: time_dim_symbol,
+                    };
+                    return Ok(result);
+                } else {
+                    return Err(CubeError::user(format!(
+                        "Undefined granularity {} for time dimension {}",
+                        granularity, path_tail[0]
+                    )));
+                }
+            }
+        }
+
+        if path_tail.len() > 1 {
+            return Err(CubeError::user(format!(
+                "Undefined property {}",
+                path_tail[0]
+            )));
+        }
+        let result = SqlCallDependency {
+            path: processed_path,
+            symbol: member_symbol,
+        };
+        Ok(result)
+    }
+
+    fn get_cube_symbol(
+        &mut self,
+        current_cube_symbol: &Rc<MemberSymbol>,
+        cube_name: &String,
+    ) -> Result<Option<Rc<MemberSymbol>>, CubeError> {
+        if self.is_current_cube(cube_name) {
+            Ok(Some(current_cube_symbol.clone()))
+        } else if self.cube_evaluator.cube_exists(cube_name.clone())? {
+            let cube_symbol = self.compiler.add_cube_table_evaluator(cube_name.clone())?;
+            Ok(Some(cube_symbol))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn get_cube_name(
+        &mut self,
+        current_cube: &String,
+        cube_name: &String,
+    ) -> Result<Option<String>, CubeError> {
+        if self.is_current_cube(cube_name) {
+            Ok(Some(current_cube.clone()))
+        } else if self.cube_evaluator.cube_exists(cube_name.clone())? {
+            Ok(Some(cube_name.clone()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn is_current_cube(&self, name: &str) -> bool {
+        match name {
+            "CUBE" | "TABLE" => true,
+            _ => false,
+        }
+    }
+
+    fn build_evaluator(
+        &mut self,
+        current_cube_name: &String,
+        name: &String,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let dep_full_name = format!("{}.{}", current_cube_name, name);
+        let res = self
+            .compiler
+            .add_auto_resolved_member_evaluator(dep_full_name.clone())?;
+        Ok(res)
+    }
+}

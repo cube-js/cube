@@ -96,9 +96,6 @@ impl<'a> DependenciesBuilder<'a> {
         cube_name: String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<Dependency>, CubeError> {
-        println!("!!!! =====================");
-        let test = member_sql.into_template_sql(self.security_context.clone())?;
-        println!("!!!! test: {:?}", test);
         self.new_build_develop(cube_name.clone(), member_sql.clone())?;
         let call_deps = if member_sql.need_deps_resolve() {
             self.cube_evaluator

@@ -4,6 +4,8 @@ use super::{
     security_context::{NativeSecurityContext, SecurityContext},
     sql_utils::{NativeSqlUtils, SqlUtils},
 };
+use crate::planner::sql_evaluator::{FilterGroupItem, FilterParamsItem, SecutityContextProps};
+use crate::utils::UniqueVector;
 use cubenativeutils::wrappers::make_proxy;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
 use cubenativeutils::wrappers::serializer::{
@@ -18,53 +20,61 @@ use std::collections::hash_map::HashMap;
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell, rc::Weak};
 
-#[derive(Clone, Debug)]
-pub struct TemplatedSql {
-    pub args: HashMap<Vec<String>, usize>,
-    pub template: String,
+// Extension trait для дедупликации элементов в Vec
+trait VecDedup<T> {
+    fn insert_or_get_index(&mut self, item: T) -> usize;
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct FilterParamsItem {
-    pub cube_name: String,
-    pub name: String,
-    pub column: String,
+impl<T: PartialEq> VecDedup<T> for Vec<T> {
+    fn insert_or_get_index(&mut self, item: T) -> usize {
+        if let Some((index, _)) = self.iter().enumerate().find(|(_, itm)| *itm == &item) {
+            index
+        } else {
+            let index = self.len();
+            self.push(item);
+            index
+        }
+    }
 }
 
 #[derive(Default, Clone, Debug)]
-struct FilterGroupItem {
+pub struct SqlTemplateArgs {
+    pub symbol_paths: Vec<Vec<String>>,
     pub filter_params: Vec<FilterParamsItem>,
-}
-
-#[derive(Default, Clone, Debug)]
-struct SecutityContextProps {
-    pub values: Vec<String>,
-}
-
-#[derive(Default, Clone, Debug)]
-struct ProxyStateInner {
-    pub args: HashMap<Vec<String>, usize>,
-    pub filter_params: Vec<(FilterParamsItem, usize)>,
-    pub filter_groups: Vec<(FilterGroupItem, usize)>,
+    pub filter_groups: Vec<FilterGroupItem>,
     pub security_context: SecutityContextProps,
 }
 
+impl SqlTemplateArgs {
+    pub fn insert_symbol_path(&mut self, path: Vec<String>) -> usize {
+        self.symbol_paths.unique_insert(path)
+    }
+
+    pub fn insert_filter_params(&mut self, params: FilterParamsItem) -> usize {
+        self.filter_params.unique_insert(params)
+    }
+
+    pub fn insert_filter_group(&mut self, group: FilterGroupItem) -> usize {
+        self.filter_groups.unique_insert(group)
+    }
+
+    pub fn insert_security_context_value(&mut self, value: String) -> usize {
+        self.security_context.values.unique_insert(value)
+    }
+}
+
 struct ProxyState {
-    state: RefCell<ProxyStateInner>,
+    state: RefCell<SqlTemplateArgs>,
 }
 
 impl ProxyState {
     fn new() -> Rc<Self> {
         Rc::new(Self {
-            state: RefCell::new(ProxyStateInner::default()),
+            state: RefCell::new(SqlTemplateArgs::default()),
         })
     }
 
-    fn get_args(self: &Rc<Self>) -> Result<HashMap<Vec<String>, usize>, CubeError> {
-        self.with_state(|state| state.args.clone())
-    }
-
-    fn get_state(self: &Rc<Self>) -> Result<ProxyStateInner, CubeError> {
+    fn get_args(self: &Rc<Self>) -> Result<SqlTemplateArgs, CubeError> {
         self.with_state(|state| state.clone())
     }
 
@@ -76,7 +86,7 @@ impl ProxyState {
 
     fn with_state<T, F>(&self, f: F) -> Result<T, CubeError>
     where
-        F: FnOnce(&ProxyStateInner) -> T,
+        F: FnOnce(&SqlTemplateArgs) -> T,
     {
         let state = self
             .state
@@ -86,7 +96,7 @@ impl ProxyState {
     }
     fn with_state_mut<T, F>(&self, f: F) -> Result<T, CubeError>
     where
-        F: FnOnce(&mut ProxyStateInner) -> T,
+        F: FnOnce(&mut SqlTemplateArgs) -> T,
     {
         let mut state = self
             .state
@@ -102,19 +112,9 @@ struct ProxyStateWeak {
 }
 
 impl ProxyStateWeak {
-    fn with_state<T, F>(&self, f: F) -> Result<T, CubeError>
-    where
-        F: FnOnce(&ProxyStateInner) -> T,
-    {
-        let state = self.state.upgrade().ok_or(CubeError::internal(format!(
-            "Cant upgrade dependency parsing state"
-        )))?;
-        state.with_state(f)
-    }
-
     fn with_state_mut<T, F>(&self, f: F) -> Result<T, CubeError>
     where
-        F: FnOnce(&mut ProxyStateInner) -> T,
+        F: FnOnce(&mut SqlTemplateArgs) -> T,
     {
         let state = self.state.upgrade().ok_or(CubeError::internal(format!(
             "Cant upgrade dependency parsing state"
@@ -122,16 +122,8 @@ impl ProxyStateWeak {
         state.with_state_mut(f)
     }
 
-    fn add_arg(&self, path: &Vec<String>) -> Result<usize, CubeError> {
-        self.with_state_mut(|state| {
-            if let Some(ind) = state.args.get(path) {
-                ind.clone()
-            } else {
-                let ind = state.args.len();
-                state.args.insert(path.clone(), ind);
-                ind
-            }
-        })
+    fn insert_symbol_path(&self, path: &Vec<String>) -> Result<usize, CubeError> {
+        self.with_state_mut(|state| state.insert_symbol_path(path.clone()))
     }
 }
 
@@ -160,10 +152,10 @@ pub trait MemberSql {
     fn args_names(&self) -> &Vec<String>;
     fn need_deps_resolve(&self) -> bool;
     fn as_any(self: Rc<Self>) -> Rc<dyn Any>;
-    fn into_template_sql(
+    fn compile_template_sql(
         &self,
         security_context: Rc<dyn SecurityContext>,
-    ) -> Result<TemplatedSql, CubeError>;
+    ) -> Result<(String, SqlTemplateArgs), CubeError>;
 }
 
 pub struct NativeMemberSql<IT: InnerTypes> {
@@ -188,7 +180,7 @@ impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlStruct {
         }
         if let Some(sql_fn) = &self.sql_fn {
             res.set_field(
-                "sql",
+                "__sql_fn",
                 NativeObjectHandle::new(context.to_string_fn(sql_fn.clone())?.into_object()),
             )?;
         }
@@ -253,15 +245,15 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             if prop == "sql" {
                 let mut path_with_sql = path.clone();
                 path_with_sql.push("sql".to_string());
-                let index = proxy_state.add_arg(&path_with_sql)?;
-                let str = format!("{{prop:{}}}", index);
+                let index = proxy_state.insert_symbol_path(&path_with_sql)?;
+                let str = format!("{{arg:{}}}", index);
                 let result = inner_context.to_string_fn(str)?;
                 let result = NativeObjectHandle::new(result.into_object());
                 return Ok(Some(result));
             }
             if prop == "toString" || prop == "valueOf" {
-                let index = proxy_state.add_arg(&path)?;
-                let str = format!("{{prop:{}}}", index);
+                let index = proxy_state.insert_symbol_path(&path)?;
+                let str = format!("{{arg:{}}}", index);
                 let result = inner_context.to_string_fn(str)?;
                 let result = NativeObjectHandle::new(result.into_object());
                 return Ok(Some(result));
@@ -392,7 +384,6 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
         context_holder.make_proxy(Some(base_object), move |inner_context, target, prop| {
             if &prop == "filter" {
-                println!("!!!! AAAAAAA");
                 return Ok(Some(Self::security_context_filter_fn(
                     inner_context.clone(),
                     target.clone(),
@@ -424,7 +415,6 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                 )?));
             }
 
-            println!("!!!! EEEEEE");
             let result = inner_context.empty_struct()?;
             result.set_field(
                 "filter",
@@ -449,45 +439,9 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                 Self::security_context_unsafe_value_fn(inner_context, target.clone())?,
             )?;
             let result = NativeObjectHandle::new(result.into_object());
-            println!("!!!! BBBBBBB");
             Ok(Some(result))
         })
     }
-    /*
-    public static contextSymbolsProxyFrom(symbols: object, allocateParam: (param: unknown) => unknown): object {
-      return new Proxy(symbols, {
-        get: (target, name) => {
-          const propValue = target[name];
-          const methods = (paramValue) => ({
-            filter: (column) => {
-              if (paramValue) {
-                const value = Array.isArray(paramValue) ?
-                  paramValue.map(allocateParam) :
-                  allocateParam(paramValue);
-                if (typeof column === 'function') {
-                  return column(value);
-                } else {
-                  return `${column} = ${value}`;
-                }
-              } else {
-                return '1 = 1';
-              }
-            },
-            requiredFilter: (column) => {
-              if (!paramValue) {
-                throw new UserError(`Filter for ${column} is required`);
-              }
-              return methods(paramValue).filter(column);
-            },
-            unsafeValue: () => paramValue
-          });
-          return methods(target)[name] ||
-            typeof propValue === 'object' && propValue !== null && CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam) ||
-            methods(propValue);
-        }
-      });
-    }
-       */
 
     fn filter_goup_fn<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
@@ -508,11 +462,8 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                     )
                 })?;
             let filter_group = FilterGroupItem { filter_params };
-            let index = proxy_state.with_state_mut(|state| {
-                let i = state.filter_groups.len();
-                state.filter_groups.push((filter_group, i));
-                i
-            })?;
+            let index =
+                proxy_state.with_state_mut(|state| state.insert_filter_group(filter_group))?;
 
             let str = format!("{{fg:{}}}", index);
             Ok(str)
@@ -534,11 +485,8 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         });
         let item_native = item.to_native(context_holder.clone())?;
         let to_string_fn = context_holder.make_function(move |_| {
-            let index = proxy_state.with_state_mut(|state| {
-                let i = state.filter_params.len();
-                state.filter_params.push((item.as_ref().clone(), i));
-                i
-            })?;
+            let index = proxy_state
+                .with_state_mut(|state| state.insert_filter_params(item.as_ref().clone()))?;
 
             let str = format!("{{fp:{}}}", index);
             Ok(str)
@@ -620,15 +568,14 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
         !self.args_names.is_empty()
     }
 
-    fn into_template_sql(
+    fn compile_template_sql(
         &self,
         security_context: Rc<dyn SecurityContext>,
-    ) -> Result<TemplatedSql, CubeError> {
+    ) -> Result<(String, SqlTemplateArgs), CubeError> {
         let state = ProxyState::new();
         let weak_state = state.weak();
         let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
         let mut proxy_args = vec![];
-        println!("!!!! ============");
         for arg in self.args_names.iter().cloned() {
             let proxy_arg = if arg == "FILTER_PARAMS" {
                 Self::filter_params_proxy(context_holder.clone(), weak_state.clone())?
@@ -638,7 +585,6 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
                 || arg == "security_context"
                 || arg == "securityContext"
             {
-                println!("!!! sec context");
                 let context_obj = if let Some(security_context) = security_context
                     .clone()
                     .as_any()
@@ -661,23 +607,12 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
             };
             proxy_args.push(proxy_arg);
         }
-        println!("!!!! ------ {}", proxy_args.len());
         let native_func = self.native_object.to_function()?;
-        println!("!!!! eeeee");
         let evaluation_result = native_func.call(proxy_args)?;
-        println!("!!!! kkkk");
-        if let Ok(t) = Vec::<String>::from_native(evaluation_result.clone()) {
-            println!("!!!! fff {:?}", t);
-        }
         let template = String::from_native(evaluation_result)?;
-        println!("!!!!! state: {:#?}", state.get_state()?);
-        let property_args = state.get_args()?;
-        let result = TemplatedSql {
-            args: property_args,
-            template,
-        };
+        let sql_args = state.get_args()?;
 
-        Ok(result)
+        Ok((template, sql_args))
     }
 }
 
