@@ -10,7 +10,7 @@ use crate::cube_bridge::member_sql::{
 };
 use crate::plan::{Filter, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::sql_nodes::{RawReferenceValue, SqlNodesFactory};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
@@ -198,7 +198,7 @@ impl SqlCall {
                     for itm in items {
                         context_factory.add_render_reference(
                             itm.filter_symbol_name.clone(),
-                            itm.column.clone(),
+                            RawReferenceValue(itm.column.clone()),
                         );
                     }
                     let context = Rc::new(VisitorContext::new(

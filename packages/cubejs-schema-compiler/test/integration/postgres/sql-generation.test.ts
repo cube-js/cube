@@ -3831,7 +3831,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   );
 
   it(
-    'filter group',
+    'filter group 1',
     () => runQueryTest({
       measures: ['visitor_checkins.visitor_checkins_count'],
       dimensions: [],
