@@ -18170,4 +18170,14 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_coerce_string_to_number() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "coerce_string_to_number",
+            execute_query("SELECT COS('0')".to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+
+        Ok(())
+    }
 }
