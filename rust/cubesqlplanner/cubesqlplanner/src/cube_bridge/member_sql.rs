@@ -19,23 +19,6 @@ use std::collections::hash_map::HashMap;
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell, rc::Weak};
 
-// Extension trait для дедупликации элементов в Vec
-trait VecDedup<T> {
-    fn insert_or_get_index(&mut self, item: T) -> usize;
-}
-
-impl<T: PartialEq> VecDedup<T> for Vec<T> {
-    fn insert_or_get_index(&mut self, item: T) -> usize {
-        if let Some((index, _)) = self.iter().enumerate().find(|(_, itm)| *itm == &item) {
-            index
-        } else {
-            let index = self.len();
-            self.push(item);
-            index
-        }
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FilterParamsItem {
     pub cube_name: String,
