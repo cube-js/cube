@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.2](https://github.com/cube-js/cube/compare/v1.5.1...v1.5.2) (2025-11-10)
+
+### Bug Fixes
+
+- **api-gateway:** Sanitize query before logging ([#10120](https://github.com/cube-js/cube/issues/10120)) ([e8db92f](https://github.com/cube-js/cube/commit/e8db92f6bf64a8154ebb34c04375360a3c23f76d))
+
 ## [1.5.1](https://github.com/cube-js/cube/compare/v1.5.0...v1.5.1) (2025-11-04)
 
 ### Bug Fixes

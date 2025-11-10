@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.2](https://github.com/cube-js/cube/compare/v1.5.1...v1.5.2) (2025-11-10)
+
+### Bug Fixes
+
+- **api-gateway:** Sanitize query before logging ([#10120](https://github.com/cube-js/cube/issues/10120)) ([e8db92f](https://github.com/cube-js/cube/commit/e8db92f6bf64a8154ebb34c04375360a3c23f76d))
+- **cubeorchestrator:** Increase VerifierOptions max_tables to 10M ([#10121](https://github.com/cube-js/cube/issues/10121)) ([5b048b2](https://github.com/cube-js/cube/commit/5b048b2e3266e7248751498daa8c1597d8fbced4))
+- Simplify external refresh condition so when pre-aggregation buil… ([#10116](https://github.com/cube-js/cube/issues/10116)) ([4f4a0b4](https://github.com/cube-js/cube/commit/4f4a0b4bbab2069df1496b9a84e54050f0696f8e))
+
+### Features
+
+- **client-core:** add custom granularities support to drilldown() ([#10094](https://github.com/cube-js/cube/issues/10094)) ([5ec1b7d](https://github.com/cube-js/cube/commit/5ec1b7d28fda141208f5196adb8742740299daef))
+- **cubesql:** Coerce strings to any type in functions ([#10126](https://github.com/cube-js/cube/issues/10126)) ([076ae0c](https://github.com/cube-js/cube/commit/076ae0cb4d39b2f7711bfb5492b782b8adce2a3b))
+- **tesseract:** Support custom granularities in pre-aggregations with allow_non_strict_date_range_match=true ([#10092](https://github.com/cube-js/cube/issues/10092)) ([6a8ca2e](https://github.com/cube-js/cube/commit/6a8ca2ea36da43d84f70866113733036fa042a46))
+
 ## [1.5.1](https://github.com/cube-js/cube/compare/v1.5.0...v1.5.1) (2025-11-04)
 
 ### Bug Fixes

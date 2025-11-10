@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.2](https://github.com/cube-js/cube/compare/v1.5.1...v1.5.2) (2025-11-10)
+
+### Bug Fixes
+
+- **cubeorchestrator:** Increase VerifierOptions max_tables to 10M ([#10121](https://github.com/cube-js/cube/issues/10121)) ([5b048b2](https://github.com/cube-js/cube/commit/5b048b2e3266e7248751498daa8c1597d8fbced4))
+
+### Features
+
+- **cubesql:** Coerce strings to any type in functions ([#10126](https://github.com/cube-js/cube/issues/10126)) ([076ae0c](https://github.com/cube-js/cube/commit/076ae0cb4d39b2f7711bfb5492b782b8adce2a3b))
+
 ## [1.5.1](https://github.com/cube-js/cube/compare/v1.5.0...v1.5.1) (2025-11-04)
 
 **Note:** Version bump only for package @cubejs-backend/native
