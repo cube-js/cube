@@ -1,8 +1,8 @@
 use super::symbols::MemberSymbol;
 use super::Compiler;
-use super::{SqlCallDependency, SqlCallNew};
+use super::{SqlCallDependency, SqlCallFilterGroupItem, SqlCallFilterParamsItem, SqlCallNew};
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::member_sql::*;
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::GranularityHelper;
@@ -41,14 +41,50 @@ impl<'a> SqlCallBuilder<'a> {
             .iter()
             .map(|path| self.build_dependency(cube_name, path))
             .collect::<Result<Vec<_>, _>>()?;
+
+        let filter_params = template_args
+            .filter_params
+            .iter()
+            .map(|itm| self.build_filter_params_item(itm))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let filter_groups = template_args
+            .filter_groups
+            .iter()
+            .map(|itm| self.build_filter_group_item(itm))
+            .collect::<Result<Vec<_>, _>>()?;
+
         let result = SqlCallNew::builder()
             .template(template)
             .deps(deps)
-            .filter_params(template_args.filter_params.clone())
-            .filter_groups(template_args.filter_groups.clone())
+            .filter_params(filter_params)
+            .filter_groups(filter_groups)
             .security_context(template_args.security_context.clone())
             .build();
         Ok(result)
+    }
+
+    fn build_filter_params_item(
+        &mut self,
+        item: &FilterParamsItem,
+    ) -> Result<SqlCallFilterParamsItem, CubeError> {
+        let filter_symbol = self.build_evaluator(&item.cube_name, &item.name)?;
+        Ok(SqlCallFilterParamsItem {
+            filter_symbol,
+            column: item.column.clone(),
+        })
+    }
+
+    fn build_filter_group_item(
+        &mut self,
+        item: &FilterGroupItem,
+    ) -> Result<SqlCallFilterGroupItem, CubeError> {
+        let filter_params = item
+            .filter_params
+            .iter()
+            .map(|itm| self.build_filter_params_item(itm))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(SqlCallFilterGroupItem { filter_params })
     }
 
     fn build_dependency(

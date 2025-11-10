@@ -4,7 +4,6 @@ use super::{
     security_context::{NativeSecurityContext, SecurityContext},
     sql_utils::{NativeSqlUtils, SqlUtils},
 };
-use crate::planner::sql_evaluator::{FilterGroupItem, FilterParamsItem, SecutityContextProps};
 use crate::utils::UniqueVector;
 use cubenativeutils::wrappers::make_proxy;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
@@ -35,6 +34,23 @@ impl<T: PartialEq> VecDedup<T> for Vec<T> {
             index
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FilterParamsItem {
+    pub cube_name: String,
+    pub name: String,
+    pub column: String,
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
+pub struct FilterGroupItem {
+    pub filter_params: Vec<FilterParamsItem>,
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct SecutityContextProps {
+    pub values: Vec<String>,
 }
 
 #[derive(Default, Clone, Debug)]
