@@ -19,6 +19,23 @@ use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
+pub struct SqlCallArg;
+
+impl SqlCallArg {
+    pub fn dependency(i: usize) -> String {
+        format!("{{arg:{}}}", i)
+    }
+    pub fn filter_param(i: usize) -> String {
+        format!("{{fp:{}}}", i)
+    }
+    pub fn filter_group(i: usize) -> String {
+        format!("{{fg:{}}}", i)
+    }
+    pub fn security_value(i: usize) -> String {
+        format!("{{sv:{}}}", i)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SqlCallDependency {
     pub path: Vec<String>,

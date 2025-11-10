@@ -4,6 +4,7 @@ use super::{
     security_context::{NativeSecurityContext, SecurityContext},
     sql_utils::{NativeSqlUtils, SqlUtils},
 };
+use crate::planner::sql_evaluator::SqlCallArg;
 use crate::utils::UniqueVector;
 use cubenativeutils::wrappers::make_proxy;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
@@ -245,14 +246,14 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                 let mut path_with_sql = path.clone();
                 path_with_sql.push("sql".to_string());
                 let index = proxy_state.insert_symbol_path(&path_with_sql)?;
-                let str = format!("{{arg:{}}}", index);
+                let str = SqlCallArg::dependency(index);
                 let result = inner_context.to_string_fn(str)?;
                 let result = NativeObjectHandle::new(result.into_object());
                 return Ok(Some(result));
             }
             if prop == "toString" || prop == "valueOf" {
                 let index = proxy_state.insert_symbol_path(&path)?;
-                let str = format!("{{arg:{}}}", index);
+                let str = SqlCallArg::dependency(index);
                 let result = inner_context.to_string_fn(str)?;
                 let result = NativeObjectHandle::new(result.into_object());
                 return Ok(Some(result));
@@ -276,7 +277,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             state.security_context.values.push(value.clone());
             i
         })?;
-        Ok(format!("{{sc_value:{}}}", index))
+        Ok(SqlCallArg::security_value(index))
     }
 
     fn security_context_filter_fn<CIT: InnerTypes>(
@@ -464,7 +465,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             let index =
                 proxy_state.with_state_mut(|state| state.insert_filter_group(filter_group))?;
 
-            let str = format!("{{fg:{}}}", index);
+            let str = SqlCallArg::filter_group(index);
             Ok(str)
         })?;
         Ok(NativeObjectHandle::new(result.into_object()))
@@ -487,7 +488,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             let index = proxy_state
                 .with_state_mut(|state| state.insert_filter_params(item.as_ref().clone()))?;
 
-            let str = format!("{{fp:{}}}", index);
+            let str = SqlCallArg::filter_param(index);
             Ok(str)
         })?;
         let result = context_holder.empty_struct()?;
