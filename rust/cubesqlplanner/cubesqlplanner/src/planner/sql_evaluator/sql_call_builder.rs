@@ -1,6 +1,6 @@
 use super::symbols::MemberSymbol;
 use super::Compiler;
-use super::{SqlCallDependency, SqlCallFilterGroupItem, SqlCallFilterParamsItem, SqlCallNew};
+use super::{SqlCall, SqlCallDependency, SqlCallFilterGroupItem, SqlCallFilterParamsItem};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::*;
 use crate::cube_bridge::security_context::SecurityContext;
@@ -32,7 +32,7 @@ impl<'a> SqlCallBuilder<'a> {
         mut self,
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
-    ) -> Result<SqlCallNew, CubeError> {
+    ) -> Result<SqlCall, CubeError> {
         let (template, template_args) =
             member_sql.compile_template_sql(self.security_context.clone())?;
 
@@ -54,8 +54,8 @@ impl<'a> SqlCallBuilder<'a> {
             .map(|itm| self.build_filter_group_item(itm))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let result = SqlCallNew::builder()
-            .template(template)
+        let result = SqlCall::builder()
+            .template(template.clone())
             .deps(deps)
             .filter_params(filter_params)
             .filter_groups(filter_groups)
@@ -68,9 +68,8 @@ impl<'a> SqlCallBuilder<'a> {
         &mut self,
         item: &FilterParamsItem,
     ) -> Result<SqlCallFilterParamsItem, CubeError> {
-        let filter_symbol = self.build_evaluator(&item.cube_name, &item.name)?;
         Ok(SqlCallFilterParamsItem {
-            filter_symbol,
+            filter_symbol_name: format!("{}.{}", item.cube_name, item.name),
             column: item.column.clone(),
         })
     }
@@ -105,6 +104,7 @@ impl<'a> SqlCallBuilder<'a> {
         mut processed_path: Vec<String>,
     ) -> Result<SqlCallDependency, CubeError> {
         assert!(!path_tail.is_empty());
+        processed_path.push(current_cube_name.clone());
         if let Some(cube_name) = self.get_cube_name(&current_cube_name, &path_tail[0])? {
             if path_tail.len() == 1 {
                 let result = SqlCallDependency {
@@ -120,7 +120,6 @@ impl<'a> SqlCallBuilder<'a> {
                 };
                 return Ok(result);
             }
-            processed_path.push(current_cube_name.clone());
             return self.process_dependency_item(&cube_name, &path_tail[1..], processed_path);
         }
 
@@ -167,21 +166,6 @@ impl<'a> SqlCallBuilder<'a> {
             symbol: member_symbol,
         };
         Ok(result)
-    }
-
-    fn get_cube_symbol(
-        &mut self,
-        current_cube_symbol: &Rc<MemberSymbol>,
-        cube_name: &String,
-    ) -> Result<Option<Rc<MemberSymbol>>, CubeError> {
-        if self.is_current_cube(cube_name) {
-            Ok(Some(current_cube_symbol.clone()))
-        } else if self.cube_evaluator.cube_exists(cube_name.clone())? {
-            let cube_symbol = self.compiler.add_cube_table_evaluator(cube_name.clone())?;
-            Ok(Some(cube_symbol))
-        } else {
-            Ok(None)
-        }
     }
 
     fn get_cube_name(

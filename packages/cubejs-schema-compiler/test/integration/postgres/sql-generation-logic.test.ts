@@ -382,7 +382,7 @@ describe('SQL Generation', () => {
     })
   `);
 
-  it('filter with operator OR', async () => {
+  it('filter with operator OR 1', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {

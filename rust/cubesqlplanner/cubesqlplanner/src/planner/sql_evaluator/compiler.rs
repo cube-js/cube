@@ -134,21 +134,12 @@ impl Compiler {
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        {
-            let call_builder = SqlCallBuilder::new(
-                self,
-                self.cube_evaluator.clone(),
-                self.security_context.clone(),
-            );
-            let sql_call = call_builder.build(&cube_name, member_sql.clone())?;
-        }
-        let dep_builder = DependenciesBuilder::new(
+        let call_builder = SqlCallBuilder::new(
             self,
             self.cube_evaluator.clone(),
             self.security_context.clone(),
         );
-        let deps = dep_builder.build(cube_name.clone(), member_sql.clone())?;
-        let sql_call = SqlCall::new(member_sql, deps);
+        let sql_call = call_builder.build(&cube_name, member_sql.clone())?;
         Ok(Rc::new(sql_call))
     }
 

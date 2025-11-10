@@ -5,30 +5,69 @@ use super::sql_nodes::SqlNode;
 use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::cube_bridge::base_tools::BaseTools;
-use crate::cube_bridge::member_sql::{ContextSymbolArg, MemberSql, MemberSqlArg, MemberSqlStruct};
+use crate::cube_bridge::member_sql::{
+    ContextSymbolArg, MemberSql, MemberSqlArg, MemberSqlStruct, SecutityContextProps,
+};
 use crate::plan::{Filter, FilterItem};
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use std::rc::Rc;
+use typed_builder::TypedBuilder;
 
-#[derive(Clone)]
-pub struct SqlCall {
-    member_sql: Rc<dyn MemberSql>,
-    deps: Vec<Dependency>,
+pub struct SqlCallArg;
+
+impl SqlCallArg {
+    const ARG_PREFIX: &'static str = "arg";
+    const FILTER_PARAM_PREFIX: &'static str = "fp";
+    const FILTER_GROUP_PREFIX: &'static str = "fg";
+    const SECURITY_VALUE_PREFIX: &'static str = "sv";
+
+    pub fn dependency(i: usize) -> String {
+        format!("{{{}:{}}}", Self::ARG_PREFIX, i)
+    }
+    pub fn filter_param(i: usize) -> String {
+        format!("{{{}:{}}}", Self::FILTER_PARAM_PREFIX, i)
+    }
+    pub fn filter_group(i: usize) -> String {
+        format!("{{{}:{}}}", Self::FILTER_GROUP_PREFIX, i)
+    }
+    pub fn security_value(i: usize) -> String {
+        format!("{{{}:{}}}", Self::SECURITY_VALUE_PREFIX, i)
+    }
 }
 
-impl std::fmt::Debug for SqlCall {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SqlCall").finish()
-    }
+#[derive(Debug, Clone)]
+pub struct SqlCallDependency {
+    pub path: Vec<String>,
+    pub symbol: Rc<MemberSymbol>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SqlCallFilterParamsItem {
+    pub filter_symbol_name: String,
+    pub column: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct SqlCallFilterGroupItem {
+    pub filter_params: Vec<SqlCallFilterParamsItem>,
+}
+
+#[derive(Clone, TypedBuilder, Debug)]
+pub struct SqlCall {
+    template: String,
+    deps: Vec<SqlCallDependency>,
+    filter_params: Vec<SqlCallFilterParamsItem>,
+    filter_groups: Vec<SqlCallFilterGroupItem>,
+    security_context: SecutityContextProps,
 }
 
 impl SqlCall {
-    pub fn new(member_sql: Rc<dyn MemberSql>, deps: Vec<Dependency>) -> Self {
-        Self { member_sql, deps }
-    }
-
     pub fn eval(
         &self,
         visitor: &SqlEvaluatorVisitor,
@@ -36,50 +75,189 @@ impl SqlCall {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let args = self
-            .deps
+        let filter_params = self
+            .filter_params
             .iter()
-            .map(|d| {
-                self.evaluate_single_dep(
-                    &d,
-                    visitor,
-                    node_processor.clone(),
-                    query_tools.clone(),
-                    templates,
-                )
+            .map(|itm| {
+                Self::eval_filter_group(&vec![itm.clone()], visitor, query_tools.clone(), templates)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        self.member_sql.call(args)
-    }
+        let filter_groups = self
+            .filter_groups
+            .iter()
+            .map(|itm| {
+                Self::eval_filter_group(&itm.filter_params, visitor, query_tools.clone(), templates)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-    pub fn is_direct_reference(&self, base_tools: Rc<dyn BaseTools>) -> Result<bool, CubeError> {
-        Ok(self.resolve_direct_reference(base_tools)?.is_some())
-    }
-
-    pub fn resolve_direct_reference(
-        &self,
-        base_tools: Rc<dyn BaseTools>,
-    ) -> Result<Option<Rc<MemberSymbol>>, CubeError> {
-        let dependencies = self.get_dependencies();
-        if dependencies.len() != 1 {
-            return Ok(None);
-        }
-
-        let reference_candidate = dependencies[0].clone();
-
-        let args = self
+        let deps = self
             .deps
             .iter()
-            .map(|d| self.evaluate_single_dep_for_ref_check(&d, base_tools.clone()))
+            .map(|dep| visitor.apply(&dep.symbol, node_processor.clone(), templates))
             .collect::<Result<Vec<_>, _>>()?;
-        let eval_result = self.member_sql.call(args)?;
 
-        let res = if eval_result.trim() == reference_candidate.full_name() {
-            Some(reference_candidate.clone())
+        let context_values = self.eval_security_context_values(&query_tools);
+
+        // Substitute placeholders in template in a single pass
+        Self::substitute_template(
+            &self.template,
+            &deps,
+            &filter_params,
+            &filter_groups,
+            &context_values,
+        )
+    }
+
+    /// Substitute placeholders in template string with computed values in a single pass
+    /// Supports placeholders: {arg:N}, {fp:N}, {fg:N}, {sv:N}
+    fn substitute_template(
+        template: &str,
+        deps: &[String],
+        filter_params: &[String],
+        filter_groups: &[String],
+        security_values: &[String],
+    ) -> Result<String, CubeError> {
+        let mut result = String::with_capacity(template.len());
+        let mut chars = template.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            if ch == '{' {
+                // Found potential placeholder - parse it
+                let mut placeholder = String::new();
+                let mut found_closing = false;
+
+                while let Some(&next_ch) = chars.peek() {
+                    chars.next();
+                    if next_ch == '}' {
+                        found_closing = true;
+                        break;
+                    }
+                    placeholder.push(next_ch);
+                }
+
+                if !found_closing {
+                    // No closing brace - treat as literal text
+                    result.push('{');
+                    result.push_str(&placeholder);
+                    continue;
+                }
+
+                // Parse placeholder format: "type:index"
+                if let Some((typ, idx_str)) = placeholder.split_once(':') {
+                    if let Ok(idx) = idx_str.parse::<usize>() {
+                        let value = match typ {
+                            SqlCallArg::ARG_PREFIX => deps.get(idx),
+                            SqlCallArg::FILTER_PARAM_PREFIX => filter_params.get(idx),
+                            SqlCallArg::FILTER_GROUP_PREFIX => filter_groups.get(idx),
+                            SqlCallArg::SECURITY_VALUE_PREFIX => security_values.get(idx),
+                            _ => None,
+                        };
+
+                        if let Some(val) = value {
+                            result.push_str(val);
+                        } else {
+                            return Err(CubeError::internal(format!(
+                                "Placeholder {{{}:{}}} out of bounds or unknown type",
+                                typ, idx
+                            )));
+                        }
+                    } else {
+                        return Err(CubeError::internal(format!(
+                            "Invalid placeholder index: {}",
+                            idx_str
+                        )));
+                    }
+                } else {
+                    return Err(CubeError::internal(format!(
+                        "Invalid placeholder format: {{{}}}",
+                        placeholder
+                    )));
+                }
+            } else {
+                result.push(ch);
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn eval_filter_group(
+        items: &[SqlCallFilterParamsItem],
+        visitor: &SqlEvaluatorVisitor,
+        query_tools: Rc<QueryTools>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        if let Some(all_filters) = visitor.all_filters() {
+            if let Some(filter_item) = all_filters.to_filter_item() {
+                let symbols = items
+                    .iter()
+                    .map(|itm| &itm.filter_symbol_name)
+                    .collect_vec();
+                if let Some(subtree) = filter_item.find_subtree_for_members(&symbols) {
+                    let mut context_factory = SqlNodesFactory::new();
+                    for itm in items {
+                        context_factory.add_render_reference(
+                            itm.filter_symbol_name.clone(),
+                            itm.column.clone(),
+                        );
+                    }
+                    let context = Rc::new(VisitorContext::new(
+                        query_tools.clone(),
+                        &context_factory,
+                        None,
+                    ));
+                    return subtree.to_sql(templates, context);
+                }
+            }
+        }
+        templates.always_true()
+    }
+
+    fn eval_security_context_values(&self, query_tools: &Rc<QueryTools>) -> Vec<String> {
+        self.security_context
+            .values
+            .iter()
+            .map(|itm| query_tools.allocate_param(itm))
+            .collect()
+    }
+
+    pub fn is_direct_reference(&self) -> bool {
+        self.dependencies_count() == 1 && self.template == SqlCallArg::dependency(0)
+    }
+
+    pub fn resolve_direct_reference(&self) -> Option<Rc<MemberSymbol>> {
+        if self.is_direct_reference() {
+            Some(self.deps[0].symbol.clone())
         } else {
             None
-        };
-        Ok(res)
+        }
+    }
+
+    pub fn dependencies_count(&self) -> usize {
+        self.deps.iter().filter(|d| !d.symbol.is_cube()).count()
+    }
+
+    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+        self.deps.iter().map(|d| d.symbol.clone()).collect()
+    }
+
+    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
+        self.deps
+            .iter()
+            .map(|d| (d.symbol.clone(), d.path.clone()))
+            .collect()
+    }
+
+    pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
+        for dep in self.deps.iter() {
+            result.push(dep.symbol.clone())
+        }
+    }
+
+    pub fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
+        for dep in self.deps.iter() {
+            result.push((dep.symbol.clone(), dep.path.clone()))
+        }
     }
 
     pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
@@ -88,424 +266,8 @@ impl SqlCall {
     ) -> Result<Rc<Self>, CubeError> {
         let mut result = self.clone();
         for dep in result.deps.iter_mut() {
-            match dep {
-                Dependency::SymbolDependency(dep) => {
-                    *dep = dep.apply_recursive(f)?;
-                }
-                Dependency::CubeDependency(cube_dep) => {
-                    *cube_dep = self.apply_recursive_to_cube_dep(cube_dep, f)?;
-                }
-                Dependency::TimeDimensionDependency(dep) => {
-                    dep.base_symbol = dep.base_symbol.apply_recursive(f)?;
-                    for (_, granularity) in dep.granularities.iter_mut() {
-                        *granularity = granularity.apply_recursive(f)?;
-                    }
-                }
-                Dependency::ContextDependency(_) => {}
-            }
+            dep.symbol = dep.symbol.apply_recursive(f)?;
         }
         Ok(Rc::new(result))
-    }
-
-    pub fn apply_recursive_to_cube_dep<
-        F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
-    >(
-        &self,
-        cube_dep: &CubeDependency,
-        f: &F,
-    ) -> Result<CubeDependency, CubeError> {
-        let mut result = cube_dep.clone();
-        for (_, v) in result.properties.iter_mut() {
-            match v {
-                CubeDepProperty::SymbolDependency(dep) => *dep = dep.apply_recursive(f)?,
-                CubeDepProperty::TimeDimensionDependency(dep) => {
-                    dep.base_symbol = dep.base_symbol.apply_recursive(f)?;
-                    for (_, granularity) in dep.granularities.iter_mut() {
-                        *granularity = granularity.apply_recursive(f)?;
-                    }
-                }
-                CubeDepProperty::CubeDependency(cube_dep) => {
-                    *cube_dep = self.apply_recursive_to_cube_dep(cube_dep, f)?;
-                }
-            };
-        }
-        Ok(result)
-    }
-
-    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
-        let mut deps = Vec::new();
-        self.extract_symbol_deps(&mut deps);
-        deps
-    }
-
-    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
-        let mut deps = Vec::new();
-        self.extract_symbol_deps_with_path(&mut deps);
-        deps
-    }
-
-    pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
-        for dep in self.deps.iter() {
-            match dep {
-                Dependency::SymbolDependency(dep) => result.push(dep.clone()),
-                Dependency::CubeDependency(cube_dep) => {
-                    self.extract_symbol_deps_from_cube_dep(cube_dep, result)
-                }
-                Dependency::TimeDimensionDependency(dep) => {
-                    for (_, granularity) in dep.granularities.iter() {
-                        result.push(granularity.clone());
-                    }
-                }
-                Dependency::ContextDependency(_) => {}
-            }
-        }
-    }
-
-    pub fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
-        for dep in self.deps.iter() {
-            match dep {
-                Dependency::SymbolDependency(dep) => result.push((dep.clone(), vec![])),
-                Dependency::TimeDimensionDependency(dep) => {
-                    for (_, granularity) in dep.granularities.iter() {
-                        result.push((granularity.clone(), vec![]));
-                    }
-                }
-                Dependency::CubeDependency(cube_dep) => {
-                    self.extract_symbol_deps_with_path_from_cube_dep(cube_dep, vec![], result)
-                }
-                Dependency::ContextDependency(_) => {}
-            }
-        }
-    }
-
-    pub fn extract_cube_deps(&self, result: &mut Vec<String>) {
-        for dep in self.deps.iter() {
-            match dep {
-                Dependency::SymbolDependency(_) => {}
-                Dependency::TimeDimensionDependency(_) => {}
-                Dependency::CubeDependency(cube_dep) => {
-                    self.extract_cube_deps_from_cube_dep(cube_dep, result)
-                }
-                Dependency::ContextDependency(_) => {}
-            }
-        }
-    }
-
-    fn extract_symbol_deps_from_cube_dep(
-        &self,
-        cube_dep: &CubeDependency,
-        result: &mut Vec<Rc<MemberSymbol>>,
-    ) {
-        for (_, v) in cube_dep.properties.iter() {
-            match v {
-                CubeDepProperty::SymbolDependency(dep) => result.push(dep.clone()),
-                CubeDepProperty::TimeDimensionDependency(dep) => {
-                    for (_, granularity) in dep.granularities.iter() {
-                        result.push(granularity.clone());
-                    }
-                }
-                CubeDepProperty::CubeDependency(cube_dep) => {
-                    self.extract_symbol_deps_from_cube_dep(cube_dep, result)
-                }
-            };
-        }
-    }
-
-    fn extract_symbol_deps_with_path_from_cube_dep(
-        &self,
-        cube_dep: &CubeDependency,
-        mut path: Vec<String>,
-        result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>,
-    ) {
-        path.push(cube_dep.cube_symbol.cube_name());
-        if let Some(sql_fn) = &cube_dep.sql_fn {
-            result.push((sql_fn.clone(), path.clone()));
-        }
-        if let Some(to_string_fn) = &cube_dep.to_string_fn {
-            result.push((to_string_fn.clone(), path.clone()));
-        }
-        for (_, v) in cube_dep.properties.iter() {
-            match v {
-                CubeDepProperty::SymbolDependency(dep) => result.push((dep.clone(), path.clone())),
-                CubeDepProperty::TimeDimensionDependency(dep) => {
-                    for (_, granularity) in dep.granularities.iter() {
-                        result.push((granularity.clone(), path.clone()));
-                    }
-                }
-                CubeDepProperty::CubeDependency(cube_dep) => {
-                    self.extract_symbol_deps_with_path_from_cube_dep(cube_dep, path.clone(), result)
-                }
-            };
-        }
-    }
-
-    fn extract_cube_deps_from_cube_dep(&self, cube_dep: &CubeDependency, result: &mut Vec<String>) {
-        result.push(cube_dep.cube_symbol.name());
-
-        for (_, v) in cube_dep.properties.iter() {
-            if let CubeDepProperty::CubeDependency(cube_dep) = v {
-                self.extract_cube_deps_from_cube_dep(cube_dep, result)
-            };
-        }
-    }
-
-    //TODO temporary solution, should be removed after refactoring
-    fn evaluate_single_dep_for_ref_check(
-        &self,
-        dep: &Dependency,
-        base_tools: Rc<dyn BaseTools>,
-    ) -> Result<MemberSqlArg, CubeError> {
-        match dep {
-            Dependency::SymbolDependency(dep) => Ok(MemberSqlArg::String(dep.full_name())),
-            Dependency::TimeDimensionDependency(dep) => {
-                self.evaluate_time_dimesion_dep_for_ref_check(dep)
-            }
-            Dependency::CubeDependency(dep) => self.evaluate_cube_dep_for_ref_check(dep),
-            Dependency::ContextDependency(dep) => match dep {
-                ContextSymbolDep::SecurityContext => Ok(MemberSqlArg::ContextSymbol(
-                    ContextSymbolArg::SecurityContext(base_tools.security_context_for_rust()?),
-                )),
-                ContextSymbolDep::FilterParams => {
-                    let r = base_tools.filters_proxy_for_rust(None)?;
-                    Ok(MemberSqlArg::ContextSymbol(ContextSymbolArg::FilterParams(
-                        r,
-                    )))
-                }
-                ContextSymbolDep::FilterGroup => {
-                    let r = base_tools.filter_group_function_for_rust(None)?;
-                    Ok(MemberSqlArg::ContextSymbol(ContextSymbolArg::FilterGroup(
-                        r,
-                    )))
-                }
-                ContextSymbolDep::SqlUtils => Ok(MemberSqlArg::ContextSymbol(
-                    ContextSymbolArg::SqlUtils(base_tools.sql_utils_for_rust()?),
-                )),
-            },
-        }
-    }
-
-    //TODO temporary solution, should be removed after refactoring
-    fn evaluate_cube_dep_for_ref_check(
-        &self,
-        dep: &CubeDependency,
-    ) -> Result<MemberSqlArg, CubeError> {
-        let mut res = MemberSqlStruct::default();
-        if let Some(sql_fn) = &dep.sql_fn {
-            res.sql_fn = Some(sql_fn.full_name());
-        }
-        if let Some(to_string_fn) = &dep.to_string_fn {
-            res.to_string_fn = Some(to_string_fn.full_name());
-        }
-        for (k, v) in dep.properties.iter() {
-            let prop_res = match v {
-                CubeDepProperty::SymbolDependency(dep) => MemberSqlArg::String(dep.full_name()),
-
-                CubeDepProperty::TimeDimensionDependency(dep) => {
-                    self.evaluate_time_dimesion_dep_for_ref_check(dep)?
-                }
-
-                CubeDepProperty::CubeDependency(dep) => {
-                    self.evaluate_cube_dep_for_ref_check(&dep)?
-                }
-            };
-            res.properties.insert(k.clone(), prop_res);
-        }
-        Ok(MemberSqlArg::Struct(res))
-    }
-
-    fn evaluate_time_dimesion_dep_for_ref_check(
-        &self,
-        dep: &TimeDimensionDependency,
-    ) -> Result<MemberSqlArg, CubeError> {
-        let mut res = MemberSqlStruct::default();
-        for (k, v) in dep.granularities.iter() {
-            let arg = MemberSqlArg::String(v.full_name());
-            res.properties.insert(k.clone(), arg);
-        }
-        Ok(MemberSqlArg::Struct(res))
-    }
-
-    fn evaluate_single_dep(
-        &self,
-        dep: &Dependency,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<MemberSqlArg, CubeError> {
-        match dep {
-            Dependency::SymbolDependency(dep) => Ok(MemberSqlArg::String(visitor.apply(
-                dep,
-                node_processor.clone(),
-                templates,
-            )?)),
-            Dependency::TimeDimensionDependency(dep) => {
-                self.evaluate_time_dimesion_dep(dep, visitor, node_processor.clone(), templates)
-            }
-            Dependency::CubeDependency(dep) => self.evaluate_cube_dep(
-                dep,
-                visitor,
-                node_processor.clone(),
-                query_tools.clone(),
-                templates,
-            ),
-            Dependency::ContextDependency(contex_symbol) => {
-                self.apply_context_symbol(visitor, contex_symbol, query_tools.clone())
-            }
-        }
-    }
-
-    fn evaluate_cube_dep(
-        &self,
-        dep: &CubeDependency,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        query_tools: Rc<QueryTools>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<MemberSqlArg, CubeError> {
-        let mut res = MemberSqlStruct::default();
-        if let Some(sql_fn) = &dep.sql_fn {
-            res.sql_fn = Some(visitor.apply(sql_fn, node_processor.clone(), templates)?);
-        }
-        if let Some(to_string_fn) = &dep.to_string_fn {
-            res.to_string_fn =
-                Some(visitor.apply(to_string_fn, node_processor.clone(), templates)?);
-        }
-        for (k, v) in dep.properties.iter() {
-            let prop_res = match v {
-                CubeDepProperty::SymbolDependency(dep) => {
-                    MemberSqlArg::String(visitor.apply(&dep, node_processor.clone(), templates)?)
-                }
-
-                CubeDepProperty::TimeDimensionDependency(dep) => self.evaluate_time_dimesion_dep(
-                    dep,
-                    visitor,
-                    node_processor.clone(),
-                    templates,
-                )?,
-
-                CubeDepProperty::CubeDependency(dep) => self.evaluate_cube_dep(
-                    &dep,
-                    visitor,
-                    node_processor.clone(),
-                    query_tools.clone(),
-                    templates,
-                )?,
-            };
-            res.properties.insert(k.clone(), prop_res);
-        }
-        Ok(MemberSqlArg::Struct(res))
-    }
-
-    fn evaluate_time_dimesion_dep(
-        &self,
-        dep: &TimeDimensionDependency,
-        visitor: &SqlEvaluatorVisitor,
-        node_processor: Rc<dyn SqlNode>,
-        templates: &PlanSqlTemplates,
-    ) -> Result<MemberSqlArg, CubeError> {
-        let mut res = MemberSqlStruct::default();
-        for (k, v) in dep.granularities.iter() {
-            let arg = MemberSqlArg::String(visitor.apply(&v, node_processor.clone(), templates)?);
-            res.properties.insert(k.clone(), arg);
-        }
-        let string_fn = visitor.apply(&dep.base_symbol, node_processor.clone(), templates)?;
-        res.to_string_fn = Some(string_fn);
-        Ok(MemberSqlArg::Struct(res))
-    }
-
-    pub fn apply_context_symbol(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        context_symbol: &ContextSymbolDep,
-        query_tools: Rc<QueryTools>,
-    ) -> Result<MemberSqlArg, CubeError> {
-        let res = match context_symbol {
-            ContextSymbolDep::SecurityContext => {
-                MemberSqlArg::ContextSymbol(ContextSymbolArg::SecurityContext(
-                    query_tools.base_tools().security_context_for_rust()?,
-                ))
-            }
-            ContextSymbolDep::FilterParams => {
-                let filters = visitor.all_filters();
-                let native_filters = self.filters_to_native_filter_item(filters);
-                let r = query_tools
-                    .base_tools()
-                    .filters_proxy_for_rust(native_filters)?;
-                MemberSqlArg::ContextSymbol(ContextSymbolArg::FilterParams(r))
-            }
-            ContextSymbolDep::FilterGroup => {
-                let filters = visitor.all_filters();
-                let native_filters = self.filters_to_native_filter_item(filters);
-                let r = query_tools
-                    .base_tools()
-                    .filter_group_function_for_rust(native_filters)?;
-                MemberSqlArg::ContextSymbol(ContextSymbolArg::FilterGroup(r))
-            }
-            ContextSymbolDep::SqlUtils => MemberSqlArg::ContextSymbol(ContextSymbolArg::SqlUtils(
-                query_tools.base_tools().sql_utils_for_rust()?,
-            )),
-        };
-        Ok(res)
-    }
-
-    fn filters_to_native_filter_item(
-        &self,
-        filter: Option<Filter>,
-    ) -> Option<Vec<NativeFilterItem>> {
-        if let Some(filter) = filter {
-            let mut res = Vec::new();
-            for item in filter.items.iter() {
-                if let Some(item) = self.filters_to_native_filter_item_impl(item) {
-                    res.push(item);
-                }
-            }
-            Some(res)
-        } else {
-            None
-        }
-    }
-
-    fn filters_to_native_filter_item_impl(
-        &self,
-        filter_item: &FilterItem,
-    ) -> Option<NativeFilterItem> {
-        match filter_item {
-            FilterItem::Group(group) => {
-                let mut native_items = Vec::new();
-                for itm in group.items.iter() {
-                    if let Some(item) = self.filters_to_native_filter_item_impl(itm) {
-                        native_items.push(item);
-                    }
-                }
-                let (or, and) = match group.operator {
-                    crate::plan::filter::FilterGroupOperator::Or => (Some(native_items), None),
-                    crate::plan::filter::FilterGroupOperator::And => (None, Some(native_items)),
-                };
-                Some(NativeFilterItem {
-                    or,
-                    and,
-                    member: None,
-                    dimension: None,
-                    operator: None,
-                    values: None,
-                })
-            }
-            FilterItem::Item(filter) => {
-                if filter.use_raw_values() {
-                    None
-                } else {
-                    Some(NativeFilterItem {
-                        or: None,
-                        and: None,
-                        member: Some(filter.member_name()),
-                        dimension: None,
-                        operator: Some(filter.filter_operator().to_string()),
-                        values: Some(filter.values().clone()),
-                    })
-                }
-            }
-            FilterItem::Segment(_) => None,
-        }
     }
 }

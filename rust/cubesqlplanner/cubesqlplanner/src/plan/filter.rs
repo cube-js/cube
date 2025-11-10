@@ -161,10 +161,7 @@ impl FilterItem {
     /// Returns Some(FilterItem) with the subtree containing only filters for target members
     ///
     /// This only processes AND groups - OR groups are not supported and will return None
-    pub fn find_subtree_for_members(
-        &self,
-        target_members: &[Rc<MemberSymbol>],
-    ) -> Option<FilterItem> {
+    pub fn find_subtree_for_members(&self, target_members: &[&String]) -> Option<FilterItem> {
         match self {
             FilterItem::Group(group) => {
                 // Empty groups return None
@@ -178,9 +175,7 @@ impl FilterItem {
                 // Check if all members in this filter are in the target set
                 let all_members_match = filter_members.iter().all(|member| {
                     target_members.iter().any(|target| {
-                        // Compare by resolved reference chains
-                        member.clone().resolve_reference_chain()
-                            == target.clone().resolve_reference_chain()
+                        &&member.clone().resolve_reference_chain().full_name() == target
                     })
                 });
 
@@ -220,10 +215,10 @@ impl FilterItem {
                 let member = item.member_evaluator();
 
                 // Check if this item's member is in the target set
-                if target_members.iter().any(|target| {
-                    member.clone().resolve_reference_chain()
-                        == target.clone().resolve_reference_chain()
-                }) {
+                if target_members
+                    .iter()
+                    .any(|target| &&member.clone().resolve_reference_chain().full_name() == target)
+                {
                     Some(self.clone())
                 } else {
                     None

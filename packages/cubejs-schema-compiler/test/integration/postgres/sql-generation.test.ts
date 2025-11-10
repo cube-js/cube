@@ -2556,7 +2556,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     });
   });
 
-  it('subquery', async () => {
+  it('subquery 1', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -3114,7 +3114,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     );
   });
 
-  it('security context', async () => {
+  it('security context 1', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {

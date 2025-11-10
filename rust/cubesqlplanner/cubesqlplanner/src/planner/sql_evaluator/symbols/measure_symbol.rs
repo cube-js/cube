@@ -620,7 +620,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         };
 
         let is_sql_is_direct_ref = if let Some(sql) = &sql {
-            sql.is_direct_reference(compiler.base_tools())?
+            sql.is_direct_reference()
         } else {
             false
         };
