@@ -27,9 +27,9 @@ on:
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
-      # To test SQL API Push down
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
+      - 'rust/cubesqlplanner/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
@@ -54,9 +54,9 @@ on:
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
-      # To test SQL API Push down
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
+      - 'rust/cubesqlplanner/**'
   workflow_dispatch:
     inputs:
       use_tesseract_sql_planner:
