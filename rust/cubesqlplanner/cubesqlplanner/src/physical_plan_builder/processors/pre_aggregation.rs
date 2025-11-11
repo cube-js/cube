@@ -96,10 +96,10 @@ impl PreAggregationProcessor<'_> {
                 );
             }
             for dim in pre_aggregation.time_dimensions().iter() {
-                let granularity = if let Ok(td) = dim.as_time_dimension() {
-                    td.granularity().clone()
+                let (alias, granularity) = if let Ok(td) = dim.as_time_dimension() {
+                    (td.base_symbol().alias(), td.granularity().clone())
                 } else {
-                    None
+                    (dim.alias(), None)
                 };
 
                 let name_in_table = PlanSqlTemplates::memeber_alias_name(
@@ -107,12 +107,13 @@ impl PreAggregationProcessor<'_> {
                     &dim.name(),
                     &granularity,
                 );
+
                 let suffix = if let Some(granularity) = granularity {
                     format!("_{}", granularity.clone())
                 } else {
                     "_day".to_string()
                 };
-                let alias = format!("{}{}", dim.alias(), suffix);
+                let alias = format!("{}{}", alias, suffix);
                 select_builder.add_projection_reference_member(
                     &dim,
                     QualifiedColumnName::new(None, name_in_table.clone()),
