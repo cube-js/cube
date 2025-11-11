@@ -33,8 +33,8 @@ impl<'a> SqlCallBuilder<'a> {
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<SqlCall, CubeError> {
-        let (template, template_args) =
-            member_sql.compile_template_sql(self.security_context.clone())?;
+        let (template, template_args) = member_sql
+            .compile_template_sql(self.compiler.base_tools(), self.security_context.clone())?;
 
         let deps = template_args
             .symbol_paths
@@ -93,6 +93,11 @@ impl<'a> SqlCallBuilder<'a> {
     ) -> Result<SqlCallDependency, CubeError> {
         assert!(!dep_path.is_empty());
 
+        println!(
+            "curr_cube_name: {}, dep path: {}",
+            current_cube_name,
+            dep_path.join(".")
+        );
         self.process_dependency_item(current_cube_name, dep_path, vec![])
             .map_err(|e| CubeError::user(format!("Error in `{}`: {}", dep_path.join("."), e)))
     }
@@ -104,8 +109,8 @@ impl<'a> SqlCallBuilder<'a> {
         mut processed_path: Vec<String>,
     ) -> Result<SqlCallDependency, CubeError> {
         assert!(!path_tail.is_empty());
-        processed_path.push(current_cube_name.clone());
         if let Some(cube_name) = self.get_cube_name(&current_cube_name, &path_tail[0])? {
+            processed_path.push(cube_name.clone());
             if path_tail.len() == 1 {
                 let result = SqlCallDependency {
                     path: processed_path,

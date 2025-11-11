@@ -49,6 +49,7 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
             let deserializer = NativeMapDeserializer::<IT>::new(val)?;
             visitor.visit_map(deserializer)
         } else {
+            panic!("des");
             Err(NativeObjSerializerError::Message(
                 "deserializer is not implemented".to_string(),
             ))

@@ -1,5 +1,4 @@
 use super::collectors::JoinHintsCollector;
-use super::dependency::DependenciesBuilder;
 use super::symbols::MemberSymbol;
 use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, MeasureSymbolFactory,

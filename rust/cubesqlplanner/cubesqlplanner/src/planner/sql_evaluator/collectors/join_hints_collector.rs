@@ -85,7 +85,6 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<JoinHintItem>, 
     visitor.apply(node, &())?;
     let mut collected_hints = visitor.extract_result();
 
-    println!("!!!! hints: {:?}", collected_hints);
     let join_map = match node.as_ref() {
         MemberSymbol::Dimension(d) => d.join_map(),
         MemberSymbol::TimeDimension(d) => d.join_map(),

@@ -4,8 +4,8 @@ use super::{
     security_context::{NativeSecurityContext, SecurityContext},
     sql_utils::{NativeSqlUtils, SqlUtils},
 };
-use crate::planner::sql_evaluator::SqlCallArg;
 use crate::utils::UniqueVector;
+use crate::{cube_bridge::base_tools::BaseTools, planner::sql_evaluator::SqlCallArg};
 use cubenativeutils::wrappers::make_proxy;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
 use cubenativeutils::wrappers::serializer::{
@@ -127,33 +127,12 @@ impl ProxyStateWeak {
     }
 }
 
-#[derive(Default)]
-pub struct MemberSqlStruct {
-    pub sql_fn: Option<String>,
-    pub to_string_fn: Option<String>,
-    pub properties: HashMap<String, MemberSqlArg>,
-}
-
-pub enum ContextSymbolArg {
-    SecurityContext(Rc<dyn SecurityContext>),
-    SqlUtils(Rc<dyn SqlUtils>),
-    FilterParams(Rc<dyn FilterParams>),
-    FilterGroup(Rc<dyn FilterGroup>),
-}
-
-pub enum MemberSqlArg {
-    String(String),
-    Struct(MemberSqlStruct),
-    ContextSymbol(ContextSymbolArg),
-}
-
 pub trait MemberSql {
-    fn call(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError>;
     fn args_names(&self) -> &Vec<String>;
-    fn need_deps_resolve(&self) -> bool;
     fn as_any(self: Rc<Self>) -> Rc<dyn Any>;
     fn compile_template_sql(
         &self,
+        base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
     ) -> Result<(String, SqlTemplateArgs), CubeError>;
 }
@@ -161,70 +140,6 @@ pub trait MemberSql {
 pub struct NativeMemberSql<IT: InnerTypes> {
     native_object: NativeObjectHandle<IT>,
     args_names: Vec<String>,
-}
-
-impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlStruct {
-    fn to_native(
-        &self,
-        context: NativeContextHolder<IT>,
-    ) -> Result<NativeObjectHandle<IT>, CubeError> {
-        let res = context.empty_struct()?;
-        for (k, v) in self.properties.iter() {
-            res.set_field(k, v.to_native(context.clone())?)?;
-        }
-        if let Some(to_string_fn) = &self.to_string_fn {
-            res.set_field(
-                "toString",
-                NativeObjectHandle::new(context.to_string_fn(to_string_fn.clone())?.into_object()),
-            )?;
-        }
-        if let Some(sql_fn) = &self.sql_fn {
-            res.set_field(
-                "__sql_fn",
-                NativeObjectHandle::new(context.to_string_fn(sql_fn.clone())?.into_object()),
-            )?;
-        }
-        Ok(NativeObjectHandle::new(res.into_object()))
-    }
-}
-
-impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlArg {
-    fn to_native(
-        &self,
-        context_holder: NativeContextHolder<IT>,
-    ) -> Result<NativeObjectHandle<IT>, CubeError> {
-        let res = match self {
-            MemberSqlArg::String(s) => s.to_native(context_holder.clone()),
-            MemberSqlArg::Struct(s) => s.to_native(context_holder.clone()),
-            MemberSqlArg::ContextSymbol(symbol) => match symbol {
-                ContextSymbolArg::SecurityContext(context) => context
-                    .clone()
-                    .as_any()
-                    .downcast::<NativeSecurityContext<IT>>()
-                    .unwrap()
-                    .to_native(context_holder.clone()),
-                ContextSymbolArg::SqlUtils(context) => context
-                    .clone()
-                    .as_any()
-                    .downcast::<NativeSqlUtils<IT>>()
-                    .unwrap()
-                    .to_native(context_holder.clone()),
-                ContextSymbolArg::FilterParams(params) => params
-                    .clone()
-                    .as_any()
-                    .downcast::<NativeFilterParams<IT>>()
-                    .unwrap()
-                    .to_native(context_holder.clone()),
-                ContextSymbolArg::FilterGroup(group) => group
-                    .clone()
-                    .as_any()
-                    .downcast::<NativeFilterGroup<IT>>()
-                    .unwrap()
-                    .to_native(context_holder.clone()),
-            },
-        }?;
-        Ok(NativeObjectHandle::new(res.into_object()))
-    }
 }
 
 impl<IT: InnerTypes> NativeMemberSql<IT> {
@@ -242,13 +157,16 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         path: Vec<String>,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
         context_holder.make_proxy(None, move |inner_context, _, prop| {
+            println!("!!!! into {}", prop);
             if prop == "sql" {
+                println!("!!!! JJJJJJ");
                 let mut path_with_sql = path.clone();
                 path_with_sql.push("sql".to_string());
                 let index = proxy_state.insert_symbol_path(&path_with_sql)?;
                 let str = SqlCallArg::dependency(index);
                 let result = inner_context.to_string_fn(str)?;
                 let result = NativeObjectHandle::new(result.into_object());
+                println!("!!!! LLLLLL");
                 return Ok(Some(result));
             }
             if prop == "toString" || prop == "valueOf" {
@@ -544,38 +462,20 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
         self.clone()
     }
-    fn call(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
-        if args.len() != self.args_names.len() {
-            return Err(CubeError::internal(format!(
-                "Invalid arguments count for MemberSql call: expected {}, got {}",
-                self.args_names.len(),
-                args.len()
-            )));
-        }
-        let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
-        let native_args = args
-            .into_iter()
-            .map(|a| a.to_native(context_holder.clone()))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let res = self.native_object.to_function()?.call(native_args)?;
-        NativeDeserializer::deserialize::<IT, String>(res)
-    }
     fn args_names(&self) -> &Vec<String> {
         &self.args_names
-    }
-    fn need_deps_resolve(&self) -> bool {
-        !self.args_names.is_empty()
     }
 
     fn compile_template_sql(
         &self,
+        base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
     ) -> Result<(String, SqlTemplateArgs), CubeError> {
         let state = ProxyState::new();
         let weak_state = state.weak();
         let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
         let mut proxy_args = vec![];
+        println!("!!! RRRR");
         for arg in self.args_names.iter().cloned() {
             let proxy_arg = if arg == "FILTER_PARAMS" {
                 Self::filter_params_proxy(context_holder.clone(), weak_state.clone())?
@@ -601,16 +501,28 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
                     weak_state.clone(),
                     context_obj,
                 )?
+            } else if arg == "SQL_UTILS" {
+                base_tools
+                    .sql_utils_for_rust()?
+                    .as_any()
+                    .downcast::<NativeSqlUtils<IT>>()
+                    .unwrap()
+                    .to_native(context_holder.clone())?
             } else {
                 let path = vec![arg];
                 Self::property_proxy(context_holder.clone(), weak_state.clone(), path.clone())?
             };
             proxy_args.push(proxy_arg);
         }
+        println!("!!! KKKKK");
         let native_func = self.native_object.to_function()?;
+        println!("!!! 1111 {}", proxy_args.len());
         let evaluation_result = native_func.call(proxy_args)?;
+        println!("!!! 2222");
         let template = String::from_native(evaluation_result)?;
+        println!("!!! 3333");
         let sql_args = state.get_args()?;
+        println!("!!! templ: {}", template);
 
         Ok((template, sql_args))
     }

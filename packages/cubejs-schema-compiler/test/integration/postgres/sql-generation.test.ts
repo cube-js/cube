@@ -665,8 +665,6 @@ describe('SQL Generation', () => {
     cube('ReferenceVisitors', {
       sql: \`
         select * from \${visitors.sql()} as t
-        WHERE \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter(\`(t.created_at + interval '28 day')\`)} AND
-        \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter((from, to) => \`(t.created_at + interval '28 day') >= \${from} AND (t.created_at + interval '28 day') <= \${to}\`)}
       \`,
 
       measures: {

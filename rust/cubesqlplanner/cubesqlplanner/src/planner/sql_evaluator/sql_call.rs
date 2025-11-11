@@ -1,13 +1,8 @@
-use super::dependency::{
-    ContextSymbolDep, CubeDepProperty, CubeDependency, Dependency, TimeDimensionDependency,
-};
 use super::sql_nodes::SqlNode;
 use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::cube_bridge::base_tools::BaseTools;
-use crate::cube_bridge::member_sql::{
-    ContextSymbolArg, MemberSql, MemberSqlArg, MemberSqlStruct, SecutityContextProps,
-};
+use crate::cube_bridge::member_sql::{MemberSql, SecutityContextProps};
 use crate::plan::{Filter, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::{RawReferenceValue, SqlNodesFactory};

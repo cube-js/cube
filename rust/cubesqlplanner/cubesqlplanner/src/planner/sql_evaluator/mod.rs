@@ -1,6 +1,5 @@
 pub mod collectors;
 pub mod compiler;
-mod dependency;
 pub mod references_builder;
 pub mod sql_call;
 mod sql_call_builder;
@@ -10,7 +9,6 @@ pub mod symbols;
 pub mod visitor;
 
 pub use compiler::Compiler;
-pub use dependency::{CubeDepProperty, Dependency};
 pub use references_builder::ReferencesBuilder;
 pub use sql_call::*;
 pub use sql_visitor::SqlEvaluatorVisitor;
