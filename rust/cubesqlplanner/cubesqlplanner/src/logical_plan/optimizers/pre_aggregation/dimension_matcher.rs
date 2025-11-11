@@ -209,16 +209,21 @@ impl<'a> DimensionMatcher<'a> {
                 found.1 = true;
             }
 
-            let pre_aggr_granularity = &found.0;
+            let pre_agg_td = &found.0;
+            let pre_aggr_granularity = if let Some(pre_agg_td) = pre_agg_td {
+                pre_agg_td.granularity().clone()
+            } else {
+                None
+            };
 
-            if granularity.is_none() || pre_aggr_granularity == &granularity {
+            if granularity.is_none() || pre_aggr_granularity == granularity {
                 Ok(MatchState::Full)
             } else if pre_aggr_granularity.is_none() {
                 Ok(MatchState::NotMatched)
-            } else if let Some(pre_agg_td) = found.2.clone() {
+            } else if let Some(pre_agg_td) = pre_agg_td {
                 let min_granularity = GranularityHelper::min_granularity_for_time_dimensions(
-                    time_dimension,
-                    &pre_agg_td,
+                    (&granularity, time_dimension),
+                    (&pre_aggr_granularity, &pre_agg_td),
                 )?;
 
                 if min_granularity == pre_aggr_granularity {

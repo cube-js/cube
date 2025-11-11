@@ -257,15 +257,15 @@ impl GranularityHelper {
     // Note: for custom granularities, returns [...standard_hierarchy_for_min_granularity, granularity_name].
     // custom granularity is at the end of the array, in BaseQuery.js it's first.
     pub fn time_dimension_granularity_hierarchy(
-        time_dimension: &TimeDimensionSymbol,
+        time_dimension: (&Option<String>, &TimeDimensionSymbol),
     ) -> Result<Vec<String>, CubeError> {
-        let granularity = time_dimension.granularity();
+        let granularity = time_dimension.0.clone();
 
         if let Some(granularity_name) = granularity {
-            if Self::is_predefined_granularity(granularity_name) {
-                Ok(Self::granularity_parents(granularity_name)?.clone())
+            if Self::is_predefined_granularity(&granularity_name) {
+                Ok(Self::granularity_parents(&granularity_name)?.clone())
             } else {
-                if let Some(granularity_obj) = time_dimension.granularity_obj() {
+                if let Some(granularity_obj) = time_dimension.1.granularity_obj() {
                     let min_granularity = granularity_obj.min_granularity()?;
 
                     if let Some(min_gran) = min_granularity {
@@ -288,19 +288,19 @@ impl GranularityHelper {
         } else {
             Err(CubeError::internal(format!(
                 "Time dimension \"{}\" has no granularity specified",
-                time_dimension.full_name()
+                time_dimension.1.full_name()
             )))
         }
     }
 
     pub fn min_granularity_for_time_dimensions(
-        time_dimension_a: &TimeDimensionSymbol,
-        time_dimension_b: &TimeDimensionSymbol,
+        time_dimension_a: (&Option<String>, &TimeDimensionSymbol),
+        time_dimension_b: (&Option<String>, &TimeDimensionSymbol),
     ) -> Result<Option<String>, CubeError> {
-        let granularity_a = time_dimension_a.granularity();
-        let granularity_b = time_dimension_b.granularity();
+        let granularity_a = time_dimension_a.0;
+        let granularity_b = time_dimension_b.0;
 
-        if let (Some(gran_a), Some(gran_b)) = (granularity_a, granularity_b) {
+        if let (Some(gran_a), Some(gran_b)) = (granularity_a.clone(), granularity_b.clone()) {
             let a_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_a)?;
             let b_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_b)?;
 
