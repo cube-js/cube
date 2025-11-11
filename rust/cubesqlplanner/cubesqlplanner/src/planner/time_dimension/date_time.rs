@@ -260,9 +260,9 @@ mod tests {
         let result = date.add_interval(&interval).unwrap().naive_utc();
         assert_eq!(
             result,
-            NaiveDate::from_ymd_opt(2024, 03, 10)
+            NaiveDate::from_ymd_opt(2024, 3, 10)
                 .unwrap()
-                .and_hms_opt(11, 00, 00)
+                .and_hms_opt(11, 0, 0)
                 .unwrap()
         );
 
