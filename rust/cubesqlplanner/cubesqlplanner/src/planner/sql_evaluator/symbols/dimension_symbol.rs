@@ -341,15 +341,27 @@ impl DimensionSymbolFactory {
         cube_evaluator: Rc<dyn CubeEvaluator>,
     ) -> Result<Self, CubeError> {
         let parts: Vec<&str> = full_name.split('.').collect();
-        let member_short_path = if parts.len() > 2 {
-            format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1])
-        } else {
-            full_name.clone()
-        };
+        let mut iter;
+        let member_short_path;
 
-        let mut iter = cube_evaluator
-            .parse_path("dimensions".to_string(), member_short_path.clone())?
-            .into_iter();
+        // try_new might be invoked with next full_name variants:
+        // 1. "cube.member"
+        // 2. "cube.member.granularity" might come from multistage things
+        // 3. "cube.cube.cube...cube.member" might come from pre-agg references (as it include full join paths)
+        // And we can not distinguish between "cube.member.granularity" and "cube.cube.member" here,
+        // so we have to try-catch 2 variants of evaluation.
+        if let Ok(iter_by_start) =
+            cube_evaluator.parse_path("dimensions".to_string(), full_name.clone())
+        {
+            member_short_path = full_name.clone();
+            iter = iter_by_start.into_iter();
+        } else {
+            member_short_path = format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]);
+            iter = cube_evaluator
+                .parse_path("dimensions".to_string(), member_short_path.clone())?
+                .into_iter();
+        }
+
         let cube_name = iter.next().unwrap();
         let name = iter.next().unwrap();
         let granularity = iter.next();
