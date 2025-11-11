@@ -34,8 +34,7 @@ pub struct DimensionMatcher<'a> {
     query_tools: Rc<QueryTools>,
     pre_aggregation: &'a CompiledPreAggregation,
     pre_aggregation_dimensions: HashMap<String, bool>,
-    pre_aggregation_time_dimensions:
-        HashMap<String, (Option<String>, bool, Option<Rc<TimeDimensionSymbol>>)>,
+    pre_aggregation_time_dimensions: HashMap<String, (Option<Rc<TimeDimensionSymbol>>, bool)>,
     result: MatchState,
 }
 
@@ -49,11 +48,12 @@ impl<'a> DimensionMatcher<'a> {
         let pre_aggregation_time_dimensions = pre_aggregation
             .time_dimensions
             .iter()
-            .map(|(dim, granularity)| {
-                (
-                    dim.full_name(),
-                    (granularity.clone(), false, dim.as_time_dimension().ok()),
-                )
+            .map(|dim| {
+                if let Ok(td) = dim.as_time_dimension() {
+                    (td.base_symbol().full_name(), (Some(td), false))
+                } else {
+                    (dim.full_name(), (None, false))
+                }
             })
             .collect::<HashMap<_, _>>();
         Self {
@@ -221,7 +221,7 @@ impl<'a> DimensionMatcher<'a> {
                     &pre_agg_td,
                 )?;
 
-                if &min_granularity == pre_aggr_granularity {
+                if min_granularity == pre_aggr_granularity {
                     Ok(MatchState::Partial)
                 } else {
                     Ok(MatchState::NotMatched)

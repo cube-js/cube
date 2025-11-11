@@ -95,11 +95,17 @@ impl PreAggregationProcessor<'_> {
                     Some(alias),
                 );
             }
-            for (dim, granularity) in pre_aggregation.time_dimensions().iter() {
+            for dim in pre_aggregation.time_dimensions().iter() {
+                let granularity = if let Ok(td) = dim.as_time_dimension() {
+                    td.granularity().clone()
+                } else {
+                    None
+                };
+
                 let name_in_table = PlanSqlTemplates::memeber_alias_name(
                     &item.cube_alias,
                     &dim.name(),
-                    granularity,
+                    &granularity,
                 );
                 let suffix = if let Some(granularity) = granularity {
                     format!("_{}", granularity.clone())
