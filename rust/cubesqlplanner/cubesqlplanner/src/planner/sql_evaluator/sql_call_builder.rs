@@ -101,71 +101,94 @@ impl<'a> SqlCallBuilder<'a> {
         &mut self,
         current_cube_name: &String,
         path_tail: &[String],
-        mut processed_path: Vec<String>,
+        processed_path: Vec<String>,
     ) -> Result<SqlCallDependency, CubeError> {
         assert!(!path_tail.is_empty());
-        if let Some(cube_name) = self.get_cube_name(&current_cube_name, &path_tail[0])? {
-            processed_path.push(cube_name.clone());
-            if path_tail.len() == 1 {
-                let result = SqlCallDependency {
-                    path: processed_path,
-                    symbol: self.compiler.add_cube_name_evaluator(cube_name)?,
-                };
-                return Ok(result);
-            }
-            if path_tail.len() == 2 && path_tail[1] == "__sql_fn" {
-                let result = SqlCallDependency {
-                    path: processed_path,
-                    symbol: self.compiler.add_cube_table_evaluator(cube_name.clone())?,
-                };
-                return Ok(result);
-            }
-            return self.process_dependency_item(&cube_name, &path_tail[1..], processed_path);
-        }
-
-        let member_symbol = self.build_evaluator(&current_cube_name, &path_tail[0])?;
-        if let Ok(dimension) = member_symbol.as_dimension() {
-            if dimension.dimension_type() == "time" && path_tail.len() == 2 {
-                let granularity = &path_tail[1];
-                if let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
-                    self.cube_evaluator.clone(),
-                    self.compiler,
-                    &current_cube_name,
-                    &path_tail[0],
-                    Some(granularity.clone()),
-                )? {
-                    let time_dim_symbol =
-                        MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
-                            member_symbol,
-                            Some(granularity.clone()),
-                            Some(granularity_obj),
-                            None,
-                        ));
-                    let result = SqlCallDependency {
-                        path: processed_path,
-                        symbol: time_dim_symbol,
-                    };
-                    return Ok(result);
-                } else {
-                    return Err(CubeError::user(format!(
-                        "Undefined granularity {} for time dimension {}",
-                        granularity, path_tail[0]
-                    )));
-                }
-            }
-        }
-
-        if path_tail.len() > 1 {
-            return Err(CubeError::user(format!(
+        if let Some(member) = self.try_process_member_dependency_item(
+            current_cube_name,
+            path_tail,
+            processed_path.clone(),
+        ) {
+            Ok(member)
+        } else if let Some(cube_name) = self.get_cube_name(&current_cube_name, &path_tail[0])? {
+            self.process_cube_dependency_item(&cube_name, path_tail, processed_path)
+        } else {
+            Err(CubeError::user(format!(
                 "Undefined property {}",
                 path_tail[0]
-            )));
+            )))
         }
-        let result = SqlCallDependency {
-            path: processed_path,
-            symbol: member_symbol,
-        };
-        Ok(result)
+    }
+
+    fn try_process_member_dependency_item(
+        &mut self,
+        current_cube_name: &String,
+        path_tail: &[String],
+        processed_path: Vec<String>,
+    ) -> Option<SqlCallDependency> {
+        if let Ok(member_symbol) = self.build_evaluator(&current_cube_name, &path_tail[0]) {
+            if let Ok(dimension) = member_symbol.as_dimension() {
+                if dimension.dimension_type() == "time" && path_tail.len() == 2 {
+                    let granularity = &path_tail[1];
+                    if let Ok(Some(granularity_obj)) = GranularityHelper::make_granularity_obj(
+                        self.cube_evaluator.clone(),
+                        self.compiler,
+                        &current_cube_name,
+                        &path_tail[0],
+                        Some(granularity.clone()),
+                    ) {
+                        let time_dim_symbol =
+                            MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+                                member_symbol,
+                                Some(granularity.clone()),
+                                Some(granularity_obj),
+                                None,
+                            ));
+                        let result = SqlCallDependency {
+                            path: processed_path,
+                            symbol: time_dim_symbol,
+                        };
+                        return Some(result);
+                    } else {
+                        return None;
+                    }
+                }
+            }
+            if path_tail.len() > 1 {
+                return None;
+            }
+            let result = SqlCallDependency {
+                path: processed_path,
+                symbol: member_symbol,
+            };
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    fn process_cube_dependency_item(
+        &mut self,
+        cube_name: &String,
+        path_tail: &[String],
+        mut processed_path: Vec<String>,
+    ) -> Result<SqlCallDependency, CubeError> {
+        processed_path.push(cube_name.clone());
+        if path_tail.len() == 1 {
+            let result = SqlCallDependency {
+                path: processed_path,
+                symbol: self.compiler.add_cube_name_evaluator(cube_name.clone())?,
+            };
+            return Ok(result);
+        }
+        if path_tail.len() == 2 && path_tail[1] == "__sql_fn" {
+            let result = SqlCallDependency {
+                path: processed_path,
+                symbol: self.compiler.add_cube_table_evaluator(cube_name.clone())?,
+            };
+            return Ok(result);
+        }
+        self.process_dependency_item(&cube_name, &path_tail[1..], processed_path)
     }
 
     fn get_cube_name(
@@ -180,6 +203,14 @@ impl<'a> SqlCallBuilder<'a> {
         } else {
             Ok(None)
         }
+    }
+
+    //TODO Temporary solution while we haven't all symbols in rust side
+    fn is_member(&self, cube_name: &String, name: &String) -> Result<bool, CubeError> {
+        let path = vec![cube_name.clone(), name.clone()];
+        Ok(self.cube_evaluator.is_measure(path.clone())?
+            || self.cube_evaluator.is_dimension(path.clone())?
+            || self.cube_evaluator.is_segment(path.clone())?)
     }
 
     fn is_current_cube(&self, name: &str) -> bool {

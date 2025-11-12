@@ -127,7 +127,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             );
             let disable_external_pre_aggregations =
                 self.request.disable_external_pre_aggregations();
-            /* if let Some(result) = pre_aggregation_optimizer
+            if let Some(result) = pre_aggregation_optimizer
                 .try_optimize(plan.clone(), disable_external_pre_aggregations)?
             {
                 if pre_aggregation_optimizer.get_used_pre_aggregations().len() == 1 {
@@ -139,9 +139,9 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                     //TODO multiple pre-aggregations sources required changes in BaseQuery
                     (plan.clone(), Vec::new())
                 }
-            } else { */
-            (plan.clone(), Vec::new())
-            //}
+            } else {
+                (plan.clone(), Vec::new())
+            }
         } else {
             (plan.clone(), Vec::new())
         };

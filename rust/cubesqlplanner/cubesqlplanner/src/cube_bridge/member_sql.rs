@@ -11,15 +11,39 @@ use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
-use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeString};
 use cubenativeutils::wrappers::{make_proxy, NativeContextHolderRef};
+use cubenativeutils::wrappers::{NativeArray, NativeContextHolder};
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::HashMap;
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell, rc::Weak};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SqlTemplate {
+    String(String),
+    StringVec(Vec<String>),
+}
+
+impl<IT: InnerTypes> NativeDeserialize<IT> for SqlTemplate {
+    fn from_native(v: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
+        if let Ok(vec) = v.to_array() {
+            let mut result = vec![];
+            for v in vec.to_vec()? {
+                let string_value = v.convert_to_string()?;
+
+                result.push(string_value);
+            }
+            Ok(SqlTemplate::StringVec(result))
+        } else {
+            let val = v.convert_to_string()?;
+
+            Ok(SqlTemplate::String(val))
+        }
+    }
+}
 
 #[derive(Clone)]
 pub enum FilterParamsColumn {
@@ -284,7 +308,7 @@ pub trait MemberSql {
         &self,
         base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
-    ) -> Result<(String, SqlTemplateArgs), CubeError>;
+    ) -> Result<(SqlTemplate, SqlTemplateArgs), CubeError>;
 }
 
 pub struct NativeMemberSql<IT: InnerTypes> {
@@ -617,7 +641,7 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
         &self,
         base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
-    ) -> Result<(String, SqlTemplateArgs), CubeError> {
+    ) -> Result<(SqlTemplate, SqlTemplateArgs), CubeError> {
         let state = ProxyState::new();
         let weak_state = state.weak();
         let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
@@ -662,7 +686,7 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
         }
         let native_func = self.native_object.to_function()?;
         let evaluation_result = native_func.call(proxy_args)?;
-        let template = String::from_native(evaluation_result)?;
+        let template = SqlTemplate::from_native(evaluation_result)?;
         let context_ref = context_holder.as_holder_ref();
         let sql_args = state.get_args()?.clone_to_context(context_ref)?;
 

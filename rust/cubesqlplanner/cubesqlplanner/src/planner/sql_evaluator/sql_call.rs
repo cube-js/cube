@@ -2,7 +2,9 @@ use super::sql_nodes::SqlNode;
 use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::cube_bridge::base_tools::BaseTools;
-use crate::cube_bridge::member_sql::{FilterParamsColumn, MemberSql, SecutityContextProps};
+use crate::cube_bridge::member_sql::{
+    FilterParamsColumn, MemberSql, SecutityContextProps, SqlTemplate,
+};
 use crate::plan::{Filter, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::{RawReferenceValue, SqlNodesFactory};
@@ -56,7 +58,7 @@ pub struct SqlCallFilterGroupItem {
 
 #[derive(Clone, TypedBuilder, Debug)]
 pub struct SqlCall {
-    template: String,
+    template: SqlTemplate,
     deps: Vec<SqlCallDependency>,
     filter_params: Vec<SqlCallFilterParamsItem>,
     filter_groups: Vec<SqlCallFilterGroupItem>,
@@ -71,6 +73,68 @@ impl SqlCall {
         query_tools: Rc<QueryTools>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        if let SqlTemplate::String(template) = &self.template {
+            let (filter_params, filter_groups, deps, context_values) =
+                self.prepare_template_params(visitor, node_processor, &query_tools, templates)?;
+
+            // Substitute placeholders in template in a single pass
+            Self::substitute_template(
+                template,
+                &deps,
+                &filter_params,
+                &filter_groups,
+                &context_values,
+            )
+        } else {
+            Err(CubeError::internal(
+                "SqlCall::eval called for fuction that return string".to_string(),
+            ))
+        }
+    }
+
+    pub fn eval_vec(
+        &self,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        query_tools: Rc<QueryTools>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<Vec<String>, CubeError> {
+        let (filter_params, filter_groups, deps, context_values) =
+            self.prepare_template_params(visitor, node_processor, &query_tools, templates)?;
+
+        let result = match &self.template {
+            SqlTemplate::String(template) => {
+                vec![Self::substitute_template(
+                    template,
+                    &deps,
+                    &filter_params,
+                    &filter_groups,
+                    &context_values,
+                )?]
+            }
+            SqlTemplate::StringVec(templates) => templates
+                .iter()
+                .map(|template| {
+                    Self::substitute_template(
+                        template,
+                        &deps,
+                        &filter_params,
+                        &filter_groups,
+                        &context_values,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        };
+        Ok(result)
+    }
+
+    fn prepare_template_params(
+        &self,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        query_tools: &Rc<QueryTools>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<(Vec<String>, Vec<String>, Vec<String>, Vec<String>), CubeError> {
         let filter_params = self
             .filter_params
             .iter()
@@ -93,15 +157,7 @@ impl SqlCall {
             .collect::<Result<Vec<_>, _>>()?;
 
         let context_values = self.eval_security_context_values(&query_tools);
-
-        // Substitute placeholders in template in a single pass
-        Self::substitute_template(
-            &self.template,
-            &deps,
-            &filter_params,
-            &filter_groups,
-            &context_values,
-        )
+        Ok((filter_params, filter_groups, deps, context_values))
     }
 
     /// Substitute placeholders in template string with computed values in a single pass
@@ -146,28 +202,33 @@ impl SqlCall {
                             SqlCallArg::FILTER_PARAM_PREFIX => filter_params.get(idx),
                             SqlCallArg::FILTER_GROUP_PREFIX => filter_groups.get(idx),
                             SqlCallArg::SECURITY_VALUE_PREFIX => security_values.get(idx),
-                            _ => None,
+                            _ => {
+                                result.push('{');
+                                result.push_str(&placeholder);
+                                result.push('}');
+                                continue;
+                            }
                         };
 
                         if let Some(val) = value {
                             result.push_str(val);
                         } else {
                             return Err(CubeError::internal(format!(
-                                "Placeholder {{{}:{}}} out of bounds or unknown type",
+                                "Placeholder {{{}:{}}} out of bounds",
                                 typ, idx
                             )));
                         }
                     } else {
-                        return Err(CubeError::internal(format!(
-                            "Invalid placeholder index: {}",
-                            idx_str
-                        )));
+                        result.push('{');
+                        result.push_str(&placeholder);
+                        result.push('}');
+                        continue;
                     }
                 } else {
-                    return Err(CubeError::internal(format!(
-                        "Invalid placeholder format: {{{}}}",
-                        placeholder
-                    )));
+                    result.push('{');
+                    result.push_str(&placeholder);
+                    result.push('}');
+                    continue;
                 }
             } else {
                 result.push(ch);
@@ -217,7 +278,8 @@ impl SqlCall {
     }
 
     pub fn is_direct_reference(&self) -> bool {
-        self.dependencies_count() == 1 && self.template == SqlCallArg::dependency(0)
+        self.dependencies_count() == 1
+            && self.template == SqlTemplate::String(SqlCallArg::dependency(0))
     }
 
     pub fn resolve_direct_reference(&self) -> Option<Rc<MemberSymbol>> {

@@ -159,17 +159,24 @@ impl BaseFilter {
                 _ => None,
             };
 
-            if let Some(filter_params_column) = filters_context
-                .filter_params_columns
-                .get(&symbol.full_name())
-            {
-                return self.to_sql_for_filter_params(
-                    filter_params_column,
-                    symbol,
-                    plan_templates,
-                    filters_context,
-                    &member_type,
-                );
+            if !filters_context.filter_params_columns.is_empty() {
+                let symbol_to_match = if let Ok(time_dim) = symbol.as_time_dimension() {
+                    time_dim.base_symbol().clone().resolve_reference_chain()
+                } else {
+                    symbol.clone().resolve_reference_chain()
+                };
+                if let Some(filter_params_column) = filters_context
+                    .filter_params_columns
+                    .get(&symbol_to_match.full_name())
+                {
+                    return self.to_sql_for_filter_params(
+                        filter_params_column,
+                        symbol,
+                        plan_templates,
+                        filters_context,
+                        &member_type,
+                    );
+                }
             }
 
             let member_sql = evaluate_with_context(&symbol, context.clone(), plan_templates)?;
@@ -183,6 +190,7 @@ impl BaseFilter {
             )
         }
     }
+
     fn to_sql_for_filter_params(
         &self,
         column: &FilterParamsColumn,
