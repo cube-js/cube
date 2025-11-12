@@ -2,7 +2,7 @@ use super::sql_nodes::SqlNode;
 use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::cube_bridge::base_tools::BaseTools;
-use crate::cube_bridge::member_sql::{MemberSql, SecutityContextProps};
+use crate::cube_bridge::member_sql::{FilterParamsColumn, MemberSql, SecutityContextProps};
 use crate::plan::{Filter, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::{RawReferenceValue, SqlNodesFactory};
@@ -11,6 +11,7 @@ use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -45,7 +46,7 @@ pub struct SqlCallDependency {
 #[derive(Debug, Clone)]
 pub struct SqlCallFilterParamsItem {
     pub filter_symbol_name: String,
-    pub column: String,
+    pub column: FilterParamsColumn,
 }
 
 #[derive(Clone, Debug)]
@@ -189,17 +190,16 @@ impl SqlCall {
                     .map(|itm| &itm.filter_symbol_name)
                     .collect_vec();
                 if let Some(subtree) = filter_item.find_subtree_for_members(&symbols) {
-                    let mut context_factory = SqlNodesFactory::new();
+                    let mut filter_params_columns = HashMap::new();
                     for itm in items {
-                        context_factory.add_render_reference(
-                            itm.filter_symbol_name.clone(),
-                            RawReferenceValue(itm.column.clone()),
-                        );
+                        filter_params_columns
+                            .insert(itm.filter_symbol_name.clone(), itm.column.clone());
                     }
-                    let context = Rc::new(VisitorContext::new(
+
+                    let context = Rc::new(VisitorContext::new_for_filter_params(
                         query_tools.clone(),
-                        &context_factory,
-                        None,
+                        &SqlNodesFactory::new(),
+                        filter_params_columns,
                     ));
                     return subtree.to_sql(templates, context);
                 }

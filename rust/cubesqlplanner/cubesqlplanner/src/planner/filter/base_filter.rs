@@ -1,4 +1,5 @@
 use super::filter_operator::FilterOperator;
+use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -142,9 +143,8 @@ impl BaseFilter {
         if matches!(self.filter_operator, FilterOperator::MeasureFilter) {
             self.measure_filter_where(context, plan_templates)
         } else {
+            let filters_context = context.filters_context();
             let symbol = self.member_evaluator();
-            let member_sql = evaluate_with_context(&symbol, context.clone(), plan_templates)?;
-
             let member_type = match symbol.as_ref() {
                 MemberSymbol::Dimension(dimension_symbol) => Some(
                     dimension_symbol
@@ -159,157 +159,196 @@ impl BaseFilter {
                 _ => None,
             };
 
-            let filters_context = context.filters_context();
+            if let Some(filter_params_column) = filters_context
+                .filter_params_columns
+                .get(&symbol.full_name())
+            {
+                return self.to_sql_for_filter_params(
+                    filter_params_column,
+                    symbol,
+                    plan_templates,
+                    filters_context,
+                    &member_type,
+                );
+            }
 
-            let res = match self.filter_operator {
-                FilterOperator::Equal => {
-                    self.equals_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::NotEqual => self.not_equals_where(
+            let member_sql = evaluate_with_context(&symbol, context.clone(), plan_templates)?;
+
+            self.to_sql_impl(
+                &member_sql,
+                symbol,
+                plan_templates,
+                filters_context,
+                &member_type,
+            )
+        }
+    }
+    fn to_sql_for_filter_params(
+        &self,
+        column: &FilterParamsColumn,
+        symbol: Rc<MemberSymbol>,
+        plan_templates: &PlanSqlTemplates,
+        filters_context: &FiltersContext,
+        member_type: &Option<String>,
+    ) -> Result<String, CubeError> {
+        match column {
+            FilterParamsColumn::String(column) => {
+                self.to_sql_impl(column, symbol, plan_templates, filters_context, member_type)
+            }
+            FilterParamsColumn::Callback(filter_params_callback) => {
+                let args = match self.filter_operator {
+                    FilterOperator::InDateRange | FilterOperator::NotInDateRange => {
+                        let use_db_time_zone = !filters_context.use_local_tz;
+                        let (from, to) =
+                            self.allocate_date_params(use_db_time_zone, false, plan_templates)?;
+                        vec![from, to]
+                    }
+                    _ => self
+                        .values
+                        .iter()
+                        .filter_map(|v| v.as_ref().map(|v| self.allocate_param(&v)))
+                        .collect::<Vec<_>>(),
+                };
+                filter_params_callback.call(&args)
+            }
+        }
+    }
+
+    fn to_sql_impl(
+        &self,
+        member_sql: &str,
+        symbol: Rc<MemberSymbol>,
+        plan_templates: &PlanSqlTemplates,
+        filters_context: &FiltersContext,
+        member_type: &Option<String>,
+    ) -> Result<String, CubeError> {
+        let res = match self.filter_operator {
+            FilterOperator::Equal => {
+                self.equals_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::NotEqual => {
+                self.not_equals_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::InDateRange => {
+                self.in_date_range(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::BeforeDate => {
+                self.before_date(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::BeforeOrOnDate => {
+                self.before_or_on_date(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::AfterDate => {
+                self.after_date(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::AfterOrOnDate => {
+                self.after_or_on_date(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::NotInDateRange => {
+                self.not_in_date_range(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::RegularRollingWindowDateRange => self
+                .regular_rolling_window_date_range(
                     &member_sql,
                     plan_templates,
                     filters_context,
                     &member_type,
                 )?,
-                FilterOperator::InDateRange => {
-                    self.in_date_range(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::BeforeDate => {
-                    self.before_date(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::BeforeOrOnDate => self.before_or_on_date(
-                    &member_sql,
-                    plan_templates,
-                    filters_context,
-                    &member_type,
-                )?,
-                FilterOperator::AfterDate => {
-                    self.after_date(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::AfterOrOnDate => self.after_or_on_date(
-                    &member_sql,
-                    plan_templates,
-                    filters_context,
-                    &member_type,
-                )?,
-                FilterOperator::NotInDateRange => self.not_in_date_range(
-                    &member_sql,
-                    plan_templates,
-                    filters_context,
-                    &member_type,
-                )?,
-                FilterOperator::RegularRollingWindowDateRange => self
-                    .regular_rolling_window_date_range(
-                        &member_sql,
-                        plan_templates,
-                        filters_context,
-                        &member_type,
-                    )?,
-                FilterOperator::ToDateRollingWindowDateRange => {
-                    let query_granularity = if self.values.len() >= 3 {
-                        if let Some(granularity) = &self.values[2] {
-                            granularity
-                        } else {
-                            return Err(CubeError::user(
-                                "Granularity required for to_date rolling window".to_string(),
-                            ));
-                        }
+            FilterOperator::ToDateRollingWindowDateRange => {
+                let query_granularity = if self.values.len() >= 3 {
+                    if let Some(granularity) = &self.values[2] {
+                        granularity
                     } else {
                         return Err(CubeError::user(
                             "Granularity required for to_date rolling window".to_string(),
                         ));
-                    };
-                    let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-                    let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+                    }
+                } else {
+                    return Err(CubeError::user(
+                        "Granularity required for to_date rolling window".to_string(),
+                    ));
+                };
+                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
-                    let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
-                        self.query_tools.cube_evaluator().clone(),
-                        &mut evaluator_compiler,
-                        &symbol.cube_name(),
-                        &symbol.name(),
-                        Some(query_granularity.clone()),
-                    )?
-                    else {
-                        return Err(CubeError::internal(format!(
-                            "Rolling window granularity '{}' is not found in time dimension '{}'",
-                            query_granularity,
-                            symbol.name()
-                        )));
-                    };
-
-                    self.to_date_rolling_window_date_range(
-                        &member_sql,
-                        plan_templates,
-                        filters_context,
-                        &member_type,
-                        granularity_obj,
-                    )?
-                }
-                FilterOperator::In => {
-                    self.in_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::NotIn => {
-                    self.not_in_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::Set => {
-                    self.set_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::NotSet => {
-                    self.not_set_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::Gt => {
-                    self.gt_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::Gte => {
-                    self.gte_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::Lt => {
-                    self.lt_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::Lte => {
-                    self.lte_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::Contains => {
-                    self.contains_where(&member_sql, plan_templates, filters_context, &member_type)?
-                }
-                FilterOperator::NotContains => self.not_contains_where(
-                    &member_sql,
-                    plan_templates,
-                    filters_context,
-                    &member_type,
-                )?,
-                FilterOperator::StartsWith => self.starts_with_where(
-                    &member_sql,
-                    plan_templates,
-                    filters_context,
-                    &member_type,
-                )?,
-                FilterOperator::NotStartsWith => self.not_starts_with_where(
-                    &member_sql,
-                    plan_templates,
-                    filters_context,
-                    &member_type,
-                )?,
-                FilterOperator::EndsWith => self.ends_with_where(
-                    &member_sql,
-                    plan_templates,
-                    filters_context,
-                    &member_type,
-                )?,
-                FilterOperator::NotEndsWith => self.not_ends_with_where(
-                    &member_sql,
-                    plan_templates,
-                    filters_context,
-                    &member_type,
-                )?,
-                FilterOperator::MeasureFilter => {
+                let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
+                    self.query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    &symbol.cube_name(),
+                    &symbol.name(),
+                    Some(query_granularity.clone()),
+                )?
+                else {
                     return Err(CubeError::internal(format!(
-                        "Measure filter should be processed separately"
+                        "Rolling window granularity '{}' is not found in time dimension '{}'",
+                        query_granularity,
+                        symbol.name()
                     )));
-                }
-            };
-            Ok(res)
-        }
+                };
+
+                self.to_date_rolling_window_date_range(
+                    &member_sql,
+                    plan_templates,
+                    filters_context,
+                    &member_type,
+                    granularity_obj,
+                )?
+            }
+            FilterOperator::In => {
+                self.in_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::NotIn => {
+                self.not_in_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::Set => {
+                self.set_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::NotSet => {
+                self.not_set_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::Gt => {
+                self.gt_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::Gte => {
+                self.gte_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::Lt => {
+                self.lt_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::Lte => {
+                self.lte_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::Contains => {
+                self.contains_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::NotContains => {
+                self.not_contains_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::StartsWith => {
+                self.starts_with_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::NotStartsWith => self.not_starts_with_where(
+                &member_sql,
+                plan_templates,
+                filters_context,
+                &member_type,
+            )?,
+            FilterOperator::EndsWith => {
+                self.ends_with_where(&member_sql, plan_templates, filters_context, &member_type)?
+            }
+            FilterOperator::NotEndsWith => self.not_ends_with_where(
+                &member_sql,
+                plan_templates,
+                filters_context,
+                &member_type,
+            )?,
+            FilterOperator::MeasureFilter => {
+                return Err(CubeError::internal(format!(
+                    "Measure filter should be processed separately"
+                )));
+            }
+        };
+        Ok(res)
     }
 
     fn measure_filter_where(

@@ -1,3 +1,4 @@
+use super::filter_params_callback::{FilterParamsCallback, NativeFilterParamsCallback};
 use super::{
     filter_group::{FilterGroup, NativeFilterGroup},
     filter_params::{FilterParams, NativeFilterParams},
@@ -6,7 +7,6 @@ use super::{
 };
 use crate::utils::UniqueVector;
 use crate::{cube_bridge::base_tools::BaseTools, planner::sql_evaluator::SqlCallArg};
-use cubenativeutils::wrappers::make_proxy;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
@@ -14,22 +14,145 @@ use cubenativeutils::wrappers::serializer::{
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeString};
+use cubenativeutils::wrappers::{make_proxy, NativeContextHolderRef};
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::HashMap;
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell, rc::Weak};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone)]
+pub enum FilterParamsColumn {
+    String(String),
+    Callback(Rc<dyn FilterParamsCallback>),
+}
+
+impl FilterParamsColumn {
+    fn clone_to_context(
+        &self,
+        context_ref: &dyn NativeContextHolderRef,
+    ) -> Result<Self, CubeError> {
+        let res = match self {
+            Self::String(s) => Self::String(s.clone()),
+            Self::Callback(callback) => Self::Callback(callback.clone_to_context(context_ref)?),
+        };
+        Ok(res)
+    }
+}
+
+impl<IT: InnerTypes> NativeSerialize<IT> for FilterParamsColumn {
+    fn to_native(
+        &self,
+        context: NativeContextHolder<IT>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError> {
+        match self {
+            FilterParamsColumn::String(s) => s.to_native(context.clone()),
+            FilterParamsColumn::Callback(cb) => {
+                if let Ok(callback) = cb
+                    .clone()
+                    .as_any()
+                    .downcast::<NativeFilterParamsCallback<IT>>()
+                {
+                    callback.to_native(context.clone())
+                } else {
+                    Err(CubeError::internal(
+                        "Cannot downcast filter params callback".to_string(),
+                    ))
+                }
+            }
+        }
+    }
+}
+impl<IT: InnerTypes> NativeDeserialize<IT> for FilterParamsColumn {
+    fn from_native(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
+        let column = if let Ok(string_column) = String::from_native(native_object.clone()) {
+            FilterParamsColumn::String(string_column)
+        } else {
+            let callback = NativeFilterParamsCallback::from_native(native_object.clone())?;
+            FilterParamsColumn::Callback(Rc::new(callback))
+        };
+        Ok(column)
+    }
+}
+
+impl std::fmt::Debug for FilterParamsColumn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
+            Self::Callback(_) => f
+                .debug_tuple("Callback")
+                .field(&"JsFunc".to_string())
+                .finish(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct FilterParamsItem {
     pub cube_name: String,
     pub name: String,
-    pub column: String,
+    pub column: FilterParamsColumn,
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq)]
+impl FilterParamsItem {
+    fn clone_to_context(
+        &self,
+        context_ref: &dyn NativeContextHolderRef,
+    ) -> Result<Self, CubeError> {
+        Ok(Self {
+            cube_name: self.cube_name.clone(),
+            name: self.name.clone(),
+            column: self.column.clone_to_context(context_ref)?,
+        })
+    }
+}
+
+impl<IT: InnerTypes> NativeSerialize<IT> for FilterParamsItem {
+    fn to_native(
+        &self,
+        context: NativeContextHolder<IT>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError> {
+        let result = context.empty_struct()?;
+        result.set_field("cube_name", self.cube_name.to_native(context.clone())?)?;
+        result.set_field("name", self.name.to_native(context.clone())?)?;
+        result.set_field("column", self.column.to_native(context.clone())?)?;
+
+        Ok(NativeObjectHandle::new(result.into_object()))
+    }
+}
+impl<IT: InnerTypes> NativeDeserialize<IT> for FilterParamsItem {
+    fn from_native(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
+        let object = native_object.to_struct()?;
+        let cube_name = String::from_native(object.get_field("cube_name")?)?;
+        let name = String::from_native(object.get_field("name")?)?;
+        let native_column = object.get_field("column")?;
+        let column = FilterParamsColumn::from_native(native_column)?;
+        let result = Self {
+            cube_name,
+            name,
+            column,
+        };
+        Ok(result)
+    }
+}
+
+#[derive(Default, Clone, Debug)]
 pub struct FilterGroupItem {
     pub filter_params: Vec<FilterParamsItem>,
+}
+
+impl FilterGroupItem {
+    fn clone_to_context(
+        &self,
+        context_ref: &dyn NativeContextHolderRef,
+    ) -> Result<Self, CubeError> {
+        let filter_params = self
+            .filter_params
+            .iter()
+            .map(|itm| itm.clone_to_context(context_ref))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self { filter_params })
+    }
 }
 
 #[derive(Default, Clone, Debug)]
@@ -51,15 +174,42 @@ impl SqlTemplateArgs {
     }
 
     pub fn insert_filter_params(&mut self, params: FilterParamsItem) -> usize {
-        self.filter_params.unique_insert(params)
+        let index = self.filter_params.len();
+        self.filter_params.push(params);
+        index
     }
 
     pub fn insert_filter_group(&mut self, group: FilterGroupItem) -> usize {
-        self.filter_groups.unique_insert(group)
+        let index = self.filter_groups.len();
+        self.filter_groups.push(group);
+        index
     }
 
     pub fn insert_security_context_value(&mut self, value: String) -> usize {
         self.security_context.values.unique_insert(value)
+    }
+
+    pub fn clone_to_context(
+        &self,
+        context_ref: &dyn NativeContextHolderRef,
+    ) -> Result<Self, CubeError> {
+        let filter_params = self
+            .filter_params
+            .iter()
+            .map(|itm| itm.clone_to_context(context_ref))
+            .collect::<Result<Vec<_>, _>>()?;
+        let filter_groups = self
+            .filter_groups
+            .iter()
+            .map(|itm| itm.clone_to_context(context_ref))
+            .collect::<Result<Vec<_>, _>>()?;
+        let result = Self {
+            symbol_paths: self.symbol_paths.clone(),
+            filter_params,
+            filter_groups,
+            security_context: self.security_context.clone(),
+        };
+        Ok(result)
     }
 }
 
@@ -157,16 +307,13 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         path: Vec<String>,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
         context_holder.make_proxy(None, move |inner_context, _, prop| {
-            println!("!!!! into {}", prop);
             if prop == "sql" {
-                println!("!!!! JJJJJJ");
                 let mut path_with_sql = path.clone();
-                path_with_sql.push("sql".to_string());
+                path_with_sql.push("__sql_fn".to_string());
                 let index = proxy_state.insert_symbol_path(&path_with_sql)?;
                 let str = SqlCallArg::dependency(index);
                 let result = inner_context.to_string_fn(str)?;
                 let result = NativeObjectHandle::new(result.into_object());
-                println!("!!!! LLLLLL");
                 return Ok(Some(result));
             }
             if prop == "toString" || prop == "valueOf" {
@@ -249,14 +396,13 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                     ParamValue::StringVec(items) => {
                         let values = items
                             .iter()
-                            .map(|v| {
-                                Self::process_secutity_context_value(&proxy_state, &v)?
-                                    .to_native(context.clone())
-                            })
+                            .map(|v| Self::process_secutity_context_value(&proxy_state, &v))
                             .collect::<Result<Vec<_>, _>>()?;
 
+                        let values = values.to_native(context)?;
+
                         if let Ok(column) = column.to_function() {
-                            let result = column.call(values)?;
+                            let result = column.call(vec![values])?;
                             if let Ok(result) = result.to_string() {
                                 result.value()?
                             } else {
@@ -361,7 +507,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         })
     }
 
-    fn filter_goup_fn<CIT: InnerTypes>(
+    fn filter_group_fn<CIT: InnerTypes>(
         context_holder: NativeContextHolder<CIT>,
         proxy_state: ProxyStateWeak,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
@@ -394,7 +540,7 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
         proxy_state: ProxyStateWeak,
         cube_name: String,
         name: String,
-        column: String,
+        column: FilterParamsColumn,
     ) -> Result<NativeObjectHandle<CIT>, CubeError> {
         let item = Rc::new(FilterParamsItem {
             cube_name: cube_name.clone(),
@@ -427,8 +573,8 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
             let name = prop.clone();
             let cube_name_to_move = Rc::new(cube_name.clone());
             let proxy_state = proxy_state.clone();
-            let filter_func =
-                inner_context.make_function(move |filter_context, column: String| {
+            let filter_func = inner_context.make_function(
+                move |filter_context, column: FilterParamsColumn| {
                     Self::filter_params_filter(
                         filter_context,
                         proxy_state.clone(),
@@ -436,7 +582,8 @@ impl<IT: InnerTypes> NativeMemberSql<IT> {
                         name.clone(),
                         column.clone(),
                     )
-                })?;
+                },
+            )?;
             let filter_func = NativeObjectHandle::new(filter_func.into_object());
             let result_struct = inner_context.empty_struct()?;
             result_struct.set_field("filter", filter_func)?;
@@ -475,12 +622,11 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
         let weak_state = state.weak();
         let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
         let mut proxy_args = vec![];
-        println!("!!! RRRR");
         for arg in self.args_names.iter().cloned() {
             let proxy_arg = if arg == "FILTER_PARAMS" {
                 Self::filter_params_proxy(context_holder.clone(), weak_state.clone())?
             } else if arg == "FILTER_GROUP" {
-                Self::filter_goup_fn(context_holder.clone(), weak_state.clone())?
+                Self::filter_group_fn(context_holder.clone(), weak_state.clone())?
             } else if arg == "SECURITY_CONTEXT"
                 || arg == "security_context"
                 || arg == "securityContext"
@@ -514,15 +660,11 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
             };
             proxy_args.push(proxy_arg);
         }
-        println!("!!! KKKKK");
         let native_func = self.native_object.to_function()?;
-        println!("!!! 1111 {}", proxy_args.len());
         let evaluation_result = native_func.call(proxy_args)?;
-        println!("!!! 2222");
         let template = String::from_native(evaluation_result)?;
-        println!("!!! 3333");
-        let sql_args = state.get_args()?;
-        println!("!!! templ: {}", template);
+        let context_ref = context_holder.as_holder_ref();
+        let sql_args = state.get_args()?.clone_to_context(context_ref)?;
 
         Ok((template, sql_args))
     }

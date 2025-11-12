@@ -996,6 +996,7 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
+      securityContext: this.contextSymbols.securityContext,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
     };

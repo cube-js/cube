@@ -665,6 +665,8 @@ describe('SQL Generation', () => {
     cube('ReferenceVisitors', {
       sql: \`
         select * from \${visitors.sql()} as t
+        WHERE \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter(\`(t.created_at + interval '28 day')\`)} AND
+        \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter((from, to) => \`(t.created_at + interval '28 day') >= \${from} AND (t.created_at + interval '28 day') <= \${to}\`)}
       \`,
 
       measures: {
@@ -3112,7 +3114,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     );
   });
 
-  it('security context 1', async () => {
+  it('security context', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {

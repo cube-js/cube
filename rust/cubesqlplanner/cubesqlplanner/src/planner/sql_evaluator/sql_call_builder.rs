@@ -93,11 +93,6 @@ impl<'a> SqlCallBuilder<'a> {
     ) -> Result<SqlCallDependency, CubeError> {
         assert!(!dep_path.is_empty());
 
-        println!(
-            "curr_cube_name: {}, dep path: {}",
-            current_cube_name,
-            dep_path.join(".")
-        );
         self.process_dependency_item(current_cube_name, dep_path, vec![])
             .map_err(|e| CubeError::user(format!("Error in `{}`: {}", dep_path.join("."), e)))
     }
