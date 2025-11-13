@@ -68,6 +68,13 @@ pub fn create_visitors_schema() -> MockSchema {
                 .build(),
         )
         .add_dimension(
+            "visitor_id_proxy",
+            MockDimensionDefinition::builder()
+                .dimension_type("number".to_string())
+                .sql("{visitors.visitor_id}".to_string())
+                .build(),
+        )
+        .add_dimension(
             "visitor_id_twice",
             MockDimensionDefinition::builder()
                 .dimension_type("number".to_string())
@@ -145,6 +152,13 @@ pub fn create_visitors_schema() -> MockSchema {
             MockMeasureDefinition::builder()
                 .measure_type("sum".to_string())
                 .sql("revenue".to_string())
+                .build(),
+        )
+        .add_measure(
+            "total_revenue_proxy",
+            MockMeasureDefinition::builder()
+                .measure_type("number".to_string())
+                .sql("{total_revenue}".to_string())
                 .build(),
         )
         .add_measure(

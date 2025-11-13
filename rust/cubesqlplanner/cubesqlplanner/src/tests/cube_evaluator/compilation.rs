@@ -515,3 +515,83 @@ fn test_view_measure_compilation() {
     );
     assert!(!resolved.as_measure().unwrap().is_view(), "Resolved member should not be a view");
 }
+
+#[test]
+fn test_proxy_dimension_compilation() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // Compile proxy dimension that references another dimension
+    let proxy_symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("visitors.visitor_id_proxy".to_string())
+        .unwrap();
+
+    // Check basic properties
+    assert!(proxy_symbol.is_dimension());
+    assert_eq!(proxy_symbol.full_name(), "visitors.visitor_id_proxy");
+    assert_eq!(proxy_symbol.cube_name(), "visitors");
+    assert_eq!(proxy_symbol.name(), "visitor_id_proxy");
+
+    let dimension = proxy_symbol.as_dimension().unwrap();
+
+    // Check that it's NOT a view member
+    assert!(!dimension.is_view(), "Proxy should not be a view member");
+
+    // Check that it IS a reference (proxy references another member)
+    assert!(dimension.is_reference(), "Proxy should be a reference to another member");
+
+    // Resolve reference chain to get the target member
+    let resolved = proxy_symbol.clone().resolve_reference_chain();
+    assert_eq!(
+        resolved.full_name(),
+        "visitors.visitor_id",
+        "Proxy should resolve to visitors.visitor_id"
+    );
+
+    // Verify the resolved member is not a view
+    assert!(!resolved.as_dimension().unwrap().is_view(), "Target member should not be a view");
+
+    // Verify the resolved member is also not a reference (it's the actual dimension)
+    assert!(!resolved.as_dimension().unwrap().is_reference(), "Target member should not be a reference");
+}
+
+#[test]
+fn test_proxy_measure_compilation() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // Compile proxy measure that references another measure
+    let proxy_symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("visitors.total_revenue_proxy".to_string())
+        .unwrap();
+
+    // Check basic properties
+    assert!(proxy_symbol.is_measure());
+    assert_eq!(proxy_symbol.full_name(), "visitors.total_revenue_proxy");
+    assert_eq!(proxy_symbol.cube_name(), "visitors");
+    assert_eq!(proxy_symbol.name(), "total_revenue_proxy");
+
+    let measure = proxy_symbol.as_measure().unwrap();
+
+    // Check that it's NOT a view member
+    assert!(!measure.is_view(), "Proxy should not be a view member");
+
+    // Check that it IS a reference (proxy references another member)
+    assert!(measure.is_reference(), "Proxy should be a reference to another member");
+
+    // Resolve reference chain to get the target member
+    let resolved = proxy_symbol.clone().resolve_reference_chain();
+    assert_eq!(
+        resolved.full_name(),
+        "visitors.total_revenue",
+        "Proxy should resolve to visitors.total_revenue"
+    );
+
+    // Verify the resolved member is not a view
+    assert!(!resolved.as_measure().unwrap().is_view(), "Target member should not be a view");
+
+    // Verify the resolved member is not a reference (it's the actual measure)
+    assert!(!resolved.as_measure().unwrap().is_reference(), "Target member should not be a reference");
+}

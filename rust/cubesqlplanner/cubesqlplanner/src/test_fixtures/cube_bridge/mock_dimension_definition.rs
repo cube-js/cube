@@ -16,7 +16,7 @@ pub struct MockDimensionDefinition {
     // Fields from DimensionDefinitionStatic
     #[builder(default = "string".to_string())]
     dimension_type: String,
-    #[builder(default)]
+    #[builder(default = Some(false))]
     owned_by_cube: Option<bool>,
     #[builder(default)]
     multi_stage: Option<bool>,
@@ -447,4 +447,3 @@ mod tests {
         }
     }
 }
-

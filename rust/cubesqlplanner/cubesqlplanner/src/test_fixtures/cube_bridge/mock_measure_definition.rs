@@ -20,7 +20,7 @@ pub struct MockMeasureDefinition {
     // Fields from MeasureDefinitionStatic
     #[builder(default = "number".to_string())]
     measure_type: String,
-    #[builder(default)]
+    #[builder(default = Some(false))]
     owned_by_cube: Option<bool>,
     #[builder(default)]
     multi_stage: Option<bool>,
