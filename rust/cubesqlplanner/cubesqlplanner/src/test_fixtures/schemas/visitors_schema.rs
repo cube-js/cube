@@ -168,6 +168,10 @@ pub fn create_visitors_schema() -> MockSchema {
                 .build(),
         )
         .finish_cube()
+        .add_view("visitors_visitors_checkins")
+        .include_cube("visitors", vec!["id".to_string(), "source_concat_id".to_string()])
+        .include_cube("visitors.visitor_checkins", vec!["visitor_id".to_string(), "count".to_string()])
+        .finish_view()
         .build()
 }
 

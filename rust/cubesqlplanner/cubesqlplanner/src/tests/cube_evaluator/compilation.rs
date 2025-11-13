@@ -429,3 +429,89 @@ fn test_measure_with_explicit_cube_and_member_dependencies() {
         "Should have dependency on visitors.total_revenue"
     );
 }
+
+#[test]
+fn test_view_dimension_compilation() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // Compile dimension from view with simple join path
+    let id_symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("visitors_visitors_checkins.id".to_string())
+        .unwrap();
+
+    // Check basic properties
+    assert!(id_symbol.is_dimension());
+    assert_eq!(id_symbol.full_name(), "visitors_visitors_checkins.id");
+    assert_eq!(id_symbol.cube_name(), "visitors_visitors_checkins");
+    assert_eq!(id_symbol.name(), "id");
+
+    // Check that it's a view member
+    let dimension = id_symbol.as_dimension().unwrap();
+    assert!(dimension.is_view(), "Should be a view member");
+
+    // Check that it's a reference (view members reference original cube members)
+    assert!(dimension.is_reference(), "Should be a reference to original member");
+
+    // Resolve reference chain to get the original member
+    let resolved = id_symbol.clone().resolve_reference_chain();
+    assert_eq!(resolved.full_name(), "visitors.id", "Should resolve to visitors.id");
+    assert!(!resolved.as_dimension().unwrap().is_view(), "Resolved member should not be a view");
+
+    // Compile dimension from view with long join path
+    let visitor_id_symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("visitors_visitors_checkins.visitor_id".to_string())
+        .unwrap();
+
+    assert!(visitor_id_symbol.is_dimension());
+    assert_eq!(visitor_id_symbol.full_name(), "visitors_visitors_checkins.visitor_id");
+
+    let visitor_id_dim = visitor_id_symbol.as_dimension().unwrap();
+    assert!(visitor_id_dim.is_view(), "Should be a view member");
+    assert!(visitor_id_dim.is_reference(), "Should be a reference");
+
+    // Resolve to original member from visitor_checkins cube
+    let resolved = visitor_id_symbol.clone().resolve_reference_chain();
+    assert_eq!(
+        resolved.full_name(),
+        "visitor_checkins.visitor_id",
+        "Should resolve to visitor_checkins.visitor_id"
+    );
+    assert!(!resolved.as_dimension().unwrap().is_view(), "Resolved member should not be a view");
+}
+
+#[test]
+fn test_view_measure_compilation() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // Compile measure from view with long join path
+    let count_symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("visitors_visitors_checkins.count".to_string())
+        .unwrap();
+
+    // Check basic properties
+    assert!(count_symbol.is_measure());
+    assert_eq!(count_symbol.full_name(), "visitors_visitors_checkins.count");
+    assert_eq!(count_symbol.cube_name(), "visitors_visitors_checkins");
+    assert_eq!(count_symbol.name(), "count");
+
+    // Check that it's a view member
+    let measure = count_symbol.as_measure().unwrap();
+    assert!(measure.is_view(), "Should be a view member");
+
+    // Check that it's a reference
+    assert!(measure.is_reference(), "Should be a reference to original member");
+
+    // Resolve reference chain to get the original member
+    let resolved = count_symbol.clone().resolve_reference_chain();
+    assert_eq!(
+        resolved.full_name(),
+        "visitor_checkins.count",
+        "Should resolve to visitor_checkins.count"
+    );
+    assert!(!resolved.as_measure().unwrap().is_view(), "Resolved member should not be a view");
+}
