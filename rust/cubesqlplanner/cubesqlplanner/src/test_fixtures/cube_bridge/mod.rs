@@ -7,6 +7,7 @@ mod mock_case_item;
 mod mock_case_switch_definition;
 mod mock_case_switch_else_item;
 mod mock_case_switch_item;
+mod mock_cube_definition;
 mod mock_dimension_definition;
 mod mock_geo_item;
 mod mock_measure_definition;
