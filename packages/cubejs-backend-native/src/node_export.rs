@@ -21,7 +21,6 @@ use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::{batch_to_rows, NonDebugInRelease};
-use cubenativeutils::wrappers::neon::inner_types::NeonInnerTypes;
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
