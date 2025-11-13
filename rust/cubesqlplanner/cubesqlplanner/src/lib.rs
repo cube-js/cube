@@ -5,4 +5,6 @@ pub mod plan;
 pub mod planner;
 #[cfg(test)]
 pub(crate) mod test_fixtures;
+#[cfg(test)]
+mod tests;
 pub(crate) mod utils;
