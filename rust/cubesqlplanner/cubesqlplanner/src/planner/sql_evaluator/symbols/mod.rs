@@ -1,6 +1,7 @@
 mod common;
 mod cube_symbol;
 mod dimension_symbol;
+mod geo_dimension;
 mod measure_symbol;
 mod member_expression_symbol;
 mod member_symbol;
@@ -14,6 +15,7 @@ pub use cube_symbol::{
     CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
 };
 pub use dimension_symbol::*;
+pub use geo_dimension::GeoDimension;
 pub use measure_symbol::{
     DimensionTimeShift, MeasureSymbol, MeasureSymbolFactory, MeasureTimeShifts,
 };
