@@ -39,9 +39,7 @@ impl_static_data!(
 );
 
 impl CubeDefinition for MockCubeDefinition {
-    fn static_data(&self) -> &CubeDefinitionStatic {
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(CubeDefinitionStatic);
 
     fn has_sql_table(&self) -> Result<bool, CubeError> {
         Ok(self.sql_table.is_some())

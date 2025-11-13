@@ -29,11 +29,7 @@ impl_static_data!(
 );
 
 impl TimeShiftDefinition for MockTimeShiftDefinition {
-    fn static_data(&self) -> &TimeShiftDefinitionStatic {
-        // Store static data in a thread-local or use lazy_static
-        // For now, we'll use a simpler approach - Box::leak for tests
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(TimeShiftDefinitionStatic);
 
     fn has_sql(&self) -> Result<bool, CubeError> {
         Ok(self.sql.is_some())

@@ -35,8 +35,6 @@ pub struct CallDep {
 
 #[nativebridge::native_bridge(CubeEvaluatorStatic)]
 pub trait CubeEvaluator {
-    #[nbridge(field)]
-    fn primary_keys(&self) -> Result<HashMap<String, String>, CubeError>;
     fn parse_path(&self, path_type: String, path: String) -> Result<Vec<String>, CubeError>;
     fn measure_by_path(&self, measure_path: String)
         -> Result<Rc<dyn MeasureDefinition>, CubeError>;

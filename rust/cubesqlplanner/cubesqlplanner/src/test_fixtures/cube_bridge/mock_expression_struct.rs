@@ -31,9 +31,7 @@ impl_static_data!(
 );
 
 impl ExpressionStruct for MockExpressionStruct {
-    fn static_data(&self) -> &ExpressionStructStatic {
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(ExpressionStructStatic);
 
     fn has_add_filters(&self) -> Result<bool, CubeError> {
         Ok(self.add_filters.is_some())

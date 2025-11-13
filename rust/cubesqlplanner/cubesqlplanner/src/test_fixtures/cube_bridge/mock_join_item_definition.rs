@@ -17,12 +17,14 @@ pub struct MockJoinItemDefinition {
     sql: String,
 }
 
-impl_static_data!(MockJoinItemDefinition, JoinItemDefinitionStatic, relationship);
+impl_static_data!(
+    MockJoinItemDefinition,
+    JoinItemDefinitionStatic,
+    relationship
+);
 
 impl JoinItemDefinition for MockJoinItemDefinition {
-    fn static_data(&self) -> &JoinItemDefinitionStatic {
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(JoinItemDefinitionStatic);
 
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError> {
         Ok(Rc::new(MockMemberSql::new(&self.sql)?))

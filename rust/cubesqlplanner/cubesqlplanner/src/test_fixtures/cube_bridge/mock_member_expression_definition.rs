@@ -34,9 +34,7 @@ impl_static_data!(
 );
 
 impl MemberExpressionDefinition for MockMemberExpressionDefinition {
-    fn static_data(&self) -> &MemberExpressionDefinitionStatic {
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(MemberExpressionDefinitionStatic);
 
     fn expression(&self) -> Result<MemberExpressionExpressionDef, CubeError> {
         Ok(match &self.expression {

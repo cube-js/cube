@@ -28,9 +28,7 @@ impl_static_data!(
 );
 
 impl JoinDefinition for MockJoinDefinition {
-    fn static_data(&self) -> &JoinDefinitionStatic {
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(JoinDefinitionStatic);
 
     fn joins(&self) -> Result<Vec<Rc<dyn JoinItem>>, CubeError> {
         Ok(self

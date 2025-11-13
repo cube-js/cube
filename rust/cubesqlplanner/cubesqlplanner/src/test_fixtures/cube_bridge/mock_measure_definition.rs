@@ -62,9 +62,7 @@ impl_static_data!(
 );
 
 impl MeasureDefinition for MockMeasureDefinition {
-    fn static_data(&self) -> &MeasureDefinitionStatic {
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(MeasureDefinitionStatic);
 
     fn has_sql(&self) -> Result<bool, CubeError> {
         Ok(self.sql.is_some())

@@ -55,9 +55,7 @@ impl_static_data!(
 );
 
 impl DimensionDefinition for MockDimensionDefinition {
-    fn static_data(&self) -> &DimensionDefinitionStatic {
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(DimensionDefinitionStatic);
 
     fn has_sql(&self) -> Result<bool, CubeError> {
         Ok(self.sql.is_some())

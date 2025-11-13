@@ -30,9 +30,7 @@ impl_static_data!(
 );
 
 impl JoinItem for MockJoinItem {
-    fn static_data(&self) -> &JoinItemStatic {
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(JoinItemStatic);
 
     fn join(&self) -> Result<Rc<dyn JoinItemDefinition>, CubeError> {
         Ok(self.join.clone() as Rc<dyn JoinItemDefinition>)

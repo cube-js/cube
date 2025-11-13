@@ -17,9 +17,7 @@ pub struct MockCaseSwitchItem {
 impl_static_data!(MockCaseSwitchItem, CaseSwitchItemStatic, value);
 
 impl CaseSwitchItem for MockCaseSwitchItem {
-    fn static_data(&self) -> &CaseSwitchItemStatic {
-        Box::leak(Box::new(Self::static_data(self)))
-    }
+    crate::impl_static_data_method!(CaseSwitchItemStatic);
 
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError> {
         Ok(Rc::new(MockMemberSql::new(&self.sql)?))
