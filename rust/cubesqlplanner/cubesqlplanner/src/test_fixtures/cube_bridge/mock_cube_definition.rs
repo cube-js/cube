@@ -8,7 +8,7 @@ use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
 /// Mock implementation of CubeDefinition for testing
-#[derive(TypedBuilder)]
+#[derive(Clone, TypedBuilder)]
 pub struct MockCubeDefinition {
     // Fields from CubeDefinitionStatic
     name: String,
