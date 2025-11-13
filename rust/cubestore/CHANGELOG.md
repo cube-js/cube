@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.3](https://github.com/cube-js/cube/compare/v1.5.2...v1.5.3) (2025-11-13)
+
+### Features
+
+- **cubestore:** Support two arguments for round, fix [#6179](https://github.com/cube-js/cube/issues/6179) ([#10132](https://github.com/cube-js/cube/issues/10132)) ([b666705](https://github.com/cube-js/cube/commit/b6667052a789ae0866b5bbb51baa674bede2cd76))
+
 ## [1.5.2](https://github.com/cube-js/cube/compare/v1.5.1...v1.5.2) (2025-11-10)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
