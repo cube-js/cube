@@ -57,7 +57,7 @@ const session = await fetch(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: "Access-Token ${API_KEY}",
+      Authorization: "Api-Key ${API_KEY}",
     },
     body: JSON.stringify({
       deploymentId: DEPLOYMENT_ID,
@@ -120,7 +120,7 @@ Here's a complete HTML example that demonstrates the full flow for embedding a d
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Access-Token ${API_KEY}`,
+              Authorization: `Api-Key ${API_KEY}`,
             },
             body: JSON.stringify({
               deploymentId: DEPLOYMENT_ID,
