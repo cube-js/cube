@@ -48,9 +48,10 @@ impl MockCubeEvaluator {
     ) -> Result<Vec<String>, CubeError> {
         let parts: Vec<String> = path.split('.').map(|s| s.to_string()).collect();
 
-        if parts.len() != 2 {
+        // Allow 2 parts (cube.member) or 3 parts (cube.dimension.granularity for time dimensions)
+        if parts.len() != 2 && parts.len() != 3 {
             return Err(CubeError::user(format!(
-                "Invalid path format: '{}'. Expected format: 'cube.member'",
+                "Invalid path format: '{}'. Expected format: 'cube.member' or 'cube.time_dimension.granularity'",
                 path
             )));
         }
@@ -63,7 +64,36 @@ impl MockCubeEvaluator {
             return Err(CubeError::user(format!("Cube '{}' not found", cube_name)));
         }
 
-        // Validate member exists for the given type
+        // If we have 3 parts, check if the dimension is a time dimension
+        if parts.len() == 3 {
+            // Only dimensions can have granularity
+            if path_type != "dimension" && path_type != "dimensions" {
+                return Err(CubeError::user(format!(
+                    "Granularity can only be specified for dimensions, not for {}",
+                    path_type
+                )));
+            }
+
+            // Check if the dimension exists and is of type 'time'
+            if let Some(dimension) = self.schema.get_dimension(cube_name, member_name) {
+                if dimension.static_data().dimension_type != "time" {
+                    return Err(CubeError::user(format!(
+                        "Granularity can only be specified for time dimensions, but '{}' is of type '{}'",
+                        member_name,
+                        dimension.static_data().dimension_type
+                    )));
+                }
+                // Granularity is valid - return all 3 parts
+                return Ok(parts);
+            } else {
+                return Err(CubeError::user(format!(
+                    "Dimension '{}' not found in cube '{}'",
+                    member_name, cube_name
+                )));
+            }
+        }
+
+        // For 2-part paths, validate member exists for the given type
         let exists = match path_type {
             "measure" | "measures" => self.schema.get_measure(cube_name, member_name).is_some(),
             "dimension" | "dimensions" => {
@@ -189,9 +219,44 @@ impl CubeEvaluator for MockCubeEvaluator {
 
     fn resolve_granularity(
         &self,
-        _path: Vec<String>,
+        path: Vec<String>,
     ) -> Result<Rc<dyn GranularityDefinition>, CubeError> {
-        todo!("resolve_granularity is not implemented in MockCubeEvaluator")
+        // path should be [cube_name, dimension_name, "granularities", granularity]
+        if path.len() != 4 {
+            return Err(CubeError::user(format!(
+                "Invalid granularity path: expected 4 parts (cube.dimension.granularities.granularity), got {}",
+                path.len()
+            )));
+        }
+
+        if path[2] != "granularities" {
+            return Err(CubeError::user(format!(
+                "Invalid granularity path: expected 'granularities' at position 2, got '{}'",
+                path[2]
+            )));
+        }
+
+        let granularity = &path[3];
+
+        // Validate granularity is one of the supported ones
+        let valid_granularities = vec![
+            "second", "minute", "hour", "day", "week", "month", "quarter", "year",
+        ];
+
+        if !valid_granularities.contains(&granularity.as_str()) {
+            return Err(CubeError::user(format!(
+                "Unsupported granularity: '{}'. Supported: second, minute, hour, day, week, month, quarter, year",
+                granularity
+            )));
+        }
+
+        // Create mock granularity definition with interval equal to granularity
+        use crate::test_fixtures::cube_bridge::MockGranularityDefinition;
+        Ok(Rc::new(
+            MockGranularityDefinition::builder()
+                .interval(granularity.clone())
+                .build(),
+        ) as Rc<dyn GranularityDefinition>)
     }
 
     fn pre_aggregations_for_cube_as_array(
@@ -328,10 +393,12 @@ mod tests {
         let schema = create_test_schema();
         let evaluator = MockCubeEvaluator::new(schema);
 
-        let result =
-            evaluator.parse_path("measure".to_string(), "nonexistent.count".to_string());
+        let result = evaluator.parse_path("measure".to_string(), "nonexistent.count".to_string());
         assert!(result.is_err());
-        assert!(result.unwrap_err().message.contains("Cube 'nonexistent' not found"));
+        assert!(result
+            .unwrap_err()
+            .message
+            .contains("Cube 'nonexistent' not found"));
     }
 
     #[test]
@@ -339,8 +406,7 @@ mod tests {
         let schema = create_test_schema();
         let evaluator = MockCubeEvaluator::new(schema);
 
-        let result =
-            evaluator.parse_path("measure".to_string(), "users.nonexistent".to_string());
+        let result = evaluator.parse_path("measure".to_string(), "users.nonexistent".to_string());
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -353,7 +419,9 @@ mod tests {
         let schema = create_test_schema();
         let evaluator = MockCubeEvaluator::new(schema);
 
-        let measure = evaluator.measure_by_path("users.count".to_string()).unwrap();
+        let measure = evaluator
+            .measure_by_path("users.count".to_string())
+            .unwrap();
         assert_eq!(measure.static_data().measure_type, "count");
     }
 
@@ -373,7 +441,9 @@ mod tests {
         let schema = create_test_schema();
         let evaluator = MockCubeEvaluator::new(schema);
 
-        let segment = evaluator.segment_by_path("users.active".to_string()).unwrap();
+        let segment = evaluator
+            .segment_by_path("users.active".to_string())
+            .unwrap();
         // Verify it's a valid segment
         assert!(segment.sql().is_ok());
     }
@@ -498,12 +568,80 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "resolve_granularity is not implemented")]
-    fn test_resolve_granularity_panics() {
+    fn test_resolve_granularity() {
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "created_at",
+                MockDimensionDefinition::builder()
+                    .dimension_type("time".to_string())
+                    .sql("created_at".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+        let evaluator = MockCubeEvaluator::new(schema);
+
+        // Test valid granularities with 4-part path: [cube, dimension, "granularities", granularity]
+        let granularities = vec![
+            "second", "minute", "hour", "day", "week", "month", "quarter", "year",
+        ];
+        for gran in granularities {
+            let result = evaluator.resolve_granularity(vec![
+                "users".to_string(),
+                "created_at".to_string(),
+                "granularities".to_string(),
+                gran.to_string(),
+            ]);
+            assert!(result.is_ok());
+            let granularity_def = result.unwrap();
+            assert_eq!(granularity_def.static_data().interval, gran);
+            assert_eq!(granularity_def.static_data().origin, None);
+            assert_eq!(granularity_def.static_data().offset, None);
+        }
+    }
+
+    #[test]
+    fn test_resolve_granularity_invalid_path_length() {
         let schema = create_test_schema();
         let evaluator = MockCubeEvaluator::new(schema);
 
-        let _ = evaluator.resolve_granularity(vec!["users".to_string(), "created_at".to_string()]);
+        let result = evaluator.resolve_granularity(vec![
+            "users".to_string(),
+            "created_at".to_string(),
+            "granularities".to_string(),
+        ]);
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(err.message.contains("expected 4 parts"));
+        }
+    }
+
+    #[test]
+    fn test_resolve_granularity_unsupported() {
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "created_at",
+                MockDimensionDefinition::builder()
+                    .dimension_type("time".to_string())
+                    .sql("created_at".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+        let evaluator = MockCubeEvaluator::new(schema);
+
+        let result = evaluator.resolve_granularity(vec![
+            "users".to_string(),
+            "created_at".to_string(),
+            "granularities".to_string(),
+            "invalid".to_string(),
+        ]);
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(err.message.contains("Unsupported granularity"));
+        }
     }
 
     #[test]
@@ -521,10 +659,8 @@ mod tests {
         let schema = create_test_schema();
         let evaluator = MockCubeEvaluator::new(schema);
 
-        let _ = evaluator.pre_aggregation_description_by_name(
-            "users".to_string(),
-            "main".to_string(),
-        );
+        let _ =
+            evaluator.pre_aggregation_description_by_name("users".to_string(), "main".to_string());
     }
 
     #[test]
@@ -538,3 +674,4 @@ mod tests {
         let _ = evaluator.evaluate_rollup_references("users".to_string(), sql);
     }
 }
+

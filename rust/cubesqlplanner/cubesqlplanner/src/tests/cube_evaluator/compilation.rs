@@ -595,3 +595,54 @@ fn test_proxy_measure_compilation() {
     // Verify the resolved member is not a reference (it's the actual measure)
     assert!(!resolved.as_measure().unwrap().is_reference(), "Target member should not be a reference");
 }
+
+#[test]
+fn test_time_dimension_with_granularity_compilation() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // Compile time dimension with month granularity
+    let time_symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("visitors.created_at.month".to_string())
+        .unwrap();
+
+    // Check that it's a time dimension, not a regular dimension
+    assert!(time_symbol.as_time_dimension().is_ok(), "Should be a time dimension");
+
+    // Check full name includes granularity
+    assert_eq!(
+        time_symbol.full_name(),
+        "visitors.created_at_month",
+        "Full name should be visitors.created_at_month"
+    );
+    assert_eq!(time_symbol.cube_name(), "visitors");
+    assert_eq!(time_symbol.name(), "created_at");
+
+    // Get as time dimension to check specific properties
+    let time_dim = time_symbol.as_time_dimension().unwrap();
+
+    // Check granularity
+    assert_eq!(
+        time_dim.granularity(),
+        &Some("month".to_string()),
+        "Granularity should be month"
+    );
+
+    // Check that it's NOT a reference
+    assert!(!time_dim.is_reference(), "Time dimension with granularity should not be a reference");
+
+    // Check base symbol - should be the original dimension without granularity
+    let base_symbol = time_dim.base_symbol();
+    assert!(base_symbol.is_dimension(), "Base symbol should be a dimension");
+    assert_eq!(
+        base_symbol.full_name(),
+        "visitors.created_at",
+        "Base symbol should be visitors.created_at"
+    );
+    assert_eq!(
+        base_symbol.as_dimension().unwrap().dimension_type(),
+        "time",
+        "Base dimension should be time type"
+    );
+}
