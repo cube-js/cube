@@ -1,5 +1,6 @@
 use crate::test_fixtures::cube_bridge::{
-    MockCubeDefinition, MockDimensionDefinition, MockMeasureDefinition, MockSegmentDefinition,
+    MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockMeasureDefinition,
+    MockSecurityContext, MockSegmentDefinition, MockSqlUtils,
 };
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -59,6 +60,19 @@ impl MockSchema {
     /// Get all cube names
     pub fn cube_names(&self) -> Vec<&String> {
         self.cubes.keys().collect()
+    }
+
+    /// Create a MockCubeEvaluator from this schema
+    pub fn create_evaluator(self) -> Rc<MockCubeEvaluator> {
+        Rc::new(MockCubeEvaluator::new(self))
+    }
+
+    /// Create a MockCubeEvaluator with primary keys from this schema
+    pub fn create_evaluator_with_primary_keys(
+        self,
+        primary_keys: std::collections::HashMap<String, Vec<String>>,
+    ) -> Rc<MockCubeEvaluator> {
+        Rc::new(MockCubeEvaluator::with_primary_keys(self, primary_keys))
     }
 }
 
