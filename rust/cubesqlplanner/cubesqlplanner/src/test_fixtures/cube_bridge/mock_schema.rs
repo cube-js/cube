@@ -1,5 +1,5 @@
 use crate::test_fixtures::cube_bridge::{
-    MockCubeDefinition, MockDimensionDefinition, MockMeasureDefinition,
+    MockCubeDefinition, MockDimensionDefinition, MockMeasureDefinition, MockSegmentDefinition,
 };
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -14,6 +14,7 @@ pub struct MockCube {
     pub definition: MockCubeDefinition,
     pub measures: HashMap<String, Rc<MockMeasureDefinition>>,
     pub dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
+    pub segments: HashMap<String, Rc<MockSegmentDefinition>>,
 }
 
 impl MockSchema {
@@ -44,6 +45,17 @@ impl MockSchema {
             .and_then(|cube| cube.measures.get(measure_name).cloned())
     }
 
+    /// Get segment by cube name and segment name
+    pub fn get_segment(
+        &self,
+        cube_name: &str,
+        segment_name: &str,
+    ) -> Option<Rc<MockSegmentDefinition>> {
+        self.cubes
+            .get(cube_name)
+            .and_then(|cube| cube.segments.get(segment_name).cloned())
+    }
+
     /// Get all cube names
     pub fn cube_names(&self) -> Vec<&String> {
         self.cubes.keys().collect()
@@ -71,6 +83,7 @@ impl MockSchemaBuilder {
             cube_definition: None,
             measures: HashMap::new(),
             dimensions: HashMap::new(),
+            segments: HashMap::new(),
         }
     }
 
@@ -93,6 +106,7 @@ pub struct MockCubeBuilder {
     cube_definition: Option<MockCubeDefinition>,
     measures: HashMap<String, Rc<MockMeasureDefinition>>,
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
+    segments: HashMap<String, Rc<MockSegmentDefinition>>,
 }
 
 impl MockCubeBuilder {
@@ -123,6 +137,16 @@ impl MockCubeBuilder {
         self
     }
 
+    /// Add a segment to the cube
+    pub fn add_segment(
+        mut self,
+        name: impl Into<String>,
+        definition: MockSegmentDefinition,
+    ) -> Self {
+        self.segments.insert(name.into(), Rc::new(definition));
+        self
+    }
+
     /// Finish building this cube and return to schema builder
     pub fn finish_cube(mut self) -> MockSchemaBuilder {
         let cube_def = self.cube_definition.unwrap_or_else(|| {
@@ -137,6 +161,7 @@ impl MockCubeBuilder {
             definition: cube_def,
             measures: self.measures,
             dimensions: self.dimensions,
+            segments: self.segments,
         };
 
         self.schema_builder.cubes.insert(self.cube_name, cube);
@@ -147,6 +172,7 @@ impl MockCubeBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cube_bridge::segment_definition::SegmentDefinition;
 
     #[test]
     fn test_basic_schema() {
@@ -380,5 +406,130 @@ mod tests {
         // Verify dimensions
         assert!(schema.get_dimension("users", "name").is_some());
         assert!(schema.get_dimension("orders", "user_id").is_some());
+    }
+
+    #[test]
+    fn test_schema_with_segments() {
+        use crate::test_fixtures::cube_bridge::MockSegmentDefinition;
+
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .add_measure(
+                "count",
+                MockMeasureDefinition::builder()
+                    .measure_type("count".to_string())
+                    .sql("COUNT(*)".to_string())
+                    .build(),
+            )
+            .add_segment(
+                "active",
+                MockSegmentDefinition::builder()
+                    .sql("{CUBE.status} = 'active'".to_string())
+                    .build(),
+            )
+            .add_segment(
+                "premium",
+                MockSegmentDefinition::builder()
+                    .sql("{CUBE.is_premium} = true".to_string())
+                    .segment_type(Some("filter".to_string()))
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        // Verify cube exists
+        assert!(schema.get_cube("users").is_some());
+
+        // Verify segments
+        let active_segment = schema.get_segment("users", "active").unwrap();
+        let sql = active_segment.sql().unwrap();
+        assert_eq!(sql.args_names(), &vec!["CUBE"]);
+
+        let premium_segment = schema.get_segment("users", "premium").unwrap();
+        assert_eq!(
+            premium_segment.static_data().segment_type,
+            Some("filter".to_string())
+        );
+
+        // Verify missing segment
+        assert!(schema.get_segment("users", "nonexistent").is_none());
+        assert!(schema.get_segment("nonexistent_cube", "active").is_none());
+    }
+
+    #[test]
+    fn test_complete_schema_with_all_members() {
+        use crate::test_fixtures::cube_bridge::MockSegmentDefinition;
+
+        let schema = MockSchemaBuilder::new()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .add_dimension(
+                "status",
+                MockDimensionDefinition::builder()
+                    .dimension_type("string".to_string())
+                    .sql("status".to_string())
+                    .build(),
+            )
+            .add_dimension(
+                "created_at",
+                MockDimensionDefinition::builder()
+                    .dimension_type("time".to_string())
+                    .sql("created_at".to_string())
+                    .build(),
+            )
+            .add_measure(
+                "count",
+                MockMeasureDefinition::builder()
+                    .measure_type("count".to_string())
+                    .sql("COUNT(*)".to_string())
+                    .build(),
+            )
+            .add_measure(
+                "total_amount",
+                MockMeasureDefinition::builder()
+                    .measure_type("sum".to_string())
+                    .sql("amount".to_string())
+                    .build(),
+            )
+            .add_segment(
+                "completed",
+                MockSegmentDefinition::builder()
+                    .sql("{CUBE.status} = 'completed'".to_string())
+                    .build(),
+            )
+            .add_segment(
+                "high_value",
+                MockSegmentDefinition::builder()
+                    .sql("{CUBE.amount} > 1000".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let cube = schema.get_cube("orders").unwrap();
+
+        // Verify all member types exist
+        assert_eq!(cube.dimensions.len(), 3);
+        assert_eq!(cube.measures.len(), 2);
+        assert_eq!(cube.segments.len(), 2);
+
+        // Verify lookups work for all member types
+        assert!(schema.get_dimension("orders", "status").is_some());
+        assert!(schema.get_measure("orders", "count").is_some());
+        assert!(schema.get_segment("orders", "completed").is_some());
+        assert!(schema.get_segment("orders", "high_value").is_some());
     }
 }
