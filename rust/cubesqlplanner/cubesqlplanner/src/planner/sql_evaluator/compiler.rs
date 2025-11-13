@@ -329,4 +329,152 @@ mod tests {
         assert_eq!(source_symbol.get_dependencies().len(), 0);
         assert_eq!(created_at_symbol.get_dependencies().len(), 0);
     }
+
+    #[test]
+    fn test_add_measure_evaluator_count_measure() {
+        let schema = create_visitors_schema();
+        let evaluator = Rc::new(MockCubeEvaluator::new(schema));
+        let sql_utils = Rc::new(MockSqlUtils);
+        let security_context = Rc::new(MockSecurityContext);
+        let timezone = Tz::UTC;
+
+        let mut compiler = Compiler::new(evaluator, sql_utils, security_context, timezone);
+
+        let symbol = compiler
+            .add_measure_evaluator("visitor_checkins.count".to_string())
+            .unwrap();
+
+        // Check symbol type
+        assert!(symbol.is_measure());
+        assert!(!symbol.is_dimension());
+
+        // Check full name
+        assert_eq!(symbol.full_name(), "visitor_checkins.count");
+
+        // Check cube name and member name
+        assert_eq!(symbol.cube_name(), "visitor_checkins");
+        assert_eq!(symbol.name(), "count");
+
+        // Check no dependencies for simple measure
+        let dependencies = symbol.get_dependencies();
+        assert_eq!(
+            dependencies.len(),
+            0,
+            "Simple measure should have no dependencies"
+        );
+
+        // Check measure type
+        let measure = symbol.as_measure().unwrap();
+        assert_eq!(measure.measure_type(), "count");
+    }
+
+    #[test]
+    fn test_add_measure_evaluator_sum_measure() {
+        let schema = create_visitors_schema();
+        let evaluator = Rc::new(MockCubeEvaluator::new(schema));
+        let sql_utils = Rc::new(MockSqlUtils);
+        let security_context = Rc::new(MockSecurityContext);
+        let timezone = Tz::UTC;
+
+        let mut compiler = Compiler::new(evaluator, sql_utils, security_context, timezone);
+
+        let symbol = compiler
+            .add_measure_evaluator("visitors.total_revenue".to_string())
+            .unwrap();
+
+        // Check symbol type
+        assert!(symbol.is_measure());
+        assert!(!symbol.is_dimension());
+
+        // Check full name
+        assert_eq!(symbol.full_name(), "visitors.total_revenue");
+
+        // Check cube name and member name
+        assert_eq!(symbol.cube_name(), "visitors");
+        assert_eq!(symbol.name(), "total_revenue");
+
+        // Check no dependencies for simple measure
+        let dependencies = symbol.get_dependencies();
+        assert_eq!(
+            dependencies.len(),
+            0,
+            "Simple measure should have no dependencies"
+        );
+
+        // Check measure type
+        let measure = symbol.as_measure().unwrap();
+        assert_eq!(measure.measure_type(), "sum");
+    }
+
+    #[test]
+    fn test_add_measure_evaluator_caching() {
+        let schema = create_visitors_schema();
+        let evaluator = Rc::new(MockCubeEvaluator::new(schema));
+        let sql_utils = Rc::new(MockSqlUtils);
+        let security_context = Rc::new(MockSecurityContext);
+        let timezone = Tz::UTC;
+
+        let mut compiler = Compiler::new(evaluator, sql_utils, security_context, timezone);
+
+        // Add measure twice
+        let symbol1 = compiler
+            .add_measure_evaluator("visitors.total_revenue".to_string())
+            .unwrap();
+        let symbol2 = compiler
+            .add_measure_evaluator("visitors.total_revenue".to_string())
+            .unwrap();
+
+        // Should return the same cached instance
+        assert_eq!(
+            symbol1.full_name(),
+            symbol2.full_name(),
+            "Cached symbols should have the same full name"
+        );
+    }
+
+    #[test]
+    fn test_add_measure_evaluator_invalid_path() {
+        let schema = create_visitors_schema();
+        let evaluator = Rc::new(MockCubeEvaluator::new(schema));
+        let sql_utils = Rc::new(MockSqlUtils);
+        let security_context = Rc::new(MockSecurityContext);
+        let timezone = Tz::UTC;
+
+        let mut compiler = Compiler::new(evaluator, sql_utils, security_context, timezone);
+
+        // Try to add non-existent measure
+        let result = compiler.add_measure_evaluator("nonexistent.measure".to_string());
+
+        assert!(result.is_err(), "Should fail for non-existent measure");
+    }
+
+    #[test]
+    fn test_add_measure_evaluator_multiple_measures() {
+        let schema = create_visitors_schema();
+        let evaluator = Rc::new(MockCubeEvaluator::new(schema));
+        let sql_utils = Rc::new(MockSqlUtils);
+        let security_context = Rc::new(MockSecurityContext);
+        let timezone = Tz::UTC;
+
+        let mut compiler = Compiler::new(evaluator, sql_utils, security_context, timezone);
+
+        // Add multiple different measures
+        let count_symbol = compiler
+            .add_measure_evaluator("visitor_checkins.count".to_string())
+            .unwrap();
+        let revenue_symbol = compiler
+            .add_measure_evaluator("visitors.total_revenue".to_string())
+            .unwrap();
+
+        // Verify each measure
+        assert_eq!(count_symbol.full_name(), "visitor_checkins.count");
+        assert_eq!(count_symbol.as_measure().unwrap().measure_type(), "count");
+
+        assert_eq!(revenue_symbol.full_name(), "visitors.total_revenue");
+        assert_eq!(revenue_symbol.as_measure().unwrap().measure_type(), "sum");
+
+        // All should have no dependencies
+        assert_eq!(count_symbol.get_dependencies().len(), 0);
+        assert_eq!(revenue_symbol.get_dependencies().len(), 0);
+    }
 }
