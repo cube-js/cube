@@ -3934,16 +3934,16 @@ mod tests {
                     .await
                     .unwrap();
 
-                assert_eq!(result.len(), 3);
-                assert_eq!(result.get_columns().len(), 1);
+                assert_eq!(result.len(), 1);
+                assert_eq!(result.get_columns().len(), 3);
 
                 assert_eq!(
                     result.get_rows(),
-                    &vec![
-                        Row::new(vec![TableValue::Float(42_0.into())]),
-                        Row::new(vec![TableValue::Float(42.44.into())]),
-                        Row::new(vec![TableValue::Float(1230_0.into())]),
-                    ]
+                    &vec![Row::new(vec![
+                        TableValue::Float(42.0.into()),
+                        TableValue::Float(42.44.into()),
+                        TableValue::Float(1230.0.into())
+                    ]),]
                 )
             }
         })
