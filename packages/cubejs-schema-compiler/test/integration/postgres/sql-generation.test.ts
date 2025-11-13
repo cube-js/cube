@@ -906,7 +906,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     })
     `);
 
-  it('simple join 1', async () => {
+  it('simple join', async () => {
     await compiler.compile();
 
     console.log(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
@@ -2866,8 +2866,6 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     console.log(query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      console.log(res);
-
       const expected = getEnv('nativeSqlPlanner') ?
 
         [
@@ -3873,7 +3871,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   );
 
   it(
-    'filter group 1',
+    'filter group',
     () => runQueryTest({
       measures: ['visitor_checkins.visitor_checkins_count'],
       dimensions: [],
