@@ -49,11 +49,6 @@ pub trait CubeEvaluator {
     fn is_dimension(&self, path: Vec<String>) -> Result<bool, CubeError>;
     fn is_segment(&self, path: Vec<String>) -> Result<bool, CubeError>;
     fn cube_exists(&self, name: String) -> Result<bool, CubeError>;
-    fn resolve_symbols_call_deps(
-        &self,
-        cube_name: String,
-        sql: Rc<dyn MemberSql>,
-    ) -> Result<Vec<CallDep>, CubeError>;
     fn resolve_granularity(
         &self,
         path: Vec<String>,
