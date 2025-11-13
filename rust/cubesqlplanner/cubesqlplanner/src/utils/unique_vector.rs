@@ -11,5 +11,3 @@ impl<T: PartialEq> UniqueVector<T> for Vec<T> {
         })
     }
 }
-
-

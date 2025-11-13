@@ -108,7 +108,6 @@ impl QueryToolsCachedData {
 pub struct QueryTools {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
-    security_context: Rc<dyn SecurityContext>,
     join_graph: Rc<dyn JoinGraph>,
     templates_render: Rc<dyn SqlTemplatesRender>,
     params_allocator: Rc<RefCell<ParamsAllocator>>,
@@ -142,7 +141,6 @@ impl QueryTools {
         )));
         Ok(Rc::new(Self {
             cube_evaluator,
-            security_context,
             base_tools,
             join_graph,
             templates_render,

@@ -205,14 +205,6 @@ impl<'a> SqlCallBuilder<'a> {
         }
     }
 
-    //TODO Temporary solution while we haven't all symbols in rust side
-    fn is_member(&self, cube_name: &String, name: &String) -> Result<bool, CubeError> {
-        let path = vec![cube_name.clone(), name.clone()];
-        Ok(self.cube_evaluator.is_measure(path.clone())?
-            || self.cube_evaluator.is_dimension(path.clone())?
-            || self.cube_evaluator.is_segment(path.clone())?)
-    }
-
     fn is_current_cube(&self, name: &str) -> bool {
         match name {
             "CUBE" | "TABLE" => true,

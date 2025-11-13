@@ -1,6 +1,5 @@
 use super::{inner_types::InnerTypes, object::NativeObject};
 use super::{NativeContextHolder, NativeContextHolderRef, NativeString, NativeStruct};
-use crate::wrappers::NativeNumber;
 use crate::CubeError;
 
 #[derive(Clone)]

@@ -1,7 +1,5 @@
-use cubenativeutils::wrappers::serializer::{
-    NativeDeserialize, NativeDeserializer, NativeSerialize,
-};
-use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeString};
+use cubenativeutils::wrappers::inner_types::InnerTypes;
+use cubenativeutils::wrappers::serializer::{NativeDeserialize, NativeSerialize};
 use cubenativeutils::wrappers::{NativeContextHolder, NativeFunction};
 use cubenativeutils::wrappers::{NativeContextHolderRef, NativeObjectHandle};
 use cubenativeutils::CubeError;

@@ -10,19 +10,17 @@ use super::{
 };
 use crate::wrappers::neon::object::IntoNeonObject;
 use crate::wrappers::object::*;
-use crate::wrappers::serializer::{NativeDeserialize, NativeSerialize};
+use crate::wrappers::serializer::NativeSerialize;
 use crate::wrappers::{
     context::NativeContext, functions_args_def::FunctionArgsDef, object::NativeObject,
     object_handle::NativeObjectHandle, NativeContextHolder,
 };
-use crate::wrappers::{NativeString, NativeStruct};
 use crate::CubeError;
 use neon::prelude::*;
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
 };
-use tokio::sync::mpsc::error::SendTimeoutError;
 
 pub struct ContextHolder<C: Context<'static>> {
     context: Weak<RefCell<ContextWrapper<C>>>,

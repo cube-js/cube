@@ -2,9 +2,7 @@ use super::object::NeonObject;
 use super::*;
 use crate::CubeError;
 use crate::{
-    wrappers::{
-        functions_args_def::FunctionArgsDef, object_handle::NativeObjectHandle, NativeContextHolder,
-    },
+    wrappers::{functions_args_def::FunctionArgsDef, object_handle::NativeObjectHandle},
     CubeErrorCauseType,
 };
 use neon::prelude::*;

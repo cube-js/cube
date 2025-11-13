@@ -1,18 +1,12 @@
 use super::sql_nodes::SqlNode;
 use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
-use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
-use crate::cube_bridge::base_tools::BaseTools;
-use crate::cube_bridge::member_sql::{
-    FilterParamsColumn, MemberSql, SecutityContextProps, SqlTemplate,
-};
-use crate::plan::{Filter, FilterItem};
+use crate::cube_bridge::member_sql::{FilterParamsColumn, SecutityContextProps, SqlTemplate};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::sql_nodes::{RawReferenceValue, SqlNodesFactory};
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
@@ -139,7 +133,12 @@ impl SqlCall {
             .filter_params
             .iter()
             .map(|itm| {
-                Self::eval_filter_group(&vec![itm.clone()], visitor, query_tools.clone(), templates)
+                Self::eval_filter_group(
+                    std::slice::from_ref(&itm),
+                    visitor,
+                    query_tools.clone(),
+                    templates,
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
         let filter_groups = self

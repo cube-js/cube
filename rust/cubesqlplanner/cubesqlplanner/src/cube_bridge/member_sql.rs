@@ -1,23 +1,17 @@
 use super::filter_params_callback::{FilterParamsCallback, NativeFilterParamsCallback};
 use super::{
-    filter_group::{FilterGroup, NativeFilterGroup},
-    filter_params::{FilterParams, NativeFilterParams},
     security_context::{NativeSecurityContext, SecurityContext},
-    sql_utils::{NativeSqlUtils, SqlUtils},
+    sql_utils::NativeSqlUtils,
 };
 use crate::utils::UniqueVector;
 use crate::{cube_bridge::base_tools::BaseTools, planner::sql_evaluator::SqlCallArg};
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
-use cubenativeutils::wrappers::serializer::{
-    NativeDeserialize, NativeDeserializer, NativeSerialize,
-};
+use cubenativeutils::wrappers::serializer::{NativeDeserialize, NativeSerialize};
+use cubenativeutils::wrappers::NativeContextHolderRef;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::wrappers::{inner_types::InnerTypes, NativeString};
-use cubenativeutils::wrappers::{make_proxy, NativeContextHolderRef};
 use cubenativeutils::wrappers::{NativeArray, NativeContextHolder};
 use cubenativeutils::CubeError;
-use serde::{Deserialize, Serialize};
-use std::collections::hash_map::HashMap;
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell, rc::Weak};
 

@@ -2,8 +2,7 @@ use std::any::Any;
 
 use super::FunctionArgsDef;
 use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
-use crate::wrappers::serializer::{NativeDeserialize, NativeSerialize};
-use crate::wrappers::*;
+use crate::wrappers::serializer::NativeSerialize;
 use crate::CubeError;
 
 pub trait NativeContext<IT: InnerTypes>: Clone {

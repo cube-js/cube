@@ -1,8 +1,5 @@
-use std::any::Any;
-
-use super::FunctionArgsDef;
 use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
-use crate::wrappers::serializer::{NativeDeserialize, NativeSerialize};
+use crate::wrappers::serializer::NativeSerialize;
 use crate::wrappers::*;
 use crate::CubeError;
 pub fn make_proxy<
