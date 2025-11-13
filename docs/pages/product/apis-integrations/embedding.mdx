@@ -35,10 +35,21 @@ Use the `/api/v1/embed/generate-session` endpoint to create a session for your u
 </WarningBox>
 
 
+#### Request parameters
+
+- **`deploymentId`** (required): The deployment ID to scope the session to. This ensures tokens and access are limited to a specific deployment and model, providing better security isolation.
+- **`externalId`** (required): A unique identifier for your user (e.g., email, user ID)
+- **`userAttributes`** (optional): Array of attributes for row-level security and personalized responses
+
+<InfoBox>
+  The `deploymentId` parameter is required for security purposes. It scopes the generated session token to a specific deployment and data model, preventing unauthorized access across different deployments or models.
+</InfoBox>
+
 #### Example (JavaScript)
 
 ```javascript
 const API_KEY = "YOUR_API_KEY";
+const DEPLOYMENT_ID = 32;
 
 const session = await fetch(
   "https://your-tenant.cubecloud.dev/api/v1/embed/generate-session",
@@ -49,6 +60,7 @@ const session = await fetch(
       Authorization: "Access-Token ${API_KEY}",
     },
     body: JSON.stringify({
+      deploymentId: DEPLOYMENT_ID,
       externalId: "user@example.com",
       userAttributes: [
         // optional - enables row-level security
@@ -99,6 +111,7 @@ Here's a complete HTML example that demonstrates the full flow for embedding a d
       (async () => {
         const API_BASE_URL = "https://your-tenant.cubecloud.dev";
         const API_KEY = "YOUR_API_KEY";
+        const DEPLOYMENT_ID = 32;
         const externalId = "user@example.com";
 
         const sessionResponse = await fetch(
@@ -110,6 +123,7 @@ Here's a complete HTML example that demonstrates the full flow for embedding a d
               Authorization: `Access-Token ${API_KEY}`,
             },
             body: JSON.stringify({
+              deploymentId: DEPLOYMENT_ID,
               externalId: externalId,
             }),
           },
@@ -165,6 +179,7 @@ User attributes enable row-level security and personalized chat responses by fil
 ## Security considerations
 
 - **API Key Security**: Keep your API keys secure and never expose them in client-side code
+- **Deployment Scoping**: The required `deploymentId` parameter ensures that generated session tokens are scoped to a specific deployment and data model. This provides isolation between different deployments and prevents unauthorized cross-deployment access.
 - **Session Management**: Sessions are temporary and should be regenerated as needed
 - **HTTPS**: Always use HTTPS in production environments
 
