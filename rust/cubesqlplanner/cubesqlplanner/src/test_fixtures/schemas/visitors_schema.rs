@@ -64,7 +64,14 @@ pub fn create_visitors_schema() -> MockSchema {
             "visitor_id",
             MockDimensionDefinition::builder()
                 .dimension_type("number".to_string())
-                .sql("visitor_id".to_string())
+                .sql("{CUBE}.visitor_id".to_string())
+                .build(),
+        )
+        .add_dimension(
+            "visitor_id_twice",
+            MockDimensionDefinition::builder()
+                .dimension_type("number".to_string())
+                .sql("{visitor_id} * 2".to_string())
                 .build(),
         )
         .add_dimension(
@@ -72,6 +79,13 @@ pub fn create_visitors_schema() -> MockSchema {
             MockDimensionDefinition::builder()
                 .dimension_type("string".to_string())
                 .sql("source".to_string())
+                .build(),
+        )
+        .add_dimension(
+            "source_concat_id",
+            MockDimensionDefinition::builder()
+                .dimension_type("string".to_string())
+                .sql("CONCAT({CUBE.source}, ' ', {visitors.visitor_id})".to_string())
                 .build(),
         )
         .add_dimension(
@@ -131,6 +145,20 @@ pub fn create_visitors_schema() -> MockSchema {
             MockMeasureDefinition::builder()
                 .measure_type("sum".to_string())
                 .sql("revenue".to_string())
+                .build(),
+        )
+        .add_measure(
+            "revenue",
+            MockMeasureDefinition::builder()
+                .measure_type("sum".to_string())
+                .sql("{CUBE}.revenue".to_string())
+                .build(),
+        )
+        .add_measure(
+            "total_revenue_per_count",
+            MockMeasureDefinition::builder()
+                .measure_type("number".to_string())
+                .sql("{visitors.count} / {total_revenue}".to_string())
                 .build(),
         )
         .add_segment(
@@ -213,9 +241,7 @@ mod tests {
             .get_dimension("visitor_checkins", "visitor_id")
             .is_some());
 
-        let min_date = schema
-            .get_dimension("visitor_checkins", "minDate")
-            .unwrap();
+        let min_date = schema.get_dimension("visitor_checkins", "minDate").unwrap();
         assert_eq!(min_date.static_data().dimension_type, "time");
 
         let min_date1 = schema
@@ -282,3 +308,4 @@ mod tests {
         assert_eq!(lon_sql.args_names().len(), 0);
     }
 }
+

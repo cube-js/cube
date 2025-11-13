@@ -266,3 +266,166 @@ fn test_add_cube_name_evaluator() {
     assert_eq!(symbol.cube_name(), "visitors");
 }
 
+// Tests for dimensions and measures with dependencies
+
+#[test]
+fn test_dimension_with_cube_table_dependency() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // visitor_id has dependency on {CUBE.}visitor_id
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("visitors.visitor_id".to_string())
+        .unwrap();
+
+    assert!(symbol.is_dimension());
+    assert_eq!(symbol.full_name(), "visitors.visitor_id");
+    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.as_dimension().unwrap().dimension_type(), "number");
+
+    // Should have 1 dependency: CubeTable
+    let dependencies = symbol.get_dependencies();
+    assert_eq!(dependencies.len(), 1, "Should have 1 dependency on CUBE");
+
+    let dep = &dependencies[0];
+    assert!(dep.is_cube(), "Dependency should be a cube symbol");
+    assert_eq!(dep.full_name(), "visitors");
+    assert_eq!(dep.cube_name(), "visitors");
+}
+
+#[test]
+fn test_dimension_with_member_dependency_no_prefix() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // visitor_id_twice has dependency on {visitor_id} without cube prefix
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("visitors.visitor_id_twice".to_string())
+        .unwrap();
+
+    assert!(symbol.is_dimension());
+    assert_eq!(symbol.full_name(), "visitors.visitor_id_twice");
+    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.as_dimension().unwrap().dimension_type(), "number");
+
+    // Should have 1 dependency: visitor_id dimension
+    let dependencies = symbol.get_dependencies();
+    assert_eq!(
+        dependencies.len(),
+        1,
+        "Should have 1 dependency on visitor_id"
+    );
+
+    let dep = &dependencies[0];
+    assert!(dep.is_dimension(), "Dependency should be a dimension");
+    assert_eq!(dep.full_name(), "visitors.visitor_id");
+    assert_eq!(dep.cube_name(), "visitors");
+}
+
+#[test]
+fn test_dimension_with_mixed_dependencies() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // source_concat_id has dependencies on {CUBE.source} and {visitors.visitor_id}
+    let symbol = test_compiler
+        .compiler
+        .add_dimension_evaluator("visitors.source_concat_id".to_string())
+        .unwrap();
+
+    assert!(symbol.is_dimension());
+    assert_eq!(symbol.full_name(), "visitors.source_concat_id");
+    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.as_dimension().unwrap().dimension_type(), "string");
+
+    // Should have 2 dependencies: visitors.source and visitors.visitor_id
+    let dependencies = symbol.get_dependencies();
+    assert_eq!(
+        dependencies.len(),
+        2,
+        "Should have 2 dimension dependencies"
+    );
+
+    // Both should be dimensions
+    for dep in &dependencies {
+        assert!(dep.is_dimension(), "All dependencies should be dimensions");
+        assert_eq!(dep.cube_name(), "visitors");
+    }
+
+    // Check we have both expected dependencies
+    let dep_names: Vec<String> = dependencies.iter().map(|d| d.full_name()).collect();
+    assert!(
+        dep_names.contains(&"visitors.source".to_string()),
+        "Should have dependency on visitors.source"
+    );
+    assert!(
+        dep_names.contains(&"visitors.visitor_id".to_string()),
+        "Should have dependency on visitors.visitor_id"
+    );
+}
+
+#[test]
+fn test_measure_with_cube_table_dependency() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // revenue has dependency on {CUBE}.revenue
+    let symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("visitors.revenue".to_string())
+        .unwrap();
+
+    assert!(symbol.is_measure());
+    assert_eq!(symbol.full_name(), "visitors.revenue");
+    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.as_measure().unwrap().measure_type(), "sum");
+
+    // Should have 1 dependency: CubeTable
+    let dependencies = symbol.get_dependencies();
+    assert_eq!(dependencies.len(), 1, "Should have 1 dependency on CUBE");
+
+    let dep = &dependencies[0];
+    assert!(dep.is_cube(), "Dependency should be a cube symbol");
+    assert_eq!(dep.full_name(), "visitors");
+    assert_eq!(dep.cube_name(), "visitors");
+}
+
+#[test]
+fn test_measure_with_explicit_cube_and_member_dependencies() {
+    let evaluator = create_visitors_schema().create_evaluator();
+    let mut test_compiler = TestCompiler::new(evaluator);
+
+    // total_revenue_per_count has dependencies on {visitors.count} and {total_revenue}
+    let symbol = test_compiler
+        .compiler
+        .add_measure_evaluator("visitors.total_revenue_per_count".to_string())
+        .unwrap();
+
+    assert!(symbol.is_measure());
+    assert_eq!(symbol.full_name(), "visitors.total_revenue_per_count");
+    assert_eq!(symbol.cube_name(), "visitors");
+    assert_eq!(symbol.as_measure().unwrap().measure_type(), "number");
+
+    // Should have 2 dependencies: visitors.count and total_revenue
+    let dependencies = symbol.get_dependencies();
+    assert_eq!(dependencies.len(), 2, "Should have 2 measure dependencies");
+
+    // Both should be measures
+    for dep in &dependencies {
+        assert!(dep.is_measure(), "All dependencies should be measures");
+        assert_eq!(dep.cube_name(), "visitors");
+    }
+
+    // Check we have both expected dependencies
+    let dep_names: Vec<String> = dependencies.iter().map(|d| d.full_name()).collect();
+    assert!(
+        dep_names.contains(&"visitors.count".to_string()),
+        "Should have dependency on visitors.count"
+    );
+    assert!(
+        dep_names.contains(&"visitors.total_revenue".to_string()),
+        "Should have dependency on visitors.total_revenue"
+    );
+}
