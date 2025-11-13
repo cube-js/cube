@@ -1,6 +1,7 @@
 #[macro_use]
 mod macros;
 
+mod mock_base_tools;
 mod mock_case_definition;
 mod mock_case_else_item;
 mod mock_case_item;
@@ -29,6 +30,7 @@ mod mock_sql_templates_render;
 mod mock_struct_with_sql_member;
 mod mock_timeshift_definition;
 
+pub use mock_base_tools::MockBaseTools;
 pub use mock_case_definition::MockCaseDefinition;
 pub use mock_case_else_item::MockCaseElseItem;
 pub use mock_case_item::MockCaseItem;
