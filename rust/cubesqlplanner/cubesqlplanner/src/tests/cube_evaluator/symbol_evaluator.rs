@@ -6,8 +6,8 @@ use crate::planner::sql_evaluator::sql_nodes::{SqlNode, SqlNodesFactory};
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{
-    MockBaseTools, MockCubeDefinition, MockDimensionDefinition, MockJoinGraph, MockSchema,
-    MockSchemaBuilder, MockSecurityContext,
+    MockBaseTools, MockCubeDefinition, MockDimensionDefinition, MockJoinGraph,
+    MockMeasureDefinition, MockSchema, MockSchemaBuilder, MockSecurityContext,
 };
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -27,6 +27,7 @@ fn create_test_schema() -> MockSchema {
             MockDimensionDefinition::builder()
                 .dimension_type("number".to_string())
                 .sql("id".to_string())
+                .primary_key(Some(true))
                 .build(),
         )
         .add_dimension(
@@ -49,6 +50,48 @@ fn create_test_schema() -> MockSchema {
                 .dimension_type("geo".to_string())
                 .latitude("latitude".to_string())
                 .longitude("longitude".to_string())
+                .build(),
+        )
+        .add_measure(
+            "sum_revenue",
+            MockMeasureDefinition::builder()
+                .measure_type("sum".to_string())
+                .sql("revenue".to_string())
+                .build(),
+        )
+        .add_measure(
+            "min_revenue",
+            MockMeasureDefinition::builder()
+                .measure_type("min".to_string())
+                .sql("revenue".to_string())
+                .build(),
+        )
+        .add_measure(
+            "max_revenue",
+            MockMeasureDefinition::builder()
+                .measure_type("max".to_string())
+                .sql("revenue".to_string())
+                .build(),
+        )
+        .add_measure(
+            "avg_revenue",
+            MockMeasureDefinition::builder()
+                .measure_type("avg".to_string())
+                .sql("revenue".to_string())
+                .build(),
+        )
+        .add_measure(
+            "count_distinct_id",
+            MockMeasureDefinition::builder()
+                .measure_type("countDistinct".to_string())
+                .sql("id".to_string())
+                .build(),
+        )
+        .add_measure(
+            "count_distinct_approx_id",
+            MockMeasureDefinition::builder()
+                .measure_type("countDistinctApprox".to_string())
+                .sql("id".to_string())
                 .build(),
         )
         .finish_cube()
@@ -158,5 +201,41 @@ fn simple_dimension_sql_evaluation() {
     assert_eq!(
         created_at_day_sql,
         "date_trunc('day', (\"test_cube\".created_at::timestamptz AT TIME ZONE 'UTC'))"
+    );
+}
+
+#[test]
+fn simple_aggregate_measures() {
+    let context = SqlEvaluationContext::new();
+
+    // Test SUM measure
+    let sum_sql = context.evaluate_measure("test_cube.sum_revenue").unwrap();
+    assert_eq!(sum_sql, r#"sum("test_cube".revenue)"#);
+
+    // Test MIN measure
+    let min_sql = context.evaluate_measure("test_cube.min_revenue").unwrap();
+    assert_eq!(min_sql, r#"min("test_cube".revenue)"#);
+
+    // Test MAX measure
+    let max_sql = context.evaluate_measure("test_cube.max_revenue").unwrap();
+    assert_eq!(max_sql, r#"max("test_cube".revenue)"#);
+
+    // Test AVG measure
+    let avg_sql = context.evaluate_measure("test_cube.avg_revenue").unwrap();
+    assert_eq!(avg_sql, r#"avg("test_cube".revenue)"#);
+
+    // Test COUNT DISTINCT measure
+    let count_distinct_sql = context
+        .evaluate_measure("test_cube.count_distinct_id")
+        .unwrap();
+    assert_eq!(count_distinct_sql, r#"COUNT(DISTINCT "test_cube".id)"#);
+
+    // Test COUNT DISTINCT APPROX measure
+    let count_distinct_approx_sql = context
+        .evaluate_measure("test_cube.count_distinct_approx_id")
+        .unwrap();
+    assert_eq!(
+        count_distinct_approx_sql,
+        r#"round(hll_cardinality(hll_add_agg(hll_hash_any("test_cube".id))))"#
     );
 }
