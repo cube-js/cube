@@ -555,20 +555,102 @@ impl MockJoinGraph {
         )
     }
 
-    /// Checks if a cube has a multiplication factor in the join tree
+    /// Checks if a specific join causes row multiplication for a cube
     ///
-    /// This is a stub implementation that will be completed in Step 6.
-    /// For now, it returns false for all cubes.
+    /// # Multiplication Rules
+    /// - If join.from == cube && relationship == "hasMany": multiplies
+    /// - If join.to == cube && relationship == "belongsTo": multiplies
+    /// - Otherwise: no multiplication
     ///
     /// # Arguments
-    /// * `_cube` - The cube name to check
-    /// * `_joins` - The join edges in the tree
+    /// * `cube` - The cube name to check
+    /// * `join` - The join edge to examine
     ///
     /// # Returns
-    /// * `false` - stub always returns false
-    fn find_multiplication_factor_for(&self, _cube: &str, _joins: &[JoinEdge]) -> bool {
-        // TODO: Implement in Step 6
-        false
+    /// * `true` if this join multiplies rows for the cube
+    /// * `false` otherwise
+    fn check_if_cube_multiplied(&self, cube: &str, join: &JoinEdge) -> bool {
+        let relationship = &join.join.static_data().relationship;
+
+        (join.from == cube && relationship == "hasMany")
+            || (join.to == cube && relationship == "belongsTo")
+    }
+
+    /// Determines if a cube has a multiplication factor in the join tree
+    ///
+    /// This method walks the join tree recursively to determine if joining
+    /// this cube causes row multiplication due to hasMany or belongsTo relationships.
+    ///
+    /// # Algorithm
+    /// 1. Start from the target cube
+    /// 2. Find all adjacent joins in the tree
+    /// 3. Check if any immediate join causes multiplication
+    /// 4. If not, recursively check adjacent cubes
+    /// 5. Use visited set to prevent infinite loops
+    ///
+    /// # Arguments
+    /// * `cube` - The cube name to check
+    /// * `joins` - The join edges in the tree
+    ///
+    /// # Returns
+    /// * `true` if this cube causes row multiplication
+    /// * `false` otherwise
+    ///
+    /// # Example
+    /// ```ignore
+    /// // users hasMany orders
+    /// let joins = vec![join_users_to_orders];
+    /// assert!(graph.find_multiplication_factor_for("users", &joins));
+    /// assert!(!graph.find_multiplication_factor_for("orders", &joins));
+    /// ```
+    fn find_multiplication_factor_for(&self, cube: &str, joins: &[JoinEdge]) -> bool {
+        use std::collections::HashSet;
+
+        let mut visited: HashSet<String> = HashSet::new();
+
+        fn find_if_multiplied_recursive(
+            graph: &MockJoinGraph,
+            current_cube: &str,
+            joins: &[JoinEdge],
+            visited: &mut HashSet<String>,
+        ) -> bool {
+            // Check if already visited (prevent cycles)
+            if visited.contains(current_cube) {
+                return false;
+            }
+            visited.insert(current_cube.to_string());
+
+            // Helper to get next node in edge
+            let next_node = |join: &JoinEdge| -> String {
+                if join.from == current_cube {
+                    join.to.clone()
+                } else {
+                    join.from.clone()
+                }
+            };
+
+            // Find all joins adjacent to current cube
+            let next_joins: Vec<&JoinEdge> = joins
+                .iter()
+                .filter(|j| j.from == current_cube || j.to == current_cube)
+                .collect();
+
+            // Check if any immediate join multiplies AND leads to unvisited node
+            if next_joins.iter().any(|next_join| {
+                let next = next_node(next_join);
+                graph.check_if_cube_multiplied(current_cube, next_join) && !visited.contains(&next)
+            }) {
+                return true;
+            }
+
+            // Recursively check adjacent cubes
+            next_joins.iter().any(|next_join| {
+                let next = next_node(next_join);
+                find_if_multiplied_recursive(graph, &next, joins, visited)
+            })
+        }
+
+        find_if_multiplied_recursive(self, cube, joins, &mut visited)
     }
 
     /// Compiles the join graph from cube definitions
@@ -1998,6 +2080,386 @@ mod tests {
 
         // Verify same Rc returned (pointer equality)
         assert!(Rc::ptr_eq(&result1, &result2));
+    }
+
+    #[test]
+    fn test_multiplication_factor_has_many() {
+        // users hasMany orders
+        // users should multiply, orders should not
+        let graph = MockJoinGraph::new();
+
+        let joins = vec![JoinEdge {
+            join: Rc::new(
+                MockJoinItemDefinition::builder()
+                    .relationship("hasMany".to_string())
+                    .sql("{CUBE}.id = {orders.user_id}".to_string())
+                    .build(),
+            ),
+            from: "users".to_string(),
+            to: "orders".to_string(),
+            original_from: "users".to_string(),
+            original_to: "orders".to_string(),
+        }];
+
+        assert!(graph.find_multiplication_factor_for("users", &joins));
+        assert!(!graph.find_multiplication_factor_for("orders", &joins));
+    }
+
+    #[test]
+    fn test_multiplication_factor_belongs_to() {
+        // orders belongsTo users
+        // users should multiply, orders should not
+        let graph = MockJoinGraph::new();
+
+        let joins = vec![JoinEdge {
+            join: Rc::new(
+                MockJoinItemDefinition::builder()
+                    .relationship("belongsTo".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            ),
+            from: "orders".to_string(),
+            to: "users".to_string(),
+            original_from: "orders".to_string(),
+            original_to: "users".to_string(),
+        }];
+
+        assert!(graph.find_multiplication_factor_for("users", &joins));
+        assert!(!graph.find_multiplication_factor_for("orders", &joins));
+    }
+
+    #[test]
+    fn test_multiplication_factor_transitive() {
+        // users hasMany orders, orders hasMany items
+        // users multiplies (direct hasMany)
+        // orders multiplies (has hasMany to items)
+        // items does not multiply
+        let graph = MockJoinGraph::new();
+
+        let joins = vec![
+            JoinEdge {
+                join: Rc::new(
+                    MockJoinItemDefinition::builder()
+                        .relationship("hasMany".to_string())
+                        .sql("{CUBE}.id = {orders.user_id}".to_string())
+                        .build(),
+                ),
+                from: "users".to_string(),
+                to: "orders".to_string(),
+                original_from: "users".to_string(),
+                original_to: "orders".to_string(),
+            },
+            JoinEdge {
+                join: Rc::new(
+                    MockJoinItemDefinition::builder()
+                        .relationship("hasMany".to_string())
+                        .sql("{CUBE}.id = {items.order_id}".to_string())
+                        .build(),
+                ),
+                from: "orders".to_string(),
+                to: "items".to_string(),
+                original_from: "orders".to_string(),
+                original_to: "items".to_string(),
+            },
+        ];
+
+        assert!(graph.find_multiplication_factor_for("users", &joins));
+        assert!(graph.find_multiplication_factor_for("orders", &joins));
+        assert!(!graph.find_multiplication_factor_for("items", &joins));
+    }
+
+    #[test]
+    fn test_multiplication_factor_many_to_one() {
+        // orders many_to_one users (neither multiplies)
+        let graph = MockJoinGraph::new();
+
+        let joins = vec![JoinEdge {
+            join: Rc::new(
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            ),
+            from: "orders".to_string(),
+            to: "users".to_string(),
+            original_from: "orders".to_string(),
+            original_to: "users".to_string(),
+        }];
+
+        assert!(!graph.find_multiplication_factor_for("users", &joins));
+        assert!(!graph.find_multiplication_factor_for("orders", &joins));
+    }
+
+    #[test]
+    fn test_multiplication_factor_star_pattern() {
+        // users hasMany orders, users hasMany sessions
+        // In this graph topology:
+        // - users multiplies (has hasMany to unvisited nodes)
+        // - orders multiplies (connected to users which has hasMany to sessions)
+        // - sessions multiplies (connected to users which has hasMany to orders)
+        // This is because the algorithm checks for multiplication in the connected component
+        let graph = MockJoinGraph::new();
+
+        let joins = vec![
+            JoinEdge {
+                join: Rc::new(
+                    MockJoinItemDefinition::builder()
+                        .relationship("hasMany".to_string())
+                        .sql("{CUBE}.id = {orders.user_id}".to_string())
+                        .build(),
+                ),
+                from: "users".to_string(),
+                to: "orders".to_string(),
+                original_from: "users".to_string(),
+                original_to: "orders".to_string(),
+            },
+            JoinEdge {
+                join: Rc::new(
+                    MockJoinItemDefinition::builder()
+                        .relationship("hasMany".to_string())
+                        .sql("{CUBE}.id = {sessions.user_id}".to_string())
+                        .build(),
+                ),
+                from: "users".to_string(),
+                to: "sessions".to_string(),
+                original_from: "users".to_string(),
+                original_to: "sessions".to_string(),
+            },
+        ];
+
+        assert!(graph.find_multiplication_factor_for("users", &joins));
+        // orders and sessions both return true because users (connected node) has hasMany
+        assert!(graph.find_multiplication_factor_for("orders", &joins));
+        assert!(graph.find_multiplication_factor_for("sessions", &joins));
+    }
+
+    #[test]
+    fn test_multiplication_factor_cycle() {
+        // A hasMany B, B hasMany A (cycle)
+        // Both should multiply
+        let graph = MockJoinGraph::new();
+
+        let joins = vec![
+            JoinEdge {
+                join: Rc::new(
+                    MockJoinItemDefinition::builder()
+                        .relationship("hasMany".to_string())
+                        .sql("{CUBE}.id = {B.a_id}".to_string())
+                        .build(),
+                ),
+                from: "A".to_string(),
+                to: "B".to_string(),
+                original_from: "A".to_string(),
+                original_to: "B".to_string(),
+            },
+            JoinEdge {
+                join: Rc::new(
+                    MockJoinItemDefinition::builder()
+                        .relationship("hasMany".to_string())
+                        .sql("{CUBE}.id = {A.b_id}".to_string())
+                        .build(),
+                ),
+                from: "B".to_string(),
+                to: "A".to_string(),
+                original_from: "B".to_string(),
+                original_to: "A".to_string(),
+            },
+        ];
+
+        assert!(graph.find_multiplication_factor_for("A", &joins));
+        assert!(graph.find_multiplication_factor_for("B", &joins));
+    }
+
+    #[test]
+    fn test_multiplication_factor_empty_joins() {
+        // No joins, no multiplication
+        let graph = MockJoinGraph::new();
+        let joins = vec![];
+
+        assert!(!graph.find_multiplication_factor_for("users", &joins));
+    }
+
+    #[test]
+    fn test_multiplication_factor_disconnected() {
+        // orders hasMany items (users disconnected)
+        // users not in join tree, should not multiply
+        let graph = MockJoinGraph::new();
+
+        let joins = vec![JoinEdge {
+            join: Rc::new(
+                MockJoinItemDefinition::builder()
+                    .relationship("hasMany".to_string())
+                    .sql("{CUBE}.id = {items.order_id}".to_string())
+                    .build(),
+            ),
+            from: "orders".to_string(),
+            to: "items".to_string(),
+            original_from: "orders".to_string(),
+            original_to: "items".to_string(),
+        }];
+
+        assert!(!graph.find_multiplication_factor_for("users", &joins));
+    }
+
+    #[test]
+    fn test_build_join_with_multiplication_factors() {
+        // Schema: users hasMany orders, orders many_to_one products
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "orders",
+                MockJoinItemDefinition::builder()
+                    .relationship("hasMany".to_string())
+                    .sql("{CUBE}.id = {orders.user_id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "products",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.product_id = {products.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("products")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let evaluator = schema.create_evaluator();
+        let cubes: Vec<Rc<crate::test_fixtures::cube_bridge::MockCubeDefinition>> = vec![
+            Rc::new(
+                evaluator
+                    .cube_from_path("users".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("orders".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("products".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+        ];
+
+        let mut graph = MockJoinGraph::new();
+        graph.compile(&cubes, &evaluator).unwrap();
+
+        // Build join: users -> orders -> products
+        let cubes_to_join = vec![
+            JoinHintItem::Single("users".to_string()),
+            JoinHintItem::Single("orders".to_string()),
+            JoinHintItem::Single("products".to_string()),
+        ];
+        let result = graph.build_join(cubes_to_join).unwrap();
+
+        // Check multiplication factors
+        let mult_factors = result.static_data().multiplication_factor.clone();
+
+        // users hasMany orders -> users multiplies
+        assert_eq!(mult_factors.get("users"), Some(&true));
+
+        // orders is in the middle, does not have its own hasMany, does not multiply
+        assert_eq!(mult_factors.get("orders"), Some(&false));
+
+        // products is leaf with many_to_one, does not multiply
+        assert_eq!(mult_factors.get("products"), Some(&false));
+    }
+
+    #[test]
+    fn test_check_if_cube_multiplied() {
+        let graph = MockJoinGraph::new();
+
+        // hasMany: from side multiplies
+        let join_has_many = JoinEdge {
+            join: Rc::new(
+                MockJoinItemDefinition::builder()
+                    .relationship("hasMany".to_string())
+                    .sql("{orders.user_id} = {users.id}".to_string())
+                    .build(),
+            ),
+            from: "users".to_string(),
+            to: "orders".to_string(),
+            original_from: "users".to_string(),
+            original_to: "orders".to_string(),
+        };
+
+        assert!(graph.check_if_cube_multiplied("users", &join_has_many));
+        assert!(!graph.check_if_cube_multiplied("orders", &join_has_many));
+
+        // belongsTo: to side multiplies
+        let join_belongs_to = JoinEdge {
+            join: Rc::new(
+                MockJoinItemDefinition::builder()
+                    .relationship("belongsTo".to_string())
+                    .sql("{orders.user_id} = {users.id}".to_string())
+                    .build(),
+            ),
+            from: "orders".to_string(),
+            to: "users".to_string(),
+            original_from: "orders".to_string(),
+            original_to: "users".to_string(),
+        };
+
+        assert!(graph.check_if_cube_multiplied("users", &join_belongs_to));
+        assert!(!graph.check_if_cube_multiplied("orders", &join_belongs_to));
+
+        // many_to_one: no multiplication
+        let join_many_to_one = JoinEdge {
+            join: Rc::new(
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{orders.user_id} = {users.id}".to_string())
+                    .build(),
+            ),
+            from: "orders".to_string(),
+            to: "users".to_string(),
+            original_from: "orders".to_string(),
+            original_to: "users".to_string(),
+        };
+
+        assert!(!graph.check_if_cube_multiplied("users", &join_many_to_one));
+        assert!(!graph.check_if_cube_multiplied("orders", &join_many_to_one));
     }
 
     #[test]
