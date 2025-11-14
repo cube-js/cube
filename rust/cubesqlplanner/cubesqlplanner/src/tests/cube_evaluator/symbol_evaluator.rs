@@ -12,6 +12,111 @@ use crate::test_fixtures::cube_bridge::{
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// Creates a schema for count measure testing with no primary keys
+fn create_count_schema_no_pk() -> MockSchema {
+    MockSchemaBuilder::new()
+        .add_cube("users")
+        .cube_def(
+            MockCubeDefinition::builder()
+                .name("users".to_string())
+                .sql("SELECT 1".to_string())
+                .build(),
+        )
+        .add_dimension(
+            "id",
+            MockDimensionDefinition::builder()
+                .dimension_type("number".to_string())
+                .sql("id".to_string())
+                .build(),
+        )
+        .add_dimension(
+            "userName",
+            MockDimensionDefinition::builder()
+                .dimension_type("string".to_string())
+                .sql("user_name".to_string())
+                .build(),
+        )
+        .add_measure(
+            "count",
+            MockMeasureDefinition::builder()
+                .measure_type("count".to_string())
+                .build(),
+        )
+        .finish_cube()
+        .build()
+}
+
+/// Creates a schema for count measure testing with one primary key
+fn create_count_schema_one_pk() -> MockSchema {
+    MockSchemaBuilder::new()
+        .add_cube("users")
+        .cube_def(
+            MockCubeDefinition::builder()
+                .name("users".to_string())
+                .sql("SELECT 1".to_string())
+                .build(),
+        )
+        .add_dimension(
+            "id",
+            MockDimensionDefinition::builder()
+                .dimension_type("number".to_string())
+                .sql("id".to_string())
+                .primary_key(Some(true))
+                .build(),
+        )
+        .add_dimension(
+            "userName",
+            MockDimensionDefinition::builder()
+                .dimension_type("string".to_string())
+                .sql("user_name".to_string())
+                .build(),
+        )
+        .add_measure(
+            "count",
+            MockMeasureDefinition::builder()
+                .measure_type("count".to_string())
+                .build(),
+        )
+        .finish_cube()
+        .build()
+}
+
+/// Creates a schema for count measure testing with two primary keys
+fn create_count_schema_two_pk() -> MockSchema {
+    MockSchemaBuilder::new()
+        .add_cube("users")
+        .cube_def(
+            MockCubeDefinition::builder()
+                .name("users".to_string())
+                .sql("SELECT 1".to_string())
+                .build(),
+        )
+        .add_dimension(
+            "id",
+            MockDimensionDefinition::builder()
+                .dimension_type("number".to_string())
+                .sql("id".to_string())
+                .primary_key(Some(true))
+                .build(),
+        )
+        .add_dimension(
+            "userName",
+            MockDimensionDefinition::builder()
+                .dimension_type("string".to_string())
+                .sql("user_name".to_string())
+                .primary_key(Some(true))
+                .build(),
+        )
+        .add_measure(
+            "count",
+            MockMeasureDefinition::builder()
+                .measure_type("count".to_string())
+                .build(),
+        )
+        .finish_cube()
+        .build()
+}
+
 /// Creates a test schema for symbol SQL generation tests
 fn create_test_schema() -> MockSchema {
     MockSchemaBuilder::new()
@@ -113,10 +218,8 @@ pub struct SqlEvaluationContext {
 }
 
 impl SqlEvaluationContext {
-    /// Create a new SQL evaluation context with test schema
-    pub fn new() -> Self {
-        // Create schema and evaluator
-        let schema = create_test_schema();
+    /// Create a new SQL evaluation context with a custom schema
+    pub fn new_with_schema(schema: MockSchema) -> Self {
         let evaluator = schema.create_evaluator();
 
         // Create QueryTools with mocks
@@ -150,6 +253,12 @@ impl SqlEvaluationContext {
             templates,
             node_processor,
         }
+    }
+
+    /// Create a new SQL evaluation context with test schema
+    pub fn new() -> Self {
+        let schema = create_test_schema();
+        Self::new_with_schema(schema)
     }
 
     /// Evaluate a dimension to SQL
@@ -237,5 +346,29 @@ fn simple_aggregate_measures() {
     assert_eq!(
         count_distinct_approx_sql,
         r#"round(hll_cardinality(hll_add_agg(hll_hash_any("test_cube".id))))"#
+    );
+}
+
+#[test]
+fn count_measure_variants() {
+    // Test COUNT with no primary keys - should use COUNT(*)
+    let schema_no_pk = create_count_schema_no_pk();
+    let context_no_pk = SqlEvaluationContext::new_with_schema(schema_no_pk);
+    let count_no_pk_sql = context_no_pk.evaluate_measure("users.count").unwrap();
+    assert_eq!(count_no_pk_sql, "count(*)");
+
+    // Test COUNT with one primary key - should use count(pk)
+    let schema_one_pk = create_count_schema_one_pk();
+    let context_one_pk = SqlEvaluationContext::new_with_schema(schema_one_pk);
+    let count_one_pk_sql = context_one_pk.evaluate_measure("users.count").unwrap();
+    assert_eq!(count_one_pk_sql, r#"count("users".id)"#);
+
+    // Test COUNT with two primary keys - should use count(CAST(pk1) || CAST(pk2))
+    let schema_two_pk = create_count_schema_two_pk();
+    let context_two_pk = SqlEvaluationContext::new_with_schema(schema_two_pk);
+    let count_two_pk_sql = context_two_pk.evaluate_measure("users.count").unwrap();
+    assert_eq!(
+        count_two_pk_sql,
+        "count(CAST(id AS STRING) || CAST(user_name AS STRING))"
     );
 }
