@@ -115,7 +115,10 @@ impl MemberSql for MockMemberSql {
         _sql_utils: Rc<dyn SqlUtils>,
         _security_context: Rc<dyn SecurityContext>,
     ) -> Result<(SqlTemplate, SqlTemplateArgs), CubeError> {
-        Ok((SqlTemplate::String(self.template.clone()), self.args.clone()))
+        Ok((
+            SqlTemplate::String(self.template.clone()),
+            self.args.clone(),
+        ))
     }
 }
 
@@ -150,18 +153,25 @@ mod tests {
 
         assert_eq!(mock.template, "{arg:0}");
         assert_eq!(mock.args.symbol_paths.len(), 1);
-        assert_eq!(mock.args.symbol_paths[0], vec!["other_cube", "cube2", "field"]);
+        assert_eq!(
+            mock.args.symbol_paths[0],
+            vec!["other_cube", "cube2", "field"]
+        );
         assert_eq!(mock.args_names, vec!["other_cube"]);
     }
 
     #[test]
     fn test_complex_expression() {
-        let mock = MockMemberSql::new("{CUBE.field} / {other_cube.cube2.field} + {revenue}").unwrap();
+        let mock =
+            MockMemberSql::new("{CUBE.field} / {other_cube.cube2.field} + {revenue}").unwrap();
 
         assert_eq!(mock.template, "{arg:0} / {arg:1} + {arg:2}");
         assert_eq!(mock.args.symbol_paths.len(), 3);
         assert_eq!(mock.args.symbol_paths[0], vec!["CUBE", "field"]);
-        assert_eq!(mock.args.symbol_paths[1], vec!["other_cube", "cube2", "field"]);
+        assert_eq!(
+            mock.args.symbol_paths[1],
+            vec!["other_cube", "cube2", "field"]
+        );
         assert_eq!(mock.args.symbol_paths[2], vec!["revenue"]);
         assert_eq!(mock.args_names, vec!["CUBE", "other_cube", "revenue"]);
     }

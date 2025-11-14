@@ -1,4 +1,6 @@
-use crate::cube_bridge::granularity_definition::{GranularityDefinition, GranularityDefinitionStatic};
+use crate::cube_bridge::granularity_definition::{
+    GranularityDefinition, GranularityDefinitionStatic,
+};
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::impl_static_data;
 use cubenativeutils::CubeError;

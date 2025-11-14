@@ -76,4 +76,3 @@ mod tests {
         assert!(timeshift.sql().unwrap().is_none());
     }
 }
-

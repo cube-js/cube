@@ -451,12 +451,22 @@ fn test_view_dimension_compilation() {
     assert!(dimension.is_view(), "Should be a view member");
 
     // Check that it's a reference (view members reference original cube members)
-    assert!(dimension.is_reference(), "Should be a reference to original member");
+    assert!(
+        dimension.is_reference(),
+        "Should be a reference to original member"
+    );
 
     // Resolve reference chain to get the original member
     let resolved = id_symbol.clone().resolve_reference_chain();
-    assert_eq!(resolved.full_name(), "visitors.id", "Should resolve to visitors.id");
-    assert!(!resolved.as_dimension().unwrap().is_view(), "Resolved member should not be a view");
+    assert_eq!(
+        resolved.full_name(),
+        "visitors.id",
+        "Should resolve to visitors.id"
+    );
+    assert!(
+        !resolved.as_dimension().unwrap().is_view(),
+        "Resolved member should not be a view"
+    );
 
     // Compile dimension from view with long join path
     let visitor_id_symbol = test_compiler
@@ -465,7 +475,10 @@ fn test_view_dimension_compilation() {
         .unwrap();
 
     assert!(visitor_id_symbol.is_dimension());
-    assert_eq!(visitor_id_symbol.full_name(), "visitors_visitors_checkins.visitor_id");
+    assert_eq!(
+        visitor_id_symbol.full_name(),
+        "visitors_visitors_checkins.visitor_id"
+    );
 
     let visitor_id_dim = visitor_id_symbol.as_dimension().unwrap();
     assert!(visitor_id_dim.is_view(), "Should be a view member");
@@ -478,7 +491,10 @@ fn test_view_dimension_compilation() {
         "visitor_checkins.visitor_id",
         "Should resolve to visitor_checkins.visitor_id"
     );
-    assert!(!resolved.as_dimension().unwrap().is_view(), "Resolved member should not be a view");
+    assert!(
+        !resolved.as_dimension().unwrap().is_view(),
+        "Resolved member should not be a view"
+    );
 }
 
 #[test]
@@ -503,7 +519,10 @@ fn test_view_measure_compilation() {
     assert!(measure.is_view(), "Should be a view member");
 
     // Check that it's a reference
-    assert!(measure.is_reference(), "Should be a reference to original member");
+    assert!(
+        measure.is_reference(),
+        "Should be a reference to original member"
+    );
 
     // Resolve reference chain to get the original member
     let resolved = count_symbol.clone().resolve_reference_chain();
@@ -512,7 +531,10 @@ fn test_view_measure_compilation() {
         "visitor_checkins.count",
         "Should resolve to visitor_checkins.count"
     );
-    assert!(!resolved.as_measure().unwrap().is_view(), "Resolved member should not be a view");
+    assert!(
+        !resolved.as_measure().unwrap().is_view(),
+        "Resolved member should not be a view"
+    );
 }
 
 #[test]
@@ -538,7 +560,10 @@ fn test_proxy_dimension_compilation() {
     assert!(!dimension.is_view(), "Proxy should not be a view member");
 
     // Check that it IS a reference (proxy references another member)
-    assert!(dimension.is_reference(), "Proxy should be a reference to another member");
+    assert!(
+        dimension.is_reference(),
+        "Proxy should be a reference to another member"
+    );
 
     // Resolve reference chain to get the target member
     let resolved = proxy_symbol.clone().resolve_reference_chain();
@@ -549,10 +574,16 @@ fn test_proxy_dimension_compilation() {
     );
 
     // Verify the resolved member is not a view
-    assert!(!resolved.as_dimension().unwrap().is_view(), "Target member should not be a view");
+    assert!(
+        !resolved.as_dimension().unwrap().is_view(),
+        "Target member should not be a view"
+    );
 
     // Verify the resolved member is also not a reference (it's the actual dimension)
-    assert!(!resolved.as_dimension().unwrap().is_reference(), "Target member should not be a reference");
+    assert!(
+        !resolved.as_dimension().unwrap().is_reference(),
+        "Target member should not be a reference"
+    );
 }
 
 #[test]
@@ -578,7 +609,10 @@ fn test_proxy_measure_compilation() {
     assert!(!measure.is_view(), "Proxy should not be a view member");
 
     // Check that it IS a reference (proxy references another member)
-    assert!(measure.is_reference(), "Proxy should be a reference to another member");
+    assert!(
+        measure.is_reference(),
+        "Proxy should be a reference to another member"
+    );
 
     // Resolve reference chain to get the target member
     let resolved = proxy_symbol.clone().resolve_reference_chain();
@@ -589,10 +623,16 @@ fn test_proxy_measure_compilation() {
     );
 
     // Verify the resolved member is not a view
-    assert!(!resolved.as_measure().unwrap().is_view(), "Target member should not be a view");
+    assert!(
+        !resolved.as_measure().unwrap().is_view(),
+        "Target member should not be a view"
+    );
 
     // Verify the resolved member is not a reference (it's the actual measure)
-    assert!(!resolved.as_measure().unwrap().is_reference(), "Target member should not be a reference");
+    assert!(
+        !resolved.as_measure().unwrap().is_reference(),
+        "Target member should not be a reference"
+    );
 }
 
 #[test]
@@ -607,7 +647,10 @@ fn test_time_dimension_with_granularity_compilation() {
         .unwrap();
 
     // Check that it's a time dimension, not a regular dimension
-    assert!(time_symbol.as_time_dimension().is_ok(), "Should be a time dimension");
+    assert!(
+        time_symbol.as_time_dimension().is_ok(),
+        "Should be a time dimension"
+    );
 
     // Check full name includes granularity
     assert_eq!(
@@ -629,11 +672,17 @@ fn test_time_dimension_with_granularity_compilation() {
     );
 
     // Check that it's NOT a reference
-    assert!(!time_dim.is_reference(), "Time dimension with granularity should not be a reference");
+    assert!(
+        !time_dim.is_reference(),
+        "Time dimension with granularity should not be a reference"
+    );
 
     // Check base symbol - should be the original dimension without granularity
     let base_symbol = time_dim.base_symbol();
-    assert!(base_symbol.is_dimension(), "Base symbol should be a dimension");
+    assert!(
+        base_symbol.is_dimension(),
+        "Base symbol should be a dimension"
+    );
     assert_eq!(
         base_symbol.full_name(),
         "visitors.created_at",

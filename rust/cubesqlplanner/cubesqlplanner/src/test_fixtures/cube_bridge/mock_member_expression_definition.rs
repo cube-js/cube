@@ -111,10 +111,7 @@ mod tests {
         );
 
         let result = expr.expression().unwrap();
-        assert!(matches!(
-            result,
-            MemberExpressionExpressionDef::Struct(_)
-        ));
+        assert!(matches!(result, MemberExpressionExpressionDef::Struct(_)));
     }
 
     #[test]

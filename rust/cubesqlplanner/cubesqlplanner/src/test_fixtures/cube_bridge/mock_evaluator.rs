@@ -674,4 +674,3 @@ mod tests {
         let _ = evaluator.evaluate_rollup_references("users".to_string(), sql);
     }
 }
-

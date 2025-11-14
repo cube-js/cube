@@ -79,8 +79,10 @@ mod tests {
     #[test]
     fn test_complex_segment_sql() {
         let segment = MockSegmentDefinition::builder()
-            .sql("{CUBE.created_at} >= '2024-01-01' AND {CUBE.status} IN ('active', 'pending')"
-                .to_string())
+            .sql(
+                "{CUBE.created_at} >= '2024-01-01' AND {CUBE.status} IN ('active', 'pending')"
+                    .to_string(),
+            )
             .build();
 
         let sql = segment.sql().unwrap();
@@ -109,8 +111,10 @@ mod tests {
     #[test]
     fn test_segment_with_cross_cube_reference() {
         let segment = MockSegmentDefinition::builder()
-            .sql("{CUBE.user_id} IN (SELECT id FROM {users} WHERE {users.is_premium} = true)"
-                .to_string())
+            .sql(
+                "{CUBE.user_id} IN (SELECT id FROM {users} WHERE {users.is_premium} = true)"
+                    .to_string(),
+            )
             .build();
 
         let sql = segment.sql().unwrap();

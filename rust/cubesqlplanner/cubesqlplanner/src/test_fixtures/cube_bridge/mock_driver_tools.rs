@@ -416,7 +416,9 @@ mod tests {
     fn test_count_distinct_approx() {
         let tools = MockDriverTools::new();
         assert_eq!(
-            tools.count_distinct_approx("visitor_id".to_string()).unwrap(),
+            tools
+                .count_distinct_approx("visitor_id".to_string())
+                .unwrap(),
             "round(hll_cardinality(hll_add_agg(hll_hash_any(visitor_id))))"
         );
     }
@@ -447,7 +449,9 @@ mod tests {
     #[test]
     fn test_in_db_time_zone() {
         let tools = MockDriverTools::new();
-        let result = tools.in_db_time_zone("2024-01-01T00:00:00".to_string()).unwrap();
+        let result = tools
+            .in_db_time_zone("2024-01-01T00:00:00".to_string())
+            .unwrap();
         assert_eq!(result, "2024-01-01T00:00:00");
     }
 

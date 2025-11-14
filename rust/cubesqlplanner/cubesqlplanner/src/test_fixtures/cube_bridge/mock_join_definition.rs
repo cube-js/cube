@@ -188,7 +188,11 @@ mod tests {
 
         let join_def = MockJoinDefinition::builder()
             .root("orders".to_string())
-            .joins(vec![join_orders_users, join_users_countries, join_orders_products])
+            .joins(vec![
+                join_orders_users,
+                join_users_countries,
+                join_orders_products,
+            ])
             .multiplication_factor(mult_factor)
             .build();
 
