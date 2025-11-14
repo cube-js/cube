@@ -39,6 +39,17 @@ impl MockCubeEvaluator {
         }
     }
 
+    /// Get all measures for a cube
+    pub fn measures_for_cube(
+        &self,
+        cube_name: &str,
+    ) -> HashMap<String, Rc<crate::test_fixtures::cube_bridge::MockMeasureDefinition>> {
+        self.schema
+            .get_cube(cube_name)
+            .map(|cube| cube.measures.clone())
+            .unwrap_or_default()
+    }
+
     /// Parse a path string like "cube.member" into ["cube", "member"]
     /// Returns error if the path doesn't exist in schema for the given type
     fn parse_and_validate_path(
