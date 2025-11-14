@@ -350,7 +350,6 @@ impl DimensionSymbolFactory {
         // 3. "cube.cube.cube...cube.member" might come from pre-agg references (as it include full join paths)
         // And we can not distinguish between "cube.member.granularity" and "cube.cube.member" here,
         // so we have to try-catch 2 variants of evaluation.
-        println!("!!! {}", full_name);
         if let Ok(iter_by_start) =
             cube_evaluator.parse_path("dimensions".to_string(), full_name.clone())
         {
