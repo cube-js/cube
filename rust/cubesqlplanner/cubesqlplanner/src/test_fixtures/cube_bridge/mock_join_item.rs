@@ -8,7 +8,7 @@ use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
 /// Mock implementation of JoinItem for testing
-#[derive(TypedBuilder)]
+#[derive(Debug, TypedBuilder)]
 pub struct MockJoinItem {
     // Fields from JoinItemStatic
     from: String,

@@ -9,7 +9,7 @@ use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
 /// Mock implementation of JoinDefinition for testing
-#[derive(TypedBuilder)]
+#[derive(Debug, TypedBuilder)]
 pub struct MockJoinDefinition {
     // Fields from JoinDefinitionStatic
     root: String,
