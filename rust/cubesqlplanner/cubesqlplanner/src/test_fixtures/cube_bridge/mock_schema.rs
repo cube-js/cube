@@ -1,6 +1,6 @@
 use crate::test_fixtures::cube_bridge::{
-    MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockMeasureDefinition,
-    MockSegmentDefinition,
+    MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockJoinItemDefinition,
+    MockMeasureDefinition, MockSegmentDefinition,
 };
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -119,6 +119,7 @@ impl MockSchemaBuilder {
             measures: HashMap::new(),
             dimensions: HashMap::new(),
             segments: HashMap::new(),
+            joins: HashMap::new(),
         }
     }
 
@@ -154,6 +155,7 @@ pub struct MockCubeBuilder {
     measures: HashMap<String, Rc<MockMeasureDefinition>>,
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
+    joins: HashMap<String, MockJoinItemDefinition>,
 }
 
 impl MockCubeBuilder {
@@ -193,15 +195,36 @@ impl MockCubeBuilder {
         self
     }
 
+    /// Add a join to the cube
+    pub fn add_join(mut self, name: impl Into<String>, definition: MockJoinItemDefinition) -> Self {
+        self.joins.insert(name.into(), definition);
+        self
+    }
+
     /// Finish building this cube and return to schema builder
     pub fn finish_cube(mut self) -> MockSchemaBuilder {
-        let cube_def = self.cube_definition.unwrap_or_else(|| {
+        let mut cube_def = self.cube_definition.unwrap_or_else(|| {
             // Create default cube definition with the cube name
             MockCubeDefinition::builder()
                 .name(self.cube_name.clone())
                 .sql_table(format!("public.{}", self.cube_name))
                 .build()
         });
+
+        // Merge joins from builder with joins from cube definition
+        let mut all_joins = cube_def.joins().clone();
+        all_joins.extend(self.joins);
+
+        // Rebuild cube definition with merged joins
+        let static_data = cube_def.static_data();
+        cube_def = MockCubeDefinition::builder()
+            .name(static_data.name.clone())
+            .sql_alias(static_data.sql_alias.clone())
+            .is_view(static_data.is_view)
+            .is_calendar(static_data.is_calendar)
+            .join_map(static_data.join_map.clone())
+            .joins(all_joins)
+            .build();
 
         let cube = MockCube {
             definition: cube_def,
@@ -400,6 +423,7 @@ impl MockViewBuilder {
 mod tests {
     use super::*;
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
+    use crate::cube_bridge::join_item_definition::JoinItemDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
 
@@ -1101,5 +1125,198 @@ mod tests {
             .include_cube("orders", vec![])
             .finish_view()
             .build();
+    }
+
+    #[test]
+    fn test_schema_builder_with_joins() {
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .add_dimension(
+                "user_id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("user_id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        // Verify cubes exist
+        assert!(schema.get_cube("users").is_some());
+        assert!(schema.get_cube("orders").is_some());
+
+        // Verify join in orders cube
+        let orders_cube = schema.get_cube("orders").unwrap();
+        assert_eq!(orders_cube.definition.joins().len(), 1);
+        assert!(orders_cube.definition.get_join("users").is_some());
+
+        let users_join = orders_cube.definition.get_join("users").unwrap();
+        assert_eq!(users_join.static_data().relationship, "many_to_one");
+    }
+
+    #[test]
+    fn test_complex_schema_with_join_relationships() {
+        let schema = MockSchemaBuilder::new()
+            .add_cube("countries")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_dimension(
+                "name",
+                MockDimensionDefinition::builder()
+                    .dimension_type("string".to_string())
+                    .sql("name".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_dimension(
+                "country_id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("country_id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "countries",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.country_id = {countries.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_dimension(
+                "user_id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("user_id".to_string())
+                    .build(),
+            )
+            .add_measure(
+                "count",
+                MockMeasureDefinition::builder()
+                    .measure_type("count".to_string())
+                    .sql("COUNT(*)".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        // Verify all cubes exist
+        assert_eq!(schema.cube_names().len(), 3);
+
+        // Verify countries has no joins
+        let countries_cube = schema.get_cube("countries").unwrap();
+        assert_eq!(countries_cube.definition.joins().len(), 0);
+
+        // Verify users has join to countries
+        let users_cube = schema.get_cube("users").unwrap();
+        assert_eq!(users_cube.definition.joins().len(), 1);
+        assert!(users_cube.definition.get_join("countries").is_some());
+
+        // Verify orders has join to users
+        let orders_cube = schema.get_cube("orders").unwrap();
+        assert_eq!(orders_cube.definition.joins().len(), 1);
+        assert!(orders_cube.definition.get_join("users").is_some());
+
+        // Verify join SQL
+        let orders_users_join = orders_cube.definition.get_join("users").unwrap();
+        let sql = orders_users_join.sql().unwrap();
+        assert_eq!(sql.args_names(), &vec!["CUBE", "users"]);
+    }
+
+    #[test]
+    fn test_cube_with_multiple_joins_via_builder() {
+        let schema = MockSchemaBuilder::new()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .add_join(
+                "products",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.product_id = {products.id}".to_string())
+                    .build(),
+            )
+            .add_join(
+                "warehouses",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.warehouse_id = {warehouses.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let orders_cube = schema.get_cube("orders").unwrap();
+        assert_eq!(orders_cube.definition.joins().len(), 3);
+        assert!(orders_cube.definition.get_join("users").is_some());
+        assert!(orders_cube.definition.get_join("products").is_some());
+        assert!(orders_cube.definition.get_join("warehouses").is_some());
     }
 }
