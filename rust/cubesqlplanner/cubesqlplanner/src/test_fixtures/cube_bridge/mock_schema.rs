@@ -76,6 +76,9 @@ impl MockSchema {
                 }
             }
 
+            // Sort primary keys by name to ensure stable ordering
+            pk_dimensions.sort();
+
             if !pk_dimensions.is_empty() {
                 primary_keys.insert(cube_name.clone(), pk_dimensions);
             }
