@@ -1,6 +1,5 @@
 //! Tests for Compiler member evaluation
 
-use crate::planner::sql_evaluator::Compiler;
 use crate::test_fixtures::schemas::{create_visitors_schema, TestCompiler};
 
 #[test]

@@ -46,6 +46,7 @@ impl MockDriverTools {
     }
 
     /// Creates a new MockDriverTools with custom SQL templates
+    #[allow(dead_code)]
     pub fn with_sql_templates(sql_templates: MockSqlTemplatesRender) -> Self {
         Self {
             timezone: "UTC".to_string(),

@@ -68,6 +68,7 @@ impl MockSchema {
     }
 
     /// Create a MockCubeEvaluator with primary keys from this schema
+    #[allow(dead_code)]
     pub fn create_evaluator_with_primary_keys(
         self,
         primary_keys: std::collections::HashMap<String, Vec<String>>,
@@ -148,8 +149,7 @@ impl MockCubeBuilder {
         name: impl Into<String>,
         definition: MockDimensionDefinition,
     ) -> Self {
-        self.dimensions
-            .insert(name.into(), Rc::new(definition));
+        self.dimensions.insert(name.into(), Rc::new(definition));
         self
     }
 
@@ -215,11 +215,7 @@ pub struct MockViewBuilder {
 
 impl MockViewBuilder {
     /// Add a cube to include in this view
-    pub fn include_cube(
-        mut self,
-        join_path: impl Into<String>,
-        includes: Vec<String>,
-    ) -> Self {
+    pub fn include_cube(mut self, join_path: impl Into<String>, includes: Vec<String>) -> Self {
         self.view_cubes.push(ViewCube {
             join_path: join_path.into(),
             includes,
@@ -233,8 +229,7 @@ impl MockViewBuilder {
         name: impl Into<String>,
         definition: MockDimensionDefinition,
     ) -> Self {
-        self.dimensions
-            .insert(name.into(), Rc::new(definition));
+        self.dimensions.insert(name.into(), Rc::new(definition));
         self
     }
 
@@ -249,6 +244,7 @@ impl MockViewBuilder {
     }
 
     /// Add a custom segment to the view
+    #[allow(dead_code)]
     pub fn add_segment(
         mut self,
         name: impl Into<String>,
@@ -286,7 +282,8 @@ impl MockViewBuilder {
                 // Add dimensions
                 for member_name in &members_to_include {
                     if let Some(dimension) = source_cube.dimensions.get(member_name) {
-                        let view_member_sql = format!("{{{}.{}}}", view_cube.join_path, member_name);
+                        let view_member_sql =
+                            format!("{{{}.{}}}", view_cube.join_path, member_name);
 
                         // Check for duplicates
                         if all_dimensions.contains_key(member_name) {
@@ -311,7 +308,8 @@ impl MockViewBuilder {
                 // Add measures
                 for member_name in &members_to_include {
                     if let Some(measure) = source_cube.measures.get(member_name) {
-                        let view_member_sql = format!("{{{}.{}}}", view_cube.join_path, member_name);
+                        let view_member_sql =
+                            format!("{{{}.{}}}", view_cube.join_path, member_name);
 
                         // Check for duplicates
                         if all_measures.contains_key(member_name) {
@@ -336,7 +334,8 @@ impl MockViewBuilder {
                 // Add segments
                 for member_name in &members_to_include {
                     if source_cube.segments.contains_key(member_name) {
-                        let view_member_sql = format!("{{{}.{}}}", view_cube.join_path, member_name);
+                        let view_member_sql =
+                            format!("{{{}.{}}}", view_cube.join_path, member_name);
 
                         // Check for duplicates
                         if all_segments.contains_key(member_name) {
@@ -907,8 +906,6 @@ mod tests {
             .finish_view()
             .build();
 
-        let view_cube = schema.get_cube("orders_view").unwrap();
-
         // Verify member SQL uses full join path
         let id_dim = schema.get_dimension("orders_view", "id").unwrap();
         let id_sql = id_dim.sql().unwrap().unwrap();
@@ -921,8 +918,8 @@ mod tests {
 
     #[test]
     fn test_view_with_multiple_long_join_paths() {
-        use crate::cube_bridge::member_sql::MemberSql;
         use crate::test_fixtures::cube_bridge::{MockSecurityContext, MockSqlUtils};
+        use std::rc::Rc;
 
         let schema = MockSchemaBuilder::new()
             .add_cube("visitors")
@@ -974,7 +971,9 @@ mod tests {
 
         // Verify SQL for members from first include (with long join path)
         // SQL template should contain full path: {visitors.visitor_checkins.checkin_id}
-        let checkin_id_dim = schema.get_dimension("multi_path_view", "checkin_id").unwrap();
+        let checkin_id_dim = schema
+            .get_dimension("multi_path_view", "checkin_id")
+            .unwrap();
         let checkin_id_sql = checkin_id_dim.sql().unwrap().unwrap();
 
         // Compile template and check symbol_paths structure
@@ -983,7 +982,11 @@ mod tests {
             .unwrap();
 
         // Should have exactly one symbol path
-        assert_eq!(args.symbol_paths.len(), 1, "Should have exactly one symbol path");
+        assert_eq!(
+            args.symbol_paths.len(),
+            1,
+            "Should have exactly one symbol path"
+        );
 
         // The symbol path should be ["visitors", "visitor_checkins", "checkin_id"]
         assert_eq!(
@@ -1001,7 +1004,11 @@ mod tests {
             .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
             .unwrap();
 
-        assert_eq!(args.symbol_paths.len(), 1, "Should have exactly one symbol path");
+        assert_eq!(
+            args.symbol_paths.len(),
+            1,
+            "Should have exactly one symbol path"
+        );
         assert_eq!(
             args.symbol_paths[0],
             vec!["visitors", "visitor_checkins", "checkin_count"],
@@ -1017,7 +1024,11 @@ mod tests {
             .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
             .unwrap();
 
-        assert_eq!(args.symbol_paths.len(), 1, "Should have exactly one symbol path");
+        assert_eq!(
+            args.symbol_paths.len(),
+            1,
+            "Should have exactly one symbol path"
+        );
         assert_eq!(
             args.symbol_paths[0],
             vec!["visitors", "id"],
@@ -1031,7 +1042,11 @@ mod tests {
             .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
             .unwrap();
 
-        assert_eq!(args.symbol_paths.len(), 1, "Should have exactly one symbol path");
+        assert_eq!(
+            args.symbol_paths.len(),
+            1,
+            "Should have exactly one symbol path"
+        );
         assert_eq!(
             args.symbol_paths[0],
             vec!["visitors", "count"],
@@ -1068,3 +1083,4 @@ mod tests {
             .build();
     }
 }
+

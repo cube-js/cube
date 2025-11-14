@@ -193,7 +193,6 @@ pub fn create_visitors_schema() -> MockSchema {
 mod tests {
     use super::*;
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
-    use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
 
     #[test]
@@ -206,6 +205,9 @@ mod tests {
 
     #[test]
     fn test_visitors_dimensions() {
+        use crate::test_fixtures::cube_bridge::{MockSecurityContext, MockSqlUtils};
+        use std::rc::Rc;
+
         let schema = create_visitors_schema();
 
         // Basic dimensions
@@ -237,9 +239,6 @@ mod tests {
         assert_eq!(question_mark.static_data().dimension_type, "string");
         let sql = question_mark.sql().unwrap().unwrap();
         // Verify SQL contains question marks
-        use crate::cube_bridge::member_sql::MemberSql;
-        use crate::test_fixtures::cube_bridge::{MockSecurityContext, MockSqlUtils};
-        use std::rc::Rc;
         let (template, _args) = sql
             .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
             .unwrap();
@@ -286,7 +285,6 @@ mod tests {
         let google_segment = schema.get_segment("visitors", "google").unwrap();
         let sql = google_segment.sql().unwrap();
 
-        use crate::cube_bridge::member_sql::MemberSql;
         assert_eq!(sql.args_names(), &vec!["CUBE"]);
     }
 
@@ -299,16 +297,12 @@ mod tests {
             .unwrap();
         let sql = min_checkin.sql().unwrap().unwrap();
 
-        use crate::cube_bridge::member_sql::MemberSql;
         // Should reference visitor_checkins.minDate
         assert_eq!(sql.args_names(), &vec!["visitor_checkins"]);
     }
 
     #[test]
     fn test_geo_dimension_structure() {
-        use crate::cube_bridge::geo_item::GeoItem;
-        use crate::cube_bridge::member_sql::MemberSql;
-
         let schema = create_visitors_schema();
 
         let location = schema.get_dimension("visitors", "location").unwrap();
@@ -326,4 +320,3 @@ mod tests {
         assert_eq!(lon_sql.args_names().len(), 0);
     }
 }
-
