@@ -29,6 +29,28 @@ fn create_test_schema() -> MockSchema {
                 .sql("id".to_string())
                 .build(),
         )
+        .add_dimension(
+            "source",
+            MockDimensionDefinition::builder()
+                .dimension_type("string".to_string())
+                .sql("{CUBE}.source".to_string())
+                .build(),
+        )
+        .add_dimension(
+            "created_at",
+            MockDimensionDefinition::builder()
+                .dimension_type("time".to_string())
+                .sql("created_at".to_string())
+                .build(),
+        )
+        .add_dimension(
+            "location",
+            MockDimensionDefinition::builder()
+                .dimension_type("geo".to_string())
+                .latitude("latitude".to_string())
+                .longitude("longitude".to_string())
+                .build(),
+        )
         .finish_cube()
         .build()
 }
@@ -110,11 +132,31 @@ impl SqlEvaluationContext {
 }
 
 #[test]
-fn test_dimension_sql_evaluation() {
+fn simple_dimension_sql_evaluation() {
     let context = SqlEvaluationContext::new();
-    let sql = context.evaluate_dimension("test_cube.id").unwrap();
 
-    println!("Generated SQL: {}", sql);
-    assert_eq!(sql, r#""test_cube".id"#);
+    // Test simple dimension without dependencies
+    let id_sql = context.evaluate_dimension("test_cube.id").unwrap();
+    assert_eq!(id_sql, r#""test_cube".id"#);
+
+    // Test dimension with {CUBE} reference
+    let source_sql = context.evaluate_dimension("test_cube.source").unwrap();
+    assert_eq!(source_sql, r#""test_cube".source"#);
+
+    // Test time dimension
+    let created_at_sql = context.evaluate_dimension("test_cube.created_at").unwrap();
+    assert_eq!(created_at_sql, r#""test_cube".created_at"#);
+
+    // Test geo dimension (latitude || ',' || longitude)
+    let location_sql = context.evaluate_dimension("test_cube.location").unwrap();
+    assert_eq!(location_sql, "latitude || ',' || longitude");
+
+    // Test time dimension with granularity (day)
+    let created_at_day_sql = context
+        .evaluate_dimension("test_cube.created_at.day")
+        .unwrap();
+    assert_eq!(
+        created_at_day_sql,
+        "date_trunc('day', (\"test_cube\".created_at::timestamptz AT TIME ZONE 'UTC'))"
+    );
 }
-
