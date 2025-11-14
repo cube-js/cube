@@ -108,17 +108,24 @@ export type DatabaseType =
   | 'mongobi'
   | 'mssql'
   | 'mysql'
+  | 'mysqlauroraserverless'
   | 'elasticsearch'
   | 'awselasticsearch'
   | 'oracle'
   | 'postgres'
   | 'prestodb'
+  | 'trino'
   | 'redshift'
   | 'snowflake'
   | 'sqlite'
   | 'questdb'
   | 'materialize'
-  | 'pinot';
+  | 'pinot'
+  | 'dremio'
+  | 'duckdb'
+  | 'ksql'
+  | 'vertica'
+  | 'databricks-jdbc';
 
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;
