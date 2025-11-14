@@ -8,7 +8,7 @@ use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
 /// Mock implementation of JoinItemDefinition for testing
-#[derive(Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct MockJoinItemDefinition {
     // Fields from JoinItemDefinitionStatic
     relationship: String,

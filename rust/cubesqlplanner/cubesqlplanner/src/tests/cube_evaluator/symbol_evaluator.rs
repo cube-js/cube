@@ -239,7 +239,7 @@ impl SqlEvaluationContext {
         // Create QueryTools with mocks
         let security_context = Rc::new(MockSecurityContext);
         let base_tools = Rc::new(MockBaseTools::builder().build());
-        let join_graph = Rc::new(MockJoinGraph);
+        let join_graph = Rc::new(MockJoinGraph::new());
 
         let query_tools = QueryTools::try_new(
             evaluator.clone(),
