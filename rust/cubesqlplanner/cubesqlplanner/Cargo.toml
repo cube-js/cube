@@ -22,6 +22,9 @@ lazy_static = "1.4.0"
 regex = "1.3.9"
 typed-builder = "0.21.2"
 
+[dev-dependencies]
+petgraph = "0.6"
+
 [dependencies.neon]
 version = "=1"
 default-features = false
