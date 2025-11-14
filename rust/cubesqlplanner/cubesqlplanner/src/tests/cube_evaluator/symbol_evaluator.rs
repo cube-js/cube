@@ -143,6 +143,13 @@ fn create_test_schema() -> MockSchema {
                 .build(),
         )
         .add_dimension(
+            "source_extended",
+            MockDimensionDefinition::builder()
+                .dimension_type("string".to_string())
+                .sql("CONCAT({CUBE.source}, '_source')".to_string())
+                .build(),
+        )
+        .add_dimension(
             "created_at",
             MockDimensionDefinition::builder()
                 .dimension_type("time".to_string())
@@ -183,6 +190,13 @@ fn create_test_schema() -> MockSchema {
             MockMeasureDefinition::builder()
                 .measure_type("avg".to_string())
                 .sql("revenue".to_string())
+                .build(),
+        )
+        .add_measure(
+            "complex_measure",
+            MockMeasureDefinition::builder()
+                .measure_type("number".to_string())
+                .sql("{sum_revenue} + {CUBE.avg_revenue}/{test_cube.min_revenue} - {test_cube.min_revenue}".to_string())
                 .build(),
         )
         .add_measure(
@@ -370,5 +384,29 @@ fn count_measure_variants() {
     assert_eq!(
         count_two_pk_sql,
         "count(CAST(id AS STRING) || CAST(user_name AS STRING))"
+    );
+}
+
+#[test]
+fn composite_symbols() {
+    let context = SqlEvaluationContext::new();
+
+    // Test dimension with member dependency ({CUBE.source})
+    let source_extended_sql = context
+        .evaluate_dimension("test_cube.source_extended")
+        .unwrap();
+    assert_eq!(
+        source_extended_sql,
+        r#"CONCAT("test_cube".source, '_source')"#
+    );
+
+    // Test measure with multiple member dependencies
+    // {sum_revenue} + {CUBE.avg_revenue}/{test_cube.min_revenue} - {test_cube.min_revenue}
+    let complex_measure_sql = context
+        .evaluate_measure("test_cube.complex_measure")
+        .unwrap();
+    assert_eq!(
+        complex_measure_sql,
+        r#"sum("test_cube".revenue) + avg("test_cube".revenue)/min("test_cube".revenue) - min("test_cube".revenue)"#
     );
 }
