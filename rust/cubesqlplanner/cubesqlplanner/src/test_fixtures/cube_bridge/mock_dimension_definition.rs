@@ -28,6 +28,8 @@ pub struct MockDimensionDefinition {
     propagate_filters_to_sub_query: Option<bool>,
     #[builder(default)]
     values: Option<Vec<String>>,
+    #[builder(default)]
+    primary_key: Option<bool>,
 
     // Optional trait fields
     #[builder(default, setter(strip_option))]
@@ -51,7 +53,8 @@ impl_static_data!(
     add_group_by_references,
     sub_query,
     propagate_filters_to_sub_query,
-    values
+    values,
+    primary_key
 );
 
 impl DimensionDefinition for MockDimensionDefinition {

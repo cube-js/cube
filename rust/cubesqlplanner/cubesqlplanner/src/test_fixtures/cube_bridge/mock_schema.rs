@@ -64,7 +64,24 @@ impl MockSchema {
 
     /// Create a MockCubeEvaluator from this schema
     pub fn create_evaluator(self) -> Rc<MockCubeEvaluator> {
-        Rc::new(MockCubeEvaluator::new(self))
+        // Collect primary keys from all cubes
+        let mut primary_keys = std::collections::HashMap::new();
+
+        for (cube_name, cube) in &self.cubes {
+            let mut pk_dimensions = Vec::new();
+
+            for (dim_name, dimension) in &cube.dimensions {
+                if dimension.static_data().primary_key == Some(true) {
+                    pk_dimensions.push(dim_name.clone());
+                }
+            }
+
+            if !pk_dimensions.is_empty() {
+                primary_keys.insert(cube_name.clone(), pk_dimensions);
+            }
+        }
+
+        Rc::new(MockCubeEvaluator::with_primary_keys(self, primary_keys))
     }
 
     /// Create a MockCubeEvaluator with primary keys from this schema
