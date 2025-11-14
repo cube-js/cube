@@ -239,9 +239,7 @@ impl CubeEvaluator for MockCubeEvaluator {
         let granularity = &path[3];
 
         // Validate granularity is one of the supported ones
-        let valid_granularities = vec![
-            "second", "minute", "hour", "day", "week", "month", "quarter", "year",
-        ];
+        let valid_granularities = ["second", "minute", "hour", "day", "week", "month", "quarter", "year"];
 
         if !valid_granularities.contains(&granularity.as_str()) {
             return Err(CubeError::user(format!(

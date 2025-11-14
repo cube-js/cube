@@ -51,7 +51,7 @@ impl MockMemberSql {
                 let mut path = String::new();
                 let mut found_closing = false;
 
-                while let Some(ch) = chars.next() {
+                for ch in chars.by_ref() {
                     if ch == '}' {
                         found_closing = true;
                         break;
