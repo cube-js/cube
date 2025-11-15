@@ -170,7 +170,7 @@ impl MockJoinGraph {
             if !from_multiplied.is_empty() {
                 let static_data = evaluator.static_data();
                 let primary_keys = static_data.primary_keys.get(cube_name);
-                if primary_keys.map_or(true, |pk| pk.is_empty()) {
+                if primary_keys.is_none_or(|pk| pk.is_empty()) {
                     return Err(CubeError::user(format!(
                         "primary key for '{}' is required when join is defined in order to make aggregates work properly",
                         cube_name
@@ -183,7 +183,7 @@ impl MockJoinGraph {
             if !to_multiplied.is_empty() {
                 let static_data = evaluator.static_data();
                 let primary_keys = static_data.primary_keys.get(join_name);
-                if primary_keys.map_or(true, |pk| pk.is_empty()) {
+                if primary_keys.is_none_or(|pk| pk.is_empty()) {
                     return Err(CubeError::user(format!(
                         "primary key for '{}' is required when join is defined in order to make aggregates work properly",
                         join_name
@@ -372,9 +372,7 @@ impl MockJoinGraph {
 
                 // Find shortest path
                 let path = find_shortest_path(&self.nodes, &prev_node, to_join);
-                if path.is_none() {
-                    return None; // Can't find path
-                }
+                path.as_ref()?;
 
                 let path = path.unwrap();
 
@@ -681,7 +679,7 @@ impl MockJoinGraph {
         // First, ensure all cubes exist in nodes HashMap (even if they have no joins)
         for cube in cubes {
             let cube_name = cube.static_data().name.clone();
-            self.nodes.entry(cube_name).or_insert_with(HashMap::new);
+            self.nodes.entry(cube_name).or_default();
         }
 
         // Build edges from all cubes
@@ -694,19 +692,19 @@ impl MockJoinGraph {
 
         // Build nodes HashMap (directed graph)
         // Group edges by 'from' field and create HashMap of destinations
-        for (_, edge) in &self.edges {
+        for edge in self.edges.values() {
             self.nodes
                 .entry(edge.from.clone())
-                .or_insert_with(HashMap::new)
+                .or_default()
                 .insert(edge.to.clone(), 1);
         }
 
         // Build undirected_nodes HashMap
         // For each edge (from -> to), also add (to -> from) for bidirectional connectivity
-        for (_, edge) in &self.edges {
+        for edge in self.edges.values() {
             self.undirected_nodes
                 .entry(edge.to.clone())
-                .or_insert_with(HashMap::new)
+                .or_default()
                 .insert(edge.from.clone(), 1);
         }
 

@@ -1403,7 +1403,6 @@ mod tests {
 
     #[test]
     fn test_schema_with_join_graph_integration() {
-        use crate::cube_bridge::join_graph::JoinGraph;
         use crate::cube_bridge::join_hints::JoinHintItem;
 
         // Small schema: orders -> users (one join)
