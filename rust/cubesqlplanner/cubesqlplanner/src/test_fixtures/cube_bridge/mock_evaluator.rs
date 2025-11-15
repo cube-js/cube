@@ -8,6 +8,7 @@ use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::cube_bridge::segment_definition::SegmentDefinition;
 use crate::impl_static_data;
 use crate::test_fixtures::cube_bridge::mock_schema::MockSchema;
+use crate::test_fixtures::cube_bridge::MockJoinGraph;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
@@ -17,6 +18,7 @@ use std::rc::Rc;
 pub struct MockCubeEvaluator {
     schema: MockSchema,
     primary_keys: HashMap<String, Vec<String>>,
+    join_graph: Option<Rc<MockJoinGraph>>,
 }
 
 impl MockCubeEvaluator {
@@ -25,6 +27,7 @@ impl MockCubeEvaluator {
         Self {
             schema,
             primary_keys: HashMap::new(),
+            join_graph: None,
         }
     }
 
@@ -36,7 +39,41 @@ impl MockCubeEvaluator {
         Self {
             schema,
             primary_keys,
+            join_graph: None,
         }
+    }
+
+    /// Create a new MockCubeEvaluator with join graph
+    ///
+    /// This constructor creates an evaluator with a compiled join graph,
+    /// enabling join path resolution in tests.
+    ///
+    /// # Arguments
+    /// * `schema` - The mock schema containing cubes
+    /// * `primary_keys` - Primary key definitions for cubes
+    /// * `join_graph` - Compiled join graph
+    ///
+    /// # Returns
+    /// * `MockCubeEvaluator` - Evaluator with compiled join graph
+    pub fn with_join_graph(
+        schema: MockSchema,
+        primary_keys: HashMap<String, Vec<String>>,
+        join_graph: MockJoinGraph,
+    ) -> Self {
+        Self {
+            schema,
+            primary_keys,
+            join_graph: Some(Rc::new(join_graph)),
+        }
+    }
+
+    /// Get the join graph if available
+    ///
+    /// # Returns
+    /// * `Some(Rc<MockJoinGraph>)` - If join graph was created
+    /// * `None` - If evaluator was created without join graph
+    pub fn join_graph(&self) -> Option<Rc<MockJoinGraph>> {
+        self.join_graph.clone()
     }
 
     /// Get all measures for a cube

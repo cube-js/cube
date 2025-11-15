@@ -1,16 +1,19 @@
 use crate::test_fixtures::cube_bridge::{
-    MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockJoinItemDefinition,
-    MockMeasureDefinition, MockSegmentDefinition,
+    MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockJoinGraph,
+    MockJoinItemDefinition, MockMeasureDefinition, MockSegmentDefinition,
 };
+use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Mock schema containing cubes with their measures and dimensions
+#[derive(Clone)]
 pub struct MockSchema {
     cubes: HashMap<String, MockCube>,
 }
 
 /// Single cube with its definition and members
+#[derive(Clone)]
 pub struct MockCube {
     pub definition: MockCubeDefinition,
     pub measures: HashMap<String, Rc<MockMeasureDefinition>>,
@@ -94,6 +97,84 @@ impl MockSchema {
         primary_keys: std::collections::HashMap<String, Vec<String>>,
     ) -> Rc<MockCubeEvaluator> {
         Rc::new(MockCubeEvaluator::with_primary_keys(self, primary_keys))
+    }
+
+    /// Create a MockJoinGraph from this schema
+    ///
+    /// This method:
+    /// 1. Extracts all cubes as Vec<Rc<MockCubeDefinition>>
+    /// 2. Creates a temporary MockCubeEvaluator for validation
+    /// 3. Creates and compiles a MockJoinGraph
+    ///
+    /// # Returns
+    /// * `Ok(MockJoinGraph)` - Compiled join graph
+    /// * `Err(CubeError)` - If join graph compilation fails (invalid joins, missing PKs, etc.)
+    pub fn create_join_graph(&self) -> Result<MockJoinGraph, CubeError> {
+        // Collect cubes as Vec<Rc<MockCubeDefinition>>
+        let cubes: Vec<Rc<MockCubeDefinition>> = self
+            .cubes
+            .values()
+            .map(|mock_cube| Rc::new(mock_cube.definition.clone()))
+            .collect();
+
+        // Extract primary keys for evaluator
+        let mut primary_keys = HashMap::new();
+        for (cube_name, cube) in &self.cubes {
+            let mut pk_dimensions = Vec::new();
+            for (dim_name, dimension) in &cube.dimensions {
+                if dimension.static_data().primary_key == Some(true) {
+                    pk_dimensions.push(dim_name.clone());
+                }
+            }
+            pk_dimensions.sort();
+            if !pk_dimensions.is_empty() {
+                primary_keys.insert(cube_name.clone(), pk_dimensions);
+            }
+        }
+
+        // Clone self for evaluator
+        let evaluator = MockCubeEvaluator::with_primary_keys(self.clone(), primary_keys);
+
+        // Create and compile join graph
+        let mut join_graph = MockJoinGraph::new();
+        join_graph.compile(&cubes, &evaluator)?;
+
+        Ok(join_graph)
+    }
+
+    /// Create a MockCubeEvaluator with join graph from this schema
+    ///
+    /// This method creates an evaluator with a fully compiled join graph,
+    /// enabling join path resolution in tests.
+    ///
+    /// # Returns
+    /// * `Ok(Rc<MockCubeEvaluator>)` - Evaluator with join graph
+    /// * `Err(CubeError)` - If join graph compilation fails
+    pub fn create_evaluator_with_join_graph(self) -> Result<Rc<MockCubeEvaluator>, CubeError> {
+        // Extract primary keys
+        let mut primary_keys = HashMap::new();
+        for (cube_name, cube) in &self.cubes {
+            let mut pk_dimensions = Vec::new();
+            for (dim_name, dimension) in &cube.dimensions {
+                if dimension.static_data().primary_key == Some(true) {
+                    pk_dimensions.push(dim_name.clone());
+                }
+            }
+            pk_dimensions.sort();
+            if !pk_dimensions.is_empty() {
+                primary_keys.insert(cube_name.clone(), pk_dimensions);
+            }
+        }
+
+        // Compile join graph
+        let join_graph = self.create_join_graph()?;
+
+        // Create evaluator with join graph
+        Ok(Rc::new(MockCubeEvaluator::with_join_graph(
+            self,
+            primary_keys,
+            join_graph,
+        )))
     }
 }
 
@@ -1318,5 +1399,82 @@ mod tests {
         assert!(orders_cube.definition.get_join("users").is_some());
         assert!(orders_cube.definition.get_join("products").is_some());
         assert!(orders_cube.definition.get_join("warehouses").is_some());
+    }
+
+    #[test]
+    fn test_schema_with_join_graph_integration() {
+        use crate::cube_bridge::join_graph::JoinGraph;
+        use crate::cube_bridge::join_hints::JoinHintItem;
+
+        // Small schema: orders -> users (one join)
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_dimension(
+                "user_id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("user_id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        // Verify create_join_graph() succeeds
+        let join_graph_result = schema.create_join_graph();
+        assert!(
+            join_graph_result.is_ok(),
+            "create_join_graph should succeed"
+        );
+
+        // Verify create_evaluator_with_join_graph() succeeds
+        let evaluator_result = schema.create_evaluator_with_join_graph();
+        assert!(
+            evaluator_result.is_ok(),
+            "create_evaluator_with_join_graph should succeed"
+        );
+        let evaluator = evaluator_result.unwrap();
+
+        // Verify evaluator.join_graph() returns Some(graph)
+        assert!(
+            evaluator.join_graph().is_some(),
+            "Evaluator should have join graph"
+        );
+        let graph = evaluator.join_graph().unwrap();
+
+        // Verify graph.build_join() works
+        let cubes = vec![
+            JoinHintItem::Single("orders".to_string()),
+            JoinHintItem::Single("users".to_string()),
+        ];
+        let join_def_result = graph.build_join(cubes);
+        assert!(
+            join_def_result.is_ok(),
+            "graph.build_join should succeed for orders -> users"
+        );
     }
 }

@@ -2,8 +2,8 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::test_fixtures::cube_bridge::{
-    JoinEdge, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition,
-    MockJoinItemDefinition, MockJoinGraph, MockMeasureDefinition, MockSchemaBuilder,
+    JoinEdge, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockJoinGraph,
+    MockJoinItemDefinition, MockMeasureDefinition, MockSchemaBuilder,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -919,8 +919,7 @@ fn test_build_join_star_pattern() {
 fn test_build_join_disconnected() {
     // Schema: warehouses and suppliers are disconnected (no join)
     let (evaluator, cubes_map) = create_comprehensive_test_schema();
-    let graph =
-        compile_test_graph(&cubes_map, &["warehouses", "suppliers"], &evaluator).unwrap();
+    let graph = compile_test_graph(&cubes_map, &["warehouses", "suppliers"], &evaluator).unwrap();
 
     // Build join: warehouses, suppliers (disconnected)
     let cubes_to_join = vec![
@@ -1461,8 +1460,7 @@ fn test_connected_components_cycle() {
     // Cycle: regions -> countries -> cities -> regions
     let (evaluator, cubes_map) = create_comprehensive_test_schema();
     let mut graph =
-        compile_test_graph(&cubes_map, &["regions", "countries", "cities"], &evaluator)
-            .unwrap();
+        compile_test_graph(&cubes_map, &["regions", "countries", "cities"], &evaluator).unwrap();
 
     let components = graph.connected_components();
 
