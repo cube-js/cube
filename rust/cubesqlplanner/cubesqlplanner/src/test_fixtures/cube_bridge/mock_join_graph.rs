@@ -712,6 +712,106 @@ impl MockJoinGraph {
 
         Ok(())
     }
+
+    /// Recursively marks all cubes in a connected component
+    ///
+    /// This method performs a depth-first search starting from the given node,
+    /// marking all reachable nodes with the same component ID. It uses the
+    /// undirected_nodes graph to traverse in both directions.
+    ///
+    /// # Algorithm
+    /// 1. Check if node already has a component ID (base case)
+    /// 2. Assign component ID to current node
+    /// 3. Find all connected nodes in undirected_nodes graph
+    /// 4. Recursively process each connected node
+    ///
+    /// # Arguments
+    /// * `component_id` - The ID to assign to this component
+    /// * `node` - The current cube name being processed
+    /// * `components` - Mutable map of cube -> component_id
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mut components = HashMap::new();
+    /// graph.find_connected_component(1, "users", &mut components);
+    /// // All cubes reachable from "users" now have component_id = 1
+    /// ```
+    fn find_connected_component(
+        &self,
+        component_id: u32,
+        node: &str,
+        components: &mut HashMap<String, u32>,
+    ) {
+        // Base case: already visited
+        if components.contains_key(node) {
+            return;
+        }
+
+        // Mark this node with component ID
+        components.insert(node.to_string(), component_id);
+
+        // Get connected nodes from undirected graph (backward edges: to -> from)
+        if let Some(connected_nodes) = self.undirected_nodes.get(node) {
+            for connected_node in connected_nodes.keys() {
+                self.find_connected_component(component_id, connected_node, components);
+            }
+        }
+
+        // Also traverse forward edges (from -> to)
+        if let Some(connected_nodes) = self.nodes.get(node) {
+            for connected_node in connected_nodes.keys() {
+                self.find_connected_component(component_id, connected_node, components);
+            }
+        }
+    }
+
+    /// Returns connected components of the join graph
+    ///
+    /// This method identifies which cubes are connected through join relationships.
+    /// Cubes in the same component can be joined together. Cubes in different
+    /// components cannot be joined and would result in a query error.
+    ///
+    /// Component IDs start at 1 and increment for each disconnected subgraph.
+    /// Isolated cubes (with no joins) each get their own unique component ID.
+    ///
+    /// # Returns
+    /// HashMap mapping cube name to component ID (1-based)
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Graph: users <-> orders, products (isolated)
+    /// let components = graph.connected_components();
+    /// assert_eq!(components.get("users"), components.get("orders")); // Same component
+    /// assert_ne!(components.get("users"), components.get("products")); // Different
+    /// ```
+    ///
+    /// # Caching
+    /// Results are cached and reused on subsequent calls until `compile()` is called.
+    pub fn connected_components(&mut self) -> HashMap<String, u32> {
+        // Return cached result if available
+        if let Some(cached) = &self.cached_connected_components {
+            return cached.clone();
+        }
+
+        let mut component_id: u32 = 1;
+        let mut components: HashMap<String, u32> = HashMap::new();
+
+        // Process all nodes (includes isolated cubes)
+        let node_names: Vec<String> = self.nodes.keys().cloned().collect();
+
+        for node in node_names {
+            // Only process if not already assigned to a component
+            if !components.contains_key(&node) {
+                self.find_connected_component(component_id, &node, &mut components);
+                component_id += 1;
+            }
+        }
+
+        // Cache results
+        self.cached_connected_components = Some(components.clone());
+
+        components
+    }
 }
 
 impl Default for MockJoinGraph {
@@ -2562,5 +2662,669 @@ mod tests {
         assert_eq!(joins[0].static_data().to, "B");
         assert_eq!(joins[1].static_data().from, "B");
         assert_eq!(joins[1].static_data().to, "C");
+    }
+
+    #[test]
+    fn test_connected_components_simple() {
+        // Graph: users -> orders (both in same component)
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let evaluator = schema.create_evaluator();
+        let cubes: Vec<Rc<crate::test_fixtures::cube_bridge::MockCubeDefinition>> = vec![
+            Rc::new(
+                evaluator
+                    .cube_from_path("users".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("orders".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+        ];
+
+        let mut graph = MockJoinGraph::new();
+        graph.compile(&cubes, &evaluator).unwrap();
+
+        let components = graph.connected_components();
+
+        // Both cubes should be in same component
+        assert_eq!(components.len(), 2);
+        let users_comp = components.get("users").unwrap();
+        let orders_comp = components.get("orders").unwrap();
+        assert_eq!(users_comp, orders_comp);
+    }
+
+    #[test]
+    fn test_connected_components_disconnected() {
+        // Graph: users -> orders, products (isolated)
+        // Two components: {users, orders}, {products}
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("products")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let evaluator = schema.create_evaluator();
+        let cubes: Vec<Rc<crate::test_fixtures::cube_bridge::MockCubeDefinition>> = vec![
+            Rc::new(
+                evaluator
+                    .cube_from_path("users".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("orders".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("products".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+        ];
+
+        let mut graph = MockJoinGraph::new();
+        graph.compile(&cubes, &evaluator).unwrap();
+
+        let components = graph.connected_components();
+
+        // All three cubes should have component IDs
+        assert_eq!(components.len(), 3);
+
+        // users and orders in same component
+        let users_comp = components.get("users").unwrap();
+        let orders_comp = components.get("orders").unwrap();
+        assert_eq!(users_comp, orders_comp);
+
+        // products in different component
+        let products_comp = components.get("products").unwrap();
+        assert_ne!(users_comp, products_comp);
+    }
+
+    #[test]
+    fn test_connected_components_all_isolated() {
+        // Graph: A, B, C (no joins)
+        // Three components: {A}, {B}, {C}
+        let schema = MockSchemaBuilder::new()
+            .add_cube("A")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("B")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("C")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let evaluator = schema.create_evaluator();
+        let cubes: Vec<Rc<crate::test_fixtures::cube_bridge::MockCubeDefinition>> = vec![
+            Rc::new(
+                evaluator
+                    .cube_from_path("A".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("B".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("C".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+        ];
+
+        let mut graph = MockJoinGraph::new();
+        graph.compile(&cubes, &evaluator).unwrap();
+
+        let components = graph.connected_components();
+
+        // All three cubes in different components
+        assert_eq!(components.len(), 3);
+        let a_comp = components.get("A").unwrap();
+        let b_comp = components.get("B").unwrap();
+        let c_comp = components.get("C").unwrap();
+        assert_ne!(a_comp, b_comp);
+        assert_ne!(b_comp, c_comp);
+        assert_ne!(a_comp, c_comp);
+    }
+
+    #[test]
+    fn test_connected_components_large_connected() {
+        // Chain: A -> B -> C -> D (all in same component)
+        let schema = MockSchemaBuilder::new()
+            .add_cube("A")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "B",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.b_id = {B.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("B")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "C",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.c_id = {C.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("C")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "D",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.d_id = {D.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("D")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let evaluator = schema.create_evaluator();
+        let cubes: Vec<Rc<crate::test_fixtures::cube_bridge::MockCubeDefinition>> = vec![
+            Rc::new(
+                evaluator
+                    .cube_from_path("A".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("B".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("C".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("D".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+        ];
+
+        let mut graph = MockJoinGraph::new();
+        graph.compile(&cubes, &evaluator).unwrap();
+
+        let components = graph.connected_components();
+
+        // All four cubes in same component
+        assert_eq!(components.len(), 4);
+        let a_comp = components.get("A").unwrap();
+        let b_comp = components.get("B").unwrap();
+        let c_comp = components.get("C").unwrap();
+        let d_comp = components.get("D").unwrap();
+        assert_eq!(a_comp, b_comp);
+        assert_eq!(b_comp, c_comp);
+        assert_eq!(c_comp, d_comp);
+    }
+
+    #[test]
+    fn test_connected_components_cycle() {
+        // Cycle: A -> B -> C -> A (all in same component)
+        let schema = MockSchemaBuilder::new()
+            .add_cube("A")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "B",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.b_id = {B.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("B")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "C",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.c_id = {C.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("C")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "A",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.a_id = {A.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let evaluator = schema.create_evaluator();
+        let cubes: Vec<Rc<crate::test_fixtures::cube_bridge::MockCubeDefinition>> = vec![
+            Rc::new(
+                evaluator
+                    .cube_from_path("A".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("B".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("C".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+        ];
+
+        let mut graph = MockJoinGraph::new();
+        graph.compile(&cubes, &evaluator).unwrap();
+
+        let components = graph.connected_components();
+
+        // All three cubes in same component (cycle doesn't break connectivity)
+        assert_eq!(components.len(), 3);
+        let a_comp = components.get("A").unwrap();
+        let b_comp = components.get("B").unwrap();
+        let c_comp = components.get("C").unwrap();
+        assert_eq!(a_comp, b_comp);
+        assert_eq!(b_comp, c_comp);
+    }
+
+    #[test]
+    fn test_connected_components_empty() {
+        // Empty graph (no cubes)
+        let mut graph = MockJoinGraph::new();
+        let components = graph.connected_components();
+
+        // Empty result
+        assert_eq!(components.len(), 0);
+    }
+
+    #[test]
+    fn test_connected_components_caching() {
+        // Verify that results are cached
+        let schema = MockSchemaBuilder::new()
+            .add_cube("A")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let evaluator = schema.create_evaluator();
+        let cubes: Vec<Rc<crate::test_fixtures::cube_bridge::MockCubeDefinition>> = vec![Rc::new(
+            evaluator
+                .cube_from_path("A".to_string())
+                .unwrap()
+                .as_any()
+                .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                .unwrap()
+                .clone(),
+        )];
+
+        let mut graph = MockJoinGraph::new();
+        graph.compile(&cubes, &evaluator).unwrap();
+
+        // First call - computes components
+        let components1 = graph.connected_components();
+        assert_eq!(components1.len(), 1);
+
+        // Second call - uses cache
+        let components2 = graph.connected_components();
+        assert_eq!(components2.len(), 1);
+        assert_eq!(components1.get("A"), components2.get("A"));
+
+        // Recompile - cache should be invalidated
+        graph.compile(&cubes, &evaluator).unwrap();
+
+        // Third call - recomputes after cache invalidation
+        let components3 = graph.connected_components();
+        assert_eq!(components3.len(), 1);
+    }
+
+    #[test]
+    fn test_connected_components_multiple_groups() {
+        // Three separate components: {A, B}, {C, D}, {E}
+        let schema = MockSchemaBuilder::new()
+            .add_cube("A")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "B",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.b_id = {B.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("B")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("C")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_join(
+                "D",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.d_id = {D.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("D")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("E")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let evaluator = schema.create_evaluator();
+        let cubes: Vec<Rc<crate::test_fixtures::cube_bridge::MockCubeDefinition>> = vec![
+            Rc::new(
+                evaluator
+                    .cube_from_path("A".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("B".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("C".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("D".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+            Rc::new(
+                evaluator
+                    .cube_from_path("E".to_string())
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<crate::test_fixtures::cube_bridge::MockCubeDefinition>()
+                    .unwrap()
+                    .clone(),
+            ),
+        ];
+
+        let mut graph = MockJoinGraph::new();
+        graph.compile(&cubes, &evaluator).unwrap();
+
+        let components = graph.connected_components();
+
+        // All five cubes should have component IDs
+        assert_eq!(components.len(), 5);
+
+        // A and B in same component
+        let a_comp = components.get("A").unwrap();
+        let b_comp = components.get("B").unwrap();
+        assert_eq!(a_comp, b_comp);
+
+        // C and D in same component
+        let c_comp = components.get("C").unwrap();
+        let d_comp = components.get("D").unwrap();
+        assert_eq!(c_comp, d_comp);
+
+        // E in its own component
+        let e_comp = components.get("E").unwrap();
+
+        // All three components are different
+        assert_ne!(a_comp, c_comp);
+        assert_ne!(a_comp, e_comp);
+        assert_ne!(c_comp, e_comp);
     }
 }
