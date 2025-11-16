@@ -593,7 +593,7 @@ impl SymbolFactory for DimensionSymbolFactory {
     }
 }
 
-impl crate::planner::sql_evaluator::debug_sql::DebugSql for DimensionSymbol {
+impl crate::utils::debug::DebugSql for DimensionSymbol {
     fn debug_sql(&self, expand_deps: bool) -> String {
         // Handle case expressions
         if let Some(case) = &self.case {

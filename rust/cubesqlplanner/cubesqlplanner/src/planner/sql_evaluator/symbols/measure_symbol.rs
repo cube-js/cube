@@ -800,7 +800,7 @@ impl SymbolFactory for MeasureSymbolFactory {
     }
 }
 
-impl crate::planner::sql_evaluator::debug_sql::DebugSql for MeasureSymbol {
+impl crate::utils::debug::DebugSql for MeasureSymbol {
     fn debug_sql(&self, expand_deps: bool) -> String {
         // Handle case expressions
         if let Some(case) = &self.case {

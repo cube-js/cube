@@ -9,6 +9,7 @@ pub mod sql_visitor;
 pub mod symbols;
 pub mod visitor;
 
+pub use crate::utils::debug::DebugSql;
 pub use compiler::Compiler;
 pub use debug_sql::DebugSql;
 pub use references_builder::ReferencesBuilder;

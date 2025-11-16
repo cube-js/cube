@@ -307,7 +307,7 @@ impl TimeDimensionSymbol {
     }
 }
 
-impl crate::planner::sql_evaluator::debug_sql::DebugSql for TimeDimensionSymbol {
+impl crate::utils::debug::DebugSql for TimeDimensionSymbol {
     fn debug_sql(&self, expand_deps: bool) -> String {
         let sql = if expand_deps {
             self.base_symbol.debug_sql(expand_deps)

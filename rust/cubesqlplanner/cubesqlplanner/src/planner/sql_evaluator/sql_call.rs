@@ -328,7 +328,7 @@ impl SqlCall {
     }
 }
 
-impl crate::planner::sql_evaluator::debug_sql::DebugSql for SqlCall {
+impl crate::utils::debug::DebugSql for SqlCall {
     fn debug_sql(&self, expand_deps: bool) -> String {
         let template_str = match &self.template {
             SqlTemplate::String(s) => s.clone(),

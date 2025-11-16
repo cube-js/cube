@@ -372,7 +372,7 @@ impl Case {
     }
 }
 
-impl crate::planner::sql_evaluator::debug_sql::DebugSql for Case {
+impl crate::utils::debug::DebugSql for Case {
     fn debug_sql(&self, expand_deps: bool) -> String {
         match self {
             Case::Case(case_def) => {

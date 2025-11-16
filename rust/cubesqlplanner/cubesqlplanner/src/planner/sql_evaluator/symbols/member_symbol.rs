@@ -325,7 +325,7 @@ impl MemberSymbol {
     }
 }
 
-impl crate::planner::sql_evaluator::debug_sql::DebugSql for MemberSymbol {
+impl crate::utils::debug::DebugSql for MemberSymbol {
     fn debug_sql(&self, expand_deps: bool) -> String {
         match self {
             MemberSymbol::Dimension(d) => d.debug_sql(expand_deps),
