@@ -1,3 +1,6 @@
+use crate::plan::filter::{FilterGroup, FilterGroupOperator};
+use crate::plan::FilterItem;
+use crate::planner::filter::{BaseFilter, FilterOperator};
 use crate::planner::sql_evaluator::DebugSql;
 use crate::test_fixtures::schemas::create_visitors_schema;
 use crate::test_fixtures::test_utils::TestContext;
@@ -110,4 +113,76 @@ fn test_time_dimension() {
     assert_eq!(sql, "(created_at).day");
     let sql = symbol.debug_sql(false);
     assert_eq!(sql, "({visitors.created_at}).day");
+}
+
+#[test]
+fn test_filter_simple_collapsed() {
+    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let symbol = ctx.create_symbol("visitors.source").unwrap();
+
+    let filter = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        symbol,
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Equal,
+        Some(vec![Some("google".to_string())]),
+    )
+    .unwrap();
+
+    let sql = filter.debug_sql(false);
+    assert_eq!(sql, "{visitors.source} equals: ['google']");
+}
+
+#[test]
+fn test_filter_simple_expanded() {
+    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let symbol = ctx.create_symbol("visitors.source").unwrap();
+
+    let filter = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        symbol,
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Equal,
+        Some(vec![Some("google".to_string())]),
+    )
+    .unwrap();
+
+    let sql = filter.debug_sql(true);
+    assert_eq!(sql, "source equals: ['google']");
+}
+
+#[test]
+fn test_filter_group_and_collapsed() {
+    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+
+    let source_symbol = ctx.create_symbol("visitors.source").unwrap();
+    let id_symbol = ctx.create_symbol("visitors.id").unwrap();
+
+    let filter1 = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        source_symbol,
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Equal,
+        Some(vec![Some("google".to_string())]),
+    )
+    .unwrap();
+
+    let filter2 = BaseFilter::try_new(
+        ctx.query_tools().clone(),
+        id_symbol,
+        crate::planner::filter::base_filter::FilterType::Dimension,
+        FilterOperator::Gt,
+        Some(vec![Some("100".to_string())]),
+    )
+    .unwrap();
+
+    let group = FilterGroup::new(
+        FilterGroupOperator::And,
+        vec![FilterItem::Item(filter1), FilterItem::Item(filter2)],
+    );
+
+    let sql = group.debug_sql(false);
+    let expected =
+        "AND: [\n  {visitors.source} equals: ['google'],\n  {visitors.id} gt: ['100']\n]";
+    assert_eq!(sql, expected);
 }

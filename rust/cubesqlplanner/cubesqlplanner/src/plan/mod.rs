@@ -3,6 +3,7 @@ pub mod calc_groups_join;
 pub mod cte;
 pub mod expression;
 pub mod filter;
+pub mod filter_debug;
 pub mod from;
 pub mod join;
 pub mod order;
