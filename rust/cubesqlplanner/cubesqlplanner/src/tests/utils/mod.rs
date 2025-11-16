@@ -1,1 +1,1 @@
-mod debug;
+pub mod debug;
