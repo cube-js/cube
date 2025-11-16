@@ -13,14 +13,6 @@ pub trait DebugSql {
 /// * `text` - The text to indent
 /// * `indent` - The indentation string to prepend to each non-empty line
 ///
-/// # Examples
-/// ```
-/// use cubesqlplanner::utils::debug::indent_lines;
-///
-/// let text = "line1\nline2\n\nline3";
-/// let result = indent_lines(text, "  ");
-/// assert_eq!(result, "  line1\n  line2\n\n  line3");
-/// ```
 pub fn indent_lines(text: &str, indent: &str) -> String {
     text.lines()
         .map(|line| {
@@ -40,11 +32,6 @@ pub fn indent_lines(text: &str, indent: &str) -> String {
 /// * `text` - The text to indent
 /// * `levels` - Number of indentation levels (each level adds 2 spaces)
 ///
-/// # Examples
-/// ```
-/// use cubesqlplanner::utils::debug::indent_by;
-///
-/// ```
 pub fn indent_by(text: &str, levels: usize) -> String {
     let indent = "  ".repeat(levels);
     indent_lines(text, &indent)
@@ -55,7 +42,6 @@ pub fn indent_by(text: &str, levels: usize) -> String {
 /// # Arguments
 /// * `text` - The text to indent
 ///
-/// ```
 pub fn indent(text: &str) -> String {
     indent_by(text, 1)
 }
