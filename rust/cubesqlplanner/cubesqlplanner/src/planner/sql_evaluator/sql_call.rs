@@ -327,3 +327,57 @@ impl SqlCall {
         Ok(Rc::new(result))
     }
 }
+
+impl crate::planner::sql_evaluator::debug_sql::DebugSql for SqlCall {
+    fn debug_sql(&self, expand_deps: bool) -> String {
+        let template_str = match &self.template {
+            SqlTemplate::String(s) => s.clone(),
+            SqlTemplate::StringVec(vec) => {
+                format!("[{}]", vec.join(", "))
+            }
+        };
+
+        let deps = self
+            .deps
+            .iter()
+            .map(|dep| {
+                if expand_deps {
+                    dep.symbol.debug_sql(true)
+                } else {
+                    format!("{{{}}}", dep.symbol.full_name())
+                }
+            })
+            .collect_vec();
+
+        let filter_params = self
+            .filter_params
+            .iter()
+            .enumerate()
+            .map(|(i, _filter_param)| format!("{{FILTER_PARAMS[{}]}}", i))
+            .collect_vec();
+
+        let filter_groups = self
+            .filter_groups
+            .iter()
+            .enumerate()
+            .map(|(i, _filter_group)| format!("{{FILTER_GROUP[{}]}}", i))
+            .collect_vec();
+
+        let context_values = self
+            .security_context
+            .values
+            .iter()
+            .enumerate()
+            .map(|(key, _value)| format!("{{SECURITY_CONTEXT[{}]}}", key))
+            .collect_vec();
+
+        Self::substitute_template(
+            &template_str,
+            &deps,
+            &filter_params,
+            &filter_groups,
+            &context_values,
+        )
+        .unwrap()
+    }
+}

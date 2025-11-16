@@ -4,7 +4,6 @@ use super::{
     sql_utils::NativeSqlUtils,
 };
 use crate::cube_bridge::base_tools::BaseTools;
-use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::planner::sql_evaluator::SqlCallArg;
 use crate::utils::UniqueVector;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};

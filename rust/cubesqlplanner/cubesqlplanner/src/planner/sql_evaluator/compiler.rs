@@ -46,7 +46,7 @@ impl Compiler {
         let path = name.split(".").map(|s| s.to_string()).collect::<Vec<_>>();
         if self.cube_evaluator.is_measure(path.clone())? {
             Ok(self.add_measure_evaluator(name)?)
-        } else if self.cube_evaluator.is_dimension(path.clone())? {
+        } else if self.cube_evaluator.dimension_by_path(name.clone()).is_ok() {
             Ok(self.add_dimension_evaluator(name)?)
         } else {
             Err(CubeError::internal(format!(

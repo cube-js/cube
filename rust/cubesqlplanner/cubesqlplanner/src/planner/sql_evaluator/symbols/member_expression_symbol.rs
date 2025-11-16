@@ -156,3 +156,18 @@ impl MemberExpressionSymbol {
         &self.definition
     }
 }
+
+impl crate::planner::sql_evaluator::debug_sql::DebugSql for MemberExpressionSymbol {
+    fn debug_sql(&self, expand_deps: bool) -> String {
+        match &self.expression {
+            MemberExpressionExpression::SqlCall(sql) => sql.debug_sql(expand_deps),
+            MemberExpressionExpression::PatchedSymbol(symbol) => {
+                if expand_deps {
+                    symbol.debug_sql(true)
+                } else {
+                    format!("{{EXPRESSION:{}}}", self.full_name())
+                }
+            }
+        }
+    }
+}
