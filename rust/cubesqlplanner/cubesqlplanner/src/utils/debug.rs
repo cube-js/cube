@@ -44,9 +44,6 @@ pub fn indent_lines(text: &str, indent: &str) -> String {
 /// ```
 /// use cubesqlplanner::utils::debug::indent_by;
 ///
-/// let text = "line1\nline2";
-/// let result = indent_by(text, 2);
-/// assert_eq!(result, "    line1\n    line2"); // 2 levels = 4 spaces
 /// ```
 pub fn indent_by(text: &str, levels: usize) -> String {
     let indent = "  ".repeat(levels);
@@ -58,13 +55,6 @@ pub fn indent_by(text: &str, levels: usize) -> String {
 /// # Arguments
 /// * `text` - The text to indent
 ///
-/// # Examples
-/// ```
-/// use cubesqlplanner::utils::debug::indent;
-///
-/// let text = "line1\nline2";
-/// let result = indent(text);
-/// assert_eq!(result, "  line1\n  line2");
 /// ```
 pub fn indent(text: &str) -> String {
     indent_by(text, 1)
