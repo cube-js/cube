@@ -102,6 +102,60 @@ pub fn members_from_strings<S: ToString>(strings: Vec<S>) -> Vec<OptionsMember> 
         .collect()
 }
 
+/// Helper function to create a FilterItem with member, operator, and values
+///
+/// # Arguments
+/// * `member` - Member name (e.g., "orders.status")
+/// * `operator` - Filter operator (e.g., "equals", "contains", "gt")
+/// * `values` - Array of filter values
+///
+pub fn filter_item<M: ToString, O: ToString, V: ToString>(
+    member: M,
+    operator: O,
+    values: Vec<V>,
+) -> FilterItem {
+    FilterItem {
+        member: Some(member.to_string()),
+        dimension: None,
+        operator: Some(operator.to_string()),
+        values: Some(values.into_iter().map(|v| Some(v.to_string())).collect()),
+        or: None,
+        and: None,
+    }
+}
+
+/// Helper function to create a FilterItem with OR logic
+///
+/// # Arguments
+/// * `items` - Array of FilterItems to combine with OR
+///
+pub fn filter_or(items: Vec<FilterItem>) -> FilterItem {
+    FilterItem {
+        or: Some(items),
+        member: None,
+        dimension: None,
+        operator: None,
+        values: None,
+        and: None,
+    }
+}
+
+/// Helper function to create a FilterItem with AND logic
+///
+/// # Arguments
+/// * `items` - Array of FilterItems to combine with AND
+///
+pub fn filter_and(items: Vec<FilterItem>) -> FilterItem {
+    FilterItem {
+        and: Some(items),
+        member: None,
+        dimension: None,
+        operator: None,
+        values: None,
+        or: None,
+    }
+}
+
 impl BaseQueryOptions for MockBaseQueryOptions {
     crate::impl_static_data_method!(BaseQueryOptionsStatic);
 

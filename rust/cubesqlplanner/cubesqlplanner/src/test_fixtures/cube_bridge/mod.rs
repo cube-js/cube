@@ -35,7 +35,9 @@ mod mock_timeshift_definition;
 #[cfg(test)]
 mod mock_join_graph_tests;
 
-pub use base_query_options::{members_from_strings, MockBaseQueryOptions};
+pub use base_query_options::{
+    filter_and, filter_item, filter_or, members_from_strings, MockBaseQueryOptions,
+};
 pub use mock_base_tools::MockBaseTools;
 pub use mock_case_definition::MockCaseDefinition;
 pub use mock_case_else_item::MockCaseElseItem;
