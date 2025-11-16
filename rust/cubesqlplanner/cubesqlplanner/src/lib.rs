@@ -3,3 +3,4 @@ pub mod logical_plan;
 pub mod physical_plan_builder;
 pub mod plan;
 pub mod planner;
+pub(crate) mod utils;

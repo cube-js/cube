@@ -61,6 +61,7 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                         RenderReferencesType::LiteralValue(value) => {
                             templates.quote_string(value)?
                         }
+                        RenderReferencesType::RawReferenceValue(value) => value.clone(),
                     }
                 } else {
                     self.input.to_sql(

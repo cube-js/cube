@@ -121,6 +121,7 @@ pub fn collect_join_hints_for_measures(
     for meas in measures.iter() {
         visitor.apply(&meas, &())?;
     }
+
     let res = visitor.extract_result();
     Ok(res)
 }

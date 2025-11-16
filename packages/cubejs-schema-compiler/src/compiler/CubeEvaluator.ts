@@ -885,7 +885,6 @@ export class CubeEvaluator extends CubeSymbols {
         });
       }
     }
-
     return {
       allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
