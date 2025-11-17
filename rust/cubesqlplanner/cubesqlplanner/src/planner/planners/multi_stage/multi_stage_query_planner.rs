@@ -403,17 +403,6 @@ impl MultiStageQueryPlanner {
                 resolved_multi_stage_dimensions,
             )?;
 
-            // Add GROUP BY to the dimension subquery itself
-            // if a multi-stage dimension has the `add_group_by` field.
-            let self_state =
-                if !multi_stage_member.add_group_by_symbols().is_empty() && member.is_dimension() {
-                    let mut self_state = state.clone_state();
-                    self_state.add_dimensions(multi_stage_member.add_group_by_symbols().clone());
-                    Rc::new(self_state)
-                } else {
-                    state.clone()
-                };
-
             let alias = format!("cte_{}", descriptions.len());
             MultiStageQueryDescription::new(
                 MultiStageMember::new(
@@ -422,7 +411,7 @@ impl MultiStageQueryPlanner {
                     is_ungrupped,
                     false,
                 ),
-                self_state,
+                state.clone(),
                 input,
                 alias.clone(),
             )
