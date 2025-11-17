@@ -1,6 +1,7 @@
 #[macro_use]
 mod macros;
 
+mod base_query_options;
 mod mock_base_tools;
 mod mock_case_definition;
 mod mock_case_else_item;
