@@ -96,6 +96,10 @@ impl FullKeyAggregate {
     pub fn multi_stage_subquery_refs(&self) -> &Vec<Rc<MultiStageSubqueryRef>> {
         &self.multi_stage_subquery_refs
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.multi_stage_subquery_refs.is_empty() && self.multiplied_measures_resolver.is_none()
+    }
 }
 
 impl LogicalNode for FullKeyAggregate {

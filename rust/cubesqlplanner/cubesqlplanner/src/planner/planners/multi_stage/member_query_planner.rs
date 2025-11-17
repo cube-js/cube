@@ -294,6 +294,20 @@ impl MultiStageMemberQueryPlanner {
             MemberSymbol::Measure(_) => measures.push(cte_member.clone()),
             _ => {}
         }
+        //We add all non multi stage dimensions to the of the underling states because it's needed
+        //for
+        let (all_dependend_dimensions, all_dependend_time_dimensions) =
+            self.description.collect_all_non_multi_stage_dimension()?;
+        dimensions.extend(all_dependend_dimensions.iter().cloned());
+        time_dimensions.extend(all_dependend_time_dimensions.iter().cloned());
+        dimensions = dimensions
+            .into_iter()
+            .unique_by(|d| d.full_name())
+            .collect_vec();
+        time_dimensions = time_dimensions
+            .into_iter()
+            .unique_by(|d| d.full_name())
+            .collect_vec();
 
         let schema = LogicalSchema::default()
             .set_dimensions(dimensions)

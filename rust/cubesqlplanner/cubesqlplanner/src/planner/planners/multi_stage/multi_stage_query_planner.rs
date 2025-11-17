@@ -219,7 +219,7 @@ impl MultiStageQueryPlanner {
                     descriptions,
                     resolved_multi_stage_dimensions,
                 )?;
-                if !description.is_multi_stage_dimension() {
+                if !description.is_multi_stage_dimension() || member.as_dimension().is_ok() {
                     result.push(description);
                 }
             }
