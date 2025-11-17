@@ -90,12 +90,10 @@ impl MockJoinGraph {
         let cube_name = &cube.static_data().name;
 
         for (join_name, join_def) in joins {
-            // Validate target cube exists
             if !evaluator.cube_exists(join_name.clone())? {
                 return Err(CubeError::user(format!("Cube {} doesn't exist", join_name)));
             }
 
-            // Check multiplied measures for source cube
             let from_multiplied = self.get_multiplied_measures(cube_name, evaluator)?;
             if !from_multiplied.is_empty() {
                 let static_data = evaluator.static_data();
@@ -108,7 +106,6 @@ impl MockJoinGraph {
                 }
             }
 
-            // Check multiplied measures for target cube
             let to_multiplied = self.get_multiplied_measures(join_name, evaluator)?;
             if !to_multiplied.is_empty() {
                 let static_data = evaluator.static_data();
@@ -121,7 +118,6 @@ impl MockJoinGraph {
                 }
             }
 
-            // Create JoinEdge
             let edge = JoinEdge {
                 join: Rc::new(join_def.clone()),
                 from: cube_name.clone(),
@@ -185,7 +181,6 @@ impl MockJoinGraph {
         use crate::test_fixtures::graph_utils::find_shortest_path;
         use std::collections::HashSet;
 
-        // Extract root and additional cubes to join
         let (root_name, additional_cubes) = match root {
             JoinHintItem::Single(name) => (name.clone(), Vec::new()),
             JoinHintItem::Vector(path) => {
@@ -202,30 +197,23 @@ impl MockJoinGraph {
             }
         };
 
-        // Combine additional cubes with cubes_to_join
         let mut all_cubes_to_join = additional_cubes;
         all_cubes_to_join.extend_from_slice(cubes_to_join);
 
-        // Track which nodes have been joined
         let mut nodes_joined: HashSet<String> = HashSet::new();
 
-        // Collect all joins with their indices
         let mut all_joins: Vec<(usize, JoinEdge)> = Vec::new();
         let mut next_index = 0;
 
-        // Process each cube to join
         for join_hint in &all_cubes_to_join {
-            // Convert to Vector if Single
             let path_elements = match join_hint {
                 JoinHintItem::Single(name) => vec![name.clone()],
                 JoinHintItem::Vector(path) => path.clone(),
             };
 
-            // Find path from previous node to each target
             let mut prev_node = root_name.clone();
 
             for to_join in &path_elements {
-                // Skip if already joined or same as previous
                 if to_join == &prev_node {
                     continue;
                 }
@@ -235,31 +223,25 @@ impl MockJoinGraph {
                     continue;
                 }
 
-                // Find shortest path
                 let path = find_shortest_path(&self.nodes, &prev_node, to_join);
                 path.as_ref()?;
 
                 let path = path.unwrap();
 
-                // Convert path to joins
                 let found_joins = self.joins_by_path(&path);
 
-                // Add joins with indices
                 for join in found_joins {
                     all_joins.push((next_index, join));
                     next_index += 1;
                 }
 
-                // Mark as joined
                 nodes_joined.insert(to_join.clone());
                 prev_node = to_join.clone();
             }
         }
 
-        // Sort by index and remove duplicates
         all_joins.sort_by_key(|(idx, _)| *idx);
 
-        // Remove duplicates by edge key
         let mut seen_keys: HashSet<String> = HashSet::new();
         let mut unique_joins: Vec<JoinEdge> = Vec::new();
 
@@ -274,49 +256,16 @@ impl MockJoinGraph {
         Some((root_name, unique_joins))
     }
 
-    /// Builds a join definition from a list of cubes to join
-    ///
-    /// This is the main entry point for finding optimal join paths between cubes.
-    /// It tries each cube as a potential root and selects the shortest join tree.
-    ///
-    /// # Arguments
-    /// * `cubes_to_join` - Vector of JoinHintItem specifying which cubes to join
-    ///
-    /// # Returns
-    /// * `Ok(Rc<MockJoinDefinition>)` - The optimal join definition with multiplication factors
-    /// * `Err(CubeError)` - If no join path exists or input is empty
-    ///
-    /// # Caching
-    /// Results are cached based on the serialized cubes_to_join.
-    /// Subsequent calls with the same cubes return the cached result.
-    ///
-    /// # Algorithm
-    /// 1. Check cache for existing result
-    /// 2. Try each cube as root, find shortest tree
-    /// 3. Calculate multiplication factors for each cube
-    /// 4. Create MockJoinDefinition with results
-    /// 5. Cache and return
-    ///
-    /// # Example
-    /// ```ignore
-    /// let cubes = vec![
-    ///     JoinHintItem::Single("orders".to_string()),
-    ///     JoinHintItem::Single("users".to_string()),
-    /// ];
-    /// let join_def = graph.build_join(cubes)?;
-    /// ```
     pub fn build_join(
         &self,
         cubes_to_join: Vec<JoinHintItem>,
     ) -> Result<Rc<MockJoinDefinition>, CubeError> {
-        // Handle empty input
         if cubes_to_join.is_empty() {
             return Err(CubeError::user(
                 "Cannot build join with empty cube list".to_string(),
             ));
         }
 
-        // Check cache
         let cache_key = serde_json::to_string(&cubes_to_join).map_err(|e| {
             CubeError::internal(format!("Failed to serialize cubes_to_join: {}", e))
         })?;
@@ -328,7 +277,6 @@ impl MockJoinGraph {
             }
         }
 
-        // Try each cube as root
         let mut join_trees: Vec<(String, Vec<JoinEdge>)> = Vec::new();
 
         for i in 0..cubes_to_join.len() {
@@ -342,10 +290,8 @@ impl MockJoinGraph {
             }
         }
 
-        // Sort by number of joins (shortest first)
         join_trees.sort_by_key(|(_, joins)| joins.len());
 
-        // Take the shortest tree
         let (root_name, joins) = join_trees.first().ok_or_else(|| {
             let cube_names: Vec<String> = cubes_to_join
                 .iter()
@@ -360,7 +306,6 @@ impl MockJoinGraph {
             ))
         })?;
 
-        // Calculate multiplication factors
         let mut multiplication_factor: HashMap<String, bool> = HashMap::new();
         for cube_hint in &cubes_to_join {
             let cube_name = self.cube_from_path(cube_hint);
@@ -368,13 +313,11 @@ impl MockJoinGraph {
             multiplication_factor.insert(cube_name, factor);
         }
 
-        // Convert JoinEdges to MockJoinItems
         let join_items: Vec<Rc<crate::test_fixtures::cube_bridge::MockJoinItem>> = joins
             .iter()
             .map(|edge| self.join_edge_to_mock_join_item(edge))
             .collect();
 
-        // Create MockJoinDefinition
         let join_def = Rc::new(
             MockJoinDefinition::builder()
                 .root(root_name.clone())
@@ -383,7 +326,6 @@ impl MockJoinGraph {
                 .build(),
         );
 
-        // Cache and return
         self.built_joins
             .borrow_mut()
             .insert(cache_key, join_def.clone());
@@ -391,16 +333,6 @@ impl MockJoinGraph {
         Ok(join_def)
     }
 
-    /// Converts a JoinEdge to a MockJoinItem
-    ///
-    /// Helper method to convert internal JoinEdge representation to the MockJoinItem
-    /// type used in MockJoinDefinition.
-    ///
-    /// # Arguments
-    /// * `edge` - The JoinEdge to convert
-    ///
-    /// # Returns
-    /// Rc<MockJoinItem> with the same from/to/original_from/original_to and join definition
     fn join_edge_to_mock_join_item(
         &self,
         edge: &JoinEdge,
@@ -418,20 +350,6 @@ impl MockJoinGraph {
         )
     }
 
-    /// Checks if a specific join causes row multiplication for a cube
-    ///
-    /// # Multiplication Rules
-    /// - If join.from == cube && relationship == "hasMany": multiplies
-    /// - If join.to == cube && relationship == "belongsTo": multiplies
-    /// - Otherwise: no multiplication
-    ///
-    /// # Arguments
-    /// * `cube` - The cube name to check
-    /// * `join` - The join edge to examine
-    ///
-    /// # Returns
-    /// * `true` if this join multiplies rows for the cube
-    /// * `false` otherwise
     pub(crate) fn check_if_cube_multiplied(&self, cube: &str, join: &JoinEdge) -> bool {
         let relationship = &join.join.static_data().relationship;
 
@@ -439,33 +357,6 @@ impl MockJoinGraph {
             || (join.to == cube && relationship == "belongsTo")
     }
 
-    /// Determines if a cube has a multiplication factor in the join tree
-    ///
-    /// This method walks the join tree recursively to determine if joining
-    /// this cube causes row multiplication due to hasMany or belongsTo relationships.
-    ///
-    /// # Algorithm
-    /// 1. Start from the target cube
-    /// 2. Find all adjacent joins in the tree
-    /// 3. Check if any immediate join causes multiplication
-    /// 4. If not, recursively check adjacent cubes
-    /// 5. Use visited set to prevent infinite loops
-    ///
-    /// # Arguments
-    /// * `cube` - The cube name to check
-    /// * `joins` - The join edges in the tree
-    ///
-    /// # Returns
-    /// * `true` if this cube causes row multiplication
-    /// * `false` otherwise
-    ///
-    /// # Example
-    /// ```ignore
-    /// // users hasMany orders
-    /// let joins = vec![join_users_to_orders];
-    /// assert!(graph.find_multiplication_factor_for("users", &joins));
-    /// assert!(!graph.find_multiplication_factor_for("orders", &joins));
-    /// ```
     pub(crate) fn find_multiplication_factor_for(&self, cube: &str, joins: &[JoinEdge]) -> bool {
         use std::collections::HashSet;
 
@@ -477,13 +368,11 @@ impl MockJoinGraph {
             joins: &[JoinEdge],
             visited: &mut HashSet<String>,
         ) -> bool {
-            // Check if already visited (prevent cycles)
             if visited.contains(current_cube) {
                 return false;
             }
             visited.insert(current_cube.to_string());
 
-            // Helper to get next node in edge
             let next_node = |join: &JoinEdge| -> String {
                 if join.from == current_cube {
                     join.to.clone()
@@ -492,13 +381,11 @@ impl MockJoinGraph {
                 }
             };
 
-            // Find all joins adjacent to current cube
             let next_joins: Vec<&JoinEdge> = joins
                 .iter()
                 .filter(|j| j.from == current_cube || j.to == current_cube)
                 .collect();
 
-            // Check if any immediate join multiplies AND leads to unvisited node
             if next_joins.iter().any(|next_join| {
                 let next = next_node(next_join);
                 graph.check_if_cube_multiplied(current_cube, next_join) && !visited.contains(&next)
@@ -506,7 +393,6 @@ impl MockJoinGraph {
                 return true;
             }
 
-            // Recursively check adjacent cubes
             next_joins.iter().any(|next_join| {
                 let next = next_node(next_join);
                 find_if_multiplied_recursive(graph, &next, joins, visited)
@@ -516,38 +402,21 @@ impl MockJoinGraph {
         find_if_multiplied_recursive(self, cube, joins, &mut visited)
     }
 
-    /// Compiles the join graph from cube definitions
-    ///
-    /// This method processes all cubes and their join definitions to build the internal
-    /// graph structure needed for join path finding. It validates that:
-    /// - All referenced cubes exist
-    /// - Cubes with multiplied measures have primary keys defined
-    ///
-    /// # Arguments
-    /// * `cubes` - Slice of cube definitions to compile
-    /// * `evaluator` - Evaluator for validation and lookups
-    ///
-    /// # Returns
-    /// * `Ok(())` if compilation succeeds
-    /// * `Err(CubeError)` if validation fails
     pub fn compile(
         &mut self,
         cubes: &[Rc<crate::test_fixtures::cube_bridge::MockCubeDefinition>],
         evaluator: &crate::test_fixtures::cube_bridge::MockCubeEvaluator,
     ) -> Result<(), CubeError> {
-        // Clear existing state
         self.edges.clear();
         self.nodes.clear();
         self.undirected_nodes.clear();
         self.cached_connected_components = None;
 
-        // First, ensure all cubes exist in nodes HashMap (even if they have no joins)
         for cube in cubes {
             let cube_name = cube.static_data().name.clone();
             self.nodes.entry(cube_name).or_default();
         }
 
-        // Build edges from all cubes
         for cube in cubes {
             let cube_edges = self.build_join_edges(cube, evaluator)?;
             for (key, edge) in cube_edges {
@@ -555,8 +424,6 @@ impl MockJoinGraph {
             }
         }
 
-        // Build nodes HashMap (directed graph)
-        // Group edges by 'from' field and create HashMap of destinations
         for edge in self.edges.values() {
             self.nodes
                 .entry(edge.from.clone())
@@ -564,8 +431,6 @@ impl MockJoinGraph {
                 .insert(edge.to.clone(), 1);
         }
 
-        // Build undirected_nodes HashMap
-        // For each edge (from -> to), also add (to -> from) for bidirectional connectivity
         for edge in self.edges.values() {
             self.undirected_nodes
                 .entry(edge.to.clone())
@@ -576,51 +441,25 @@ impl MockJoinGraph {
         Ok(())
     }
 
-    /// Recursively marks all cubes in a connected component
-    ///
-    /// This method performs a depth-first search starting from the given node,
-    /// marking all reachable nodes with the same component ID. It uses the
-    /// undirected_nodes graph to traverse in both directions.
-    ///
-    /// # Algorithm
-    /// 1. Check if node already has a component ID (base case)
-    /// 2. Assign component ID to current node
-    /// 3. Find all connected nodes in undirected_nodes graph
-    /// 4. Recursively process each connected node
-    ///
-    /// # Arguments
-    /// * `component_id` - The ID to assign to this component
-    /// * `node` - The current cube name being processed
-    /// * `components` - Mutable map of cube -> component_id
-    ///
-    /// # Example
-    /// ```ignore
-    /// let mut components = HashMap::new();
-    /// graph.find_connected_component(1, "users", &mut components);
-    /// // All cubes reachable from "users" now have component_id = 1
-    /// ```
+    #[allow(dead_code)]
     fn find_connected_component(
         &self,
         component_id: u32,
         node: &str,
         components: &mut HashMap<String, u32>,
     ) {
-        // Base case: already visited
         if components.contains_key(node) {
             return;
         }
 
-        // Mark this node with component ID
         components.insert(node.to_string(), component_id);
 
-        // Get connected nodes from undirected graph (backward edges: to -> from)
         if let Some(connected_nodes) = self.undirected_nodes.get(node) {
             for connected_node in connected_nodes.keys() {
                 self.find_connected_component(component_id, connected_node, components);
             }
         }
 
-        // Also traverse forward edges (from -> to)
         if let Some(connected_nodes) = self.nodes.get(node) {
             for connected_node in connected_nodes.keys() {
                 self.find_connected_component(component_id, connected_node, components);
@@ -628,30 +467,8 @@ impl MockJoinGraph {
         }
     }
 
-    /// Returns connected components of the join graph
-    ///
-    /// This method identifies which cubes are connected through join relationships.
-    /// Cubes in the same component can be joined together. Cubes in different
-    /// components cannot be joined and would result in a query error.
-    ///
-    /// Component IDs start at 1 and increment for each disconnected subgraph.
-    /// Isolated cubes (with no joins) each get their own unique component ID.
-    ///
-    /// # Returns
-    /// HashMap mapping cube name to component ID (1-based)
-    ///
-    /// # Example
-    /// ```ignore
-    /// // Graph: users <-> orders, products (isolated)
-    /// let components = graph.connected_components();
-    /// assert_eq!(components.get("users"), components.get("orders")); // Same component
-    /// assert_ne!(components.get("users"), components.get("products")); // Different
-    /// ```
-    ///
-    /// # Caching
-    /// Results are cached and reused on subsequent calls until `compile()` is called.
+    #[allow(dead_code)]
     pub fn connected_components(&mut self) -> HashMap<String, u32> {
-        // Return cached result if available
         if let Some(cached) = &self.cached_connected_components {
             return cached.clone();
         }
@@ -659,18 +476,15 @@ impl MockJoinGraph {
         let mut component_id: u32 = 1;
         let mut components: HashMap<String, u32> = HashMap::new();
 
-        // Process all nodes (includes isolated cubes)
         let node_names: Vec<String> = self.nodes.keys().cloned().collect();
 
         for node in node_names {
-            // Only process if not already assigned to a component
             if !components.contains_key(&node) {
                 self.find_connected_component(component_id, &node, &mut components);
                 component_id += 1;
             }
         }
 
-        // Cache results
         self.cached_connected_components = Some(components.clone());
 
         components
@@ -692,7 +506,6 @@ impl JoinGraph for MockJoinGraph {
         &self,
         cubes_to_join: Vec<JoinHintItem>,
     ) -> Result<Rc<dyn JoinDefinition>, CubeError> {
-        // Call our implementation and cast to trait object
         let result = self.build_join(cubes_to_join)?;
         Ok(result as Rc<dyn JoinDefinition>)
     }

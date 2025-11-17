@@ -26,6 +26,7 @@ impl MockDriverTools {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_timezone(timezone: String) -> Self {
         Self {
             timezone,

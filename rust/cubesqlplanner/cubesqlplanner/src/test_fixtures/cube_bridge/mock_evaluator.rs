@@ -21,6 +21,7 @@ pub struct MockCubeEvaluator {
 }
 
 impl MockCubeEvaluator {
+    #[allow(dead_code)]
     pub fn new(schema: MockSchema) -> Self {
         Self {
             schema,
