@@ -6,13 +6,11 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Mock schema containing cubes with their measures and dimensions
 #[derive(Clone)]
 pub struct MockSchema {
     cubes: HashMap<String, MockCube>,
 }
 
-/// Single cube with its definition and members
 #[derive(Clone)]
 pub struct MockCube {
     pub definition: MockCubeDefinition,
@@ -22,12 +20,10 @@ pub struct MockCube {
 }
 
 impl MockSchema {
-    /// Get cube by name
     pub fn get_cube(&self, name: &str) -> Option<&MockCube> {
         self.cubes.get(name)
     }
 
-    /// Get dimension by cube name and dimension name
     pub fn get_dimension(
         &self,
         cube_name: &str,
@@ -38,7 +34,6 @@ impl MockSchema {
             .and_then(|cube| cube.dimensions.get(dimension_name).cloned())
     }
 
-    /// Get measure by cube name and measure name
     pub fn get_measure(
         &self,
         cube_name: &str,
@@ -49,7 +44,6 @@ impl MockSchema {
             .and_then(|cube| cube.measures.get(measure_name).cloned())
     }
 
-    /// Get segment by cube name and segment name
     pub fn get_segment(
         &self,
         cube_name: &str,
@@ -60,14 +54,11 @@ impl MockSchema {
             .and_then(|cube| cube.segments.get(segment_name).cloned())
     }
 
-    /// Get all cube names
     pub fn cube_names(&self) -> Vec<&String> {
         self.cubes.keys().collect()
     }
 
-    /// Create a MockCubeEvaluator from this schema
     pub fn create_evaluator(self) -> Rc<MockCubeEvaluator> {
-        // Collect primary keys from all cubes
         let mut primary_keys = std::collections::HashMap::new();
 
         for (cube_name, cube) in &self.cubes {
@@ -79,7 +70,6 @@ impl MockSchema {
                 }
             }
 
-            // Sort primary keys by name to ensure stable ordering
             pk_dimensions.sort();
 
             if !pk_dimensions.is_empty() {
@@ -90,7 +80,6 @@ impl MockSchema {
         Rc::new(MockCubeEvaluator::with_primary_keys(self, primary_keys))
     }
 
-    /// Create a MockCubeEvaluator with primary keys from this schema
     #[allow(dead_code)]
     pub fn create_evaluator_with_primary_keys(
         self,
@@ -99,25 +88,13 @@ impl MockSchema {
         Rc::new(MockCubeEvaluator::with_primary_keys(self, primary_keys))
     }
 
-    /// Create a MockJoinGraph from this schema
-    ///
-    /// This method:
-    /// 1. Extracts all cubes as Vec<Rc<MockCubeDefinition>>
-    /// 2. Creates a temporary MockCubeEvaluator for validation
-    /// 3. Creates and compiles a MockJoinGraph
-    ///
-    /// # Returns
-    /// * `Ok(MockJoinGraph)` - Compiled join graph
-    /// * `Err(CubeError)` - If join graph compilation fails (invalid joins, missing PKs, etc.)
     pub fn create_join_graph(&self) -> Result<MockJoinGraph, CubeError> {
-        // Collect cubes as Vec<Rc<MockCubeDefinition>>
         let cubes: Vec<Rc<MockCubeDefinition>> = self
             .cubes
             .values()
             .map(|mock_cube| Rc::new(mock_cube.definition.clone()))
             .collect();
 
-        // Extract primary keys for evaluator
         let mut primary_keys = HashMap::new();
         for (cube_name, cube) in &self.cubes {
             let mut pk_dimensions = Vec::new();
@@ -132,26 +109,15 @@ impl MockSchema {
             }
         }
 
-        // Clone self for evaluator
         let evaluator = MockCubeEvaluator::with_primary_keys(self.clone(), primary_keys);
 
-        // Create and compile join graph
         let mut join_graph = MockJoinGraph::new();
         join_graph.compile(&cubes, &evaluator)?;
 
         Ok(join_graph)
     }
 
-    /// Create a MockCubeEvaluator with join graph from this schema
-    ///
-    /// This method creates an evaluator with a fully compiled join graph,
-    /// enabling join path resolution in tests.
-    ///
-    /// # Returns
-    /// * `Ok(Rc<MockCubeEvaluator>)` - Evaluator with join graph
-    /// * `Err(CubeError)` - If join graph compilation fails
     pub fn create_evaluator_with_join_graph(self) -> Result<Rc<MockCubeEvaluator>, CubeError> {
-        // Extract primary keys
         let mut primary_keys = HashMap::new();
         for (cube_name, cube) in &self.cubes {
             let mut pk_dimensions = Vec::new();
@@ -166,10 +132,8 @@ impl MockSchema {
             }
         }
 
-        // Compile join graph
         let join_graph = self.create_join_graph()?;
 
-        // Create evaluator with join graph
         Ok(Rc::new(MockCubeEvaluator::with_join_graph(
             self,
             primary_keys,
@@ -178,20 +142,17 @@ impl MockSchema {
     }
 }
 
-/// Builder for MockSchema with fluent API
 pub struct MockSchemaBuilder {
     cubes: HashMap<String, MockCube>,
 }
 
 impl MockSchemaBuilder {
-    /// Create a new schema builder
     pub fn new() -> Self {
         Self {
             cubes: HashMap::new(),
         }
     }
 
-    /// Add a cube and return a cube builder
     pub fn add_cube(self, name: impl Into<String>) -> MockCubeBuilder {
         MockCubeBuilder {
             schema_builder: self,
@@ -204,7 +165,6 @@ impl MockSchemaBuilder {
         }
     }
 
-    /// Add a view and return a view builder
     pub fn add_view(self, name: impl Into<String>) -> MockViewBuilder {
         MockViewBuilder {
             schema_builder: self,
@@ -216,7 +176,6 @@ impl MockSchemaBuilder {
         }
     }
 
-    /// Build the final schema
     pub fn build(self) -> MockSchema {
         MockSchema { cubes: self.cubes }
     }
@@ -228,7 +187,6 @@ impl Default for MockSchemaBuilder {
     }
 }
 
-/// Builder for a single cube within a schema
 pub struct MockCubeBuilder {
     schema_builder: MockSchemaBuilder,
     cube_name: String,
@@ -240,13 +198,11 @@ pub struct MockCubeBuilder {
 }
 
 impl MockCubeBuilder {
-    /// Set the cube definition
     pub fn cube_def(mut self, definition: MockCubeDefinition) -> Self {
         self.cube_definition = Some(definition);
         self
     }
 
-    /// Add a dimension to the cube
     pub fn add_dimension(
         mut self,
         name: impl Into<String>,
@@ -256,7 +212,6 @@ impl MockCubeBuilder {
         self
     }
 
-    /// Add a measure to the cube
     pub fn add_measure(
         mut self,
         name: impl Into<String>,
@@ -266,7 +221,6 @@ impl MockCubeBuilder {
         self
     }
 
-    /// Add a segment to the cube
     pub fn add_segment(
         mut self,
         name: impl Into<String>,
@@ -276,27 +230,22 @@ impl MockCubeBuilder {
         self
     }
 
-    /// Add a join to the cube
     pub fn add_join(mut self, name: impl Into<String>, definition: MockJoinItemDefinition) -> Self {
         self.joins.insert(name.into(), definition);
         self
     }
 
-    /// Finish building this cube and return to schema builder
     pub fn finish_cube(mut self) -> MockSchemaBuilder {
         let mut cube_def = self.cube_definition.unwrap_or_else(|| {
-            // Create default cube definition with the cube name
             MockCubeDefinition::builder()
                 .name(self.cube_name.clone())
                 .sql_table(format!("public.{}", self.cube_name))
                 .build()
         });
 
-        // Merge joins from builder with joins from cube definition
         let mut all_joins = cube_def.joins().clone();
         all_joins.extend(self.joins);
 
-        // Rebuild cube definition with merged joins
         let static_data = cube_def.static_data();
         cube_def = MockCubeDefinition::builder()
             .name(static_data.name.clone())
@@ -319,15 +268,11 @@ impl MockCubeBuilder {
     }
 }
 
-/// Represents a cube to include in a view
 pub struct ViewCube {
-    /// Join path to the cube (e.g., "visitors" or "visitors.visitor_checkins")
     pub join_path: String,
-    /// Member names to include, empty vec means include all
     pub includes: Vec<String>,
 }
 
-/// Builder for a view within a schema
 pub struct MockViewBuilder {
     schema_builder: MockSchemaBuilder,
     view_name: String,
@@ -338,7 +283,6 @@ pub struct MockViewBuilder {
 }
 
 impl MockViewBuilder {
-    /// Add a cube to include in this view
     pub fn include_cube(mut self, join_path: impl Into<String>, includes: Vec<String>) -> Self {
         self.view_cubes.push(ViewCube {
             join_path: join_path.into(),
@@ -347,7 +291,6 @@ impl MockViewBuilder {
         self
     }
 
-    /// Add a custom dimension to the view
     pub fn add_dimension(
         mut self,
         name: impl Into<String>,
@@ -357,7 +300,6 @@ impl MockViewBuilder {
         self
     }
 
-    /// Add a custom measure to the view
     pub fn add_measure(
         mut self,
         name: impl Into<String>,
@@ -367,7 +309,6 @@ impl MockViewBuilder {
         self
     }
 
-    /// Add a custom segment to the view
     #[allow(dead_code)]
     pub fn add_segment(
         mut self,
@@ -378,22 +319,17 @@ impl MockViewBuilder {
         self
     }
 
-    /// Finish building this view and return to schema builder
     pub fn finish_view(mut self) -> MockSchemaBuilder {
         let mut all_dimensions = self.dimensions;
         let mut all_measures = self.measures;
         let mut all_segments = self.segments;
 
-        // Process each included cube
         for view_cube in &self.view_cubes {
             let join_path_parts: Vec<&str> = view_cube.join_path.split('.').collect();
             let target_cube_name = join_path_parts.last().unwrap();
 
-            // Get the target cube from schema
             if let Some(source_cube) = self.schema_builder.cubes.get(*target_cube_name) {
-                // Determine which members to include
                 let members_to_include: Vec<String> = if view_cube.includes.is_empty() {
-                    // Include all members
                     let mut all_members = Vec::new();
                     all_members.extend(source_cube.dimensions.keys().cloned());
                     all_members.extend(source_cube.measures.keys().cloned());
@@ -403,13 +339,11 @@ impl MockViewBuilder {
                     view_cube.includes.clone()
                 };
 
-                // Add dimensions
                 for member_name in &members_to_include {
                     if let Some(dimension) = source_cube.dimensions.get(member_name) {
                         let view_member_sql =
                             format!("{{{}.{}}}", view_cube.join_path, member_name);
 
-                        // Check for duplicates
                         if all_dimensions.contains_key(member_name) {
                             panic!(
                                 "Duplicate member '{}' in view '{}'. Members must be unique.",
@@ -429,13 +363,11 @@ impl MockViewBuilder {
                     }
                 }
 
-                // Add measures
                 for member_name in &members_to_include {
                     if let Some(measure) = source_cube.measures.get(member_name) {
                         let view_member_sql =
                             format!("{{{}.{}}}", view_cube.join_path, member_name);
 
-                        // Check for duplicates
                         if all_measures.contains_key(member_name) {
                             panic!(
                                 "Duplicate member '{}' in view '{}'. Members must be unique.",
@@ -455,13 +387,11 @@ impl MockViewBuilder {
                     }
                 }
 
-                // Add segments
                 for member_name in &members_to_include {
                     if source_cube.segments.contains_key(member_name) {
                         let view_member_sql =
                             format!("{{{}.{}}}", view_cube.join_path, member_name);
 
-                        // Check for duplicates
                         if all_segments.contains_key(member_name) {
                             panic!(
                                 "Duplicate member '{}' in view '{}'. Members must be unique.",
@@ -482,7 +412,6 @@ impl MockViewBuilder {
             }
         }
 
-        // Create view cube definition with is_view = true
         let view_def = MockCubeDefinition::builder()
             .name(self.view_name.clone())
             .is_view(Some(true))
