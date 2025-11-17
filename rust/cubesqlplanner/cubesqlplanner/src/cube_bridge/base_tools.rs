@@ -18,7 +18,6 @@ use std::rc::Rc;
 pub trait BaseTools {
     fn driver_tools(&self, external: bool) -> Result<Rc<dyn DriverTools>, CubeError>;
     fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError>;
-    fn security_context_for_rust(&self) -> Result<Rc<dyn SecurityContext>, CubeError>;
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError>;
     fn generate_time_series(
         &self,

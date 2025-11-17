@@ -29,9 +29,6 @@ pub struct MockBaseTools {
     #[builder(default = Rc::new(MockSqlTemplatesRender::default_templates()))]
     sql_templates: Rc<MockSqlTemplatesRender>,
 
-    #[builder(default = Rc::new(MockSecurityContext))]
-    security_context: Rc<MockSecurityContext>,
-
     #[builder(default = Rc::new(MockSqlUtils))]
     sql_utils: Rc<MockSqlUtils>,
 
