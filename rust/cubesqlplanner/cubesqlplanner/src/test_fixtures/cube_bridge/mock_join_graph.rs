@@ -15,41 +15,13 @@ use std::rc::Rc;
 /// the current routing (from/to) and the original cube names (original_from/original_to).
 /// This distinction is important when dealing with cube aliases.
 ///
-/// # Example
-///
-/// ```
-/// use cubesqlplanner::test_fixtures::cube_bridge::{JoinEdge, MockJoinItemDefinition};
-/// use std::rc::Rc;
-///
-/// let join_def = Rc::new(
-///     MockJoinItemDefinition::builder()
-///         .relationship("many_to_one".to_string())
-///         .sql("{orders.user_id} = {users.id}".to_string())
-///         .build()
-/// );
-///
-/// let edge = JoinEdge {
-///     join: join_def,
-///     from: "orders".to_string(),
-///     to: "users".to_string(),
-///     original_from: "Orders".to_string(),
-///     original_to: "Users".to_string(),
-/// };
-///
-/// assert_eq!(edge.from, "orders");
-/// assert_eq!(edge.original_from, "Orders");
 /// ```
 #[derive(Debug, Clone)]
 pub struct JoinEdge {
-    /// The join definition containing the relationship and SQL
     pub join: Rc<MockJoinItemDefinition>,
-    /// The current source cube name (may be an alias)
     pub from: String,
-    /// The current destination cube name (may be an alias)
     pub to: String,
-    /// The original source cube name (without aliases)
     pub original_from: String,
-    /// The original destination cube name (without aliases)
     pub original_to: String,
 }
 
@@ -63,13 +35,6 @@ pub struct JoinEdge {
 /// pathfinding and connectivity queries. It also caches built join trees to avoid
 /// redundant computation.
 ///
-/// # Example
-///
-/// ```
-/// use cubesqlplanner::test_fixtures::cube_bridge::MockJoinGraph;
-///
-/// let graph = MockJoinGraph::new();
-/// // Add edges and build joins...
 /// ```
 #[derive(Clone)]
 pub struct MockJoinGraph {
@@ -97,15 +62,6 @@ pub struct MockJoinGraph {
 }
 
 impl MockJoinGraph {
-    /// Creates a new empty join graph
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use cubesqlplanner::test_fixtures::cube_bridge::MockJoinGraph;
-    ///
-    /// let graph = MockJoinGraph::new();
-    /// ```
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
@@ -116,36 +72,10 @@ impl MockJoinGraph {
         }
     }
 
-    /// Creates an edge key from source and destination cube names
-    ///
-    /// The key format is "from-to", matching the TypeScript implementation.
-    ///
-    /// # Arguments
-    ///
-    /// * `from` - Source cube name
-    /// * `to` - Destination cube name
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use cubesqlplanner::test_fixtures::cube_bridge::MockJoinGraph;
-    /// let key = MockJoinGraph::edge_key("orders", "users");
-    /// assert_eq!(key, "orders-users");
-    /// ```
     pub(crate) fn edge_key(from: &str, to: &str) -> String {
         format!("{}-{}", from, to)
     }
 
-    /// Builds join edges for a single cube
-    ///
-    /// This method extracts all joins from the cube, validates them, and creates JoinEdge instances.
-    ///
-    /// # Validation
-    /// - Target cube must exist
-    /// - Source and target cubes with multiplied measures must have primary keys
-    ///
-    /// # Returns
-    /// Vector of (edge_key, JoinEdge) tuples
     fn build_join_edges(
         &self,
         cube: &crate::test_fixtures::cube_bridge::MockCubeDefinition,
@@ -207,9 +137,6 @@ impl MockJoinGraph {
         Ok(result)
     }
 
-    /// Gets measures that are "multiplied" by joins (require primary keys)
-    ///
-    /// Multiplied measure types: sum, avg, count, number
     fn get_multiplied_measures(
         &self,
         cube_name: &str,
@@ -229,29 +156,6 @@ impl MockJoinGraph {
         Ok(result)
     }
 
-    /// Extracts the cube name from a JoinHintItem
-    ///
-    /// For Single variants, returns the cube name directly.
-    /// For Vector variants, returns the last element (the destination).
-    ///
-    /// # Arguments
-    /// * `cube_path` - The JoinHintItem to extract from
-    ///
-    /// # Returns
-    /// The cube name as a String
-    ///
-    /// # Example
-    /// ```
-    /// use cubesqlplanner::cube_bridge::join_hints::JoinHintItem;
-    /// # use cubesqlplanner::test_fixtures::cube_bridge::MockJoinGraph;
-    /// # let graph = MockJoinGraph::new();
-    ///
-    /// let single = JoinHintItem::Single("users".to_string());
-    /// assert_eq!(graph.cube_from_path(&single), "users");
-    ///
-    /// let vector = JoinHintItem::Vector(vec!["orders".to_string(), "users".to_string()]);
-    /// assert_eq!(graph.cube_from_path(&vector), "users");
-    /// ```
     fn cube_from_path(&self, cube_path: &JoinHintItem) -> String {
         match cube_path {
             JoinHintItem::Single(name) => name.clone(),
@@ -262,23 +166,6 @@ impl MockJoinGraph {
         }
     }
 
-    /// Converts a path of cube names to a list of JoinEdges
-    ///
-    /// For a path [A, B, C], this looks up edges "A-B" and "B-C" in the edges HashMap.
-    ///
-    /// # Arguments
-    /// * `path` - Slice of cube names representing the path
-    ///
-    /// # Returns
-    /// Vector of JoinEdge instances corresponding to consecutive pairs in the path
-    ///
-    /// # Example
-    /// ```ignore
-    /// // For path ["orders", "users", "countries"]
-    /// // Returns edges for "orders-users" and "users-countries"
-    /// let path = vec!["orders".to_string(), "users".to_string(), "countries".to_string()];
-    /// let joins = graph.joins_by_path(&path);
-    /// ```
     fn joins_by_path(&self, path: &[String]) -> Vec<JoinEdge> {
         let mut result = Vec::new();
         for i in 0..path.len().saturating_sub(1) {
@@ -290,28 +177,6 @@ impl MockJoinGraph {
         result
     }
 
-    /// Builds a join tree with a specific root cube
-    ///
-    /// This method tries to build a join tree starting from the specified root,
-    /// connecting to all cubes in cubes_to_join. It uses Dijkstra's algorithm
-    /// to find the shortest paths.
-    ///
-    /// # Arguments
-    /// * `root` - The root cube (can be Single or Vector)
-    /// * `cubes_to_join` - Other cubes to connect to the root
-    ///
-    /// # Returns
-    /// * `Some((root_name, joins))` - If a valid join tree can be built
-    /// * `None` - If no path exists to connect all cubes
-    ///
-    /// # Algorithm
-    /// 1. Extract root name (if Vector, first element becomes root, rest go to cubes_to_join)
-    /// 2. Track joined nodes to avoid duplicates
-    /// 3. For each cube to join:
-    ///    - Find shortest path from previous node
-    ///    - Convert path to JoinEdge list
-    ///    - Mark nodes as joined
-    /// 4. Collect and deduplicate all joins
     fn build_join_tree_for_root(
         &self,
         root: &JoinHintItem,

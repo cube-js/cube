@@ -6,7 +6,6 @@ use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Mock implementation of GeoItem for testing
 #[derive(Debug, TypedBuilder)]
 pub struct MockGeoItem {
     sql: String,

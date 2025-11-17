@@ -8,7 +8,6 @@ use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Mock implementation of GranularityDefinition for testing
 #[derive(Clone, TypedBuilder)]
 pub struct MockGranularityDefinition {
     #[builder(setter(into))]

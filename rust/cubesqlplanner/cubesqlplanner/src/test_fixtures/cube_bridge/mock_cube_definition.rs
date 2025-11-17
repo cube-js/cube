@@ -8,10 +8,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Mock implementation of CubeDefinition for testing
 #[derive(Clone, TypedBuilder)]
 pub struct MockCubeDefinition {
-    // Fields from CubeDefinitionStatic
     name: String,
     #[builder(default)]
     sql_alias: Option<String>,
@@ -22,13 +20,11 @@ pub struct MockCubeDefinition {
     #[builder(default)]
     join_map: Option<Vec<Vec<String>>>,
 
-    // Optional trait fields
     #[builder(default, setter(strip_option))]
     sql_table: Option<String>,
     #[builder(default, setter(strip_option))]
     sql: Option<String>,
 
-    // Joins field for mock testing
     #[builder(default)]
     joins: HashMap<String, MockJoinItemDefinition>,
 }
@@ -74,12 +70,10 @@ impl CubeDefinition for MockCubeDefinition {
 }
 
 impl MockCubeDefinition {
-    /// Get all joins for this cube
     pub fn joins(&self) -> &HashMap<String, MockJoinItemDefinition> {
         &self.joins
     }
 
-    /// Get a specific join by name
     pub fn get_join(&self, name: &str) -> Option<&MockJoinItemDefinition> {
         self.joins.get(name)
     }
@@ -261,17 +255,14 @@ mod tests {
             .joins(joins)
             .build();
 
-        // Test joins() method
         let all_joins = cube.joins();
         assert_eq!(all_joins.len(), 1);
         assert!(all_joins.contains_key("countries"));
 
-        // Test get_join() method
         let country_join = cube.get_join("countries").unwrap();
         let sql = country_join.sql().unwrap();
         assert_eq!(sql.args_names(), &vec!["CUBE", "countries"]);
 
-        // Test nonexistent join
         assert!(cube.get_join("nonexistent").is_none());
     }
 

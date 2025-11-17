@@ -6,7 +6,6 @@ use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Mock implementation of CaseSwitchElseItem for testing
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct MockCaseSwitchElseItem {
     sql: String,
