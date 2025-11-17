@@ -116,6 +116,10 @@ export class CompilerApi {
 
   protected readonly compiledScriptCache: LRUCache<string, vm.Script>;
 
+  protected readonly compiledYamlCache: LRUCache<string, string>;
+
+  protected readonly compiledJinjaCache: LRUCache<string, string>;
+
   protected compiledScriptCacheInterval?: NodeJS.Timeout;
 
   protected graphqlSchema?: GraphQLSchema;
@@ -145,7 +149,19 @@ export class CompilerApi {
     this.sqlCache = options.sqlCache;
     this.standalone = options.standalone;
     this.nativeInstance = this.createNativeInstance();
+
+    // Caching stuff
     this.compiledScriptCache = new LRUCache({
+      max: options.compilerCacheSize || 250,
+      ttl: options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: options.updateCompilerCacheKeepAlive
+    });
+    this.compiledYamlCache = new LRUCache({
+      max: options.compilerCacheSize || 250,
+      ttl: options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: options.updateCompilerCacheKeepAlive
+    });
+    this.compiledJinjaCache = new LRUCache({
       max: options.compilerCacheSize || 250,
       ttl: options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
@@ -154,7 +170,11 @@ export class CompilerApi {
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
       this.compiledScriptCacheInterval = setInterval(
-        () => this.compiledScriptCache.purgeStale(),
+        () => {
+          this.compiledScriptCache.purgeStale();
+          this.compiledYamlCache.purgeStale();
+          this.compiledJinjaCache.purgeStale();
+        },
         this.options.maxCompilerCacheKeepAlive
       );
     }
@@ -235,6 +255,8 @@ export class CompilerApi {
         standalone: this.standalone,
         nativeInstance: this.nativeInstance,
         compiledScriptCache: this.compiledScriptCache,
+        compiledJinjaCache: this.compiledJinjaCache,
+        compiledYamlCache: this.compiledYamlCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
 
