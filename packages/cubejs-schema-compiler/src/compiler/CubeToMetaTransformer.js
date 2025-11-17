@@ -1,5 +1,4 @@
 import inflection from 'inflection';
-import R from 'ramda';
 import camelCase from 'camelcase';
 
 import { getEnv } from '@cubejs-backend/shared';
@@ -91,60 +90,51 @@ export class CubeToMetaTransformer {
         description: cube.description,
         connectedComponent: this.joinGraph.connectedComponents()[cube.name],
         meta: cube.meta,
-        measures: R.compose(
-          R.map((nameToMetric) => ({
-            ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
-            isVisible: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false,
-            public: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false,
-          })),
-          R.toPairs
-        )(cube.measures || {}),
-        dimensions: R.compose(
-          R.map((nameToDimension) => ({
-            name: `${cube.name}.${nameToDimension[0]}`,
-            title: this.title(cubeTitle, nameToDimension),
-            type: this.dimensionDataType(nameToDimension[1].type),
-            description: nameToDimension[1].description,
-            shortTitle: this.title(cubeTitle, nameToDimension, true),
-            suggestFilterValues:
-              nameToDimension[1].suggestFilterValues == null
-                ? true
-                : nameToDimension[1].suggestFilterValues,
-            format: nameToDimension[1].format,
-            meta: nameToDimension[1].meta,
-            isVisible: isCubeVisible
-              ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
-              : false,
-            public: isCubeVisible
-              ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
-              : false,
-            primaryKey: !!nameToDimension[1].primaryKey,
-            aliasMember: nameToDimension[1].aliasMember,
-            granularities:
-              nameToDimension[1].granularities
-                ? R.compose(R.map((g) => ({
-                  name: g[0],
-                  title: this.title(cubeTitle, g, true),
-                  interval: g[1].interval,
-                  offset: g[1].offset,
-                  origin: g[1].origin,
-                })), R.toPairs)(nameToDimension[1].granularities)
-                : undefined,
-          })),
-          R.toPairs
-        )(cube.dimensions || {}),
-        segments: R.compose(
-          R.map((nameToSegment) => ({
-            name: `${cube.name}.${nameToSegment[0]}`,
-            title: this.title(cubeTitle, nameToSegment),
-            shortTitle: this.title(cubeTitle, nameToSegment, true),
-            description: nameToSegment[1].description,
-            meta: nameToSegment[1].meta,
-            isVisible: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
-            public: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
-          })),
-          R.toPairs
-        )(cube.segments || {}),
+        measures: Object.entries(cube.measures || {}).map((nameToMetric) => ({
+          ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
+          isVisible: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false,
+          public: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false,
+        })),
+        dimensions: Object.entries(cube.dimensions || {}).map((nameToDimension) => ({
+          name: `${cube.name}.${nameToDimension[0]}`,
+          title: this.title(cubeTitle, nameToDimension),
+          type: this.dimensionDataType(nameToDimension[1].type),
+          description: nameToDimension[1].description,
+          shortTitle: this.title(cubeTitle, nameToDimension, true),
+          suggestFilterValues:
+            nameToDimension[1].suggestFilterValues == null
+              ? true
+              : nameToDimension[1].suggestFilterValues,
+          format: nameToDimension[1].format,
+          meta: nameToDimension[1].meta,
+          isVisible: isCubeVisible
+            ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
+            : false,
+          public: isCubeVisible
+            ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
+            : false,
+          primaryKey: !!nameToDimension[1].primaryKey,
+          aliasMember: nameToDimension[1].aliasMember,
+          granularities:
+            nameToDimension[1].granularities
+              ? Object.entries(nameToDimension[1].granularities).map((g) => ({
+                name: g[0],
+                title: this.title(cubeTitle, g, true),
+                interval: g[1].interval,
+                offset: g[1].offset,
+                origin: g[1].origin,
+              }))
+              : undefined,
+        })),
+        segments: Object.entries(cube.segments || {}).map((nameToSegment) => ({
+          name: `${cube.name}.${nameToSegment[0]}`,
+          title: this.title(cubeTitle, nameToSegment),
+          shortTitle: this.title(cubeTitle, nameToSegment, true),
+          description: nameToSegment[1].description,
+          meta: nameToSegment[1].meta,
+          isVisible: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
+          public: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
+        })),
         hierarchies: (cube.evaluatedHierarchies || []).map((it) => ({
           ...it,
           aliasMember: it.aliasMember,
@@ -159,21 +149,21 @@ export class CubeToMetaTransformer {
 
   queriesForContext(contextId) {
     // return All queries if no context pass
-    if (R.isNil(contextId) || R.isEmpty(contextId)) {
+    if (contextId == null || contextId.length === 0) {
       return this.queries;
     }
 
     const context = this.contextEvaluator.contextDefinitions[contextId];
 
     // If contextId is wrong
-    if (R.isNil(context)) {
+    if (context == null) {
       throw new UserError(`Context ${contextId} doesn't exist`);
     }
 
     // As for now context works on the cubes level
-    return R.filter(
-      (query) => R.includes(query.config.name, context.contextMembers)
-    )(this.queries);
+    return this.queries.filter(
+      (query) => context.contextMembers.includes(query.config.name)
+    );
   }
 
   /**
