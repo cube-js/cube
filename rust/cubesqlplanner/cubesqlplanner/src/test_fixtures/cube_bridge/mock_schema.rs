@@ -1,16 +1,19 @@
 use crate::test_fixtures::cube_bridge::{
-    MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockMeasureDefinition,
-    MockSegmentDefinition,
+    MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockJoinGraph,
+    MockJoinItemDefinition, MockMeasureDefinition, MockSegmentDefinition,
 };
+use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Mock schema containing cubes with their measures and dimensions
+#[derive(Clone)]
 pub struct MockSchema {
     cubes: HashMap<String, MockCube>,
 }
 
 /// Single cube with its definition and members
+#[derive(Clone)]
 pub struct MockCube {
     pub definition: MockCubeDefinition,
     pub measures: HashMap<String, Rc<MockMeasureDefinition>>,
@@ -95,6 +98,84 @@ impl MockSchema {
     ) -> Rc<MockCubeEvaluator> {
         Rc::new(MockCubeEvaluator::with_primary_keys(self, primary_keys))
     }
+
+    /// Create a MockJoinGraph from this schema
+    ///
+    /// This method:
+    /// 1. Extracts all cubes as Vec<Rc<MockCubeDefinition>>
+    /// 2. Creates a temporary MockCubeEvaluator for validation
+    /// 3. Creates and compiles a MockJoinGraph
+    ///
+    /// # Returns
+    /// * `Ok(MockJoinGraph)` - Compiled join graph
+    /// * `Err(CubeError)` - If join graph compilation fails (invalid joins, missing PKs, etc.)
+    pub fn create_join_graph(&self) -> Result<MockJoinGraph, CubeError> {
+        // Collect cubes as Vec<Rc<MockCubeDefinition>>
+        let cubes: Vec<Rc<MockCubeDefinition>> = self
+            .cubes
+            .values()
+            .map(|mock_cube| Rc::new(mock_cube.definition.clone()))
+            .collect();
+
+        // Extract primary keys for evaluator
+        let mut primary_keys = HashMap::new();
+        for (cube_name, cube) in &self.cubes {
+            let mut pk_dimensions = Vec::new();
+            for (dim_name, dimension) in &cube.dimensions {
+                if dimension.static_data().primary_key == Some(true) {
+                    pk_dimensions.push(dim_name.clone());
+                }
+            }
+            pk_dimensions.sort();
+            if !pk_dimensions.is_empty() {
+                primary_keys.insert(cube_name.clone(), pk_dimensions);
+            }
+        }
+
+        // Clone self for evaluator
+        let evaluator = MockCubeEvaluator::with_primary_keys(self.clone(), primary_keys);
+
+        // Create and compile join graph
+        let mut join_graph = MockJoinGraph::new();
+        join_graph.compile(&cubes, &evaluator)?;
+
+        Ok(join_graph)
+    }
+
+    /// Create a MockCubeEvaluator with join graph from this schema
+    ///
+    /// This method creates an evaluator with a fully compiled join graph,
+    /// enabling join path resolution in tests.
+    ///
+    /// # Returns
+    /// * `Ok(Rc<MockCubeEvaluator>)` - Evaluator with join graph
+    /// * `Err(CubeError)` - If join graph compilation fails
+    pub fn create_evaluator_with_join_graph(self) -> Result<Rc<MockCubeEvaluator>, CubeError> {
+        // Extract primary keys
+        let mut primary_keys = HashMap::new();
+        for (cube_name, cube) in &self.cubes {
+            let mut pk_dimensions = Vec::new();
+            for (dim_name, dimension) in &cube.dimensions {
+                if dimension.static_data().primary_key == Some(true) {
+                    pk_dimensions.push(dim_name.clone());
+                }
+            }
+            pk_dimensions.sort();
+            if !pk_dimensions.is_empty() {
+                primary_keys.insert(cube_name.clone(), pk_dimensions);
+            }
+        }
+
+        // Compile join graph
+        let join_graph = self.create_join_graph()?;
+
+        // Create evaluator with join graph
+        Ok(Rc::new(MockCubeEvaluator::with_join_graph(
+            self,
+            primary_keys,
+            join_graph,
+        )))
+    }
 }
 
 /// Builder for MockSchema with fluent API
@@ -119,6 +200,7 @@ impl MockSchemaBuilder {
             measures: HashMap::new(),
             dimensions: HashMap::new(),
             segments: HashMap::new(),
+            joins: HashMap::new(),
         }
     }
 
@@ -154,6 +236,7 @@ pub struct MockCubeBuilder {
     measures: HashMap<String, Rc<MockMeasureDefinition>>,
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
+    joins: HashMap<String, MockJoinItemDefinition>,
 }
 
 impl MockCubeBuilder {
@@ -193,15 +276,36 @@ impl MockCubeBuilder {
         self
     }
 
+    /// Add a join to the cube
+    pub fn add_join(mut self, name: impl Into<String>, definition: MockJoinItemDefinition) -> Self {
+        self.joins.insert(name.into(), definition);
+        self
+    }
+
     /// Finish building this cube and return to schema builder
     pub fn finish_cube(mut self) -> MockSchemaBuilder {
-        let cube_def = self.cube_definition.unwrap_or_else(|| {
+        let mut cube_def = self.cube_definition.unwrap_or_else(|| {
             // Create default cube definition with the cube name
             MockCubeDefinition::builder()
                 .name(self.cube_name.clone())
                 .sql_table(format!("public.{}", self.cube_name))
                 .build()
         });
+
+        // Merge joins from builder with joins from cube definition
+        let mut all_joins = cube_def.joins().clone();
+        all_joins.extend(self.joins);
+
+        // Rebuild cube definition with merged joins
+        let static_data = cube_def.static_data();
+        cube_def = MockCubeDefinition::builder()
+            .name(static_data.name.clone())
+            .sql_alias(static_data.sql_alias.clone())
+            .is_view(static_data.is_view)
+            .is_calendar(static_data.is_calendar)
+            .join_map(static_data.join_map.clone())
+            .joins(all_joins)
+            .build();
 
         let cube = MockCube {
             definition: cube_def,
@@ -400,6 +504,7 @@ impl MockViewBuilder {
 mod tests {
     use super::*;
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
+    use crate::cube_bridge::join_item_definition::JoinItemDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
 
@@ -1101,5 +1206,274 @@ mod tests {
             .include_cube("orders", vec![])
             .finish_view()
             .build();
+    }
+
+    #[test]
+    fn test_schema_builder_with_joins() {
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .add_dimension(
+                "user_id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("user_id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        // Verify cubes exist
+        assert!(schema.get_cube("users").is_some());
+        assert!(schema.get_cube("orders").is_some());
+
+        // Verify join in orders cube
+        let orders_cube = schema.get_cube("orders").unwrap();
+        assert_eq!(orders_cube.definition.joins().len(), 1);
+        assert!(orders_cube.definition.get_join("users").is_some());
+
+        let users_join = orders_cube.definition.get_join("users").unwrap();
+        assert_eq!(users_join.static_data().relationship, "many_to_one");
+    }
+
+    #[test]
+    fn test_complex_schema_with_join_relationships() {
+        let schema = MockSchemaBuilder::new()
+            .add_cube("countries")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_dimension(
+                "name",
+                MockDimensionDefinition::builder()
+                    .dimension_type("string".to_string())
+                    .sql("name".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_dimension(
+                "country_id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("country_id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "countries",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.country_id = {countries.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_dimension(
+                "user_id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("user_id".to_string())
+                    .build(),
+            )
+            .add_measure(
+                "count",
+                MockMeasureDefinition::builder()
+                    .measure_type("count".to_string())
+                    .sql("COUNT(*)".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        // Verify all cubes exist
+        assert_eq!(schema.cube_names().len(), 3);
+
+        // Verify countries has no joins
+        let countries_cube = schema.get_cube("countries").unwrap();
+        assert_eq!(countries_cube.definition.joins().len(), 0);
+
+        // Verify users has join to countries
+        let users_cube = schema.get_cube("users").unwrap();
+        assert_eq!(users_cube.definition.joins().len(), 1);
+        assert!(users_cube.definition.get_join("countries").is_some());
+
+        // Verify orders has join to users
+        let orders_cube = schema.get_cube("orders").unwrap();
+        assert_eq!(orders_cube.definition.joins().len(), 1);
+        assert!(orders_cube.definition.get_join("users").is_some());
+
+        // Verify join SQL
+        let orders_users_join = orders_cube.definition.get_join("users").unwrap();
+        let sql = orders_users_join.sql().unwrap();
+        assert_eq!(sql.args_names(), &vec!["CUBE", "users"]);
+    }
+
+    #[test]
+    fn test_cube_with_multiple_joins_via_builder() {
+        let schema = MockSchemaBuilder::new()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .add_join(
+                "products",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.product_id = {products.id}".to_string())
+                    .build(),
+            )
+            .add_join(
+                "warehouses",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.warehouse_id = {warehouses.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        let orders_cube = schema.get_cube("orders").unwrap();
+        assert_eq!(orders_cube.definition.joins().len(), 3);
+        assert!(orders_cube.definition.get_join("users").is_some());
+        assert!(orders_cube.definition.get_join("products").is_some());
+        assert!(orders_cube.definition.get_join("warehouses").is_some());
+    }
+
+    #[test]
+    fn test_schema_with_join_graph_integration() {
+        use crate::cube_bridge::join_hints::JoinHintItem;
+
+        // Small schema: orders -> users (one join)
+        let schema = MockSchemaBuilder::new()
+            .add_cube("users")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .finish_cube()
+            .add_cube("orders")
+            .add_dimension(
+                "id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("id".to_string())
+                    .primary_key(Some(true))
+                    .build(),
+            )
+            .add_dimension(
+                "user_id",
+                MockDimensionDefinition::builder()
+                    .dimension_type("number".to_string())
+                    .sql("user_id".to_string())
+                    .build(),
+            )
+            .add_join(
+                "users",
+                MockJoinItemDefinition::builder()
+                    .relationship("many_to_one".to_string())
+                    .sql("{CUBE}.user_id = {users.id}".to_string())
+                    .build(),
+            )
+            .finish_cube()
+            .build();
+
+        // Verify create_join_graph() succeeds
+        let join_graph_result = schema.create_join_graph();
+        assert!(
+            join_graph_result.is_ok(),
+            "create_join_graph should succeed"
+        );
+
+        // Verify create_evaluator_with_join_graph() succeeds
+        let evaluator_result = schema.create_evaluator_with_join_graph();
+        assert!(
+            evaluator_result.is_ok(),
+            "create_evaluator_with_join_graph should succeed"
+        );
+        let evaluator = evaluator_result.unwrap();
+
+        // Verify evaluator.join_graph() returns Some(graph)
+        assert!(
+            evaluator.join_graph().is_some(),
+            "Evaluator should have join graph"
+        );
+        let graph = evaluator.join_graph().unwrap();
+
+        // Verify graph.build_join() works
+        let cubes = vec![
+            JoinHintItem::Single("orders".to_string()),
+            JoinHintItem::Single("users".to_string()),
+        ];
+        let join_def_result = graph.build_join(cubes);
+        assert!(
+            join_def_result.is_ok(),
+            "graph.build_join should succeed for orders -> users"
+        );
     }
 }

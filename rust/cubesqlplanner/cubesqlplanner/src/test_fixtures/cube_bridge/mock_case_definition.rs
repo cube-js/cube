@@ -7,7 +7,6 @@ use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Mock implementation of CaseDefinition for testing
 #[derive(TypedBuilder)]
 pub struct MockCaseDefinition {
     when: Vec<Rc<MockCaseItem>>,

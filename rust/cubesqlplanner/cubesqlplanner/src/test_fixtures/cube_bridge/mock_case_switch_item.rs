@@ -7,7 +7,6 @@ use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Mock implementation of CaseSwitchItem for testing
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct MockCaseSwitchItem {
     value: String,

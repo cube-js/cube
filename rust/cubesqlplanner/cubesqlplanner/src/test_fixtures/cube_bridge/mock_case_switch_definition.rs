@@ -10,7 +10,6 @@ use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Mock implementation of CaseSwitchDefinition for testing
 #[derive(TypedBuilder)]
 pub struct MockCaseSwitchDefinition {
     switch: String,

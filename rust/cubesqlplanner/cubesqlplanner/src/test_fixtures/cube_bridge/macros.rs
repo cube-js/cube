@@ -3,28 +3,6 @@
 /// This macro generates a helper method that returns an owned StaticData struct.
 /// The helper is used by the trait's static_data() method which applies Box::leak.
 ///
-/// # Usage
-/// ```ignore
-/// impl_static_data!(
-///     MockDimensionDefinition,          // The mock type
-///     DimensionDefinitionStatic,         // The static data type
-///     dimension_type,                    // Fields to include
-///     owned_by_cube,
-///     multi_stage
-/// );
-/// ```
-///
-/// # Generated Code
-/// ```ignore
-/// impl MockDimensionDefinition {
-///     pub fn static_data(&self) -> DimensionDefinitionStatic {
-///         DimensionDefinitionStatic {
-///             dimension_type: self.dimension_type.clone(),
-///             owned_by_cube: self.owned_by_cube.clone(),
-///             multi_stage: self.multi_stage.clone(),
-///         }
-///     }
-/// }
 /// ```
 #[macro_export]
 macro_rules! impl_static_data {
@@ -54,24 +32,6 @@ macro_rules! impl_static_data {
 /// - The leaked memory is minimal and reclaimed when the test process exits
 /// - This approach significantly simplifies test code by avoiding complex lifetime management
 ///
-/// # Usage
-/// ```ignore
-/// impl DimensionDefinition for MockDimensionDefinition {
-///     impl_static_data_method!(DimensionDefinitionStatic);
-///
-///     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError> {
-///         // ... other trait methods
-///     }
-/// }
-/// ```
-///
-/// # Generated Code
-/// ```ignore
-/// fn static_data(&self) -> &DimensionDefinitionStatic {
-///     // Intentional memory leak - acceptable for test mocks
-///     // The Box::leak pattern converts the owned value to a static reference
-///     Box::leak(Box::new(Self::static_data(self)))
-/// }
 /// ```
 #[macro_export]
 macro_rules! impl_static_data_method {
