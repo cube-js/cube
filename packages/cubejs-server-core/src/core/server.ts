@@ -106,22 +106,22 @@ export class CubejsServerCore {
   /**
    * Resolve driver module name by db type.
    */
-  public static driverDependencies = driverDependencies;
+  public static readonly driverDependencies = driverDependencies;
 
   /**
    * Resolve driver module object by db type.
    */
-  public static lookupDriverClass = lookupDriverClass;
+  public static readonly lookupDriverClass = lookupDriverClass;
 
   /**
    * Create new driver instance by specified database type.
    */
-  public static createDriver = createDriver;
+  public static readonly createDriver = createDriver;
 
   /**
    * Calculate and returns driver's max pool number.
    */
-  public static getDriverMaxPool = getDriverMaxPool;
+  public static readonly getDriverMaxPool = getDriverMaxPool;
 
   public repository: FileRepository;
 
