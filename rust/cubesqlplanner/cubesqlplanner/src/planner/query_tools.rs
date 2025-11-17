@@ -135,7 +135,7 @@ impl QueryTools {
         };
         let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
             cube_evaluator.clone(),
-            base_tools.clone(),
+            base_tools.sql_utils_for_rust()?,
             security_context.clone(),
             timezone.clone(),
         )));
