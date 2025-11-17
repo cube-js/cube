@@ -1,6 +1,6 @@
 use super::{NeonObject, ObjectNeonTypeHolder, RootHolder};
 use crate::wrappers::{
-    neon::inner_types::NeonInnerTypes,
+    neon::{inner_types::NeonInnerTypes, object::IntoNeonObject},
     object::{NativeStruct, NativeType},
     object_handle::NativeObjectHandle,
 };
@@ -61,21 +61,21 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
         field_name: &str,
         value: NativeObjectHandle<NeonInnerTypes<C>>,
     ) -> Result<bool, CubeError> {
-        let value = value.into_object().get_object()?;
+        let value = value.into_object().get_js_value()?;
         self.object
             .map_neon_object::<_, _>(|cx, object| object.set(cx, field_name, value))
     }
     fn get_own_property_names(
         &self,
     ) -> Result<Vec<NativeObjectHandle<NeonInnerTypes<C>>>, CubeError> {
-        let neon_array = self.object.map_neon_object(|cx, neon_object| {
-            let neon_array = neon_object.get_own_property_names(cx)?;
-            neon_array.to_vec(cx)
-        })?;
-        neon_array
+        self.object
+            .map_neon_object(|cx, neon_object| {
+                let neon_array = neon_object.get_own_property_names(cx)?;
+                neon_array.to_vec(cx)
+            })?
             .into_iter()
-            .map(|o| NeonObject::new(self.object.get_context(), o).map(NativeObjectHandle::new))
-            .collect::<Result<Vec<_>, _>>()
+            .map(|o| Ok(o.into_neon_object(self.object.get_context())?.into()))
+            .collect()
     }
     fn call_method(
         &self,
@@ -84,17 +84,17 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
     ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
         let neon_args = args
             .into_iter()
-            .map(|arg| -> Result<_, CubeError> { arg.into_object().get_object() })
+            .map(|arg| -> Result<_, CubeError> { arg.into_object().get_js_value() })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
-            neon_object
-                .get::<JsFunction, _, _>(cx, method)?
-                .call(cx, *neon_object, neon_args)
-        })?;
-        Ok(NativeObjectHandle::new(NeonObject::new(
-            self.object.get_context(),
-            neon_reuslt,
-        )?))
+        let result = self
+            .object
+            .map_neon_object(|cx, neon_object| {
+                neon_object
+                    .get::<JsFunction, _, _>(cx, method)?
+                    .call(cx, *neon_object, neon_args)
+            })?
+            .into_neon_object(self.object.get_context())?;
+        Ok(result.into())
     }
 }

@@ -230,6 +230,7 @@
     "querying SwitchSourceTest: simple cross join",
     "querying SwitchSourceTest: full cross join",
     "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures",
 
     "---------------------------------------",
     "Custom Granularities                   ",
@@ -268,14 +269,13 @@
     "SQL API: Nested Rollup",
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)",
     "querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "SQL API: Timeshift measure from cube",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailMonthAgo",
     "Tesseract: querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "Tesseract: SQL API: Timeshift measure from cube",
+    "querying BigECommerce: SeveralMultiStageMeasures",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying ECommerce: dimensions",

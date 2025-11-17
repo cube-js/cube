@@ -176,7 +176,8 @@
     "querying BigECommerce: multi-stage group by time dimension",
     "querying SwitchSourceTest: simple cross join",
     "querying SwitchSourceTest: full cross join",
-    "querying SwitchSourceTest: filter by switch dimensions"
+    "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -202,8 +203,6 @@
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying BigECommerce: rolling window YTD (month + week)",
     "querying BigECommerce: rolling window YTD (month + week + no gran)",
-    "querying BigECommerce: rolling window YTD without granularity",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
+    "querying BigECommerce: rolling window YTD without granularity"
   ]
 }

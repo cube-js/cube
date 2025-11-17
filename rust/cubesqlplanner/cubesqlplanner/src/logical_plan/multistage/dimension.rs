@@ -3,6 +3,7 @@ use crate::planner::query_properties::OrderByItem;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::MemberSymbol;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -44,12 +45,20 @@ impl MultiStageDimensionCalculation {
     }
 
     pub fn join_dimensions(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-        let mut result = vec![];
+        let mut result = if let Ok(dimension) = self.multi_stage_dimension.as_dimension() {
+            dimension.add_group_by().clone().unwrap_or_default()
+        } else {
+            vec![]
+        };
         for dim in self.schema.all_dimensions() {
             if !has_multi_stage_members(dim, true)? {
                 result.push(dim.clone());
             }
         }
+        let result = result
+            .into_iter()
+            .unique_by(|d| d.full_name())
+            .collect_vec();
         Ok(result)
     }
 }

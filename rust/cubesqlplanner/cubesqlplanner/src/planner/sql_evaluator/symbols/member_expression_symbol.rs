@@ -30,12 +30,10 @@ impl MemberExpressionSymbol {
         name: String,
         expression: MemberExpressionExpression,
         definition: Option<String>,
-        base_tools: Rc<dyn BaseTools>,
+        _base_tools: Rc<dyn BaseTools>,
     ) -> Result<Rc<Self>, CubeError> {
         let is_reference = match &expression {
-            MemberExpressionExpression::SqlCall(sql_call) => {
-                sql_call.is_direct_reference(base_tools.clone())?
-            }
+            MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference(),
             MemberExpressionExpression::PatchedSymbol(_symbol) => false,
         };
         Ok(Rc::new(Self {

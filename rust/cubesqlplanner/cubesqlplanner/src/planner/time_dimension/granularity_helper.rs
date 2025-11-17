@@ -1,7 +1,7 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::planner::sql_evaluator::Compiler;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
-use crate::planner::Granularity;
+use crate::planner::{Granularity, QueryDateTimeHelper};
 use chrono::prelude::*;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -63,6 +63,7 @@ impl GranularityHelper {
             .fold(first, |acc, d| -> Result<_, CubeError> {
                 match acc {
                     Ok(min_dim) => {
+                        // TODO: Add support for custom granularities comparison
                         let min_granularity = Self::min_granularity(
                             &min_dim.resolved_granularity()?,
                             &d.resolved_granularity()?,
@@ -80,16 +81,22 @@ impl GranularityHelper {
 
     pub fn granularity_from_interval(interval: &Option<String>) -> Option<String> {
         if let Some(interval) = interval {
-            if interval.contains("day") {
+            if interval.contains("second") {
+                Some("second".to_string())
+            } else if interval.contains("minute") {
+                Some("minute".to_string())
+            } else if interval.contains("hour") {
+                Some("hour".to_string())
+            } else if interval.contains("day") {
+                Some("day".to_string())
+            } else if interval.contains("week") {
                 Some("day".to_string())
             } else if interval.contains("month") {
                 Some("month".to_string())
+            } else if interval.contains("quarter") {
+                Some("month".to_string())
             } else if interval.contains("year") {
                 Some("year".to_string())
-            } else if interval.contains("week") {
-                Some("week".to_string())
-            } else if interval.contains("hour") {
-                Some("hour".to_string())
             } else {
                 None
             }
@@ -200,25 +207,7 @@ impl GranularityHelper {
     }
 
     pub fn parse_date_time(date: &str) -> Result<NaiveDateTime, CubeError> {
-        let formats = &[
-            "%Y-%m-%d",
-            "%Y-%m-%d %H:%M:%S%.f",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S%.f",
-            "%Y-%m-%dT%H:%M:%S",
-        ];
-
-        for format in formats {
-            if let Ok(dt) = NaiveDateTime::parse_from_str(date, format) {
-                return Ok(dt);
-            }
-        }
-
-        if let Ok(d) = NaiveDate::parse_from_str(date, "%Y-%m-%d") {
-            return Ok(d.and_hms_opt(0, 0, 0).unwrap());
-        }
-
-        Err(CubeError::user(format!("Can't parse date: '{}'", date)))
+        QueryDateTimeHelper::parse_native_date_time(date)
     }
 
     pub fn make_granularity_obj(
@@ -262,5 +251,89 @@ impl GranularityHelper {
             None
         };
         Ok(granularity_obj)
+    }
+
+    // Returns the granularity hierarchy for a td granularity.
+    // Note: for custom granularities, returns [...standard_hierarchy_for_min_granularity, granularity_name].
+    // custom granularity is at the end of the array, in BaseQuery.js it's first.
+    pub fn time_dimension_granularity_hierarchy(
+        time_dimension: (&Option<String>, &TimeDimensionSymbol),
+    ) -> Result<Vec<String>, CubeError> {
+        let granularity = time_dimension.0.clone();
+
+        if let Some(granularity_name) = granularity {
+            if Self::is_predefined_granularity(&granularity_name) {
+                Ok(Self::granularity_parents(&granularity_name)?.clone())
+            } else {
+                if let Some(granularity_obj) = time_dimension.1.granularity_obj() {
+                    let min_granularity = granularity_obj.min_granularity()?;
+
+                    if let Some(min_gran) = min_granularity {
+                        let mut standard_hierarchy = Self::granularity_parents(&min_gran)?.clone();
+                        let custom = vec![granularity_name.clone()];
+                        standard_hierarchy.extend(custom.clone());
+                        Ok(standard_hierarchy)
+                    } else {
+                        // Safeguard: if no min_granularity, just return the custom granularity name
+                        Ok(vec![granularity_name.clone()])
+                    }
+                } else {
+                    // No granularity object but has a name - shouldn't happen, but handle gracefully
+                    Err(CubeError::internal(format!(
+                        "Time dimension has granularity '{}' but no granularity object",
+                        granularity_name
+                    )))
+                }
+            }
+        } else {
+            Err(CubeError::internal(format!(
+                "Time dimension \"{}\" has no granularity specified",
+                time_dimension.1.full_name()
+            )))
+        }
+    }
+
+    pub fn min_granularity_for_time_dimensions(
+        time_dimension_a: (&Option<String>, &TimeDimensionSymbol),
+        time_dimension_b: (&Option<String>, &TimeDimensionSymbol),
+    ) -> Result<Option<String>, CubeError> {
+        let granularity_a = time_dimension_a.0;
+        let granularity_b = time_dimension_b.0;
+
+        if let (Some(gran_a), Some(gran_b)) = (granularity_a.clone(), granularity_b.clone()) {
+            let a_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_a)?;
+            let b_hierarchy = Self::time_dimension_granularity_hierarchy(time_dimension_b)?;
+
+            let diff_position = a_hierarchy
+                .iter()
+                .zip(b_hierarchy.iter())
+                .find_position(|(a, b)| a != b);
+
+            if let Some((diff_position, _)) = diff_position {
+                if diff_position == 0 {
+                    Err(CubeError::user(format!(
+                        "Can't find common parent for '{}' and '{}'",
+                        gran_a, gran_b
+                    )))
+                } else {
+                    // Return the granularity before the first difference
+                    Ok(Some(a_hierarchy[diff_position - 1].clone()))
+                }
+            } else {
+                // One hierarchy is a prefix of the other or they are identical
+                // Return the last element of the shorter hierarchy
+                if a_hierarchy.len() >= b_hierarchy.len() {
+                    Ok(Some(b_hierarchy.last().unwrap().clone()))
+                } else {
+                    Ok(Some(a_hierarchy.last().unwrap().clone()))
+                }
+            }
+        } else if granularity_a.is_some() {
+            Ok(granularity_a.clone())
+        } else if granularity_b.is_some() {
+            Ok(granularity_b.clone())
+        } else {
+            Ok(None)
+        }
     }
 }

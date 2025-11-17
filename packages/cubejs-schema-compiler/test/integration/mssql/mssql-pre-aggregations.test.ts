@@ -270,7 +270,7 @@ describe('MSSqlPreAggregations', () => {
 
       expect(preAggregationsDescription[0].invalidateKeyQueries[0][0].replace(/(\r\n|\n|\r)/gm, '')
         .replace(/\s+/g, ' '))
-        .toMatch('SELECT CASE WHEN CURRENT_TIMESTAMP < DATEADD(day, 7, CAST(@_1 AS DATETIMEOFFSET)) THEN FLOOR((-25200 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END');
+        .toMatch('SELECT CASE WHEN CURRENT_TIMESTAMP < DATEADD(day, 7, CAST(@_1 AS DATETIMEOFFSET)) THEN FLOOR((-28800 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key');
 
       return dbRunner
         .evaluateQueryWithPreAggregations(query)

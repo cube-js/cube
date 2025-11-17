@@ -239,6 +239,22 @@ The name of the [Databricks catalog][databricks-catalog] to connect to.
 
 [databricks-catalog]: (https://docs.databricks.com/en/data-governance/unity-catalog/create-catalogs.html)
 
+## `CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_ID`
+
+The OAuth client ID for [service principal][ref-databricks-m2m-oauth] authentication in Databricks.
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A valid client ID      | N/A                    | N/A                   |
+
+## `CUBEJS_DB_DATABRICKS_OAUTH_CLIENT_SECRET`
+
+The OAuth client secret for [service principal][ref-databricks-m2m-oauth] authentication in Databricks.
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A valid client secret  | N/A                    | N/A                   |
+
 ## `CUBEJS_DB_DATABRICKS_TOKEN`
 
 The [personal access token][databricks-docs-pat] used to authenticate the
@@ -680,6 +696,14 @@ The catalog within Presto/Trino to connect to.
 | --------------------------------------------------- | ---------------------- | --------------------- |
 | A valid catalog name within a Presto/Trino database | N/A                    | N/A                   |
 
+## `CUBEJS_DB_PRESTO_AUTH_TOKEN`
+
+The authentication token to use when connecting to Presto/Trino. It will be sent in the `Authorization` header.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid authentication token | N/A | N/A |
+
 ## `CUBEJS_DB_QUERY_TIMEOUT`
 
 The timeout value for any queries made to the database by Cube.
@@ -741,6 +765,22 @@ username/password, or `SNOWFLAKE_JWT` with key pairs.
 | Possible Values              | Default in Development | Default in Production |
 | ---------------------------- | ---------------------- | --------------------- |
 | `SNOWFLAKE`, `SNOWFLAKE_JWT` | `SNOWFLAKE`            | `SNOWFLAKE`           |
+
+## `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN`
+
+The OAuth token to use with Snowflake.
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------ | ---------------------- | --------------------- |
+| A valid OAuth token            | N/A                    | N/A                   |
+
+## `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`
+
+The path to the file containing the OAuth token for Snowflake.
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------ | ---------------------- | --------------------- |
+| A valid OAuth token            | N/A                    | N/A                   |
 
 ## `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE`
 
@@ -1305,6 +1345,34 @@ If `true`, the DAX API will expose time dimensions as calendar hierarchies.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true` | `true` |
 
+## `CUBE_XMLA_LANGUAGE`
+
+This variable is used to [configure the locale][ref-mdx-api-locale] for the [MDX API][ref-mdx-api].
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| Either a [LCID][link-lcid] (numeric) or a language tag (string) | `1033` (English - United States) | `1033` (English - United States) |
+
+For example, to display currency values using the Netherlands locale (euro with comma as decimal separator), you can use either:
+
+```bash
+# LCID
+CUBE_XMLA_LANGUAGE=1043
+
+# Language tag
+CUBE_XMLA_LANGUAGE=nl-NL
+```
+
+[link-lcid]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-lcid/70feba9f-294e-491e-b6eb-56532684c37f
+
+## `CUBE_MDX_CREATE_DATE_HIERARCHIES`
+
+If `true`, the [MDX API][ref-mdx-api] will automatically create additional hierarchies for all [time dimensions][ref-time-dimensions] and organize them in a separate "Calendar" folder for each dimension.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
 ## `CUBEJS_NESTED_FOLDERS_DELIMITER`
 
 Specifies the delimiter used to flatten the names of nested [folder][ref-folders] in
@@ -1357,6 +1425,7 @@ Required port to send where collector server accept UDP connections.
 <WarningBox>
 
 If the refresh worker’s throughput isn’t sufficient and the Cube Refresh Worker can’t refresh every partition, Cube will start dropping partitions once the timeout is reached.
+For externally refreshed pre-aggregations, make sure each pre-aggregation is refreshed at least once within the specified timeout period.
 
 </WarningBox>
 
@@ -1376,7 +1445,7 @@ code in worker threads.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                | `false`               |
+| `true`, `false` | `true`                 | `true`                |
 
 <ReferenceBox>
 
@@ -1808,3 +1877,7 @@ The port for a Cube deployment to listen to API connections on.
 [ref-dataviz-tools]: /product/configuration/visualization-tools
 [ref-context-to-app-id]: /product/configuration/reference/config#context_to_app_id
 [ref-environments]: /product/workspace/environments
+[ref-databricks-m2m-oauth]: https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-mdx-api-locale]: /product/apis-integrations/mdx-api#measure-format
+[ref-time-dimensions]: /product/data-modeling/reference/dimensions#time

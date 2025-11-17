@@ -175,6 +175,13 @@ impl TimeDimensionSymbol {
         self.base_symbol.cube_name()
     }
 
+    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+        match self.base_symbol.as_ref() {
+            MemberSymbol::Dimension(d) => d.join_map(),
+            _ => &None,
+        }
+    }
+
     pub fn is_multi_stage(&self) -> bool {
         self.base_symbol.is_multi_stage()
     }
@@ -231,13 +238,38 @@ impl TimeDimensionSymbol {
         query_tools: Rc<QueryTools>,
     ) -> Result<Option<String>, CubeError> {
         if let Some(granularity_obj) = &self.granularity_obj {
-            let date_range_granularity = self.date_range_granularity(query_tools.clone())?;
-            let self_granularity = granularity_obj.min_granularity()?;
+            if let Some(date_range) = &self.date_range {
+                let date_range_granularity = self.date_range_granularity(query_tools.clone())?;
 
-            GranularityHelper::min_granularity(&date_range_granularity, &self_granularity)
+                // For predefined granularities or custom granularities not aligned with date range,
+                // we need to return the minimum granularity
+                if granularity_obj.is_predefined_granularity() {
+                    let self_granularity = granularity_obj.min_granularity()?;
+                    GranularityHelper::min_granularity(&date_range_granularity, &self_granularity)
+                } else {
+                    let from_date_str = QueryDateTimeHelper::format_from_date(&date_range.0, 3)?;
+                    let to_date_str = QueryDateTimeHelper::format_to_date(&date_range.1, 3)?;
+                    let is_aligned = granularity_obj.is_aligned_with_date_range(
+                        &from_date_str,
+                        &to_date_str,
+                        query_tools.timezone(),
+                    )?;
+
+                    if is_aligned {
+                        Ok(self.granularity.clone())
+                    } else {
+                        let self_granularity = granularity_obj.min_granularity()?;
+                        GranularityHelper::min_granularity(
+                            &date_range_granularity,
+                            &self_granularity,
+                        )
+                    }
+                }
+            } else {
+                Ok(self.granularity.clone())
+            }
         } else {
             let date_range_granularity = self.date_range_granularity(query_tools.clone())?;
-
             Ok(date_range_granularity)
         }
     }

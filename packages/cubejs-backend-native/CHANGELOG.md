@@ -3,6 +3,71 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.3](https://github.com/cube-js/cube/compare/v1.5.2...v1.5.3) (2025-11-13)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.2](https://github.com/cube-js/cube/compare/v1.5.1...v1.5.2) (2025-11-10)
+
+### Bug Fixes
+
+- **cubeorchestrator:** Increase VerifierOptions max_tables to 10M ([#10121](https://github.com/cube-js/cube/issues/10121)) ([5b048b2](https://github.com/cube-js/cube/commit/5b048b2e3266e7248751498daa8c1597d8fbced4))
+
+### Features
+
+- **cubesql:** Coerce strings to any type in functions ([#10126](https://github.com/cube-js/cube/issues/10126)) ([076ae0c](https://github.com/cube-js/cube/commit/076ae0cb4d39b2f7711bfb5492b782b8adce2a3b))
+
+## [1.5.1](https://github.com/cube-js/cube/compare/v1.5.0...v1.5.1) (2025-11-04)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+# [1.5.0](https://github.com/cube-js/cube/compare/v1.4.0...v1.5.0) (2025-10-29)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+# [1.4.0](https://github.com/cube-js/cube/compare/v1.3.86...v1.4.0) (2025-10-29)
+
+### Bug Fixes
+
+- **cubesql:** Always repartition joins when right side has multiple partitions ([#10105](https://github.com/cube-js/cube/issues/10105)) ([ae32748](https://github.com/cube-js/cube/commit/ae327483caabba974e271fb52f4ccc5fd5fa5789))
+
+## [1.3.86](https://github.com/cube-js/cube/compare/v1.3.85...v1.3.86) (2025-10-29)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.3.85](https://github.com/cube-js/cube/compare/v1.3.84...v1.3.85) (2025-10-28)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.3.84](https://github.com/cube-js/cube/compare/v1.3.83...v1.3.84) (2025-10-28)
+
+### Bug Fixes
+
+- **cube-orchestrator:** Deterministic column sequence in output ([#10086](https://github.com/cube-js/cube/issues/10086)) ([e82fbeb](https://github.com/cube-js/cube/commit/e82fbeb4243db6f8efa25b29a75d1a24dce63079))
+- **cubesql:** Coerce strings with any type in binary expressions ([#10088](https://github.com/cube-js/cube/issues/10088)) ([3164adc](https://github.com/cube-js/cube/commit/3164adc2195ae545ca041489e93c3eb259e9971d))
+
+## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
+
+### Features
+
+- **api-gateway:** Introduce cache mode option for `/cubesql` API ([#9972](https://github.com/cube-js/cube/issues/9972)) ([7d4ecdc](https://github.com/cube-js/cube/commit/7d4ecdccdf75dbe8c764cf54ad48a25fa4de9443))
+
+## [1.3.82](https://github.com/cube-js/cube/compare/v1.3.81...v1.3.82) (2025-10-21)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.3.81](https://github.com/cube-js/cube/compare/v1.3.80...v1.3.81) (2025-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.3.80](https://github.com/cube-js/cube/compare/v1.3.79...v1.3.80) (2025-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.3.79](https://github.com/cube-js/cube/compare/v1.3.78...v1.3.79) (2025-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
 ## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
 
 **Note:** Version bump only for package @cubejs-backend/native

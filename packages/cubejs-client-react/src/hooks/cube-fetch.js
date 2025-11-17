@@ -3,10 +3,8 @@ import { isQueryPresent } from '@cubejs-client/core';
 
 import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
-import { useIsMounted } from './is-mounted';
 
 export function useCubeFetch(method, options = {}) {
-  const isMounted = useIsMounted();
   const context = useContext(CubeContext);
   const mutexRef = useRef({});
 
@@ -22,7 +20,8 @@ export function useCubeFetch(method, options = {}) {
     const cubeApi = options.cubeApi || context?.cubeApi;
     const query = loadOptions.query || options.query;
 
-    const queryCondition = method === 'meta' ? true : query && isQueryPresent(query);
+    const queryCondition =
+      method === 'meta' ? true : query && isQueryPresent(query);
 
     if (cubeApi && (ignoreSkip || !skip) && queryCondition) {
       setError(null);
@@ -40,20 +39,16 @@ export function useCubeFetch(method, options = {}) {
       try {
         const response = await cubeApi[method](...args);
 
-        if (isMounted()) {
-          setResponse({
-            response,
-            isLoading: false,
-          });
-        }
+        setResponse({
+          response,
+          isLoading: false,
+        });
       } catch (error) {
-        if (isMounted()) {
-          setError(error);
-          setResponse({
-            isLoading: false,
-            response: null,
-          });
-        }
+        setError(error);
+        setResponse({
+          isLoading: false,
+          response: null,
+        });
       }
     }
   }

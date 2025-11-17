@@ -33,6 +33,7 @@ pub struct DimensionSymbol {
     definition: Rc<dyn DimensionDefinition>,
     is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
     is_view: bool,
+    add_group_by: Option<Vec<Rc<MemberSymbol>>>,
     time_shift: Vec<CalendarDimensionTimeShift>,
     time_shift_pk_full_name: Option<String>,
     is_self_time_shift_pk: bool, // If the dimension itself is a primary key and has time shifts, we can not reevaluate itself again while processing time shifts to avoid infinite recursion. So we raise this flag instead.
@@ -56,6 +57,7 @@ impl DimensionSymbol {
         values: Vec<String>,
         case: Option<Case>,
         definition: Rc<dyn DimensionDefinition>,
+        add_group_by: Option<Vec<Rc<MemberSymbol>>>,
         time_shift: Vec<CalendarDimensionTimeShift>,
         time_shift_pk_full_name: Option<String>,
         is_self_time_shift_pk: bool,
@@ -75,6 +77,7 @@ impl DimensionSymbol {
             longitude,
             values,
             definition,
+            add_group_by,
             case,
             is_view,
             time_shift,
@@ -119,6 +122,10 @@ impl DimensionSymbol {
 
     pub(super) fn replace_case(&self, new_case: Case) -> Rc<DimensionSymbol> {
         let mut new = self.clone();
+        if new_case.is_single_value() {
+            //FIXME - Hack: we don’t treat a single-element case as a multi-stage dimension
+            new.is_multi_stage = false;
+        }
         new.case = Some(new_case);
         Rc::new(new)
     }
@@ -165,6 +172,10 @@ impl DimensionSymbol {
 
     pub fn is_sub_query(&self) -> bool {
         self.is_sub_query
+    }
+
+    pub fn add_group_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
+        &self.add_group_by
     }
 
     pub fn dimension_type(&self) -> &String {
@@ -227,6 +238,11 @@ impl DimensionSymbol {
         if let Some(member_sql) = &self.longitude {
             member_sql.extract_symbol_deps(&mut deps);
         }
+        if let Some(add_group_by) = &self.add_group_by {
+            for member_sql in add_group_by {
+                deps.extend(member_sql.get_dependencies().into_iter());
+            }
+        }
         if let Some(case) = &self.case {
             case.extract_symbol_deps(&mut deps);
         }
@@ -247,6 +263,11 @@ impl DimensionSymbol {
         if let Some(case) = &self.case {
             case.extract_symbol_deps_with_path(&mut deps);
         }
+        if let Some(add_group_by) = &self.add_group_by {
+            for member_sql in add_group_by {
+                deps.extend(member_sql.get_dependencies_with_path().into_iter());
+            }
+        }
         deps
     }
 
@@ -256,6 +277,10 @@ impl DimensionSymbol {
 
     pub fn definition(&self) -> &Rc<dyn DimensionDefinition> {
         &self.definition
+    }
+
+    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+        self.cube.join_map()
     }
 
     pub fn name(&self) -> &String {
@@ -315,13 +340,32 @@ impl DimensionSymbolFactory {
         full_name: &String,
         cube_evaluator: Rc<dyn CubeEvaluator>,
     ) -> Result<Self, CubeError> {
-        let mut iter = cube_evaluator
-            .parse_path("dimensions".to_string(), full_name.clone())?
-            .into_iter();
+        let parts: Vec<&str> = full_name.split('.').collect();
+        let mut iter;
+        let member_short_path;
+
+        // try_new might be invoked with next full_name variants:
+        // 1. "cube.member"
+        // 2. "cube.member.granularity" might come from multistage things
+        // 3. "cube.cube.cube...cube.member" might come from pre-agg references (as it include full join paths)
+        // And we can not distinguish between "cube.member.granularity" and "cube.cube.member" here,
+        // so we have to try-catch 2 variants of evaluation.
+        if let Ok(iter_by_start) =
+            cube_evaluator.parse_path("dimensions".to_string(), full_name.clone())
+        {
+            member_short_path = full_name.clone();
+            iter = iter_by_start.into_iter();
+        } else {
+            member_short_path = format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]);
+            iter = cube_evaluator
+                .parse_path("dimensions".to_string(), member_short_path.clone())?
+                .into_iter();
+        }
+
         let cube_name = iter.next().unwrap();
         let name = iter.next().unwrap();
         let granularity = iter.next();
-        let definition = cube_evaluator.dimension_by_path(full_name.clone())?;
+        let definition = cube_evaluator.dimension_by_path(member_short_path)?;
         Ok(Self {
             cube_name,
             name,
@@ -373,7 +417,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let is_sql_direct_ref = if let Some(sql) = &sql {
-            sql.is_direct_reference(compiler.base_tools())?
+            sql.is_direct_reference()
         } else {
             false
         };
@@ -472,6 +516,17 @@ impl SymbolFactory for DimensionSymbolFactory {
             vec![]
         };
 
+        let add_group_by =
+            if let Some(add_group_by) = &definition.static_data().add_group_by_references {
+                let symbols = add_group_by
+                    .iter()
+                    .map(|add_group_by| compiler.add_dimension_evaluator(add_group_by.clone()))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Some(symbols)
+            } else {
+                None
+            };
+
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
 
         //TODO move owned logic to rust
@@ -510,6 +565,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             values,
             case,
             definition,
+            add_group_by,
             time_shift,
             time_shift_pk,
             is_self_time_shift_pk,

@@ -30,6 +30,7 @@ export type FireboltDriverConfiguration = {
   readOnly?: boolean;
   apiEndpoint?: string;
   connection: ConnectionOptions;
+  requestTimeout: number;
 };
 
 const FireboltTypeToGeneric: Record<string, string> = {
@@ -91,6 +92,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       readOnly: true,
+      requestTimeout: getEnv('dbQueryTimeout') * 1000,
       apiEndpoint:
         getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
       ...config,
@@ -225,7 +227,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       const connection = await this.getConnection();
 
       const statement = await connection.execute(query, {
-        settings: { output_format: OutputFormat.JSON },
+        settings: { output_format: OutputFormat.JSON, statement_timeout: this.config.requestTimeout },
         parameters,
         response: { hydrateRow: this.hydrateRow }
       });
@@ -275,7 +277,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       const connection = await this.getConnection();
 
       const statement = await connection.execute(query, {
-        settings: { output_format: OutputFormat.JSON },
+        settings: { output_format: OutputFormat.JSON, statement_timeout: this.config.requestTimeout },
         parameters,
         response: { hydrateRow: this.hydrateRow }
       });

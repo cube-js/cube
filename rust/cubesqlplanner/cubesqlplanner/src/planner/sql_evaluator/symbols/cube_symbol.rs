@@ -74,6 +74,7 @@ pub struct CubeTableSymbol {
     member_sql: Option<Rc<SqlCall>>,
     alias: String,
     is_table_sql: bool,
+    join_map: Option<Vec<Vec<String>>>,
 }
 
 impl CubeTableSymbol {
@@ -82,12 +83,14 @@ impl CubeTableSymbol {
         member_sql: Option<Rc<SqlCall>>,
         alias: String,
         is_table_sql: bool,
+        join_map: Option<Vec<Vec<String>>>,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_name,
             member_sql,
             alias,
             is_table_sql,
+            join_map,
         })
     }
 
@@ -132,6 +135,10 @@ impl CubeTableSymbol {
 
     pub fn alias(&self) -> String {
         self.alias.clone()
+    }
+
+    pub fn join_map(&self) -> &Option<Vec<Vec<String>>> {
+        &self.join_map
     }
 }
 
@@ -203,6 +210,7 @@ impl SymbolFactory for CubeTableSymbolFactory {
             sql,
             alias,
             is_table_sql,
+            definition.static_data().join_map.clone(),
         )))
     }
 }

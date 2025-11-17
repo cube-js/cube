@@ -1,4 +1,5 @@
 import YAML from 'js-yaml';
+import { getEnv } from '@cubejs-backend/shared';
 
 interface CreateCubeSchemaOptions {
   name: string,

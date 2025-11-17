@@ -11,7 +11,7 @@ describe('ErrorReporter', () => {
     // Test inFile and exitFile
     reporter.inFile({
       fileName: 'schema/users.js',
-      content: `cube('Users', {\n  sql: \`SELECT * FROM users\`,\n  measures: {\n    count: {\n      type: 'count'\n    }\n  }\n});`
+      content: 'cube(\'Users\', {\n  sql: `SELECT * FROM users`,\n  measures: {\n    count: {\n      type: \'count\'\n    }\n  }\n});'
     });
 
     // Test syntaxError with location
@@ -45,7 +45,7 @@ describe('ErrorReporter', () => {
     // Test inFile for another file
     reporter.inFile({
       fileName: 'schema/orders.js',
-      content: `cube('Orders', {\n  sql: \`SELECT * FROM orders\`\n});`
+      content: 'cube(\'Orders\', {\n  sql: `SELECT * FROM orders`\n});'
     });
 
     // Test syntaxError without location but with file context

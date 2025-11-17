@@ -83,11 +83,12 @@ impl MultiStageQueryPlanner {
                 &mut resolved_multi_stage_dimensions,
             )?;
             if !description.is_multi_stage_dimension() {
-                let result = (
-                    description.alias().clone(),
-                    vec![description.member_node().clone()],
-                );
-                top_level_ctes.push(result)
+                let result = MultiStageSubqueryRef::builder()
+                    .name(description.alias().clone())
+                    .symbols(vec![description.member_node().clone()])
+                    .schema(description.schema().clone())
+                    .build();
+                top_level_ctes.push(Rc::new(result))
             }
         }
 
@@ -103,18 +104,6 @@ impl MultiStageQueryPlanner {
                 Ok(res)
             })
             .collect::<Result<Vec<_>, _>>()?;
-
-        let top_level_ctes = top_level_ctes
-            .iter()
-            .map(|(alias, symbols)| {
-                Rc::new(
-                    MultiStageSubqueryRef::builder()
-                        .name(alias.clone())
-                        .symbols(symbols.clone())
-                        .build(),
-                )
-            })
-            .collect_vec();
 
         Ok((all_queries, top_level_ctes))
     }
@@ -154,13 +143,18 @@ impl MultiStageQueryPlanner {
                 is_ungrupped,
             )
         } else {
+            let add_group_by = if let Ok(dimension) = base_member.as_dimension() {
+                dimension.add_group_by().clone().unwrap_or_default()
+            } else {
+                vec![]
+            };
             resolved_multi_stage_dimensions
                 .insert(base_member.clone().resolve_reference_chain().full_name());
             (
                 MultiStageInodeMember::new(
                     MultiStageInodeMemberType::Dimension,
                     vec![],
-                    vec![],
+                    add_group_by,
                     None,
                     None,
                 ),
@@ -409,6 +403,17 @@ impl MultiStageQueryPlanner {
                 resolved_multi_stage_dimensions,
             )?;
 
+            // Add GROUP BY to the dimension subquery itself
+            // if a multi-stage dimension has the `add_group_by` field.
+            let self_state =
+                if !multi_stage_member.add_group_by_symbols().is_empty() && member.is_dimension() {
+                    let mut self_state = state.clone_state();
+                    self_state.add_dimensions(multi_stage_member.add_group_by_symbols().clone());
+                    Rc::new(self_state)
+                } else {
+                    state.clone()
+                };
+
             let alias = format!("cte_{}", descriptions.len());
             MultiStageQueryDescription::new(
                 MultiStageMember::new(
@@ -417,7 +422,7 @@ impl MultiStageQueryPlanner {
                     is_ungrupped,
                     false,
                 ),
-                state.clone(),
+                self_state,
                 input,
                 alias.clone(),
             )

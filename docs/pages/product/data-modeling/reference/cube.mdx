@@ -593,6 +593,16 @@ cubes:
 
 </CodeTabs>
 
+### `calendar`
+
+The `calendar` parameter is used to mark [calendar cubes][ref-calendar-cubes].
+It's set to `false` by default.
+
+When set to `true`, Cube will treat this cube as a calendar cube and allow to
+[override time-shifts][ref-calendar-cubes-time-shifts] and [granularities][ref-calendar-cubes-granularities]
+on its [time dimensions][ref-time-dimensions]. This can be useful for [time-shift
+calculations][ref-time-shift] with a custom calendar.
+
 ### `pre_aggregations`
 
 The `pre_aggregations` parameter is used to configure [pre-aggregations][ref-ref-pre-aggs].
@@ -637,3 +647,8 @@ The `access_policy` parameter is used to configure [data access policies][ref-re
 [ref-ref-dap]: /product/data-modeling/reference/data-access-policies
 [ref-syntax-cube-sql]: /product/data-modeling/syntax#cubesql-function
 [ref-extension]: /product/data-modeling/concepts/code-reusability-extending-cubes
+[ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes
+[ref-calendar-cubes-time-shifts]: /product/data-modeling/concepts/calendar-cubes#time-shifts
+[ref-calendar-cubes-granularities]: /product/data-modeling/concepts/calendar-cubes#granularities
+[ref-time-dimensions]: /product/data-modeling/concepts#time-dimensions
+[ref-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift

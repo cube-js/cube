@@ -33,7 +33,7 @@ class SqliteDriver extends BaseDriver {
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-    
+
     this.config = {
       database: getEnv('dbName', { dataSource }),
       ...config
@@ -64,7 +64,7 @@ class SqliteDriver extends BaseDriver {
 
   informationSchemaQuery() {
     return `
-      SELECT name, sql
+      SELECT name
       FROM sqlite_master
       WHERE type='table'
       AND name!='sqlite_sequence'
@@ -72,31 +72,25 @@ class SqliteDriver extends BaseDriver {
    `;
   }
 
+  tableColumnsQuery(tableName) {
+    return `
+      SELECT name, type
+      FROM pragma_table_info('${tableName}')
+    `;
+  }
+
   async tablesSchema() {
     const query = this.informationSchemaQuery();
 
     const tables = await this.query(query);
 
+    const tableColumns = await Promise.all(tables.map(async table => {
+      const columns = await this.query(this.tableColumnsQuery(table.name));
+      return [table.name, columns];
+    }));
+
     return {
-      main: tables.reduce((acc, table) => ({
-        ...acc,
-        [table.name]: table.sql
-          // remove EOL for next .match to read full string
-          .replace(/\n/g, '')
-          // extract fields
-          .match(/\((.*)\)/)[1]
-          // split fields
-          .split(',')
-          .map((nameAndType) => {
-            const match = nameAndType
-              .trim()
-              // replace \t with whitespace
-              .replace(/\t/g, ' ')
-              // obtain "([|`|")?name(]|`|")? type"
-              .match(/([|`|"])?([^[\]"`]+)(]|`|")?\s+(\w+)/);
-            return { name: match[2], type: match[4] };
-          })
-      }), {}),
+      main: Object.fromEntries(tableColumns)
     };
   }
 

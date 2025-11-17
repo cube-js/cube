@@ -14,7 +14,7 @@ pub struct PreAggregation {
     #[builder(default)]
     dimensions: Vec<Rc<MemberSymbol>>,
     #[builder(default)]
-    time_dimensions: Vec<(Rc<MemberSymbol>, Option<String>)>,
+    time_dimensions: Vec<Rc<MemberSymbol>>,
     external: bool,
     #[builder(default)]
     granularity: Option<String>,
@@ -39,7 +39,7 @@ impl PreAggregation {
         &self.dimensions
     }
 
-    pub fn time_dimensions(&self) -> &Vec<(Rc<MemberSymbol>, Option<String>)> {
+    pub fn time_dimensions(&self) -> &Vec<Rc<MemberSymbol>> {
         &self.time_dimensions
     }
 
@@ -97,11 +97,11 @@ impl PreAggregation {
                 QualifiedColumnName::new(None, alias.clone()),
             );
         }
-        for (dim, granularity) in self.time_dimensions().iter() {
-            let base_symbol = if let Ok(td) = dim.as_time_dimension() {
-                td.base_symbol().clone()
+        for dim in self.time_dimensions().iter() {
+            let (base_symbol, granularity) = if let Ok(td) = dim.as_time_dimension() {
+                (td.base_symbol().clone(), td.granularity().clone())
             } else {
-                dim.clone()
+                (dim.clone(), None)
             };
             let suffix = if let Some(granularity) = &granularity {
                 format!("_{}", granularity.clone())
@@ -110,7 +110,7 @@ impl PreAggregation {
             };
             let alias = format!("{}{}", base_symbol.alias(), suffix);
             res.insert(
-                dim.full_name(),
+                base_symbol.full_name(),
                 QualifiedColumnName::new(None, alias.clone()),
             );
         }
@@ -184,11 +184,7 @@ impl PrettyPrint for PreAggregation {
                 &self
                     .time_dimensions()
                     .iter()
-                    .map(|(d, granularity)| format!(
-                        "({} {})",
-                        d.full_name(),
-                        granularity.clone().unwrap_or("None".to_string())
-                    ))
+                    .map(|d| d.full_name())
                     .join(", ")
             ),
             &state,

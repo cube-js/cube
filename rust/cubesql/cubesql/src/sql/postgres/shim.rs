@@ -22,6 +22,7 @@ use crate::{
     transport::{MetaContext, SpanId},
     CubeError,
 };
+use datafusion::{arrow::error::ArrowError, error::DataFusionError};
 use futures::{FutureExt, StreamExt};
 use log::{debug, error, trace};
 use pg_srv::{
@@ -108,6 +109,10 @@ impl QueryPlanExt for QueryPlan {
 pub enum ConnectionError {
     #[error("CubeError: {0}")]
     Cube(CubeError, Option<Arc<SpanId>>),
+    #[error("DataFusionError: {0}")]
+    DataFusion(DataFusionError, Option<Arc<SpanId>>),
+    #[error("ArrowError: {0}")]
+    Arrow(ArrowError, Option<Arc<SpanId>>),
     #[error("CompilationError: {0}")]
     CompilationError(CompilationError, Option<Arc<SpanId>>),
     #[error("ProtocolError: {0}")]
@@ -121,15 +126,16 @@ impl ConnectionError {
             ConnectionError::Cube(e, _) => e.backtrace(),
             ConnectionError::CompilationError(e, _) => e.backtrace(),
             ConnectionError::Protocol(e, _) => e.backtrace(),
+            ConnectionError::DataFusion(_, _) | ConnectionError::Arrow(_, _) => None,
         }
     }
 
     /// Converts Error to protocol::ErrorResponse which is usefully for writing response to the client
     pub fn to_error_response(self) -> protocol::ErrorResponse {
         match self {
-            ConnectionError::Cube(e, _) => {
-                protocol::ErrorResponse::error(protocol::ErrorCode::InternalError, e.to_string())
-            }
+            ConnectionError::Cube(e, _) => Self::cube_to_error_response(&e),
+            ConnectionError::DataFusion(e, _) => Self::df_to_error_response(&e),
+            ConnectionError::Arrow(e, _) => Self::arrow_to_error_response(&e),
             ConnectionError::CompilationError(e, _) => {
                 fn to_error_response(e: CompilationError) -> protocol::ErrorResponse {
                     match e {
@@ -161,6 +167,8 @@ impl ConnectionError {
     pub fn with_span_id(self, span_id: Option<Arc<SpanId>>) -> Self {
         match self {
             ConnectionError::Cube(e, _) => ConnectionError::Cube(e, span_id),
+            ConnectionError::DataFusion(e, _) => ConnectionError::DataFusion(e, span_id),
+            ConnectionError::Arrow(e, _) => ConnectionError::Arrow(e, span_id),
             ConnectionError::CompilationError(e, _) => {
                 ConnectionError::CompilationError(e, span_id)
             }
@@ -171,9 +179,58 @@ impl ConnectionError {
     pub fn span_id(&self) -> Option<Arc<SpanId>> {
         match self {
             ConnectionError::Cube(_, span_id) => span_id.clone(),
+            ConnectionError::DataFusion(_, span_id) => span_id.clone(),
+            ConnectionError::Arrow(_, span_id) => span_id.clone(),
             ConnectionError::CompilationError(_, span_id) => span_id.clone(),
             ConnectionError::Protocol(_, span_id) => span_id.clone(),
         }
+    }
+
+    fn cube_to_error_response(e: &CubeError) -> protocol::ErrorResponse {
+        let message = e.to_string();
+        // Remove `Error: ` prefix that can come from JS
+        let message = if let Some(message) = message.strip_prefix("Error: ") {
+            message.to_string()
+        } else {
+            message
+        };
+        protocol::ErrorResponse::error(protocol::ErrorCode::InternalError, message)
+    }
+
+    fn df_to_error_response(e: &DataFusionError) -> protocol::ErrorResponse {
+        match e {
+            DataFusionError::ArrowError(arrow_err) => {
+                return Self::arrow_to_error_response(arrow_err);
+            }
+            DataFusionError::External(err) => {
+                if let Some(cube_err) = err.downcast_ref::<CubeError>() {
+                    return Self::cube_to_error_response(cube_err);
+                }
+            }
+            _ => {}
+        }
+        protocol::ErrorResponse::error(
+            protocol::ErrorCode::InternalError,
+            format!("Post-processing Error: {}", e),
+        )
+    }
+
+    fn arrow_to_error_response(e: &ArrowError) -> protocol::ErrorResponse {
+        match e {
+            ArrowError::ExternalError(err) => {
+                if let Some(df_err) = err.downcast_ref::<DataFusionError>() {
+                    return Self::df_to_error_response(df_err);
+                }
+                if let Some(cube_err) = err.downcast_ref::<CubeError>() {
+                    return Self::cube_to_error_response(cube_err);
+                }
+            }
+            _ => {}
+        }
+        protocol::ErrorResponse::error(
+            protocol::ErrorCode::InternalError,
+            format!("Post-processing Error: {}", e),
+        )
     }
 }
 
@@ -201,15 +258,15 @@ impl From<tokio::task::JoinError> for ConnectionError {
     }
 }
 
-impl From<datafusion::error::DataFusionError> for ConnectionError {
-    fn from(e: datafusion::error::DataFusionError) -> Self {
-        ConnectionError::Cube(e.into(), None)
+impl From<DataFusionError> for ConnectionError {
+    fn from(e: DataFusionError) -> Self {
+        ConnectionError::DataFusion(e, None)
     }
 }
 
-impl From<datafusion::arrow::error::ArrowError> for ConnectionError {
-    fn from(e: datafusion::arrow::error::ArrowError) -> Self {
-        ConnectionError::Cube(e.into(), None)
+impl From<ArrowError> for ConnectionError {
+    fn from(e: ArrowError) -> Self {
+        ConnectionError::Arrow(e, None)
     }
 }
 
@@ -1902,5 +1959,15 @@ impl AsyncPostgresShim {
             .state
             .auth_context()
             .ok_or(CubeError::internal("must be auth".to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_connection_error_mem_size() {
+        assert_eq!(std::mem::size_of::<ConnectionError>(), 136)
     }
 }

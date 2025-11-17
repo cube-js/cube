@@ -1,4 +1,16 @@
+use crate::compile::date_parser::parse_date_str;
+use crate::{
+    compile::{
+        engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
+        test::find_cube_scans_deep_search,
+    },
+    config::ConfigObj,
+    sql::AuthContextRef,
+    transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
+    CubeError,
+};
 use async_trait::async_trait;
+use chrono::{Datelike, NaiveDate};
 use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse};
 pub use datafusion::{
     arrow::{
@@ -18,28 +30,6 @@ pub use datafusion::{
         Partitioning, PhysicalPlanner, RecordBatchStream, SendableRecordBatchStream, Statistics,
     },
 };
-use futures::Stream;
-use log::warn;
-use std::{
-    any::Any,
-    borrow::Cow,
-    fmt,
-    sync::Arc,
-    task::{Context, Poll},
-};
-
-use crate::compile::date_parser::parse_date_str;
-use crate::{
-    compile::{
-        engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
-        test::find_cube_scans_deep_search,
-    },
-    config::ConfigObj,
-    sql::AuthContextRef,
-    transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
-    CubeError,
-};
-use chrono::{Datelike, NaiveDate};
 use datafusion::{
     arrow::{
         array::{
@@ -51,7 +41,18 @@ use datafusion::{
     execution::context::TaskContext,
     scalar::ScalarValue,
 };
+use futures::Stream;
+use log::warn;
+use serde::Serialize;
 use serde_json::Value;
+use std::str::FromStr;
+use std::{
+    any::Any,
+    borrow::Cow,
+    fmt,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RegularMember {
@@ -79,10 +80,37 @@ impl MemberField {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub enum CacheMode {
+    #[serde(rename = "stale-if-slow")]
+    StaleIfSlow,
+    #[serde(rename = "stale-while-revalidate")]
+    StaleWhileRevalidate,
+    #[serde(rename = "must-revalidate")]
+    MustRevalidate,
+    #[serde(rename = "no-cache")]
+    NoCache,
+}
+
+impl FromStr for CacheMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "stale-if-slow" => Ok(Self::StaleIfSlow),
+            "stale-while-revalidate" => Ok(Self::StaleWhileRevalidate),
+            "must-revalidate" => Ok(Self::MustRevalidate),
+            "no-cache" => Ok(Self::NoCache),
+            other => Err(format!("Unknown cache mode: {}", other)),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CubeScanOptions {
     pub change_user: Option<String>,
     pub max_records: Option<usize>,
+    pub cache_mode: Option<CacheMode>,
 }
 
 #[derive(Debug, Clone)]
@@ -455,7 +483,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                     self.member_fields.clone(),
                 )
                 .await;
-            let stream = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
+            let stream = result.map_err(|err| DataFusionError::External(Box::new(err)))?;
             let main_stream = CubeScanMemoryStream::new(stream);
 
             return Ok(Box::pin(CubeScanStreamRouter::new(
@@ -572,7 +600,16 @@ impl CubeScanMemoryStream {
     fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<ArrowResult<RecordBatch>>> {
         self.receiver.poll_recv(cx).map(|res| match res {
             Some(Some(Ok(chunk))) => Some(Ok(chunk)),
-            Some(Some(Err(err))) => Some(Err(ArrowError::ComputeError(err.to_string()))),
+            Some(Some(Err(mut err))) => {
+                // Remove `Error: ` prefix that can come from database
+                err.message = if let Some(message) = err.message.strip_prefix("Error: ") {
+                    message.to_string()
+                } else {
+                    err.message
+                };
+                err.message = format!("Database Execution Error: {}", err.message);
+                Some(Err(ArrowError::ExternalError(Box::new(err))))
+            }
             Some(None) => None,
             None => None,
         })
@@ -609,9 +646,9 @@ impl Stream for CubeScanStreamRouter {
         match &mut self.main_stream {
             Some(main_stream) => {
                 let next = main_stream.poll_next(cx);
-                if let Poll::Ready(Some(Err(ArrowError::ComputeError(err)))) = &next {
+                if let Poll::Ready(Some(Err(ArrowError::ExternalError(err)))) = &next {
                     if err
-                        .as_str()
+                        .to_string()
                         .contains("streamQuery() method is not implemented yet")
                     {
                         warn!("{}", err);
@@ -669,7 +706,7 @@ async fn load_data(
 
         let mut response = JsonValueObject::new(data);
         let rec = transform_response(&mut response, schema.clone(), &member_fields)
-            .map_err(|e| DataFusionError::Execution(e.message.to_string()))?;
+            .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
 
         rec
     } else {
@@ -682,23 +719,41 @@ async fn load_data(
                 meta,
                 schema,
                 member_fields,
+                options.cache_mode,
             )
             .await
-            .map_err(|err| ArrowError::ComputeError(err.to_string()))?;
+            .map_err(|mut err| {
+                // Remove `Error: ` prefix that can come from database
+                err.message = if let Some(message) = err.message.strip_prefix("Error: ") {
+                    message.to_string()
+                } else {
+                    err.message
+                };
+                err.message = format!("Database Execution Error: {}", err.message);
+                ArrowError::ExternalError(Box::new(err))
+            })?;
         let response = result.first();
         if let Some(data) = response.cloned() {
             match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
-                    return Err(ArrowError::ComputeError(format!("One of the Cube queries exceeded the maximum row limit ({}). JOIN/UNION is not possible as it will produce incorrect results. Try filtering the results more precisely or moving post-processing functions to an outer query.", max_records)));
+                    return Err(ArrowError::ExternalError(Box::new(CubeError::user(
+                        format!(
+                            "One of the Cube queries exceeded the maximum row limit ({}). \
+                            JOIN/UNION is not possible as it will produce incorrect results. \
+                            Try filtering the results more precisely \
+                            or moving post-processing functions to an outer query.",
+                            max_records
+                        ),
+                    ))));
                 }
                 (_, _) => (),
             }
 
             data
         } else {
-            return Err(ArrowError::ComputeError(
+            return Err(ArrowError::ExternalError(Box::new(CubeError::internal(
                 "Unable to extract results from response: results is empty".to_string(),
-            ));
+            ))));
         }
     };
 
@@ -1192,6 +1247,7 @@ mod tests {
                 _meta_fields: LoadRequestMeta,
                 schema: SchemaRef,
                 member_fields: Vec<MemberField>,
+                _cache_mode: Option<CacheMode>,
             ) -> Result<Vec<RecordBatch>, CubeError> {
                 let response = r#"
                 {
@@ -1317,6 +1373,7 @@ mod tests {
             options: CubeScanOptions {
                 change_user: None,
                 max_records: None,
+                cache_mode: None,
             },
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),

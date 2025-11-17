@@ -89,12 +89,10 @@ export type PreAggregationTimeDimensionReference = {
 export type PreAggregationReferences = {
   allowNonStrictDateRangeMatch?: boolean,
   dimensions: Array<string>,
-  fullNameDimensions: Array<string>,
   measures: Array<string>,
-  fullNameMeasures: Array<string>,
   timeDimensions: Array<PreAggregationTimeDimensionReference>,
-  fullNameTimeDimensions: Array<PreAggregationTimeDimensionReference>,
   rollups: Array<string>,
+  rollupsReferences: Array<PreAggregationReferences>,
   multipliedMeasures?: Array<string>,
   joinTree?: FinishedJoinTree;
 };
@@ -730,6 +728,18 @@ export class CubeEvaluator extends CubeSymbols {
     return !!this.evaluatedCubes[cube];
   }
 
+  public memberShortNameFromPath(path: string | string[]): string {
+    if (!Array.isArray(path)) {
+      path = path.split('.');
+    }
+
+    if (path.length < 2) {
+      throw new UserError(`Not full member name provided: ${path[0]}`);
+    }
+
+    return path.slice(-2).join('.');
+  }
+
   public cubeFromPath(path: string): EvaluatedCube {
     return this.evaluatedCubes[this.cubeNameFromPath(path)];
   }
@@ -875,7 +885,6 @@ export class CubeEvaluator extends CubeSymbols {
         });
       }
     }
-
     return {
       allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
@@ -888,9 +897,7 @@ export class CubeEvaluator extends CubeSymbols {
       timeDimensions,
       rollups:
         aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences, { originalSorting: true }) || [],
-      fullNameDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
-      fullNameMeasures: [], // May be filled in PreAggregations.evaluateAllReferences()
-      fullNameTimeDimensions: [], // May be filled in PreAggregations.evaluateAllReferences()
+      rollupsReferences: [], // May be filled in PreAggregations.evaluateAllReferences()
     };
   }
 }

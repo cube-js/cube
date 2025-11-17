@@ -64,8 +64,9 @@ features:
 | Removed    | [`initApp` hook](#initapp-hook)                                                                                                   | v0.35.0    | v0.35.0   |
 | Removed    | [`/v1/run-scheduled-refresh` REST API endpoint](#v1run-scheduled-refresh-rest-api-endpoint)                                       | v0.35.0    | v0.36.0   |
 | Removed    | [Node.js 18](#nodejs-18)                                                                                                          | v0.36.0    | v1.3.0    |
-| Deprecated | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7 |           |
+| Deprecated | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7    |           |
 | Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
+| Deprecated | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   |           |
 
 ### Node.js 8
 
@@ -412,3 +413,8 @@ This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_
 
 Node.js 20 is in maintenance mode from [November 22, 2024][link-nodejs-eol]. This means
 no more new features, only security updates. Please upgrade to Node.js 22 or higher.
+
+### `renewQuery` parameter of the `/v1/load` endpoint
+
+This parameter is deprecated and will be removed in future releases. See [cache control](https://cube.dev/docs/product/apis-integrations/rest-api#cache-control)
+options and use the new `cache` parameter of the `/v1/load` endpoint instead.

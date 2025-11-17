@@ -56,6 +56,13 @@ describe('Custom Granularities', () => {
             - name: twenty_five_minutes
               interval: 25 minutes
               origin: '2024-01-01 10:15:00'
+            - name: five_minutes_from_utc_origin
+              interval: 5 minutes
+              # 10:15 UTC = 11:15 Paris time (UTC+1)
+              origin: '2024-01-01T10:15:00Z'
+            - name: five_minutes_from_local_origin
+              interval: 5 minutes
+              origin: '2024-01-01 10:15:00'
             - name: fiscal_year_by_1st_feb
               interval: 1 year
               origin: '2024-02-01'
@@ -158,6 +165,64 @@ describe('Custom Granularities', () => {
       {
         orders__count: '1',
         orders__created_at_one_week_by_friday_by_offset: '2024-02-23T00:00:00.000Z',
+      },
+    ],
+    { joinGraph, cubeEvaluator, compiler }
+  ));
+
+  it('works with five_minutes_from_utc_origin custom granularity in Europe/Paris timezone', async () => dbRunner.runQueryTest(
+    {
+      measures: ['orders.count'],
+      timeDimensions: [{
+        dimension: 'orders.createdAt',
+        granularity: 'five_minutes_from_utc_origin',
+        dateRange: ['2024-01-01', '2024-01-31']
+      }],
+      dimensions: [],
+      filters: [],
+      timezone: 'Europe/Paris'
+    },
+    [
+      {
+        orders__count: '1',
+        orders__created_at_five_minutes_from_utc_origin: '2024-01-01T01:00:00.000Z',
+      },
+      {
+        orders__count: '1',
+        orders__created_at_five_minutes_from_utc_origin: '2024-01-15T01:00:00.000Z',
+      },
+      {
+        orders__count: '1',
+        orders__created_at_five_minutes_from_utc_origin: '2024-01-29T01:00:00.000Z',
+      },
+    ],
+    { joinGraph, cubeEvaluator, compiler }
+  ));
+
+  it('works with five_minutes_from_local_origin custom granularity in Europe/Paris timezone', async () => dbRunner.runQueryTest(
+    {
+      measures: ['orders.count'],
+      timeDimensions: [{
+        dimension: 'orders.createdAt',
+        granularity: 'five_minutes_from_local_origin',
+        dateRange: ['2024-01-01', '2024-01-31']
+      }],
+      dimensions: [],
+      filters: [],
+      timezone: 'Europe/Paris'
+    },
+    [
+      {
+        orders__count: '1',
+        orders__created_at_five_minutes_from_local_origin: '2024-01-01T01:00:00.000Z',
+      },
+      {
+        orders__count: '1',
+        orders__created_at_five_minutes_from_local_origin: '2024-01-15T01:00:00.000Z',
+      },
+      {
+        orders__count: '1',
+        orders__created_at_five_minutes_from_local_origin: '2024-01-29T01:00:00.000Z',
       },
     ],
     { joinGraph, cubeEvaluator, compiler }

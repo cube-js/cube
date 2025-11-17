@@ -229,7 +229,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('true')
     .asBoolStrict(),
   transpilationWorkerThreads: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   allowNonStrictDateRangeMatching: () => get('CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH')
     .default('true')

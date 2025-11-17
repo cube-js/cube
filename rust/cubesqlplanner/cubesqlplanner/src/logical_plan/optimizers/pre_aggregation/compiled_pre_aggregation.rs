@@ -46,7 +46,7 @@ pub struct CompiledPreAggregation {
     pub external: Option<bool>,
     pub measures: Vec<Rc<MemberSymbol>>,
     pub dimensions: Vec<Rc<MemberSymbol>>,
-    pub time_dimensions: Vec<(Rc<MemberSymbol>, Option<String>)>,
+    pub time_dimensions: Vec<Rc<MemberSymbol>>,
     pub allow_non_strict_date_range_match: bool,
 }
 

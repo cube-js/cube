@@ -177,6 +177,7 @@
     "querying SwitchSourceTest: simple cross join",
     "querying SwitchSourceTest: full cross join",
     "querying SwitchSourceTest: filter by switch dimensions",
+    "querying BigECommerce: SeveralMultiStageMeasures",
 
     "---------------------------------------",
     "SKIPPED SQL API (Need work)",
@@ -220,6 +221,7 @@
     "querying BigECommerce: rolling count_distinct_approx window by 2 week",
     "querying BigECommerce: rolling count_distinct_approx window by 2 month",
     "querying BigECommerce: totalProfitYearAgo",
+    "querying BigECommerce: SeveralMultiStageMeasures",
     "SQL API: post-aggregate percentage of total",
     "SQL API: Simple Rollup",
     "SQL API: Rollup over exprs",
@@ -235,8 +237,6 @@
     "SQL API: SQL push down push to cube quoted alias",
     "querying BigECommerce: rolling window YTD (month + week)",
     "querying BigECommerce: rolling window YTD (month + week + no gran)",
-    "querying BigECommerce: rolling window YTD without granularity",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc equal)",
-    "SQL API: Rolling Window YTD (year + month + day + date_trunc IN)"
+    "querying BigECommerce: rolling window YTD without granularity"
   ]
 }

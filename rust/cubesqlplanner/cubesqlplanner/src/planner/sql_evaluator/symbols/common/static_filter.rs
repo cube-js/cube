@@ -22,12 +22,13 @@ pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -
         if dim.dimension_type() == "switch" {
             if let Some(filter) = filter {
                 if let Some(values) = find_value_restriction(&filter.items, symbol) {
-                    return dim
+                    let res = dim
                         .values()
                         .iter()
                         .filter(|v| values.contains(v))
                         .cloned()
                         .collect();
+                    return res;
                 }
             }
         }

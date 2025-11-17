@@ -1,4 +1,5 @@
 module.exports = {
+  "workbooks": "Workbooks",
   "playground": "Playground",
   "vizard": "Chart Prototyping",
   "data-model": "Data Model",
@@ -16,6 +17,8 @@ module.exports = {
   "access-control": "Access Control",
   "sso": "Authentication & SSO",
   "audit-log": "Audit Log",
+  "chats-history": "Chats History",
+  "api-keys": "API keys",
   "encryption-keys": "Encryption keys",
   "budgets": "Budgets",
   "preferences": "Preferences",

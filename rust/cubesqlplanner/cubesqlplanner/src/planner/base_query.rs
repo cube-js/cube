@@ -36,6 +36,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             .unwrap_or(false);
         let query_tools = QueryTools::try_new(
             options.cube_evaluator()?,
+            options.security_context()?,
             options.base_tools()?,
             options.join_graph()?,
             options.static_data().timezone.clone(),

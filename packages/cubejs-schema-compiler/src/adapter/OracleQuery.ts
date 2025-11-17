@@ -1,7 +1,8 @@
+import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
-import { BaseDimension } from './BaseDimension';
+import type { BaseDimension } from './BaseDimension';
 
 const GRANULARITY_VALUE = {
   day: 'DD',
@@ -55,7 +56,11 @@ export class OracleQuery extends BaseQuery {
    * using forSelect dimensions for grouping
    */
   public groupByClause() {
-    const dimensions = this.forSelect().filter((item: any) => !!item.dimension) as BaseDimension[];
+    // Only include dimensions that have select columns
+    // Time dimensions without granularity return null from selectColumns()
+    const dimensions = this.forSelect().filter((item: any) => (
+      !!item.dimension && item.selectColumns && item.selectColumns()
+    )) as BaseDimension[];
     if (!dimensions.length) {
       return '';
     }
@@ -71,11 +76,14 @@ export class OracleQuery extends BaseQuery {
   }
 
   public dateTimeCast(value) {
-    return `to_date(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
+    // Use timezone-aware parsing for ISO 8601 with milliseconds and trailing 'Z', then cast to DATE
+    // to preserve index-friendly comparisons against DATE columns.
+    return `CAST(TO_TIMESTAMP_TZ(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"') AS DATE)`;
   }
 
   public timeStampCast(value) {
-    return this.dateTimeCast(value);
+    // Return timezone-aware timestamp for TIMESTAMP comparisons
+    return `TO_TIMESTAMP_TZ(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"')`;
   }
 
   public timeStampParam(timeDimension) {
@@ -87,6 +95,88 @@ export class OracleQuery extends BaseQuery {
       return dimension;
     }
     return `TRUNC(${dimension}, '${GRANULARITY_VALUE[granularity]}')`;
+  }
+
+  /**
+   * Oracle uses ADD_MONTHS for year/month/quarter intervals
+   * and NUMTODSINTERVAL for day/hour/minute/second intervals
+   */
+  public addInterval(date: string, interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    let res = date;
+
+    // Handle year/month/quarter using ADD_MONTHS
+    let totalMonths = 0;
+    if (intervalParsed.year) {
+      totalMonths += intervalParsed.year * 12;
+    }
+    if (intervalParsed.quarter) {
+      totalMonths += intervalParsed.quarter * 3;
+    }
+    if (intervalParsed.month) {
+      totalMonths += intervalParsed.month;
+    }
+
+    if (totalMonths !== 0) {
+      res = `ADD_MONTHS(${res}, ${totalMonths})`;
+    }
+
+    // Handle day/hour/minute/second using NUMTODSINTERVAL
+    if (intervalParsed.day) {
+      res = `${res} + NUMTODSINTERVAL(${intervalParsed.day}, 'DAY')`;
+    }
+    if (intervalParsed.hour) {
+      res = `${res} + NUMTODSINTERVAL(${intervalParsed.hour}, 'HOUR')`;
+    }
+    if (intervalParsed.minute) {
+      res = `${res} + NUMTODSINTERVAL(${intervalParsed.minute}, 'MINUTE')`;
+    }
+    if (intervalParsed.second) {
+      res = `${res} + NUMTODSINTERVAL(${intervalParsed.second}, 'SECOND')`;
+    }
+
+    return res;
+  }
+
+  /**
+   * Oracle subtraction uses ADD_MONTHS with negative values
+   * and subtracts NUMTODSINTERVAL for time units
+   */
+  public subtractInterval(date: string, interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    let res = date;
+
+    // Handle year/month/quarter using ADD_MONTHS with negative values
+    let totalMonths = 0;
+    if (intervalParsed.year) {
+      totalMonths += intervalParsed.year * 12;
+    }
+    if (intervalParsed.quarter) {
+      totalMonths += intervalParsed.quarter * 3;
+    }
+    if (intervalParsed.month) {
+      totalMonths += intervalParsed.month;
+    }
+
+    if (totalMonths !== 0) {
+      res = `ADD_MONTHS(${res}, -${totalMonths})`;
+    }
+
+    // Handle day/hour/minute/second using NUMTODSINTERVAL with subtraction
+    if (intervalParsed.day) {
+      res = `${res} - NUMTODSINTERVAL(${intervalParsed.day}, 'DAY')`;
+    }
+    if (intervalParsed.hour) {
+      res = `${res} - NUMTODSINTERVAL(${intervalParsed.hour}, 'HOUR')`;
+    }
+    if (intervalParsed.minute) {
+      res = `${res} - NUMTODSINTERVAL(${intervalParsed.minute}, 'MINUTE')`;
+    }
+    if (intervalParsed.second) {
+      res = `${res} - NUMTODSINTERVAL(${intervalParsed.second}, 'SECOND')`;
+    }
+
+    return res;
   }
 
   public newFilter(filter) {
