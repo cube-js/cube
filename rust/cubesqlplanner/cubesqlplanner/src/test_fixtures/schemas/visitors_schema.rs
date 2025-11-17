@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_visitors_dimensions() {
-        use crate::test_fixtures::cube_bridge::{MockSecurityContext, MockSqlUtils};
+        use crate::test_fixtures::cube_bridge::MockSecurityContext;
         use std::rc::Rc;
 
         let schema = create_visitors_schema();
