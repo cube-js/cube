@@ -3,6 +3,130 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.3](https://github.com/cube-js/cube/compare/v1.5.2...v1.5.3) (2025-11-13)
+
+### Features
+
+- **cubestore:** Support two arguments for round, fix [#6179](https://github.com/cube-js/cube/issues/6179) ([#10132](https://github.com/cube-js/cube/issues/10132)) ([b666705](https://github.com/cube-js/cube/commit/b6667052a789ae0866b5bbb51baa674bede2cd76))
+- **tesseract:** Custom granularities in pre-aggregations ([#10127](https://github.com/cube-js/cube/issues/10127)) ([a462b41](https://github.com/cube-js/cube/commit/a462b41a30973d6e888d1836cce5e4234efe1087))
+
+### Performance Improvements
+
+- **api-gateway:** Return granularityHierarchies only related to query time dimensions ([#10129](https://github.com/cube-js/cube/issues/10129)) ([1803b28](https://github.com/cube-js/cube/commit/1803b2839f8aa6159bb95e1ea0c85780dad0d8af))
+
+## [1.5.2](https://github.com/cube-js/cube/compare/v1.5.1...v1.5.2) (2025-11-10)
+
+### Bug Fixes
+
+- **api-gateway:** Sanitize query before logging ([#10120](https://github.com/cube-js/cube/issues/10120)) ([e8db92f](https://github.com/cube-js/cube/commit/e8db92f6bf64a8154ebb34c04375360a3c23f76d))
+- **cubeorchestrator:** Increase VerifierOptions max_tables to 10M ([#10121](https://github.com/cube-js/cube/issues/10121)) ([5b048b2](https://github.com/cube-js/cube/commit/5b048b2e3266e7248751498daa8c1597d8fbced4))
+- Simplify external refresh condition so when pre-aggregation buil… ([#10116](https://github.com/cube-js/cube/issues/10116)) ([4f4a0b4](https://github.com/cube-js/cube/commit/4f4a0b4bbab2069df1496b9a84e54050f0696f8e))
+
+### Features
+
+- **client-core:** add custom granularities support to drilldown() ([#10094](https://github.com/cube-js/cube/issues/10094)) ([5ec1b7d](https://github.com/cube-js/cube/commit/5ec1b7d28fda141208f5196adb8742740299daef))
+- **cubesql:** Coerce strings to any type in functions ([#10126](https://github.com/cube-js/cube/issues/10126)) ([076ae0c](https://github.com/cube-js/cube/commit/076ae0cb4d39b2f7711bfb5492b782b8adce2a3b))
+- **tesseract:** Support custom granularities in pre-aggregations with allow_non_strict_date_range_match=true ([#10092](https://github.com/cube-js/cube/issues/10092)) ([6a8ca2e](https://github.com/cube-js/cube/commit/6a8ca2ea36da43d84f70866113733036fa042a46))
+
+## [1.5.1](https://github.com/cube-js/cube/compare/v1.5.0...v1.5.1) (2025-11-04)
+
+### Bug Fixes
+
+- **api-gateway:** Make `securityContext` available to `extendContext`, thanks [@morford-brex](https://github.com/morford-brex) ([#10050](https://github.com/cube-js/cube/issues/10050)) ([5a69f7b](https://github.com/cube-js/cube/commit/5a69f7b2ac0e871f5f247440e1eed9d41b92c8a2))
+- **clickhouse-driver:** Respect timezone for origin in custom granula… ([#10110](https://github.com/cube-js/cube/issues/10110)) ([2d1b850](https://github.com/cube-js/cube/commit/2d1b850e58c99d32b4dfeabe654cf0659fae8d44))
+- **tesseract:** Prevent duplicate measures in some cases ([#10065](https://github.com/cube-js/cube/issues/10065)) ([b0b011e](https://github.com/cube-js/cube/commit/b0b011efc14cc6ac4e1ecb204c5e0ffabb57f389))
+
+# [1.5.0](https://github.com/cube-js/cube/compare/v1.4.0...v1.5.0) (2025-10-29)
+
+**Note:** Version bump only for package cubejs
+
+# [1.4.0](https://github.com/cube-js/cube/compare/v1.3.86...v1.4.0) (2025-10-29)
+
+### Bug Fixes
+
+- **cubesql:** Always repartition joins when right side has multiple partitions ([#10105](https://github.com/cube-js/cube/issues/10105)) ([ae32748](https://github.com/cube-js/cube/commit/ae327483caabba974e271fb52f4ccc5fd5fa5789))
+
+## [1.3.86](https://github.com/cube-js/cube/compare/v1.3.85...v1.3.86) (2025-10-29)
+
+### Features
+
+- **tesseract:** Bucketing ([#10095](https://github.com/cube-js/cube/issues/10095)) ([2dacac4](https://github.com/cube-js/cube/commit/2dacac406815285a82ee07d125d8519b93be9f4a))
+
+## [1.3.85](https://github.com/cube-js/cube/compare/v1.3.84...v1.3.85) (2025-10-28)
+
+### Bug Fixes
+
+- **schema-compiler:** Add missing numeric types to scaffolding schema, thanks @XUJiahua ([#10079](https://github.com/cube-js/cube/issues/10079)) ([fa694c3](https://github.com/cube-js/cube/commit/fa694c3b6bbefe02b8aa6d55f0ad6595ddf9f6c2))
+- **schema-compiler:** Fix incorrect cache that affects query joins ([#10084](https://github.com/cube-js/cube/issues/10084)) ([b335c93](https://github.com/cube-js/cube/commit/b335c93bf82e8856a6b79259ba29f59e72c058bc))
+- **schema-compiler:** Fix inherited drill members for views ([#9966](https://github.com/cube-js/cube/issues/9966)) ([558fbb3](https://github.com/cube-js/cube/commit/558fbb3b664968f3456eefd67f21b959473eb6bc))
+- **schema-compiler:** Fix pre-agg matching for 'rollupJoin' / 'rollupLambda' pre-aggregations ([#10017](https://github.com/cube-js/cube/issues/10017)) ([635b45b](https://github.com/cube-js/cube/commit/635b45b88ef5c6ee8ec60b5191ec84960a85fb12))
+
+## [1.3.84](https://github.com/cube-js/cube/compare/v1.3.83...v1.3.84) (2025-10-28)
+
+### Bug Fixes
+
+- **cube-orchestrator:** Deterministic column sequence in output ([#10086](https://github.com/cube-js/cube/issues/10086)) ([e82fbeb](https://github.com/cube-js/cube/commit/e82fbeb4243db6f8efa25b29a75d1a24dce63079))
+- **cubesql:** Coerce strings with any type in binary expressions ([#10088](https://github.com/cube-js/cube/issues/10088)) ([3164adc](https://github.com/cube-js/cube/commit/3164adc2195ae545ca041489e93c3eb259e9971d))
+- **schema-compiler:** add support for time filters and rolling windows and fix subquery aliasing in Oracle dialect ([#10066](https://github.com/cube-js/cube/issues/10066)) ([56b5c9b](https://github.com/cube-js/cube/commit/56b5c9bf2d33ee07376b38dfcf96e4532ad4dd5a))
+
+### Features
+
+- **client-core:** add CacheMode type ([#10091](https://github.com/cube-js/cube/issues/10091)) ([98976e0](https://github.com/cube-js/cube/commit/98976e06872c12efb7c43f900492d99c8f07bc72))
+- **schema-compiler:** Support joins for proxied time dimensions in pre-aggregations ([#10020](https://github.com/cube-js/cube/issues/10020)) ([aabb3c5](https://github.com/cube-js/cube/commit/aabb3c5b4a0e2c8cf08769a9f4394e0bf966dd3d))
+
+## [1.3.83](https://github.com/cube-js/cube/compare/v1.3.82...v1.3.83) (2025-10-24)
+
+### Bug Fixes
+
+- **client-react:** isLoading is set to false early ([#10075](https://github.com/cube-js/cube/issues/10075)) ([06afa28](https://github.com/cube-js/cube/commit/06afa28f8c1a06a4e05ba54d9931512749cc42b0))
+- **tesseract:** Fix member name case conversion ([#10064](https://github.com/cube-js/cube/issues/10064)) ([6523074](https://github.com/cube-js/cube/commit/6523074f3e5d1c3537efb3fd1002eb5d79772d85))
+
+### Features
+
+- **api-gateway:** Introduce cache mode option for `/cubesql` API ([#9972](https://github.com/cube-js/cube/issues/9972)) ([7d4ecdc](https://github.com/cube-js/cube/commit/7d4ecdccdf75dbe8c764cf54ad48a25fa4de9443))
+- **cubesql:** Push down `CAST(... AS DATE)` to CubeScan filters ([#10081](https://github.com/cube-js/cube/issues/10081)) ([61a94ef](https://github.com/cube-js/cube/commit/61a94ef9086d79bfcb5a370d2684f9b20b100022))
+- **schema-compiler:** Support time series queries in MySQL dialect in Tesseract ([#10078](https://github.com/cube-js/cube/issues/10078)) ([765cd77](https://github.com/cube-js/cube/commit/765cd7787e2b62abebd1bbdd81bb85567cbff799))
+
+## [1.3.82](https://github.com/cube-js/cube/compare/v1.3.81...v1.3.82) (2025-10-21)
+
+### Bug Fixes
+
+- **cube:** Meta type for switch dimension ([#10060](https://github.com/cube-js/cube/issues/10060)) ([b45a1c4](https://github.com/cube-js/cube/commit/b45a1c4673986679d24e13d6bb41f7cf2d72f1df))
+- **schema-compiler:** Oracle use `TO_TIMESTAMP_TZ` for `ISO 8601 with Z` for date and timestamp ([#9970](https://github.com/cube-js/cube/issues/9970)) ([b7018c7](https://github.com/cube-js/cube/commit/b7018c79be4e596b013696ed35a042188935a33e))
+
+### Features
+
+- **cubesql:** Filter push down for date_part(?upper) AND date_part(?lower) ([#10070](https://github.com/cube-js/cube/issues/10070)) ([bcadbf2](https://github.com/cube-js/cube/commit/bcadbf233a7a875aecf6dcd9c4c17c7150f74dfe))
+- **cubesql:** Filter push down for date_part(?upper) AND date_part('week') ([#10071](https://github.com/cube-js/cube/issues/10071)) ([150a3c5](https://github.com/cube-js/cube/commit/150a3c520b93bbcd8be3bd098d24a3d95187fc14))
+- **cubesql:** PlanNormalize - reduce stack allocations (split by path) ([#10067](https://github.com/cube-js/cube/issues/10067)) ([bc8ff68](https://github.com/cube-js/cube/commit/bc8ff6857785022ecfdd1458f50b0677f3d6c500))
+- **cubesql:** Push down Tableau year-month-day IN number filter to CubeScan ([#10068](https://github.com/cube-js/cube/issues/10068)) ([bc16a5f](https://github.com/cube-js/cube/commit/bc16a5f9137fd88fb5243f356481bbe27a9a5f6b))
+
+## [1.3.81](https://github.com/cube-js/cube/compare/v1.3.80...v1.3.81) (2025-10-16)
+
+### Features
+
+- **tesseract:** Full outer join support ([#10057](https://github.com/cube-js/cube/issues/10057)) ([a315737](https://github.com/cube-js/cube/commit/a3157376815d71ed2e37805c9d7dff61ded3c665))
+
+## [1.3.80](https://github.com/cube-js/cube/compare/v1.3.79...v1.3.80) (2025-10-15)
+
+### Features
+
+- **schema-compiler:** Use views join maps and hints for query joins construction ([#10039](https://github.com/cube-js/cube/issues/10039)) ([f556b62](https://github.com/cube-js/cube/commit/f556b62691c473490c7f27b7ac759c2ffb89d2ff))
+
+## [1.3.79](https://github.com/cube-js/cube/compare/v1.3.78...v1.3.79) (2025-10-14)
+
+### Bug Fixes
+
+- **client-vue3:** Cleanup polluted package-lock file ([da98986](https://github.com/cube-js/cube/commit/da98986ded60d55cebc903061dc795a76e6332bc))
+- **cubesql:** Normalize timestamp/date expressions ([#10040](https://github.com/cube-js/cube/issues/10040)) ([7b1a5af](https://github.com/cube-js/cube/commit/7b1a5afe983e5191becb5eabd1381632acab133e))
+- **sqlite-driver:** Use pragma_table_info to fetch table columns ([#10031](https://github.com/cube-js/cube/issues/10031)) ([070e6e0](https://github.com/cube-js/cube/commit/070e6e0d016537af293e3dc7ec02791072ccba42))
+
+### Features
+
+- **cubesql:** PlanNormalize - reduce stack allocations ([#10055](https://github.com/cube-js/cube/issues/10055)) ([619343d](https://github.com/cube-js/cube/commit/619343d0e2962de99786ca47e298ab00afb3d776))
+- **docs:** Integrate Purple Banner component into documentation site ([#10053](https://github.com/cube-js/cube/issues/10053)) ([32df746](https://github.com/cube-js/cube/commit/32df746362b1d2d199e4f8616db3fd4080b4712d))
+- **firebolt-driver:** Pass CUBEJS_DB_QUERY_TIMEOUT to Firebolt driver ([#10043](https://github.com/cube-js/cube/issues/10043)) ([b46565b](https://github.com/cube-js/cube/commit/b46565b0d41ec8c3cfd7caf0a51dc5ee89d1df90))
+
 ## [1.3.78](https://github.com/cube-js/cube/compare/v1.3.77...v1.3.78) (2025-10-03)
 
 ### Bug Fixes

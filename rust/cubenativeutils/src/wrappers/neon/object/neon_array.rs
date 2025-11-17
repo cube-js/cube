@@ -1,6 +1,6 @@
 use super::{NeonObject, ObjectNeonTypeHolder, RootHolder};
 use crate::wrappers::{
-    neon::inner_types::NeonInnerTypes,
+    neon::{inner_types::NeonInnerTypes, object::IntoNeonObject},
     object::{NativeArray, NativeType},
     object_handle::NativeObjectHandle,
 };
@@ -57,17 +57,14 @@ impl<C: Context<'static> + 'static> NativeArray<NeonInnerTypes<C>> for NeonArray
         index: u32,
         value: NativeObjectHandle<NeonInnerTypes<C>>,
     ) -> Result<bool, CubeError> {
-        let value = value.into_object().get_object()?;
+        let value = value.into_object().get_js_value()?;
         self.object
             .map_neon_object::<_, _>(|cx, object| object.set(cx, index, value))
     }
     fn get(&self, index: u32) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
         let r = self
             .object
-            .map_neon_object::<_, _>(|cx, object| object.get(cx, index))?;
-        Ok(NativeObjectHandle::new(NeonObject::new(
-            self.object.get_context(),
-            r,
-        )?))
+            .map_neon_object::<_, _>(|cx, object| object.get::<JsValue, _, _>(cx, index))?;
+        Ok(r.into_neon_object(self.object.get_context())?.into())
     }
 }

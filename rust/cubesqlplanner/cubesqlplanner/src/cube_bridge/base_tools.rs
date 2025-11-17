@@ -2,10 +2,12 @@ use super::base_query_options::FilterItem;
 use super::driver_tools::{DriverTools, NativeDriverTools};
 use super::filter_group::{FilterGroup, NativeFilterGroup};
 use super::filter_params::{FilterParams, NativeFilterParams};
+use super::join_definition::{JoinDefinition, NativeJoinDefinition};
 use super::pre_aggregation_obj::{NativePreAggregationObj, PreAggregationObj};
 use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
 use super::sql_utils::{NativeSqlUtils, SqlUtils};
+use crate::cube_bridge::join_hints::JoinHintItem;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -53,4 +55,9 @@ pub trait BaseTools {
         cube_name: String,
         name: String,
     ) -> Result<String, CubeError>; //TODO move to rust
+
+    fn join_tree_for_hints(
+        &self,
+        hints: Vec<JoinHintItem>,
+    ) -> Result<Rc<dyn JoinDefinition>, CubeError>;
 }

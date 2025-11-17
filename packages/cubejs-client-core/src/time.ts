@@ -79,25 +79,6 @@ export const isPredefinedGranularity = (granularity: TimeDimensionGranularity): 
 export const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 export const LocalDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z?$/;
 
-export const dayRange = (from: any, to: any): DayRange => ({
-  by: (value: any) => {
-    const results = [];
-
-    let start = internalDayjs(from);
-    const end = internalDayjs(to);
-
-    while (start.startOf(value).isBefore(end) || start.isSame(end)) {
-      results.push(start);
-      start = start.add(1, value);
-    }
-
-    return results;
-  },
-  snapTo: (value: any): DayRange => dayRange(internalDayjs(from).startOf(value), internalDayjs(to).endOf(value)),
-  start: internalDayjs(from),
-  end: internalDayjs(to),
-});
-
 /**
  * Parse PostgreSQL-like interval string into object
  * E.g. '2 years 15 months 100 weeks 99 hours 15 seconds'
@@ -201,6 +182,70 @@ function alignToOrigin(startDate: dayjs.Dayjs, interval: ParsedInterval, origin:
 
   return alignedDate;
 }
+
+export const dayRange = (from: any, to: any, annotations?: Record<string, { granularity?: Granularity }>): DayRange => ({
+  by: (value: any) => {
+    const results = [];
+
+    let start = internalDayjs(from);
+    const end = internalDayjs(to);
+
+    while (start.startOf(value).isBefore(end) || start.isSame(end)) {
+      results.push(start);
+      start = start.add(1, value);
+    }
+
+    return results;
+  },
+  snapTo: (value: any): DayRange => {
+    // Check if this is a custom granularity
+    if (!isPredefinedGranularity(value) && annotations) {
+      // Try to find the custom granularity metadata
+      // The annotation key might be in format "Cube.dimension.granularity"
+      // So we need to search through all annotations
+      let customGranularity: Granularity | undefined;
+
+      for (const key of Object.keys(annotations)) {
+        if (key.endsWith(`.${value}`) && annotations[key].granularity) {
+          customGranularity = annotations[key].granularity;
+          break;
+        }
+      }
+
+      if (customGranularity?.interval) {
+        // For custom granularities, calculate the range for the bucket
+        const intervalParsed = parseSqlInterval(customGranularity.interval);
+        let intervalStart = internalDayjs(from);
+
+        // origin and offset are mutually exclusive
+        // If either is specified, align to it
+        if (customGranularity.origin || customGranularity.offset) {
+          let origin;
+          if (customGranularity.origin) {
+            // Absolute origin time
+            origin = internalDayjs(customGranularity.origin);
+          } else {
+            // offset is relative to start of year
+            origin = addInterval(internalDayjs().startOf('year'), parseSqlInterval(customGranularity.offset!));
+          }
+
+          // Align the value to the origin to find the actual bucket start
+          intervalStart = alignToOrigin(intervalStart, intervalParsed, origin);
+        }
+
+        // End is start + interval - 1 millisecond (to stay within the bucket)
+        const intervalEnd = addInterval(intervalStart, intervalParsed).subtract(1, 'millisecond');
+
+        return dayRange(intervalStart, intervalEnd, annotations);
+      }
+    }
+
+    // Default behavior for predefined granularities
+    return dayRange(internalDayjs(from).startOf(value), internalDayjs(to).endOf(value), annotations);
+  },
+  start: internalDayjs(from),
+  end: internalDayjs(to),
+});
 
 /**
  * Returns the time series points for the custom interval

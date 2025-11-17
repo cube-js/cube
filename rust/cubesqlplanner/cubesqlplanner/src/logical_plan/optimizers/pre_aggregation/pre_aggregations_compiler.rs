@@ -12,6 +12,8 @@ use crate::planner::planners::ResolvedJoinItem;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_cube_names_from_symbols;
 use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::sql_evaluator::TimeDimensionSymbol;
+use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -136,7 +138,30 @@ impl PreAggregationsCompiler {
                 refs,
                 Self::check_is_time_dimension,
             )?;
-            vec![(dims[0].clone(), static_data.granularity.clone())]
+
+            if static_data.granularity.is_some() {
+                let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+                let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+                let base_symbol = dims[0].clone();
+
+                let granularity_obj = GranularityHelper::make_granularity_obj(
+                    self.query_tools.cube_evaluator().clone(),
+                    &mut evaluator_compiler,
+                    &base_symbol.cube_name(),
+                    &base_symbol.name(),
+                    static_data.granularity.clone(),
+                )?;
+                let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+                    base_symbol,
+                    static_data.granularity.clone(),
+                    granularity_obj,
+                    None,
+                ));
+
+                vec![symbol]
+            } else {
+                vec![dims[0].clone()]
+            }
         } else {
             Vec::new()
         };
@@ -276,14 +301,16 @@ impl PreAggregationsCompiler {
     }
 
     fn match_time_dimensions(
-        a: &Vec<(Rc<MemberSymbol>, Option<String>)>,
-        b: &Vec<(Rc<MemberSymbol>, Option<String>)>,
+        a: &Vec<Rc<MemberSymbol>>,
+        b: &Vec<Rc<MemberSymbol>>,
     ) -> Result<(), CubeError> {
-        if !a
-            .iter()
-            .zip(b.iter())
-            .all(|(a, b)| a.0.name() == b.0.name() && a.1 == b.1)
-        {
+        if !a.iter().zip(b.iter()).all(|(a, b)| {
+            if let (Ok(td_a), Ok(td_b)) = (a.as_time_dimension(), b.as_time_dimension()) {
+                td_a.name() == td_a.name() && td_a.granularity() == td_b.granularity()
+            } else {
+                false
+            }
+        }) {
             return Err(CubeError::user(format!(
                 "Names for pre-aggregation symbols in lambda pre-aggragation don't match"
             )));

@@ -83,7 +83,7 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      let fetchQueryPromise = query.loadRefreshKeysOnly
+      let fetchQueryPromise: Promise<any> = query.loadRefreshKeysOnly
         ? this.orchestrator.loadRefreshKeys(query)
         : this.orchestrator.fetchQuery(query);
 
@@ -122,7 +122,7 @@ export class OrchestratorApi {
 
       return data;
     } catch (err) {
-      if ((err instanceof pt.TimeoutError || err instanceof ContinueWaitError)) {
+      if (err instanceof pt.TimeoutError || err instanceof ContinueWaitError) {
         this.logger('Continue wait', {
           duration: ((new Date()).getTime() - startQueryTime),
           query: queryForLog,
@@ -130,14 +130,18 @@ export class OrchestratorApi {
           requestId: query.requestId
         });
 
+        if (query.scheduledRefresh) {
+          throw {
+            error: 'Continue wait',
+            stage: null
+          };
+        }
+
         const fromCache = await this
           .orchestrator
           .resultFromCacheIfExists(query);
-        if (
-          !query.renewQuery &&
-          fromCache &&
-          !query.scheduledRefresh
-        ) {
+
+        if ((query.cacheMode === 'stale-if-slow' || query.cacheMode === 'stale-while-revalidate') && fromCache) {
           this.logger('Slow Query Warning', {
             query: queryForLog,
             requestId: query.requestId,
@@ -154,9 +158,7 @@ export class OrchestratorApi {
 
         throw {
           error: 'Continue wait',
-          stage: !query.scheduledRefresh
-            ? await this.orchestrator.queryStage(query)
-            : null
+          stage: await this.orchestrator.queryStage(query)
         };
       }
 
@@ -262,7 +264,7 @@ export class OrchestratorApi {
     this.seenDataSources[dataSource] = true;
   }
 
-  public getPreAggregationVersionEntries(context: RequestContext, preAggregations, preAggregationsSchema) {
+  public getPreAggregationVersionEntries(context: RequestContext, preAggregations, preAggregationsSchema): Promise<any> {
     return this.orchestrator.getPreAggregationVersionEntries(
       preAggregations,
       preAggregationsSchema,

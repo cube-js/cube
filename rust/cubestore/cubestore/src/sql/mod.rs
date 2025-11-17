@@ -3923,6 +3923,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn builtin_functions() {
+        Config::run_test("builtin_functions", async move |services| {
+            let service = services.sql_service;
+
+            // ROUND
+            {
+                let result = service
+                    .exec_query("SELECT round(42.4), round(42.4382, 2), round(1234.56, -1)")
+                    .await
+                    .unwrap();
+
+                assert_eq!(result.len(), 1);
+                assert_eq!(result.get_columns().len(), 3);
+
+                assert_eq!(
+                    result.get_rows(),
+                    &vec![Row::new(vec![
+                        TableValue::Float(42.0.into()),
+                        TableValue::Float(42.44.into()),
+                        TableValue::Float(1230.0.into())
+                    ]),]
+                )
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn explain_physical_plan() {
         Config::test("explain_analyze_router").update_config(|mut config| {
             config.select_workers = vec!["127.0.0.1:14006".to_string()];

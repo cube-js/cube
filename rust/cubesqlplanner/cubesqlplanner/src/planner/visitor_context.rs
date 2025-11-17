@@ -1,15 +1,18 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::sql_nodes::{SqlNode, SqlNodesFactory};
 use super::sql_evaluator::{MemberSymbol, SqlCall};
+use crate::cube_bridge::member_sql::FilterParamsColumn;
 use crate::plan::Filter;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Default)]
 pub struct FiltersContext {
     pub use_local_tz: bool,
+    pub filter_params_columns: HashMap<String, FilterParamsColumn>,
 }
 
 pub struct VisitorContext {
@@ -27,11 +30,29 @@ impl VisitorContext {
     ) -> Self {
         let filters_context = FiltersContext {
             use_local_tz: nodes_factory.use_local_tz_in_date_range(),
+            filter_params_columns: HashMap::new(),
         };
         Self {
             query_tools,
             node_processor: nodes_factory.default_node_processor(),
             all_filters,
+            filters_context,
+        }
+    }
+
+    pub fn new_for_filter_params(
+        query_tools: Rc<QueryTools>,
+        nodes_factory: &SqlNodesFactory,
+        filter_params_columns: HashMap<String, FilterParamsColumn>,
+    ) -> Self {
+        let filters_context = FiltersContext {
+            use_local_tz: nodes_factory.use_local_tz_in_date_range(),
+            filter_params_columns,
+        };
+        Self {
+            query_tools,
+            node_processor: nodes_factory.default_node_processor(),
+            all_filters: None,
             filters_context,
         }
     }

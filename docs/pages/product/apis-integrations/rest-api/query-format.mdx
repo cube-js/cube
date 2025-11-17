@@ -34,10 +34,11 @@ The default value is `false`.
 - `offset`: The number of initial rows to be skipped for your query. The default
   value is `0`.
 - `order`: An object, where the keys are measures or dimensions to order by and
-  their corresponding values are either `asc` or `desc`. The order of the fields
-  to order on is based on the order of the keys in the object. If not provided,
-  [default ordering][ref-default-order] is applied. If an empty object (`[]`) is
-  provided, no ordering is applied.
+  their corresponding values are either `asc` or `desc`. For [time dimensions][ref-default-granularities],
+  a granularity can be optionally provided, e.g., `orders.created_at.month`.
+  The order of the fields to order on is based on the order of the keys in the object.
+  If not provided, the [default ordering][ref-default-order] is applied.
+  If an empty object (`[]`) is provided, no ordering is applied.
 - `timezone`: A [time zone][ref-time-zone] for your query. You can set the
 desired time zone in the [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database)
 format, e.g., `America/Los_Angeles`.
@@ -48,10 +49,16 @@ format, e.g., `America/Los_Angeles`.
   [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every]) doesn't
   indicate that there's a need for an update this setting has no effect. The
   default value is `false`.
-  > **NOTE**: Cube provides only eventual consistency guarantee. Using a small
-  > [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every] value together
-  > with `renewQuery` to achieve immediate consistency can lead to endless
-  > refresh loops and overall system instability.
+
+<InfoBox>
+
+Cube provides only eventual consistency guarantee. Using a small
+[`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every] value together
+with `renewQuery` to achieve immediate consistency can lead to endless
+refresh loops and overall system instability.
+
+</InfoBox>
+
 - `ungrouped`: If set to `true`, Cube will run an [ungrouped
 query][ref-ungrouped-query].
 - `joinHints`: Query-time [join hints][ref-join-hints], provided as an array of

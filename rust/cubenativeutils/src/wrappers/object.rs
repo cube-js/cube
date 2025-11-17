@@ -13,6 +13,10 @@ pub trait NativeObject<IT: InnerTypes>: Clone {
     fn is_null(&self) -> Result<bool, CubeError>;
     fn is_undefined(&self) -> Result<bool, CubeError>;
     fn clone_to_context(&self, context: &IT::Context) -> Self;
+    fn clone_to_function_context(
+        &self,
+        context: &<IT::FunctionIT as InnerTypes>::Context,
+    ) -> <IT::FunctionIT as InnerTypes>::Object;
 }
 
 pub trait NativeType<IT: InnerTypes> {
@@ -42,6 +46,10 @@ pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
 
 pub trait NativeFunction<IT: InnerTypes>: NativeType<IT> {
     fn call(&self, args: Vec<NativeObjectHandle<IT>>) -> Result<NativeObjectHandle<IT>, CubeError>;
+    fn construct(
+        &self,
+        args: Vec<NativeObjectHandle<IT>>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn definition(&self) -> Result<String, CubeError>;
     fn args_names(&self) -> Result<Vec<String>, CubeError>;
 }

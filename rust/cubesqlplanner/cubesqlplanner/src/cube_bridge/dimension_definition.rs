@@ -21,6 +21,8 @@ pub struct DimensionDefinitionStatic {
     pub owned_by_cube: Option<bool>,
     #[serde(rename = "multiStage")]
     pub multi_stage: Option<bool>,
+    #[serde(rename = "addGroupByReferences")]
+    pub add_group_by_references: Option<Vec<String>>,
     #[serde(rename = "subQuery")]
     pub sub_query: Option<bool>,
     #[serde(rename = "propagateFiltersToSubQuery")]

@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use chrono::{DateTime, Datelike, Timelike, Utc};
+use chrono::{DateTime, Datelike, Days, Months, NaiveDate, Timelike, Utc};
 use datafusion::{
     arrow::datatypes::{ArrowPrimitiveType, IntervalDayTimeType, IntervalMonthDayNanoType},
     error::DataFusionError,
@@ -742,5 +742,215 @@ impl DecomposedMonthDayNano {
                 templates.interval_expr(format!("{mons} {MONTH} {days} {DAY} {millis} {MILLIS}"))
             }
         }
+    }
+}
+
+/// Try to merge a date range with a date part extraction filter.
+///
+/// This function calculates the date range for a specific date part (month, quarter, week)
+/// within the given year, constrained by the provided start and end dates.
+pub fn try_merge_range_with_date_part(
+    start_date: NaiveDate,
+    end_date: NaiveDate,
+    granularity: &str,
+    value: i64,
+) -> Option<(NaiveDate, NaiveDate)> {
+    // Check that the range only covers one year
+    let year = start_date.year();
+    if year != end_date.year() {
+        return None;
+    }
+
+    match granularity {
+        "month" => {
+            // Month value must be valid
+            if !(1..=12).contains(&value) {
+                return None;
+            }
+
+            // Obtain the new range
+            let new_start_date = NaiveDate::from_ymd_opt(year, value as u32, 1)?;
+
+            let new_end_date = new_start_date
+                .checked_add_months(Months::new(1))
+                .and_then(|date| date.checked_sub_days(Days::new(1)))?;
+
+            // If the resulting range is outside of the original range, we can't merge
+            // the filters
+            if new_start_date > end_date || new_end_date < start_date {
+                return None;
+            }
+
+            // Preserves existing constraints, for example:
+            // inDataRange: order_date >= '2019-02-15' AND order_date < '2019-03-10'
+            // filter: EXTRACT(MONTH FROM order_date) = 2 (February)
+            let new_start_date = max(new_start_date, start_date);
+            let new_end_date = min(new_end_date, end_date);
+
+            Some((new_start_date, new_end_date))
+        }
+        "quarter" | "qtr" => {
+            // Quarter value must be valid
+            if !(1..=4).contains(&value) {
+                return None;
+            }
+
+            let quarter_start_month = (value - 1) * 3 + 1;
+
+            // Obtain the new range
+            let new_start_date = NaiveDate::from_ymd_opt(year, quarter_start_month as u32, 1)?;
+
+            let new_end_date = new_start_date
+                .checked_add_months(Months::new(3))
+                .and_then(|date| date.checked_sub_days(Days::new(1)))?;
+
+            // Paranoid check, If the resulting range is outside of the original range, we can't merge
+            // the filters
+            if new_start_date > end_date || new_end_date < start_date {
+                return None;
+            }
+
+            // Preserves existing constraints, for example:
+            // inDataRange: order_date >= '2019-04-15' AND order_date < '2019-12-31'
+            // filter: EXTRACT(QUARTER FROM order_date) = 2
+            let new_start_date = max(new_start_date, start_date);
+            let new_end_date = min(new_end_date, end_date);
+
+            Some((new_start_date, new_end_date))
+        }
+        // Following ISO 8601
+        "week" => {
+            // Week value must be valid
+            if !(1..=53).contains(&value) {
+                return None;
+            }
+
+            // For ISO weeks, we need to find the year that contains this week number
+            // Try with the start_date year first
+            let year = start_date.year();
+
+            // Get January 4th of the year (which is always in week 1)
+            let jan_4 = NaiveDate::from_ymd_opt(year, 1, 4)?;
+
+            // Get the Monday of week 1
+            let iso_week = jan_4.iso_week();
+            let week_1_year = iso_week.year();
+
+            // Check if we're looking at the right ISO year
+            // The ISO year might differ from calendar year for dates near year boundaries
+            if week_1_year != year {
+                // This can happen when January 1-3 belong to the previous year's last week
+                // For now, we'll require that the range is within a single ISO year
+                return None;
+            }
+
+            // Calculate the date of Monday of the requested week
+            // ISO week 1 starts on the Monday of the week containing January 4th
+            let days_from_week_1 = (value - 1) * 7;
+            let week_1_monday = jan_4 - Days::new(jan_4.weekday().num_days_from_monday() as u64);
+
+            let week_start = week_1_monday.checked_add_days(Days::new(days_from_week_1 as u64))?;
+
+            let week_end = week_start.checked_add_days(Days::new(6))?;
+
+            // Verify this week actually exists in this year (week 53 doesn't always exist)
+            if week_start.iso_week().week() != value as u32 {
+                return None;
+            }
+
+            // Paranoid check, If the resulting range is outside of the original range, we can't merge
+            // the filters
+            if week_start > end_date || week_end < start_date {
+                return None;
+            }
+
+            // Preserves existing constraints, for example:
+            // inDataRange: order_date >= '2019-04-09' AND order_date <= '2019-04-12'
+            // filter: EXTRACT(WEEK FROM date) = 15
+            let new_start_date = max(week_start, start_date);
+            let new_end_date = min(week_end, end_date);
+
+            Some((new_start_date, new_end_date))
+        }
+        // TODO: handle more granularities
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_week_range() -> Result<(), CubeError> {
+        let start = NaiveDate::from_ymd_opt(2019, 1, 1).expect("Invalid date");
+        let end = NaiveDate::from_ymd_opt(2019, 12, 31).expect("Invalid date");
+
+        // Test week 1 of 2019 (Dec 31, 2018 - Jan 6, 2019)
+        // But constrained by our range starting Jan 1
+        let (week_start, week_end) =
+            try_merge_range_with_date_part(start, end, "week", 1).expect("Expected week range");
+        assert_eq!(
+            week_start,
+            NaiveDate::from_ymd_opt(2019, 1, 1).expect("Invalid date")
+        );
+        assert_eq!(
+            week_end,
+            NaiveDate::from_ymd_opt(2019, 1, 6).expect("Invalid date")
+        );
+
+        // Test week 15 of 2019 (Apr 8-14)
+        let (week_start, week_end) =
+            try_merge_range_with_date_part(start, end, "week", 15).expect("Expected week range");
+        assert_eq!(
+            week_start,
+            NaiveDate::from_ymd_opt(2019, 4, 8).expect("Invalid date")
+        );
+        assert_eq!(
+            week_end,
+            NaiveDate::from_ymd_opt(2019, 4, 14).expect("Invalid date")
+        );
+
+        // Test week 52 of 2019 (Dec 23-29)
+        let (week_start, week_end) =
+            try_merge_range_with_date_part(start, end, "week", 52).expect("Expected week range");
+        assert_eq!(
+            week_start,
+            NaiveDate::from_ymd_opt(2019, 12, 23).expect("Invalid date")
+        );
+        assert_eq!(
+            week_end,
+            NaiveDate::from_ymd_opt(2019, 12, 29).expect("Invalid date")
+        );
+
+        // Test invalid week number
+        assert_eq!(try_merge_range_with_date_part(start, end, "week", 0), None);
+        assert_eq!(try_merge_range_with_date_part(start, end, "week", 54), None);
+
+        // Test week 53 (which doesn't exist in 2019)
+        let result = try_merge_range_with_date_part(start, end, "week", 53);
+        assert!(result.is_none());
+
+        // Test partial overlap
+        let start = NaiveDate::from_ymd_opt(2019, 4, 10).expect("Invalid date");
+        let end = NaiveDate::from_ymd_opt(2019, 4, 12).expect("Invalid date");
+        let (week_start, week_end) =
+            try_merge_range_with_date_part(start, end, "week", 15).expect("Expected week range");
+        assert_eq!(
+            week_start,
+            NaiveDate::from_ymd_opt(2019, 4, 10).expect("Invalid date")
+        );
+        assert_eq!(
+            week_end,
+            NaiveDate::from_ymd_opt(2019, 4, 12).expect("Invalid date")
+        );
+
+        // Test no overlap
+        let start = NaiveDate::from_ymd_opt(2019, 5, 1).expect("Invalid date");
+        let end = NaiveDate::from_ymd_opt(2019, 12, 31).expect("Invalid date");
+        let result = try_merge_range_with_date_part(start, end, "week", 15);
+        assert!(result.is_none());
+
+        Ok(())
     }
 }

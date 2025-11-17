@@ -1,7 +1,7 @@
 import * as stream from 'stream';
 import R from 'ramda';
 import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
-import { getEnv } from '@cubejs-backend/shared';
+import { CacheMode, getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
   QuerySchemasResult,
@@ -407,7 +407,6 @@ export class QueryOrchestrator {
 
     const data = await this.fetchQuery({
       dataSource: preAggregation.dataSource,
-      continueWait: true,
       query,
       external,
       preAggregations: [

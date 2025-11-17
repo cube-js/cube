@@ -1,5 +1,8 @@
 module.exports = {
   "queries": "Queries",
+  "embedding": "Embedding",
+  "chat-api": "Chat API",
+  "mcp-server": "MCP server",
   "dax-api": "DAX API",
   "mdx-api": "MDX API",
   "microsoft-excel": "Cube Cloud for Excel",

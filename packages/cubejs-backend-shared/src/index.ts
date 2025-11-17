@@ -13,6 +13,7 @@ export * from './convert';
 export * from './helpers';
 export * from './machine-id';
 export * from './type-helpers';
+export * from './shared-types';
 export * from './http-utils';
 export * from './cli';
 export * from './proxy';

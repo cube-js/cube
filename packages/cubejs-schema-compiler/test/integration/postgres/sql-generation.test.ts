@@ -361,6 +361,31 @@ describe('SQL Generation', () => {
           type: 'string',
           sql: 'source'
         },
+        // dimensions for testing letter cases
+        my_favorite_source: {
+          type: 'string',
+          sql: 'source'
+        },
+        My_favorite_source: {
+          type: 'string',
+          sql: 'source'
+        },
+        MY_favorite_source: {
+          type: 'string',
+          sql: 'source'
+        },
+        My_Favorite_Source: {
+          type: 'string',
+          sql: 'source'
+        },
+        MY_Favorite_SOURCE: {
+          type: 'string',
+          sql: 'source'
+        },
+        MY_FAVORITE_SOURCE: {
+          type: 'string',
+          sql: 'source'
+        },
         created_at: {
           type: 'time',
           sql: 'created_at',
@@ -563,6 +588,9 @@ describe('SQL Generation', () => {
       }, {
         join_path: 'visitors.visitor_checkins',
         includes: ['visitor_checkins_count', 'id_sum']
+      }, {
+        join_path: 'visitors.visitor_checkins.cards',
+        includes: ['max_id']
       }]
     })
 
@@ -618,6 +646,10 @@ describe('SQL Generation', () => {
       measures: {
         count: {
           type: 'count'
+        },
+        max_id: {
+          type: 'max',
+          sql: 'id'
         }
       },
 
@@ -2289,6 +2321,62 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     });
   });
 
+  it('multiplied subquery measures', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.id_sum',
+        'visitor_checkins.revenue_per_checkin',
+        'visitors.visitor_revenue'
+      ],
+      dimensions: [
+        'visitors.source',
+        'visitor_checkins.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles'
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [
+          {
+            visitors__source: null,
+            vc__source: null,
+            vc__id_sum: null,
+            vc__revenue_per_checkin: null,
+            visitors__visitor_revenue: null
+          },
+          {
+            visitors__source: 'some',
+            vc__source: null,
+            vc__id_sum: '12',
+            vc__revenue_per_checkin: '75',
+            visitors__visitor_revenue: '300'
+          },
+          {
+            visitors__source: 'google',
+            vc__source: null,
+            vc__id_sum: '6',
+            vc__revenue_per_checkin: null,
+            visitors__visitor_revenue: null
+          },
+          {
+            visitors__source: 'some',
+            vc__source: 'google',
+            vc__id_sum: '3',
+            vc__revenue_per_checkin: '100',
+            visitors__visitor_revenue: '100'
+          }
+        ]
+      );
+    });
+  });
+
   it('having filter', async () => {
     await compiler.compile();
 
@@ -2778,97 +2866,137 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     console.log(query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      console.log(JSON.stringify(res));
-
       const expected = getEnv('nativeSqlPlanner') ?
+
         [
           {
-            vc__id: 3,
-            vc__created_at_day: '2017-01-04T00:00:00.000Z',
-            vc__visitor_checkins_count: 1,
-            vc__visitor_checkins_rolling: 1
-          },
-          {
-            vc__created_at_day: '2017-01-05T00:00:00.000Z',
-            vc__id: 3,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__created_at_day: '2017-01-06T00:00:00.000Z',
-            vc__id: 3,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__id: 4,
-            vc__created_at_day: '2017-01-04T00:00:00.000Z',
-            vc__visitor_checkins_count: 1,
-            vc__visitor_checkins_rolling: 1
-
-          },
-          {
-            vc__created_at_day: '2017-01-05T00:00:00.000Z',
-            vc__id: 4,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__created_at_day: '2017-01-06T00:00:00.000Z',
-            vc__id: 4,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__id: 5,
-            vc__created_at_day: '2017-01-04T00:00:00.000Z',
-            vc__visitor_checkins_count: 1,
-            vc__visitor_checkins_rolling: 1
-          },
-          {
-            vc__created_at_day: '2017-01-05T00:00:00.000Z',
-            vc__id: 5,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__created_at_day: '2017-01-06T00:00:00.000Z',
-            vc__id: 5,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__id: 6,
-            vc__created_at_day: '2017-01-05T00:00:00.000Z',
-            vc__visitor_checkins_count: 1,
-            vc__visitor_checkins_rolling: 1
-          },
-
-          {
-            vc__created_at_day: '2017-01-06T00:00:00.000Z',
-            vc__id: 6,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__created_at_day: '2017-01-01T00:00:00.000Z',
-            vc__id: null,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: null,
-          },
-          {
+            vc__id: 1,
             vc__created_at_day: '2017-01-02T00:00:00.000Z',
-            vc__id: null,
             vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: null,
+            vc__visitor_checkins_rolling: 1
           },
           {
+            vc__id: 1,
             vc__created_at_day: '2017-01-03T00:00:00.000Z',
-            vc__id: null,
             vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: null,
+            vc__visitor_checkins_rolling: 1
           },
+          {
+            vc__id: 1,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 1,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 1,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 2,
+            vc__created_at_day: '2017-01-03T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 2,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 2,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 2,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 3,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 3,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 3,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 4,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 4,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 4,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 5,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 5,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 5,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 6,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 6,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: null,
+            vc__created_at_day: '2017-01-01T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: null
+          }
         ]
+
         : [
           {
             vc__id: 3,
@@ -5198,7 +5326,7 @@ cubes:
         sql: amount
         type: sum
 
-# Join loop for testing transitive joins
+# Model for testing multiple joins to the same cube via transitive joins
   - name: alpha_facts
     sql: |
       (
@@ -5215,7 +5343,7 @@ cubes:
         sql: "{CUBE}.b_id = {gamma_dims.b_id}"
       - name: delta_bridge
         relationship: many_to_one
-        sql: "{beta_dims.a_name} = {delta_bridge.a_name} AND {gamma_dims.b_name} = {delta_bridge.b_name}"
+        sql: "{beta_dims.a_name} = {delta_bridge.a_name} AND {gamma_dims.b_name} = {delta_bridge.c_name}"
     dimensions:
       - name: reporting_date
         sql: reporting_date
@@ -5256,9 +5384,9 @@ cubes:
   - name: gamma_dims
     sql: |
       (
-        SELECT 10 AS b_id, 'Beta1' AS b_name
+        SELECT 10 AS b_id, 'Beta1' AS b_name, 'Gamma1' AS c_name
         UNION ALL
-        SELECT 20 AS b_id, 'Beta2' AS b_name
+        SELECT 20 AS b_id, 'Beta2' AS b_name, 'Gamma2' AS c_name
       )
     dimensions:
       - name: b_id
@@ -5272,16 +5400,16 @@ cubes:
   - name: delta_bridge
     sql: |
       (
-        SELECT 'Alpha1' AS a_name, 'Beta1' AS b_name, 'Organic' AS channel
+        SELECT 'Alpha1' AS a_name, 'Beta1' AS b_name, 'Beta1' AS c_name, 'Organic' AS channel
         UNION ALL
-        SELECT 'Alpha1' AS a_name, 'Beta2' AS b_name, 'Paid' AS channel
+        SELECT 'Alpha2' AS a_name, 'Beta2' AS b_name, 'Beta2' AS c_name, 'Paid' AS channel
         UNION ALL
-        SELECT 'Alpha2' AS a_name, 'Beta1' AS b_name, 'Referral' AS channel
+        SELECT 'Alpha1' AS a_name, 'Beta1' AS b_name, 'Beta3' AS c_name, 'Referral' AS channel
       )
     joins:
       - name: gamma_dims
         relationship: many_to_one
-        sql: "{CUBE}.b_name = {gamma_dims.b_name}"
+        sql: "{CUBE}.c_name = {gamma_dims.c_name}"
     dimensions:
       - name: a_name
         sql: a_name
@@ -5290,87 +5418,136 @@ cubes:
       - name: b_name
         sql: "{gamma_dims.b_name}"
         type: string
-        primary_key: true
+      - name: c_name
+        sql: c_name
+        type: string
       - name: channel
         sql: channel
         type: string
       `);
 
-    if (!getEnv('nativeSqlPlanner')) {
-      it('querying cube dimension that require transitive joins', async () => {
-        await compiler.compile();
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-          measures: [],
-          dimensions: [
-            'test_facts.reporting_date',
-            'test_facts.merchant_sk',
-            'test_facts.product_sk',
-            'test_facts.acquisition_channel'
-          ],
-          order: [{
-            id: 'test_facts.acquisition_channel'
-          }],
-          timezone: 'America/Los_Angeles'
-        });
-
-        const res = await dbRunner.testQuery(query.buildSqlAndParams());
-        console.log(JSON.stringify(res));
-
-        expect(res).toEqual([
-          {
-            test_facts__acquisition_channel: 'Organic',
-            test_facts__merchant_sk: 101,
-            test_facts__product_sk: 201,
-            test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
-          },
-          {
-            test_facts__acquisition_channel: 'Paid',
-            test_facts__merchant_sk: 101,
-            test_facts__product_sk: 202,
-            test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
-          },
-          {
-            test_facts__acquisition_channel: 'Referral',
-            test_facts__merchant_sk: 102,
-            test_facts__product_sk: 201,
-            test_facts__reporting_date: '2023-01-02T00:00:00.000Z',
-          },
-        ]);
+    it('querying cube dimension that require transitive joins', async () => {
+      await compiler.compile();
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: [
+          'test_facts.reporting_date',
+          'test_facts.merchant_sk',
+          'test_facts.product_sk',
+          'test_facts.acquisition_channel'
+        ],
+        order: [{
+          id: 'test_facts.acquisition_channel'
+        }],
+        timezone: 'America/Los_Angeles'
       });
-    } else {
-      it.skip('FIXME(tesseract): querying cube dimension that require transitive joins', async () => {
-        // FIXME should be implemented in Tesseract
-      });
-    }
 
-    if (!getEnv('nativeSqlPlanner')) {
-      it('querying cube with transitive joins with loop', async () => {
-        await compiler.compile();
+      const res = await dbRunner.testQuery(query.buildSqlAndParams());
+      console.log(JSON.stringify(res));
 
-        try {
-          const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-            measures: [],
-            dimensions: [
-              'alpha_facts.reporting_date',
-              'delta_bridge.b_name',
-              'alpha_facts.channel'
-            ],
-            order: [{
-              id: 'alpha_facts.reporting_date'
-            }],
-            timezone: 'America/Los_Angeles'
-          });
+      expect(res).toEqual([
+        {
+          test_facts__acquisition_channel: 'Organic',
+          test_facts__merchant_sk: 101,
+          test_facts__product_sk: 201,
+          test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
+        },
+        {
+          test_facts__acquisition_channel: 'Paid',
+          test_facts__merchant_sk: 101,
+          test_facts__product_sk: 202,
+          test_facts__reporting_date: '2023-01-01T00:00:00.000Z',
+        },
+        {
+          test_facts__acquisition_channel: 'Referral',
+          test_facts__merchant_sk: 102,
+          test_facts__product_sk: 201,
+          test_facts__reporting_date: '2023-01-02T00:00:00.000Z',
+        },
+      ]);
+    });
 
-          await dbRunner.testQuery(query.buildSqlAndParams());
-          throw new Error('Should have thrown an error');
-        } catch (err: any) {
-          expect(err.message).toContain('Can not construct joins for the query, potential loop detected');
-        }
+    it('querying cube with transitive joins with a few joins to the same cube', async () => {
+      await compiler.compile();
+
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: [
+          'alpha_facts.reporting_date',
+          'delta_bridge.b_name',
+          'alpha_facts.channel'
+        ],
+        order: [{
+          id: 'alpha_facts.reporting_date'
+        }],
+        timezone: 'America/Los_Angeles'
       });
-    } else {
-      it.skip('FIXME(tesseract): querying cube dimension that require transitive joins', async () => {
-        // FIXME should be implemented in Tesseract
-      });
-    }
+
+      const res = await dbRunner.testQuery(query.buildSqlAndParams());
+      console.log(JSON.stringify(res));
+
+      expect(res).toEqual([
+        {
+          alpha_facts__channel: 'Organic',
+          alpha_facts__reporting_date: '2023-01-01T00:00:00.000Z',
+          delta_bridge__b_name: 'Beta1',
+        },
+        {
+          alpha_facts__channel: 'Paid',
+          alpha_facts__reporting_date: '2023-01-02T00:00:00.000Z',
+          delta_bridge__b_name: 'Beta2',
+        },
+      ]);
+    });
+  });
+
+  it('Checking member name letter cases', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [],
+      dimensions: [
+        'visitors.my_favorite_source',
+        'visitors.My_favorite_source',
+        'visitors.MY_favorite_source',
+        'visitors.My_Favorite_Source',
+        'visitors.MY_Favorite_SOURCE',
+        'visitors.MY_FAVORITE_SOURCE',
+      ],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    });
+
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+
+    expect(res).toEqual([
+      {
+        visitors___m_y__f_a_v_o_r_i_t_e__s_o_u_r_c_e: null,
+        visitors___m_y__favorite__s_o_u_r_c_e: null,
+        visitors___m_y_favorite_source: null,
+        visitors___my__favorite__source: null,
+        visitors___my_favorite_source: null,
+        visitors__my_favorite_source: null,
+      },
+      {
+        visitors___m_y__f_a_v_o_r_i_t_e__s_o_u_r_c_e: 'google',
+        visitors___m_y__favorite__s_o_u_r_c_e: 'google',
+        visitors___m_y_favorite_source: 'google',
+        visitors___my__favorite__source: 'google',
+        visitors___my_favorite_source: 'google',
+        visitors__my_favorite_source: 'google',
+      },
+      {
+        visitors___m_y__f_a_v_o_r_i_t_e__s_o_u_r_c_e: 'some',
+        visitors___m_y__favorite__s_o_u_r_c_e: 'some',
+        visitors___m_y_favorite_source: 'some',
+        visitors___my__favorite__source: 'some',
+        visitors___my_favorite_source: 'some',
+        visitors__my_favorite_source: 'some',
+      },
+    ]);
   });
 });

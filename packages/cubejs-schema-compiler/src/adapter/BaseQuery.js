@@ -22,7 +22,6 @@ import {
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
   timeSeriesFromCustomInterval,
-  parseSqlInterval,
   findMinGranularityDimension
 } from '@cubejs-backend/shared';
 
@@ -387,12 +386,63 @@ export class BaseQuery {
     }
   }
 
+  /**
+   * This function follows the same logic as in this.collectJoinHints()
+   * skipQueryJoinMap is used by PreAggregations to build join tree without user's query all members map
+   * @public
+   * @param {Array<(Array<string> | string)>} hints
+   * @param { boolean } skipQueryJoinMap
+   * @return {import('../compiler/JoinGraph').FinishedJoinTree}
+   */
+  joinTreeForHints(hints, skipQueryJoinMap = false) {
+    const queryJoinMaps = skipQueryJoinMap ? {} : this.queryJoinMap();
+    let newCollectedHints = [];
+
+    const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
+      ...newCollectedHints,
+      ...hints,
+    ],
+    queryJoinMaps));
+
+    let prevJoin = null;
+    let newJoin = null;
+
+    // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
+    let cnt = 0;
+    let newJoinHintsCollectedCnt;
+
+    do {
+      const allJoinHints = constructJH();
+      prevJoin = newJoin;
+      newJoin = this.joinGraph.buildJoin(allJoinHints);
+      const allJoinHintsFlatten = new Set(allJoinHints.flat());
+      const joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
+
+      const iterationCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
+      newJoinHintsCollectedCnt = iterationCollectedHints.length;
+      cnt++;
+      if (newJoin && newJoin.joins.length > 0) {
+        // Even if there is no join tree changes, we still
+        // push correctly ordered join hints, collected from the resolving of members of join tree
+        // upfront the all existing query members. This ensures the correct cube join order
+        // with transitive joins even if they are already presented among query members.
+        newCollectedHints = this.enrichedJoinHintsFromJoinTree(newJoin, joinMembersJoinHints);
+      }
+    } while (newJoin?.joins.length > 0 && !this.isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
+
+    if (cnt >= 10000) {
+      throw new UserError('Can not construct joins for the query, potential loop detected');
+    }
+
+    return this.joinGraph.buildJoin(constructJH());
+  }
+
   cacheValue(key, fn, { contextPropNames, inputProps, cache } = {}) {
     const currentContext = this.safeEvaluateSymbolContext();
     if (contextPropNames) {
       const contextKey = {};
-      for (let i = 0; i < contextPropNames.length; i++) {
-        contextKey[contextPropNames[i]] = currentContext[contextPropNames[i]];
+      for (const element of contextPropNames) {
+        contextKey[element] = currentContext[element];
       }
       key = key.concat([JSON.stringify(contextKey)]);
     }
@@ -436,83 +486,82 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
-      const [rootOfJoin, ...allMembersJoinHints] = this.collectJoinHintsFromMembers(this.allMembersConcat(false));
-      const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
-      let joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(this.join));
-
-      // One cube may join the other cube via transitive joined cubes,
-      // members from which are referenced in the join `on` clauses.
-      // We need to collect such join hints and push them upfront of the joining one
-      // but only if they don't exist yet. Cause in other case we might affect what
-      // join path will be constructed in join graph.
-      // It is important to use queryLevelJoinHints during the calculation if it is set.
-
-      const constructJH = () => {
-        const filteredJoinMembersJoinHints = joinMembersJoinHints.filter(m => !allMembersJoinHints.includes(m));
-        return [
-          ...this.queryLevelJoinHints,
-          ...(rootOfJoin ? [rootOfJoin] : []),
-          ...filteredJoinMembersJoinHints,
-          ...allMembersJoinHints,
-          ...customSubQueryJoinHints,
-        ];
-      };
-
-      let prevJoins = this.join;
-      let prevJoinMembersJoinHints = joinMembersJoinHints;
-      let newJoin = this.joinGraph.buildJoin(constructJH());
-
-      const isOrderPreserved = (base, updated) => {
-        const common = base.filter(value => updated.includes(value));
-        const bFiltered = updated.filter(value => common.includes(value));
-
-        return common.every((x, i) => x === bFiltered[i]);
-      };
-
-      const isJoinTreesEqual = (a, b) => {
-        if (!a || !b || a.root !== b.root || a.joins.length !== b.joins.length) {
-          return false;
-        }
-
-        // We don't care about the order of joins on the same level, so
-        // we can compare them as sets.
-        const aJoinsSet = new Set(a.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
-        const bJoinsSet = new Set(b.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
-
-        if (aJoinsSet.size !== bJoinsSet.size) {
-          return false;
-        }
-
-        for (const val of aJoinsSet) {
-          if (!bJoinsSet.has(val)) {
-            return false;
-          }
-        }
-
-        return true;
-      };
-
-      // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
-      let cnt = 0;
-
-      while (newJoin?.joins.length > 0 && !isJoinTreesEqual(prevJoins, newJoin) && cnt < 10000) {
-        prevJoins = newJoin;
-        joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
-        if (!isOrderPreserved(prevJoinMembersJoinHints, joinMembersJoinHints)) {
-          throw new UserError(`Can not construct joins for the query, potential loop detected: ${prevJoinMembersJoinHints.join('->')} vs ${joinMembersJoinHints.join('->')}`);
-        }
-        newJoin = this.joinGraph.buildJoin(constructJH());
-        prevJoinMembersJoinHints = joinMembersJoinHints;
-        cnt++;
-      }
-
-      if (cnt >= 10000) {
-        throw new UserError('Can not construct joins for the query, potential loop detected');
-      }
-
-      this.collectedJoinHints = R.uniq(constructJH());
+      this.collectedJoinHints = this.collectJoinHints();
     }
     return this.collectedJoinHints;
+  }
+
+  /**
+   * @private
+   * @return { Record<string, string[][]>}
+   */
+  queryJoinMap() {
+    const queryMembers = this.allMembersConcat(false);
+    const joinMaps = {};
+
+    for (const member of queryMembers) {
+      const memberCube = member.cube?.();
+      if (memberCube?.isView && !joinMaps[memberCube.name] && memberCube.joinMap) {
+        joinMaps[memberCube.name] = memberCube.joinMap;
+      }
+    }
+
+    return joinMaps;
+  }
+
+  /**
+   * @private
+   * @param { import('../compiler/JoinGraph').FinishedJoinTree } joinTree
+   * @param { string[] } joinHints
+   * @return { string[][] }
+   */
+  enrichedJoinHintsFromJoinTree(joinTree, joinHints) {
+    const joinsMap = {};
+
+    for (const j of joinTree.joins) {
+      joinsMap[j.to] = j.from;
+    }
+
+    return joinHints.map(jh => {
+      let cubeName = jh;
+      const path = [cubeName];
+      while (joinsMap[cubeName]) {
+        cubeName = joinsMap[cubeName];
+        path.push(cubeName);
+      }
+
+      if (path.length === 1) {
+        return path[0];
+      }
+      return path.reverse();
+    });
+  }
+
+  /**
+   * @private
+   * @param { (string|string[])[] } hints
+   * @param { Record<string, string[][]>} joinMap
+   * @return {(string|string[])[]}
+   */
+  enrichHintsWithJoinMap(hints, joinMap) {
+    // Potentially, if joins between views would take place, we need to distinguish
+    // join maps on per view basis.
+    const allPaths = Object.values(joinMap).flat();
+
+    return hints.map(hint => {
+      if (Array.isArray(hint)) {
+        return hint;
+      }
+
+      for (const path of allPaths) {
+        const hintIndex = path.indexOf(hint);
+        if (hintIndex !== -1) {
+          return path.slice(0, hintIndex + 1);
+        }
+      }
+
+      return hint;
+    });
   }
 
   get dataSource() {
@@ -886,6 +935,7 @@ export class BaseQuery {
       timezone: this.options.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
+      securityContext: this.contextSymbols.securityContext,
       order,
       filters: this.options.filters,
       limit: this.options.limit ? this.options.limit.toString() : null,
@@ -946,6 +996,7 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
+      securityContext: this.contextSymbols.securityContext,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
     };
@@ -1363,8 +1414,8 @@ export class BaseQuery {
     const join = R.drop(1, toJoin)
       .map(
         (q, i) => (this.dimensionAliasNames().length ?
-          `INNER JOIN ${this.wrapInParenthesis((q))} as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
-          `, ${this.wrapInParenthesis(q)} as q_${i + 1}`),
+          `INNER JOIN ${this.wrapInParenthesis((q))} ${this.asSyntaxJoin} q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
+          `, ${this.wrapInParenthesis(q)} ${this.asSyntaxJoin} q_${i + 1}`),
       ).join('\n');
 
     const columnsToSelect = this.evaluateSymbolSqlWithContext(
@@ -1393,7 +1444,7 @@ export class BaseQuery {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 
-    return `SELECT ${this.topLimit()}${columnsToSelect} FROM ${this.wrapInParenthesis(toJoin[0])} as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
+    return `SELECT ${this.topLimit()}${columnsToSelect} FROM ${this.wrapInParenthesis(toJoin[0])} ${this.asSyntaxJoin} q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 
   wrapInParenthesis(select) {
@@ -2613,18 +2664,92 @@ export class BaseQuery {
   }
 
   /**
-   *
+   * Just a helper to avoid copy/paste
+   * @private
+   * @param {import('../compiler/JoinGraph').FinishedJoinTree} a
+   * @param {import('../compiler/JoinGraph').FinishedJoinTree} b
+   * @return {boolean}
+   */
+  isJoinTreesEqual(a, b) {
+    if (!a || !b || a.root !== b.root || a.joins.length !== b.joins.length) {
+      return false;
+    }
+
+    // We don't care about the order of joins on the same level, so
+    // we can compare them as sets.
+    const aJoinsSet = new Set(a.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
+    const bJoinsSet = new Set(b.joins.map(j => `${j.originalFrom}->${j.originalTo}`));
+
+    if (aJoinsSet.size !== bJoinsSet.size) {
+      return false;
+    }
+
+    for (const val of aJoinsSet) {
+      if (!bJoinsSet.has(val)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * @private
    * @param {boolean} [excludeTimeDimensions=false]
-   * @returns {Array<Array<string>>}
+   * @returns {Array<(Array<string> | string)>}
    */
   collectJoinHints(excludeTimeDimensions = false) {
-    const membersToCollectFrom = [
-      ...this.allMembersConcat(excludeTimeDimensions),
-      ...this.joinMembersFromJoin(this.join),
-      ...this.joinMembersFromCustomSubQuery(),
-    ];
+    const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(excludeTimeDimensions));
+    const queryJoinMaps = this.queryJoinMap();
+    const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
+    let newCollectedHints = [];
 
-    return this.collectJoinHintsFromMembers(membersToCollectFrom);
+    // One cube may join the other cube via transitive joined cubes,
+    // members from which are referenced in the join `on` clauses.
+    // We need to collect such join hints and push them upfront of the joining one
+    // but only if they don't exist yet. Cause in other case we might affect what
+    // join path will be constructed in join graph.
+    // It is important to use queryLevelJoinHints during the calculation if it is set.
+
+    const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
+      ...this.queryLevelJoinHints,
+      ...newCollectedHints,
+      ...allMembersJoinHints,
+      ...customSubQueryJoinHints,
+    ],
+    queryJoinMaps));
+
+    let prevJoin = null;
+    let newJoin = null;
+
+    // Safeguard against infinite loop in case of cyclic joins somehow managed to slip through
+    let cnt = 0;
+    let newJoinHintsCollectedCnt;
+
+    do {
+      const allJoinHints = constructJH();
+      prevJoin = newJoin;
+      newJoin = this.joinGraph.buildJoin(allJoinHints);
+      const allJoinHintsFlatten = new Set(allJoinHints.flat());
+      const joinMembersJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromJoin(newJoin));
+
+      const iterationCollectedHints = joinMembersJoinHints.filter(j => !allJoinHintsFlatten.has(j));
+      newJoinHintsCollectedCnt = iterationCollectedHints.length;
+      cnt++;
+      if (newJoin && newJoin.joins.length > 0) {
+        // Even if there is no join tree changes, we still
+        // push correctly ordered join hints, collected from the resolving of members of join tree
+        // upfront the all existing query members. This ensures the correct cube join order
+        // with transitive joins even if they are already presented among query members.
+        newCollectedHints = this.enrichedJoinHintsFromJoinTree(newJoin, joinMembersJoinHints);
+      }
+    } while (newJoin?.joins.length > 0 && !this.isJoinTreesEqual(prevJoin, newJoin) && cnt < 10000 && newJoinHintsCollectedCnt > 0);
+
+    if (cnt >= 10000) {
+      throw new UserError('Can not construct joins for the query, potential loop detected');
+    }
+
+    return constructJH();
   }
 
   joinMembersFromCustomSubQuery() {
@@ -2657,9 +2782,15 @@ export class BaseQuery {
   }
 
   collectJoinHintsFromMembers(members) {
+    // Extract cube names from members to make cache key member-cubes-specific
+    const memberCubes = members
+      .map(m => m.cube?.()?.name)
+      .filter(Boolean)
+      .sort();
+
     return [
       ...members.map(m => m.joinHint).filter(h => h?.length > 0),
-      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers'),
+      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), ['collectJoinHintsFromMembers', ...memberCubes]),
     ];
   }
 
@@ -3921,7 +4052,17 @@ export class BaseQuery {
       const dimensionSql = this.dimensionSql(dimension);
       return `select ${aggFunction}(${this.convertTz(dimensionSql)}) from ${this.cubeSql(cube)} ${this.asSyntaxTable} ${this.cubeAlias(cube)}`;
     }
-    return null;
+
+    // Handle case that requires joins
+    const subQuery = this.newSubQuery({
+      dimensions: [dimension.dimension],
+      rowLimit: null,
+    });
+
+    const dimensionSql = subQuery.dimensionSql(dimension);
+    const fromClause = subQuery.query();
+
+    return `select ${aggFunction}(${subQuery.convertTz(dimensionSql)}) from ${fromClause}`;
   }
 
   cubeCardinalityQueries() { // TODO collect sub queries

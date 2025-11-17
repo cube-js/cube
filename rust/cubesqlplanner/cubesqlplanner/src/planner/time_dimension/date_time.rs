@@ -64,6 +64,20 @@ impl QueryDateTime {
     }
 
     pub fn add_interval(&self, interval: &SqlInterval) -> Result<Self, CubeError> {
+        // For time-only intervals (hour, minute, second), use UTC arithmetic to avoid DST issues
+        let is_time_only =
+            interval.year == 0 && interval.month == 0 && interval.week == 0 && interval.day == 0;
+
+        if is_time_only {
+            // Use UTC-based arithmetic for time intervals
+            let duration = Duration::hours(interval.hour as i64)
+                + Duration::minutes(interval.minute as i64)
+                + Duration::seconds(interval.second as i64);
+            let new_datetime = self.date_time + duration;
+            return Ok(Self::new(new_datetime));
+        }
+
+        // For date-based intervals, use local time arithmetic
         let date = self.naive_local().date();
 
         // Step 1: add years and months with fallback logic
@@ -239,6 +253,19 @@ mod tests {
     }
     #[test]
     fn test_add_interval() {
+        let tz = "America/Los_Angeles".parse::<Tz>().unwrap();
+
+        let date = QueryDateTime::from_date_str(tz, "2024-03-10T03:00:00").unwrap();
+        let interval = "1 hour".parse::<SqlInterval>().unwrap();
+        let result = date.add_interval(&interval).unwrap().naive_utc();
+        assert_eq!(
+            result,
+            NaiveDate::from_ymd_opt(2024, 3, 10)
+                .unwrap()
+                .and_hms_opt(11, 0, 0)
+                .unwrap()
+        );
+
         let tz = "Etc/GMT-3".parse::<Tz>().unwrap();
 
         let date = QueryDateTime::from_date_str(tz, "2024-11-03 01:30:00").unwrap();
@@ -389,6 +416,19 @@ mod tests {
             NaiveDate::from_ymd_opt(2024, 1, 15)
                 .unwrap()
                 .and_hms_opt(0, 0, 0)
+                .unwrap()
+        );
+
+        let tz = "America/Los_Angeles".parse::<Tz>().unwrap();
+        let date = QueryDateTime::from_date_str(tz, "2017-01-01T00:10:00").unwrap();
+        let interval = "1 hour".parse::<SqlInterval>().unwrap();
+        let origin = QueryDateTime::from_date_str(tz, "2025-01-01T00:10:00").unwrap();
+        let result = date.align_to_origin(&origin, &interval).unwrap();
+        assert_eq!(
+            result.naive_local(),
+            NaiveDate::from_ymd_opt(2017, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 10, 0)
                 .unwrap()
         );
     }

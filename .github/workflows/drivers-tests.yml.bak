@@ -27,9 +27,9 @@ on:
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
-      # To test SQL API Push down
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
+      - 'rust/cubesqlplanner/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
@@ -54,9 +54,9 @@ on:
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
-      # To test SQL API Push down
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
+      - 'rust/cubesqlplanner/**'
   workflow_dispatch:
     inputs:
       use_tesseract_sql_planner:
@@ -241,6 +241,13 @@ jobs:
       # secrets as job-level environment variables, then referencing the environment variables
       # to conditionally run steps in the job.
       DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
+
+    # redshift Test Serverless Instance is so tiny that it can't serve a few test suites at once,
+    # so we constrain it to 1 test suite at time.
+    concurrency:
+      group: ${{ contains(matrix.database, 'redshift') && 'redshift-global' || format('drivers-tests-{0}-{1}', matrix.database, github.run_id) }}
+      cancel-in-progress: false
+
     strategy:
       matrix:
         database:
@@ -284,6 +291,8 @@ jobs:
           - database: athena-export-bucket-s3
             use_tesseract_sql_planner: true
           - database: databricks-jdbc
+            use_tesseract_sql_planner: true
+          - database: mysql
             use_tesseract_sql_planner: true
       fail-fast: false
 

@@ -138,8 +138,11 @@ impl<C: Context<'static> + 'static, V: Value + NeonPrimitiveMapping + 'static>
         self.context.with_context(|cx| V::to_neon(cx, &self.value))
     }
 
-    pub fn clone_to_context(&self, context: &ContextHolder<C>) -> Self {
-        Self {
+    pub fn clone_to_context<CC: Context<'static> + 'static>(
+        &self,
+        context: &ContextHolder<CC>,
+    ) -> PrimitiveNeonTypeHolder<CC, V> {
+        PrimitiveNeonTypeHolder {
             context: context.clone(),
             value: self.value.clone(),
         }

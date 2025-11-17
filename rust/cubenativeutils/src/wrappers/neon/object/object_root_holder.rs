@@ -37,8 +37,11 @@ impl<C: Context<'static> + 'static, V: Object + 'static> ObjectNeonTypeHolder<C,
         })??)
     }
 
-    pub fn clone_to_context(&self, context: &ContextHolder<C>) -> Self {
-        Self {
+    pub fn clone_to_context<CC: Context<'static> + 'static>(
+        &self,
+        context: &ContextHolder<CC>,
+    ) -> ObjectNeonTypeHolder<CC, V> {
+        ObjectNeonTypeHolder {
             context: context.clone(),
             value: self.value.clone(),
         }
@@ -49,12 +52,12 @@ impl<C: Context<'static>, V: Object + 'static> Drop for ObjectNeonTypeHolder<C, 
     fn drop(&mut self) {
         if let Some(value) = self.value.take() {
             if let Ok(value) = Rc::try_unwrap(value) {
-                let res = self.context.with_context(|cx| {
+                // Attempt to drop Root with context for immediate cleanup.
+                // If context is no longer valid (e.g., callback outlived its scope),
+                // Root will be safely dropped via N-API's deferred cleanup mechanism.
+                let _ = self.context.with_context(|cx| {
                     value.drop(cx);
                 });
-                if let Err(e) = res {
-                    log::error!("Error while dropping Neon Root: {}", e)
-                }
             }
         }
     }

@@ -2,6 +2,7 @@ use super::context::PushDownBuilderContext;
 use super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::*;
 use crate::physical_plan_builder::context::MultiStageDimensionContext;
+use crate::plan::join::JoinType;
 use crate::plan::schema::QualifiedColumnName;
 use crate::plan::*;
 use crate::planner::query_properties::OrderByItem;
@@ -10,6 +11,7 @@ use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -37,6 +39,10 @@ impl PhysicalPlanBuilder {
 
     pub(super) fn qtools_and_templates(&self) -> (&Rc<QueryTools>, &PlanSqlTemplates) {
         (&self.query_tools, &self.plan_sql_templates)
+    }
+
+    pub(super) fn templates(&self) -> &PlanSqlTemplates {
+        &self.plan_sql_templates
     }
 
     pub(super) fn process_node<T: ProcessableNode>(
@@ -148,7 +154,10 @@ impl PhysicalPlanBuilder {
         &self,
         dimension_schema: &Rc<MultiStageDimensionContext>,
         join_builder: &mut JoinBuilder,
+        context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
+        let original_join = join_builder.clone().build();
+        let references_builder = ReferencesBuilder::new(From::new_from_join(original_join));
         let conditions = dimension_schema
             .join_dimensions
             .iter()
@@ -159,7 +168,26 @@ impl PhysicalPlanBuilder {
                     alias_in_cte,
                 ));
 
-                Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))])
+                if let Ok(dimension) = dim.as_dimension() {
+                    if dimension.is_calc_group() {
+                        return Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))]);
+                    }
+                }
+
+                let mut context_factory = context.make_sql_nodes_factory()?;
+                references_builder.resolve_references_for_member(
+                    dim.clone(),
+                    &None,
+                    context_factory.render_references_mut(),
+                )?;
+
+                let visitor_context =
+                    VisitorContext::new(self.query_tools.clone(), &context_factory, None);
+
+                Ok(vec![(
+                    sub_query_ref,
+                    Expr::new_member_with_context(dim.clone(), Rc::new(visitor_context)),
+                )])
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -213,5 +241,60 @@ impl PhysicalPlanBuilder {
             }
         }
         Ok(result)
+    }
+
+    pub(super) fn process_query_dimension(
+        &self,
+        dimension: &Rc<MemberSymbol>,
+        references_builder: &ReferencesBuilder,
+        select_builder: &mut SelectBuilder,
+        context_factory: &mut SqlNodesFactory,
+        context: &PushDownBuilderContext,
+    ) -> Result<(), CubeError> {
+        if let Some(coalesce_ref) = self.dimension_coalesce_refs(dimension, select_builder.from()) {
+            select_builder.add_projection_coalesce_member(dimension, coalesce_ref, None)?;
+        } else {
+            references_builder.resolve_references_for_member(
+                dimension.clone(),
+                &None,
+                context_factory.render_references_mut(),
+            )?;
+            if context.measure_subquery {
+                select_builder.add_projection_member_without_schema(dimension, None);
+            } else {
+                select_builder.add_projection_member(dimension, None);
+            }
+        }
+        Ok(())
+    }
+
+    fn dimension_coalesce_refs(
+        &self,
+        dimension: &Rc<MemberSymbol>,
+        from: &Rc<From>,
+    ) -> Option<Vec<QualifiedColumnName>> {
+        match &from.source {
+            FromSource::Join(join) => {
+                if join.joins.iter().any(|i| i.join_type == JoinType::Full) {
+                    let mut result = vec![];
+                    let dim_alias = join.root.source.schema().resolve_member_alias(dimension);
+                    result.push(QualifiedColumnName::new(
+                        Some(join.root.alias.clone()),
+                        dim_alias,
+                    ));
+                    for item in join.joins.iter() {
+                        let dim_alias = item.from.source.schema().resolve_member_alias(dimension);
+                        result.push(QualifiedColumnName::new(
+                            Some(item.from.alias.clone()),
+                            dim_alias,
+                        ));
+                    }
+                    Some(result)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 }

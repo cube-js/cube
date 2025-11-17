@@ -143,6 +143,13 @@
     algoliasearch "^4.17.0"
     classnames "^2.3.2"
 
+"@cube-dev/purple-banner@https://github.com/cubedevinc/purple-banner/releases/download/v2.0.21/cube-dev-purple-banner-2.0.21.tgz":
+  version "2.0.21"
+  resolved "https://github.com/cubedevinc/purple-banner/releases/download/v2.0.21/cube-dev-purple-banner-2.0.21.tgz#57217ed1c3952b5ba8f235d9863f07dc9921d3c4"
+  dependencies:
+    classnames "^2.3.1"
+    dayjs "^1.11.7"
+
 "@cubejs-client/core@^0.32.17":
   version "0.32.30"
   resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.32.30.tgz#40bad1199635363a82a1a5e9f4718a67f2fe4f59"
@@ -1015,6 +1022,11 @@ character-reference-invalid@^2.0.0:
     readdirp "~3.6.0"
   optionalDependencies:
     fsevents "~2.3.2"
+
+classnames@^2.3.1:
+  version "2.5.1"
+  resolved "https://registry.yarnpkg.com/classnames/-/classnames-2.5.1.tgz#ba774c614be0f016da105c858e7159eae8e7687b"
+  integrity sha512-saHYOzhIQs6wy2sVxTM6bUDsQO4F50V9RQ22qBpEdCW+I+/Wmke2HOl6lS6dTpdxVhb88/I6+Hs+438c3lfUow==
 
 classnames@^2.3.2:
   version "2.3.2"

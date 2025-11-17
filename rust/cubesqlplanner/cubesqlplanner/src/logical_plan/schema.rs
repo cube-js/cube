@@ -1,6 +1,8 @@
+use cubenativeutils::CubeError;
 use itertools::Itertools;
 
 use super::pretty_print::*;
+use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::MemberSymbol;
 use std::collections::HashSet;
 use std::fmt;
@@ -81,6 +83,16 @@ impl LogicalSchema {
 
     pub fn has_dimensions(&self) -> bool {
         !self.time_dimensions.is_empty() || !self.dimensions.is_empty()
+    }
+
+    pub fn multi_stage_dimensions(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        let mut result = vec![];
+        for member in self.all_dimensions() {
+            if has_multi_stage_members(member, true)? {
+                result.push(member.clone())
+            }
+        }
+        Ok(result)
     }
 }
 

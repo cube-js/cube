@@ -26,8 +26,8 @@ Please track [this issue](https://github.com/cube-js/cube/issues/8487).
 Common uses of multi-stage calculations:
 
 - [Rolling window](#rolling-window) calculations.
+- [Time-shift](#time-shift) calculations, e.g., year-over-year sales growth.
 - [Period-to-date](#period-to-date) calculations, e.g., year-to-date (YTD) analysis.
-- [Prior date](#prior-date) calculations, e.g., year-over-year sales growth.
 - [Fixed dimension](#fixed-dimension) calculations, e.g., comparing individual items to a broader dataset or calculating percent of total.
 - [Ranking](#ranking) calculations.
 
@@ -98,100 +98,16 @@ Query and result:
 
 <Screenshot src="https://ucarecdn.com/40179d09-3e10-4ada-8456-1deca6a5035d/" />
 
-## Period-to-date
+## Time shift
 
-Period-to-date calculations can be used to analyze data over different time periods:
+A _time-shift measure_ calculates the value of another measure at a different point in
+time. This is achieved by _shifting_ the time dimension from the query in the necessary
+direction during the calculation. Time-shifts are configured using the [`time_shift`
+parameter][ref-ref-time-shift] of a measure.
 
-- Year-to-date (YTD) analysis.
-- Quarter-to-date (QTD) analysis.
-- Month-to-date (MTD) analysis.
-
-```yaml
-- name: revenue_ytd
-  sql: revenue
-  type: sum
-  rolling_window:
-    type: to_date
-    granularity: year
-  
-- name: revenue_qtd
-  sql: revenue
-  type: sum
-  rolling_window:
-    type: to_date
-    granularity: quarter
-  
-- name: revenue_mtd
-  sql: revenue
-  type: sum
-  rolling_window:
-    type: to_date
-    granularity: month
-```
-
-### Example
-
-Data model:
-
-```yaml
-cubes:
-  - name: period_to_date
-    sql: |
-      SELECT '2024-01-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-02-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-03-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-06-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-07-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-08-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-09-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-10-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-11-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2024-12-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2025-01-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2025-02-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2025-03-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2025-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2025-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
-      SELECT '2025-06-01'::TIMESTAMP AS time, 1000 AS revenue
-
-    dimensions:
-      - name: time
-        sql: time
-        type: time
-
-    measures:
-      - name: revenue_ytd
-        sql: revenue
-        type: sum
-        rolling_window:
-          type: to_date
-          granularity: year
-        
-      - name: revenue_qtd
-        sql: revenue
-        type: sum
-        rolling_window:
-          type: to_date
-          granularity: quarter
-        
-      - name: revenue_mtd
-        sql: revenue
-        type: sum
-        rolling_window:
-          type: to_date
-          granularity: month
-```
-
-Query and result:
-
-<Screenshot src="https://ucarecdn.com/3c8bbb38-b582-410d-8a1c-fa7c0dc38d14/" />
-
-## Prior date
-
-Prior date calculations can be used to find the difference between two aggregated
-measures, like year-over-year sales growth.
+Typically, this is used to compare the current value of a measure with its prior value,
+such as the same time last year. For example, if you have the `revenue` measure, you can
+calculate its value for the same time last year:
 
 ```yaml
 - name: revenue_prior_year
@@ -199,19 +115,13 @@ measures, like year-over-year sales growth.
   sql: "{revenue}"
   type: number
   time_shift:
-    - time_dimension: calendar.CalendarDate
-      interval: 1 year
-      type: prior
-      
-- name: revenue_prior_year_ytd
-  multi_stage: true
-  sql: "{revenue_ytd}"
-  type: number
-  time_shift:
-    - time_dimension: calendar.CalendarDate
-      interval: 1 year
+    - interval: 1 year
       type: prior
 ```
+
+You can use time-shift measures with [calendar cubes][ref-calendar-cubes] to customize
+how time-shifting works, e.g., to shift the time dimension to the prior date in a retail
+calendar.
 
 ### Example
 
@@ -290,6 +200,105 @@ Queries and results:
 <Screenshot src="https://ucarecdn.com/fdc8dba1-6c9e-4682-87b9-1435f8eac0ca/" />
 
 <Screenshot src="https://ucarecdn.com/d60c3ec2-07e0-47c3-adcd-1f7fe2c75bc9/" />
+
+## Period-to-date
+
+Period-to-date calculations can be used to analyze data over different time periods:
+
+- Year-to-date (YTD) analysis.
+- Quarter-to-date (QTD) analysis.
+- Month-to-date (MTD) analysis.
+
+```yaml
+- name: revenue_ytd
+  sql: revenue
+  type: sum
+  rolling_window:
+    type: to_date
+    granularity: year
+  
+- name: revenue_qtd
+  sql: revenue
+  type: sum
+  rolling_window:
+    type: to_date
+    granularity: quarter
+  
+- name: revenue_mtd
+  sql: revenue
+  type: sum
+  rolling_window:
+    type: to_date
+    granularity: month
+```
+
+### Example
+
+Data model:
+
+```yaml
+cubes:
+  - name: prior_date
+    sql: |
+      SELECT '2023-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-06-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-07-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-08-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-09-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-10-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-11-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2023-12-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-01-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-02-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-03-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-06-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-07-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-08-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-09-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-10-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-11-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2024-12-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-01-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-02-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-03-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-04-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-05-01'::TIMESTAMP AS time, 1000 AS revenue UNION ALL
+      SELECT '2025-06-01'::TIMESTAMP AS time, 1000 AS revenue
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+
+    measures:
+      - name: revenue_ytd
+        sql: revenue
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: year
+        
+      - name: revenue_qtd
+        sql: revenue
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: quarter
+        
+      - name: revenue_mtd
+        sql: revenue
+        type: sum
+        rolling_window:
+          type: to_date
+          granularity: month
+```
+
+Query and result:
+
+<Screenshot src="https://ucarecdn.com/3c8bbb38-b582-410d-8a1c-fa7c0dc38d14/" />
 
 ## Fixed dimension
 
@@ -460,3 +469,5 @@ Query and result:
 [ref-dimensions]: /product/data-modeling/concepts#dimensions
 [ref-rolling-window]: /product/data-modeling/reference/measures#rolling_window
 [link-cte]: https://en.wikipedia.org/wiki/Hierarchical_and_recursive_queries_in_SQL#Common_table_expression
+[ref-ref-time-shift]: /product/data-modeling/reference/measures#time_shift
+[ref-calendar-cubes]: /product/data-modeling/concepts/calendar-cubes

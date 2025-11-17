@@ -161,10 +161,22 @@ impl PlanSqlTemplates {
         } else {
             format!("")
         };
+
+        // For strange reasons, the javascript snake caser used in cube
+        // changes first UPPERCASE letter to "_lowercase", prepending "_"
+        // This is weird, but to be compatible we have to add it too.
+        let mut member_alias = Self::alias_name(name);
+
+        if let Some(fl) = name.chars().next() {
+            if fl.is_uppercase() {
+                member_alias = format!("_{}", member_alias);
+            }
+        }
+
         format!(
             "{}__{}{}",
             Self::alias_name(cube_name),
-            Self::alias_name(name),
+            member_alias,
             suffix
         )
     }

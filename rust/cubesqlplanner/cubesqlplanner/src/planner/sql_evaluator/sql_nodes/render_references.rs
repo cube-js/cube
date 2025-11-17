@@ -10,9 +10,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone)]
+pub struct RawReferenceValue(pub String);
+
+#[derive(Clone)]
 pub enum RenderReferencesType {
     QualifiedColumnName(QualifiedColumnName),
     LiteralValue(String),
+    RawReferenceValue(String),
 }
 
 impl From<QualifiedColumnName> for RenderReferencesType {
@@ -24,6 +28,12 @@ impl From<QualifiedColumnName> for RenderReferencesType {
 impl From<String> for RenderReferencesType {
     fn from(value: String) -> Self {
         Self::LiteralValue(value)
+    }
+}
+
+impl From<RawReferenceValue> for RenderReferencesType {
+    fn from(value: RawReferenceValue) -> Self {
+        Self::RawReferenceValue(value.0)
     }
 }
 
@@ -90,6 +100,7 @@ impl SqlNode for RenderReferencesSqlNode {
                     ))
                 }
                 RenderReferencesType::LiteralValue(value) => templates.quote_string(value),
+                RenderReferencesType::RawReferenceValue(value) => Ok(value.clone()),
             }
         } else {
             self.input.to_sql(

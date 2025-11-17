@@ -13,6 +13,7 @@ import {
   getRealType,
   parseUtcIntoLocalDate,
   QueryAlias,
+  CacheMode,
 } from '@cubejs-backend/shared';
 import {
   ResultArrayWrapper,
@@ -29,6 +30,7 @@ import type {
 } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 
+import { QueryBody } from '@cubejs-backend/query-orchestrator';
 import {
   QueryType,
   ApiScopes,
@@ -51,7 +53,9 @@ import {
   PreAggJob,
   PreAggJobStatusItem,
   PreAggJobStatusResponse,
-  SqlApiRequest, MetaResponseResultFn,
+  SqlApiRequest,
+  MetaResponseResultFn,
+  RequestQuery,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -178,7 +182,13 @@ class ApiGateway {
 
   public constructor(
     protected readonly apiSecret: string,
+    /**
+     * It actually returns a Promise<CompilerApi>
+     */
     protected readonly compilerApi: (ctx: RequestContext) => Promise<any>,
+    /**
+     * It actually returns a Promise<OrchestratorApi>
+     */
     protected readonly adapterApi: (ctx: RequestContext) => Promise<any>,
     protected readonly logger: any,
     protected readonly eventEmitter: EventEmitterInterface,
@@ -313,6 +323,7 @@ class ApiGateway {
         context: req.context,
         res: this.resToResultFn(res),
         queryType: req.query.queryType,
+        cacheMode: req.query.cache,
       });
     }));
 
@@ -322,7 +333,8 @@ class ApiGateway {
         query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res),
-        queryType: req.body.queryType
+        queryType: req.body.queryType,
+        cacheMode: req.body.cache,
       });
     }));
 
@@ -331,7 +343,8 @@ class ApiGateway {
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
-        queryType: req.query.queryType
+        queryType: req.query.queryType,
+        cacheMode: req.query.cache,
       });
     }));
 
@@ -427,7 +440,7 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext);
+          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache);
         } catch (e: any) {
           this.handleError({
             e,
@@ -1236,6 +1249,7 @@ class ApiGateway {
     context: RequestContext,
     persistent = false,
     memberExpressions: boolean = false,
+    cacheMode?: CacheMode,
   ): Promise<[QueryType, NormalizedQuery[], NormalizedQuery[]]> {
     let query = this.parseQueryParam(inputQuery);
 
@@ -1276,7 +1290,7 @@ class ApiGateway {
       }
 
       return {
-        normalizedQuery: (normalizeQuery(currentQuery, persistent)),
+        normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
         hasExpressionsInQuery
       };
     });
@@ -1320,14 +1334,14 @@ class ApiGateway {
     this.log({
       type: 'Query Rewrite completed',
       queryRewriteId,
-      normalizedQueries,
-      duration: new Date().getTime() - startTime,
+      normalizedQueries: normalizedQueries.map(q => this.sanitizeQueryForLogging(q)),
+      duration: Date.now() - startTime,
       query
     }, context);
 
     normalizedQueries = normalizedQueries.map(q => remapToQueryAdapterFormat(q));
 
-    if (normalizedQueries.find((currentQuery) => !currentQuery)) {
+    if (normalizedQueries.some((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
     }
 
@@ -1645,15 +1659,16 @@ class ApiGateway {
       normalizedQueries.map(
         async (normalizedQuery, index) => {
           const loadRequestSQLStarted = new Date();
-          const sqlQuery = await (await this.getCompilerApi(context))
+          const sqlQueryRaw = await (await this.getCompilerApi(context))
             .getSql(
               this.coerceForSqlQuery(normalizedQuery, context)
             );
+          const sqlQuery = this.sanitizeSqlQuery(sqlQueryRaw);
 
           this.log({
             type: 'Load Request SQL',
             duration: this.duration(loadRequestSQLStarted),
-            query: normalizedQueries[index],
+            query: this.sanitizeQueryForLogging(normalizedQueries[index]),
             sqlQuery
           }, context);
 
@@ -1662,6 +1677,32 @@ class ApiGateway {
       )
     );
     return sqlQueries;
+  }
+
+  private sanitizeSqlQuery(sqlQuery: any): any {
+    if (sqlQuery.canUseTransformedQuery) {
+      // Keep only granularityHierarchies related to the query time dimensions
+      const tdArr = sqlQuery.canUseTransformedQuery.timeDimensions.map(([m, _g]) => m);
+      if (tdArr.length > 0) {
+        sqlQuery.canUseTransformedQuery.granularityHierarchies =
+          Object.fromEntries(
+            Object.entries(sqlQuery.canUseTransformedQuery.granularityHierarchies)
+              .filter(
+                ([key]) => tdArr.some((prefix: string) => key.startsWith(prefix))
+              )
+          );
+      } else {
+        sqlQuery.canUseTransformedQuery.granularityHierarchies = {};
+      }
+    }
+
+    return sqlQuery;
+  }
+
+  private sanitizeQueryForLogging(query: NormalizedQuery): NormalizedQuery {
+    const res: NormalizedQuery = { ...query };
+    delete res.cacheMode;
+    return res;
   }
 
   /**
@@ -1673,12 +1714,11 @@ class ApiGateway {
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
   ): Promise<ResultWrapper> {
-    const queries = [{
+    const queries: QueryBody[] = [{
       ...sqlQuery,
       query: sqlQuery.sql[0],
       values: sqlQuery.sql[1],
-      continueWait: true,
-      renewQuery: normalizedQuery.renewQuery,
+      cacheMode: normalizedQuery.cacheMode,
       requestId: context.requestId,
       context,
       persistent: false,
@@ -1701,8 +1741,7 @@ class ApiGateway {
         ...totalQuery,
         query: totalQuery.sql[0],
         values: totalQuery.sql[1],
-        continueWait: true,
-        renewQuery: normalizedTotal.renewQuery,
+        cacheMode: normalizedTotal.cacheMode,
         requestId: context.requestId,
         context
       });
@@ -1818,12 +1857,11 @@ class ApiGateway {
       this.log({ type: 'Load Request', query, streaming: true }, context);
       const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
       const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
-      const q = {
+      const q: QueryBody = {
         ...sqlQuery,
         query: sqlQuery.sql[0],
         values: sqlQuery.sql[1],
-        continueWait: true,
-        renewQuery: false,
+        cacheMode: 'stale-if-slow',
         requestId: context.requestId,
         context,
         persistent: true,
@@ -1862,6 +1900,7 @@ class ApiGateway {
       context,
       res,
       apiType = 'rest',
+      cacheMode,
       ...props
     } = request;
     const requestStarted = new Date();
@@ -1883,7 +1922,7 @@ class ApiGateway {
       }, context);
 
       const [queryType, normalizedQueries] =
-        await this.getNormalizedQueries(query, context);
+        await this.getNormalizedQueries(query, context, false, false, cacheMode);
 
       if (
         queryType !== QueryTypeEnum.REGULAR_QUERY &&
@@ -1977,6 +2016,7 @@ class ApiGateway {
     const {
       context,
       res,
+      cacheMode,
     } = request;
     const requestStarted = new Date();
 
@@ -1991,7 +2031,7 @@ class ApiGateway {
       }
 
       const [queryType, normalizedQueries] =
-        await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions);
+        await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions, cacheMode);
 
       const compilerApi = await this.getCompilerApi(context);
       let metaConfigResult = await compilerApi.metaConfig(request.context, {
@@ -2006,17 +2046,16 @@ class ApiGateway {
           normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations: request.sqlQuery }))
         );
 
-      let results;
+      let results: any[];
 
       let slowQuery = false;
 
       const streamResponse = async (sqlQuery) => {
-        const q = {
+        const q: QueryBody = {
           ...sqlQuery,
           query: sqlQuery.query || sqlQuery.sql[0],
           values: sqlQuery.values || sqlQuery.sql[1],
-          continueWait: true,
-          renewQuery: false,
+          cacheMode: 'stale-if-slow',
           requestId: context.requestId,
           context,
           persistent: true,
@@ -2031,11 +2070,10 @@ class ApiGateway {
       };
 
       if (request.sqlQuery) {
-        const finalQuery = {
+        const finalQuery: QueryBody = {
           query: request.sqlQuery[0],
           values: request.sqlQuery[1],
-          continueWait: true,
-          renewQuery: normalizedQueries[0].renewQuery,
+          cacheMode: request.cacheMode,
           requestId: context.requestId,
           context,
           ...sqlQueries[0],
@@ -2170,7 +2208,7 @@ class ApiGateway {
     };
   }
 
-  protected parseQueryParam(query): Query | Query[] {
+  protected parseQueryParam(query: RequestQuery | 'undefined'): Query | Query[] {
     if (!query || query === 'undefined') {
       throw new UserError('Query param is required');
     }
@@ -2195,6 +2233,8 @@ class ApiGateway {
   }
 
   public async contextByReq(req: Request, securityContext, requestId: string): Promise<ExtendedRequestContext> {
+    req.securityContext = securityContext;
+
     const extensions = typeof this.extendContext === 'function' ? await this.extendContext(req) : {};
 
     return {
@@ -2229,7 +2269,7 @@ class ApiGateway {
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
-        query,
+        query: this.sanitizeQueryForLogging(query),
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
@@ -2237,7 +2277,7 @@ class ApiGateway {
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
-        query,
+        query: this.sanitizeQueryForLogging(query),
         error: e.message,
         duration: this.duration(requestStarted),
       }, context);
@@ -2245,7 +2285,7 @@ class ApiGateway {
     } else if (e.error) {
       this.log({
         type: 'Orchestrator error',
-        query,
+        query: this.sanitizeQueryForLogging(query),
         error: e.error,
         duration: this.duration(requestStarted),
       }, context);
@@ -2253,7 +2293,7 @@ class ApiGateway {
     } else if (e.type === 'UserError') {
       this.log({
         type: e.type,
-        query,
+        query: this.sanitizeQueryForLogging(query),
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);

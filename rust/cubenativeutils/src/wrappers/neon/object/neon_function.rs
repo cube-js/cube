@@ -1,6 +1,6 @@
 use super::{NeonObject, ObjectNeonTypeHolder, RootHolder};
 use crate::wrappers::{
-    neon::inner_types::NeonInnerTypes,
+    neon::{inner_types::NeonInnerTypes, object::IntoNeonObject},
     object::{NativeFunction, NativeType},
     object_handle::NativeObjectHandle,
 };
@@ -41,16 +41,30 @@ impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFu
     ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
         let neon_args = args
             .into_iter()
-            .map(|arg| -> Result<_, CubeError> { arg.into_object().get_object() })
+            .map(|arg| -> Result<_, CubeError> { arg.into_object().get_js_value() })
             .collect::<Result<Vec<_>, _>>()?;
-        let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
-            let null = cx.null();
-            neon_object.call(cx, null, neon_args)
-        })?;
-        Ok(NativeObjectHandle::new(NeonObject::new(
-            self.object.get_context(),
-            neon_reuslt,
-        )?))
+        let neon_result = self
+            .object
+            .map_neon_object(|cx, neon_object| {
+                let null = cx.null();
+                neon_object.call(cx, null, neon_args)
+            })?
+            .into_neon_object(self.object.get_context())?;
+        Ok(neon_result.into())
+    }
+    fn construct(
+        &self,
+        args: Vec<NativeObjectHandle<NeonInnerTypes<C>>>,
+    ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
+        let neon_args = args
+            .into_iter()
+            .map(|arg| -> Result<_, CubeError> { arg.into_object().get_js_value() })
+            .collect::<Result<Vec<_>, _>>()?;
+        let neon_result = self
+            .object
+            .map_neon_object(|cx, neon_object| neon_object.construct(cx, neon_args))?
+            .into_neon_object(self.object.get_context())?;
+        Ok(neon_result.into())
     }
 
     fn definition(&self) -> Result<String, CubeError> {

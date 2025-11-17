@@ -1,4 +1,3 @@
-import { getEnv } from '@cubejs-backend/shared';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
@@ -60,14 +59,14 @@ cube('A', {
 
 cube('B', {
   sql: \`
-    SELECT 2 id, 'b'::text as "name"\`,
+    SELECT 2 id, 4 as fk_e, 'b'::text as "name"\`,
   joins: {
     A: {
       relationship: \`many_to_one\`,
       sql: \`\${CUBE.fk} = \${A.id}\`,
     },
     E: {
-      sql: \`\${CUBE.name} = \${E.id}\`,
+      sql: \`\${CUBE}.fk_e = \${E.id}\`,
       relationship: \`many_to_one\`,
     },
   },
@@ -144,61 +143,31 @@ cube('D', {
 });
     `);
 
-  if (getEnv('nativeSqlPlanner')) {
-    it('join order', async () => dbRunner.runQueryTest({
-      dimensions: [
-        'View.A_id',
-        'View.A_name',
-        'View.B_id',
-        'View.B_name',
-        'View.D_id',
-        'View.D_name',
-        'View.E_id',
-        'View.E_name'
-      ],
-      timeDimensions: [],
-      segments: [],
-      filters: [],
-      total: true,
-      renewQuery: false,
-      limit: 1
-    }, [{
-      view__a_id: 1,
-      view__a_name: 'a',
-      view__b_id: 2,
-      view__b_name: 'b',
-      view__d_id: 3,
-      view__d_name: 'd',
-      view__e_id: 4,
-      view__e_name: 'e',
-    }], { compiler, joinGraph, cubeEvaluator }));
-  } else {
-    it('join order', async () => dbRunner.runQueryTest({
-      dimensions: [
-        'View.A_id',
-        'View.A_name',
-        'View.B_id',
-        'View.B_name',
-        'View.D_id',
-        'View.D_name',
-        'View.E_id',
-        'View.E_name'
-      ],
-      timeDimensions: [],
-      segments: [],
-      filters: [],
-      total: true,
-      renewQuery: false,
-      limit: 1
-    }, [{
-      view___a_id: 1,
-      view___a_name: 'a',
-      view___b_id: 2,
-      view___b_name: 'b',
-      view___d_id: 3,
-      view___d_name: 'd',
-      view___e_id: 4,
-      view___e_name: 'e',
-    }], { compiler, joinGraph, cubeEvaluator }));
-  }
+  it('join order', async () => dbRunner.runQueryTest({
+    dimensions: [
+      'View.A_id',
+      'View.A_name',
+      'View.B_id',
+      'View.B_name',
+      'View.D_id',
+      'View.D_name',
+      'View.E_id',
+      'View.E_name'
+    ],
+    timeDimensions: [],
+    segments: [],
+    filters: [],
+    total: true,
+    renewQuery: false,
+    limit: 1
+  }, [{
+    view___a_id: 1,
+    view___a_name: 'a',
+    view___b_id: 2,
+    view___b_name: 'b',
+    view___d_id: 3,
+    view___d_name: 'd',
+    view___e_id: 4,
+    view___e_name: 'e',
+  }], { compiler, joinGraph, cubeEvaluator }));
 });

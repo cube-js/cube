@@ -447,7 +447,7 @@ views:
     `);
 
   if (getEnv('nativeSqlPlanner')) {
-    it('basic cross join 1', async () => dbRunner.runQueryTest({
+    it('basic cross join', async () => dbRunner.runQueryTest({
       dimensions: ['orders.currency'],
       timeDimensions: [
         {
@@ -1192,85 +1192,6 @@ views:
         },
         {
           source__product_category: 'some category B',
-          source__created_at_month: '2022-04-01T00:00:00.000Z'
-        }
-      ],
-      { joinGraph, cubeEvaluator, compiler });
-    });
-
-    it('source product_category_ext and created_at cross join', async () => {
-      await dbRunner.runQueryTest({
-        dimensions: ['source.product_category_ext'],
-        timeDimensions: [
-          {
-            dimension: 'source.created_at',
-            granularity: 'month'
-          }
-        ],
-        timezone: 'UTC',
-        order: [
-          {
-            id: 'source.created_at'
-          },
-          {
-            id: 'source.product_category_ext'
-          }
-        ],
-      }, [
-        {
-          source__product_category_ext: 'some category-EUR-EUR',
-          source__created_at_month: '2022-01-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category-USD-USD',
-          source__created_at_month: '2022-01-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category A-EUR-EUR',
-          source__created_at_month: '2022-02-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category A-USD-USD',
-          source__created_at_month: '2022-02-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category B-EUR-EUR',
-          source__created_at_month: '2022-02-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category B-USD-USD',
-          source__created_at_month: '2022-02-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category-EUR-EUR',
-          source__created_at_month: '2022-02-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category-USD-USD',
-          source__created_at_month: '2022-02-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category A-EUR-EUR',
-          source__created_at_month: '2022-03-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category A-USD-USD',
-          source__created_at_month: '2022-03-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category B-EUR-EUR',
-          source__created_at_month: '2022-03-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category B-USD-USD',
-          source__created_at_month: '2022-03-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category B-EUR-EUR',
-          source__created_at_month: '2022-04-01T00:00:00.000Z'
-        },
-        {
-          source__product_category_ext: 'some category B-USD-USD',
           source__created_at_month: '2022-04-01T00:00:00.000Z'
         }
       ],

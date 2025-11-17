@@ -1,5 +1,3 @@
-use std::{collections::HashMap, env, ops::Deref, sync::Arc};
-
 use super::{convert_sql_to_cube_query, CompilationResult, QueryPlan};
 use crate::{
     compile::{
@@ -23,6 +21,8 @@ use crate::{
 use async_trait::async_trait;
 use cubeclient::models::V1CubeMetaType;
 use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFrame};
+use std::future::Future;
+use std::{collections::HashMap, env, ops::Deref, sync::Arc};
 use uuid::Uuid;
 
 pub mod rewrite_engine;
@@ -47,6 +47,7 @@ pub mod test_user_change;
 #[cfg(test)]
 pub mod test_wrapper;
 pub mod utils;
+use crate::compile::engine::df::scan::CacheMode;
 use crate::compile::{
     arrow::record_batch::RecordBatch, engine::df::scan::convert_transport_response,
 };
@@ -911,6 +912,7 @@ impl TransportService for TestConnectionTransport {
         meta: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
+        _cache_mode: Option<CacheMode>,
     ) -> Result<Vec<RecordBatch>, CubeError> {
         {
             let mut calls = self.load_calls.lock().await;
@@ -1200,4 +1202,46 @@ pub async fn convert_select_to_query_plan_with_meta(
     .await;
 
     query.unwrap()
+}
+
+pub struct AsyncTestOptions {
+    stack_bytes: usize,
+}
+
+impl Default for AsyncTestOptions {
+    fn default() -> Self {
+        Self {
+            // By default tokio stack size is aligned with OS default:
+            // 1mb for Windows, 2mb for macOS, 8mb for linux
+            // Let's align everything to 8mb
+            stack_bytes: 8 * 1024 * 1024,
+        }
+    }
+}
+
+pub fn run_async_test<F>(fut: F)
+where
+    F: Future<Output = ()> + Send + 'static,
+{
+    run_async_test_opt(AsyncTestOptions::default(), fut)
+}
+
+pub fn run_async_test_opt<F>(opts: AsyncTestOptions, fut: F)
+where
+    F: Future<Output = ()> + Send + 'static,
+{
+    std::thread::Builder::new()
+        .name("test-rt".into())
+        .stack_size(opts.stack_bytes)
+        .spawn(|| {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
+            rt.block_on(fut);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
 }

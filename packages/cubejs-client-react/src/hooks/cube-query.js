@@ -3,11 +3,9 @@ import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
 
 import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
-import { useIsMounted } from './is-mounted';
 
 export function useCubeQuery(query, options = {}) {
   const mutexRef = useRef({});
-  const isMounted = useIsMounted();
   const [currentQuery, setCurrentQuery] = useState(null);
   const [isLoading, setLoading] = useState(!options.skip);
   const [resultSet, setResultSet] = useState(null);
@@ -42,21 +40,15 @@ export function useCubeQuery(query, options = {}) {
         castNumerics: Boolean(typeof options.castNumerics === 'boolean' ? options.castNumerics : context?.options?.castNumerics)
       });
 
-      if (isMounted()) {
-        setResultSet(response);
-        setProgress(null);
-      }
+      setResultSet(response);
+      setProgress(null);
     } catch (error) {
-      if (isMounted()) {
-        setError(error);
-        setResultSet(null);
-        setProgress(null);
-      }
+      setError(error);
+      setResultSet(null);
+      setProgress(null);
     }
 
-    if (isMounted()) {
-      setLoading(false);
-    }
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -95,27 +87,23 @@ export function useCubeQuery(query, options = {}) {
                 progressCallback,
               },
               (e, result) => {
-                if (isMounted()) {
-                  if (e) {
-                    setError(e);
-                  } else {
-                    setResultSet(result);
-                  }
-                  setLoading(false);
-                  setProgress(null);
+                if (e) {
+                  setError(e);
+                } else {
+                  setResultSet(result);
                 }
+                setLoading(false);
+                setProgress(null);
               }
             );
           } else {
             await fetch();
           }
         } catch (e) {
-          if (isMounted()) {
-            setError(e);
-            setResultSet(null);
-            setLoading(false);
-            setProgress(null);
-          }
+          setError(e);
+          setResultSet(null);
+          setLoading(false);
+          setProgress(null);
         }
       }
     }

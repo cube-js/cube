@@ -185,4 +185,38 @@ impl Granularity {
 
         Ok(res)
     }
+
+    /// Check if the granularity is aligned with the given date range.
+    /// For custom granularities, this checks if:
+    /// 1. The date range duration is an exact multiple of the granularity interval
+    /// 2. The start date is aligned with the granularity origin
+    pub fn is_aligned_with_date_range(
+        &self,
+        start_str: &str,
+        end_str: &str,
+        timezone: Tz,
+    ) -> Result<bool, CubeError> {
+        let start = QueryDateTime::from_date_str(timezone, start_str)?;
+        let end = QueryDateTime::from_date_str(timezone, end_str)?;
+        let end = end.add_duration(chrono::Duration::milliseconds(1))?;
+
+        // Check if the start is aligned with the origin first
+        let aligned_start = self.align_date_to_origin(start.clone())?;
+
+        if start != aligned_start {
+            return Ok(false);
+        }
+
+        // Check if the interval fits exactly into the date range
+        let mut test_date = start;
+        while test_date < end {
+            test_date = test_date.add_interval(&self.granularity_interval)?;
+        }
+
+        if test_date != end {
+            return Ok(false);
+        }
+
+        Ok(true)
+    }
 }
