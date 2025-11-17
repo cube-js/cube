@@ -1,13 +1,13 @@
 import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
 import {
+  CanSwitchSQLUserFn,
   CheckAuthFn,
+  CheckSQLAuthFn,
+  ContextToApiScopesFn,
   ExtendContextFn,
   JWTOptions,
-  UserBackgroundContext,
   QueryRewriteFn,
-  CheckSQLAuthFn,
-  CanSwitchSQLUserFn,
-  ContextToApiScopesFn,
+  UserBackgroundContext,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
@@ -169,6 +169,8 @@ export type DriverFactoryAsyncFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig>;
 
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
+
+export type DialectClassFn = (options: { dataSource: string; dbType: string }) => BaseQuery;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
