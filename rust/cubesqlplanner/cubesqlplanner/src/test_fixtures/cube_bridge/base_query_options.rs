@@ -85,6 +85,23 @@ impl_static_data!(
     disable_external_pre_aggregations
 );
 
+/// Helper function to create Vec<OptionsMember> from Vec<String>
+///
+/// Converts a vector of strings into a vector of OptionsMember::MemberName variants.
+///
+/// # Example
+/// ```ignore
+/// use crate::test_fixtures::cube_bridge::members_from_strings;
+///
+/// let members = members_from_strings(vec!["orders.count", "orders.status"]);
+/// ```
+pub fn members_from_strings<S: ToString>(strings: Vec<S>) -> Vec<OptionsMember> {
+    strings
+        .into_iter()
+        .map(|s| OptionsMember::MemberName(s.to_string()))
+        .collect()
+}
+
 impl BaseQueryOptions for MockBaseQueryOptions {
     crate::impl_static_data_method!(BaseQueryOptionsStatic);
 
