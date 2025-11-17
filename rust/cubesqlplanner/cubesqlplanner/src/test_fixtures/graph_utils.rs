@@ -1,35 +1,3 @@
-//! Graph utilities for MockJoinGraph testing
-//!
-//! This module provides graph algorithms for testing join path finding in MockJoinGraph.
-//! It uses the petgraph library to implement shortest path algorithms (Dijkstra's algorithm
-//! via A* with zero heuristic).
-//!
-//! # Why dev-only
-//!
-//! This is test infrastructure code that:
-//! - Uses petgraph as a dev-dependency (not needed in production)
-//! - Converts between our HashMap format and petgraph's graph representation
-//! - Provides utilities specifically for testing MockJoinGraph
-//! - Is not included in the production binary
-//!
-//! # Usage
-//!
-//! ```rust
-//! use std::collections::HashMap;
-//! use cubesqlplanner::test_fixtures::graph_utils::find_shortest_path;
-//!
-//! let mut nodes = HashMap::new();
-//! nodes.insert("orders".to_string(), {
-//!     let mut edges = HashMap::new();
-//!     edges.insert("users".to_string(), 1);
-//!     edges
-//! });
-//! nodes.insert("users".to_string(), HashMap::new());
-//!
-//! let path = find_shortest_path(&nodes, "orders", "users");
-//! assert_eq!(path, Some(vec!["orders".to_string(), "users".to_string()]));
-//! ```
-
 use petgraph::graph::NodeIndex;
 use petgraph::Graph;
 use std::collections::HashMap;
@@ -42,20 +10,6 @@ use std::collections::HashMap;
 /// - Outer map keys are cube names (all nodes in the graph)
 /// - Inner map represents edges: destination cube name -> edge weight
 ///
-/// Example:
-/// ```rust
-/// use std::collections::HashMap;
-///
-/// let mut nodes = HashMap::new();
-/// nodes.insert("orders".to_string(), {
-///     let mut edges = HashMap::new();
-///     edges.insert("users".to_string(), 1);
-///     edges.insert("products".to_string(), 1);
-///     edges
-/// });
-/// nodes.insert("users".to_string(), HashMap::new());
-/// nodes.insert("products".to_string(), HashMap::new());
-/// ```
 ///
 /// # Returns
 ///
@@ -113,51 +67,25 @@ pub fn build_petgraph_from_hashmap(
 /// - If `start` or `end` don't exist in the graph, returns `None`
 /// - If nodes are disconnected, returns `None`
 ///
-/// # Example
-///
-/// ```rust
-/// use std::collections::HashMap;
-/// use cubesqlplanner::test_fixtures::graph_utils::find_shortest_path;
-///
-/// let mut nodes = HashMap::new();
-/// nodes.insert("A".to_string(), {
-///     let mut edges = HashMap::new();
-///     edges.insert("B".to_string(), 1);
-///     edges
-/// });
-/// nodes.insert("B".to_string(), {
-///     let mut edges = HashMap::new();
-///     edges.insert("C".to_string(), 1);
-///     edges
-/// });
-/// nodes.insert("C".to_string(), HashMap::new());
-///
-/// let path = find_shortest_path(&nodes, "A", "C");
-/// assert_eq!(path, Some(vec!["A".to_string(), "B".to_string(), "C".to_string()]));
 /// ```
 pub fn find_shortest_path(
     nodes: &HashMap<String, HashMap<String, u32>>,
     start: &str,
     end: &str,
 ) -> Option<Vec<String>> {
-    // Edge case: start == end
     if start == end {
         return Some(vec![start.to_string()]);
     }
 
-    // Edge case: start or end not in graph
     if !nodes.contains_key(start) || !nodes.contains_key(end) {
         return None;
     }
 
-    // Build petgraph from HashMap
     let (graph, node_indices) = build_petgraph_from_hashmap(nodes);
 
-    // Get NodeIndex for start and end
     let start_index = node_indices[start];
     let end_index = node_indices[end];
 
-    // Use A* with zero heuristic (equivalent to Dijkstra)
     let result = petgraph::algo::astar(
         &graph,
         start_index,
@@ -166,7 +94,6 @@ pub fn find_shortest_path(
         |_| 0, // Zero heuristic makes this equivalent to Dijkstra
     );
 
-    // Convert result to path of cube names
     match result {
         Some((_cost, path)) => {
             let cube_names: Vec<String> = path
