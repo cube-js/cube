@@ -39,7 +39,8 @@ export class CubeToMetaTransformer {
    * @protected
    */
   transform(cube) {
-    const cubeTitle = cube.title || this.titleize(cube.name);
+    const cubeName = cube.name;
+    const cubeTitle = cube.title || this.titleize(cubeName);
 
     const isCubeVisible = this.isVisible(cube, true);
 
@@ -52,7 +53,7 @@ export class CubeToMetaTransformer {
         if (member.type === 'folder') {
           return processFolder(member, [...path, folder.name], flatMembers);
         }
-        const memberName = `${cube.name}.${member.name}`;
+        const memberName = `${cubeName}.${member.name}`;
         flatMembers.push(memberName);
 
         return memberName;
@@ -82,64 +83,75 @@ export class CubeToMetaTransformer {
 
     return {
       config: {
-        name: cube.name,
+        name: cubeName,
         type: cube.isView ? 'view' : 'cube',
         title: cubeTitle,
         isVisible: isCubeVisible,
         public: isCubeVisible,
         description: cube.description,
-        connectedComponent: this.joinGraph.connectedComponents()[cube.name],
+        connectedComponent: this.joinGraph.connectedComponents()[cubeName],
         meta: cube.meta,
-        measures: Object.entries(cube.measures || {}).map((nameToMetric) => ({
-          ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
-          isVisible: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false,
-          public: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false,
-        })),
-        dimensions: Object.entries(cube.dimensions || {}).map((nameToDimension) => ({
-          name: `${cube.name}.${nameToDimension[0]}`,
-          title: this.title(cubeTitle, nameToDimension),
-          type: this.dimensionDataType(nameToDimension[1].type),
-          description: nameToDimension[1].description,
-          shortTitle: this.title(cubeTitle, nameToDimension, true),
-          suggestFilterValues:
-            nameToDimension[1].suggestFilterValues == null
-              ? true
-              : nameToDimension[1].suggestFilterValues,
-          format: nameToDimension[1].format,
-          meta: nameToDimension[1].meta,
-          isVisible: isCubeVisible
-            ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
-            : false,
-          public: isCubeVisible
-            ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
-            : false,
-          primaryKey: !!nameToDimension[1].primaryKey,
-          aliasMember: nameToDimension[1].aliasMember,
-          granularities:
-            nameToDimension[1].granularities
-              ? Object.entries(nameToDimension[1].granularities).map((g) => ({
-                name: g[0],
-                title: this.title(cubeTitle, g, true),
-                interval: g[1].interval,
-                offset: g[1].offset,
-                origin: g[1].origin,
-              }))
-              : undefined,
-        })),
-        segments: Object.entries(cube.segments || {}).map((nameToSegment) => ({
-          name: `${cube.name}.${nameToSegment[0]}`,
-          title: this.title(cubeTitle, nameToSegment),
-          shortTitle: this.title(cubeTitle, nameToSegment, true),
-          description: nameToSegment[1].description,
-          meta: nameToSegment[1].meta,
-          isVisible: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
-          public: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
-        })),
+        measures: Object.entries(cube.measures || {}).map((nameToMetric) => {
+          const metricDef = nameToMetric[1];
+          const measureVisibility = isCubeVisible ? this.isVisible(metricDef, true) : false;
+          return {
+            ...this.measureConfig(cubeName, cubeTitle, nameToMetric),
+            isVisible: measureVisibility,
+            public: measureVisibility,
+          };
+        }),
+        dimensions: Object.entries(cube.dimensions || {}).map((nameToDimension) => {
+          const [dimensionName, dimDef] = nameToDimension;
+          const dimensionVisibility = isCubeVisible
+            ? this.isVisible(dimDef, !dimDef.primaryKey)
+            : false;
+          const granularitiesObj = dimDef.granularities;
+
+          return {
+            name: `${cubeName}.${dimensionName}`,
+            title: this.title(cubeTitle, nameToDimension),
+            type: this.dimensionDataType(dimDef.type),
+            description: dimDef.description,
+            shortTitle: this.title(cubeTitle, nameToDimension, true),
+            suggestFilterValues:
+              dimDef.suggestFilterValues == null
+                ? true
+                : dimDef.suggestFilterValues,
+            format: dimDef.format,
+            meta: dimDef.meta,
+            isVisible: dimensionVisibility,
+            public: dimensionVisibility,
+            primaryKey: !!dimDef.primaryKey,
+            aliasMember: dimDef.aliasMember,
+            granularities:
+              granularitiesObj
+                ? Object.entries(granularitiesObj).map(([gName, gDef]) => ({
+                  name: gName,
+                  title: this.title(cubeTitle, [gName, gDef], true),
+                  interval: gDef.interval,
+                  offset: gDef.offset,
+                  origin: gDef.origin,
+                }))
+                : undefined,
+          };
+        }),
+        segments: Object.entries(cube.segments || {}).map((nameToSegment) => {
+          const [segmentName, segmentDef] = nameToSegment;
+          const segmentVisibility = isCubeVisible ? this.isVisible(segmentDef, true) : false;
+          return {
+            name: `${cubeName}.${segmentName}`,
+            title: this.title(cubeTitle, nameToSegment),
+            shortTitle: this.title(cubeTitle, nameToSegment, true),
+            description: segmentDef.description,
+            meta: segmentDef.meta,
+            isVisible: segmentVisibility,
+            public: segmentVisibility,
+          };
+        }),
         hierarchies: (cube.evaluatedHierarchies || []).map((it) => ({
           ...it,
-          aliasMember: it.aliasMember,
           public: it.public ?? true,
-          name: `${cube.name}.${it.name}`,
+          name: `${cubeName}.${it.name}`,
         })),
         folders: flatFolders,
         nestedFolders,
@@ -192,39 +204,49 @@ export class CubeToMetaTransformer {
   }
 
   measureConfig(cubeName, cubeTitle, nameToMetric) {
-    const name = `${cubeName}.${nameToMetric[0]}`;
+    const [metricName, metricDef] = nameToMetric;
+    const name = `${cubeName}.${metricName}`;
+
     // Support both old 'drillMemberReferences' and new 'drillMembers' keys
-    const drillMembers = nameToMetric[1].drillMembers || nameToMetric[1].drillMemberReferences;
+    const drillMembers = metricDef.drillMembers || metricDef.drillMemberReferences;
 
     const drillMembersArray = (drillMembers && this.cubeEvaluator.evaluateReferences(
       cubeName, drillMembers, { originalSorting: true }
     )) || [];
 
-    const type = CubeSymbols.toMemberDataType(nameToMetric[1].type);
+    const type = CubeSymbols.toMemberDataType(metricDef.type);
+    const isCumulative = metricDef.cumulative || BaseMeasure.isCumulative(metricDef);
+
+    const drillMembersGrouped = { measures: [], dimensions: [] };
+    for (const member of drillMembersArray) {
+      if (this.cubeEvaluator.isMeasure(member)) {
+        drillMembersGrouped.measures.push(member);
+      } else if (this.cubeEvaluator.isDimension(member)) {
+        drillMembersGrouped.dimensions.push(member);
+      }
+    }
 
     return {
       name,
       title: this.title(cubeTitle, nameToMetric),
-      description: nameToMetric[1].description,
+      description: metricDef.description,
       shortTitle: this.title(cubeTitle, nameToMetric, true),
-      format: nameToMetric[1].format,
-      cumulativeTotal: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
-      cumulative: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
+      format: metricDef.format,
+      cumulativeTotal: isCumulative,
+      cumulative: isCumulative,
       type,
-      aggType: nameToMetric[1].aggType || nameToMetric[1].type,
+      aggType: metricDef.aggType || metricDef.type,
       drillMembers: drillMembersArray,
-      drillMembersGrouped: {
-        measures: drillMembersArray.filter((member) => this.cubeEvaluator.isMeasure(member)),
-        dimensions: drillMembersArray.filter((member) => this.cubeEvaluator.isDimension(member)),
-      },
-      aliasMember: nameToMetric[1].aliasMember,
-      meta: nameToMetric[1].meta
+      drillMembersGrouped,
+      aliasMember: metricDef.aliasMember,
+      meta: metricDef.meta
     };
   }
 
   title(cubeTitle, nameToDef, short) {
-    // eslint-disable-next-line prefer-template
-    return `${short ? '' : cubeTitle + ' '}${nameToDef[1].title || this.titleize(nameToDef[0])}`;
+    const prefix = short ? '' : `${cubeTitle} `;
+    const suffix = nameToDef[1].title || this.titleize(nameToDef[0]);
+    return `${prefix}${suffix}`;
   }
 
   titleize(name) {
