@@ -141,6 +141,7 @@ jobs:
       - name: Install Rust target for cross-compilation
         if: matrix.target == 'x86_64-apple-darwin'
         run: rustup target add x86_64-apple-darwin
+        working-directory: rust/cubestore
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubestore -> target
