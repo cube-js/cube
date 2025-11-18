@@ -14,6 +14,7 @@ export type ToString = { toString(): string };
 
 export type GranularityDefinition = {
   sql?: (...args: any[]) => string;
+  name?: string;
   title?: string;
   interval?: string;
   offset?: string;
@@ -140,6 +141,17 @@ export type ViewIncludedMember = {
   name: string;
 };
 
+export type FolderMember = {
+  type?: 'folder';
+  name: string;
+  includes?: FolderMember[];
+};
+
+export type Folder = {
+  name: string;
+  includes: FolderMember[];
+};
+
 export interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
@@ -159,7 +171,7 @@ export interface CubeDefinition {
   accessPolicy?: AccessPolicyDefinition[];
   // eslint-disable-next-line camelcase
   access_policy?: any[];
-  folders?: any[];
+  folders?: Folder[];
   includes?: any;
   excludes?: any;
   cubes?: any;
