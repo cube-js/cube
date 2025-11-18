@@ -605,7 +605,7 @@ pub fn create_logger(log_level: log::Level) -> Box<dyn log::Log> {
         .with_module_level("cubejs_native", log_level.to_level_filter())
         .with_module_level("datafusion", log::Level::Warn.to_level_filter())
         .with_module_level("pg_srv", log::Level::Warn.to_level_filter())
-        .init()
+        .build()
         .unwrap();
 
     Box::new(logger)

@@ -1891,9 +1891,9 @@ dependencies = [
 
 [[package]]
 name = "log_nonblock"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcd95818c159f1051341d8733810353b5c908121eda932fe6f23569459bc55bb"
+checksum = "2dd865aac7b0ac610c132da39b2775ca0bd2554f97eb7ea7075917ce9ba70e89"
 dependencies = [
  "colored 3.0.0",
  "crossbeam-channel",
