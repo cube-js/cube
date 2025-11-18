@@ -386,15 +386,15 @@ describe('Yaml Schema Testing', () => {
 
     expect(dimensions).toBeDefined();
     expect(dimensions.length).toBeGreaterThan(0);
-    expect(dimensions.find((dimension) => dimension.name === 'CubeA.id').description).toBe('id dimension from YAML test cube');
+    expect(dimensions.find((dimension) => dimension.name === 'CubeA.id')?.description).toBe('id dimension from YAML test cube');
 
     expect(measures).toBeDefined();
     expect(measures.length).toBeGreaterThan(0);
-    expect(measures.find((measure) => measure.name === 'CubeA.count').description).toBe('count measure from YAML test cube');
+    expect(measures.find((measure) => measure.name === 'CubeA.count')?.description).toBe('count measure from YAML test cube');
 
     expect(segments).toBeDefined();
     expect(segments.length).toBeGreaterThan(0);
-    expect(segments.find((segment) => segment.name === 'CubeA.sfUsers').description).toBe('SF users segment from createCubeSchema');
+    expect(segments.find((segment) => segment.name === 'CubeA.sfUsers')?.description).toBe('SF users segment from createCubeSchema');
   });
 
   describe('Custom dimension granularities: ', () => {
