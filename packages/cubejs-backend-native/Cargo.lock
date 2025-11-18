@@ -537,7 +537,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -1841,7 +1841,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.0",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -1891,9 +1891,9 @@ dependencies = [
 
 [[package]]
 name = "log_nonblock"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8f91dc1ced2808e0e1a2efff47bad435c8679ae6ee0a42ea90e98e0eaeb1239"
+checksum = "20f3c2ef2756268549320e0a746bf015e4ceda94b8e68bb88118ad8fec6513e3"
 dependencies = [
  "colored 3.0.0",
  "crossbeam-channel",
