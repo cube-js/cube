@@ -914,9 +914,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    * refactoring.
    */
   protected evaluateContextFunction(cube: any, contextFn: any, context: any = {}) {
-    const cubeEvaluator = this;
-
-    return cubeEvaluator.resolveSymbolsCall(contextFn, (name: string) => {
+    return this.resolveSymbolsCall(contextFn, (name: string) => {
       const resolvedSymbol = this.resolveSymbol(cube, name);
       if (resolvedSymbol) {
         return resolvedSymbol;
@@ -931,7 +929,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     });
   }
 
-  protected evaluateReferences<T extends ToString | Array<ToString>>(
+  public evaluateReferences<T extends ToString | Array<ToString>>(
     cube: string | null,
     referencesFn: (...args: Array<unknown>) => T,
     options: { collectJoinHints?: boolean, originalSorting?: boolean } = {}
