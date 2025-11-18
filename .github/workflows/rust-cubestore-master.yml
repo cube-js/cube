@@ -199,6 +199,9 @@ jobs:
         run: rustup set auto-self-update disable
         if: contains(runner.os, 'windows')
         shell: bash
+      - name: Install Rust target for cross-compilation
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: rustup target add x86_64-apple-darwin
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubestore -> target
