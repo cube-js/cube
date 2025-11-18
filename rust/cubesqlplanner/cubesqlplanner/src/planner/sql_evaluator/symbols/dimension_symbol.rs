@@ -238,11 +238,6 @@ impl DimensionSymbol {
         if let Some(member_sql) = &self.longitude {
             member_sql.extract_symbol_deps(&mut deps);
         }
-        if let Some(add_group_by) = &self.add_group_by {
-            for member_sql in add_group_by {
-                deps.extend(member_sql.get_dependencies().into_iter());
-            }
-        }
         if let Some(case) = &self.case {
             case.extract_symbol_deps(&mut deps);
         }
@@ -262,11 +257,6 @@ impl DimensionSymbol {
         }
         if let Some(case) = &self.case {
             case.extract_symbol_deps_with_path(&mut deps);
-        }
-        if let Some(add_group_by) = &self.add_group_by {
-            for member_sql in add_group_by {
-                deps.extend(member_sql.get_dependencies_with_path().into_iter());
-            }
         }
         deps
     }
