@@ -1,0 +1,128 @@
+# Deploying Cube Cloud BYOC on GCP
+
+With Bring Your Own Cloud (BYOC) on Google Cloud Platform (GCP), all the components interacting with private data are deployed on
+the customer infrastructure on GCP and managed by the Cube Cloud Control Plane via the Cube Cloud Operator.
+This document provides step-by-step instructions for deploying Cube Cloud BYOC on GCP.
+
+## Prerequisites
+
+The bulk of provisioning work will be done remotely by Cube Cloud automation.
+However, to get started, you'll need to provide Cube with the necessary access
+along with some additional information that includes:
+
+- **GCP Project ID:** A dedicated GCP project ID that will exclusively host Cube-managed infrastructure.
+  This should be a new, isolated project created specifically for Cube Cloud BYOC.
+- **GCP Region:** [The GCP region][gcp-docs-regions] where Cube Cloud resources
+  should be deployed.
+
+In addition to that, you'll need to make sure you have sufficient access to grant
+IAM permissions in the dedicated project to allow Cube Cloud to:
+- Create and manage VPC networking
+- Create and manage GKE clusters
+- Create and manage Cloud Storage buckets
+- Create and manage Cloud DNS zones
+- Create and manage service accounts
+- Configure IAM permissions for resources
+- Read from Artifact Registry
+
+## Provisioning access
+
+### Create a dedicated GCP project
+
+We strongly recommend creating a dedicated GCP project that will exclusively host
+Cube-managed infrastructure. This project isolation approach simplifies permission
+management and provides clear resource boundaries.
+
+Navigate to the [GCP Console][gcp-console] and create a new project for Cube Cloud BYOC.
+Note the **Project ID** (not the project name) as you'll need it for the next steps
+and to share with your Cube contact point.
+
+### Grant IAM permissions
+
+In order to manage resources in the Cube-dedicated GCP project, Cube Cloud Service Principal
+needs to be granted administrative permissions to a set of services.
+
+Navigate to **IAM & Admin > IAM** in your dedicated project and add the following IAM
+binding for the Cube Cloud service account:
+
+**Principal:** `cube-cloud-byoc-installer@cube-cloud-byoc.iam.gserviceaccount.com`
+
+**Roles:**
+
+- **Compute Admin** (`roles/compute.admin`) - Allows creation and management of VPC networks, subnets, routers, NAT gateways, firewall rules, IP addresses, and Private Service Connect endpoints
+- **Kubernetes Engine Admin** (`roles/container.admin`) - Allows creation and management of GKE clusters and node pools
+- **Storage Admin** (`roles/storage.admin`) - Allows creation and management of Cloud Storage buckets for Cube Store
+- **Service Account Admin** (`roles/iam.serviceAccountAdmin`) - Allows creation and management of service accounts for cluster nodes and workload identity
+- **Project IAM Admin** (`roles/resourcemanager.projectIamAdmin`) - Allows granting IAM permissions to created resources (e.g., bucket access for service accounts)
+
+You can grant these permissions through the Google Cloud Console UI or using the
+`gcloud` command-line tool:
+
+```bash
+# Set your project ID
+export PROJECT_ID="your-cube-byoc-project-id"
+
+# Set the Cube Cloud service account
+export CUBE_SA="cube-cloud-byoc-installer@cube-cloud-byoc.iam.gserviceaccount.com"
+
+# Grant all required roles
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$CUBE_SA" \
+  --role="roles/compute.admin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$CUBE_SA" \
+  --role="roles/container.admin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$CUBE_SA" \
+  --role="roles/storage.admin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$CUBE_SA" \
+  --role="roles/iam.serviceAccountAdmin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$CUBE_SA" \
+  --role="roles/resourcemanager.projectIamAdmin"
+```
+
+### Enable required APIs
+
+Ensure the following GCP APIs are enabled in your dedicated project:
+
+- Compute Engine API (`compute.googleapis.com`)
+- Kubernetes Engine API (`container.googleapis.com`)
+- Cloud Storage API (`storage.googleapis.com`)
+- IAM API (`iam.googleapis.com`)
+- Service Networking API (`servicenetworking.googleapis.com`)
+
+You can enable these APIs through the [API Library][gcp-api-library] in the GCP Console,
+or use the `gcloud` command:
+
+```bash
+gcloud services enable compute.googleapis.com \
+  container.googleapis.com \
+  storage.googleapis.com \
+  iam.googleapis.com \
+  servicenetworking.googleapis.com \
+  --project=$PROJECT_ID
+```
+
+## Deployment
+
+The actual deployment will be done by Cube Cloud automation. All that's left to
+do is notify your Cube contact point that access has been granted, and pass
+along your GCP Project ID and Region information.
+
+After deployment, Cube Cloud will manage the following resources in your dedicated project:
+
+- A VPC network with subnets, Cloud Router, and Cloud NAT for outbound connectivity
+- A GKE cluster with node pools for running Cube applications
+- Cloud Storage buckets for Cube Store data
+- Service accounts and IAM bindings for secure resource access
+- Firewall rules and network policies for security
+
+[gcp-console]: https://console.cloud.google.com/
+[gcp-docs-regions]: https://cloud.google.com/compute/docs/regions-zones
+[gcp-api-library]: https://console.cloud.google.com/apis/library
