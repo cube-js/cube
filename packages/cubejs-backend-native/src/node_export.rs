@@ -30,8 +30,11 @@ use std::sync::Arc;
 
 use cubesql::telemetry::LocalReporter;
 use cubesql::{telemetry::ReportingLogger, CubeError};
+#[cfg(feature = "async-log")]
+use log_nonblock::NonBlockingLoggerBuilder;
 use neon::prelude::*;
 use neon::result::Throw;
+#[cfg(not(feature = "async-log"))]
 use simple_logger::SimpleLogger;
 
 pub(crate) struct SQLInterface {
@@ -578,8 +581,23 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
-pub fn create_logger(log_level: log::Level) -> SimpleLogger {
-    SimpleLogger::new()
+#[cfg(not(feature = "async-log"))]
+pub fn create_logger(log_level: log::Level) -> Box<dyn log::Log> {
+    let logger = SimpleLogger::new()
+        .with_level(log::Level::Error.to_level_filter())
+        .with_module_level("cubesql", log_level.to_level_filter())
+        .with_module_level("cube_xmla", log_level.to_level_filter())
+        .with_module_level("cube_xmla_engine", log_level.to_level_filter())
+        .with_module_level("cubejs_native", log_level.to_level_filter())
+        .with_module_level("datafusion", log::Level::Warn.to_level_filter())
+        .with_module_level("pg_srv", log::Level::Warn.to_level_filter());
+
+    Box::new(logger)
+}
+
+#[cfg(feature = "async-log")]
+pub fn create_logger(log_level: log::Level) -> Box<dyn log::Log> {
+    let logger = NonBlockingLoggerBuilder::new()
         .with_level(log::Level::Error.to_level_filter())
         .with_module_level("cubesql", log_level.to_level_filter())
         .with_module_level("cube_xmla", log_level.to_level_filter())
@@ -587,6 +605,10 @@ pub fn create_logger(log_level: log::Level) -> SimpleLogger {
         .with_module_level("cubejs_native", log_level.to_level_filter())
         .with_module_level("datafusion", log::Level::Warn.to_level_filter())
         .with_module_level("pg_srv", log::Level::Warn.to_level_filter())
+        .build()
+        .unwrap();
+
+    Box::new(logger)
 }
 
 pub fn setup_local_logger(log_level: log::Level) {
