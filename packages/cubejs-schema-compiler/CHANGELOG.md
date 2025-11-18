@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.4](https://github.com/cube-js/cube/compare/v1.5.3...v1.5.4) (2025-11-18)
+
+### Bug Fixes
+
+- **tesseract:** Multi-stage dimension dependent on another multi-stage dimension didn’t work ([#10147](https://github.com/cube-js/cube/issues/10147)) ([ca71721](https://github.com/cube-js/cube/commit/ca717211e7340c6e0f7551b535465a21ec126262))
+
 ## [1.5.3](https://github.com/cube-js/cube/compare/v1.5.2...v1.5.3) (2025-11-13)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
