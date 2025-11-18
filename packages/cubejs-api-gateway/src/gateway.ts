@@ -1290,7 +1290,7 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(rewrittenQuery, persistent);
+          return normalizeQuery(rewrittenQuery, persistent, cacheMode);
         }
       )
     );
