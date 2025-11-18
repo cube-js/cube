@@ -32,11 +32,11 @@ impl TraversalVisitor for JoinHintsCollector {
                     for item in add_group_by.iter() {
                         self.apply(item, &())?;
                     }
-                    for (dep, path) in dim.get_dependencies_with_path().into_iter() {
-                        if let Ok(dim) = dep.as_dimension() {
-                            if dim.is_multi_stage() {
-                                self.on_node_traverse(&dep, &path, &())?;
-                            }
+                }
+                for (dep, path) in dim.get_dependencies_with_path().into_iter() {
+                    if let Ok(dim) = dep.as_dimension() {
+                        if dim.is_multi_stage() {
+                            self.on_node_traverse(&dep, &path, &())?;
                         }
                     }
                 }

@@ -98,6 +98,12 @@ cubes:
       - name: changeTypeConcat
         sql: "CONCAT({changeTypeComplex}, '-test')"
         type: string
+        multi_stage: true
+
+      - name: twoDimsConcat
+        sql: "CONCAT({changeTypeComplex}, '-', {first_date.customerType2})"
+        type: string
+        multi_stage: true
 
 
     measures:
@@ -154,6 +160,16 @@ cubes:
           CASE
             WHEN {orders.revenue} < 10000 THEN 'Low'
             WHEN {orders.revenue} < 20000 THEN 'Medium'
+            ELSE 'Top'
+          END
+        multi_stage: true
+        type: string
+        add_group_by: [first_date.customerId]
+
+      - name: customerType2
+        sql: >
+          CASE
+            WHEN {orders.revenue} < 3000 THEN 'Low'
             ELSE 'Top'
           END
         multi_stage: true
@@ -392,6 +408,107 @@ cubes:
       { first_date__customer_type: 'Low', orders__revenue: '8100' },
       { first_date__customer_type: 'Medium', orders__revenue: '41700' },
       { first_date__customer_type: 'Top', orders__revenue: '46400' }
+    ],
+    { joinGraph, cubeEvaluator, compiler }));
+    it('bucketing with two dimensions', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.changeTypeConcat', 'first_date.customerType2'],
+      measures: ['orders.revenue', 'orders.revenueYearAgo'],
+      timeDimensions: [
+        {
+          dimension: 'orders.createdAt',
+          granularity: 'year',
+          dateRange: ['2024-01-02T00:00:00', '2026-01-01T00:00:00']
+        }
+      ],
+      timezone: 'UTC',
+      order: [{
+        id: 'orders.changeTypeConcat'
+      }, { id: 'orders.createdAt' }],
+    },
+    [
+      {
+        orders__change_type_concat: 'Down-test',
+        first_date__customer_type2: 'Top',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '20400',
+        orders__revenue_year_ago: '22800'
+      },
+      {
+        orders__change_type_concat: 'Down-test',
+        first_date__customer_type2: 'Top',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '17800',
+        orders__revenue_year_ago: '20400'
+      },
+      {
+        orders__change_type_concat: 'Grow-test',
+        first_date__customer_type2: 'Low',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '2700',
+        orders__revenue_year_ago: '2100'
+      },
+      {
+        orders__change_type_concat: 'Grow-test',
+        first_date__customer_type2: 'Top',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '9000',
+        orders__revenue_year_ago: '7300'
+      },
+      {
+        orders__change_type_concat: 'Grow-test',
+        first_date__customer_type2: 'Top',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '14100',
+        orders__revenue_year_ago: '11700'
+      }
+    ],
+    { joinGraph, cubeEvaluator, compiler }));
+    it('bucketing with two dims concacted', async () => dbRunner.runQueryTest({
+      dimensions: ['orders.twoDimsConcat'],
+      measures: ['orders.revenue', 'orders.revenueYearAgo'],
+      timeDimensions: [
+        {
+          dimension: 'orders.createdAt',
+          granularity: 'year',
+          dateRange: ['2024-01-02T00:00:00', '2026-01-01T00:00:00']
+        }
+      ],
+      timezone: 'UTC',
+      order: [{
+        id: 'orders.twoDimsConcat'
+      }, { id: 'orders.createdAt' }],
+    },
+    [
+      {
+        orders__two_dims_concat: 'Down-Top',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '20400',
+        orders__revenue_year_ago: '22800'
+      },
+      {
+        orders__two_dims_concat: 'Down-Top',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '17800',
+        orders__revenue_year_ago: '20400'
+      },
+      {
+        orders__two_dims_concat: 'Grow-Low',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '2700',
+        orders__revenue_year_ago: '2100'
+      },
+      {
+        orders__two_dims_concat: 'Grow-Top',
+        orders__created_at_year: '2024-01-01T00:00:00.000Z',
+        orders__revenue: '9000',
+        orders__revenue_year_ago: '7300'
+      },
+      {
+        orders__two_dims_concat: 'Grow-Top',
+        orders__created_at_year: '2025-01-01T00:00:00.000Z',
+        orders__revenue: '14100',
+        orders__revenue_year_ago: '11700'
+      }
     ],
     { joinGraph, cubeEvaluator, compiler }));
   } else {
