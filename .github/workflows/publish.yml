@@ -153,7 +153,7 @@ jobs:
     strategy:
       matrix:
         node-version: [22.x]
-        os-version: ["macos-13"]
+        os-version: ["macos-14"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         include:
@@ -682,7 +682,7 @@ jobs:
             tar_executable: tar
             # Please use minimal possible version of macOS, because it produces constraint on libstdc++
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-14
             executable_name: cubestored
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
             strip: false
