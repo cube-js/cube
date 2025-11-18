@@ -8,6 +8,7 @@ import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
 import { TranspilerSymbolResolver } from './transpilers';
+import { CompilerInterface } from './PrepareCompiler';
 
 export type ToString = { toString(): string };
 
@@ -215,7 +216,7 @@ export const CONTEXT_SYMBOLS = {
 
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
-export class CubeSymbols implements TranspilerSymbolResolver {
+export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface {
   public symbols: Record<string | symbol, CubeSymbolsDefinition>;
 
   private builtCubes: Record<string, CubeDefinitionExtended>;

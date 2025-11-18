@@ -1,12 +1,13 @@
 import type { ErrorReporter } from './ErrorReporter';
 import { TranspilerCubeResolver } from './transpilers';
+import { CompilerInterface } from './PrepareCompiler';
 
 export interface Cube {
   name: string;
   [key: string]: any;
 }
 
-export class CubeDictionary implements TranspilerCubeResolver {
+export class CubeDictionary implements TranspilerCubeResolver, CompilerInterface {
   public byId: Record<string, Cube>;
 
   public constructor() {
