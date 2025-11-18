@@ -1,6 +1,8 @@
 use super::{MultiStageAppliedState, MultiStageMember};
 use crate::logical_plan::LogicalSchema;
 use crate::planner::sql_evaluator::MemberSymbol;
+use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -77,6 +79,56 @@ impl MultiStageQueryDescription {
 
     pub fn is_leaf(&self) -> bool {
         self.input.is_empty()
+    }
+
+    pub fn collect_all_non_multi_stage_dimension(
+        &self,
+    ) -> Result<(Vec<Rc<MemberSymbol>>, Vec<Rc<MemberSymbol>>), CubeError> {
+        let mut dimensions = vec![];
+        let mut time_dimensions = vec![];
+        self.collect_all_non_multi_stage_dimension_impl(&mut dimensions, &mut time_dimensions);
+        let dimensions = dimensions
+            .into_iter()
+            .unique_by(|d| d.full_name())
+            .filter_map(|d| match d.is_basic_dimension() {
+                Ok(res) => {
+                    if res {
+                        None
+                    } else {
+                        Some(Ok(d))
+                    }
+                }
+                Err(e) => Some(Err(e)),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let time_dimensions = time_dimensions
+            .into_iter()
+            .unique_by(|d| d.full_name())
+            .filter_map(|d| match d.is_basic_dimension() {
+                Ok(res) => {
+                    if res {
+                        None
+                    } else {
+                        Some(Ok(d))
+                    }
+                }
+                Err(e) => Some(Err(e)),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((dimensions, time_dimensions))
+    }
+
+    fn collect_all_non_multi_stage_dimension_impl(
+        &self,
+        dimensions: &mut Vec<Rc<MemberSymbol>>,
+        time_dimensions: &mut Vec<Rc<MemberSymbol>>,
+    ) {
+        dimensions.extend(self.state.dimensions_symbols().iter().cloned());
+        time_dimensions.extend(self.state.time_dimensions_symbols().iter().cloned());
+        for child in self.input.iter() {
+            child.collect_all_non_multi_stage_dimension_impl(dimensions, time_dimensions);
+        }
     }
 
     pub fn is_match_member_and_state(

@@ -27,7 +27,20 @@ impl TraversalVisitor for JoinHintsCollector {
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         if node.is_multi_stage() {
-            //We don't add multi-stage members childs to join hints
+            if let Ok(dim) = node.as_dimension() {
+                if let Some(add_group_by) = dim.add_group_by() {
+                    for item in add_group_by.iter() {
+                        self.apply(item, &())?;
+                    }
+                }
+                for (dep, path) in dim.get_dependencies_with_path().into_iter() {
+                    if let Ok(dim) = dep.as_dimension() {
+                        if dim.is_multi_stage() {
+                            self.on_node_traverse(&dep, &path, &())?;
+                        }
+                    }
+                }
+            }
             return Ok(None);
         }
 
