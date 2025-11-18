@@ -294,8 +294,8 @@ impl MultiStageMemberQueryPlanner {
             MemberSymbol::Measure(_) => measures.push(cte_member.clone()),
             _ => {}
         }
-        //We add all non multi stage dimensions to the of the underling states because it's needed
-        //for
+        // We add all non–multi-stage dimensions from the underlying states because
+        // they’re needed to join a multi-stage dimension into the measure query
         let (all_dependend_dimensions, all_dependend_time_dimensions) =
             self.description.collect_all_non_multi_stage_dimension()?;
         dimensions.extend(all_dependend_dimensions.iter().cloned());
