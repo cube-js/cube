@@ -554,4 +554,3 @@ export type ProgressResponse = {
   timeElapsed: number;
 };
 
-
