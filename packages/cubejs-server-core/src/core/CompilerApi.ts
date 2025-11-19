@@ -185,6 +185,10 @@ export class CompilerApi {
       clearInterval(this.compiledScriptCacheInterval);
       this.compiledScriptCacheInterval = null;
     }
+
+    this.compilers = undefined;
+    this.queryFactory = undefined;
+    this.graphqlSchema = undefined;
   }
 
   public setGraphQLSchema(schema: GraphQLSchema): void {
