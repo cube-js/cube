@@ -35,6 +35,7 @@
     "@cubejs-backend/native": "1.5.4",
     "@cubejs-backend/query-orchestrator": "1.5.4",
     "@cubejs-backend/schema-compiler": "1.5.4",
+    "@cubejs-backend/cubestore-driver": "1.5.4",
     "@cubejs-backend/shared": "1.5.4",
     "@cubejs-backend/templates": "1.5.4",
     "codesandbox-import-utils": "^2.1.12",
@@ -59,7 +60,6 @@
     "ws": "^7.5.3"
   },
   "devDependencies": {
-    "@cubejs-backend/cubestore-driver": "1.5.4",
     "@cubejs-backend/linter": "1.5.4",
     "@cubejs-client/playground": "1.5.4",
     "@types/cross-spawn": "^6.0.2",
