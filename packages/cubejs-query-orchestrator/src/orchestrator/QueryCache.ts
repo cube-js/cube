@@ -308,6 +308,7 @@ export class QueryCache {
         cacheKey,
         renewalThreshold,
         {
+          forceNoCache,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
@@ -770,6 +771,7 @@ export class QueryCache {
       requestId?: string,
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
+      forceNoCache?: boolean,
       dataSource: string,
       useCsvQuery?: boolean,
       lambdaTypes?: TableStructure,
@@ -803,6 +805,7 @@ export class QueryCache {
                 this.queryRedisKey([query, values]),
               ],
               waitForRenew: true,
+              forceNoCache: options.forceNoCache,
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
