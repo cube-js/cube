@@ -553,4 +553,3 @@ export type ProgressResponse = {
   stage: string;
   timeElapsed: number;
 };
-
