@@ -257,7 +257,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   protected queryResponse(query: string, values: unknown[]): Promise<ResponseJSON<Record<string, unknown>>> {
-    const formattedQuery = sqlstring.format(query, values);
+    const formattedQuery = query.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => sqlstring.escape(values[idx]));
 
     return this.withCancel(async (connection, queryId, signal) => {
       try {
@@ -304,6 +304,10 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   public async release() {
     await this.client.close();
+  }
+
+  public param(paramIndex: number): string {
+    return `___ClickHouseParam_${paramIndex}___`;
   }
 
   public informationSchemaQuery() {
@@ -362,7 +366,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const queryId = uuidv4();
 
     try {
-      const formattedQuery = sqlstring.format(query, values);
+      const formattedQuery = query.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => sqlstring.escape(values[idx]));
 
       const format = 'JSONCompactEachRowWithNamesAndTypes';
 
@@ -486,7 +490,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public getTablesQuery(schemaName: string): Promise<TableQueryResult[]> {
-    return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
+    return this.query('SELECT name as table_name FROM system.tables WHERE database = ___ClickHouseParam_0___', [schemaName]);
   }
 
   public override async dropTable(tableName: string, _options?: QueryOptions): Promise<void> {
@@ -598,7 +602,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
-    const formattedQuery = sqlstring.format(`
+    const formattedQuery = `
       INSERT INTO FUNCTION
          s3(
              'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
@@ -607,7 +611,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
              'CSV'
           )
       ${sql}
-    `, params);
+    `.replace(/___ClickHouseParam_(\d+)___/g, (_, idx) => sqlstring.escape(params[idx]));
 
     await this.command(formattedQuery);
 
