@@ -223,10 +223,55 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
-    if (this.config.schema) {
-      return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.schema}'`;
-    }
-    return super.informationSchemaQuery();
+    const catalogPrefix = this.catalog ? `${this.catalog}.` : '';
+    const schemaFilter = this.config.schema ? ` AND columns.table_schema = '${this.config.schema}'` : '';
+
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM ${catalogPrefix}information_schema.columns
+      WHERE columns.table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${schemaFilter}
+   `;
+  }
+
+  protected override getSchemasQuery() {
+    const catalogPrefix = this.catalog ? `${this.catalog}.` : '';
+
+    return `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')}
+      FROM ${catalogPrefix}information_schema.tables
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      GROUP BY table_schema
+    `;
+  }
+
+  protected override getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+    const catalogPrefix = this.catalog ? `${this.catalog}.` : '';
+
+    const query = `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')},
+            table_name as ${this.quoteIdentifier('table_name')}
+      FROM ${catalogPrefix}information_schema.tables as columns
+      WHERE table_schema IN (${schemasPlaceholders})
+    `;
+    return query;
+  }
+
+  protected override getColumnsForSpecificTablesQuery(conditionString: string) {
+    const catalogPrefix = this.catalog ? `${this.catalog}.` : '';
+
+    const query = `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('schema_name')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM ${catalogPrefix}information_schema.columns as columns
+      WHERE ${conditionString}
+    `;
+
+    return query;
   }
 
   public normalizeResultOverColumns(data: any[], columns: TableStructure) {
