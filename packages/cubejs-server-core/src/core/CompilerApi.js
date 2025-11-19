@@ -55,7 +55,12 @@ export class CompilerApi {
   dispose() {
     if (this.compiledScriptCacheInterval) {
       clearInterval(this.compiledScriptCacheInterval);
+      this.compiledScriptCacheInterval = null;
     }
+
+    this.compilers = undefined;
+    this.queryFactory = undefined;
+    this.graphqlSchema = undefined;
   }
 
   setGraphQLSchema(schema) {
