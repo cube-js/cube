@@ -6,215 +6,119 @@ use crate::planner::sql_evaluator::sql_nodes::{SqlNode, SqlNodesFactory};
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{
-    MockBaseTools, MockCubeDefinition, MockDimensionDefinition, MockJoinGraph,
-    MockMeasureDefinition, MockSchema, MockSchemaBuilder, MockSecurityContext,
+    MockBaseTools, MockJoinGraph, MockSchema, MockSecurityContext,
 };
 use cubenativeutils::CubeError;
+use indoc::indoc;
 use std::rc::Rc;
 
-/// Creates a schema for count measure testing with no primary keys
 fn create_count_schema_no_pk() -> MockSchema {
-    MockSchemaBuilder::new()
-        .add_cube("users")
-        .cube_def(
-            MockCubeDefinition::builder()
-                .name("users".to_string())
-                .sql("SELECT 1".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "id",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("id".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "userName",
-            MockDimensionDefinition::builder()
-                .dimension_type("string".to_string())
-                .sql("user_name".to_string())
-                .build(),
-        )
-        .add_measure(
-            "count",
-            MockMeasureDefinition::builder()
-                .measure_type("count".to_string())
-                .build(),
-        )
-        .finish_cube()
-        .build()
+    let yaml = indoc! {r#"
+        cubes:
+          - name: users
+            sql: "SELECT 1"
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+              - name: userName
+                type: string
+                sql: user_name
+            measures:
+              - name: count
+                type: count
+    "#};
+    MockSchema::from_yaml(yaml).unwrap()
 }
 
-/// Creates a schema for count measure testing with one primary key
 fn create_count_schema_one_pk() -> MockSchema {
-    MockSchemaBuilder::new()
-        .add_cube("users")
-        .cube_def(
-            MockCubeDefinition::builder()
-                .name("users".to_string())
-                .sql("SELECT 1".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "id",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("id".to_string())
-                .primary_key(Some(true))
-                .build(),
-        )
-        .add_dimension(
-            "userName",
-            MockDimensionDefinition::builder()
-                .dimension_type("string".to_string())
-                .sql("user_name".to_string())
-                .build(),
-        )
-        .add_measure(
-            "count",
-            MockMeasureDefinition::builder()
-                .measure_type("count".to_string())
-                .build(),
-        )
-        .finish_cube()
-        .build()
+    let yaml = indoc! {r#"
+        cubes:
+          - name: users
+            sql: "SELECT 1"
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+                primary_key: true
+              - name: userName
+                type: string
+                sql: user_name
+            measures:
+              - name: count
+                type: count
+    "#};
+    MockSchema::from_yaml(yaml).unwrap()
 }
 
-/// Creates a schema for count measure testing with two primary keys
 fn create_count_schema_two_pk() -> MockSchema {
-    MockSchemaBuilder::new()
-        .add_cube("users")
-        .cube_def(
-            MockCubeDefinition::builder()
-                .name("users".to_string())
-                .sql("SELECT 1".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "id",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("id".to_string())
-                .primary_key(Some(true))
-                .build(),
-        )
-        .add_dimension(
-            "userName",
-            MockDimensionDefinition::builder()
-                .dimension_type("string".to_string())
-                .sql("user_name".to_string())
-                .primary_key(Some(true))
-                .build(),
-        )
-        .add_measure(
-            "count",
-            MockMeasureDefinition::builder()
-                .measure_type("count".to_string())
-                .build(),
-        )
-        .finish_cube()
-        .build()
+    let yaml = indoc! {r#"
+        cubes:
+          - name: users
+            sql: "SELECT 1"
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+                primary_key: true
+              - name: userName
+                type: string
+                sql: user_name
+                primary_key: true
+            measures:
+              - name: count
+                type: count
+    "#};
+    MockSchema::from_yaml(yaml).unwrap()
 }
 
-/// Creates a test schema for symbol SQL generation tests
 fn create_test_schema() -> MockSchema {
-    MockSchemaBuilder::new()
-        .add_cube("test_cube")
-        .cube_def(
-            MockCubeDefinition::builder()
-                .name("test_cube".to_string())
-                .sql("SELECT 1".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "id",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("id".to_string())
-                .primary_key(Some(true))
-                .build(),
-        )
-        .add_dimension(
-            "source",
-            MockDimensionDefinition::builder()
-                .dimension_type("string".to_string())
-                .sql("{CUBE}.source".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "source_extended",
-            MockDimensionDefinition::builder()
-                .dimension_type("string".to_string())
-                .sql("CONCAT({CUBE.source}, '_source')".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "created_at",
-            MockDimensionDefinition::builder()
-                .dimension_type("time".to_string())
-                .sql("created_at".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "location",
-            MockDimensionDefinition::builder()
-                .dimension_type("geo".to_string())
-                .latitude("latitude".to_string())
-                .longitude("longitude".to_string())
-                .build(),
-        )
-        .add_measure(
-            "sum_revenue",
-            MockMeasureDefinition::builder()
-                .measure_type("sum".to_string())
-                .sql("revenue".to_string())
-                .build(),
-        )
-        .add_measure(
-            "min_revenue",
-            MockMeasureDefinition::builder()
-                .measure_type("min".to_string())
-                .sql("revenue".to_string())
-                .build(),
-        )
-        .add_measure(
-            "max_revenue",
-            MockMeasureDefinition::builder()
-                .measure_type("max".to_string())
-                .sql("revenue".to_string())
-                .build(),
-        )
-        .add_measure(
-            "avg_revenue",
-            MockMeasureDefinition::builder()
-                .measure_type("avg".to_string())
-                .sql("revenue".to_string())
-                .build(),
-        )
-        .add_measure(
-            "complex_measure",
-            MockMeasureDefinition::builder()
-                .measure_type("number".to_string())
-                .sql("{sum_revenue} + {CUBE.avg_revenue}/{test_cube.min_revenue} - {test_cube.min_revenue}".to_string())
-                .build(),
-        )
-        .add_measure(
-            "count_distinct_id",
-            MockMeasureDefinition::builder()
-                .measure_type("countDistinct".to_string())
-                .sql("id".to_string())
-                .build(),
-        )
-        .add_measure(
-            "count_distinct_approx_id",
-            MockMeasureDefinition::builder()
-                .measure_type("countDistinctApprox".to_string())
-                .sql("id".to_string())
-                .build(),
-        )
-        .finish_cube()
-        .build()
+    let yaml = indoc! {r#"
+        cubes:
+          - name: test_cube
+            sql: "SELECT 1"
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+                primary_key: true
+              - name: source
+                type: string
+                sql: "{CUBE}.source"
+              - name: source_extended
+                type: string
+                sql: "CONCAT({CUBE.source}, '_source')"
+              - name: created_at
+                type: time
+                sql: created_at
+              - name: location
+                type: geo
+                latitude: latitude
+                longitude: longitude
+            measures:
+              - name: sum_revenue
+                type: sum
+                sql: revenue
+              - name: min_revenue
+                type: min
+                sql: revenue
+              - name: max_revenue
+                type: max
+                sql: revenue
+              - name: avg_revenue
+                type: avg
+                sql: revenue
+              - name: complex_measure
+                type: number
+                sql: "{sum_revenue} + {CUBE.avg_revenue}/{test_cube.min_revenue} - {test_cube.min_revenue}"
+              - name: count_distinct_id
+                type: countDistinct
+                sql: id
+              - name: count_distinct_approx_id
+                type: countDistinctApprox
+                sql: id
+    "#};
+    MockSchema::from_yaml(yaml).unwrap()
 }
 
 /// Helper structure for SQL evaluation in tests
