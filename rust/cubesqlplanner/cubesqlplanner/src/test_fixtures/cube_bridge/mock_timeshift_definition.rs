@@ -59,15 +59,16 @@ impl TimeShiftDefinition for MockTimeShiftDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
 
     #[test]
     fn test_from_yaml_all_fields() {
-        let yaml = r#"
-            interval: "1 year"
-            type: "prior"
-            name: "date"
-            sql: "{CUBE}.created_at"
-            "#;
+        let yaml = indoc! {"
+            interval: 1 year
+            type: prior
+            name: date
+            sql: \"{CUBE}.created_at\"
+        "};
 
         let ts = MockTimeShiftDefinition::from_yaml(yaml).unwrap();
         let static_data = ts.static_data();
@@ -80,9 +81,9 @@ mod tests {
 
     #[test]
     fn test_from_yaml_minimal() {
-        let yaml = r#"
-            interval: "1 month"
-            "#;
+        let yaml = indoc! {"
+            interval: 1 month
+        "};
 
         let ts = MockTimeShiftDefinition::from_yaml(yaml).unwrap();
         let static_data = ts.static_data();

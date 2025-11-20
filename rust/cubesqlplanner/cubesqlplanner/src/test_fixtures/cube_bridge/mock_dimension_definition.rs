@@ -139,24 +139,25 @@ impl DimensionDefinition for MockDimensionDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
 
     #[test]
     fn test_from_yaml_all_fields() {
-        let yaml = r#"
-            type: "number"
+        let yaml = indoc! {"
+            type: number
             owned_by_cube: true
             multi_stage: true
             sub_query: true
             propagate_filters_to_sub_query: true
-            values: ["val1", "val2"]
+            values: [val1, val2]
             primary_key: true
-            sql: "id"
-            latitude: "lat"
-            longitude: "lon"
+            sql: id
+            latitude: lat
+            longitude: lon
             time_shift:
-            - interval: "1 year"
-                type: "prior"
-            "#;
+              - interval: 1 year
+                type: prior
+        "};
 
         let dim = MockDimensionDefinition::from_yaml(yaml).unwrap();
         let static_data = dim.static_data();
@@ -172,16 +173,16 @@ mod tests {
         );
         assert_eq!(static_data.primary_key, Some(true));
         assert!(dim.has_sql().unwrap());
-        assert_eq!(dim.has_latitude().unwrap());
+        assert!(dim.has_latitude().unwrap());
         assert!(dim.has_longitude().unwrap());
         assert!(dim.has_time_shift().unwrap());
     }
 
     #[test]
     fn test_from_yaml_minimal() {
-        let yaml = r#"
-            sql: "status"
-            "#;
+        let yaml = indoc! {"
+            sql: status
+        "};
 
         let dim = MockDimensionDefinition::from_yaml(yaml).unwrap();
         let static_data = dim.static_data();
