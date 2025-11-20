@@ -26,6 +26,7 @@ indoc = "2.0.7"
 [dev-dependencies]
 petgraph = "0.6"
 insta = "1.34"
+serde_yaml = "0.9"
 
 [dependencies.neon]
 version = "=1"

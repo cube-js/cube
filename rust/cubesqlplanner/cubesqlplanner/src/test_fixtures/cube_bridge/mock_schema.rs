@@ -1,7 +1,7 @@
 use crate::test_fixtures::cube_bridge::{
-    MockBaseTools, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockDriverTools,
-    MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition, MockSegmentDefinition,
-    MockSqlTemplatesRender,
+    parse_schema_yaml, MockBaseTools, MockCubeDefinition, MockCubeEvaluator,
+    MockDimensionDefinition, MockDriverTools, MockJoinGraph, MockJoinItemDefinition,
+    MockMeasureDefinition, MockSegmentDefinition, MockSqlTemplatesRender,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -21,6 +21,10 @@ pub struct MockCube {
 }
 
 impl MockSchema {
+    pub fn from_yaml(yaml: &str) -> Result<Self, CubeError> {
+        parse_schema_yaml(yaml)
+    }
+
     pub fn get_cube(&self, name: &str) -> Option<&MockCube> {
         self.cubes.get(name)
     }
