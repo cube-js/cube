@@ -2,120 +2,10 @@
 
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
-use indoc::indoc;
-
-fn create_count_schema_no_pk() -> MockSchema {
-    let yaml = indoc! {r#"
-        cubes:
-          - name: users
-            sql: "SELECT 1"
-            dimensions:
-              - name: id
-                type: number
-                sql: id
-              - name: userName
-                type: string
-                sql: user_name
-            measures:
-              - name: count
-                type: count
-    "#};
-    MockSchema::from_yaml(yaml).unwrap()
-}
-
-fn create_count_schema_one_pk() -> MockSchema {
-    let yaml = indoc! {r#"
-        cubes:
-          - name: users
-            sql: "SELECT 1"
-            dimensions:
-              - name: id
-                type: number
-                sql: id
-                primary_key: true
-              - name: userName
-                type: string
-                sql: user_name
-            measures:
-              - name: count
-                type: count
-    "#};
-    MockSchema::from_yaml(yaml).unwrap()
-}
-
-fn create_count_schema_two_pk() -> MockSchema {
-    let yaml = indoc! {r#"
-        cubes:
-          - name: users
-            sql: "SELECT 1"
-            dimensions:
-              - name: id
-                type: number
-                sql: id
-                primary_key: true
-              - name: userName
-                type: string
-                sql: user_name
-                primary_key: true
-            measures:
-              - name: count
-                type: count
-    "#};
-    MockSchema::from_yaml(yaml).unwrap()
-}
-
-fn create_test_schema() -> MockSchema {
-    let yaml = indoc! {r#"
-        cubes:
-          - name: test_cube
-            sql: "SELECT 1"
-            dimensions:
-              - name: id
-                type: number
-                sql: id
-                primary_key: true
-              - name: source
-                type: string
-                sql: "{CUBE}.source"
-              - name: source_extended
-                type: string
-                sql: "CONCAT({CUBE.source}, '_source')"
-              - name: created_at
-                type: time
-                sql: created_at
-              - name: location
-                type: geo
-                latitude: latitude
-                longitude: longitude
-            measures:
-              - name: sum_revenue
-                type: sum
-                sql: revenue
-              - name: min_revenue
-                type: min
-                sql: revenue
-              - name: max_revenue
-                type: max
-                sql: revenue
-              - name: avg_revenue
-                type: avg
-                sql: revenue
-              - name: complex_measure
-                type: number
-                sql: "{sum_revenue} + {CUBE.avg_revenue}/{test_cube.min_revenue} - {test_cube.min_revenue}"
-              - name: count_distinct_id
-                type: countDistinct
-                sql: id
-              - name: count_distinct_approx_id
-                type: countDistinctApprox
-                sql: id
-    "#};
-    MockSchema::from_yaml(yaml).unwrap()
-}
 
 #[test]
 fn simple_dimension_sql_evaluation() {
-    let schema = create_test_schema();
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/test_cube.yaml");
     let context = TestContext::new(schema).unwrap();
 
     let id_symbol = context.create_dimension("test_cube.id").unwrap();
@@ -146,7 +36,7 @@ fn simple_dimension_sql_evaluation() {
 
 #[test]
 fn simple_aggregate_measures() {
-    let schema = create_test_schema();
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/test_cube.yaml");
     let context = TestContext::new(schema).unwrap();
 
     let sum_symbol = context.create_measure("test_cube.sum_revenue").unwrap();
@@ -185,13 +75,13 @@ fn simple_aggregate_measures() {
 
 #[test]
 fn count_measure_variants() {
-    let schema_no_pk = create_count_schema_no_pk();
+    let schema_no_pk = MockSchema::from_yaml_file("symbol_evaluator/count_no_pk.yaml");
     let context_no_pk = TestContext::new(schema_no_pk).unwrap();
     let count_no_pk_symbol = context_no_pk.create_measure("users.count").unwrap();
     let count_no_pk_sql = context_no_pk.evaluate_symbol(&count_no_pk_symbol).unwrap();
     assert_eq!(count_no_pk_sql, "count(*)");
 
-    let schema_one_pk = create_count_schema_one_pk();
+    let schema_one_pk = MockSchema::from_yaml_file("symbol_evaluator/count_one_pk.yaml");
     let context_one_pk = TestContext::new(schema_one_pk).unwrap();
     let count_one_pk_symbol = context_one_pk.create_measure("users.count").unwrap();
     let count_one_pk_sql = context_one_pk
@@ -199,7 +89,8 @@ fn count_measure_variants() {
         .unwrap();
     assert_eq!(count_one_pk_sql, r#"count("users".id)"#);
 
-    let schema_two_pk = create_count_schema_two_pk();
+    // Test COUNT with two primary keys - should use count(CAST(pk1) || CAST(pk2))
+    let schema_two_pk = MockSchema::from_yaml_file("symbol_evaluator/count_two_pk.yaml");
     let context_two_pk = TestContext::new(schema_two_pk).unwrap();
     let count_two_pk_symbol = context_two_pk.create_measure("users.count").unwrap();
     let count_two_pk_sql = context_two_pk
@@ -213,7 +104,7 @@ fn count_measure_variants() {
 
 #[test]
 fn composite_symbols() {
-    let schema = create_test_schema();
+    let schema = MockSchema::from_yaml_file("symbol_evaluator/test_cube.yaml");
     let context = TestContext::new(schema).unwrap();
 
     // Test dimension with member dependency ({CUBE.source})
