@@ -1,7 +1,5 @@
-use crate::test_fixtures::cube_bridge::{
-    MockDimensionDefinition, MockMeasureDefinition, MockSchema, MockSchemaBuilder,
-    MockSegmentDefinition,
-};
+use crate::test_fixtures::cube_bridge::MockSchema;
+use indoc::indoc;
 
 /// Creates a schema for visitors and visitor_checkins cubes
 ///
@@ -12,181 +10,101 @@ use crate::test_fixtures::cube_bridge::{
 /// - Dimensions with complex SQL including special characters (question marks)
 /// - Time dimensions
 pub fn create_visitors_schema() -> MockSchema {
-    MockSchemaBuilder::new()
-        // visitor_checkins cube - referenced by visitors cube
-        .add_cube("visitor_checkins")
-        .add_dimension(
-            "id",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("id".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "visitor_id",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("visitor_id".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "minDate",
-            MockDimensionDefinition::builder()
-                .dimension_type("time".to_string())
-                .sql("MIN(created_at)".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "minDate1",
-            MockDimensionDefinition::builder()
-                .dimension_type("time".to_string())
-                .sql("MIN(created_at) + INTERVAL '1 day'".to_string())
-                .build(),
-        )
-        .add_measure(
-            "count",
-            MockMeasureDefinition::builder()
-                .measure_type("count".to_string())
-                .sql("COUNT(*)".to_string())
-                .build(),
-        )
-        .finish_cube()
-        // visitors cube - main cube with various dimension types
-        .add_cube("visitors")
-        .add_dimension(
-            "id",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("id".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "visitor_id",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("{CUBE}.visitor_id".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "visitor_id_proxy",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("{visitors.visitor_id}".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "visitor_id_twice",
-            MockDimensionDefinition::builder()
-                .dimension_type("number".to_string())
-                .sql("{visitor_id} * 2".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "source",
-            MockDimensionDefinition::builder()
-                .dimension_type("string".to_string())
-                .sql("source".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "source_concat_id",
-            MockDimensionDefinition::builder()
-                .dimension_type("string".to_string())
-                .sql("CONCAT({CUBE.source}, ' ', {visitors.visitor_id})".to_string())
-                .build(),
-        )
-        .add_dimension(
-            "created_at",
-            MockDimensionDefinition::builder()
-                .dimension_type("time".to_string())
-                .sql("created_at".to_string())
-                .build(),
-        )
-        // Sub-query dimension referencing visitor_checkins.minDate
-        .add_dimension(
-            "minVisitorCheckinDate",
-            MockDimensionDefinition::builder()
-                .dimension_type("time".to_string())
-                .sql("{visitor_checkins.minDate}".to_string())
-                .sub_query(Some(true))
-                .build(),
-        )
-        // Sub-query dimension referencing visitor_checkins.minDate1
-        .add_dimension(
-            "minVisitorCheckinDate1",
-            MockDimensionDefinition::builder()
-                .dimension_type("time".to_string())
-                .sql("{visitor_checkins.minDate1}".to_string())
-                .sub_query(Some(true))
-                .build(),
-        )
-        // Geo dimension with latitude and longitude
-        .add_dimension(
-            "location",
-            MockDimensionDefinition::builder()
-                .dimension_type("geo".to_string())
-                .latitude("latitude".to_string())
-                .longitude("longitude".to_string())
-                .build(),
-        )
-        // Dimension with SQL containing question marks (special characters)
-        .add_dimension(
-            "questionMark",
-            MockDimensionDefinition::builder()
-                .dimension_type("string".to_string())
-                .sql(
-                    "replace('some string question string ? ?? ???', 'string', 'with some ? ?? ???')"
-                        .to_string(),
-                )
-                .build(),
-        )
-        .add_measure(
-            "count",
-            MockMeasureDefinition::builder()
-                .measure_type("count".to_string())
-                .sql("COUNT(*)".to_string())
-                .build(),
-        )
-        .add_measure(
-            "total_revenue",
-            MockMeasureDefinition::builder()
-                .measure_type("sum".to_string())
-                .sql("revenue".to_string())
-                .build(),
-        )
-        .add_measure(
-            "total_revenue_proxy",
-            MockMeasureDefinition::builder()
-                .measure_type("number".to_string())
-                .sql("{total_revenue}".to_string())
-                .build(),
-        )
-        .add_measure(
-            "revenue",
-            MockMeasureDefinition::builder()
-                .measure_type("sum".to_string())
-                .sql("{CUBE}.revenue".to_string())
-                .build(),
-        )
-        .add_measure(
-            "total_revenue_per_count",
-            MockMeasureDefinition::builder()
-                .measure_type("number".to_string())
-                .sql("{visitors.count} / {total_revenue}".to_string())
-                .build(),
-        )
-        .add_segment(
-            "google",
-            MockSegmentDefinition::builder()
-                .sql("{CUBE.source} = 'google'".to_string())
-                .build(),
-        )
-        .finish_cube()
-        .add_view("visitors_visitors_checkins")
-        .include_cube("visitors", vec!["id".to_string(), "source_concat_id".to_string()])
-        .include_cube("visitors.visitor_checkins", vec!["visitor_id".to_string(), "count".to_string()])
-        .finish_view()
-        .build()
+    let yaml = indoc! {r#"
+        cubes:
+          - name: visitor_checkins
+            sql: "SELECT * FROM visitor_checkins"
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+              - name: visitor_id
+                type: number
+                sql: visitor_id
+              - name: minDate
+                type: time
+                sql: "MIN(created_at)"
+              - name: minDate1
+                type: time
+                sql: "MIN(created_at) + INTERVAL '1 day'"
+            measures:
+              - name: count
+                type: count
+                sql: "COUNT(*)"
+
+          - name: visitors
+            sql: "SELECT * FROM visitors"
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+              - name: visitor_id
+                type: number
+                sql: "{CUBE}.visitor_id"
+              - name: visitor_id_proxy
+                type: number
+                sql: "{visitors.visitor_id}"
+              - name: visitor_id_twice
+                type: number
+                sql: "{visitor_id} * 2"
+              - name: source
+                type: string
+                sql: source
+              - name: source_concat_id
+                type: string
+                sql: "CONCAT({CUBE.source}, ' ', {visitors.visitor_id})"
+              - name: created_at
+                type: time
+                sql: created_at
+              - name: minVisitorCheckinDate
+                type: time
+                sql: "{visitor_checkins.minDate}"
+                sub_query: true
+              - name: minVisitorCheckinDate1
+                type: time
+                sql: "{visitor_checkins.minDate1}"
+                sub_query: true
+              - name: location
+                type: geo
+                latitude: latitude
+                longitude: longitude
+              - name: questionMark
+                type: string
+                sql: "replace('some string question string ? ?? ???', 'string', 'with some ? ?? ???')"
+            measures:
+              - name: count
+                type: count
+                sql: "COUNT(*)"
+              - name: total_revenue
+                type: sum
+                sql: revenue
+              - name: total_revenue_proxy
+                type: number
+                sql: "{total_revenue}"
+              - name: revenue
+                type: sum
+                sql: "{CUBE}.revenue"
+              - name: total_revenue_per_count
+                type: number
+                sql: "{visitors.count} / {total_revenue}"
+            segments:
+              - name: google
+                sql: "{CUBE.source} = 'google'"
+
+        views:
+          - name: visitors_visitors_checkins
+            cubes:
+              - join_path: visitors
+                includes:
+                  - id
+                  - source_concat_id
+              - join_path: visitors.visitor_checkins
+                includes:
+                  - visitor_id
+                  - count
+    "#};
+
+    MockSchema::from_yaml(yaml).expect("Failed to parse visitors schema")
 }
 
 #[cfg(test)]

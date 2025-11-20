@@ -1,6 +1,9 @@
 //! Tests for Compiler member evaluation
 
-use crate::test_fixtures::schemas::{create_visitors_schema, TestCompiler};
+use crate::{
+    test_fixtures::schemas::{create_visitors_schema, TestCompiler},
+    utils::debug::DebugSql,
+};
 
 #[test]
 fn test_add_dimension_evaluator_number_dimension() {
@@ -604,6 +607,9 @@ fn test_proxy_measure_compilation() {
     assert_eq!(proxy_symbol.name(), "total_revenue_proxy");
 
     let measure = proxy_symbol.as_measure().unwrap();
+    let dependencies = proxy_symbol.get_dependencies();
+    assert_eq!(dependencies.len(), 1, "Should have 1 measure dependencies");
+    println!("!!! {}", measure.debug_sql(true));
 
     // Check that it's NOT a view member
     assert!(!measure.is_view(), "Proxy should not be a view member");
