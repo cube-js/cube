@@ -27,6 +27,28 @@ impl MockSchema {
         yaml_schema.build()
     }
 
+    /// Loads schema from a YAML file in the test fixtures directory
+    ///
+    /// The path is relative to `src/test_fixtures/schemas/yaml_files/`.
+    /// For example, `"common/visitors.yaml"` loads from
+    /// `src/test_fixtures/schemas/yaml_files/common/visitors.yaml`.
+    pub fn from_yaml_file(relative_path: &str) -> Result<Self, CubeError> {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let full_path = format!(
+            "{}/src/test_fixtures/schemas/yaml_files/{}",
+            manifest_dir, relative_path
+        );
+
+        let yaml = std::fs::read_to_string(&full_path).map_err(|e| {
+            CubeError::user(format!(
+                "Failed to read YAML fixture '{}': {}",
+                relative_path, e
+            ))
+        })?;
+
+        Self::from_yaml(&yaml)
+    }
+
     pub fn get_cube(&self, name: &str) -> Option<&MockCube> {
         self.cubes.get(name)
     }
@@ -105,6 +127,7 @@ impl MockSchema {
         Rc::new(MockCubeEvaluator::with_primary_keys(self, primary_keys))
     }
 
+    #[allow(dead_code)]
     pub fn create_join_graph(&self) -> Result<MockJoinGraph, CubeError> {
         let cubes: Vec<Rc<MockCubeDefinition>> = self
             .cubes
@@ -705,5 +728,14 @@ mod tests {
 
         let count_measure = schema.get_measure("orders", "count").unwrap();
         assert_eq!(count_measure.static_data().measure_type, "count");
+    }
+
+    #[test]
+    fn test_from_yaml_file_not_found() {
+        let result = MockSchema::from_yaml_file("nonexistent.yaml");
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.message.contains("Failed to read YAML fixture"));
+        }
     }
 }
