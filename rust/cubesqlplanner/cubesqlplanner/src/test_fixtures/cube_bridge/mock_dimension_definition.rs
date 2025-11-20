@@ -4,6 +4,7 @@ use crate::cube_bridge::geo_item::GeoItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::timeshift_definition::TimeShiftDefinition;
 use crate::impl_static_data;
+use crate::test_fixtures::cube_bridge::yaml::dimension::YamlDimensionDefinition;
 use crate::test_fixtures::cube_bridge::{MockGeoItem, MockMemberSql, MockTimeShiftDefinition};
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -29,13 +30,13 @@ pub struct MockDimensionDefinition {
     #[builder(default)]
     primary_key: Option<bool>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default, setter(strip_option(fallback = sql_opt)))]
     sql: Option<String>,
     #[builder(default)]
     case: Option<Rc<CaseVariant>>,
-    #[builder(default, setter(strip_option))]
+    #[builder(default, setter(strip_option(fallback = latitude_opt)))]
     latitude: Option<String>,
-    #[builder(default, setter(strip_option))]
+    #[builder(default, setter(strip_option(fallback = longitude_opt)))]
     longitude: Option<String>,
     #[builder(default)]
     time_shift: Option<Vec<Rc<MockTimeShiftDefinition>>>,
@@ -53,6 +54,14 @@ impl_static_data!(
     values,
     primary_key
 );
+
+impl MockDimensionDefinition {
+    pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
+        let yaml_def: YamlDimensionDefinition = serde_yaml::from_str(yaml)
+            .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;
+        Ok(yaml_def.build())
+    }
+}
 
 impl DimensionDefinition for MockDimensionDefinition {
     crate::impl_static_data_method!(DimensionDefinitionStatic);
@@ -124,5 +133,66 @@ impl DimensionDefinition for MockDimensionDefinition {
 
     fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_yaml_all_fields() {
+        let yaml = r#"
+            type: "number"
+            owned_by_cube: true
+            multi_stage: true
+            sub_query: true
+            propagate_filters_to_sub_query: true
+            values: ["val1", "val2"]
+            primary_key: true
+            sql: "id"
+            latitude: "lat"
+            longitude: "lon"
+            time_shift:
+            - interval: "1 year"
+                type: "prior"
+            "#;
+
+        let dim = MockDimensionDefinition::from_yaml(yaml).unwrap();
+        let static_data = dim.static_data();
+
+        assert_eq!(static_data.dimension_type, "number");
+        assert_eq!(static_data.owned_by_cube, Some(true));
+        assert_eq!(static_data.multi_stage, Some(true));
+        assert_eq!(static_data.sub_query, Some(true));
+        assert_eq!(static_data.propagate_filters_to_sub_query, Some(true));
+        assert_eq!(
+            static_data.values,
+            Some(vec!["val1".to_string(), "val2".to_string()])
+        );
+        assert_eq!(static_data.primary_key, Some(true));
+        assert!(dim.has_sql().unwrap());
+        assert_eq!(dim.has_latitude().unwrap());
+        assert!(dim.has_longitude().unwrap());
+        assert!(dim.has_time_shift().unwrap());
+    }
+
+    #[test]
+    fn test_from_yaml_minimal() {
+        let yaml = r#"
+            sql: "status"
+            "#;
+
+        let dim = MockDimensionDefinition::from_yaml(yaml).unwrap();
+        let static_data = dim.static_data();
+
+        assert_eq!(static_data.dimension_type, "string");
+        assert_eq!(static_data.multi_stage, None);
+        assert_eq!(static_data.sub_query, None);
+        assert_eq!(static_data.primary_key, None);
+        assert!(dim.has_sql().unwrap());
+        assert!(!dim.has_latitude().unwrap());
+        assert!(!dim.has_longitude().unwrap());
+        assert!(!dim.has_time_shift().unwrap());
     }
 }
