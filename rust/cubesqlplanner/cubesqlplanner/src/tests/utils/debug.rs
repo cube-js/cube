@@ -2,12 +2,13 @@ use crate::plan::filter::{FilterGroup, FilterGroupOperator};
 use crate::plan::FilterItem;
 use crate::planner::filter::{BaseFilter, FilterOperator};
 use crate::planner::sql_evaluator::DebugSql;
-use crate::test_fixtures::schemas::create_visitors_schema;
+use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 
 #[test]
 fn test_dimension_basic() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.id").unwrap();
     let sql = symbol.debug_sql(false);
     assert_eq!(sql, "id");
@@ -15,7 +16,8 @@ fn test_dimension_basic() {
 
 #[test]
 fn test_measure_basic() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.count").unwrap();
     let sql = symbol.debug_sql(false);
     assert_eq!(sql, "COUNT(*)");
@@ -23,7 +25,8 @@ fn test_measure_basic() {
 
 #[test]
 fn test_time_dimension_basic() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.created_at").unwrap();
     let sql = symbol.debug_sql(false);
     assert_eq!(sql, "created_at");
@@ -31,7 +34,8 @@ fn test_time_dimension_basic() {
 
 #[test]
 fn test_geo_dimension() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.location").unwrap();
     let sql = symbol.debug_sql(false);
     assert_eq!(sql, "GEO(latitude, longitude)");
@@ -39,7 +43,8 @@ fn test_geo_dimension() {
 
 #[test]
 fn test_proxy_dimension_collapsed() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.minVisitorCheckinDate").unwrap();
     let sql = symbol.debug_sql(false);
     assert_eq!(sql, "{visitor_checkins.minDate}");
@@ -47,7 +52,8 @@ fn test_proxy_dimension_collapsed() {
 
 #[test]
 fn test_proxy_dimension_expanded() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.minVisitorCheckinDate").unwrap();
     let sql = symbol.debug_sql(true);
     assert_eq!(sql, "MIN(created_at)");
@@ -55,7 +61,8 @@ fn test_proxy_dimension_expanded() {
 
 #[test]
 fn test_visitor_id_proxy_collapsed() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.visitor_id_proxy").unwrap();
     let sql = symbol.debug_sql(false);
     assert_eq!(sql, "{visitors.visitor_id}");
@@ -63,7 +70,8 @@ fn test_visitor_id_proxy_collapsed() {
 
 #[test]
 fn test_visitor_id_proxy_expanded() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.visitor_id_proxy").unwrap();
     let sql = symbol.debug_sql(true);
     assert_eq!(sql, "visitors.visitor_id");
@@ -71,7 +79,8 @@ fn test_visitor_id_proxy_expanded() {
 
 #[test]
 fn test_visitor_id_twice_collapsed() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.visitor_id_twice").unwrap();
     let sql = symbol.debug_sql(false);
     assert_eq!(sql, "{visitors.visitor_id} * 2");
@@ -79,7 +88,8 @@ fn test_visitor_id_twice_collapsed() {
 
 #[test]
 fn test_visitor_id_twice_expanded() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.visitor_id_twice").unwrap();
     let sql = symbol.debug_sql(true);
     assert_eq!(sql, "visitors.visitor_id * 2");
@@ -87,7 +97,8 @@ fn test_visitor_id_twice_expanded() {
 
 #[test]
 fn test_total_revenue_per_count_collapsed() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx
         .create_symbol("visitors.total_revenue_per_count")
         .unwrap();
@@ -97,7 +108,8 @@ fn test_total_revenue_per_count_collapsed() {
 
 #[test]
 fn test_total_revenue_per_count_expanded() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx
         .create_symbol("visitors.total_revenue_per_count")
         .unwrap();
@@ -107,7 +119,8 @@ fn test_total_revenue_per_count_expanded() {
 
 #[test]
 fn test_time_dimension() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.created_at.day").unwrap();
     let sql = symbol.debug_sql(true);
     assert_eq!(sql, "(created_at).day");
@@ -117,7 +130,8 @@ fn test_time_dimension() {
 
 #[test]
 fn test_filter_simple_collapsed() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.source").unwrap();
 
     let filter = BaseFilter::try_new(
@@ -135,7 +149,8 @@ fn test_filter_simple_collapsed() {
 
 #[test]
 fn test_filter_simple_expanded() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.source").unwrap();
 
     let filter = BaseFilter::try_new(
@@ -153,7 +168,8 @@ fn test_filter_simple_expanded() {
 
 #[test]
 fn test_filter_group_and_collapsed() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
 
     let source_symbol = ctx.create_symbol("visitors.source").unwrap();
     let id_symbol = ctx.create_symbol("visitors.id").unwrap();

@@ -1,13 +1,12 @@
 //! Tests for Compiler member evaluation
 
-use crate::{
-    test_fixtures::schemas::{create_visitors_schema, TestCompiler},
-    utils::debug::DebugSql,
-};
+use crate::test_fixtures::cube_bridge::MockSchema;
+use crate::test_fixtures::schemas::TestCompiler;
 
 #[test]
 fn test_add_dimension_evaluator_number_dimension() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol = test_compiler
@@ -26,7 +25,8 @@ fn test_add_dimension_evaluator_number_dimension() {
 
 #[test]
 fn test_add_dimension_evaluator_string_dimension() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol = test_compiler
@@ -45,7 +45,8 @@ fn test_add_dimension_evaluator_string_dimension() {
 
 #[test]
 fn test_add_dimension_evaluator_caching() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol1 = test_compiler
@@ -62,7 +63,8 @@ fn test_add_dimension_evaluator_caching() {
 
 #[test]
 fn test_add_dimension_evaluator_invalid_path() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let result = test_compiler
@@ -74,7 +76,8 @@ fn test_add_dimension_evaluator_invalid_path() {
 
 #[test]
 fn test_add_dimension_evaluator_multiple_dimensions() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let id_symbol = test_compiler
@@ -109,7 +112,8 @@ fn test_add_dimension_evaluator_multiple_dimensions() {
 
 #[test]
 fn test_add_measure_evaluator_count_measure() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol = test_compiler
@@ -128,7 +132,8 @@ fn test_add_measure_evaluator_count_measure() {
 
 #[test]
 fn test_add_measure_evaluator_sum_measure() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol = test_compiler
@@ -147,7 +152,8 @@ fn test_add_measure_evaluator_sum_measure() {
 
 #[test]
 fn test_add_measure_evaluator_caching() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol1 = test_compiler
@@ -164,7 +170,8 @@ fn test_add_measure_evaluator_caching() {
 
 #[test]
 fn test_add_measure_evaluator_invalid_path() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let result = test_compiler
@@ -176,7 +183,8 @@ fn test_add_measure_evaluator_invalid_path() {
 
 #[test]
 fn test_add_measure_evaluator_multiple_measures() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let count_symbol = test_compiler
@@ -198,7 +206,8 @@ fn test_add_measure_evaluator_multiple_measures() {
 
 #[test]
 fn test_add_auto_resolved_member_evaluator_dimension() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol = test_compiler
@@ -217,7 +226,8 @@ fn test_add_auto_resolved_member_evaluator_dimension() {
 
 #[test]
 fn test_add_auto_resolved_member_evaluator_measure() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol = test_compiler
@@ -236,7 +246,8 @@ fn test_add_auto_resolved_member_evaluator_measure() {
 
 #[test]
 fn test_add_cube_table_evaluator() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol = test_compiler
@@ -253,7 +264,8 @@ fn test_add_cube_table_evaluator() {
 
 #[test]
 fn test_add_cube_name_evaluator() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let symbol = test_compiler
@@ -272,7 +284,8 @@ fn test_add_cube_name_evaluator() {
 
 #[test]
 fn test_dimension_with_cube_table_dependency() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // visitor_id has dependency on {CUBE.}visitor_id
@@ -298,7 +311,8 @@ fn test_dimension_with_cube_table_dependency() {
 
 #[test]
 fn test_dimension_with_member_dependency_no_prefix() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // visitor_id_twice has dependency on {visitor_id} without cube prefix
@@ -328,7 +342,8 @@ fn test_dimension_with_member_dependency_no_prefix() {
 
 #[test]
 fn test_dimension_with_mixed_dependencies() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // source_concat_id has dependencies on {CUBE.source} and {visitors.visitor_id}
@@ -370,7 +385,8 @@ fn test_dimension_with_mixed_dependencies() {
 
 #[test]
 fn test_measure_with_cube_table_dependency() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // revenue has dependency on {CUBE}.revenue
@@ -396,7 +412,8 @@ fn test_measure_with_cube_table_dependency() {
 
 #[test]
 fn test_measure_with_explicit_cube_and_member_dependencies() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // total_revenue_per_count has dependencies on {visitors.count} and {total_revenue}
@@ -434,7 +451,8 @@ fn test_measure_with_explicit_cube_and_member_dependencies() {
 
 #[test]
 fn test_view_dimension_compilation() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // Compile dimension from view with simple join path
@@ -502,7 +520,8 @@ fn test_view_dimension_compilation() {
 
 #[test]
 fn test_view_measure_compilation() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // Compile measure from view with long join path
@@ -542,7 +561,8 @@ fn test_view_measure_compilation() {
 
 #[test]
 fn test_proxy_dimension_compilation() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // Compile proxy dimension that references another dimension
@@ -591,7 +611,8 @@ fn test_proxy_dimension_compilation() {
 
 #[test]
 fn test_proxy_measure_compilation() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // Compile proxy measure that references another measure
@@ -609,7 +630,6 @@ fn test_proxy_measure_compilation() {
     let measure = proxy_symbol.as_measure().unwrap();
     let dependencies = proxy_symbol.get_dependencies();
     assert_eq!(dependencies.len(), 1, "Should have 1 measure dependencies");
-    println!("!!! {}", measure.debug_sql(true));
 
     // Check that it's NOT a view member
     assert!(!measure.is_view(), "Proxy should not be a view member");
@@ -643,7 +663,8 @@ fn test_proxy_measure_compilation() {
 
 #[test]
 fn test_time_dimension_with_granularity_compilation() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     // Compile time dimension with month granularity
