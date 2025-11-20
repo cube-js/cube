@@ -77,6 +77,14 @@ impl CaseDefinition {
         let res = CaseDefinition { items, else_label };
         Ok(res)
     }
+
+    fn is_owned_by_cube(&self) -> bool {
+        let mut owned = false;
+        for itm in self.items.iter() {
+            owned |= itm.sql.is_owned_by_cube();
+        }
+        owned
+    }
 }
 
 #[derive(Clone)]
@@ -164,6 +172,21 @@ impl CaseSwitchDefinition {
         }
         values_len == 1
     }
+
+    fn is_owned_by_cube(&self) -> bool {
+        let mut owned = false;
+        if let CaseSwitchItem::Sql(sql) = &self.switch {
+            owned |= sql.is_owned_by_cube();
+        }
+        for itm in self.items.iter() {
+            owned |= itm.sql.is_owned_by_cube();
+        }
+        if let Some(sql) = &self.else_sql {
+            owned |= sql.is_owned_by_cube();
+        }
+        owned
+    }
+
     fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         self.switch.extract_symbol_deps(result);
         for itm in self.items.iter() {
@@ -368,6 +391,12 @@ impl Case {
         match self {
             Case::Case(_) => false,
             Case::CaseSwitch(case) => case.is_single_value(),
+        }
+    }
+    pub fn is_owned_by_cube(&self) -> bool {
+        match self {
+            Case::Case(case) => case.is_owned_by_cube(),
+            Case::CaseSwitch(case) => case.is_owned_by_cube(),
         }
     }
 }
