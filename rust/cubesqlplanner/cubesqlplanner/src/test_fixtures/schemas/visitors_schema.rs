@@ -1,5 +1,4 @@
 use crate::test_fixtures::cube_bridge::MockSchema;
-use indoc::indoc;
 
 /// Creates a schema for visitors and visitor_checkins cubes
 ///
@@ -10,101 +9,7 @@ use indoc::indoc;
 /// - Dimensions with complex SQL including special characters (question marks)
 /// - Time dimensions
 pub fn create_visitors_schema() -> MockSchema {
-    let yaml = indoc! {r#"
-        cubes:
-          - name: visitor_checkins
-            sql: "SELECT * FROM visitor_checkins"
-            dimensions:
-              - name: id
-                type: number
-                sql: id
-              - name: visitor_id
-                type: number
-                sql: visitor_id
-              - name: minDate
-                type: time
-                sql: "MIN(created_at)"
-              - name: minDate1
-                type: time
-                sql: "MIN(created_at) + INTERVAL '1 day'"
-            measures:
-              - name: count
-                type: count
-                sql: "COUNT(*)"
-
-          - name: visitors
-            sql: "SELECT * FROM visitors"
-            dimensions:
-              - name: id
-                type: number
-                sql: id
-              - name: visitor_id
-                type: number
-                sql: "{CUBE}.visitor_id"
-              - name: visitor_id_proxy
-                type: number
-                sql: "{visitors.visitor_id}"
-              - name: visitor_id_twice
-                type: number
-                sql: "{visitor_id} * 2"
-              - name: source
-                type: string
-                sql: source
-              - name: source_concat_id
-                type: string
-                sql: "CONCAT({CUBE.source}, ' ', {visitors.visitor_id})"
-              - name: created_at
-                type: time
-                sql: created_at
-              - name: minVisitorCheckinDate
-                type: time
-                sql: "{visitor_checkins.minDate}"
-                sub_query: true
-              - name: minVisitorCheckinDate1
-                type: time
-                sql: "{visitor_checkins.minDate1}"
-                sub_query: true
-              - name: location
-                type: geo
-                latitude: latitude
-                longitude: longitude
-              - name: questionMark
-                type: string
-                sql: "replace('some string question string ? ?? ???', 'string', 'with some ? ?? ???')"
-            measures:
-              - name: count
-                type: count
-                sql: "COUNT(*)"
-              - name: total_revenue
-                type: sum
-                sql: revenue
-              - name: total_revenue_proxy
-                type: number
-                sql: "{total_revenue}"
-              - name: revenue
-                type: sum
-                sql: "{CUBE}.revenue"
-              - name: total_revenue_per_count
-                type: number
-                sql: "{visitors.count} / {total_revenue}"
-            segments:
-              - name: google
-                sql: "{CUBE.source} = 'google'"
-
-        views:
-          - name: visitors_visitors_checkins
-            cubes:
-              - join_path: visitors
-                includes:
-                  - id
-                  - source_concat_id
-              - join_path: visitors.visitor_checkins
-                includes:
-                  - visitor_id
-                  - count
-    "#};
-
-    MockSchema::from_yaml(yaml).expect("Failed to parse visitors schema")
+    MockSchema::from_yaml_file("common/visitors.yaml").expect("Failed to load visitors schema")
 }
 
 #[cfg(test)]
