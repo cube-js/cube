@@ -24,6 +24,7 @@ typed-builder = "0.21.2"
 
 [dev-dependencies]
 petgraph = "0.6"
+serde_yaml = "0.9"
 
 [dependencies.neon]
 version = "=1"
