@@ -95,6 +95,7 @@ impl_static_data!(
 ///
 /// let members = members_from_strings(vec!["orders.count", "orders.status"]);
 /// ```
+#[allow(dead_code)]
 pub fn members_from_strings<S: ToString>(strings: Vec<S>) -> Vec<OptionsMember> {
     strings
         .into_iter()
@@ -109,6 +110,7 @@ pub fn members_from_strings<S: ToString>(strings: Vec<S>) -> Vec<OptionsMember> 
 /// * `operator` - Filter operator (e.g., "equals", "contains", "gt")
 /// * `values` - Array of filter values
 ///
+#[allow(dead_code)]
 pub fn filter_item<M: ToString, O: ToString, V: ToString>(
     member: M,
     operator: O,
@@ -129,6 +131,7 @@ pub fn filter_item<M: ToString, O: ToString, V: ToString>(
 /// # Arguments
 /// * `items` - Array of FilterItems to combine with OR
 ///
+#[allow(dead_code)]
 pub fn filter_or(items: Vec<FilterItem>) -> FilterItem {
     FilterItem {
         or: Some(items),
@@ -145,6 +148,7 @@ pub fn filter_or(items: Vec<FilterItem>) -> FilterItem {
 /// # Arguments
 /// * `items` - Array of FilterItems to combine with AND
 ///
+#[allow(dead_code)]
 pub fn filter_and(items: Vec<FilterItem>) -> FilterItem {
     FilterItem {
         and: Some(items),

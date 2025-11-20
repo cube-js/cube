@@ -2,7 +2,6 @@ use crate::test_fixtures::cube_bridge::yaml::YamlSchema;
 use crate::test_fixtures::cube_bridge::{
     MockBaseTools, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockDriverTools,
     MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition, MockSegmentDefinition,
-    MockSqlTemplatesRender,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -221,6 +220,7 @@ impl MockCubeBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn add_dimension(
         mut self,
         name: impl Into<String>,
@@ -230,6 +230,7 @@ impl MockCubeBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn add_measure(
         mut self,
         name: impl Into<String>,
@@ -301,6 +302,7 @@ pub struct MockViewBuilder {
 }
 
 impl MockViewBuilder {
+    #[allow(dead_code)]
     pub fn include_cube(mut self, join_path: impl Into<String>, includes: Vec<String>) -> Self {
         self.view_cubes.push(ViewCube {
             join_path: join_path.into(),
@@ -309,6 +311,7 @@ impl MockViewBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn add_dimension(
         mut self,
         name: impl Into<String>,
@@ -318,6 +321,7 @@ impl MockViewBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn add_measure(
         mut self,
         name: impl Into<String>,
@@ -450,10 +454,7 @@ impl MockViewBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cube_bridge::dimension_definition::DimensionDefinition;
     use crate::cube_bridge::join_item_definition::JoinItemDefinition;
-    use crate::cube_bridge::measure_definition::MeasureDefinition;
-    use crate::cube_bridge::segment_definition::SegmentDefinition;
     use indoc::indoc;
 
     #[test]

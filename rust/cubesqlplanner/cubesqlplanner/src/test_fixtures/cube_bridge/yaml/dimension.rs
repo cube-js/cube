@@ -1,7 +1,7 @@
 use crate::cube_bridge::case_variant::CaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::timeshift::YamlTimeShiftDefinition;
-use crate::test_fixtures::cube_bridge::{MockDimensionDefinition, MockTimeShiftDefinition};
+use crate::test_fixtures::cube_bridge::MockDimensionDefinition;
 use serde::Deserialize;
 use std::rc::Rc;
 
@@ -33,6 +33,7 @@ pub struct YamlDimensionDefinition {
     time_shift: Vec<YamlTimeShiftDefinition>,
 }
 
+#[allow(dead_code)]
 fn default_dimension_type() -> String {
     "string".to_string()
 }
