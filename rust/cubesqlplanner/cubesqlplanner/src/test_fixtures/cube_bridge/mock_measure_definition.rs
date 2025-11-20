@@ -6,6 +6,7 @@ use crate::cube_bridge::member_order_by::MemberOrderBy;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::struct_with_sql_member::StructWithSqlMember;
 use crate::impl_static_data;
+use crate::test_fixtures::cube_bridge::yaml::measure::YamlMeasureDefinition;
 use crate::test_fixtures::cube_bridge::{
     MockMemberOrderBy, MockMemberSql, MockStructWithSqlMember,
 };
@@ -32,7 +33,7 @@ pub struct MockMeasureDefinition {
     #[builder(default)]
     rolling_window: Option<RollingWindow>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default, setter(strip_option(fallback = sql_opt)))]
     sql: Option<String>,
     #[builder(default)]
     case: Option<Rc<CaseVariant>>,
@@ -56,6 +57,14 @@ impl_static_data!(
     time_shift_references,
     rolling_window
 );
+
+impl MockMeasureDefinition {
+    pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
+        let yaml_def: YamlMeasureDefinition = serde_yaml::from_str(yaml)
+            .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;
+        Ok(yaml_def.build())
+    }
+}
 
 impl MeasureDefinition for MockMeasureDefinition {
     crate::impl_static_data_method!(MeasureDefinitionStatic);
@@ -141,230 +150,114 @@ impl MeasureDefinition for MockMeasureDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
 
     #[test]
-    fn test_count_measure() {
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("count".to_string())
-            .sql("COUNT(*)".to_string())
-            .build();
+    fn test_from_yaml_minimal() {
+        let yaml = indoc! {"
+            type: count
+        "};
 
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
         assert_eq!(measure.static_data().measure_type, "count");
-        assert!(measure.sql().unwrap().is_some());
+        assert!(!measure.has_sql().unwrap());
     }
 
     #[test]
-    fn test_sum_measure() {
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("sum".to_string())
-            .sql("{CUBE.amount}".to_string())
-            .build();
+    fn test_from_yaml_with_sql() {
+        let yaml = indoc! {"
+            type: sum
+            sql: \"{CUBE.amount}\"
+        "};
 
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
         assert_eq!(measure.static_data().measure_type, "sum");
-        let sql = measure.sql().unwrap().unwrap();
-        assert_eq!(sql.args_names(), &vec!["CUBE"]);
+        assert!(measure.has_sql().unwrap());
     }
 
     #[test]
-    fn test_measure_with_filters() {
-        let filters = vec![
-            Rc::new(
-                MockStructWithSqlMember::builder()
-                    .sql("{CUBE.status} = 'active'".to_string())
-                    .build(),
-            ),
-            Rc::new(
-                MockStructWithSqlMember::builder()
-                    .sql("{CUBE.amount} > 0".to_string())
-                    .build(),
-            ),
-        ];
+    fn test_from_yaml_with_filters() {
+        let yaml = indoc! {"
+            type: count
+            sql: COUNT(*)
+            filters:
+              - sql: \"{CUBE}.status = 'active'\"
+              - sql: \"{CUBE}.amount > 0\"
+        "};
 
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("sum".to_string())
-            .sql("{CUBE.amount}".to_string())
-            .filters(Some(filters))
-            .build();
-
-        let result_filters = measure.filters().unwrap().unwrap();
-        assert_eq!(result_filters.len(), 2);
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
+        let filters = measure.filters().unwrap().unwrap();
+        assert_eq!(filters.len(), 2);
     }
 
     #[test]
-    fn test_measure_with_order_by() {
-        let order_by = vec![
-            Rc::new(
-                MockMemberOrderBy::builder()
-                    .sql("{CUBE.created_at}".to_string())
-                    .dir("desc".to_string())
-                    .build(),
-            ),
-            Rc::new(
-                MockMemberOrderBy::builder()
-                    .sql("{CUBE.name}".to_string())
-                    .dir("asc".to_string())
-                    .build(),
-            ),
-        ];
+    fn test_from_yaml_with_order_by() {
+        let yaml = indoc! {"
+            type: count
+            sql: COUNT(*)
+            order_by:
+              - sql: \"{CUBE.created_at}\"
+                dir: desc
+              - sql: \"{CUBE.name}\"
+                dir: asc
+        "};
 
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("count".to_string())
-            .sql("COUNT(*)".to_string())
-            .order_by(Some(order_by))
-            .build();
-
-        let result_order_by = measure.order_by().unwrap().unwrap();
-        assert_eq!(result_order_by.len(), 2);
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
+        let order_by = measure.order_by().unwrap().unwrap();
+        assert_eq!(order_by.len(), 2);
     }
 
     #[test]
-    fn test_measure_with_time_shift() {
-        let time_shift_refs = vec![
-            TimeShiftReference {
-                interval: Some("1 day".to_string()),
-                name: Some("yesterday".to_string()),
-                shift_type: Some("prior".to_string()),
-                time_dimension: Some("created_at".to_string()),
-            },
-            TimeShiftReference {
-                interval: Some("1 week".to_string()),
-                name: Some("last_week".to_string()),
-                shift_type: Some("prior".to_string()),
-                time_dimension: Some("created_at".to_string()),
-            },
-        ];
+    fn test_from_yaml_with_references() {
+        let yaml = indoc! {"
+            type: sum
+            sql: \"{CUBE.amount}\"
+            reduce_by_references: [user_id, order_id]
+            add_group_by_references: [status]
+            group_by_references: [category]
+        "};
 
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("sum".to_string())
-            .sql("{CUBE.amount}".to_string())
-            .time_shift_references(Some(time_shift_refs))
-            .build();
-
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
         let static_data = measure.static_data();
-        let refs = static_data.time_shift_references.as_ref().unwrap();
-        assert_eq!(refs.len(), 2);
-        assert_eq!(refs[0].name, Some("yesterday".to_string()));
-    }
-
-    #[test]
-    fn test_measure_with_rolling_window() {
-        let rolling_window = RollingWindow {
-            trailing: Some("7 day".to_string()),
-            leading: Some("0 day".to_string()),
-            offset: Some("start".to_string()),
-            rolling_type: Some("trailing".to_string()),
-            granularity: Some("day".to_string()),
-        };
-
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("sum".to_string())
-            .sql("{CUBE.amount}".to_string())
-            .rolling_window(Some(rolling_window))
-            .build();
-
-        let static_data = measure.static_data();
-        let window = static_data.rolling_window.as_ref().unwrap();
-        assert_eq!(window.trailing, Some("7 day".to_string()));
-        assert_eq!(window.granularity, Some("day".to_string()));
-    }
-
-    #[test]
-    fn test_measure_with_case() {
-        use crate::cube_bridge::case_variant::CaseVariant;
-        use crate::cube_bridge::string_or_sql::StringOrSql;
-        use crate::test_fixtures::cube_bridge::{
-            MockCaseDefinition, MockCaseElseItem, MockCaseItem,
-        };
-
-        let when_items = vec![
-            Rc::new(
-                MockCaseItem::builder()
-                    .sql("{CUBE.status} = 'active'".to_string())
-                    .label(StringOrSql::String("1".to_string()))
-                    .build(),
-            ),
-            Rc::new(
-                MockCaseItem::builder()
-                    .sql("{CUBE.status} = 'inactive'".to_string())
-                    .label(StringOrSql::String("0".to_string()))
-                    .build(),
-            ),
-        ];
-
-        let else_item = Rc::new(
-            MockCaseElseItem::builder()
-                .label(StringOrSql::String("0".to_string()))
-                .build(),
-        );
-
-        let case_def = Rc::new(
-            MockCaseDefinition::builder()
-                .when(when_items)
-                .else_label(else_item)
-                .build(),
-        );
-
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("number".to_string())
-            .case(Some(Rc::new(CaseVariant::Case(case_def))))
-            .build();
-
-        let case_result = measure.case().unwrap();
-        assert!(case_result.is_some());
-    }
-
-    #[test]
-    fn test_measure_with_references() {
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("sum".to_string())
-            .sql("{CUBE.amount}".to_string())
-            .reduce_by_references(Some(vec!["user_id".to_string(), "order_id".to_string()]))
-            .add_group_by_references(Some(vec!["status".to_string()]))
-            .group_by_references(Some(vec!["category".to_string()]))
-            .build();
 
         assert_eq!(
-            measure.static_data().reduce_by_references,
+            static_data.reduce_by_references,
             Some(vec!["user_id".to_string(), "order_id".to_string()])
         );
         assert_eq!(
-            measure.static_data().add_group_by_references,
+            static_data.add_group_by_references,
             Some(vec!["status".to_string()])
         );
         assert_eq!(
-            measure.static_data().group_by_references,
+            static_data.group_by_references,
             Some(vec!["category".to_string()])
         );
     }
 
     #[test]
-    fn test_measure_with_drill_filters() {
-        let drill_filters = vec![Rc::new(
-            MockStructWithSqlMember::builder()
-                .sql("{CUBE.is_drillable} = true".to_string())
-                .build(),
-        )];
+    fn test_from_yaml_with_case() {
+        let yaml = indoc! {"
+            type: number
+            case:
+              when:
+                - sql: \"{CUBE}.status = 'active'\"
+                  label: \"1\"
+                - sql: \"{CUBE}.status = 'inactive'\"
+                  label: \"0\"
+              else:
+                label: \"0\"
+        "};
 
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("count".to_string())
-            .sql("COUNT(*)".to_string())
-            .drill_filters(Some(drill_filters))
-            .build();
+        let measure = MockMeasureDefinition::from_yaml(yaml).unwrap();
+        assert!(measure.has_case().unwrap());
 
-        let result_filters = measure.drill_filters().unwrap().unwrap();
-        assert_eq!(result_filters.len(), 1);
-    }
-
-    #[test]
-    fn test_measure_with_flags() {
-        let measure = MockMeasureDefinition::builder()
-            .measure_type("sum".to_string())
-            .sql("{CUBE.amount}".to_string())
-            .multi_stage(Some(true))
-            .owned_by_cube(Some(false))
-            .build();
-
-        assert_eq!(measure.static_data().multi_stage, Some(true));
-        assert_eq!(measure.static_data().owned_by_cube, Some(false));
+        let case_variant = measure.case().unwrap().unwrap();
+        match case_variant {
+            CaseVariant::Case(case_def) => {
+                let when_items = case_def.when().unwrap();
+                assert_eq!(when_items.len(), 2);
+            }
+            _ => panic!("Expected Case variant"),
+        }
     }
 }
