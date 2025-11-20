@@ -9,7 +9,6 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
-use typed_builder::TypedBuilder;
 
 pub struct SqlCallArg;
 
@@ -50,7 +49,7 @@ pub struct SqlCallFilterGroupItem {
     pub filter_params: Vec<SqlCallFilterParamsItem>,
 }
 
-#[derive(Clone, TypedBuilder, Debug)]
+#[derive(Clone, Debug)]
 pub struct SqlCall {
     template: SqlTemplate,
     deps: Vec<SqlCallDependency>,
@@ -60,6 +59,22 @@ pub struct SqlCall {
 }
 
 impl SqlCall {
+    pub(super) fn new(
+        template: SqlTemplate,
+        deps: Vec<SqlCallDependency>,
+        filter_params: Vec<SqlCallFilterParamsItem>,
+        filter_groups: Vec<SqlCallFilterGroupItem>,
+        security_context: SecutityContextProps,
+    ) -> Self {
+        Self {
+            template,
+            deps,
+            filter_params,
+            filter_groups,
+            security_context,
+        }
+    }
+
     pub fn eval(
         &self,
         visitor: &SqlEvaluatorVisitor,
@@ -71,7 +86,6 @@ impl SqlCall {
             let (filter_params, filter_groups, deps, context_values) =
                 self.prepare_template_params(visitor, node_processor, &query_tools, templates)?;
 
-            // Substitute placeholders in template in a single pass
             Self::substitute_template(
                 template,
                 &deps,
@@ -120,6 +134,14 @@ impl SqlCall {
                 .collect::<Result<Vec<_>, _>>()?,
         };
         Ok(result)
+    }
+
+    pub fn is_owned_by_cube(&self) -> bool {
+        if self.deps.is_empty() {
+            true
+        } else {
+            self.deps.iter().any(|dep| dep.symbol.is_cube())
+        }
     }
 
     fn prepare_template_params(

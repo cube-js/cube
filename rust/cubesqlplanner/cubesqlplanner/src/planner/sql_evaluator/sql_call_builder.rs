@@ -8,6 +8,7 @@ use crate::cube_bridge::security_context::SecurityContext;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct SqlCallBuilder<'a> {
@@ -46,6 +47,8 @@ impl<'a> SqlCallBuilder<'a> {
             .map(|path| self.build_dependency(cube_name, path))
             .collect::<Result<Vec<_>, _>>()?;
 
+        Self::validate_deps(cube_name, &deps)?;
+
         let filter_params = template_args
             .filter_params
             .iter()
@@ -58,14 +61,37 @@ impl<'a> SqlCallBuilder<'a> {
             .map(|itm| self.build_filter_group_item(itm))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let result = SqlCall::builder()
-            .template(template.clone())
-            .deps(deps)
-            .filter_params(filter_params)
-            .filter_groups(filter_groups)
-            .security_context(template_args.security_context.clone())
-            .build();
+        let result = SqlCall::new(
+            template.clone(),
+            deps,
+            filter_params,
+            filter_groups,
+            template_args.security_context.clone(),
+        );
         Ok(result)
+    }
+
+    fn validate_deps(cube_name: &String, deps: &Vec<SqlCallDependency>) -> Result<(), CubeError> {
+        let foreign_cubes = deps
+            .iter()
+            .filter_map(|dep| {
+                if let Ok(cube) = dep.symbol.as_cube_name() {
+                    if cube_name != cube.cube_name() {
+                        return Some(cube.cube_name().clone());
+                    }
+                }
+                None
+            })
+            .collect_vec();
+
+        if !foreign_cubes.is_empty() {
+            return Err(CubeError::user(format!(
+                "Member sql in cube {} references to foreign cubes: {}",
+                cube_name,
+                foreign_cubes.join(", ")
+            )));
+        }
+        Ok(())
     }
 
     fn build_filter_params_item(
