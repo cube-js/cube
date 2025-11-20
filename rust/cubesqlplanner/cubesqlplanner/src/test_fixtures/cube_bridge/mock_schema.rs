@@ -1,7 +1,8 @@
+use crate::test_fixtures::cube_bridge::yaml::YamlSchema;
 use crate::test_fixtures::cube_bridge::{
-    parse_schema_yaml, MockBaseTools, MockCubeDefinition, MockCubeEvaluator,
-    MockDimensionDefinition, MockDriverTools, MockJoinGraph, MockJoinItemDefinition,
-    MockMeasureDefinition, MockSegmentDefinition, MockSqlTemplatesRender,
+    MockBaseTools, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockDriverTools,
+    MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition, MockSegmentDefinition,
+    MockSqlTemplatesRender,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -22,7 +23,9 @@ pub struct MockCube {
 
 impl MockSchema {
     pub fn from_yaml(yaml: &str) -> Result<Self, CubeError> {
-        parse_schema_yaml(yaml)
+        let yaml_schema: YamlSchema = serde_yaml::from_str(yaml)
+            .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;
+        yaml_schema.build()
     }
 
     pub fn get_cube(&self, name: &str) -> Option<&MockCube> {
@@ -451,6 +454,7 @@ mod tests {
     use crate::cube_bridge::join_item_definition::JoinItemDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
+    use indoc::indoc;
 
     #[test]
     fn test_complex_schema_with_join_relationships() {
@@ -668,5 +672,37 @@ mod tests {
             join_def_result.is_ok(),
             "graph.build_join should succeed for orders -> users"
         );
+    }
+
+    #[test]
+    fn test_from_yaml() {
+        let yaml = indoc! {r#"
+            cubes:
+              - name: orders
+                sql: "SELECT * FROM orders"
+                dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: status
+                    type: string
+                    sql: status
+                measures:
+                  - name: count
+                    type: count
+                    owned_by_cube: true
+        "#};
+
+        let schema = MockSchema::from_yaml(yaml).unwrap();
+
+        assert!(schema.get_cube("orders").is_some());
+
+        let id_dim = schema.get_dimension("orders", "id").unwrap();
+        assert_eq!(id_dim.static_data().dimension_type, "number");
+        assert_eq!(id_dim.static_data().primary_key, Some(true));
+
+        let count_measure = schema.get_measure("orders", "count").unwrap();
+        assert_eq!(count_measure.static_data().measure_type, "count");
     }
 }
