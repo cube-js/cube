@@ -167,7 +167,6 @@ mod tests {
                 measures:
                   - name: count
                     type: count
-                    owned_by_cube: true
         "#};
 
         let yaml_schema: YamlSchema = serde_yaml::from_str(yaml).unwrap();
@@ -220,7 +219,6 @@ mod tests {
                 measures:
                   - name: count
                     type: count
-                    owned_by_cube: true
             views:
               - name: orders_view
                 cubes:
@@ -258,10 +256,8 @@ mod tests {
                 measures:
                   - name: count
                     type: count
-                    owned_by_cube: true
                   - name: total
                     type: sum
-                    owned_by_cube: true
                     sql: amount
             views:
               - name: orders_view
@@ -332,10 +328,8 @@ mod tests {
                 measures:
                   - name: count
                     type: count
-                    owned_by_cube: true
                   - name: revenue
                     type: sum
-                    owned_by_cube: true
                     sql: "CASE WHEN {CUBE}.status = 'completed' THEN {CUBE.amount} END"
 
               - name: line_items
@@ -355,10 +349,8 @@ mod tests {
                 measures:
                   - name: count
                     type: count
-                    owned_by_cube: true
                   - name: total_amount
                     type: sum
-                    owned_by_cube: true
                     sql: "{price}"
 
               - name: products
@@ -374,7 +366,6 @@ mod tests {
                 measures:
                   - name: count
                     type: count
-                    owned_by_cube: true
 
             views:
               - name: orders_view

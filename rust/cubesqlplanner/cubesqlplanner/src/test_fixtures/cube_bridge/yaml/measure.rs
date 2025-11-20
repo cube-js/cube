@@ -12,8 +12,6 @@ pub struct YamlMeasureDefinition {
     #[serde(rename = "type")]
     measure_type: String,
     #[serde(default)]
-    owned_by_cube: Option<bool>,
-    #[serde(default)]
     multi_stage: Option<bool>,
     #[serde(default)]
     reduce_by_references: Option<Vec<String>>,
@@ -93,7 +91,6 @@ impl YamlMeasureDefinition {
         Rc::new(
             MockMeasureDefinition::builder()
                 .measure_type(self.measure_type)
-                .owned_by_cube(self.owned_by_cube)
                 .multi_stage(self.multi_stage)
                 .reduce_by_references(self.reduce_by_references)
                 .add_group_by_references(self.add_group_by_references)
