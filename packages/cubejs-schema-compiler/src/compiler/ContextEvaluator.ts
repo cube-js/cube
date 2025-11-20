@@ -13,24 +13,27 @@ export interface CompiledContext {
 }
 
 export class ContextEvaluator implements CompilerInterface {
-  private cubeEvaluator: CubeEvaluator;
+  private readonly cubeEvaluator: CubeEvaluator;
 
-  private contextDefinitions: Record<string, CompiledContext>;
+  private contextDefinitions: Map<string, CompiledContext>;
 
   public constructor(cubeEvaluator: CubeEvaluator) {
     this.cubeEvaluator = cubeEvaluator;
-    this.contextDefinitions = {};
+    this.contextDefinitions = new Map<string, CompiledContext>();
   }
 
-  public compile(contexts: ContextInput[], _errorReporter?: ErrorReporter): void {
+  public compile(contexts: ContextInput[], errorReporter?: ErrorReporter): void {
     if (contexts.length === 0) {
       return;
     }
 
-    // TODO: handle duplications, context names must be uniq
-    this.contextDefinitions = {};
+    this.contextDefinitions = new Map<string, CompiledContext>();
     for (const context of contexts) {
-      this.contextDefinitions[context.name] = this.compileContext(context);
+      if (errorReporter && this.contextDefinitions.has(context.name)) {
+        errorReporter.error(`Context "${context.name}" already exists!`);
+      } else {
+        this.contextDefinitions.set(context.name, this.compileContext(context));
+      }
     }
   }
 
@@ -42,6 +45,6 @@ export class ContextEvaluator implements CompilerInterface {
   }
 
   public get contextList(): string[] {
-    return Object.keys(this.contextDefinitions);
+    return Array.from(this.contextDefinitions.keys());
   }
 }
