@@ -1,6 +1,8 @@
 #[macro_use]
 mod macros;
 
+mod yaml;
+
 mod base_query_options;
 mod mock_base_tools;
 mod mock_case_definition;

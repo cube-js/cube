@@ -1,6 +1,7 @@
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::timeshift_definition::{TimeShiftDefinition, TimeShiftDefinitionStatic};
 use crate::impl_static_data;
+use crate::test_fixtures::cube_bridge::yaml::timeshift::YamlTimeShiftDefinition;
 use crate::test_fixtures::cube_bridge::MockMemberSql;
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -16,7 +17,7 @@ pub struct MockTimeShiftDefinition {
     timeshift_type: Option<String>,
     #[builder(default)]
     name: Option<String>,
-    #[builder(default, setter(strip_option))]
+    #[builder(default, setter(strip_option(fallback = sql_opt)))]
     sql: Option<String>,
 }
 
@@ -27,6 +28,14 @@ impl_static_data!(
     timeshift_type,
     name
 );
+
+impl MockTimeShiftDefinition {
+    pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
+        let yaml_def: YamlTimeShiftDefinition = serde_yaml::from_str(yaml)
+            .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;
+        Ok(yaml_def.build())
+    }
+}
 
 impl TimeShiftDefinition for MockTimeShiftDefinition {
     crate::impl_static_data_method!(TimeShiftDefinitionStatic);
@@ -52,27 +61,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mock_timeshift_with_sql() {
-        let timeshift = MockTimeShiftDefinition::builder()
-            .interval(Some("1 day".to_string()))
-            .timeshift_type(Some("prior".to_string()))
-            .name(Some("yesterday".to_string()))
-            .sql("{CUBE.date_field}".to_string())
-            .build();
+    fn test_from_yaml_all_fields() {
+        let yaml = r#"
+            interval: "1 year"
+            type: "prior"
+            name: "date"
+            sql: "{CUBE}.created_at"
+            "#;
 
-        assert_eq!(timeshift.static_data().interval, Some("1 day".to_string()));
-        assert!(timeshift.has_sql().unwrap());
-        assert!(timeshift.sql().unwrap().is_some());
+        let ts = MockTimeShiftDefinition::from_yaml(yaml).unwrap();
+        let static_data = ts.static_data();
+
+        assert_eq!(static_data.interval, Some("1 year".to_string()));
+        assert_eq!(static_data.timeshift_type, Some("prior".to_string()));
+        assert_eq!(static_data.name, Some("date".to_string()));
+        assert!(ts.has_sql().unwrap());
     }
 
     #[test]
-    fn test_mock_timeshift_without_sql() {
-        let timeshift = MockTimeShiftDefinition::builder()
-            .interval(Some("1 week".to_string()))
-            .build();
+    fn test_from_yaml_minimal() {
+        let yaml = r#"
+            interval: "1 month"
+            "#;
 
-        assert_eq!(timeshift.static_data().interval, Some("1 week".to_string()));
-        assert!(!timeshift.has_sql().unwrap());
-        assert!(timeshift.sql().unwrap().is_none());
+        let ts = MockTimeShiftDefinition::from_yaml(yaml).unwrap();
+        let static_data = ts.static_data();
+
+        assert_eq!(static_data.interval, Some("1 month".to_string()));
+        assert_eq!(static_data.timeshift_type, None);
+        assert_eq!(static_data.name, None);
+        assert!(!ts.has_sql().unwrap());
     }
 }
