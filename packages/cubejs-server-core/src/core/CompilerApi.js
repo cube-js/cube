@@ -1,15 +1,16 @@
 import crypto from 'crypto';
 import {
-  createQuery,
   compile,
-  queryClass,
+  createQuery,
   PreAggregations,
-  QueryFactory,
-  prepareCompiler
+  prepareCompiler,
+  queryClass,
+  QueryFactory
 } from '@cubejs-backend/schema-compiler';
-import { v4 as uuidv4, parse as uuidParse } from 'uuid';
+import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
+import { disposedProxy } from "@cubejs-backend/shared";
 
 export class CompilerApi {
   /**
@@ -55,7 +56,14 @@ export class CompilerApi {
   dispose() {
     if (this.compiledScriptCacheInterval) {
       clearInterval(this.compiledScriptCacheInterval);
+      this.compiledScriptCacheInterval = null;
     }
+
+    // freeing memory-heavy allocated instances
+    // using safeguard for potential dangling references.
+    this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
+    this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
+    this.graphqlSchema = undefined;
   }
 
   setGraphQLSchema(schema) {

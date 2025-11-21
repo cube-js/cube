@@ -23,3 +23,4 @@ export * from './platform';
 export * from './FileRepository';
 export * from './decorators';
 export * from './PerfTracker';
+export * from './disposedProxy';
