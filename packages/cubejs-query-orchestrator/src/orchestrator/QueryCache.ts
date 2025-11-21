@@ -284,6 +284,26 @@ export class QueryCache {
       }
     }
 
+    if (forceNoCache) {
+      return {
+        data: this.cacheQueryResult(
+          query,
+          values,
+          cacheKey,
+          expireSecs,
+          {
+            priority: queuePriority,
+            forceNoCache,
+            external: queryBody.external,
+            requestId: queryBody.requestId,
+            dataSource: queryBody.dataSource,
+            persistent: queryBody.persistent,
+          }
+        ),
+        lastRefreshTime: await this.lastRefreshTime(cacheKey)
+      };
+    }
+
     // renewQuery has been deprecated, but keeping it for now
     if (queryBody.cacheMode === 'must-revalidate' || queryBody.renewQuery) {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
@@ -349,7 +369,6 @@ export class QueryCache {
       expireSecs,
       {
         priority: queuePriority,
-        forceNoCache,
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
@@ -357,22 +376,20 @@ export class QueryCache {
       }
     );
 
-    if (!forceNoCache) {
-      this.startRenewCycle(
-        query,
-        values,
-        cacheKeyQueries,
-        expireSecs,
-        cacheKey,
-        renewalThreshold,
-        {
-          external: queryBody.external,
-          requestId: queryBody.requestId,
-          dataSource: queryBody.dataSource,
-          persistent: queryBody.persistent,
-        }
-      );
-    }
+    this.startRenewCycle(
+      query,
+      values,
+      cacheKeyQueries,
+      expireSecs,
+      cacheKey,
+      renewalThreshold,
+      {
+        external: queryBody.external,
+        requestId: queryBody.requestId,
+        dataSource: queryBody.dataSource,
+        persistent: queryBody.persistent,
+      }
+    );
 
     return {
       data: await mainPromise,

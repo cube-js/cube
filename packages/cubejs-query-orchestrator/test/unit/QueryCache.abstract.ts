@@ -163,5 +163,33 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       // @ts-ignore
       expect(key4.persistent).toEqual(false);
     });
+
+    it('bypass cache when forceNoCache=true', async () => {
+      let queryExecutionCount = 0;
+
+      const mockDriverFactory = jest.fn(() => ({
+        query: jest.fn(async () => {
+          queryExecutionCount++;
+        })
+      })) as any;
+
+      const cacheInstance = new QueryCache(
+        crypto.randomBytes(16).toString('hex'),
+        mockDriverFactory,
+        jest.fn(),
+        {
+          ...options,
+          queueOptions: async () => ({ concurrency: 1 }),
+        }
+      );
+
+      const queryBody = { query: 'select 1', values: [], forceNoCache: true };
+
+      await cacheInstance.cachedQueryResult(queryBody, []);
+      await cacheInstance.cachedQueryResult(queryBody, []);
+
+      expect(queryExecutionCount).toBe(2);
+      await cacheInstance.cleanup();
+    });
   });
 };
