@@ -744,6 +744,78 @@ fn test_sql_regular_dimension_wrong_cube_ref() {
     ];
 
     for dim in wron_dims {
-        assert!(context.create_dimension(dim).is_err());
+        assert!(
+            context.create_dimension(dim).is_err(),
+            "Dimension {} should not compile",
+            dim
+        );
+    }
+}
+
+#[test]
+fn test_sql_multi_stage_dimension_wrong_cube_ref() {
+    let schema = MockSchema::from_yaml_file("compilation_tests/wrong_cube_refs_test.yaml");
+    let context = TestContext::new(schema).unwrap();
+    let wron_dims = vec![
+        "users.multiStageCubeRefInSql",
+        "users.multiStageOtherCubeRefInSql",
+        "users.multiStageCubeRefInLongitude",
+        "users.multiStageCubeRefInLatitude",
+        "users.multiStageCubeRefInCaseItem",
+        "users.multiStageCubeRefInCaseSwitchSwitch",
+        "users.multiStageCubeRefInCaseSwitchItem",
+        "users.multiStageCubeRefInCaseSwitchElse",
+    ];
+
+    for dim in wron_dims {
+        assert!(
+            context.create_dimension(dim).is_err(),
+            "Dimension {} should not compile",
+            dim
+        );
+    }
+}
+
+#[test]
+fn test_sql_multi_stage_dimension_wihtout_member_ref() {
+    let schema = MockSchema::from_yaml_file("compilation_tests/wrong_cube_refs_test.yaml");
+    let context = TestContext::new(schema).unwrap();
+    let wron_dims = vec![
+        "users.multiStageWithoutRefInSql",
+        "users.multiStageWithoutRefInLongitude",
+        "users.multiStageWithoutRefInLatitude",
+        "users.multiStageWithoutRefInCaseItem",
+        "users.multiStageWithoutRefInCaseSwitchSwitch",
+        "users.multiStageWithoutRefInCaseSwitchItem",
+        "users.multiStageWithoutRefInCaseSwitchElse",
+    ];
+
+    for dim in wron_dims {
+        assert!(
+            context.create_dimension(dim).is_err(),
+            "Dimension {} should not compile",
+            dim
+        );
+    }
+}
+
+#[test]
+fn test_sql_multi_stage_measures() {
+    let schema = MockSchema::from_yaml_file("compilation_tests/wrong_cube_refs_test.yaml");
+    let context = TestContext::new(schema).unwrap();
+    let wron_dims = vec![
+        "users.mOtherCubeRefInSql",
+        "users.mMultiStageCubeRefInSql",
+        "users.mMultiStageWithoutRefInCaseSwitchSwitch",
+        "users.mMultiStageWithoutRefInCaseSwitchItem",
+        "users.mMultiStageWithoutRefInCaseSwitchElse",
+    ];
+
+    for dim in wron_dims {
+        assert!(
+            context.create_dimension(dim).is_err(),
+            "Dimension {} should not compile",
+            dim
+        );
     }
 }
