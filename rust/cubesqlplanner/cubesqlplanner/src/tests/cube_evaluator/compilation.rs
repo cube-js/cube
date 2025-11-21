@@ -1,6 +1,8 @@
 //! Tests for Compiler member evaluation
 
-use crate::test_fixtures::{cube_bridge::MockSchema, schemas::TestCompiler};
+use crate::test_fixtures::cube_bridge::MockSchema;
+use crate::test_fixtures::schemas::TestCompiler;
+use crate::test_fixtures::test_utils::TestContext;
 
 #[test]
 fn test_add_dimension_evaluator_number_dimension() {
@@ -727,17 +729,21 @@ fn test_sql_deps_validation() {
 }
 
 #[test]
-fn test_sql_deps_validation_with_reference() {
-    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
-    let evaluator = schema.create_evaluator();
-    let mut test_compiler = TestCompiler::new(evaluator);
+fn test_sql_regular_dimension_wrong_cube_ref() {
+    let schema = MockSchema::from_yaml_file("compilation_tests/wrong_cube_refs_test.yaml");
+    let context = TestContext::new(schema).unwrap();
+    let wron_dims = vec![
+        "users.otherCubeRefInSql",
+        "users.otherCubeRefInSql2",
+        "users.otherCubeRefInLongitude",
+        "users.otherCubeRefInLatitude",
+        "users.otherCubeRefInCaseItem",
+        "users.otherCubeRefInCaseSwitchSwitch",
+        "users.otherCubeRefInCaseSwitchItem",
+        "users.otherCubeRefInCaseSwitchElse",
+    ];
 
-    assert!(test_compiler
-        .compiler
-        .add_dimension_evaluator("visitors.wrong_foreign_cube_ref".to_string())
-        .is_err());
-    assert!(test_compiler
-        .compiler
-        .add_dimension_evaluator("visitors.wrong_double_cube_ref".to_string())
-        .is_err());
+    for dim in wron_dims {
+        assert!(context.create_dimension(dim).is_err());
+    }
 }

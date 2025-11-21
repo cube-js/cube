@@ -3,7 +3,7 @@ use crate::test_fixtures::test_utils::TestContext;
 
 #[test]
 fn dimensions_ownships() {
-    let schema = MockSchema::from_yaml_file("owned_by_cube/ownership_test.yaml");
+    let schema = MockSchema::from_yaml_file("compilation_tests/ownership_test.yaml");
     let context = TestContext::new(schema).unwrap();
 
     let owned_dims = vec![
@@ -46,7 +46,7 @@ fn dimensions_ownships() {
 
 #[test]
 fn measures_ownships() {
-    let schema = MockSchema::from_yaml_file("owned_by_cube/ownership_test.yaml");
+    let schema = MockSchema::from_yaml_file("compilation_tests/ownership_test.yaml");
     let context = TestContext::new(schema).unwrap();
 
     let owned_measures = vec![
