@@ -1,7 +1,8 @@
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
-use crate::planner::sql_evaluator::Case;
+use crate::planner::sql_evaluator::{Case, SqlCall};
 
 use super::{
     CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol,
@@ -332,6 +333,60 @@ impl MemberSymbol {
 
     pub fn is_leaf(&self) -> bool {
         self.get_dependencies().is_empty()
+    }
+
+    pub fn validate(&self) -> Result<(), CubeError> {
+        self.validate_cube_refs()
+    }
+    fn validate_cube_refs(&self) -> Result<(), CubeError> {
+        let sql_calls = match self {
+            Self::Dimension(dim) => dim.iter_sql_calls(),
+            _ => Box::new(std::iter::empty()),
+        };
+        if self.is_multi_stage() {
+            for call in sql_calls {
+                self.validate_multi_stage_cube_refs(call)?;
+            }
+        } else {
+            for call in sql_calls {
+                self.validate_regular_member_cube_refs(call)?;
+            }
+        }
+        Ok(())
+    }
+    fn validate_multi_stage_cube_refs(&self, sql_call: &Rc<SqlCall>) -> Result<(), CubeError> {
+        let cube_name = self.cube_name();
+        let sql_cube_deps = sql_call.cube_name_deps();
+        if !sql_cube_deps.is_empty() {
+            Err(CubeError::user(format!(
+                "Multi stage member '{}' references cubes {}. Multi stage members can only reference other members.",
+                cube_name, sql_cube_deps.iter().map(|dep| dep.cube_name()).join(", ")
+            )))
+        } else {
+            Ok(())
+        }
+    }
+    fn validate_regular_member_cube_refs(&self, sql_call: &Rc<SqlCall>) -> Result<(), CubeError> {
+        let cube_name = self.cube_name();
+        let sql_cube_deps = sql_call.cube_name_deps();
+        if sql_cube_deps
+            .iter()
+            .any(|dep| dep.cube_name() != &cube_name)
+        {
+            Err(CubeError::user(format!(
+                "Member '{}' references foreign cubes: {}. Please split and move this definition to corresponding cubes.",
+                cube_name, sql_cube_deps.iter().filter_map(|dep|
+                    if dep.cube_name() != &cube_name {
+                        Some(dep.cube_name())
+                    } else {
+                        None
+                    }
+
+                ).join(", ")
+            )))
+        } else {
+            Ok(())
+        }
     }
 }
 

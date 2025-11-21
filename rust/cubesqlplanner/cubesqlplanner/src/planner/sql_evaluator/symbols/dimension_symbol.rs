@@ -227,6 +227,16 @@ impl DimensionSymbol {
         Ok(MemberSymbol::new_dimension(Rc::new(result)))
     }
 
+    pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        let result = self
+            .member_sql
+            .iter()
+            .chain(self.latitude.iter())
+            .chain(self.longitude.iter())
+            .chain(self.case.iter().flat_map(|case| case.iter_sql_calls()));
+        Box::new(result)
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         if let Some(member_sql) = &self.member_sql {
@@ -517,6 +527,7 @@ impl SymbolFactory for DimensionSymbolFactory {
                 None
             };
 
+        let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
 
         let owned_by_cube = if is_multi_stage || dimension_type == "switch" {
@@ -537,7 +548,6 @@ impl SymbolFactory for DimensionSymbolFactory {
             }
             owned
         };
-        let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_reference = (is_view && is_sql_direct_ref)
             || (!owned_by_cube
                 && !is_sub_query
@@ -609,12 +619,10 @@ impl SymbolFactory for DimensionSymbolFactory {
 
 impl crate::utils::debug::DebugSql for DimensionSymbol {
     fn debug_sql(&self, expand_deps: bool) -> String {
-        // Handle case expressions
         if let Some(case) = &self.case {
             return case.debug_sql(expand_deps);
         }
 
-        // Handle geo dimensions (latitude/longitude pair)
         if self.dimension_type == "geo" {
             let lat = self
                 .latitude
@@ -629,12 +637,10 @@ impl crate::utils::debug::DebugSql for DimensionSymbol {
             return format!("GEO({}, {})", lat, lon);
         }
 
-        // Handle switch type dimensions without SQL
         if self.dimension_type == "switch" && self.member_sql.is_none() {
             return format!("SWITCH({})", self.full_name());
         }
 
-        // Standard dimension SQL
         let res = if let Some(sql) = &self.member_sql {
             sql.debug_sql(expand_deps)
         } else {
