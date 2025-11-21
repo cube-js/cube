@@ -358,6 +358,16 @@ impl MeasureSymbol {
         Ok(MemberSymbol::new_measure(Rc::new(result)))
     }
 
+    pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        //FIXME We don't include filters and order_by here for backward compatibility
+        // because BaseQuery doesn't validate these SQL calls
+        let result = self
+            .member_sql
+            .iter()
+            .chain(self.case.iter().flat_map(|case| case.iter_sql_calls()));
+        Box::new(result)
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         if let Some(member_sql) = &self.member_sql {

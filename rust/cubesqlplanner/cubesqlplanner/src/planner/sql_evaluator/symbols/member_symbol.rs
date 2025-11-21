@@ -341,6 +341,7 @@ impl MemberSymbol {
     fn validate_cube_refs(&self) -> Result<(), CubeError> {
         let sql_calls = match self {
             Self::Dimension(dim) => dim.iter_sql_calls(),
+            Self::Measure(meas) => meas.iter_sql_calls(),
             _ => Box::new(std::iter::empty()),
         };
         if self.is_multi_stage() {
@@ -355,12 +356,16 @@ impl MemberSymbol {
         Ok(())
     }
     fn validate_multi_stage_cube_refs(&self, sql_call: &Rc<SqlCall>) -> Result<(), CubeError> {
-        let cube_name = self.cube_name();
         let sql_cube_deps = sql_call.cube_name_deps();
         if !sql_cube_deps.is_empty() {
             Err(CubeError::user(format!(
                 "Multi stage member '{}' references cubes {}. Multi stage members can only reference other members.",
-                cube_name, sql_cube_deps.iter().map(|dep| dep.cube_name()).join(", ")
+                self.full_name(), sql_cube_deps.iter().map(|dep| dep.cube_name()).join(", ")
+            )))
+        } else if sql_call.dependencies_count() == 0 {
+            Err(CubeError::user(format!(
+                "Multi stage member '{}' don't reference other members.",
+                self.full_name()
             )))
         } else {
             Ok(())
@@ -375,7 +380,7 @@ impl MemberSymbol {
         {
             Err(CubeError::user(format!(
                 "Member '{}' references foreign cubes: {}. Please split and move this definition to corresponding cubes.",
-                cube_name, sql_cube_deps.iter().filter_map(|dep|
+                self.full_name(), sql_cube_deps.iter().filter_map(|dep|
                     if dep.cube_name() != &cube_name {
                         Some(dep.cube_name())
                     } else {
