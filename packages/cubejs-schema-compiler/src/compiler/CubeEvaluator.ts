@@ -803,6 +803,7 @@ export class CubeEvaluator extends CubeSymbols {
 
     const member = typeMembers[cubeAndName[1]];
     if (member === undefined) {
+      console.log("!!! ", type);
       throw new UserError(`'${cubeAndName[1]}' not found for path '${path}'`);
     }
 

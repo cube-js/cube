@@ -52,7 +52,7 @@ impl CaseDefinition {
         }
     }
 
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+    fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         &self,
         f: &F,
     ) -> Result<Self, CubeError> {
@@ -76,6 +76,10 @@ impl CaseDefinition {
         };
         let res = CaseDefinition { items, else_label };
         Ok(res)
+    }
+
+    fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        Box::new(self.items.iter().map(|item| &item.sql))
     }
 
     fn is_owned_by_cube(&self) -> bool {
@@ -114,7 +118,7 @@ impl CaseSwitchItem {
         }
     }
 
-    pub fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
+    fn apply_to_deps<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
         &self,
         f: &F,
     ) -> Result<Self, CubeError> {
@@ -123,6 +127,13 @@ impl CaseSwitchItem {
             CaseSwitchItem::Member(member) => CaseSwitchItem::Member(member.apply_recursive(f)?),
         };
         Ok(res)
+    }
+
+    fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        match self {
+            CaseSwitchItem::Sql(sql_call) => Box::new(std::iter::once(sql_call)),
+            CaseSwitchItem::Member(_) => Box::new(std::iter::empty()),
+        }
     }
 }
 
@@ -173,6 +184,17 @@ impl CaseSwitchDefinition {
         values_len == 1
     }
 
+    fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        let result = self
+            .switch
+            .iter_sql_calls()
+            .chain(self.items.iter().map(|item| &item.sql));
+        if let Some(else_sql) = &self.else_sql {
+            Box::new(result.chain(std::iter::once(else_sql)))
+        } else {
+            Box::new(result)
+        }
+    }
     fn is_owned_by_cube(&self) -> bool {
         let mut owned = false;
         if let CaseSwitchItem::Sql(sql) = &self.switch {
@@ -391,6 +413,13 @@ impl Case {
         match self {
             Case::Case(_) => false,
             Case::CaseSwitch(case) => case.is_single_value(),
+        }
+    }
+
+    pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        match self {
+            Case::Case(case) => Box::new(case.iter_sql_calls()),
+            Case::CaseSwitch(case) => Box::new(case.iter_sql_calls()),
         }
     }
     pub fn is_owned_by_cube(&self) -> bool {

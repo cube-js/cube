@@ -3,6 +3,7 @@ use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
 use crate::cube_bridge::member_sql::{FilterParamsColumn, SecutityContextProps, SqlTemplate};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::CubeNameSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
@@ -142,6 +143,19 @@ impl SqlCall {
         } else {
             self.deps.iter().any(|dep| dep.symbol.is_cube())
         }
+    }
+
+    pub fn cube_name_deps(&self) -> Vec<Rc<CubeNameSymbol>> {
+        self.deps
+            .iter()
+            .filter_map(|dep| {
+                if let Ok(cube) = dep.symbol.as_cube_name() {
+                    Some(cube.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn prepare_template_params(

@@ -1,0 +1,173 @@
+cubes:
+  - name: users
+    sql: "SELECT 1"
+    joins:
+      - name: orders
+        relationship: one_to_many
+        sql: "{users}.id = {orders.user_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+
+      - name: otherCubeRefInSql
+        type: string
+        sql: "{orders}.user_name"
+
+      - name: otherCubeRefInSql2
+        type: string
+        sql: "{CUBE}.val + {orders}.user_name"
+
+      - name: otherCubeRefInLongitude
+        type: geo
+        longitude: "{orders}.longitude"
+        latitude: "{CUBE}.latitude"
+
+      - name: otherCubeRefInLatitude
+        type: geo
+        longitude: "{CUBE}.longitude"
+        latitude: "{orders}.latitude"
+
+      - name: otherCubeRefInCaseItem
+        type: string
+        case:
+          when:
+            - sql: "{CUBE}.id = 1"
+              label: 1
+            - sql: "{orders}.id = 1"
+              label: 2
+          else:
+            label: 3
+
+      - name: otherCubeRefInCaseSwitchSwitch
+        type: string
+        case:
+          switch: "{orders}.state"
+          when:
+            - value: "a"
+              sql: "{CUBE}.a"
+            - value: "b"
+              sql: "{CUBE}.b"
+          else:
+            sql: "{CUBE}.c"
+
+      - name: otherCubeRefInCaseSwitchItem
+        type: string
+        case:
+          switch: "{CUBE}.state"
+          when:
+            - value: "a"
+              sql: "{orders}.a"
+            - value: "b"
+              sql: "{CUBE}.b"
+          else:
+            sql: "{CUBE}.c"
+
+      - name: otherCubeRefInCaseSwitchElse
+        type: string
+        case:
+          switch: "{CUBE}.state"
+          when:
+            - value: "a"
+              sql: "{CUBE}.a"
+            - value: "b"
+              sql: "{CUBE}.b"
+          else:
+            sql: "{orders}.c"
+
+      - name: multiStageCubeRefInSql
+        type: string
+        multi_stage: true
+        sql: "{CUBE}.id"
+
+      - name: multiStageOtherCubeRefInSql
+        type: string
+        multi_stage: true
+        sql: "{orders}.id"
+
+      - name: multiStageCubeRefInLongitude
+        type: geo
+        longitude: "{CUBE}.longitude"
+        latitude: "{CUBE.id}"
+
+      - name: multiStageCubeRefInLatitude
+        type: geo
+        longitude: "{CUBE.id}"
+        latitude: "{CUBE}.latitude"
+
+      - name: multiStageCubeRefInCaseItem
+        type: string
+        case:
+          when:
+            - sql: "{CUBE}.id = 1"
+              label: 1
+            - sql: "{orders}.id = 1"
+              label: 2
+          else:
+            label: 3
+
+      - name: multiStageRefInCaseSwitchSwitch
+        type: string
+        case:
+          switch: "{CUBE}.state"
+          when:
+            - value: "a"
+              sql: "{CUBE.id}"
+            - value: "b"
+              sql: "{CUBE.id}"
+          else:
+            sql: "{orders.id}"
+
+      - name: multiStageRefInCaseSwitchItem
+        type: string
+        case:
+          switch: "{CUBE.id}"
+          when:
+            - value: "a"
+              sql: "{CUBE}.a"
+            - value: "b"
+              sql: "{CUBE.id}"
+          else:
+            sql: "{orders.id}"
+
+      - name: multiStageRefInCaseSwitchElse
+        type: string
+        case:
+          switch: "{CUBE.id}"
+          when:
+            - value: "a"
+              sql: "{CUBE.id}"
+            - value: "b"
+              sql: "{orders.id}"
+          else:
+            sql: "{CUBE}.c"
+
+    measures:
+
+  - name: orders
+    sql: "SELECT 1"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: orderUserName
+        type: string
+        sql: "{users.userName}"
+      - name: orderType
+        type: string
+        sql: "{CUBE}.order_type"
+      - name: latitude
+        type: number
+        sql: "{CUBE}.latitude"
+      - name: longitude
+        type: number
+        sql: "{CUBE}.longitude"
+    measures:
+      - name: count
+        type: count
+
+      - name: revenue
+        type: sum
+        sql: "{CUBE}.revenue"
