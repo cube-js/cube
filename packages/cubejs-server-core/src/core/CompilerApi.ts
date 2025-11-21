@@ -23,6 +23,7 @@ import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
+import { disposedProxy } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DbTypeAsyncFn, DialectClassFn, LoggerFn } from './types';
@@ -186,8 +187,10 @@ export class CompilerApi {
       this.compiledScriptCacheInterval = null;
     }
 
-    this.compilers = undefined;
-    this.queryFactory = undefined;
+    // freeing memory-heavy allocated instances
+    // using safeguard for potential dangling references.
+    this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
+    this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
     this.graphqlSchema = undefined;
   }
 
