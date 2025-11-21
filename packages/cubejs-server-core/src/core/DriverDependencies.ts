@@ -1,4 +1,6 @@
-module.exports = {
+import { DatabaseType } from './types';
+
+const DriverDependencies: Record<DatabaseType, string> = {
   postgres: '@cubejs-backend/postgres-driver',
   mysql: '@cubejs-backend/mysql-driver',
   mysqlauroraserverless: '@cubejs-backend/mysql-aurora-serverless-driver',
@@ -31,3 +33,5 @@ module.exports = {
   // List for JDBC drivers
   'databricks-jdbc': '@cubejs-backend/databricks-jdbc-driver',
 };
+
+export default DriverDependencies;

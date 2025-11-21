@@ -21,6 +21,7 @@ import {
   Query,
   NormalizedQueryFilter,
   NormalizedQuery,
+  MemberExpression,
 } from './types/query';
 
 import {
@@ -69,6 +70,7 @@ export {
   Query,
   NormalizedQueryFilter,
   NormalizedQuery,
+  MemberExpression,
   JWTOptions,
   CheckAuthFn,
   CheckSQLAuthSuccessResponse,

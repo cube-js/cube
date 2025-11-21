@@ -326,11 +326,11 @@ export class DevServer {
     app.get('/playground/driver', catchErrors(async (req: Request, res: Response) => {
       const { driver } = req.query;
 
-      if (!driver || !DriverDependencies[driver]) {
+      if (!driver || typeof driver !== 'string' || !DriverDependencies[driver as keyof typeof DriverDependencies]) {
         return res.status(400).json('Wrong driver');
       }
 
-      if (packageExists(DriverDependencies[driver])) {
+      if (packageExists(DriverDependencies[driver as keyof typeof DriverDependencies])) {
         return res.json({ status: 'installed' });
       } else if (driverPromise) {
         return res.json({ status: 'installing' });
@@ -347,9 +347,11 @@ export class DevServer {
     app.post('/playground/driver', catchErrors((req, res) => {
       const { driver } = req.body;
 
-      if (!DriverDependencies[driver]) {
+      if (!driver || typeof driver !== 'string' || !DriverDependencies[driver as keyof typeof DriverDependencies]) {
         return res.status(400).json(`'${driver}' driver dependency not found`);
       }
+
+      const driverKey = driver as keyof typeof DriverDependencies;
 
       async function installDriver() {
         driverError = null;
@@ -357,7 +359,7 @@ export class DevServer {
         try {
           await executeCommand(
             'npm',
-            ['install', DriverDependencies[driver], '--save-dev'],
+            ['install', DriverDependencies[driverKey], '--save-dev'],
             { cwd: path.resolve('.') }
           );
         } catch (error) {
@@ -372,7 +374,7 @@ export class DevServer {
       }
 
       return res.json({
-        dependency: DriverDependencies[driver]
+        dependency: DriverDependencies[driverKey]
       });
     }));
 

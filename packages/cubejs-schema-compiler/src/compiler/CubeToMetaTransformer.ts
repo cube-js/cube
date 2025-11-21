@@ -135,7 +135,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private readonly cubeSymbols: CubeEvaluator;
 
-  private readonly cubeEvaluator: CubeEvaluator;
+  public readonly cubeEvaluator: CubeEvaluator;
 
   private readonly contextEvaluator: ContextEvaluator;
 

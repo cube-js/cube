@@ -183,8 +183,8 @@ export class CubejsServerCore {
 
     this.logger = opts.logger || (
       process.env.NODE_ENV !== 'production'
-        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
-        : prodLogger(process.env.CUBEJS_LOG_LEVEL)
+        ? devLogger(process.env.CUBEJS_LOG_LEVEL as any)
+        : prodLogger(process.env.CUBEJS_LOG_LEVEL as any)
     );
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);

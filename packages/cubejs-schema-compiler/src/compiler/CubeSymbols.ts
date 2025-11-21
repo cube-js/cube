@@ -133,6 +133,9 @@ export type AccessPolicyDefinition = {
     includesMembers?: string[];
     excludesMembers?: string[];
   };
+  conditions?: {
+    if: Function;
+  }[]
 };
 
 export type ViewIncludedMember = {
@@ -233,7 +236,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
   private builtCubes: Record<string, CubeDefinitionExtended>;
 
-  private cubeDefinitions: Record<string, CubeDefinition>;
+  public cubeDefinitions: Record<string, CubeDefinition>;
 
   private funcArgumentsValues: Record<string, string[]>;
 
@@ -925,7 +928,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    * resolveSymbolsCall are sync. Async support may be added later with deeper
    * refactoring.
    */
-  protected evaluateContextFunction(cube: any, contextFn: any, context: any = {}) {
+  public evaluateContextFunction(cube: any, contextFn: any, context: any = {}) {
     return this.resolveSymbolsCall(contextFn, (name: string) => {
       const resolvedSymbol = this.resolveSymbol(cube, name);
       if (resolvedSymbol) {
