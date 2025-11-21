@@ -327,7 +327,7 @@ function normalizeQueryCacheMode(query, cacheMode) {
  * @returns {import('./types/query').NormalizedQuery}
  */
 const normalizeQuery = (query, persistent, cacheMode) => {
-  query = normalizeQueryCacheMode(query);
+  query = normalizeQueryCacheMode(query, cacheMode);
   const { error } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
