@@ -47,7 +47,7 @@ impl<'a> SqlCallBuilder<'a> {
             .map(|path| self.build_dependency(cube_name, path))
             .collect::<Result<Vec<_>, _>>()?;
 
-        Self::validate_deps(cube_name, &deps)?;
+        //Self::validate_deps(cube_name, &deps)?;
 
         let filter_params = template_args
             .filter_params
@@ -69,29 +69,6 @@ impl<'a> SqlCallBuilder<'a> {
             template_args.security_context.clone(),
         );
         Ok(result)
-    }
-
-    fn validate_deps(cube_name: &String, deps: &Vec<SqlCallDependency>) -> Result<(), CubeError> {
-        let foreign_cubes = deps
-            .iter()
-            .filter_map(|dep| {
-                if let Ok(cube) = dep.symbol.as_cube_name() {
-                    if cube_name != cube.cube_name() {
-                        return Some(cube.cube_name().clone());
-                    }
-                }
-                None
-            })
-            .collect_vec();
-
-        if !foreign_cubes.is_empty() {
-            return Err(CubeError::user(format!(
-                "Member sql in cube {} references to foreign cubes: {}",
-                cube_name,
-                foreign_cubes.join(", ")
-            )));
-        }
-        Ok(())
     }
 
     fn build_filter_params_item(
