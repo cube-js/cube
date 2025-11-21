@@ -251,17 +251,21 @@ export class QueryCache {
     ) {
       if (queryBody.persistent) {
         // stream will be returned here
-        return this.queryWithRetryAndRelease(query, values, {
-          cacheKey,
-          priority: queuePriority,
-          external: queryBody.external,
-          requestId: queryBody.requestId,
-          persistent: queryBody.persistent,
-          dataSource: queryBody.dataSource,
-          useCsvQuery: queryBody.useCsvQuery,
-          lambdaTypes: queryBody.lambdaTypes,
-          aliasNameToMember: queryBody.aliasNameToMember,
-        });
+        return this.queryWithRetryAndRelease(
+          query,
+          values,
+          {
+            cacheKey,
+            priority: queuePriority,
+            external: queryBody.external,
+            requestId: queryBody.requestId,
+            persistent: queryBody.persistent,
+            dataSource: queryBody.dataSource,
+            useCsvQuery: queryBody.useCsvQuery,
+            lambdaTypes: queryBody.lambdaTypes,
+            aliasNameToMember: queryBody.aliasNameToMember,
+          }
+        );
       } else {
         return {
           data: await this.queryWithRetryAndRelease(
@@ -291,6 +295,7 @@ export class QueryCache {
         cacheKey,
         renewalThreshold,
         {
+          forceNoCache,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
@@ -308,6 +313,7 @@ export class QueryCache {
         cacheKey,
         renewalThreshold,
         {
+          forceNoCache,
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
@@ -770,6 +776,7 @@ export class QueryCache {
       requestId?: string,
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
+      forceNoCache?: boolean,
       dataSource: string,
       useCsvQuery?: boolean,
       lambdaTypes?: TableStructure,
@@ -803,6 +810,7 @@ export class QueryCache {
                 this.queryRedisKey([query, values]),
               ],
               waitForRenew: true,
+              forceNoCache: options.forceNoCache,
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
