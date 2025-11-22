@@ -7,37 +7,85 @@ This document provides step-by-step instructions for deploying Cube Cloud BYOC o
 ## Prerequisites
 
 The bulk of provisioning work will be done remotely by Cube Cloud automation.
-However, to get started, you'll need to provide Cube with the necessary access
-along with some additional information that includes:
+However, to get started, you'll need:
+
+### Required Information
 
 - **GCP Project ID:** A dedicated GCP project ID that will exclusively host Cube-managed infrastructure.
   This should be a new, isolated project created specifically for Cube Cloud BYOC.
 - **GCP Region:** [The GCP region][gcp-docs-regions] where Cube Cloud resources
   should be deployed.
 
-In addition to that, you'll need to make sure you have sufficient access to grant
-IAM permissions in the dedicated project to allow Cube Cloud to:
-- Create and manage VPC networking
-- Create and manage GKE clusters
-- Create and manage Cloud Storage buckets
-- Create and manage Cloud DNS zones
-- Create and manage service accounts
-- Configure IAM permissions for resources
-- Read from Artifact Registry
+### Required Permissions
+
+You'll need to have the following permissions in your GCP organization/folder to complete the setup:
+
+- **Project Creator** (`roles/resourcemanager.projectCreator`) - To create a new dedicated project
+- **Project IAM Admin** (`roles/resourcemanager.projectIamAdmin`) - To grant permissions in the project
+- **Billing Account User** (`roles/billing.user`) - To link billing to the new project
+
+If you don't have these permissions, contact your GCP organization administrator.
 
 ## Provisioning access
 
-### Create a dedicated GCP project
+### Step 1: Create a dedicated GCP project
 
 We strongly recommend creating a dedicated GCP project that will exclusively host
 Cube-managed infrastructure. This project isolation approach simplifies permission
 management and provides clear resource boundaries.
 
-Navigate to the [GCP Console][gcp-console] and create a new project for Cube Cloud BYOC.
-Note the **Project ID** (not the project name) as you'll need it for the next steps
-and to share with your Cube contact point.
+1. Navigate to the [GCP Console][gcp-console]
+2. Click **Create Project**
+3. Enter a project name (e.g., "cube-cloud-byoc")
+4. Note the **Project ID** (not the project name) - you'll need this for subsequent steps
+5. Select your billing account
+6. Click **Create**
 
-### Grant IAM permissions
+<InfoBox>
+Make sure billing is enabled for the project. You can verify this by navigating to
+**Billing** in the GCP Console and confirming the project is linked to an active billing account.
+</InfoBox>
+
+### Step 2: Enable required APIs
+
+Before granting permissions, enable the necessary GCP APIs in your dedicated project.
+This ensures that subsequent API calls will work correctly.
+
+**Required APIs:**
+
+- **Compute Engine API** (`compute.googleapis.com`) - For VPC networks and compute resources
+- **Kubernetes Engine API** (`container.googleapis.com`) - For GKE clusters
+- **Cloud Storage API** (`storage.googleapis.com`) - For Cube Store buckets
+- **IAM API** (`iam.googleapis.com`) - For service account management
+- **Cloud Resource Manager API** (`cloudresourcemanager.googleapis.com`) - For project IAM operations
+- **Service Networking API** (`servicenetworking.googleapis.com`) - For private service connectivity
+
+<InfoBox>
+
+**Note:** DNS and Artifact Registry APIs are not required in your project. Cube manages DNS in its own project,
+and container images are pulled from Cube's Artifact Registry using Cube-provided credentials.
+
+</InfoBox>
+
+You can enable these APIs through the [API Library][gcp-api-library] in the GCP Console,
+or use the `gcloud` command:
+
+```bash
+# Set your project ID
+export PROJECT_ID="your-cube-byoc-project-id"
+
+# Enable all required APIs
+gcloud services enable \
+  compute.googleapis.com \
+  container.googleapis.com \
+  storage.googleapis.com \
+  iam.googleapis.com \
+  cloudresourcemanager.googleapis.com \
+  servicenetworking.googleapis.com \
+  --project=$PROJECT_ID
+```
+
+### Step 3: Grant IAM permissions
 
 In order to manage resources in the Cube-dedicated GCP project, Cube Cloud Service Principal
 needs to be granted administrative permissions to a set of services.
@@ -53,16 +101,17 @@ binding for the Cube Cloud service account:
 - **Kubernetes Engine Admin** (`roles/container.admin`) - Allows creation and management of GKE clusters and node pools
 - **Storage Admin** (`roles/storage.admin`) - Allows creation and management of Cloud Storage buckets for Cube Store
 - **Service Account Admin** (`roles/iam.serviceAccountAdmin`) - Allows creation and management of service accounts for cluster nodes and workload identity
+- **Service Account Key Admin** (`roles/iam.serviceAccountKeyAdmin`) - Allows creation and management of service account keys for Cube Store authentication
 - **Project IAM Admin** (`roles/resourcemanager.projectIamAdmin`) - Allows granting IAM permissions to created resources (e.g., bucket access for service accounts)
 
 You can grant these permissions through the Google Cloud Console UI or using the
 `gcloud` command-line tool:
 
 ```bash
-# Set your project ID
+# Set your project ID (replace with your actual project ID)
 export PROJECT_ID="your-cube-byoc-project-id"
 
-# Set the Cube Cloud service account
+# Set the Cube Cloud service account (use this exact value)
 export CUBE_SA="cube-cloud-byoc-installer@cube-cloud-byoc.iam.gserviceaccount.com"
 
 # Grant all required roles
@@ -84,30 +133,60 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:$CUBE_SA" \
+  --role="roles/iam.serviceAccountKeyAdmin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$CUBE_SA" \
   --role="roles/resourcemanager.projectIamAdmin"
 ```
 
-### Enable required APIs
+### Step 4: Grant Service Account User permissions
 
-Ensure the following GCP APIs are enabled in your dedicated project:
+Additionally, the Cube Cloud service account needs permission to use the default Compute Engine service account for GKE node pools.
 
-- Compute Engine API (`compute.googleapis.com`)
-- Kubernetes Engine API (`container.googleapis.com`)
-- Cloud Storage API (`storage.googleapis.com`)
-- IAM API (`iam.googleapis.com`)
-- Service Networking API (`servicenetworking.googleapis.com`)
+<InfoBox>
 
-You can enable these APIs through the [API Library][gcp-api-library] in the GCP Console,
-or use the `gcloud` command:
+Make sure you have the `PROJECT_ID` and `CUBE_SA` environment variables set from Step 3 before running these commands.
+
+</InfoBox>
+
+Run the following command to grant the necessary permissions:
 
 ```bash
-gcloud services enable compute.googleapis.com \
-  container.googleapis.com \
-  storage.googleapis.com \
-  iam.googleapis.com \
-  servicenetworking.googleapis.com \
+# Get the project number
+export PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+
+# Grant the Cube service account permission to use the default compute service account
+gcloud iam service-accounts add-iam-policy-binding \
+  ${PROJECT_NUMBER}-compute@developer.gserviceaccount.com \
+  --member="serviceAccount:$CUBE_SA" \
+  --role="roles/iam.serviceAccountUser" \
   --project=$PROJECT_ID
 ```
+
+This allows the Cube Cloud service account to create GKE clusters that use the project's default compute service account for worker nodes.
+
+### Step 5: Verify setup
+
+Before notifying Cube, verify that all permissions and APIs are correctly configured:
+
+```bash
+# Verify APIs are enabled
+gcloud services list --enabled --project=$PROJECT_ID | grep -E '(compute|container|storage|iam|cloudresourcemanager|servicenetworking)'
+
+# Verify IAM bindings for the Cube service account
+gcloud projects get-iam-policy $PROJECT_ID \
+  --flatten="bindings[].members" \
+  --format="table(bindings.role)" \
+  --filter="bindings.members:serviceAccount:cube-cloud-byoc-installer@cube-cloud-byoc.iam.gserviceaccount.com"
+
+# Verify Service Account User permission
+gcloud iam service-accounts get-iam-policy \
+  ${PROJECT_NUMBER}-compute@developer.gserviceaccount.com \
+  --project=$PROJECT_ID
+```
+
+If all commands return the expected results, you're ready to proceed with deployment.
 
 ## Deployment
 
