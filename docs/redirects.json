@@ -1806,137 +1806,137 @@
   },
   {
     "source": "/product/deployment/cloud/auto-suspension",
-    "destination": "/product/administration/deployment/cloud/auto-suspension",
+    "destination": "/product/administration/deployment/auto-suspension",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/byoc",
-    "destination": "/product/administration/deployment/cloud/byoc",
+    "destination": "/product/administration/deployment/byoc",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/byoc/aws/deployment",
-    "destination": "/product/administration/deployment/cloud/byoc/aws/deployment",
+    "destination": "/product/administration/deployment/byoc/aws/deployment",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/byoc/aws/privatelink",
-    "destination": "/product/administration/deployment/cloud/byoc/aws/privatelink",
+    "destination": "/product/administration/deployment/byoc/aws/privatelink",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/byoc/azure",
-    "destination": "/product/administration/deployment/cloud/byoc/azure",
+    "destination": "/product/administration/deployment/byoc/azure",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/byoc/gcp/deployment",
-    "destination": "/product/administration/deployment/cloud/byoc/gcp/deployment",
+    "destination": "/product/administration/deployment/byoc/gcp/deployment",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/continuous-deployment",
-    "destination": "/product/administration/deployment/cloud/continuous-deployment",
+    "destination": "/product/administration/deployment/continuous-deployment",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/custom-domains",
-    "destination": "/product/administration/deployment/cloud/custom-domains",
+    "destination": "/product/administration/deployment/custom-domains",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/deployment-types",
-    "destination": "/product/administration/deployment/cloud/deployment-types",
+    "destination": "/product/administration/deployment/deployment-types",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/deployments",
-    "destination": "/product/administration/deployment/cloud/deployments",
+    "destination": "/product/administration/deployment/deployments",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/infrastructure",
-    "destination": "/product/administration/deployment/cloud/infrastructure",
+    "destination": "/product/administration/deployment/infrastructure",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/limits",
-    "destination": "/product/administration/deployment/cloud/limits",
+    "destination": "/product/administration/deployment/limits",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/pricing",
-    "destination": "/product/administration/deployment/cloud/pricing",
+    "destination": "/product/administration/deployment/pricing",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/providers",
-    "destination": "/product/administration/deployment/cloud/providers",
+    "destination": "/product/administration/deployment/providers",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/providers/aws",
-    "destination": "/product/administration/deployment/cloud/providers/aws",
+    "destination": "/product/administration/deployment/providers/aws",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/providers/azure",
-    "destination": "/product/administration/deployment/cloud/providers/azure",
+    "destination": "/product/administration/deployment/providers/azure",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/providers/gcp",
-    "destination": "/product/administration/deployment/cloud/providers/gcp",
+    "destination": "/product/administration/deployment/providers/gcp",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/scalability",
-    "destination": "/product/administration/deployment/cloud/scalability",
+    "destination": "/product/administration/deployment/scalability",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/support",
-    "destination": "/product/administration/deployment/cloud/support",
+    "destination": "/product/administration/deployment/support",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/vpc",
-    "destination": "/product/administration/deployment/cloud/vpc",
+    "destination": "/product/administration/deployment/vpc",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/vpc/aws",
-    "destination": "/product/administration/deployment/cloud/vpc/aws",
+    "destination": "/product/administration/deployment/vpc/aws",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/vpc/aws/private-link",
-    "destination": "/product/administration/deployment/cloud/vpc/aws/private-link",
+    "destination": "/product/administration/deployment/vpc/aws/private-link",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/vpc/aws/vpc-peering",
-    "destination": "/product/administration/deployment/cloud/vpc/aws/vpc-peering",
+    "destination": "/product/administration/deployment/vpc/aws/vpc-peering",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/vpc/azure/private-link",
-    "destination": "/product/administration/deployment/cloud/vpc/azure/private-link",
+    "destination": "/product/administration/deployment/vpc/azure/private-link",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/vpc/azure/vpc-peering",
-    "destination": "/product/administration/deployment/cloud/vpc/azure/vpc-peering",
+    "destination": "/product/administration/deployment/vpc/azure/vpc-peering",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/vpc/gcp",
-    "destination": "/product/administration/deployment/cloud/vpc/gcp",
+    "destination": "/product/administration/deployment/vpc/gcp",
     "permanent": true
   },
   {
     "source": "/product/deployment/cloud/warm-up",
-    "destination": "/product/administration/deployment/cloud/warm-up",
+    "destination": "/product/administration/deployment/warm-up",
     "permanent": true
   },
   {
@@ -1982,11 +1982,6 @@
   {
     "source": "/product/agentic-analytics/roles-and-permissions",
     "destination": "/product/administration/users-and-permissions/roles-and-permissions",
-    "permanent": true
-  },
-  {
-    "source": "/product/agentic-analytics",
-    "destination": "/product/administration",
     "permanent": true
   }
 ]
