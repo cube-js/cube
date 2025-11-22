@@ -38,24 +38,6 @@ views:
               values: ["{ securityContext.cubeCloud.userAttributes.city }"]
 ```
 
-## Security Context
-
-The user attributes are available in the security context object:
-
-```yaml
-{
-  "securityContext": {
-     "cubeCloud": {
-        "userAttributes": {
-           "email": "user@example.com",
-           "customers_city": "Los Angeles"
-        }
-        "roles": {}
-     }
-  }
-}
-```
-
 ## Effect on Queries
 
 When the access policy is implemented, queries will automatically be filtered based on the user's attributes. This ensures users can only access data that matches their attribute values.

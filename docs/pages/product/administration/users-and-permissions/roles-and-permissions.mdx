@@ -1,17 +1,13 @@
 # Roles & Permissions
 
-_Understanding user roles and access control in Cube._
+_Understanding user roles and permissions in Cube._
 
-Cube implements a role-based access control system with three main user roles: Admin, Developer, and User. Each role has specific permissions and access levels designed to support different responsibilities within the platform.
+Cube has three built-in default roles: Admin, Developer, and Explorer. Each role has specific permissions and access levels designed to support different responsibilities within the platform.
 
-## Deployment Structure
+The Enterprise tier allows creation of custom roles with a customized set of permissions tailored to your organization's specific needs.
 
-- Database connections are managed through Semantic Model Deployments
-- Multiple Semantic Model Deployments can exist under one account
-- Roles can be either global (across all deployments) or deployment-specific
-- Admin role is always global
 
-## Role Permissions
+## Default Roles
 
 ### Admin Role
 
@@ -21,6 +17,10 @@ Cube implements a role-based access control system with three main user roles: A
 - Has access to admin section
 - Full query capabilities
 
+<InfoBox>
+Admin roles are billed at the developer rate.
+</InfoBox>
+
 ### Developer Role
 
 - Can create and edit semantic models
@@ -29,7 +29,7 @@ Cube implements a role-based access control system with three main user roles: A
 - Can create and edit data apps
 - No access to admin settings
 
-### User Role
+### Explorer Role
 
 - Can query semantic models
 - Can create and edit workbooks
@@ -54,9 +54,9 @@ This feature should not be used as a security measure. Configure [data access po
 
 ## Typical Usage Scenarios
 
-- Users: Typically data consumers and analysts
+- Explorers: Typically data consumers and analysts
 - Developers: Usually data stewards and data engineers
-- Admin: Typically assigned to data engineers managing the entire Cube instance
+- Admins: Typically assigned to data engineers managing the entire Cube instance (billed at the developer rate with additional privileges)
 
 
 [ref-data-access-policies]: /product/auth/data-access-policies

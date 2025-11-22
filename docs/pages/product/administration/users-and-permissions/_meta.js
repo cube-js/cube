@@ -1,5 +1,5 @@
 module.exports = {
+  "roles-and-permissions": "Roles & permissions",
   "user-attributes": "User attributes",
-  "roles-and-permissions": "Roles & permissions"
 }
 
