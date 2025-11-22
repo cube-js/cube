@@ -699,7 +699,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const [schema, name] = table.split('.');
     const columns = await this.query<{
       COLUMN_NAME: string,
-      DATA_TYPE: string
+      DATA_TYPE: string,
+      NUMERIC_PRECISION: number | null,
+      NUMERIC_SCALE: number | null
     }[]>(
       `SELECT COLUMNS.COLUMN_NAME,
         CASE
@@ -708,7 +710,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
             COLUMNS.DATA_TYPE = 'NUMBER'
           THEN 'int'
           ELSE COLUMNS.DATA_TYPE
-        END as DATA_TYPE
+        END as DATA_TYPE,
+        COLUMNS.NUMERIC_PRECISION,
+        COLUMNS.NUMERIC_SCALE
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE
         TABLE_NAME = ${this.param(0)} AND
@@ -718,8 +722,22 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     );
     return columns.map(c => ({
       name: c.COLUMN_NAME,
-      type: this.toGenericType(c.DATA_TYPE),
+      type: this.formatColumnType(c.DATA_TYPE, c.NUMERIC_PRECISION, c.NUMERIC_SCALE),
     }));
+  }
+
+  /**
+   * Formats column type with precision and scale for NUMBER/DECIMAL types.
+   */
+  private formatColumnType(dataType: string, precision: number | null, scale: number | null): string {
+    const genericType = this.toGenericType(dataType);
+
+    // For decimal types, include precision and scale if available
+    if (genericType === 'decimal' && precision !== null && scale !== null) {
+      return `decimal(${precision}, ${scale})`;
+    }
+
+    return genericType;
   }
 
   /**
@@ -942,9 +960,16 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       };
       if (column.isNumber()) {
         // @ts-ignore
-        if (column.getScale() === 0) {
+        const scale = column.getScale();
+        // @ts-ignore
+        const precision = column.getPrecision();
+
+        if (scale === 0) {
           type.type = 'int';
-        } else if (column.getScale() && column.getScale() <= 10) {
+        } else if (scale !== null && precision !== null) {
+          // Include precision and scale for decimal types
+          type.type = `decimal(${precision}, ${scale})`;
+        } else if (scale && scale <= 10) {
           type.type = 'decimal';
         } else {
           type.type = this.toGenericType(column.getType());
