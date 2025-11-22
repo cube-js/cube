@@ -1,4 +1,5 @@
 module.exports = {
-  "embedding": "Embedding"
+  "embedding": "Embedding",
+  "dashboards": "Dashboards",
 }
 
