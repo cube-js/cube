@@ -574,7 +574,7 @@ class CubeApi {
       () => this.request('load', {
         query,
         queryType: 'multi',
-        signal: options?.signal
+        signal: options?.signal,
       }),
       (response: any) => this.loadResponseInternal(response, options),
       options,
