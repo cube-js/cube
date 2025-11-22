@@ -12,5 +12,6 @@ module.exports = {
   "scalability": "Scalability",
   "pricing": "Pricing",
   "support": "Support",
-  "limits": "Limits"
+  "limits": "Limits",
+  "core": "Cube Core"
 }
