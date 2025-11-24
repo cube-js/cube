@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
+
+### Bug Fixes
+
+- **schema-compiler:** Free jinja instance after compilation ([#10169](https://github.com/cube-js/cube/issues/10169)) ([ec7ca2f](https://github.com/cube-js/cube/commit/ec7ca2f627520eabcd751775ef9a6d02fc3cb262))
+
 ## [1.5.6](https://github.com/cube-js/cube/compare/v1.5.5...v1.5.6) (2025-11-24)
 
 **Note:** Version bump only for package cubejs
