@@ -222,7 +222,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return super.downloadQueryResults(query, values, options);
   }
 
-  public informationSchemaQuery() {
+  protected override informationSchemaQuery() {
     const catalogPrefix = this.catalog ? `${this.catalog}.` : '';
     const schemaFilter = this.config.schema ? ` AND columns.table_schema = '${this.config.schema}'` : '';
 
