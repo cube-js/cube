@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.5](https://github.com/cube-js/cube/compare/v1.5.4...v1.5.5) (2025-11-24)
+
+### Performance Improvements
+
+- **schema-compiler:** More aggressive compilers cleanup ([#10153](https://github.com/cube-js/cube/issues/10153)) ([005a46d](https://github.com/cube-js/cube/commit/005a46d734e25b1b02a3a6315172772e8988b027))
+
 ## [1.5.4](https://github.com/cube-js/cube/compare/v1.5.3...v1.5.4) (2025-11-18)
 
 **Note:** Version bump only for package @cubejs-backend/shared

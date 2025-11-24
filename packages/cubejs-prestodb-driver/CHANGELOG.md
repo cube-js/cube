@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.5](https://github.com/cube-js/cube/compare/v1.5.4...v1.5.5) (2025-11-24)
+
+### Bug Fixes
+
+- **trino-driver, presto-driver:** Qualify information schema queries with a catalog name ([#10158](https://github.com/cube-js/cube/issues/10158)) ([9cb11bc](https://github.com/cube-js/cube/commit/9cb11bc95962e64cb459af5417f6ba2af77f1516))
+
 ## [1.5.4](https://github.com/cube-js/cube/compare/v1.5.3...v1.5.4) (2025-11-18)
 
 **Note:** Version bump only for package @cubejs-backend/prestodb-driver
