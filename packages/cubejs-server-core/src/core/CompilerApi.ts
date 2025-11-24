@@ -26,8 +26,8 @@ import { NativeInstance } from '@cubejs-backend/native';
 import { disposedProxy } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
-import { DbTypeAsyncFn, DialectClassFn, LoggerFn } from './types';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
+import { DbTypeAsyncFn, DialectClassFn, LoggerFn } from './types';
 
 type Context = any;
 

@@ -31,6 +31,7 @@
   "dependencies": {
     "@cubejs-backend/api-gateway": "1.5.5",
     "@cubejs-backend/cloud": "1.5.5",
+    "@cubejs-backend/base-driver": "1.5.5",
     "@cubejs-backend/cubestore-driver": "1.5.5",
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/native": "1.5.5",
