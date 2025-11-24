@@ -27,6 +27,7 @@ import { disposedProxy } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DbTypeAsyncFn, DialectClassFn, LoggerFn } from './types';
+import { DriverCapabilities } from '@cubejs-backend/base-driver';
 
 type Context = any;
 
@@ -78,6 +79,7 @@ export interface SqlResult {
 export interface DataSourceInfo {
   dataSource: string;
   dbType: string;
+  driverCapabilities?: DriverCapabilities;
 }
 
 export class CompilerApi {
@@ -868,7 +870,8 @@ export class CompilerApi {
 
   public async dataSources(
     orchestratorApi: any,
-    query?: NormalizedQuery
+    query?: NormalizedQuery,
+    _dataSourceFromEnvs?: string[]
   ): Promise<{ dataSources: DataSourceInfo[] }> {
     const cubeNameToDataSource = await this.cubeNameToDataSource(query || { requestId: `datasources-${uuidv4()}` });
 
