@@ -532,11 +532,14 @@ export class DataSchemaCompiler {
         if (!this.omitErrors) {
           this.throwIfAnyErrors();
         }
+
         // Free unneeded resources
         this.compileV8ContextCache = null;
         this.cubeDictionary.free();
         this.cubeOnlySymbols.free();
         this.cubeAndViewSymbols.free();
+        this.yamlCompiler.free();
+
         return res;
       });
     }
