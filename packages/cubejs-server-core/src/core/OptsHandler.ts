@@ -7,7 +7,11 @@ import {
   isDockerImage,
   displayCLIWarning,
 } from '@cubejs-backend/shared';
-import { isCubeStoreSupported, CubeStoreHandler, CubeStoreDevDriver } from "@cubejs-backend/cubestore-driver";
+import {
+  isCubeStoreSupported,
+  CubeStoreHandler,
+  CubeStoreDevDriver
+} from '@cubejs-backend/cubestore-driver';
 
 import {
   CreateOptions,
