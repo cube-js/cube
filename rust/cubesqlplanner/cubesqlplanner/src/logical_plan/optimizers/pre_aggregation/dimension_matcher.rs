@@ -34,7 +34,7 @@ pub struct DimensionMatcher<'a> {
     query_tools: Rc<QueryTools>,
     pre_aggregation: &'a CompiledPreAggregation,
     pre_aggregation_dimensions: HashMap<String, bool>,
-    pre_aggregation_time_dimensions: HashMap<String, (Option<String>, bool)>,
+    pre_aggregation_time_dimensions: HashMap<String, (Option<Rc<TimeDimensionSymbol>>, bool)>,
     result: MatchState,
 }
 
@@ -48,7 +48,13 @@ impl<'a> DimensionMatcher<'a> {
         let pre_aggregation_time_dimensions = pre_aggregation
             .time_dimensions
             .iter()
-            .map(|(dim, granularity)| (dim.full_name(), (granularity.clone(), false)))
+            .map(|dim| {
+                if let Ok(td) = dim.as_time_dimension() {
+                    (td.base_symbol().full_name(), (Some(td), false))
+                } else {
+                    (dim.full_name(), (None, false))
+                }
+            })
             .collect::<HashMap<_, _>>();
         Self {
             query_tools,
@@ -194,6 +200,7 @@ impl<'a> DimensionMatcher<'a> {
             time_dimension.rollup_granularity(self.query_tools.clone())?
         };
         let base_symbol_name = time_dimension.base_symbol().full_name();
+
         if let Some(found) = self
             .pre_aggregation_time_dimensions
             .get_mut(&base_symbol_name)
@@ -201,23 +208,31 @@ impl<'a> DimensionMatcher<'a> {
             if add_to_matched_dimension {
                 found.1 = true;
             }
-            let pre_aggr_granularity = &found.0;
-            if granularity.is_none() || pre_aggr_granularity == &granularity {
+
+            let pre_agg_td = &found.0;
+            let pre_aggr_granularity = if let Some(pre_agg_td) = pre_agg_td {
+                pre_agg_td.granularity().clone()
+            } else {
+                None
+            };
+
+            if granularity.is_none() || pre_aggr_granularity == granularity {
                 Ok(MatchState::Full)
-            } else if pre_aggr_granularity.is_none()
-                || GranularityHelper::is_predefined_granularity(
-                    pre_aggr_granularity.as_ref().unwrap(),
-                )
-            {
-                let min_granularity =
-                    GranularityHelper::min_granularity(&granularity, &pre_aggr_granularity)?;
-                if &min_granularity == pre_aggr_granularity {
+            } else if pre_aggr_granularity.is_none() {
+                Ok(MatchState::NotMatched)
+            } else if let Some(pre_agg_td) = pre_agg_td {
+                let min_granularity = GranularityHelper::min_granularity_for_time_dimensions(
+                    (&granularity, time_dimension),
+                    (&pre_aggr_granularity, &pre_agg_td),
+                )?;
+
+                if min_granularity == pre_aggr_granularity {
                     Ok(MatchState::Partial)
                 } else {
                     Ok(MatchState::NotMatched)
                 }
             } else {
-                Ok(MatchState::NotMatched) //TODO Custom granularities!!!
+                Ok(MatchState::NotMatched)
             }
         } else {
             if time_dimension.owned_by_cube() {

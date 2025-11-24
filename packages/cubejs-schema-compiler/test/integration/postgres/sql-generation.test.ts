@@ -2866,97 +2866,137 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     console.log(query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      console.log(JSON.stringify(res));
-
       const expected = getEnv('nativeSqlPlanner') ?
+
         [
           {
-            vc__id: 3,
-            vc__created_at_day: '2017-01-04T00:00:00.000Z',
-            vc__visitor_checkins_count: 1,
-            vc__visitor_checkins_rolling: 1
-          },
-          {
-            vc__created_at_day: '2017-01-05T00:00:00.000Z',
-            vc__id: 3,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__created_at_day: '2017-01-06T00:00:00.000Z',
-            vc__id: 3,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__id: 4,
-            vc__created_at_day: '2017-01-04T00:00:00.000Z',
-            vc__visitor_checkins_count: 1,
-            vc__visitor_checkins_rolling: 1
-
-          },
-          {
-            vc__created_at_day: '2017-01-05T00:00:00.000Z',
-            vc__id: 4,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__created_at_day: '2017-01-06T00:00:00.000Z',
-            vc__id: 4,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__id: 5,
-            vc__created_at_day: '2017-01-04T00:00:00.000Z',
-            vc__visitor_checkins_count: 1,
-            vc__visitor_checkins_rolling: 1
-          },
-          {
-            vc__created_at_day: '2017-01-05T00:00:00.000Z',
-            vc__id: 5,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__created_at_day: '2017-01-06T00:00:00.000Z',
-            vc__id: 5,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__id: 6,
-            vc__created_at_day: '2017-01-05T00:00:00.000Z',
-            vc__visitor_checkins_count: 1,
-            vc__visitor_checkins_rolling: 1
-          },
-
-          {
-            vc__created_at_day: '2017-01-06T00:00:00.000Z',
-            vc__id: 6,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: 1,
-          },
-          {
-            vc__created_at_day: '2017-01-01T00:00:00.000Z',
-            vc__id: null,
-            vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: null,
-          },
-          {
+            vc__id: 1,
             vc__created_at_day: '2017-01-02T00:00:00.000Z',
-            vc__id: null,
             vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: null,
+            vc__visitor_checkins_rolling: 1
           },
           {
+            vc__id: 1,
             vc__created_at_day: '2017-01-03T00:00:00.000Z',
-            vc__id: null,
             vc__visitor_checkins_count: null,
-            vc__visitor_checkins_rolling: null,
+            vc__visitor_checkins_rolling: 1
           },
+          {
+            vc__id: 1,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 1,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 1,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 2,
+            vc__created_at_day: '2017-01-03T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 2,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 2,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 2,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 3,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 3,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 3,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 4,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 4,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 4,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 5,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 5,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 5,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 6,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 6,
+            vc__created_at_day: '2017-01-06T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: null,
+            vc__created_at_day: '2017-01-01T00:00:00.000Z',
+            vc__visitor_checkins_count: null,
+            vc__visitor_checkins_rolling: null
+          }
         ]
+
         : [
           {
             vc__id: 3,

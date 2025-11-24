@@ -532,11 +532,14 @@ export class DataSchemaCompiler {
         if (!this.omitErrors) {
           this.throwIfAnyErrors();
         }
+
         // Free unneeded resources
         this.compileV8ContextCache = null;
         this.cubeDictionary.free();
         this.cubeOnlySymbols.free();
         this.cubeAndViewSymbols.free();
+        this.yamlCompiler.free();
+
         return res;
       });
     }
@@ -560,7 +563,7 @@ export class DataSchemaCompiler {
   }
 
   private prepareTranspileSymbols() {
-    const cubeNames: string[] = Object.keys(this.cubeDictionary.byId);
+    const cubeNames: string[] = this.cubeDictionary.cubeNames();
     // We need only cubes and all its member names for transpiling.
     // Cubes doesn't change during transpiling, but are changed during compilation phase,
     // so we can prepare them once for every phase.

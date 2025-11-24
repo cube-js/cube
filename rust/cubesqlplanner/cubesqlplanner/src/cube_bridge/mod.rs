@@ -13,6 +13,7 @@ pub mod driver_tools;
 pub mod evaluator;
 pub mod filter_group;
 pub mod filter_params;
+pub mod filter_params_callback;
 pub mod geo_item;
 pub mod granularity_definition;
 pub mod join_definition;

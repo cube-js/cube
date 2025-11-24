@@ -1,4 +1,5 @@
 use super::{inner_types::InnerTypes, object::NativeObject};
+use super::{NativeContextHolder, NativeContextHolderRef, NativeString, NativeStruct};
 use crate::CubeError;
 
 #[derive(Clone)]
@@ -63,5 +64,51 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     }
     pub fn get_context(&self) -> IT::Context {
         self.object.get_context()
+    }
+
+    pub fn convert_to_string(&self) -> Result<String, CubeError> {
+        if let Ok(str) = self.to_string() {
+            str.value()
+        } else if self.is_null()? {
+            Ok("".to_string())
+        } else {
+            self.to_struct()?
+                .call_method("toString", vec![])?
+                .into_string()?
+                .value()
+        }
+    }
+
+    pub fn try_clone_to_context_ref(
+        &self,
+        context_ref: &dyn NativeContextHolderRef,
+    ) -> Result<Self, CubeError> {
+        if let Some(context_holder) = context_ref
+            .as_any()
+            .downcast_ref::<NativeContextHolder<IT>>()
+        {
+            Ok(Self::new(
+                self.object.clone_to_context(context_holder.context()),
+            ))
+        } else {
+            Err(CubeError::internal(format!("wrong context reference type")))
+        }
+    }
+
+    pub fn clone_to_function_context_ref(
+        &self,
+        context_ref: &dyn NativeContextHolderRef,
+    ) -> Result<NativeObjectHandle<IT::FunctionIT>, CubeError> {
+        if let Some(context_holder) = context_ref
+            .as_any()
+            .downcast_ref::<NativeContextHolder<IT::FunctionIT>>()
+        {
+            Ok(NativeObjectHandle::new(
+                self.object
+                    .clone_to_function_context(context_holder.context()),
+            ))
+        } else {
+            Err(CubeError::internal(format!("wrong context reference type")))
+        }
     }
 }

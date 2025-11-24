@@ -21,8 +21,7 @@ use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::{batch_to_rows, NonDebugInRelease};
-use cubenativeutils::wrappers::neon::context::neon_guarded_funcion_call;
-use cubenativeutils::wrappers::neon::inner_types::NeonInnerTypes;
+use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
@@ -31,8 +30,11 @@ use std::sync::Arc;
 
 use cubesql::telemetry::LocalReporter;
 use cubesql::{telemetry::ReportingLogger, CubeError};
+#[cfg(feature = "async-log")]
+use log_nonblock::NonBlockingLoggerBuilder;
 use neon::prelude::*;
 use neon::result::Throw;
+#[cfg(not(feature = "async-log"))]
 use simple_logger::SimpleLogger;
 
 pub(crate) struct SQLInterface {
@@ -579,8 +581,23 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
-pub fn create_logger(log_level: log::Level) -> SimpleLogger {
-    SimpleLogger::new()
+#[cfg(not(feature = "async-log"))]
+pub fn create_logger(log_level: log::Level) -> Box<dyn log::Log> {
+    let logger = SimpleLogger::new()
+        .with_level(log::Level::Error.to_level_filter())
+        .with_module_level("cubesql", log_level.to_level_filter())
+        .with_module_level("cube_xmla", log_level.to_level_filter())
+        .with_module_level("cube_xmla_engine", log_level.to_level_filter())
+        .with_module_level("cubejs_native", log_level.to_level_filter())
+        .with_module_level("datafusion", log::Level::Warn.to_level_filter())
+        .with_module_level("pg_srv", log::Level::Warn.to_level_filter());
+
+    Box::new(logger)
+}
+
+#[cfg(feature = "async-log")]
+pub fn create_logger(log_level: log::Level) -> Box<dyn log::Log> {
+    let logger = NonBlockingLoggerBuilder::new()
         .with_level(log::Level::Error.to_level_filter())
         .with_module_level("cubesql", log_level.to_level_filter())
         .with_module_level("cube_xmla", log_level.to_level_filter())
@@ -588,6 +605,10 @@ pub fn create_logger(log_level: log::Level) -> SimpleLogger {
         .with_module_level("cubejs_native", log_level.to_level_filter())
         .with_module_level("datafusion", log::Level::Warn.to_level_filter())
         .with_module_level("pg_srv", log::Level::Warn.to_level_filter())
+        .build()
+        .unwrap();
+
+    Box::new(logger)
 }
 
 pub fn setup_local_logger(log_level: log::Level) {
@@ -617,8 +638,7 @@ pub fn reset_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
     neon_guarded_funcion_call(
         cx,
-        |context_holder: NativeContextHolder<_>,
-         options: NativeBaseQueryOptions<NeonInnerTypes<FunctionContext<'static>>>| {
+        |context_holder: NativeContextHolder<_>, options: NativeBaseQueryOptions<_>| {
             let base_query = BaseQuery::try_new(context_holder.clone(), Rc::new(options))?;
 
             base_query.build_sql_and_params()

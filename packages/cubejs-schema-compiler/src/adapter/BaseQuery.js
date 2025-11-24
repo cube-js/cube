@@ -771,7 +771,7 @@ export class BaseQuery {
     }
     const hasMemberExpressions = this.allMembersConcat(false).some(m => m.isMemberExpression);
 
-    if (!this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
+    if (this.options.cacheMode !== 'no-cache' && !this.options.preAggregationQuery && !this.customSubQueryJoins.length && !hasMemberExpressions) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
@@ -844,6 +844,10 @@ export class BaseQuery {
   }
 
   externalPreAggregationQuery() {
+    if (this.options.cacheMode === 'no-cache') {
+      return false;
+    }
+
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery?.preAggregation.external) {
@@ -935,6 +939,7 @@ export class BaseQuery {
       timezone: this.options.timezone,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
+      securityContext: this.contextSymbols.securityContext,
       order,
       filters: this.options.filters,
       limit: this.options.limit ? this.options.limit.toString() : null,
@@ -995,6 +1000,7 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped,
       exportAnnotatedSql: false,
       preAggregationQuery: this.options.preAggregationQuery,
+      securityContext: this.contextSymbols.securityContext,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       disableExternalPreAggregations: !!this.options.disableExternalPreAggregations,
     };

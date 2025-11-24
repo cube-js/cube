@@ -3,6 +3,61 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
+
+### Bug Fixes
+
+- **schema-compiler:** Free jinja instance after compilation ([#10169](https://github.com/cube-js/cube/issues/10169)) ([ec7ca2f](https://github.com/cube-js/cube/commit/ec7ca2f627520eabcd751775ef9a6d02fc3cb262))
+
+## [1.5.6](https://github.com/cube-js/cube/compare/v1.5.5...v1.5.6) (2025-11-24)
+
+**Note:** Version bump only for package cubejs
+
+## [1.5.5](https://github.com/cube-js/cube/compare/v1.5.4...v1.5.5) (2025-11-24)
+
+### Bug Fixes
+
+- **api-gateway:** Fix passing cacheMode from user's request ([#10162](https://github.com/cube-js/cube/issues/10162)) ([64c66c4](https://github.com/cube-js/cube/commit/64c66c4a4bdcf3e7e1ae3094791031e22397243e))
+- **trino-driver, presto-driver:** Qualify information schema queries with a catalog name ([#10158](https://github.com/cube-js/cube/issues/10158)) ([9cb11bc](https://github.com/cube-js/cube/commit/9cb11bc95962e64cb459af5417f6ba2af77f1516))
+
+### Performance Improvements
+
+- **schema-compiler:** Add Server Core shared caches for model compilation ([#10144](https://github.com/cube-js/cube/issues/10144)) ([87de073](https://github.com/cube-js/cube/commit/87de0734bf987969096d7f92c65a6ad20ef656e6))
+- **schema-compiler:** More aggressive compilers cleanup ([#10153](https://github.com/cube-js/cube/issues/10153)) ([005a46d](https://github.com/cube-js/cube/commit/005a46d734e25b1b02a3a6315172772e8988b027))
+- **schema-compiler:** Optimize CubeToMetaTransformer compilation flow ([#10150](https://github.com/cube-js/cube/issues/10150)) ([caac28b](https://github.com/cube-js/cube/commit/caac28bea4bf75ec1daa360586b99ae2521cdd82))
+
+## [1.5.4](https://github.com/cube-js/cube/compare/v1.5.3...v1.5.4) (2025-11-18)
+
+### Bug Fixes
+
+- **native:** Use async logger for Node.js non blocking STDOUT ([#10146](https://github.com/cube-js/cube/issues/10146)) ([149fc79](https://github.com/cube-js/cube/commit/149fc79e2d184fe10bd5b12181c470add7072164))
+- **tesseract:** Multi-stage dimension dependent on another multi-stage dimension didn’t work ([#10147](https://github.com/cube-js/cube/issues/10147)) ([ca71721](https://github.com/cube-js/cube/commit/ca717211e7340c6e0f7551b535465a21ec126262))
+
+## [1.5.3](https://github.com/cube-js/cube/compare/v1.5.2...v1.5.3) (2025-11-13)
+
+### Features
+
+- **cubestore:** Support two arguments for round, fix [#6179](https://github.com/cube-js/cube/issues/6179) ([#10132](https://github.com/cube-js/cube/issues/10132)) ([b666705](https://github.com/cube-js/cube/commit/b6667052a789ae0866b5bbb51baa674bede2cd76))
+- **tesseract:** Custom granularities in pre-aggregations ([#10127](https://github.com/cube-js/cube/issues/10127)) ([a462b41](https://github.com/cube-js/cube/commit/a462b41a30973d6e888d1836cce5e4234efe1087))
+
+### Performance Improvements
+
+- **api-gateway:** Return granularityHierarchies only related to query time dimensions ([#10129](https://github.com/cube-js/cube/issues/10129)) ([1803b28](https://github.com/cube-js/cube/commit/1803b2839f8aa6159bb95e1ea0c85780dad0d8af))
+
+## [1.5.2](https://github.com/cube-js/cube/compare/v1.5.1...v1.5.2) (2025-11-10)
+
+### Bug Fixes
+
+- **api-gateway:** Sanitize query before logging ([#10120](https://github.com/cube-js/cube/issues/10120)) ([e8db92f](https://github.com/cube-js/cube/commit/e8db92f6bf64a8154ebb34c04375360a3c23f76d))
+- **cubeorchestrator:** Increase VerifierOptions max_tables to 10M ([#10121](https://github.com/cube-js/cube/issues/10121)) ([5b048b2](https://github.com/cube-js/cube/commit/5b048b2e3266e7248751498daa8c1597d8fbced4))
+- Simplify external refresh condition so when pre-aggregation buil… ([#10116](https://github.com/cube-js/cube/issues/10116)) ([4f4a0b4](https://github.com/cube-js/cube/commit/4f4a0b4bbab2069df1496b9a84e54050f0696f8e))
+
+### Features
+
+- **client-core:** add custom granularities support to drilldown() ([#10094](https://github.com/cube-js/cube/issues/10094)) ([5ec1b7d](https://github.com/cube-js/cube/commit/5ec1b7d28fda141208f5196adb8742740299daef))
+- **cubesql:** Coerce strings to any type in functions ([#10126](https://github.com/cube-js/cube/issues/10126)) ([076ae0c](https://github.com/cube-js/cube/commit/076ae0cb4d39b2f7711bfb5492b782b8adce2a3b))
+- **tesseract:** Support custom granularities in pre-aggregations with allow_non_strict_date_range_match=true ([#10092](https://github.com/cube-js/cube/issues/10092)) ([6a8ca2e](https://github.com/cube-js/cube/commit/6a8ca2ea36da43d84f70866113733036fa042a46))
+
 ## [1.5.1](https://github.com/cube-js/cube/compare/v1.5.0...v1.5.1) (2025-11-04)
 
 ### Bug Fixes

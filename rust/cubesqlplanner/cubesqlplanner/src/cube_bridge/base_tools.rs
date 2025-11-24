@@ -1,7 +1,4 @@
-use super::base_query_options::FilterItem;
 use super::driver_tools::{DriverTools, NativeDriverTools};
-use super::filter_group::{FilterGroup, NativeFilterGroup};
-use super::filter_params::{FilterParams, NativeFilterParams};
 use super::join_definition::{JoinDefinition, NativeJoinDefinition};
 use super::pre_aggregation_obj::{NativePreAggregationObj, PreAggregationObj};
 use super::security_context::{NativeSecurityContext, SecurityContext};
@@ -23,14 +20,6 @@ pub trait BaseTools {
     fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError>;
     fn security_context_for_rust(&self) -> Result<Rc<dyn SecurityContext>, CubeError>;
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError>;
-    fn filters_proxy_for_rust(
-        &self,
-        used_filters: Option<Vec<FilterItem>>,
-    ) -> Result<Rc<dyn FilterParams>, CubeError>;
-    fn filter_group_function_for_rust(
-        &self,
-        used_filters: Option<Vec<FilterItem>>,
-    ) -> Result<Rc<dyn FilterGroup>, CubeError>;
     fn generate_time_series(
         &self,
         granularity: String,

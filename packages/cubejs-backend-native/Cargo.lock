@@ -532,6 +532,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "colored"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
+dependencies = [
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "comfy-table"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -603,13 +612,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam-utils"
-version = "0.8.17"
+name = "crossbeam-channel"
+version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c06d96137f14f244c37f989d9fff8f95e6c18b918e71f36638f8c49112e4c78f"
+checksum = "82b8f8f868b36967f9606790d1903570de9ceaf870a7bf9fbbd3016d636a2cb2"
 dependencies = [
- "cfg-if",
+ "crossbeam-utils",
 ]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crossterm"
@@ -667,7 +682,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "arrow",
  "chrono",
@@ -711,6 +726,7 @@ dependencies = [
  "libc",
  "log",
  "log-reroute",
+ "log_nonblock",
  "minijinja",
  "neon",
  "once_cell",
@@ -840,7 +856,7 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -873,7 +889,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "arrow",
  "ordered-float 2.10.1",
@@ -884,7 +900,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "async-trait",
  "chrono",
@@ -897,7 +913,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -908,7 +924,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -927,6 +943,15 @@ dependencies = [
  "regex",
  "sha2",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "deranged"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ececcb659e7ba858fb4f10388c250a7252eb0a27373f1a72b8748afdd248e587"
+dependencies = [
+ "powerfmt",
 ]
 
 [[package]]
@@ -1805,9 +1830,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.169"
+version = "0.2.177"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
+checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
 
 [[package]]
 name = "libloading"
@@ -1849,9 +1874,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.21"
+version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
+checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
 
 [[package]]
 name = "log-reroute"
@@ -1862,6 +1887,19 @@ dependencies = [
  "arc-swap",
  "log",
  "once_cell",
+]
+
+[[package]]
+name = "log_nonblock"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "996472e113c3ffe82a220863dfdd137a74b63995b413c1ea81b5a0d494d829d2"
+dependencies = [
+ "colored 3.0.0",
+ "crossbeam-channel",
+ "libc",
+ "log",
+ "time",
 ]
 
 [[package]]
@@ -2052,6 +2090,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-conv"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
+
+[[package]]
 name = "num-integer"
 version = "0.1.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2100,6 +2144,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
 dependencies = [
  "hermit-abi 0.3.3",
+ "libc",
+]
+
+[[package]]
+name = "num_threads"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
+dependencies = [
  "libc",
 ]
 
@@ -2383,6 +2436,12 @@ dependencies = [
  "fallible-iterator",
  "postgres-protocol",
 ]
+
+[[package]]
+name = "powerfmt"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
 name = "ppv-lite86"
@@ -3072,7 +3131,7 @@ checksum = "b7de33c687404ec3045d4a0d437580455257c0436f858d702f244e7d652f9f07"
 dependencies = [
  "atty",
  "chrono",
- "colored",
+ "colored 1.9.4",
  "log",
  "winapi",
 ]
@@ -3374,6 +3433,39 @@ dependencies = [
  "log",
  "ordered-float 1.1.1",
  "threadpool",
+]
+
+[[package]]
+name = "time"
+version = "0.3.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91e7d9e3bb61134e77bde20dd4825b97c010155709965fedf0f49bb138e52a9d"
+dependencies = [
+ "deranged",
+ "itoa",
+ "libc",
+ "num-conv",
+ "num_threads",
+ "powerfmt",
+ "serde",
+ "time-core",
+ "time-macros",
+]
+
+[[package]]
+name = "time-core"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40868e7c1d2f0b8d73e4a8c7f0ff63af4f6d19be117e90bd73eb1d62cf831c6b"
+
+[[package]]
+name = "time-macros"
+version = "0.2.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30cfb0125f12d9c277f35663a0a33f8c30190f4e4574868a330595412d34ebf3"
+dependencies = [
+ "num-conv",
+ "time-core",
 ]
 
 [[package]]

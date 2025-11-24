@@ -1,5 +1,6 @@
 use cubenativeutils::CubeError;
 
+use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::Case;
 
 use super::{
@@ -148,6 +149,10 @@ impl MemberSymbol {
 
     pub fn is_dimension(&self) -> bool {
         matches!(self, Self::Dimension(_) | Self::TimeDimension(_))
+    }
+
+    pub fn is_cube(&self) -> bool {
+        matches!(self, Self::CubeName(_) | Self::CubeTable(_))
     }
 
     pub fn apply_recursive<F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>>(
@@ -304,6 +309,14 @@ impl MemberSymbol {
         match self {
             Self::TimeDimension(d) => Some(d.alias_suffix()),
             _ => None,
+        }
+    }
+
+    pub fn is_basic_dimension(self: &Rc<Self>) -> Result<bool, CubeError> {
+        if self.as_dimension().is_ok() {
+            has_multi_stage_members(self, true)
+        } else {
+            Ok(false)
         }
     }
 

@@ -238,11 +238,6 @@ impl DimensionSymbol {
         if let Some(member_sql) = &self.longitude {
             member_sql.extract_symbol_deps(&mut deps);
         }
-        if let Some(add_group_by) = &self.add_group_by {
-            for member_sql in add_group_by {
-                deps.extend(member_sql.get_dependencies().into_iter());
-            }
-        }
         if let Some(case) = &self.case {
             case.extract_symbol_deps(&mut deps);
         }
@@ -262,11 +257,6 @@ impl DimensionSymbol {
         }
         if let Some(case) = &self.case {
             case.extract_symbol_deps_with_path(&mut deps);
-        }
-        if let Some(add_group_by) = &self.add_group_by {
-            for member_sql in add_group_by {
-                deps.extend(member_sql.get_dependencies_with_path().into_iter());
-            }
         }
         deps
     }
@@ -340,13 +330,32 @@ impl DimensionSymbolFactory {
         full_name: &String,
         cube_evaluator: Rc<dyn CubeEvaluator>,
     ) -> Result<Self, CubeError> {
-        let mut iter = cube_evaluator
-            .parse_path("dimensions".to_string(), full_name.clone())?
-            .into_iter();
+        let parts: Vec<&str> = full_name.split('.').collect();
+        let mut iter;
+        let member_short_path;
+
+        // try_new might be invoked with next full_name variants:
+        // 1. "cube.member"
+        // 2. "cube.member.granularity" might come from multistage things
+        // 3. "cube.cube.cube...cube.member" might come from pre-agg references (as it include full join paths)
+        // And we can not distinguish between "cube.member.granularity" and "cube.cube.member" here,
+        // so we have to try-catch 2 variants of evaluation.
+        if let Ok(iter_by_start) =
+            cube_evaluator.parse_path("dimensions".to_string(), full_name.clone())
+        {
+            member_short_path = full_name.clone();
+            iter = iter_by_start.into_iter();
+        } else {
+            member_short_path = format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]);
+            iter = cube_evaluator
+                .parse_path("dimensions".to_string(), member_short_path.clone())?
+                .into_iter();
+        }
+
         let cube_name = iter.next().unwrap();
         let name = iter.next().unwrap();
         let granularity = iter.next();
-        let definition = cube_evaluator.dimension_by_path(full_name.clone())?;
+        let definition = cube_evaluator.dimension_by_path(member_short_path)?;
         Ok(Self {
             cube_name,
             name,
@@ -398,7 +407,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let is_sql_direct_ref = if let Some(sql) = &sql {
-            sql.is_direct_reference(compiler.base_tools())?
+            sql.is_direct_reference()
         } else {
             false
         };

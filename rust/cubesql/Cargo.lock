@@ -697,7 +697,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "arrow",
  "chrono",
@@ -821,7 +821,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -854,7 +854,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "arrow",
  "ordered-float 2.10.0",
@@ -865,7 +865,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "async-trait",
  "chrono",
@@ -878,7 +878,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -889,7 +889,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=8e60e17fb5872d50e00ee65bf2200e1ebe5122ea#8e60e17fb5872d50e00ee65bf2200e1ebe5122ea"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
 dependencies = [
  "ahash 0.7.8",
  "arrow",

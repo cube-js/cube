@@ -1,21 +1,23 @@
 use super::collectors::JoinHintsCollector;
-use super::dependecy::DependenciesBuilder;
 use super::symbols::MemberSymbol;
 use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, MeasureSymbolFactory,
     SqlCall, SymbolFactory, TraversalVisitor,
 };
-use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::security_context::SecurityContext;
+use crate::cube_bridge::sql_utils::SqlUtils;
+use crate::planner::sql_evaluator::sql_call_builder::SqlCallBuilder;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
-    base_tools: Rc<dyn BaseTools>,
+    sql_utils: Rc<dyn SqlUtils>,
+    security_context: Rc<dyn SecurityContext>,
     timezone: Tz,
     /* (type, name) */
     members: HashMap<(String, String), Rc<MemberSymbol>>,
@@ -24,12 +26,14 @@ pub struct Compiler {
 impl Compiler {
     pub fn new(
         cube_evaluator: Rc<dyn CubeEvaluator>,
-        base_tools: Rc<dyn BaseTools>,
+        sql_utils: Rc<dyn SqlUtils>,
+        security_context: Rc<dyn SecurityContext>,
         timezone: Tz,
     ) -> Self {
         Self {
             cube_evaluator,
-            base_tools,
+            security_context,
+            sql_utils,
             timezone,
             members: HashMap::new(),
         }
@@ -50,10 +54,6 @@ impl Compiler {
                 name
             )))
         }
-    }
-
-    pub fn base_tools(&self) -> Rc<dyn BaseTools> {
-        self.base_tools.clone()
     }
 
     pub fn add_measure_evaluator(
@@ -129,9 +129,13 @@ impl Compiler {
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        let dep_builder = DependenciesBuilder::new(self, self.cube_evaluator.clone());
-        let deps = dep_builder.build(cube_name.clone(), member_sql.clone())?;
-        let sql_call = SqlCall::new(member_sql, deps);
+        let call_builder = SqlCallBuilder::new(
+            self,
+            self.cube_evaluator.clone(),
+            self.sql_utils.clone(),
+            self.security_context.clone(),
+        );
+        let sql_call = call_builder.build(&cube_name, member_sql.clone())?;
         Ok(Rc::new(sql_call))
     }
 

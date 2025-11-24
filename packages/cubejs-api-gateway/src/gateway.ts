@@ -1290,7 +1290,7 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(rewrittenQuery, persistent);
+          return normalizeQuery(rewrittenQuery, persistent, cacheMode);
         }
       )
     );
@@ -1623,10 +1623,11 @@ class ApiGateway {
       normalizedQueries.map(
         async (normalizedQuery, index) => {
           const loadRequestSQLStarted = new Date();
-          const sqlQuery = await (await this.getCompilerApi(context))
+          const sqlQueryRaw = await (await this.getCompilerApi(context))
             .getSql(
               this.coerceForSqlQuery(normalizedQuery, context)
             );
+          const sqlQuery = this.sanitizeSqlQuery(sqlQueryRaw);
 
           this.log({
             type: 'Load Request SQL',
@@ -1640,6 +1641,26 @@ class ApiGateway {
       )
     );
     return sqlQueries;
+  }
+
+  private sanitizeSqlQuery(sqlQuery: any): any {
+    if (sqlQuery.canUseTransformedQuery) {
+      // Keep only granularityHierarchies related to the query time dimensions
+      const tdArr = sqlQuery.canUseTransformedQuery.timeDimensions.map(([m, _g]) => m);
+      if (tdArr.length > 0) {
+        sqlQuery.canUseTransformedQuery.granularityHierarchies =
+          Object.fromEntries(
+            Object.entries(sqlQuery.canUseTransformedQuery.granularityHierarchies)
+              .filter(
+                ([key]) => tdArr.some((prefix: string) => key.startsWith(prefix))
+              )
+          );
+      } else {
+        sqlQuery.canUseTransformedQuery.granularityHierarchies = {};
+      }
+    }
+
+    return sqlQuery;
   }
 
   private sanitizeQueryForLogging(query: NormalizedQuery): NormalizedQuery {

@@ -9,7 +9,8 @@ import {
   JoinDefinition,
   PreAggregationDefinition,
   PreAggregationDefinitionRollup,
-  type ToString
+  type ToString,
+  ViewIncludedMember
 } from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
@@ -100,7 +101,7 @@ export type PreAggregationReferences = {
 export type PreAggregationInfo = {
   id: string,
   preAggregationName: string,
-  preAggregation: unknown,
+  preAggregation: any,
   cube: string,
   references: PreAggregationReferences,
   refreshKey: unknown,
@@ -124,6 +125,7 @@ export type EvaluatedFolder = {
 };
 
 export type EvaluatedCube = {
+  name: string;
   measures: Record<string, MeasureDefinition>;
   dimensions: Record<string, DimensionDefinition>;
   segments: Record<string, SegmentDefinition>;
@@ -136,6 +138,8 @@ export type EvaluatedCube = {
   sql?: (...args: any[]) => string;
   sqlTable?: (...args: any[]) => string;
   accessPolicy?: AccessPolicyDefinition[];
+  isView?: boolean;
+  includedMembers?: ViewIncludedMember[];
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -885,7 +889,6 @@ export class CubeEvaluator extends CubeSymbols {
         });
       }
     }
-
     return {
       allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:

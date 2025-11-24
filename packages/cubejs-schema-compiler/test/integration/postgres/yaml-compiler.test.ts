@@ -333,7 +333,7 @@ cubes:
     );
   });
 
-  it('joins', async () => {
+  it('joins 1', async () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
 cubes:
   - name: orders

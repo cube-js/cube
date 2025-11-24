@@ -511,12 +511,19 @@ impl MeasureSymbolFactory {
         full_name: &String,
         cube_evaluator: Rc<dyn CubeEvaluator>,
     ) -> Result<Self, CubeError> {
+        let parts: Vec<&str> = full_name.split('.').collect();
+        let member_short_path = if parts.len() > 2 {
+            format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1])
+        } else {
+            full_name.clone()
+        };
+
         let mut iter = cube_evaluator
-            .parse_path("measures".to_string(), full_name.clone())?
+            .parse_path("measures".to_string(), member_short_path.clone())?
             .into_iter();
         let cube_name = iter.next().unwrap();
         let name = iter.next().unwrap();
-        let definition = cube_evaluator.measure_by_path(full_name.clone())?;
+        let definition = cube_evaluator.measure_by_path(member_short_path)?;
         let sql = definition.sql()?;
         Ok(Self {
             cube_name,
@@ -613,7 +620,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         };
 
         let is_sql_is_direct_ref = if let Some(sql) = &sql {
-            sql.is_direct_reference(compiler.base_tools())?
+            sql.is_direct_reference()
         } else {
             false
         };

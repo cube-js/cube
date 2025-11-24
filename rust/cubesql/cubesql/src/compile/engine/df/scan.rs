@@ -483,7 +483,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                     self.member_fields.clone(),
                 )
                 .await;
-            let stream = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
+            let stream = result.map_err(|err| DataFusionError::External(Box::new(err)))?;
             let main_stream = CubeScanMemoryStream::new(stream);
 
             return Ok(Box::pin(CubeScanStreamRouter::new(
@@ -600,7 +600,16 @@ impl CubeScanMemoryStream {
     fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<ArrowResult<RecordBatch>>> {
         self.receiver.poll_recv(cx).map(|res| match res {
             Some(Some(Ok(chunk))) => Some(Ok(chunk)),
-            Some(Some(Err(err))) => Some(Err(ArrowError::ComputeError(err.to_string()))),
+            Some(Some(Err(mut err))) => {
+                // Remove `Error: ` prefix that can come from database
+                err.message = if let Some(message) = err.message.strip_prefix("Error: ") {
+                    message.to_string()
+                } else {
+                    err.message
+                };
+                err.message = format!("Database Execution Error: {}", err.message);
+                Some(Err(ArrowError::ExternalError(Box::new(err))))
+            }
             Some(None) => None,
             None => None,
         })
@@ -637,9 +646,9 @@ impl Stream for CubeScanStreamRouter {
         match &mut self.main_stream {
             Some(main_stream) => {
                 let next = main_stream.poll_next(cx);
-                if let Poll::Ready(Some(Err(ArrowError::ComputeError(err)))) = &next {
+                if let Poll::Ready(Some(Err(ArrowError::ExternalError(err)))) = &next {
                     if err
-                        .as_str()
+                        .to_string()
                         .contains("streamQuery() method is not implemented yet")
                     {
                         warn!("{}", err);
@@ -697,7 +706,7 @@ async fn load_data(
 
         let mut response = JsonValueObject::new(data);
         let rec = transform_response(&mut response, schema.clone(), &member_fields)
-            .map_err(|e| DataFusionError::Execution(e.message.to_string()))?;
+            .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
 
         rec
     } else {
@@ -713,21 +722,38 @@ async fn load_data(
                 options.cache_mode,
             )
             .await
-            .map_err(|err| ArrowError::ComputeError(err.to_string()))?;
+            .map_err(|mut err| {
+                // Remove `Error: ` prefix that can come from database
+                err.message = if let Some(message) = err.message.strip_prefix("Error: ") {
+                    message.to_string()
+                } else {
+                    err.message
+                };
+                err.message = format!("Database Execution Error: {}", err.message);
+                ArrowError::ExternalError(Box::new(err))
+            })?;
         let response = result.first();
         if let Some(data) = response.cloned() {
             match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
-                    return Err(ArrowError::ComputeError(format!("One of the Cube queries exceeded the maximum row limit ({}). JOIN/UNION is not possible as it will produce incorrect results. Try filtering the results more precisely or moving post-processing functions to an outer query.", max_records)));
+                    return Err(ArrowError::ExternalError(Box::new(CubeError::user(
+                        format!(
+                            "One of the Cube queries exceeded the maximum row limit ({}). \
+                            JOIN/UNION is not possible as it will produce incorrect results. \
+                            Try filtering the results more precisely \
+                            or moving post-processing functions to an outer query.",
+                            max_records
+                        ),
+                    ))));
                 }
                 (_, _) => (),
             }
 
             data
         } else {
-            return Err(ArrowError::ComputeError(
+            return Err(ArrowError::ExternalError(Box::new(CubeError::internal(
                 "Unable to extract results from response: results is empty".to_string(),
-            ));
+            ))));
         }
     };
 

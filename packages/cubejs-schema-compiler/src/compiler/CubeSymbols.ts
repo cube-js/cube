@@ -8,11 +8,13 @@ import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
 import { TranspilerSymbolResolver } from './transpilers';
+import { CompilerInterface } from './PrepareCompiler';
 
 export type ToString = { toString(): string };
 
 export type GranularityDefinition = {
   sql?: (...args: any[]) => string;
+  name?: string;
   title?: string;
   interval?: string;
   offset?: string;
@@ -131,12 +133,26 @@ export type AccessPolicyDefinition = {
     includesMembers?: string[];
     excludesMembers?: string[];
   };
+  conditions?: {
+    if: Function;
+  }[]
 };
 
 export type ViewIncludedMember = {
   type: string;
   memberPath: string;
   name: string;
+};
+
+export type FolderMember = {
+  type?: 'folder';
+  name: string;
+  includes?: FolderMember[];
+};
+
+export type Folder = {
+  name: string;
+  includes: FolderMember[];
 };
 
 export interface CubeDefinition {
@@ -158,7 +174,7 @@ export interface CubeDefinition {
   accessPolicy?: AccessPolicyDefinition[];
   // eslint-disable-next-line camelcase
   access_policy?: any[];
-  folders?: any[];
+  folders?: Folder[];
   includes?: any;
   excludes?: any;
   cubes?: any;
@@ -215,12 +231,12 @@ export const CONTEXT_SYMBOLS = {
 
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
-export class CubeSymbols implements TranspilerSymbolResolver {
+export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface {
   public symbols: Record<string | symbol, CubeSymbolsDefinition>;
 
   private builtCubes: Record<string, CubeDefinitionExtended>;
 
-  private cubeDefinitions: Record<string, CubeDefinition>;
+  public cubeDefinitions: Record<string, CubeDefinition>;
 
   private funcArgumentsValues: Record<string, string[]>;
 
@@ -912,10 +928,8 @@ export class CubeSymbols implements TranspilerSymbolResolver {
    * resolveSymbolsCall are sync. Async support may be added later with deeper
    * refactoring.
    */
-  protected evaluateContextFunction(cube: any, contextFn: any, context: any = {}) {
-    const cubeEvaluator = this;
-
-    return cubeEvaluator.resolveSymbolsCall(contextFn, (name: string) => {
+  public evaluateContextFunction(cube: any, contextFn: any, context: any = {}) {
+    return this.resolveSymbolsCall(contextFn, (name: string) => {
       const resolvedSymbol = this.resolveSymbol(cube, name);
       if (resolvedSymbol) {
         return resolvedSymbol;
@@ -930,7 +944,7 @@ export class CubeSymbols implements TranspilerSymbolResolver {
     });
   }
 
-  protected evaluateReferences<T extends ToString | Array<ToString>>(
+  public evaluateReferences<T extends ToString | Array<ToString>>(
     cube: string | null,
     referencesFn: (...args: Array<unknown>) => T,
     options: { collectJoinHints?: boolean, originalSorting?: boolean } = {}
