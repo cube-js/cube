@@ -38,6 +38,9 @@ Each role can be associated with one or more of the following policies:
 | `Deployment` | Controls deployment-level functionality, e.g., as Playground. |
 | `Report` | Controls access to specific reports in Saved Reports. |
 | `ReportFolder` | Controls access to specific folders in Saved Reports. |
+| `Agent` | Controls access to specific [AI agents][ref-ai-agents]. |
+| `AgentSpace` | Controls access to specific AI agent [spaces][ref-ai-spaces]. |
+| `Workbook` | Controls access to specific [workbooks][ref-workbooks]. |
 
 Each policy can apply to _all resources_ or _specific resources_. For example, a policy
 could apply to all deployments or only to a specific deployment.
@@ -97,15 +100,19 @@ Existing users' roles can be modified from the "Members" tab on the Team page:
 
 Policies can have the following actions associated with them.
 
-Actions for the `Global` policy:
+### `Global`
 
 | Action | Description |
 | --- | --- |
 | `Alerts Access`<br/>`Alerts Create`<br/>`Alerts Edit`<br/>`Alerts Delete` | View, create, edit, and delete [budgets][ref-budgets]. |
 | `Billing Access` | Access the billing data of the Cube Cloud account. |
 | `Deployment Manage` | Create and delete deployments in the Cube Cloud account. |
+| `Agent Admin` | Administer AI agents across the account. |
+| `AI BI Developer` | Developer-level access to AI BI features with full AI token usage. |
+| `AI BI User` | User-level access to AI BI features with standard AI token usage. |
+| `AI BI Viewer` | Viewer-level access to AI BI features with limited AI token usage. |
 
-Actions for the `Deployment` policy:
+### `Deployment`
 
 | Action | Description |
 | --- | --- |
@@ -117,17 +124,35 @@ Actions for the `Deployment` policy:
 | `SQL Runner Access` | Use [SQL Runner][ref-sql-runner]. |
 | `Data Assets Access` | Use [Semantic Catalog][ref-semantic-catalog]. |
 
-Actions for the `Report` policy:
+### `Report`
 
 | Action | Description |
 | --- | --- |
 | `Report Read`<br/>`Report Manage` | View and create/delete reports. |
 
-Actions for the `ReportFolder` policy:
+### `ReportFolder`
 
 | Action | Description |
 | --- | --- |
 | `Report Read`<br/>`Report Manage` | View and create/delete report folders. |
+
+### `Agent`
+
+| Action | Description |
+| --- | --- |
+| `Agent Access`<br/>`Agent Manage` | View and manage AI agents. |
+
+### `AgentSpace`
+
+| Action | Description |
+| --- | --- |
+| `Agent Space Manage` | Manage AI agent spaces. |
+
+### `Workbook`
+
+| Action | Description |
+| --- | --- |
+| `Workbook Read`<br/>`Workbook Manage`<br/>`Workbook Edit` | View, manage, and edit workbooks. |
 
 
 [ref-budgets]: /product/workspace/budgets
@@ -139,3 +164,6 @@ Actions for the `ReportFolder` policy:
 [ref-perf-insights]: /product/workspace/performance
 [ref-sql-runner]: /product/workspace/sql-runner
 [ref-semantic-catalog]: /product/workspace/semantic-catalog
+[ref-ai-agents]: /product/administration/ai/spaces-agents-models#2-agents-ai-agents
+[ref-ai-spaces]: /product/administration/ai/spaces-agents-models#1-spaces-agent-spaces
+[ref-workbooks]: /product/exploration/workbooks
