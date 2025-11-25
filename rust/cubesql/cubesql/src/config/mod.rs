@@ -100,11 +100,13 @@ pub trait ConfigObj: DIService + Debug {
 
     fn compiler_cache_size(&self) -> usize;
 
-    fn query_cache_size(&self) -> usize;
+    fn query_cache_size(&self) -> u64;
 
     fn enable_parameterized_rewrite_cache(&self) -> bool;
 
     fn enable_rewrite_cache(&self) -> bool;
+
+    fn query_cache_time_to_idle_secs(&self) -> u64;
 
     fn push_down_pull_up_split(&self) -> bool;
 
@@ -127,7 +129,8 @@ pub struct ConfigObjImpl {
     pub timezone: Option<String>,
     pub disable_strict_agg_type_match: bool,
     pub compiler_cache_size: usize,
-    pub query_cache_size: usize,
+    pub query_cache_size: u64,
+    pub query_cache_time_to_idle_secs: u64,
     pub enable_parameterized_rewrite_cache: bool,
     pub enable_rewrite_cache: bool,
     pub push_down_pull_up_split: bool,
@@ -163,6 +166,12 @@ impl ConfigObjImpl {
             auth_expire_secs: env_parse("CUBESQL_AUTH_EXPIRE_SECS", 300),
             compiler_cache_size: env_parse("CUBEJS_COMPILER_CACHE_SIZE", 100),
             query_cache_size: env_parse("CUBESQL_QUERY_CACHE_SIZE", 500),
+            query_cache_time_to_idle_secs: env_parse_duration(
+                "CUBESQL_QUERY_CACHE_TIME_TO_IDLE",
+                60 * 60,
+                Some(60 * 60 * 24),
+                Some(60),
+            ),
             enable_parameterized_rewrite_cache: env_optparse("CUBESQL_PARAMETERIZED_REWRITE_CACHE")
                 .unwrap_or(sql_push_down),
             enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(sql_push_down),
@@ -207,7 +216,7 @@ impl ConfigObj for ConfigObjImpl {
         self.compiler_cache_size
     }
 
-    fn query_cache_size(&self) -> usize {
+    fn query_cache_size(&self) -> u64 {
         self.query_cache_size
     }
 
@@ -217,6 +226,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn enable_rewrite_cache(&self) -> bool {
         self.enable_rewrite_cache
+    }
+
+    fn query_cache_time_to_idle_secs(&self) -> u64 {
+        self.query_cache_time_to_idle_secs
     }
 
     fn push_down_pull_up_split(&self) -> bool {
@@ -262,9 +275,10 @@ impl Config {
                 timezone,
                 disable_strict_agg_type_match: false,
                 compiler_cache_size: 100,
-                query_cache_size: 500,
+                query_cache_size: 500u64,
                 enable_parameterized_rewrite_cache: false,
                 enable_rewrite_cache: false,
+                query_cache_time_to_idle_secs: 1800,
                 push_down_pull_up_split: true,
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
@@ -396,6 +410,49 @@ where
             name, x, e
         ),
     })
+}
+
+pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T
+where
+    T: FromStr + PartialOrd + Display,
+    T::Err: Display,
+{
+    let v = match env::var(name).ok() {
+        None => {
+            return default;
+        }
+        Some(v) => v,
+    };
+
+    let n = match v.parse::<T>() {
+        Ok(n) => n,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                max
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                min
+            )
+        }
+    };
+
+    n
 }
 
 pub type LoopHandle = JoinHandle<Result<(), CubeError>>;
