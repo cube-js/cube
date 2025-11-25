@@ -248,6 +248,34 @@ To generate pre-aggregations that rely on `COMPILE_CONTEXT`, [configure
 `scheduledRefreshContexts` in your `cube.js` configuration
 file][ref-config-sched-refresh].
 
+### Usage for member-level security
+
+You can also use `COMPILE_CONTEXT` to control whether a data model entity should be
+public or private [dynamically][ref-dynamic-data-modeling].
+
+In the example below, the `customers` view would only be visible to a subset
+of [tenants][ref-multitenancy] that have the `team` property set to `marketing`
+in the security context: 
+
+```yml filename="model/views/customers.yml"
+views:
+  - name: customers
+    public: "{{ is_accessible_by_team('marketing', COMPILE_CONTEXT) }}"
+```
+
+```python filename="model/globals.py"
+from cube import TemplateContext
+
+template = TemplateContext()
+
+@template.function('is_accessible_by_team')
+def is_accessible_by_team(team: str, ctx: dict) -> bool:
+  return team == ctx['securityContext'].setdefault('team', 'default')
+```
+
+If you'd like to keep a data model entity public but prevent access to it
+anyway, you can use the [`query_rewrite` configuration option][ref-query-rewrite] for that.
+
 ## Testing during development
 
 During development, it is often useful to be able to edit the security context
@@ -294,3 +322,5 @@ of your Cube Cloud deployment and using the <Btn>Enable Cloud Auth Integration</
 [ref-auth-integration]: /product/auth#authentication-integration
 [ref-ldap-integration]: /product/workspace/sso#ldap-integration
 [ref-extend-context]: /product/configuration/reference/config#extend_context
+[ref-dynamic-data-modeling]: /product/data-modeling/dynamic
+[ref-multitenancy]: /product/configuration/multitenancy

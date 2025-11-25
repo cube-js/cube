@@ -13,26 +13,54 @@ data model facts when they are accessed by any users.
 
 ## Managing row-level access
 
-You can implement row-level access control by applying additional filters conditionally
-in the [`query_rewrite` configuration option][ref-query-rewrite].
-
-### Dynamic data models
-
-You can implement row-level access control at the data model level
-[dynamically][ref-dynamic-data-modeling] by adjusting the [`sql` parameter][ref-cubes-sql]
-of cubes.
-
-## Best practices
-
-### Data access policies
-
 You can use [data access policies][ref-dap] to manage both [member-level][ref-mls]
-and row-level security for different roles. With them, you can define access control
-rules in data model files instead of mixing them together in a single block of code
-in `query_rewrite`.
+and row-level security based on [user attributes][ref-security-context] or groups.
 
-__It is recommended to use data access policies by default.__ You can also combine
-them with using your own code in `query_rewrite` for specific cases.
+Here's an example of how to filter rows by a user attribute using data access policies:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - role: manager
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: [ "{ userAttributes.country }" ]
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      role: `manager`,
+      row_level: {
+        filters: [
+          {
+            member: `country`,
+            operator: `equals`,
+            values: [ securityContext.country ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+
+## Advanced scenarios
+
+For more complex scenarios, you can use [`query_rewrite`][ref-query-rewrite] for programmatic query filtering or adjust the [`sql` parameter][ref-cubes-sql] in [dynamic data models][ref-dynamic-data-modeling].
 
 
 [ref-data-modeling-concepts]: /product/data-modeling/concepts
@@ -44,3 +72,4 @@ them with using your own code in `query_rewrite` for specific cases.
 [ref-query-rewrite]: /product/configuration/reference/config#query_rewrite
 [ref-dap]: /product/auth/data-access-policies
 [ref-mls]: /product/auth/member-level-security
+[ref-security-context]: /product/auth/context
