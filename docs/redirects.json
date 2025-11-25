@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/administration/workspace/access-control",
+    "destination": "/product/administration/users-and-permissions/custom-roles",
+    "permanent": true
+  },
+  {
     "source": "/product/deployment/cloud/byoc/aws",
     "destination": "/product/deployment/cloud/byoc/aws/deployment",
     "permanent": true

@@ -13,7 +13,6 @@ module.exports = {
   "pre-aggregations": "Pre-aggregations",
   "performance": "Performance Insights",
   "monitoring": "Monitoring Integrations",
-  "access-control": "Access Control",
   "sso": "Authentication & SSO",
   "audit-log": "Audit Log",
   "chats-history": "Chats History",
