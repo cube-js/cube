@@ -1,20 +1,15 @@
 # Access control
 
-Access control in Cube involves _authentication_ and _authorization_.
 
-During authentication, Cube verifies the user's identity via one of the [supported
-methods][ref-auth-methods]. Then, it assigns a [security context][ref-sec-ctx] to the
-request, optionally [enriching][ref-sec-ctx-enrich] the security context with additional
-attributes, e.g., via the [authentication integration][ref-auth-integration].
-
-During authorization, Cube uses the security context to enforce [member-level
-security][ref-mls], [row-level security][ref-rls], and [data access policies][ref-dap].
+Cube has a data access control layer built into the data model. Access control in Cube involves _authentication_ and _authorization_.
 
 
-[ref-auth-methods]: /product/auth/methods
+**Cube** cloud platform provides built-in authentication abstractions alongside [user attributes][ref-user-attributes] and groups for managing data access. **Cube Core** users can control the [security context][ref-sec-ctx] directly to implement authentication.
+
+
+Authorization is based on [data access policies][ref-dap] and dynamic controls for advanced use cases.
+
+
+[ref-user-attributes]: /product/administration/users-and-permissions/user-attributes
 [ref-sec-ctx]: /product/auth/context
-[ref-sec-ctx-enrich]: /product/auth/context#enriching-the-security-context
-[ref-auth-integration]: /product/auth/context#authentication-integration
 [ref-dap]: /product/auth/data-access-policies
-[ref-mls]: /product/auth/member-level-security
-[ref-rls]: /product/auth/row-level-security
