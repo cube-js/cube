@@ -100,7 +100,7 @@ pub trait ConfigObj: DIService + Debug {
 
     fn compiler_cache_size(&self) -> usize;
 
-    fn query_cache_size(&self) -> usize;
+    fn query_cache_size(&self) -> u64;
 
     fn enable_parameterized_rewrite_cache(&self) -> bool;
 
@@ -129,7 +129,7 @@ pub struct ConfigObjImpl {
     pub timezone: Option<String>,
     pub disable_strict_agg_type_match: bool,
     pub compiler_cache_size: usize,
-    pub query_cache_size: usize,
+    pub query_cache_size: u64,
     pub enable_parameterized_rewrite_cache: bool,
     pub enable_rewrite_cache: bool,
     pub query_cache_time_to_idle_secs: u64,
@@ -217,7 +217,7 @@ impl ConfigObj for ConfigObjImpl {
         self.compiler_cache_size
     }
 
-    fn query_cache_size(&self) -> usize {
+    fn query_cache_size(&self) -> u64 {
         self.query_cache_size
     }
 
@@ -276,7 +276,7 @@ impl Config {
                 timezone,
                 disable_strict_agg_type_match: false,
                 compiler_cache_size: 100,
-                query_cache_size: 500,
+                query_cache_size: 500u64,
                 enable_parameterized_rewrite_cache: false,
                 enable_rewrite_cache: false,
                 query_cache_time_to_idle_secs: 1800,

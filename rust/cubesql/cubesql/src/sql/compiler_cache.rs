@@ -215,11 +215,11 @@ impl CompilerCache for CompilerCacheImpl {
                         meta_context: meta_context.clone(),
                         rewrite_rules: RWLockAsync::new(HashMap::new()),
                         parameterized_cache: MokaCache::builder()
-                            .max_capacity(self.config_obj.query_cache_size() as u64)
+                            .max_capacity(self.config_obj.query_cache_size())
                             .time_to_idle(ttl)
                             .build(),
                         queries_cache: MokaCache::builder()
-                            .max_capacity(self.config_obj.query_cache_size() as u64)
+                            .max_capacity(self.config_obj.query_cache_size())
                             .time_to_idle(ttl)
                             .build(),
                     });
