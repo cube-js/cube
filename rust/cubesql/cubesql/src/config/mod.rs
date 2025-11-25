@@ -130,9 +130,9 @@ pub struct ConfigObjImpl {
     pub disable_strict_agg_type_match: bool,
     pub compiler_cache_size: usize,
     pub query_cache_size: u64,
+    pub query_cache_time_to_idle_secs: u64,
     pub enable_parameterized_rewrite_cache: bool,
     pub enable_rewrite_cache: bool,
-    pub query_cache_time_to_idle_secs: u64,
     pub push_down_pull_up_split: bool,
     pub stream_mode: bool,
     pub non_streaming_query_max_row_limit: i32,
@@ -166,16 +166,15 @@ impl ConfigObjImpl {
             auth_expire_secs: env_parse("CUBESQL_AUTH_EXPIRE_SECS", 300),
             compiler_cache_size: env_parse("CUBEJS_COMPILER_CACHE_SIZE", 100),
             query_cache_size: env_parse("CUBESQL_QUERY_CACHE_SIZE", 500),
-            enable_parameterized_rewrite_cache: env_optparse("CUBESQL_PARAMETERIZED_REWRITE_CACHE")
-                .unwrap_or(sql_push_down),
-            enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(sql_push_down),
             query_cache_time_to_idle_secs: env_parse_duration(
                 "CUBESQL_QUERY_CACHE_TIME_TO_IDLE",
                 60 * 60,
                 Some(60 * 60 * 24),
-                // 1 minute
                 Some(60),
             ),
+            enable_parameterized_rewrite_cache: env_optparse("CUBESQL_PARAMETERIZED_REWRITE_CACHE")
+                .unwrap_or(sql_push_down),
+            enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(sql_push_down),
             push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
