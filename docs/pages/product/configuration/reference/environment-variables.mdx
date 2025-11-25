@@ -912,6 +912,25 @@ untrusted environments.
 
 </WarningBox>
 
+## `CUBEJS_DEFAULT_TIMEZONE`
+
+The default [time zone][ref-time-zone] for queries.
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A valid time zone name | `UTC`                  | `UTC`                 |
+
+You can set the time zone name in the [TZ Database Name][link-tzdb] format, e.g.,
+`America/Los_Angeles`.
+
+<WarningBox>
+
+Increasing the maximum row limit may cause out-of-memory (OOM) crashes and make
+Cube susceptible to denial-of-service (DoS) attacks if it's exposed to
+untrusted environments.
+
+</WarningBox>
+
 ## `CUBEJS_DEFAULT_API_SCOPES`
 
 [API scopes][ref-rest-scopes] used to allow or disallow access to REST API
@@ -1881,3 +1900,5 @@ The port for a Cube deployment to listen to API connections on.
 [ref-mdx-api]: /product/apis-integrations/mdx-api
 [ref-mdx-api-locale]: /product/apis-integrations/mdx-api#measure-format
 [ref-time-dimensions]: /product/data-modeling/reference/dimensions#time
+[ref-time-zone]: /product/apis-integrations/queries#time-zone
+[link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
