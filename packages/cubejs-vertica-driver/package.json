@@ -22,6 +22,7 @@
     "@cubejs-backend/base-driver": "1.5.7",
     "@cubejs-backend/query-orchestrator": "1.5.7",
     "@cubejs-backend/schema-compiler": "1.5.7",
+    "@cubejs-backend/shared": "1.5.7",
     "vertica-nodejs": "^1.0.3"
   },
   "license": "Apache-2.0",
