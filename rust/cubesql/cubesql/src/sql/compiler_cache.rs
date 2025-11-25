@@ -14,7 +14,8 @@ use crate::{
 use async_trait::async_trait;
 use datafusion::scalar::ScalarValue;
 use lru::LruCache;
-use std::{collections::HashMap, fmt::Debug, num::NonZeroUsize, sync::Arc};
+use moka::future::Cache as MokaCache;
+use std::{collections::HashMap, fmt::Debug, num::NonZeroUsize, sync::Arc, time::Duration};
 use uuid::Uuid;
 
 #[async_trait]
@@ -64,8 +65,8 @@ pub struct CompilerCacheImpl {
 pub struct CompilerCacheEntry {
     meta_context: Arc<MetaContext>,
     rewrite_rules: RWLockAsync<HashMap<bool, Arc<Vec<CubeRewrite>>>>,
-    parameterized_cache: MutexAsync<LruCache<[u8; 32], CubeEGraph>>,
-    queries_cache: MutexAsync<LruCache<[u8; 32], CubeEGraph>>,
+    parameterized_cache: MokaCache<[u8; 32], CubeEGraph>,
+    queries_cache: MokaCache<[u8; 32], CubeEGraph>,
 }
 
 crate::di_service!(CompilerCacheImpl, [CompilerCache]);
@@ -120,18 +121,20 @@ impl CompilerCache for CompilerCacheImpl {
     ) -> Result<CubeEGraph, CubeError> {
         let graph_key = egraph_hash(&parameterized_graph, None);
 
-        let cache_entry_clone = Arc::clone(&cache_entry);
-        let mut rewrites_cache_lock = cache_entry.parameterized_cache.lock().await;
-        if let Some(rewrite_entry) = rewrites_cache_lock.get(&graph_key) {
-            Ok(rewrite_entry.clone())
-        } else {
-            let mut rewriter = Rewriter::new(parameterized_graph, cube_context);
-            let rewrite_entry = rewriter
-                .run_rewrite_to_completion(cache_entry_clone, qtrace)
-                .await?;
-            rewrites_cache_lock.put(graph_key, rewrite_entry.clone());
-            Ok(rewrite_entry)
+        if let Some(rewrite_entry) = cache_entry.parameterized_cache.get(&graph_key).await {
+            return Ok(rewrite_entry);
         }
+
+        let cache_entry_clone = Arc::clone(&cache_entry);
+        let mut rewriter = Rewriter::new(parameterized_graph, cube_context);
+        let rewrite_entry = rewriter
+            .run_rewrite_to_completion(cache_entry_clone, qtrace)
+            .await?;
+        cache_entry
+            .parameterized_cache
+            .insert(graph_key, rewrite_entry.clone())
+            .await;
+        Ok(rewrite_entry)
     }
 
     async fn rewrite(
@@ -152,30 +155,35 @@ impl CompilerCache for CompilerCacheImpl {
 
         let graph_key = egraph_hash(&input_plan, Some(param_values));
 
-        let cache_entry_clone = Arc::clone(&cache_entry);
-        let mut rewrites_cache_lock = cache_entry.queries_cache.lock().await;
-        if let Some(plan) = rewrites_cache_lock.get(&graph_key) {
-            Ok(plan.clone())
-        } else {
-            let graph = if self.config_obj.enable_parameterized_rewrite_cache() {
-                self.parameterized_rewrite(
-                    Arc::clone(&cache_entry),
-                    cube_context.clone(),
-                    input_plan,
-                    qtrace,
-                )
-                .await?
-            } else {
-                input_plan
-            };
-            let mut rewriter = Rewriter::new(graph, cube_context);
-            rewriter.add_param_values(param_values)?;
-            let final_plan = rewriter
-                .run_rewrite_to_completion(cache_entry_clone, qtrace)
-                .await?;
-            rewrites_cache_lock.put(graph_key, final_plan.clone());
-            Ok(final_plan)
+        if let Some(plan) = cache_entry.queries_cache.get(&graph_key).await {
+            return Ok(plan);
         }
+
+        let cache_entry_clone = Arc::clone(&cache_entry);
+        let graph = if self.config_obj.enable_parameterized_rewrite_cache() {
+            self.parameterized_rewrite(
+                Arc::clone(&cache_entry),
+                cube_context.clone(),
+                input_plan,
+                qtrace,
+            )
+            .await?
+        } else {
+            input_plan
+        };
+
+        let mut rewriter = Rewriter::new(graph, cube_context);
+        rewriter.add_param_values(param_values)?;
+        let final_plan = rewriter
+            .run_rewrite_to_completion(cache_entry_clone, qtrace)
+            .await?;
+
+        cache_entry
+            .queries_cache
+            .insert(graph_key, final_plan.clone())
+            .await;
+
+        Ok(final_plan)
     }
 
     async fn get_cache_entry(
@@ -202,15 +210,18 @@ impl CompilerCache for CompilerCacheImpl {
                 .get(&(meta_context.compiler_id, protocol.clone()))
                 .cloned()
                 .unwrap_or_else(|| {
+                    let ttl = Duration::from_secs(self.config_obj.query_cache_time_to_idle_secs());
                     let cache_entry = Arc::new(CompilerCacheEntry {
                         meta_context: meta_context.clone(),
                         rewrite_rules: RWLockAsync::new(HashMap::new()),
-                        parameterized_cache: MutexAsync::new(LruCache::new(
-                            NonZeroUsize::new(self.config_obj.query_cache_size()).unwrap(),
-                        )),
-                        queries_cache: MutexAsync::new(LruCache::new(
-                            NonZeroUsize::new(self.config_obj.query_cache_size()).unwrap(),
-                        )),
+                        parameterized_cache: MokaCache::builder()
+                            .max_capacity(self.config_obj.query_cache_size() as u64)
+                            .time_to_idle(ttl)
+                            .build(),
+                        queries_cache: MokaCache::builder()
+                            .max_capacity(self.config_obj.query_cache_size() as u64)
+                            .time_to_idle(ttl)
+                            .build(),
                     });
                     compiler_id_to_entry.put(
                         (meta_context.compiler_id, protocol.clone()),

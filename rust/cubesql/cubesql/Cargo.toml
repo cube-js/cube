@@ -54,6 +54,7 @@ sha1_smol = "1.0.0"
 tera = { version = "1", default-features = false }
 minijinja = { version = "1", features = ["json", "loader"] }
 lru = "0.13.0"
+moka = { version = "0.12", features = ["future"] }
 sha2 = "0.10.8"
 bigdecimal = "0.4.2"
 indexmap = "1.9.3"

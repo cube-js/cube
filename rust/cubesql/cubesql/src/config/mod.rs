@@ -106,6 +106,8 @@ pub trait ConfigObj: DIService + Debug {
 
     fn enable_rewrite_cache(&self) -> bool;
 
+    fn query_cache_time_to_idle_secs(&self) -> u64;
+
     fn push_down_pull_up_split(&self) -> bool;
 
     fn stream_mode(&self) -> bool;
@@ -130,6 +132,7 @@ pub struct ConfigObjImpl {
     pub query_cache_size: usize,
     pub enable_parameterized_rewrite_cache: bool,
     pub enable_rewrite_cache: bool,
+    pub query_cache_time_to_idle_secs: u64,
     pub push_down_pull_up_split: bool,
     pub stream_mode: bool,
     pub non_streaming_query_max_row_limit: i32,
@@ -166,6 +169,13 @@ impl ConfigObjImpl {
             enable_parameterized_rewrite_cache: env_optparse("CUBESQL_PARAMETERIZED_REWRITE_CACHE")
                 .unwrap_or(sql_push_down),
             enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(sql_push_down),
+            query_cache_time_to_idle_secs: env_parse_duration(
+                "CUBESQL_QUERY_CACHE_TIME_TO_IDLE",
+                60 * 60,
+                Some(60 * 60 * 24),
+                // 1 minute
+                Some(60),
+            ),
             push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
@@ -219,6 +229,10 @@ impl ConfigObj for ConfigObjImpl {
         self.enable_rewrite_cache
     }
 
+    fn query_cache_time_to_idle_secs(&self) -> u64 {
+        self.query_cache_time_to_idle_secs
+    }
+
     fn push_down_pull_up_split(&self) -> bool {
         self.push_down_pull_up_split
     }
@@ -265,6 +279,7 @@ impl Config {
                 query_cache_size: 500,
                 enable_parameterized_rewrite_cache: false,
                 enable_rewrite_cache: false,
+                query_cache_time_to_idle_secs: 1800,
                 push_down_pull_up_split: true,
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
@@ -396,6 +411,49 @@ where
             name, x, e
         ),
     })
+}
+
+pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T
+where
+    T: FromStr + PartialOrd + Display,
+    T::Err: Display,
+{
+    let v = match env::var(name).ok() {
+        None => {
+            return default;
+        }
+        Some(v) => v,
+    };
+
+    let n = match v.parse::<T>() {
+        Ok(n) => n,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                max
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                min
+            )
+        }
+    };
+
+    n
 }
 
 pub type LoopHandle = JoinHandle<Result<(), CubeError>>;
