@@ -1,27 +1,16 @@
-# Access Control
+# Custom roles
 
-As a Cube Cloud account administrator, you can define roles with specific permissions
-for Cube Cloud resources and apply those roles to users within the account.
+<InfoBox>
 
-<SuccessBox>
+Custom roles are available in Cube Cloud on
+[Enterprise plan.](https://cube.dev/pricing)
 
-Access control is available in Cube Cloud on
-[Enterprise and above](https://cube.dev/pricing) product tiers.
+</InfoBox>
 
-</SuccessBox>
+Cube comes with [default roles][ref-default-roles] that cover common use cases. However, if you need more customization, you can create custom roles with a fine-grained set of permissions tailored to your organization's specific needs.
 
-You can [manage accounts](#managing-accounts) as an account administrator,
-[manage roles](#managing-roles), [assign them](#assigning-roles-to-users) to users,
-and associate [supported actions](#actions) with those roles.
+[ref-default-roles]: /product/administration/users-and-permissions/roles-and-permissions
 
-## Managing accounts
-
-Account administrators have ultimate control over the Cube Cloud account, including
-[managing roles](#managing-roles) and assigning them to users.
-
-You can see which users are account administrators on the <Btn>Members</Btn> tab of the
-<Btn>Team & Security</Btn> page in your Cube Cloud. Account administrators have the
-<Btn>Admin</Btn> toggle enabled next to their name.
 
 ## Managing roles
 
@@ -53,12 +42,12 @@ See [actions reference](#actions) for a list of available actions.
 
 ### Browsing roles
 
-To see a list of roles, go to the <Btn>Team & Security</Btn> page in your Cube Cloud
-account, then navigate to the <Btn>Roles</Btn> tab:
+To see a list of custom roles, go to the **Admin -> Custom Roles** page in your Cube
+account:
 
 <Screenshot
-  alt="Cube Cloud Team Roles tab"
-  src="https://ucarecdn.com/476cb30f-4939-41a8-a399-53d4f8a47dee/"
+  alt="Cube Cloud Custom Roles"
+  src="https://lgo0ecceic.ucarecd.net/60f2733e-4e70-4e83-944d-7611e4102c38/"
 />
 
 ### Creating a role
@@ -74,27 +63,21 @@ selected, you can restrict which actions this role can perform by selecting
 "Specific" and using the dropdown to select specific actions.
 
 <Screenshot
-  alt="Cube Cloud Team Roles tab"
-  src="https://ucarecdn.com/2bbda93d-9da9-4c1e-8c7a-816a2d9ac8a9/"
+  alt="Cube Cloud Custom Roles"
+  src="https://lgo0ecceic.ucarecd.net/94f9a6b0-b77e-415f-b096-60426369b2c6/"
 />
 
-When you are finished, click "Create Role" to create the role.
+When you are finished, click <Btn>Create</Btn> to create the role.
 
 ## Assigning roles to users
 
-Roles are assigned to new users when inviting them:
+To assign custom roles to users:
 
-<Screenshot
-  alt="Cube Cloud Team Roles tab"
-  src="https://ucarecdn.com/5636a7d9-11de-45eb-aead-a23d9d780e52/"
-/>
-
-Existing users' roles can be modified from the "Members" tab on the Team page:
-
-<Screenshot
-  alt="Cube Cloud Team Roles tab"
-  src="https://ucarecdn.com/a72cad30-487b-484a-b557-0f0e157c89b1/"
-/>
+1. Navigate to <Btn>Admin → Users</Btn>
+2. Choose one of the following methods:
+   - **From the users table**: Use the dropdown in the users table
+   - **From individual user page**: Click on a user and assign roles from their profile page
+3. You can assign multiple custom roles to a single user
 
 ## Actions
 
@@ -167,3 +150,4 @@ Policies can have the following actions associated with them.
 [ref-ai-agents]: /product/administration/ai/spaces-agents-models#2-agents-ai-agents
 [ref-ai-spaces]: /product/administration/ai/spaces-agents-models#1-spaces-agent-spaces
 [ref-workbooks]: /product/exploration/workbooks
+
