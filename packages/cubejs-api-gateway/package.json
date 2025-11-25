@@ -32,7 +32,7 @@
     "@cubejs-backend/shared": "1.5.7",
     "@ungap/structured-clone": "^0.3.4",
     "assert-never": "^1.4.0",
-    "body-parser": "^1.19.0",
+    "body-parser": "^2.2.1",
     "chrono-node": "2.6.2",
     "express": "^4.21.1",
     "express-graphql": "^0.12.0",
