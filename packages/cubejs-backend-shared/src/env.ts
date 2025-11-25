@@ -244,6 +244,9 @@ const variables: Record<string, (...args: any) => any> = {
   nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
     .default('')
     .asString(),
+  defaultTimezone: () => get('CUBEJS_DEFAULT_TIMEZONE')
+    .default('UTC')
+    .asString(),
 
   /** ****************************************************************
    * Common db options                                               *
