@@ -35,13 +35,9 @@ views:
           filters:
             - member: customers_city
               operator: equals
-              values: ["{ securityContext.cubeCloud.userAttributes.city }"]
+              values: ["{ userAttributes.city }"]
 ```
 
 ## Effect on Queries
 
 When the access policy is implemented, queries will automatically be filtered based on the user's attributes. This ensures users can only access data that matches their attribute values.
-
-<InfoBox>
-The path to access user attributes (securityContext.cubeCloud.userAttributes) will be simplified in future updates to allow direct access through user attributes.
-</InfoBox>
