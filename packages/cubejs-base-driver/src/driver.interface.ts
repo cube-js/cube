@@ -19,6 +19,10 @@ export interface TableColumnQueryResult {
   column_name: string;
   // eslint-disable-next-line camelcase
   data_type: GenericDataBaseType;
+  // eslint-disable-next-line camelcase
+  numeric_precision?: number | null;
+  // eslint-disable-next-line camelcase
+  numeric_scale?: number | null;
   attributes?: string[]
   // eslint-disable-next-line camelcase
   foreign_keys?: ForeignKey[]

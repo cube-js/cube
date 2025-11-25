@@ -244,6 +244,9 @@ const variables: Record<string, (...args: any) => any> = {
   nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
     .default('')
     .asString(),
+  preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *

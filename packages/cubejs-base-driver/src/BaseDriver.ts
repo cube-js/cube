@@ -640,14 +640,16 @@ export abstract class BaseDriver implements DriverInterface {
       `SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
              columns.table_name as ${this.quoteIdentifier('table_name')},
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
-             columns.data_type  as ${this.quoteIdentifier('data_type')}
+             columns.data_type  as ${this.quoteIdentifier('data_type')},
+             columns.numeric_precision as ${this.quoteIdentifier('numeric_precision')},
+             columns.numeric_scale as ${this.quoteIdentifier('numeric_scale')}
       FROM information_schema.columns
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}
       ${getEnv('fetchColumnsByOrdinalPosition') ? 'ORDER BY columns.ordinal_position' : ''}`,
       [name, schema]
     );
 
-    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type, c.numeric_precision, c.numeric_scale) }));
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -673,8 +675,14 @@ export abstract class BaseDriver implements DriverInterface {
     return `CREATE TABLE ${quotedTableName} (${columnNames.join(', ')})`;
   }
 
-  protected toGenericType(columnType: string): string {
-    return DbTypeToGenericType[columnType.toLowerCase()] || columnType;
+  protected toGenericType(columnType: string, precision?: number | null, scale?: number | null): string {
+    const genericType = DbTypeToGenericType[columnType.toLowerCase()] || columnType;
+
+    if (genericType === 'decimal' && precision && scale && getEnv('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')) {
+      return `decimal(${precision}, ${scale})`;
+    }
+
+    return genericType;
   }
 
   protected fromGenericType(columnType: string): string {
