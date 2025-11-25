@@ -137,6 +137,7 @@ const DbTypeToGenericType: Record<string, string> = {
   enum: 'text',
   'double precision': 'double',
   // PostgreSQL aliases, but maybe another databases support it
+  numeric: 'decimal',
   int8: 'bigint',
   int4: 'int',
   int2: 'int',
@@ -692,6 +693,12 @@ export abstract class BaseDriver implements DriverInterface {
     return `CREATE TABLE ${quotedTableName} (${columnNames.join(', ')})`;
   }
 
+  /**
+   * If overridden DbTypeToGenericType or similair mapping doesn't have
+   * a kind of "numeric: 'decimal'" mapping, it is enough to just
+   * return specificDriverGenericTypeMapping[columnType.toLowerCase()] || super.toGenericType(columnType);
+   * No need to process CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE flag.
+   */
   protected toGenericType(columnType: string, precision?: number | null, scale?: number | null): string {
     const genericType = DbTypeToGenericType[columnType.toLowerCase()] || columnType;
 
