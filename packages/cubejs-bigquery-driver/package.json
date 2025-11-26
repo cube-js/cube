@@ -23,6 +23,7 @@
   },
   "files": [
     "dist/src",
+    "dist/package.json",
     "index.js"
   ],
   "main": "index.js",
