@@ -180,6 +180,22 @@ pub struct CubeColumn {
 }
 
 impl CubeColumn {
+    pub fn new(
+        member_name: impl Into<String>,
+        name: impl Into<String>,
+        description: Option<String>,
+        column_type: ColumnType,
+        can_be_null: bool,
+    ) -> Self {
+        Self {
+            member_name: member_name.into(),
+            name: name.into(),
+            description,
+            column_type,
+            can_be_null,
+        }
+    }
+
     pub fn member_name(&self) -> &String {
         &self.member_name
     }

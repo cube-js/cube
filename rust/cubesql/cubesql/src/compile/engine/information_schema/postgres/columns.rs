@@ -190,7 +190,7 @@ impl InformationSchemaColumnsBuilder {
         // character_set_name
         columns.push(Arc::new(new_string_array_with_placeholder(
             total,
-            Some("".to_string()),
+            Some("UTF8".to_string()),
         )));
 
         // collation_catalog

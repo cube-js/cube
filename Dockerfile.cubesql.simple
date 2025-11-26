@@ -1,0 +1,67 @@
+# Simplified Dockerfile for building CubeSQL PostgreSQL compatibility fixes
+# This uses a pre-built Rust environment for faster builds
+
+# Stage 1: Build CubeSQL
+FROM rust:1.90.0 as builder
+
+WORKDIR /workspace
+
+# Copy only the necessary Rust sources for our build
+COPY rust/cubeshared /workspace/rust/cubeshared
+COPY rust/cubesqlplanner /workspace/rust/cubesqlplanner
+COPY rust/cubesql /workspace/rust/cubesql
+
+# Build CubeSQL
+WORKDIR /workspace/rust/cubesql
+RUN cargo build --release -p cubesql 2>&1 | tail -100
+
+# Stage 2: Runtime container
+FROM debian:bookworm-slim
+
+# Metadata labels
+LABEL maintainer="Cube"
+LABEL description="Cube PostgreSQL Server (CubeSQL) with PostgreSQL Compatibility Fixes"
+LABEL version="phase-1-postgres-compat"
+
+# Install minimal dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libssl3 \
+    ca-certificates \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /workspace/rust/cubesql/target/release/cubesqld /app/cubesqld
+
+# Make binary executable
+RUN chmod +x /app/cubesqld
+
+# Create non-root user
+RUN useradd -m -s /sbin/nologin -u 1001 cubesql && \
+    chown -R cubesql:cubesql /app
+
+USER cubesql
+
+# Expose PostgreSQL port
+EXPOSE 5432
+
+# Health check - verify the binary exists and can be executed
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD test -x /app/cubesqld && echo "OK" || exit 1
+
+# Environment variables
+ENV RUST_LOG=info
+ENV RUST_BACKTRACE=1
+
+# Documentation for configuration
+ENV CUBESQL_PG_PORT=5432
+ENV CUBESQL_BIND_ADDR=0.0.0.0:5432
+
+# Help text
+ONBUILD RUN echo "Build args: --build-arg RUST_BACKTRACE=full for full backtrace"
+
+# Start CubeSQL server
+CMD ["/app/cubesqld"]

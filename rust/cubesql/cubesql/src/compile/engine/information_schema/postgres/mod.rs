@@ -1,4 +1,5 @@
 pub mod ext;
+mod test_type_mapping;
 
 // information schema
 pub mod character_sets;
