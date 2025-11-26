@@ -537,6 +537,7 @@ export class CubejsServerCore {
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           contextToRoles: this.options.contextToRoles,
+          contextToGroups: this.options.contextToGroups,
           preAggregationsSchema: await this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
@@ -700,6 +701,7 @@ export class CubejsServerCore {
       {
         schemaVersion: options.schemaVersion || this.options.schemaVersion,
         contextToRoles: this.options.contextToRoles,
+        contextToGroups: this.options.contextToGroups,
         devServer: this.options.devServer,
         logger: this.logger,
         externalDbType: options.externalDbType,
