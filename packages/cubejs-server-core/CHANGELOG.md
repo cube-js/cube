@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Bug Fixes
+
+- **server-core:** pass contextToRoles option ([#10182](https://github.com/cube-js/cube/issues/10182)) ([4b7ba4e](https://github.com/cube-js/cube/commit/4b7ba4e47090d904f31786137b8c8b5d45d519ef))
+
 ## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

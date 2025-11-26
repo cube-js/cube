@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Features
+
+- **cubesql:** Implement time to idle eviction for query cache ([#10176](https://github.com/cube-js/cube/issues/10176)) ([4f9ccba](https://github.com/cube-js/cube/commit/4f9ccba8f90c7c133757842cd1df325d7cb1e122))
+
 ## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/native

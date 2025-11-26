@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix matching for pre-aggs with custom granularities ([#10180](https://github.com/cube-js/cube/issues/10180)) ([e426f6b](https://github.com/cube-js/cube/commit/e426f6b3737fbbec724a266722ef9520b3582592))
+- **server-core:** pass contextToRoles option ([#10182](https://github.com/cube-js/cube/issues/10182)) ([4b7ba4e](https://github.com/cube-js/cube/commit/4b7ba4e47090d904f31786137b8c8b5d45d519ef))
+
+### Features
+
+- **api-gateway:** Introduce CUBEJS_DEFAULT_TIMEZONE env ([#10178](https://github.com/cube-js/cube/issues/10178)) ([7d72978](https://github.com/cube-js/cube/commit/7d72978e022b2975cf97ffcc69ec4febca261d66))
+- **base-driver, other drivers:** Support numeric types with precision and scale for cube store data exports ([#10175](https://github.com/cube-js/cube/issues/10175)) ([9ba6e77](https://github.com/cube-js/cube/commit/9ba6e77e934791ee7ff80643a7a9a862f2a97e2b))
+- **bigquery-driver:** Set up Cube User agent for connection ([#10177](https://github.com/cube-js/cube/issues/10177)) ([64106a2](https://github.com/cube-js/cube/commit/64106a26c65ee42b3a1872b56f6ce0d1355a19ba))
+- **cubesql:** Implement time to idle eviction for query cache ([#10176](https://github.com/cube-js/cube/issues/10176)) ([4f9ccba](https://github.com/cube-js/cube/commit/4f9ccba8f90c7c133757842cd1df325d7cb1e122))
+
 ## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
 
 ### Bug Fixes

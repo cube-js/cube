@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Features
+
+- **base-driver, other drivers:** Support numeric types with precision and scale for cube store data exports ([#10175](https://github.com/cube-js/cube/issues/10175)) ([9ba6e77](https://github.com/cube-js/cube/commit/9ba6e77e934791ee7ff80643a7a9a862f2a97e2b))
+
 ## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/firebolt-driver
