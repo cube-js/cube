@@ -10,9 +10,7 @@
 !rust/cubestore/tsconfig.json
 !rust/cubestore/package.json
 !rust/cubestore/bin
-!rust/cubeshared/
-!rust/cubesqlplanner/
-!rust/cubesql/
+!rust/cubesql/package.json
 
 # Ignoring builds for native from local machime to protect a problem with different architecture
 packages/cubejs-backend-native/index.node
