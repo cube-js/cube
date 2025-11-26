@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+### Bug Fixes
+
+- **bigquery-driver:** Cannot find module: package.json ([#10184](https://github.com/cube-js/cube/issues/10184)) ([9a2b6a9](https://github.com/cube-js/cube/commit/9a2b6a9e6dffdc5b6c7641d7c543b858f2260e34))
+
 ## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
 
 ### Features
