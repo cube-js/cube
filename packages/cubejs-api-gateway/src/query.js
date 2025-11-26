@@ -328,6 +328,7 @@ function normalizeQueryCacheMode(query, cacheMode) {
  */
 const normalizeQuery = (query, persistent, cacheMode) => {
   query = normalizeQueryCacheMode(query, cacheMode);
+  query.timezone = query.timezone || getEnv('defaultTimezone');
   const { error } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
