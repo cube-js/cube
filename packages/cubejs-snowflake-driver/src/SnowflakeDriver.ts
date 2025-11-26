@@ -1035,7 +1035,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null) {
     const genericType = SnowflakeToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
 
-    if (genericType === 'decimal' && precision && scale && getEnv('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')) {
+    if (genericType === 'decimal' && precision && scale && getEnv('preciseDecimalInCubestore')) {
       return `decimal(${precision}, ${scale})`;
     }
 

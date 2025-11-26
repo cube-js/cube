@@ -102,7 +102,7 @@ class VerticaDriver extends BaseDriver {
     const type = columnType.toLowerCase().replace(/\([0-9,]+\)/, '');
     const genericType = VerticaTypeToGenericType[type] || defaultGenericType;
 
-    if (genericType === 'decimal' && precision && scale && getEnv('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')) {
+    if (genericType === 'decimal' && precision && scale && getEnv('preciseDecimalInCubestore')) {
       return `decimal(${precision}, ${scale})`;
     }
 

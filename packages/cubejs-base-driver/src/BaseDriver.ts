@@ -702,7 +702,7 @@ export abstract class BaseDriver implements DriverInterface {
   protected toGenericType(columnType: string, precision?: number | null, scale?: number | null): string {
     const genericType = DbTypeToGenericType[columnType.toLowerCase()] || columnType;
 
-    if (genericType === 'decimal' && precision && scale && getEnv('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')) {
+    if (genericType === 'decimal' && precision && scale && getEnv('preciseDecimalInCubestore')) {
       return `decimal(${precision}, ${scale})`;
     }
 
