@@ -137,6 +137,7 @@ const DbTypeToGenericType: Record<string, string> = {
   enum: 'text',
   'double precision': 'double',
   // PostgreSQL aliases, but maybe another databases support it
+  numeric: 'decimal',
   int8: 'bigint',
   int4: 'int',
   int2: 'int',
@@ -650,6 +651,25 @@ export abstract class BaseDriver implements DriverInterface {
     return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
+  public async tableColumnTypesWithPrecision(table: string): Promise<TableStructure> {
+    const [schema, name] = table.split('.');
+
+    const columns = await this.query<TableColumnQueryResult>(
+      `SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type  as ${this.quoteIdentifier('data_type')},
+             columns.numeric_precision as ${this.quoteIdentifier('numeric_precision')},
+             columns.numeric_scale as ${this.quoteIdentifier('numeric_scale')}
+      FROM information_schema.columns
+      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}
+      ${getEnv('fetchColumnsByOrdinalPosition') ? 'ORDER BY columns.ordinal_position' : ''}`,
+      [name, schema]
+    );
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type, c.numeric_precision, c.numeric_scale) }));
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: any; type: string; }[]> {
     return [];
@@ -673,8 +693,20 @@ export abstract class BaseDriver implements DriverInterface {
     return `CREATE TABLE ${quotedTableName} (${columnNames.join(', ')})`;
   }
 
-  protected toGenericType(columnType: string): string {
-    return DbTypeToGenericType[columnType.toLowerCase()] || columnType;
+  /**
+   * If overridden DbTypeToGenericType or similair mapping doesn't have
+   * a kind of "numeric: 'decimal'" mapping, it is enough to just
+   * return specificDriverGenericTypeMapping[columnType.toLowerCase()] || super.toGenericType(columnType);
+   * No need to process CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE flag.
+   */
+  protected toGenericType(columnType: string, precision?: number | null, scale?: number | null): string {
+    const genericType = DbTypeToGenericType[columnType.toLowerCase()] || columnType;
+
+    if (genericType === 'decimal' && precision && scale && getEnv('preciseDecimalInCubestore')) {
+      return `decimal(${precision}, ${scale})`;
+    }
+
+    return genericType;
   }
 
   protected fromGenericType(columnType: string): string {

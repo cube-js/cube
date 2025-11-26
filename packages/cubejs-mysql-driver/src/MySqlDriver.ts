@@ -447,10 +447,14 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public toGenericType(columnType: string) {
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    return this.tableColumnTypesWithPrecision(table);
+  }
+
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
     return MySqlToGenericType[columnType.toLowerCase()] ||
       MySqlToGenericType[columnType.toLowerCase().split('(')[0]] ||
-      super.toGenericType(columnType);
+      super.toGenericType(columnType, precision, scale);
   }
 
   public capabilities(): DriverCapabilities {

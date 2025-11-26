@@ -247,6 +247,9 @@ const variables: Record<string, (...args: any) => any> = {
   defaultTimezone: () => get('CUBEJS_DEFAULT_TIMEZONE')
     .default('UTC')
     .asString(),
+  preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *

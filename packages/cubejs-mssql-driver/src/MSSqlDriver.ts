@@ -16,7 +16,9 @@ import {
   DownloadQueryResultsOptions,
   TableStructure,
   DriverCapabilities,
-  DownloadQueryResultsResult, TableColumnQueryResult,
+  DownloadQueryResultsResult,
+  TableColumnQueryResult,
+  GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 
@@ -300,20 +302,22 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
     return `@_${paramIndex + 1}`;
   }
 
-  public async tableColumnTypes(table: string): Promise<TableStructure> {
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
     const [schema, name] = table.split('.');
 
     const columns: TableColumnQueryResult[] = await this.query(
       `SELECT column_name as ${this.quoteIdentifier('column_name')},
              table_name as ${this.quoteIdentifier('table_name')},
              table_schema as ${this.quoteIdentifier('table_schema')},
-             data_type  as ${this.quoteIdentifier('data_type')}
+             data_type  as ${this.quoteIdentifier('data_type')},
+             numeric_precision AS ${this.quoteIdentifier('numeric_precision')},
+             numeric_scale AS ${this.quoteIdentifier('numeric_scale')}
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
       [name, schema]
     );
 
-    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type, c.numeric_precision, c.numeric_scale) }));
   }
 
   public getTablesQuery(schemaName: string) {
@@ -368,8 +372,8 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
     return GenericTypeToMSSql[columnType] || super.fromGenericType(columnType);
   }
 
-  protected toGenericType(columnType: string): string {
-    return MSSqlToGenericType[columnType] || super.toGenericType(columnType);
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
+    return MSSqlToGenericType[columnType] || super.toGenericType(columnType, precision, scale);
   }
 
   public readOnly(): boolean {
