@@ -38,6 +38,10 @@ export class YamlCompiler {
   ) {
   }
 
+  public free() {
+    this.jinjaEngine = null;
+  }
+
   public getJinjaEngine(): JinjaEngine {
     if (this.jinjaEngine) {
       return this.jinjaEngine;

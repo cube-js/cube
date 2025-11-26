@@ -13,6 +13,7 @@ import {
   DriverInterface,
   StreamTableData,
   DownloadTableCSVData,
+  GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
 import {
   Firebolt,
@@ -329,21 +330,28 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       type: this.toGenericType(row.data_type),
     }));
   }
-  /* eslint-enable camelcase */
 
-  public toGenericType(columnType: string) {
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
     if (columnType in FireboltTypeToGeneric) {
       return FireboltTypeToGeneric[columnType];
     }
 
-    const match = columnType.match(COMPLEX_TYPE);
+    let match = columnType.match(COMPLEX_TYPE);
     if (match) {
       const [_, _outerType, innerType] = match;
       if (columnType in FireboltTypeToGeneric) {
         return FireboltTypeToGeneric[innerType];
       }
     }
-    return super.toGenericType(columnType);
+
+    match = columnType.trim().toLowerCase().match(/^numeric\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+
+    if (match) {
+      precision = Number(match[1]);
+      scale = Number(match[2]);
+    }
+
+    return super.toGenericType(columnType, precision, scale);
   }
 
   public readOnly() {

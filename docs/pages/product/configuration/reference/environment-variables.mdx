@@ -688,6 +688,16 @@ The port for the database connection.
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | N/A                    | N/A                   |
 
+## `CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE`
+
+If `true`, decimal columns maintain their precision and scale specifications (e.g.,
+`decimal(10, 2)`) rather than being converted to a generic decimal type when data is
+exported from a data source to Cube Store.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DB_PRESTO_CATALOG`
 
 The catalog within Presto/Trino to connect to.
@@ -903,6 +913,25 @@ The maximum [row limit][ref-row-limit] in the result set.
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
 | A positive integer number | `50000`                | `50000`               |
+
+<WarningBox>
+
+Increasing the maximum row limit may cause out-of-memory (OOM) crashes and make
+Cube susceptible to denial-of-service (DoS) attacks if it's exposed to
+untrusted environments.
+
+</WarningBox>
+
+## `CUBEJS_DEFAULT_TIMEZONE`
+
+The default [time zone][ref-time-zone] for queries.
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A valid time zone name | `UTC`                  | `UTC`                 |
+
+You can set the time zone name in the [TZ Database Name][link-tzdb] format, e.g.,
+`America/Los_Angeles`.
 
 <WarningBox>
 
@@ -1881,3 +1910,5 @@ The port for a Cube deployment to listen to API connections on.
 [ref-mdx-api]: /product/apis-integrations/mdx-api
 [ref-mdx-api-locale]: /product/apis-integrations/mdx-api#measure-format
 [ref-time-dimensions]: /product/data-modeling/reference/dimensions#time
+[ref-time-zone]: /product/apis-integrations/queries#time-zone
+[link-tzdb]: https://en.wikipedia.org/wiki/Tz_database

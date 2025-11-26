@@ -46,9 +46,10 @@ All time-based calculations performed by Cube are time zone-aware.
 
 By default, Cube assumes that time values in your queries (e.g., in date range
 filters) are in the [UTC time zone][wiki-utc-time-zone]. Similarly, it will use
-the same time zone for time dimension values in result sets.
+the same time zone for time dimension values in result sets. You can use the
+`CUBEJS_DEFAULT_TIMEZONE` environment variable to override it.
 
-You can use the `timezone` option with [REST API][ref-rest-api-query-format-options]
+You can also use the `timezone` option with [REST API][ref-rest-api-query-format-options]
 or [GraphQL API][ref-ref-graphql-api-args] to specify the time zone for a query.
 Also, you can use the [`SQL_UTILS` context variable][ref-sql-utils] to apply the
 time zone conversion to dimensions that are not used as time dimensions in a query.

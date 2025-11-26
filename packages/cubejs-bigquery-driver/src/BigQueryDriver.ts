@@ -35,6 +35,8 @@ import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
 
 import { HydrationStream, transformRow } from './HydrationStream';
 
+import { version } from '../package.json';
+
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
   projectId?: string,
@@ -132,6 +134,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         getEnv('dbPollMaxInterval', { dataSource })
       ) * 1000,
       exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      userAgent: `CubeDev_Cube/${version}`,
     };
 
     getEnv('dbExportBucketType', {
