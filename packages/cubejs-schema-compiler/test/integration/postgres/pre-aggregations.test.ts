@@ -262,6 +262,12 @@ describe('PreAggregations', () => {
           granularity: 'halfYear',
           allowNonStrictDateRangeMatch: false
         },
+        countAnotherCountCustomGranularityNonStrict: {
+          measures: [countAnother],
+          timeDimension: createdAt,
+          granularity: 'halfYear',
+          allowNonStrictDateRangeMatch: true
+        },
         sourceAndIdRollup: {
           measures: [count],
           dimensions: [sourceAndId, source],
@@ -1451,10 +1457,36 @@ describe('PreAggregations', () => {
     });
   });
 
-  it('pre-aggregation with custom granularity should match its own references', async () => {
+  it('pre-aggregation with custom granularity should match its own references (allowNonStrictDateRangeMatch=false)', async () => {
     await compiler.compile();
 
     const preAggregationId = 'visitors.countAnotherCountCustomGranularity';
+    const preAggregations = cubeEvaluator.preAggregations({ preAggregationIds: [preAggregationId] });
+
+    const preAggregation = preAggregations[0];
+    if (preAggregation === undefined) {
+      throw expect(preAggregation).toBeDefined();
+    }
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      ...preAggregation.references,
+      preAggregationId: preAggregation.id,
+      timezone: 'UTC',
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregation.id);
+    if (preAggregationFromQuery === undefined) {
+      throw expect(preAggregationFromQuery).toBeDefined();
+    }
+
+    expect(preAggregationFromQuery.preAggregationId).toBe(preAggregationId);
+  });
+
+  it('pre-aggregation with custom granularity should match its own references (allowNonStrictDateRangeMatch=true)', async () => {
+    await compiler.compile();
+
+    const preAggregationId = 'visitors.countAnotherCountCustomGranularityNonStrict';
     const preAggregations = cubeEvaluator.preAggregations({ preAggregationIds: [preAggregationId] });
 
     const preAggregation = preAggregations[0];
