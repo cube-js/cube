@@ -226,6 +226,7 @@ async fn handle_sql_query(
     stream_methods: WritableStreamMethods,
     sql_query: &str,
     cache_mode: &str,
+    timezone: Option<String>,
 ) -> Result<(), CubeError> {
     let span_id = Some(Arc::new(SpanId::new(
         Uuid::new_v4().to_string(),
@@ -253,6 +254,15 @@ async fn handle_sql_query(
                     }),
                 )
                 .await?;
+        }
+
+        {
+            let mut cm = session
+                .state
+                .query_timezone
+                .write()
+                .expect("failed to unlock session query_timezone for change");
+            *cm = timezone;
         }
 
         let cache_enum = cache_mode.parse().map_err(CubeError::user)?;
@@ -440,6 +450,20 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
     let cache_mode = cx.argument::<JsString>(4)?.value(&mut cx);
 
+    let timezone: Option<String> = match cx.argument::<JsValue>(5) {
+        Ok(val) => {
+            if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
+                None
+            } else {
+                match val.downcast::<JsString, _>(&mut cx) {
+                    Ok(v) => Some(v.value(&mut cx)),
+                    Err(_) => None,
+                }
+            }
+        }
+        Err(_) => None,
+    };
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -488,6 +512,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             stream_methods,
             &sql_query,
             &cache_mode,
+            timezone,
         )
         .await;
 
