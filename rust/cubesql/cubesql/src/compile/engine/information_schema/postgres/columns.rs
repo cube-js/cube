@@ -29,12 +29,12 @@ struct InformationSchemaColumnsBuilder {
     column_default: StringBuilder,
     is_nullable: StringBuilder,
     data_type: StringBuilder,
-    char_max_length: UInt32Builder,
     char_octet_length: UInt32Builder,
     numeric_precision: UInt32Builder,
     numeric_precision_radix: UInt32Builder,
     numeric_scale: UInt32Builder,
     datetime_precision: UInt32Builder,
+    character_maximum_length: UInt32Builder,
     domain_catalog: StringBuilder,
     domain_schema: StringBuilder,
     domain_name: StringBuilder,
@@ -58,12 +58,12 @@ impl InformationSchemaColumnsBuilder {
             column_default: StringBuilder::new(capacity),
             is_nullable: StringBuilder::new(capacity),
             data_type: StringBuilder::new(capacity),
-            char_max_length: UInt32Builder::new(capacity),
             char_octet_length: UInt32Builder::new(capacity),
             numeric_precision: UInt32Builder::new(capacity),
             numeric_precision_radix: UInt32Builder::new(capacity),
             numeric_scale: UInt32Builder::new(capacity),
             datetime_precision: UInt32Builder::new(capacity),
+            character_maximum_length: UInt32Builder::new(capacity),
             domain_catalog: StringBuilder::new(capacity),
             domain_schema: StringBuilder::new(capacity),
             domain_name: StringBuilder::new(capacity),
@@ -99,7 +99,10 @@ impl InformationSchemaColumnsBuilder {
 
         self.data_type.append_value(column.get_data_type()).unwrap();
 
-        self.char_max_length.append_null().unwrap();
+        match column.character_maximum_length() {
+            Some(value) => self.character_maximum_length.append_value(value).unwrap(),
+            _ => self.character_maximum_length.append_null().unwrap(),
+        }
 
         match column.char_octet_length() {
             Some(value) => self.char_octet_length.append_value(value).unwrap(),
@@ -156,7 +159,7 @@ impl InformationSchemaColumnsBuilder {
         columns.push(Arc::new(self.column_default.finish()));
         columns.push(Arc::new(self.is_nullable.finish()));
         columns.push(Arc::new(self.data_type.finish()));
-        columns.push(Arc::new(self.char_max_length.finish()));
+        columns.push(Arc::new(self.character_maximum_length.finish()));
         columns.push(Arc::new(self.char_octet_length.finish()));
         columns.push(Arc::new(self.numeric_precision.finish()));
         columns.push(Arc::new(self.numeric_precision_radix.finish()));

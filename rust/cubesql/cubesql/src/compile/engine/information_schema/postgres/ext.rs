@@ -10,6 +10,7 @@ pub trait CubeColumnPostgresExt {
     fn numeric_scale(&self) -> Option<u32>;
     fn datetime_precision(&self) -> Option<u32>;
     fn char_octet_length(&self) -> Option<u32>;
+    fn character_maximum_length(&self) -> Option<u32>;
 }
 
 impl CubeColumnPostgresExt for CubeColumn {
@@ -120,14 +121,28 @@ impl CubeColumnPostgresExt for CubeColumn {
 
     fn datetime_precision(&self) -> Option<u32> {
         match self.get_column_type() {
+            // Timestamp has microsecond precision (6 digits after decimal)
             ColumnType::Timestamp => Some(6),
+            // Interval has default precision of 6
+            ColumnType::Interval(_) => Some(6),
+            // Date types don't have precision
+            ColumnType::Date(_) => None,
             _ => None,
         }
     }
 
     fn char_octet_length(&self) -> Option<u32> {
         match self.get_column_type() {
-            ColumnType::String => Some(1073741824),
+            ColumnType::String => Some(1073741824),  // TEXT: max 1GB (2^30 bytes)
+            ColumnType::VarStr => Some(1073741824),  // VARCHAR: max 1GB (2^30 bytes)
+            _ => None,
+        }
+    }
+
+    fn character_maximum_length(&self) -> Option<u32> {
+        match self.get_column_type() {
+            ColumnType::String => None,   // TEXT has no maximum length
+            ColumnType::VarStr => None,   // VARCHAR maximum would need metadata
             _ => None,
         }
     }
