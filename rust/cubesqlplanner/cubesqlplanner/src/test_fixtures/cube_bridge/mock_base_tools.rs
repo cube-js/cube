@@ -3,11 +3,10 @@ use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
-use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::test_fixtures::cube_bridge::{
-    MockDriverTools, MockSecurityContext, MockSqlTemplatesRender, MockSqlUtils,
+    MockDriverTools, MockJoinGraph, MockSqlTemplatesRender, MockSqlUtils,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;

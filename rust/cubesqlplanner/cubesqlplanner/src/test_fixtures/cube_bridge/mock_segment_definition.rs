@@ -90,7 +90,7 @@ mod tests {
         let sql = segment.sql().unwrap();
         assert_eq!(sql.args_names(), &vec!["CUBE"]);
 
-        use crate::test_fixtures::cube_bridge::{MockSecurityContext, MockSqlUtils};
+        use crate::test_fixtures::cube_bridge::MockSecurityContext;
         let (template, args) = sql
             .compile_template_sql(
                 Rc::new(MockBaseTools::default()),

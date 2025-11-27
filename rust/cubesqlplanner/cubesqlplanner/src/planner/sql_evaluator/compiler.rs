@@ -4,12 +4,11 @@ use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, MeasureSymbolFactory,
     SqlCall, SymbolFactory, TraversalVisitor,
 };
-use crate::cube_bridge::base_tools::{self, BaseTools};
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::security_context::SecurityContext;
-use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::planner::sql_evaluator::sql_call_builder::SqlCallBuilder;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;

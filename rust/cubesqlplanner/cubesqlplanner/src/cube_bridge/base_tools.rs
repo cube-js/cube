@@ -1,7 +1,6 @@
 use super::driver_tools::{DriverTools, NativeDriverTools};
 use super::join_definition::{JoinDefinition, NativeJoinDefinition};
 use super::pre_aggregation_obj::{NativePreAggregationObj, PreAggregationObj};
-use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
 use super::sql_utils::{NativeSqlUtils, SqlUtils};
 use crate::cube_bridge::join_hints::JoinHintItem;
