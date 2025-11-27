@@ -3,9 +3,7 @@ pub mod visitors_schema;
 pub use visitors_schema::create_visitors_schema;
 
 use crate::planner::sql_evaluator::Compiler;
-use crate::test_fixtures::cube_bridge::{
-    MockBaseTools, MockCubeEvaluator, MockSecurityContext,
-};
+use crate::test_fixtures::cube_bridge::{MockBaseTools, MockCubeEvaluator, MockSecurityContext};
 use chrono_tz::Tz;
 use std::rc::Rc;
 
