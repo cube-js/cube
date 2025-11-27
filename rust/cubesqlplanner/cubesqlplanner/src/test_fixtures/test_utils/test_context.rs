@@ -11,151 +11,6 @@ use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::test_fixtures::cube_bridge::MockSchema;
-
-    #[test]
-    fn test_yaml_filter_parsing() {
-        use indoc::indoc;
-
-        let yaml = indoc! {"
-            filters:
-              - or:
-                  - dimension: visitors.count
-                    operator: gt
-                    values:
-                      - \"1\"
-                  - dimension: visitors.source
-                    operator: equals
-                    values:
-                      - google
-              - dimension: visitors.created_at
-                operator: gte
-                values:
-                  - \"2024-01-01\"
-        "};
-        let parsed: YamlBaseQueryOptions = serde_yaml::from_str(yaml).unwrap();
-        let filters = parsed.filters.unwrap();
-
-        println!("Filter count: {}", filters.len());
-        for (i, filter) in filters.iter().enumerate() {
-            println!("Filter {}: {:?}", i, filter);
-        }
-
-        assert_eq!(filters.len(), 2);
-    }
-
-    #[test]
-    fn test_create_query_options_from_yaml() {
-        use indoc::indoc;
-
-        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
-        let ctx = TestContext::new(schema).unwrap();
-
-        let yaml = indoc! {"
-            measures:
-              - visitors.count
-            dimensions:
-              - visitors.source
-            order:
-              - id: visitors.count
-                desc: true
-            filters:
-              - or:
-                  - dimension: visitors.count
-                    operator: gt
-                    values:
-                      - \"1\"
-                  - dimension: visitors.source
-                    operator: equals
-                    values:
-                      - google
-              - dimension: visitors.created_at
-                operator: gte
-                values:
-                  - \"2024-01-01\"
-            limit: \"100\"
-            offset: \"20\"
-            ungrouped: true
-        "};
-
-        let options = ctx.create_query_options_from_yaml(yaml);
-
-        // Verify measures
-        let measures = options.measures().unwrap().unwrap();
-        assert_eq!(measures.len(), 1);
-
-        // Verify dimensions
-        let dimensions = options.dimensions().unwrap().unwrap();
-        assert_eq!(dimensions.len(), 1);
-
-        // Verify order and filters from static_data
-        let static_data = options.static_data();
-
-        let order = static_data.order.as_ref().unwrap();
-        assert_eq!(order.len(), 1);
-        assert_eq!(order[0].id, "visitors.count");
-        assert_eq!(order[0].is_desc(), true);
-
-        let filters = static_data.filters.as_ref().unwrap();
-        assert_eq!(filters.len(), 2, "Should have 2 filters");
-
-        assert!(filters[0].or.is_some(), "First filter should have 'or'");
-        assert!(
-            filters[0].and.is_none(),
-            "First filter should not have 'and'"
-        );
-
-        assert!(
-            filters[1].or.is_none(),
-            "Second filter should not have 'or': {:?}",
-            filters[1].or
-        );
-        assert!(
-            filters[1].and.is_none(),
-            "Second filter should not have 'and': {:?}",
-            filters[1].and
-        );
-        assert!(
-            filters[1].dimension.is_some(),
-            "Second filter: member={:?}, dimension={:?}, operator={:?}, values={:?}",
-            filters[1].member,
-            filters[1].dimension,
-            filters[1].operator,
-            filters[1].values
-        );
-
-        // Verify other fields
-        assert_eq!(static_data.limit, Some("100".to_string()));
-        assert_eq!(static_data.offset, Some("20".to_string()));
-        assert_eq!(static_data.ungrouped, Some(true));
-    }
-
-    #[test]
-    fn test_create_query_options_minimal() {
-        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
-        let ctx = TestContext::new(schema).unwrap();
-
-        let yaml = r#"
-measures:
-  - visitors.count
-"#;
-
-        let options = ctx.create_query_options_from_yaml(yaml);
-        let measures = options.measures().unwrap().unwrap();
-        assert_eq!(measures.len(), 1);
-
-        // All other fields should be None/empty
-        assert!(options.dimensions().unwrap().is_none());
-
-        let static_data = options.static_data();
-        assert!(static_data.order.is_none());
-        assert!(static_data.filters.is_none());
-    }
-}
-
 /// Test context providing query tools and symbol creation helpers
 pub struct TestContext {
     query_tools: Rc<QueryTools>,
@@ -322,5 +177,150 @@ impl TestContext {
                 )
                 .build(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::cube_bridge::MockSchema;
+
+    #[test]
+    fn test_yaml_filter_parsing() {
+        use indoc::indoc;
+
+        let yaml = indoc! {"
+            filters:
+              - or:
+                  - dimension: visitors.count
+                    operator: gt
+                    values:
+                      - \"1\"
+                  - dimension: visitors.source
+                    operator: equals
+                    values:
+                      - google
+              - dimension: visitors.created_at
+                operator: gte
+                values:
+                  - \"2024-01-01\"
+        "};
+        let parsed: YamlBaseQueryOptions = serde_yaml::from_str(yaml).unwrap();
+        let filters = parsed.filters.unwrap();
+
+        println!("Filter count: {}", filters.len());
+        for (i, filter) in filters.iter().enumerate() {
+            println!("Filter {}: {:?}", i, filter);
+        }
+
+        assert_eq!(filters.len(), 2);
+    }
+
+    #[test]
+    fn test_create_query_options_from_yaml() {
+        use indoc::indoc;
+
+        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let yaml = indoc! {"
+            measures:
+              - visitors.count
+            dimensions:
+              - visitors.source
+            order:
+              - id: visitors.count
+                desc: true
+            filters:
+              - or:
+                  - dimension: visitors.count
+                    operator: gt
+                    values:
+                      - \"1\"
+                  - dimension: visitors.source
+                    operator: equals
+                    values:
+                      - google
+              - dimension: visitors.created_at
+                operator: gte
+                values:
+                  - \"2024-01-01\"
+            limit: \"100\"
+            offset: \"20\"
+            ungrouped: true
+        "};
+
+        let options = ctx.create_query_options_from_yaml(yaml);
+
+        // Verify measures
+        let measures = options.measures().unwrap().unwrap();
+        assert_eq!(measures.len(), 1);
+
+        // Verify dimensions
+        let dimensions = options.dimensions().unwrap().unwrap();
+        assert_eq!(dimensions.len(), 1);
+
+        // Verify order and filters from static_data
+        let static_data = options.static_data();
+
+        let order = static_data.order.as_ref().unwrap();
+        assert_eq!(order.len(), 1);
+        assert_eq!(order[0].id, "visitors.count");
+        assert!(order[0].is_desc());
+
+        let filters = static_data.filters.as_ref().unwrap();
+        assert_eq!(filters.len(), 2, "Should have 2 filters");
+
+        assert!(filters[0].or.is_some(), "First filter should have 'or'");
+        assert!(
+            filters[0].and.is_none(),
+            "First filter should not have 'and'"
+        );
+
+        assert!(
+            filters[1].or.is_none(),
+            "Second filter should not have 'or': {:?}",
+            filters[1].or
+        );
+        assert!(
+            filters[1].and.is_none(),
+            "Second filter should not have 'and': {:?}",
+            filters[1].and
+        );
+        assert!(
+            filters[1].dimension.is_some(),
+            "Second filter: member={:?}, dimension={:?}, operator={:?}, values={:?}",
+            filters[1].member,
+            filters[1].dimension,
+            filters[1].operator,
+            filters[1].values
+        );
+
+        // Verify other fields
+        assert_eq!(static_data.limit, Some("100".to_string()));
+        assert_eq!(static_data.offset, Some("20".to_string()));
+        assert_eq!(static_data.ungrouped, Some(true));
+    }
+
+    #[test]
+    fn test_create_query_options_minimal() {
+        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+
+        let yaml = r#"
+measures:
+  - visitors.count
+"#;
+
+        let options = ctx.create_query_options_from_yaml(yaml);
+        let measures = options.measures().unwrap().unwrap();
+        assert_eq!(measures.len(), 1);
+
+        // All other fields should be None/empty
+        assert!(options.dimensions().unwrap().is_none());
+
+        let static_data = options.static_data();
+        assert!(static_data.order.is_none());
+        assert!(static_data.filters.is_none());
     }
 }
