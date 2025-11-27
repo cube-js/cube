@@ -1,3 +1,5 @@
+use crate::cube_bridge::case_variant::CaseVariant;
+use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseVariant;
 use crate::test_fixtures::cube_bridge::yaml::timeshift::YamlTimeShiftDefinition;
 use crate::test_fixtures::cube_bridge::{MockDimensionDefinition, MockTimeShiftDefinition};
 use serde::Deserialize;
@@ -5,13 +7,11 @@ use std::rc::Rc;
 
 #[derive(Debug, Deserialize)]
 pub struct YamlDimensionDefinition {
-    #[serde(rename = "type", default = "default_dimension_type")]
+    #[serde(rename = "type")]
     dimension_type: String,
     #[serde(default)]
-    owned_by_cube: Option<bool>,
-    #[serde(default)]
     multi_stage: Option<bool>,
-    #[serde(default)]
+    #[serde(default, rename = "add_group_by")]
     add_group_by_references: Option<Vec<String>>,
     #[serde(default)]
     sub_query: Option<bool>,
@@ -23,6 +23,8 @@ pub struct YamlDimensionDefinition {
     primary_key: Option<bool>,
     #[serde(default)]
     sql: Option<String>,
+    #[serde(default)]
+    case: Option<YamlCaseVariant>,
     #[serde(default)]
     latitude: Option<String>,
     #[serde(default)]
@@ -43,10 +45,16 @@ impl YamlDimensionDefinition {
             None
         };
 
+        let case = self.case.map(|cv| match cv {
+            YamlCaseVariant::Case(case_def) => Rc::new(CaseVariant::Case(case_def.build())),
+            YamlCaseVariant::CaseSwitch(switch_def) => {
+                Rc::new(CaseVariant::CaseSwitch(switch_def.build()))
+            }
+        });
+
         Rc::new(
             MockDimensionDefinition::builder()
                 .dimension_type(self.dimension_type)
-                .owned_by_cube(self.owned_by_cube)
                 .multi_stage(self.multi_stage)
                 .add_group_by_references(self.add_group_by_references)
                 .sub_query(self.sub_query)
@@ -54,6 +62,7 @@ impl YamlDimensionDefinition {
                 .values(self.values)
                 .primary_key(self.primary_key)
                 .sql_opt(self.sql)
+                .case(case)
                 .latitude_opt(self.latitude)
                 .longitude_opt(self.longitude)
                 .time_shift(time_shift)

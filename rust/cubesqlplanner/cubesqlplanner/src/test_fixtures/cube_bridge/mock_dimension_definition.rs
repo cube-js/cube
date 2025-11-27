@@ -150,6 +150,7 @@ mod tests {
             sub_query: true
             propagate_filters_to_sub_query: true
             values: [val1, val2]
+            add_group_by: ['dim1', 'dim2']
             primary_key: true
             sql: id
             latitude: lat
@@ -163,7 +164,6 @@ mod tests {
         let static_data = dim.static_data();
 
         assert_eq!(static_data.dimension_type, "number");
-        assert_eq!(static_data.owned_by_cube, Some(true));
         assert_eq!(static_data.multi_stage, Some(true));
         assert_eq!(static_data.sub_query, Some(true));
         assert_eq!(static_data.propagate_filters_to_sub_query, Some(true));
@@ -172,6 +172,10 @@ mod tests {
             Some(vec!["val1".to_string(), "val2".to_string()])
         );
         assert_eq!(static_data.primary_key, Some(true));
+        assert_eq!(
+            static_data.add_group_by_references,
+            Some(vec!["dim1".to_string(), "dim2".to_string()])
+        );
         assert!(dim.has_sql().unwrap());
         assert!(dim.has_latitude().unwrap());
         assert!(dim.has_longitude().unwrap());
@@ -181,6 +185,7 @@ mod tests {
     #[test]
     fn test_from_yaml_minimal() {
         let yaml = indoc! {"
+            type: string
             sql: status
         "};
 
@@ -195,5 +200,62 @@ mod tests {
         assert!(!dim.has_latitude().unwrap());
         assert!(!dim.has_longitude().unwrap());
         assert!(!dim.has_time_shift().unwrap());
+    }
+
+    #[test]
+    fn test_from_yaml_with_case() {
+        let yaml = indoc! {"
+            type: string
+            sql: size_value
+            case:
+              when:
+                - sql: \"{CUBE}.size_value = 'xl-en'\"
+                  label: xl
+                - sql: \"{CUBE}.size_value = 'xxl'\"
+                  label: xxl
+              else:
+                label: Unknown
+        "};
+
+        let dim = MockDimensionDefinition::from_yaml(yaml).unwrap();
+        assert!(dim.has_case().unwrap());
+
+        let case_variant = dim.case().unwrap().unwrap();
+        match case_variant {
+            CaseVariant::Case(case_def) => {
+                let when_items = case_def.when().unwrap();
+                assert_eq!(when_items.len(), 2);
+            }
+            _ => panic!("Expected Case variant"),
+        }
+    }
+
+    #[test]
+    fn test_from_yaml_with_case_switch() {
+        let yaml = indoc! {"
+            type: string
+            sql: currency_name
+            case:
+              switch: \"{CUBE.currency}\"
+              when:
+                - value: USD
+                  sql: \"'dollars'\"
+                - value: EUR
+                  sql: \"'euros'\"
+              else:
+                sql: \"'unknown'\"
+        "};
+
+        let dim = MockDimensionDefinition::from_yaml(yaml).unwrap();
+        assert!(dim.has_case().unwrap());
+
+        let case_variant = dim.case().unwrap().unwrap();
+        match case_variant {
+            CaseVariant::CaseSwitch(switch_def) => {
+                let when_items = switch_def.when().unwrap();
+                assert_eq!(when_items.len(), 2);
+            }
+            _ => panic!("Expected CaseSwitch variant"),
+        }
     }
 }

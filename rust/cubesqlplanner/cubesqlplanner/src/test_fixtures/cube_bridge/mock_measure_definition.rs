@@ -14,11 +14,8 @@ use std::any::Any;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Mock implementation of MeasureDefinition for testing
 #[derive(TypedBuilder)]
 pub struct MockMeasureDefinition {
-    // Fields from MeasureDefinitionStatic
-    #[builder(default = "number".to_string())]
     measure_type: String,
     #[builder(default = Some(false))]
     owned_by_cube: Option<bool>,
@@ -35,7 +32,6 @@ pub struct MockMeasureDefinition {
     #[builder(default)]
     rolling_window: Option<RollingWindow>,
 
-    // Optional trait fields
     #[builder(default, setter(strip_option))]
     sql: Option<String>,
     #[builder(default)]
