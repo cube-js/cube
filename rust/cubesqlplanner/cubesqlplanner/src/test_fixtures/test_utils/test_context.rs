@@ -260,7 +260,7 @@ mod tests {
         let order = static_data.order.as_ref().unwrap();
         assert_eq!(order.len(), 1);
         assert_eq!(order[0].id, "visitors.count");
-        assert_eq!(order[0].is_desc(), true);
+        assert!(order[0].is_desc());
 
         let filters = static_data.filters.as_ref().unwrap();
         assert_eq!(filters.len(), 2, "Should have 2 filters");

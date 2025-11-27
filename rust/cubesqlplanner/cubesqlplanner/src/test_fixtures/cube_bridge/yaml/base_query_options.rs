@@ -65,8 +65,8 @@ impl<'de> Deserialize<'de> for YamlFilterItem {
 
         // Check if it has 'or' or 'and' keys - then it's a Group
         if let serde_yaml::Value::Mapping(ref map) = value {
-            let has_or = map.contains_key(&serde_yaml::Value::String("or".to_string()));
-            let has_and = map.contains_key(&serde_yaml::Value::String("and".to_string()));
+            let has_or = map.contains_key(serde_yaml::Value::String("or".to_string()));
+            let has_and = map.contains_key(serde_yaml::Value::String("and".to_string()));
 
             if has_or || has_and {
                 return serde_yaml::from_value::<YamlFilterGroup>(value)
