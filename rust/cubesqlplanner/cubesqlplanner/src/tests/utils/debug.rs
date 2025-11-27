@@ -130,7 +130,8 @@ fn test_time_dimension() {
 
 #[test]
 fn test_filter_simple_collapsed() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.source").unwrap();
 
     let filter = BaseFilter::try_new(
@@ -148,7 +149,8 @@ fn test_filter_simple_collapsed() {
 
 #[test]
 fn test_filter_simple_expanded() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let symbol = ctx.create_symbol("visitors.source").unwrap();
 
     let filter = BaseFilter::try_new(
@@ -166,8 +168,8 @@ fn test_filter_simple_expanded() {
 
 #[test]
 fn test_filter_group_and_collapsed() {
-    let ctx = TestContext::new(create_visitors_schema()).unwrap();
-
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
     let source_symbol = ctx.create_symbol("visitors.source").unwrap();
     let id_symbol = ctx.create_symbol("visitors.id").unwrap();
 
