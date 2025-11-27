@@ -4,6 +4,7 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -157,11 +158,12 @@ impl MemberExpressionSymbol {
     }
 }
 
-impl crate::planner::sql_evaluator::debug_sql::DebugSql for MemberExpressionSymbol {
+impl DebugSql for MemberExpressionSymbol {
     fn debug_sql(&self, expand_deps: bool) -> String {
         match &self.expression {
             MemberExpressionExpression::SqlCall(sql) => sql.debug_sql(expand_deps),
-            MemberExpressionExpression::PatchedSymbol(symbol) => {                if expand_deps {
+            MemberExpressionExpression::PatchedSymbol(symbol) => {
+                if expand_deps {
                     symbol.debug_sql(true)
                 } else {
                     format!("{{EXPRESSION:{}}}", self.full_name())
