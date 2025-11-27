@@ -32,20 +32,15 @@ impl MockSchema {
     /// The path is relative to `src/test_fixtures/schemas/yaml_files/`.
     /// For example, `"common/visitors.yaml"` loads from
     /// `src/test_fixtures/schemas/yaml_files/common/visitors.yaml`.
-<<<<<<< HEAD
     ///
     /// Panics if the file cannot be read or parsed.
     pub fn from_yaml_file(relative_path: &str) -> Self {
-=======
-    pub fn from_yaml_file(relative_path: &str) -> Result<Self, CubeError> {
->>>>>>> 1b92358ce4 (yaml fixtures)
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let full_path = format!(
             "{}/src/test_fixtures/schemas/yaml_files/{}",
             manifest_dir, relative_path
         );
 
-<<<<<<< HEAD
         let yaml = std::fs::read_to_string(&full_path)
             .unwrap_or_else(|e| panic!("Failed to read YAML fixture '{}': {}", relative_path, e));
 
@@ -55,16 +50,6 @@ impl MockSchema {
                 relative_path, e.message
             )
         })
-=======
-        let yaml = std::fs::read_to_string(&full_path).map_err(|e| {
-            CubeError::user(format!(
-                "Failed to read YAML fixture '{}': {}",
-                relative_path, e
-            ))
-        })?;
-
-        Self::from_yaml(&yaml)
->>>>>>> 1b92358ce4 (yaml fixtures)
     }
 
     pub fn get_cube(&self, name: &str) -> Option<&MockCube> {
@@ -1511,17 +1496,8 @@ mod tests {
     }
 
     #[test]
-<<<<<<< HEAD
     #[should_panic(expected = "Failed to read YAML fixture")]
     fn test_from_yaml_file_not_found() {
         MockSchema::from_yaml_file("nonexistent.yaml");
-=======
-    fn test_from_yaml_file_not_found() {
-        let result = MockSchema::from_yaml_file("nonexistent.yaml");
-        assert!(result.is_err());
-        if let Err(e) = result {
-            assert!(e.message.contains("Failed to read YAML fixture"));
-        }
->>>>>>> 1b92358ce4 (yaml fixtures)
     }
 }
