@@ -1044,7 +1044,7 @@ mod tests {
 
     #[test]
     fn test_view_with_multiple_long_join_paths() {
-        use crate::test_fixtures::cube_bridge::{MockSecurityContext, MockSqlUtils};
+        use crate::test_fixtures::cube_bridge::MockSecurityContext;
         use std::rc::Rc;
 
         let schema = MockSchemaBuilder::new()
