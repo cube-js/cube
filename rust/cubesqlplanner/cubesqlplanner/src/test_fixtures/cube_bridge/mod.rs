@@ -38,6 +38,7 @@ pub use mock_base_tools::MockBaseTools;
 pub use mock_case_definition::MockCaseDefinition;
 pub use mock_case_else_item::MockCaseElseItem;
 pub use mock_case_item::MockCaseItem;
+pub use mock_case_switch_definition::MockCaseSwitchDefinition;
 pub use mock_case_switch_else_item::MockCaseSwitchElseItem;
 pub use mock_case_switch_item::MockCaseSwitchItem;
 pub use mock_cube_definition::MockCubeDefinition;

@@ -1,6 +1,7 @@
 use crate::cube_bridge::case_definition::CaseDefinition;
 use crate::cube_bridge::case_else_item::CaseElseItem;
 use crate::cube_bridge::case_item::CaseItem;
+use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseDefinition;
 use crate::test_fixtures::cube_bridge::{MockCaseElseItem, MockCaseItem};
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -11,6 +12,14 @@ use typed_builder::TypedBuilder;
 pub struct MockCaseDefinition {
     when: Vec<Rc<MockCaseItem>>,
     else_label: Rc<MockCaseElseItem>,
+}
+
+impl MockCaseDefinition {
+    pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
+        let yaml_def: YamlCaseDefinition = serde_yaml::from_str(yaml)
+            .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;
+        Ok(yaml_def.build())
+    }
 }
 
 impl CaseDefinition for MockCaseDefinition {
@@ -35,6 +44,35 @@ impl CaseDefinition for MockCaseDefinition {
 mod tests {
     use super::*;
     use crate::cube_bridge::string_or_sql::StringOrSql;
+    use indoc::indoc;
+
+    #[test]
+    fn test_from_yaml() {
+        let yaml = indoc! {"
+            when:
+              - sql: \"{CUBE}.size_value = 'xl-en'\"
+                label: xl
+              - sql: \"{CUBE}.size_value = 'xl'\"
+                label: xl
+              - sql: \"{CUBE}.size_value = 'xxl-en'\"
+                label: xxl
+              - sql: \"{CUBE}.size_value = 'xxl'\"
+                label: xxl
+            else:
+              label: Unknown
+        "};
+
+        let case_def = MockCaseDefinition::from_yaml(yaml).unwrap();
+        let when_result = case_def.when().unwrap();
+
+        assert_eq!(when_result.len(), 4);
+
+        let else_result = case_def.else_label().unwrap();
+        assert!(matches!(
+            else_result.label().unwrap(),
+            StringOrSql::String(s) if s == "Unknown"
+        ));
+    }
 
     #[test]
     fn test_mock_case_definition() {
