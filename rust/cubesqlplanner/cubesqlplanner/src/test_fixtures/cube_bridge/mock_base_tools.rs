@@ -6,7 +6,7 @@ use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::test_fixtures::cube_bridge::{
-    MockDriverTools, MockJoinGraph, MockSecurityContext, MockSqlTemplatesRender, MockSqlUtils,
+    MockDriverTools, MockJoinGraph, MockSqlTemplatesRender, MockSqlUtils,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;

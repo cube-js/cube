@@ -2,7 +2,6 @@ use crate::test_fixtures::cube_bridge::yaml::YamlSchema;
 use crate::test_fixtures::cube_bridge::{
     MockBaseTools, MockCubeDefinition, MockCubeEvaluator, MockDimensionDefinition, MockDriverTools,
     MockJoinGraph, MockJoinItemDefinition, MockMeasureDefinition, MockSegmentDefinition,
-    MockSqlTemplatesRender,
 };
 use cubenativeutils::CubeError;
 use std::collections::HashMap;

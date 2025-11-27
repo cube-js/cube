@@ -13,12 +13,10 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    /// Creates new test context from a mock schema with UTC timezone
     pub fn new(schema: MockSchema) -> Result<Self, CubeError> {
         Self::new_with_timezone(schema, Tz::UTC)
     }
 
-    /// Creates new test context from a mock schema with specific timezone
     pub fn new_with_timezone(schema: MockSchema, timezone: Tz) -> Result<Self, CubeError> {
         let base_tools = schema.create_base_tools()?;
         let join_graph = Rc::new(schema.create_join_graph()?);
@@ -38,12 +36,12 @@ impl TestContext {
         Ok(Self { query_tools })
     }
 
-    /// Returns reference to query tools
+    #[allow(dead_code)]
     pub fn query_tools(&self) -> &Rc<QueryTools> {
         &self.query_tools
     }
 
-    /// Creates a symbol from cube.member path
+    #[allow(dead_code)]
     pub fn create_symbol(&self, member_path: &str) -> Result<Rc<MemberSymbol>, CubeError> {
         self.query_tools
             .evaluator_compiler()
@@ -51,7 +49,6 @@ impl TestContext {
             .add_auto_resolved_member_evaluator(member_path.to_string())
     }
 
-    /// Creates a dimension symbol from cube.dimension path
     pub fn create_dimension(&self, path: &str) -> Result<Rc<MemberSymbol>, CubeError> {
         self.query_tools
             .evaluator_compiler()
@@ -59,7 +56,6 @@ impl TestContext {
             .add_dimension_evaluator(path.to_string())
     }
 
-    /// Creates a measure symbol from cube.measure path
     pub fn create_measure(&self, path: &str) -> Result<Rc<MemberSymbol>, CubeError> {
         self.query_tools
             .evaluator_compiler()
@@ -67,7 +63,6 @@ impl TestContext {
             .add_measure_evaluator(path.to_string())
     }
 
-    /// Evaluates a symbol to SQL string
     pub fn evaluate_symbol(&self, symbol: &Rc<MemberSymbol>) -> Result<String, CubeError> {
         let visitor = SqlEvaluatorVisitor::new(self.query_tools.clone(), None);
         let base_tools = self.query_tools.base_tools();
