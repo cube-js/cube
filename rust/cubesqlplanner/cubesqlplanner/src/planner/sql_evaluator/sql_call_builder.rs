@@ -1,10 +1,10 @@
 use super::symbols::MemberSymbol;
 use super::Compiler;
 use super::{SqlCall, SqlCallDependency, SqlCallFilterGroupItem, SqlCallFilterParamsItem};
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::*;
 use crate::cube_bridge::security_context::SecurityContext;
-use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
@@ -13,7 +13,7 @@ use std::rc::Rc;
 pub struct SqlCallBuilder<'a> {
     compiler: &'a mut Compiler,
     cube_evaluator: Rc<dyn CubeEvaluator>,
-    sql_utils: Rc<dyn SqlUtils>,
+    base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
 }
 
@@ -21,13 +21,13 @@ impl<'a> SqlCallBuilder<'a> {
     pub fn new(
         compiler: &'a mut Compiler,
         cube_evaluator: Rc<dyn CubeEvaluator>,
-        sql_utils: Rc<dyn SqlUtils>,
+        base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
     ) -> Self {
         Self {
             compiler,
             cube_evaluator,
-            sql_utils,
+            base_tools,
             security_context,
         }
     }
@@ -38,7 +38,7 @@ impl<'a> SqlCallBuilder<'a> {
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<SqlCall, CubeError> {
         let (template, template_args) = member_sql
-            .compile_template_sql(self.sql_utils.clone(), self.security_context.clone())?;
+            .compile_template_sql(self.base_tools.clone(), self.security_context.clone())?;
 
         let deps = template_args
             .symbol_paths

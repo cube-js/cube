@@ -41,6 +41,8 @@ impl SegmentDefinition for MockSegmentDefinition {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_fixtures::cube_bridge::MockBaseTools;
+
     use super::*;
 
     #[test]
@@ -88,9 +90,12 @@ mod tests {
         let sql = segment.sql().unwrap();
         assert_eq!(sql.args_names(), &vec!["CUBE"]);
 
-        use crate::test_fixtures::cube_bridge::{MockSecurityContext, MockSqlUtils};
+        use crate::test_fixtures::cube_bridge::MockSecurityContext;
         let (template, args) = sql
-            .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
+            .compile_template_sql(
+                Rc::new(MockBaseTools::default()),
+                Rc::new(MockSecurityContext),
+            )
             .unwrap();
 
         match template {

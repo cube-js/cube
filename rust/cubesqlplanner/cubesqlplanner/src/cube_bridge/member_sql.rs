@@ -3,7 +3,7 @@ use super::{
     security_context::{NativeSecurityContext, SecurityContext},
     sql_utils::NativeSqlUtils,
 };
-use crate::cube_bridge::sql_utils::SqlUtils;
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::planner::sql_evaluator::SqlCallArg;
 use crate::utils::UniqueVector;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
@@ -301,7 +301,7 @@ pub trait MemberSql {
     fn as_any(self: Rc<Self>) -> Rc<dyn Any>;
     fn compile_template_sql(
         &self,
-        sql_utils: Rc<dyn SqlUtils>,
+        base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
     ) -> Result<(SqlTemplate, SqlTemplateArgs), CubeError>;
 }
@@ -634,7 +634,7 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
 
     fn compile_template_sql(
         &self,
-        sql_utils: Rc<dyn SqlUtils>,
+        base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
     ) -> Result<(SqlTemplate, SqlTemplateArgs), CubeError> {
         let state = ProxyState::new();
@@ -667,8 +667,8 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
                     context_obj,
                 )?
             } else if arg == "SQL_UTILS" {
-                sql_utils
-                    .clone()
+                base_tools
+                    .sql_utils_for_rust()?
                     .as_any()
                     .downcast::<NativeSqlUtils<IT>>()
                     .unwrap()

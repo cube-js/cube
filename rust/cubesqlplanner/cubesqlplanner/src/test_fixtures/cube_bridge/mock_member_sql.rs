@@ -1,6 +1,6 @@
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::member_sql::{MemberSql, SqlTemplate, SqlTemplateArgs};
 use crate::cube_bridge::security_context::SecurityContext;
-use crate::cube_bridge::sql_utils::SqlUtils;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -112,7 +112,7 @@ impl MemberSql for MockMemberSql {
 
     fn compile_template_sql(
         &self,
-        _sql_utils: Rc<dyn SqlUtils>,
+        _base_tools: Rc<dyn BaseTools>,
         _security_context: Rc<dyn SecurityContext>,
     ) -> Result<(SqlTemplate, SqlTemplateArgs), CubeError> {
         Ok((
@@ -240,7 +240,7 @@ mod tests {
         let mock = Rc::new(MockMemberSql::new("{CUBE.field} / {other.field}").unwrap());
         let (template, args) = mock
             .compile_template_sql(
-                Rc::new(crate::test_fixtures::cube_bridge::MockSqlUtils),
+                Rc::new(crate::test_fixtures::cube_bridge::MockBaseTools::default()),
                 Rc::new(crate::test_fixtures::cube_bridge::MockSecurityContext),
             )
             .unwrap();

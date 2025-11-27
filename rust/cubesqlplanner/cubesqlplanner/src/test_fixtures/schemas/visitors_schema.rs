@@ -194,6 +194,7 @@ mod tests {
     use super::*;
     use crate::cube_bridge::dimension_definition::DimensionDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
+    use crate::test_fixtures::cube_bridge::MockBaseTools;
 
     #[test]
     fn test_schema_has_both_cubes() {
@@ -205,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_visitors_dimensions() {
-        use crate::test_fixtures::cube_bridge::{MockSecurityContext, MockSqlUtils};
+        use crate::test_fixtures::cube_bridge::MockSecurityContext;
         use std::rc::Rc;
 
         let schema = create_visitors_schema();
@@ -240,7 +241,10 @@ mod tests {
         let sql = question_mark.sql().unwrap().unwrap();
         // Verify SQL contains question marks
         let (template, _args) = sql
-            .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
+            .compile_template_sql(
+                Rc::new(MockBaseTools::default()),
+                Rc::new(MockSecurityContext),
+            )
             .unwrap();
         match template {
             crate::cube_bridge::member_sql::SqlTemplate::String(s) => {
