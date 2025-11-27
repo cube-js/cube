@@ -8,7 +8,6 @@ use crate::cube_bridge::security_context::SecurityContext;
 use crate::planner::sql_evaluator::TimeDimensionSymbol;
 use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct SqlCallBuilder<'a> {
