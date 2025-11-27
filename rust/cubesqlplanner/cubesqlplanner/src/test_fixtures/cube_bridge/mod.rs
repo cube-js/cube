@@ -34,9 +34,6 @@ mod mock_sql_utils;
 mod mock_struct_with_sql_member;
 mod mock_timeshift_definition;
 
-#[cfg(test)]
-mod mock_join_graph_tests;
-
 pub use base_query_options::{
     filter_and, filter_item, filter_or, members_from_strings, MockBaseQueryOptions,
 };
