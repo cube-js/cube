@@ -674,7 +674,8 @@ fn test_time_dimension_with_granularity_compilation() {
 
 #[test]
 fn test_sql_deps_validation() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     let time_symbol = test_compiler
@@ -727,7 +728,8 @@ fn test_sql_deps_validation() {
 
 #[test]
 fn test_sql_deps_validation_with_reference() {
-    let evaluator = create_visitors_schema().create_evaluator();
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let evaluator = schema.create_evaluator();
     let mut test_compiler = TestCompiler::new(evaluator);
 
     assert!(test_compiler
