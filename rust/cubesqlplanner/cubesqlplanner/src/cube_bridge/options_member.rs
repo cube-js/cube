@@ -11,6 +11,15 @@ pub enum OptionsMember {
     MemberExpression(Rc<dyn MemberExpressionDefinition>),
 }
 
+impl Clone for OptionsMember {
+    fn clone(&self) -> Self {
+        match self {
+            Self::MemberName(name) => Self::MemberName(name.clone()),
+            Self::MemberExpression(expr) => Self::MemberExpression(expr.clone()),
+        }
+    }
+}
+
 impl<IT: InnerTypes> NativeDeserialize<IT> for OptionsMember {
     fn from_native(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
         match String::from_native(native_object.clone()) {
