@@ -592,3 +592,40 @@ impl SymbolFactory for DimensionSymbolFactory {
         Ok(symbol)
     }
 }
+
+impl crate::planner::sql_evaluator::debug_sql::DebugSql for DimensionSymbol {
+    fn debug_sql(&self, expand_deps: bool) -> String {
+        // Handle case expressions
+        if let Some(case) = &self.case {
+            return case.debug_sql(expand_deps);
+        }
+
+        // Handle geo dimensions (latitude/longitude pair)
+        if self.dimension_type == "geo" {
+            let lat = self
+                .latitude
+                .as_ref()
+                .map(|sql| sql.debug_sql(expand_deps))
+                .unwrap_or_else(|| "{missing_latitude}".to_string());
+            let lon = self
+                .longitude
+                .as_ref()
+                .map(|sql| sql.debug_sql(expand_deps))
+                .unwrap_or_else(|| "{missing_longitude}".to_string());
+            return format!("GEO({}, {})", lat, lon);
+        }
+
+        // Handle switch type dimensions without SQL
+        if self.dimension_type == "switch" && self.member_sql.is_none() {
+            return format!("SWITCH({})", self.full_name());
+        }
+
+        // Standard dimension SQL
+        let res = if let Some(sql) = &self.member_sql {
+            sql.debug_sql(expand_deps)
+        } else {
+            "".to_string()
+        };
+        res
+    }
+}

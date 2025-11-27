@@ -306,3 +306,19 @@ impl TimeDimensionSymbol {
         Ok(res)
     }
 }
+
+impl crate::planner::sql_evaluator::debug_sql::DebugSql for TimeDimensionSymbol {
+    fn debug_sql(&self, expand_deps: bool) -> String {
+        let sql = if expand_deps {
+            self.base_symbol.debug_sql(expand_deps)
+        } else {
+            format!("{{{}}}", self.base_symbol.full_name())
+        };
+
+        if let Some(granularity) = &self.granularity {
+            format!("({}).{}", sql, granularity)
+        } else {
+            sql
+        }
+    }
+}
