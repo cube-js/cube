@@ -54,10 +54,6 @@ impl BaseTools for MockBaseTools {
         Ok(self.sql_templates.clone())
     }
 
-    fn security_context_for_rust(&self) -> Result<Rc<dyn SecurityContext>, CubeError> {
-        Ok(self.security_context.clone())
-    }
-
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError> {
         Ok(self.sql_utils.clone())
     }
