@@ -276,9 +276,8 @@ export class DataSchemaCompiler {
     const transpilationNativeThreadsCount = getThreadsCount();
     const { compilerId } = this;
 
-    const wc = getEnv('transpilationWorkerThreadsCount');
-
     if (!transpilationNative) {
+      const wc = getEnv('transpilationWorkerThreadsCount');
       this.workerPool = workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
         wc > 0 ? { maxWorkers: wc } : undefined,
