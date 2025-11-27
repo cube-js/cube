@@ -104,7 +104,14 @@ impl PgCatalogAttributeBuilder {
         self.attnum.append_value(attnum).unwrap();
         self.attndims.append_value(is_array as u32).unwrap();
         self.attcacheoff.append_value(-1).unwrap();
-        self.atttypmod.append_value(-1).unwrap();
+
+        // Calculate type modifier (atttypmod) which encodes type constraints
+        // For VARCHAR: encodes maximum length
+        // For NUMERIC: encodes precision and scale
+        // For TIMESTAMP/INTERVAL: encodes fractional second precision
+        // For other types: -1 (no modifier)
+        self.atttypmod.append_value(column_type.get_typmod()).unwrap();
+
         self.attbyval.append_value(pg_typ.typbyval).unwrap();
         self.attalign.append_value(pg_typ.typalign).unwrap();
         self.attstorage.append_value(pg_typ.typstorage).unwrap();

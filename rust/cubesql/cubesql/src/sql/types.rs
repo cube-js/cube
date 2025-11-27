@@ -112,6 +112,48 @@ impl ColumnType {
             ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
         }
     }
+
+    /// Get the type modifier (atttypmod) for PostgreSQL pg_attribute.
+    /// This encodes type-specific constraints like VARCHAR length or NUMERIC precision/scale.
+    ///
+    /// PostgreSQL's atttypmod packing:
+    /// - VARCHAR(n): (length + 4) << 16 | 0xFFFF
+    /// - NUMERIC(p,s): ((p << 16) | s) + VARHDRSZ
+    /// - TIMESTAMP/INTERVAL(p): p + VARHDRSZ
+    /// - Other types: -1 (no modifier)
+    pub fn get_typmod(&self) -> i64 {
+        match self {
+            // VARCHAR types: encode maximum length
+            // Format: (length + 4) as upper 16 bits
+            // Since we don't track specific max lengths for VarStr, default to reasonable value
+            ColumnType::VarStr => {
+                // 65535 is the maximum for VARCHAR in PostgreSQL (65535 chars + 4 byte header)
+                let max_len = 65535i64;
+                ((max_len + 4) << 16) as i64 | 0xFFFF
+            }
+            // NUMERIC(precision, scale): encode both values
+            // Format: (precision << 16) | scale (with variance header offset)
+            ColumnType::Decimal(precision, scale) => {
+                let p = *precision as i64;
+                let s = *scale as i64;
+                // PostgreSQL variant header size (4 bytes)
+                const VARHDRSZ: i64 = 4;
+                ((p << 16) | s) + VARHDRSZ
+            }
+            // TIMESTAMP and INTERVAL types: encode fractional second precision
+            // Default to 6 (microsecond precision as per PostgreSQL standard)
+            ColumnType::Timestamp => {
+                const VARHDRSZ: i64 = 4;
+                6 + VARHDRSZ  // 6 decimal places for microseconds
+            }
+            ColumnType::Interval(_) => {
+                const VARHDRSZ: i64 = 4;
+                6 + VARHDRSZ  // 6 decimal places for interval precision
+            }
+            // All other types have no type modifier
+            _ => -1,
+        }
+    }
 }
 
 bitflags! {

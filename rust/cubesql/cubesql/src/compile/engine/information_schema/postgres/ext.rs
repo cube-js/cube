@@ -2,6 +2,7 @@ use crate::{sql::ColumnType, transport::CubeColumn};
 
 pub trait CubeColumnPostgresExt {
     fn get_data_type(&self) -> String;
+    fn get_data_type_with_modifiers(&self) -> String;
     fn get_udt_name(&self) -> String;
     fn is_nullable(&self) -> String;
     fn udt_schema(&self) -> String;
@@ -43,6 +44,23 @@ impl CubeColumnPostgresExt for CubeColumn {
                 };
                 format!("{}[]", base_type)
             }
+        }
+    }
+
+    fn get_data_type_with_modifiers(&self) -> String {
+        match self.get_column_type() {
+            // VARCHAR without specific length - show generic form
+            ColumnType::VarStr => "character varying".to_string(),
+            // NUMERIC with precision and scale - include them in type specification
+            ColumnType::Decimal(precision, scale) => {
+                format!("numeric({},{})", precision, scale)
+            }
+            // TIMESTAMP with fractional second precision
+            ColumnType::Timestamp => "timestamp(6) without time zone".to_string(),
+            // INTERVAL with fractional second precision
+            ColumnType::Interval(_) => "interval(6)".to_string(),
+            // All other types - return standard form without modifiers
+            _ => self.get_data_type(),
         }
     }
 
