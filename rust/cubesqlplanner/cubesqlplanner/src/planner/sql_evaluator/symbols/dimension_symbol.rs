@@ -519,12 +519,6 @@ impl SymbolFactory for DimensionSymbolFactory {
 
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
 
-<<<<<<< HEAD
-        //TODO move owned logic to rust
-        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
-        let owned_by_cube =
-            owned_by_cube && !is_multi_stage && definition.static_data().dimension_type != "switch";
-=======
         let owned_by_cube = if is_multi_stage || dimension_type == "switch" {
             false
         } else {
@@ -543,7 +537,6 @@ impl SymbolFactory for DimensionSymbolFactory {
             }
             owned
         };
->>>>>>> d8910d3aee (owned_by_cube refactoring)
         let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
         let is_reference = (is_view && is_sql_direct_ref)
             || (!owned_by_cube
