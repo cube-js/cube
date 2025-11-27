@@ -3,7 +3,9 @@ pub mod visitors_schema;
 pub use visitors_schema::create_visitors_schema;
 
 use crate::planner::sql_evaluator::Compiler;
-use crate::test_fixtures::cube_bridge::{MockCubeEvaluator, MockSecurityContext, MockSqlUtils};
+use crate::test_fixtures::cube_bridge::{
+    MockBaseTools, MockCubeEvaluator, MockSecurityContext, MockSqlUtils,
+};
 use chrono_tz::Tz;
 use std::rc::Rc;
 
@@ -20,9 +22,9 @@ impl TestCompiler {
 
     /// Create a new TestCompiler with a specific timezone
     pub fn new_with_timezone(evaluator: Rc<MockCubeEvaluator>, timezone: Tz) -> Self {
-        let sql_utils = Rc::new(MockSqlUtils);
+        let base_tools = Rc::new(MockBaseTools::default());
         let security_context = Rc::new(MockSecurityContext);
-        let compiler = Compiler::new(evaluator, sql_utils, security_context, timezone);
+        let compiler = Compiler::new(evaluator, base_tools, security_context, timezone);
 
         Self { compiler }
     }

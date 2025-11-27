@@ -29,9 +29,6 @@ pub struct MockBaseTools {
     #[builder(default = Rc::new(MockSqlTemplatesRender::default_templates()))]
     sql_templates: Rc<MockSqlTemplatesRender>,
 
-    #[builder(default = Rc::new(MockSecurityContext))]
-    security_context: Rc<MockSecurityContext>,
-
     #[builder(default = Rc::new(MockSqlUtils))]
     sql_utils: Rc<MockSqlUtils>,
 }
@@ -53,10 +50,6 @@ impl BaseTools for MockBaseTools {
 
     fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError> {
         Ok(self.sql_templates.clone())
-    }
-
-    fn security_context_for_rust(&self) -> Result<Rc<dyn SecurityContext>, CubeError> {
-        Ok(self.security_context.clone())
     }
 
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError> {

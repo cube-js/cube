@@ -507,6 +507,7 @@ mod tests {
     use crate::cube_bridge::join_item_definition::JoinItemDefinition;
     use crate::cube_bridge::measure_definition::MeasureDefinition;
     use crate::cube_bridge::segment_definition::SegmentDefinition;
+    use crate::test_fixtures::cube_bridge::MockBaseTools;
 
     #[test]
     fn test_basic_schema() {
@@ -1103,7 +1104,10 @@ mod tests {
 
         // Compile template and check symbol_paths structure
         let (_template, args) = checkin_id_sql
-            .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
+            .compile_template_sql(
+                Rc::new(MockBaseTools::default()),
+                Rc::new(MockSecurityContext),
+            )
             .unwrap();
 
         // Should have exactly one symbol path
@@ -1126,7 +1130,10 @@ mod tests {
         let checkin_count_sql = checkin_count_measure.sql().unwrap().unwrap();
 
         let (_template, args) = checkin_count_sql
-            .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
+            .compile_template_sql(
+                Rc::new(MockBaseTools::default()),
+                Rc::new(MockSecurityContext),
+            )
             .unwrap();
 
         assert_eq!(
@@ -1146,7 +1153,10 @@ mod tests {
         let id_sql = id_dim.sql().unwrap().unwrap();
 
         let (_template, args) = id_sql
-            .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
+            .compile_template_sql(
+                Rc::new(MockBaseTools::default()),
+                Rc::new(MockSecurityContext),
+            )
             .unwrap();
 
         assert_eq!(
@@ -1164,7 +1174,10 @@ mod tests {
         let count_sql = count_measure.sql().unwrap().unwrap();
 
         let (_template, args) = count_sql
-            .compile_template_sql(Rc::new(MockSqlUtils), Rc::new(MockSecurityContext))
+            .compile_template_sql(
+                Rc::new(MockBaseTools::default()),
+                Rc::new(MockSecurityContext),
+            )
             .unwrap();
 
         assert_eq!(
