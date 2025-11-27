@@ -46,8 +46,6 @@ impl<'a> SqlCallBuilder<'a> {
             .map(|path| self.build_dependency(cube_name, path))
             .collect::<Result<Vec<_>, _>>()?;
 
-        //Self::validate_deps(cube_name, &deps)?;
-
         let filter_params = template_args
             .filter_params
             .iter()
