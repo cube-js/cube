@@ -1,6 +1,5 @@
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
-use crate::utils::debug::DebugSql;
 
 #[test]
 fn dimensions_ownships() {
