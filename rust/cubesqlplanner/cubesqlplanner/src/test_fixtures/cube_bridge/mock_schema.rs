@@ -88,6 +88,16 @@ impl MockSchema {
         Rc::new(MockCubeEvaluator::with_primary_keys(self, primary_keys))
     }
 
+    pub fn create_base_tools(&self) -> Result<MockBaseTools, CubeError> {
+        let join_graph = Rc::new(self.create_join_graph()?);
+        let driver_tools = Rc::new(MockDriverTools::new());
+        let result = MockBaseTools::builder()
+            .join_graph(join_graph)
+            .driver_tools(driver_tools)
+            .build();
+        Ok(result)
+    }
+
     #[allow(dead_code)]
     pub fn create_evaluator_with_primary_keys(
         self,
