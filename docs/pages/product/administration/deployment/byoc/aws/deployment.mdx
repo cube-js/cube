@@ -25,6 +25,7 @@ the `CubeCloudBYOC` IAM role that would allow Cube Cloud to:
 - Manage ec2 autoscaling
 - Manage S3 buckets
 - Manage CloudWatch Logs
+- Create and manage RDS PostgreSQL instances
 
 ## Provisioning access
 
@@ -72,7 +73,11 @@ actual account ID.
                 "eks:DescribeNodegroup",
                 "eks:ListClusters",
                 "iam:GetRole",
-                "sts:DecodeAuthorizationMessage"
+                "sts:DecodeAuthorizationMessage",
+                "rds:DescribeDBInstances",
+                "rds:DescribeDBSubnetGroups",
+                "rds:DescribeDBParameterGroups",
+                "rds:ListTagsForResource"
             ],
             "Resource": "*"
         },
@@ -105,7 +110,10 @@ actual account ID.
                 "iam:TagOpenIDConnectProvider",
                 "logs:CreateLogDelivery",
                 "kms:TagResource",
-                "kms:CreateKey"
+                "kms:CreateKey",
+                "rds:CreateDBInstance",
+                "rds:CreateDBSubnetGroup",
+                "rds:AddTagsToResource"
             ],
             "Resource": "*",
             "Condition": {
@@ -212,6 +220,25 @@ actual account ID.
             "Condition": {
                 "StringEquals": {
                     "ec2:ResourceTag/Created-By": "CubeCloud"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "rds:ModifyDBInstance",
+                "rds:DeleteDBInstance",
+                "rds:DeleteDBSubnetGroup",
+                "rds:RebootDBInstance",
+                "rds:StartDBInstance",
+                "rds:StopDBInstance",
+                "rds:AddTagsToResource",
+                "rds:RemoveTagsFromResource"
+            ],
+            "Resource": ["*"],
+            "Condition": {
+                "StringEquals": {
+                    "aws:ResourceTag/Created-By": "CubeCloud"
                 }
             }
         }
