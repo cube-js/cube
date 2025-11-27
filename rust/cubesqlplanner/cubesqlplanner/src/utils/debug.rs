@@ -1,4 +1,3 @@
-/// Trait for generating human-readable SQL representation
 pub trait DebugSql {
     /// Generate SQL string representation
     ///
@@ -7,13 +6,7 @@ pub trait DebugSql {
     fn debug_sql(&self, expand_deps: bool) -> String;
 }
 
-/// Helper function to indent multi-line strings with custom indentation
-///
-/// # Arguments
-/// * `text` - The text to indent
-/// * `indent` - The indentation string to prepend to each non-empty line
-///
-pub fn indent_lines(text: &str, indent: &str) -> String {
+fn indent_lines(text: &str, indent: &str) -> String {
     text.lines()
         .map(|line| {
             if line.trim().is_empty() {
@@ -27,21 +20,14 @@ pub fn indent_lines(text: &str, indent: &str) -> String {
 }
 
 /// Indent multi-line string by specified number of levels (each level = 2 spaces)
-///
-/// # Arguments
-/// * `text` - The text to indent
-/// * `levels` - Number of indentation levels (each level adds 2 spaces)
-///
+#[allow(dead_code)]
 pub fn indent_by(text: &str, levels: usize) -> String {
     let indent = "  ".repeat(levels);
     indent_lines(text, &indent)
 }
 
 /// Indent multi-line string by 2 spaces (convenience function)
-///
-/// # Arguments
-/// * `text` - The text to indent
-///
+#[allow(dead_code)]
 pub fn indent(text: &str) -> String {
     indent_by(text, 1)
 }
