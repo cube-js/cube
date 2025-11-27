@@ -50,7 +50,7 @@ pub use mock_expression_struct::MockExpressionStruct;
 pub use mock_geo_item::MockGeoItem;
 pub use mock_granularity_definition::MockGranularityDefinition;
 pub use mock_join_definition::MockJoinDefinition;
-pub use mock_join_graph::{JoinEdge, MockJoinGraph};
+pub use mock_join_graph::MockJoinGraph;
 pub use mock_join_item::MockJoinItem;
 pub use mock_join_item_definition::MockJoinItemDefinition;
 pub use mock_measure_definition::MockMeasureDefinition;

@@ -121,7 +121,7 @@ fn test_total_revenue_per_count_expanded() {
 fn test_time_dimension() {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
     let ctx = TestContext::new(schema).unwrap();
-    let symbol = ctx.create_symbol("visitors.created_at.day").unwrap();
+    let symbol = ctx.create_dimension("visitors.created_at.day").unwrap();
     let sql = symbol.debug_sql(true);
     assert_eq!(sql, "(created_at).day");
     let sql = symbol.debug_sql(false);

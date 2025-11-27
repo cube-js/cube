@@ -13,6 +13,7 @@ pub trait DebugSql {
 /// * `text` - The text to indent
 /// * `indent` - The indentation string to prepend to each non-empty line
 ///
+#[allow(dead_code)]
 pub fn indent_lines(text: &str, indent: &str) -> String {
     text.lines()
         .map(|line| {
@@ -32,6 +33,7 @@ pub fn indent_lines(text: &str, indent: &str) -> String {
 /// * `text` - The text to indent
 /// * `levels` - Number of indentation levels (each level adds 2 spaces)
 ///
+#[allow(dead_code)]
 pub fn indent_by(text: &str, levels: usize) -> String {
     let indent = "  ".repeat(levels);
     indent_lines(text, &indent)
@@ -42,6 +44,7 @@ pub fn indent_by(text: &str, levels: usize) -> String {
 /// # Arguments
 /// * `text` - The text to indent
 ///
+#[allow(dead_code)]
 pub fn indent(text: &str) -> String {
     indent_by(text, 1)
 }
