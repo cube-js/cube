@@ -321,4 +321,155 @@ describe('ClickHouseDriver', () => {
       }
     });
   });
+
+  it('should handle DDL statements correctly', async () => {
+    await doWithDriver(async (driver) => {
+      const name = `ddl_test_${Date.now()}`;
+      
+      try {
+        // Test CREATE DATABASE
+        await driver.query(`CREATE DATABASE ${name}`, []);
+        
+        // Test CREATE TABLE
+        await driver.query(`CREATE TABLE ${name}.test_table (id Int32, name String) ENGINE Log`, []);
+        
+        // Test INSERT (should work normally)
+        await driver.insert(`${name}.test_table`, [[1, 'test1'], [2, 'test2']]);
+        
+        // Verify data was inserted correctly
+        const results = await driver.query(`SELECT * FROM ${name}.test_table ORDER BY id`, []);
+        expect(results).toEqual([
+          { id: '1', name: 'test1' },
+          { id: '2', name: 'test2' }
+        ]);
+        
+        // Test TRUNCATE
+        await driver.query(`TRUNCATE TABLE ${name}.test_table`, []);
+        
+        // Verify table is empty
+        const emptyResults = await driver.query(`SELECT * FROM ${name}.test_table`, []);
+        expect(emptyResults).toEqual([]);
+        
+        // Test DROP TABLE
+        await driver.query(`DROP TABLE ${name}.test_table`, []);
+        
+        // Test RENAME DATABASE
+        const newName = `${name}_renamed`;
+        await driver.query(`RENAME DATABASE ${name} TO ${newName}`, []);
+        
+        // Verify the renamed database exists
+        const databases = await driver.query(`SHOW DATABASES LIKE '${newName}'`, []);
+        expect(databases.length).toBeGreaterThan(0);
+        
+        // Clean up
+        await driver.query(`DROP DATABASE ${newName}`, []);
+        
+      } catch (error) {
+        // Clean up in case of error
+        try {
+          await driver.query(`DROP DATABASE IF EXISTS ${name}`, []);
+          await driver.query(`DROP DATABASE IF EXISTS ${name}_renamed`, []);
+        } catch (cleanupError) {
+          // Ignore cleanup errors
+        }
+        throw error;
+      }
+    });
+  });
+
+  it('should handle mixed DDL and DML statements', async () => {
+    await doWithDriver(async (driver) => {
+      const name = `mixed_test_${Date.now()}`;
+      
+      try {
+        // DDL statement
+        await driver.query(`CREATE DATABASE ${name}`, []);
+        await driver.query(`CREATE TABLE ${name}.users (id Int32, name String) ENGINE Log`, []);
+        
+        // DML statement (should return data)
+        await driver.insert(`${name}.users`, [[1, 'Alice'], [2, 'Bob']]);
+        const users = await driver.query(`SELECT * FROM ${name}.users ORDER BY id`, []);
+        expect(users).toEqual([
+          { id: '1', name: 'Alice' },
+          { id: '2', name: 'Bob' }
+        ]);
+        
+        // Test another DDL statement (RENAME TABLE)
+        await driver.query(`RENAME TABLE ${name}.users TO ${name}.users_renamed`, []);
+        
+        // Verify the renamed table exists and data is intact
+        const renamedUsers = await driver.query(`SELECT * FROM ${name}.users_renamed ORDER BY id`, []);
+        expect(renamedUsers).toEqual([
+          { id: '1', name: 'Alice' },
+          { id: '2', name: 'Bob' }
+        ]);
+        
+        // Clean up
+        await driver.query(`DROP DATABASE ${name}`, []);
+        
+      } catch (error) {
+        // Clean up in case of error
+        try {
+          await driver.query(`DROP DATABASE IF EXISTS ${name}`, []);
+        } catch (cleanupError) {
+          // Ignore cleanup errors
+        }
+        throw error;
+      }
+    });
+  });
+
+  it('should handle ALTER TABLE ADD COLUMN with Log engine compatibility', async () => {
+    await doWithDriver(async (driver) => {
+      const name = `alter_test_${Date.now()}`;
+      
+      try {
+        // Create database and table with Log engine
+        await driver.query(`CREATE DATABASE ${name}`, []);
+        await driver.query(`CREATE TABLE ${name}.test_table (id Int32, name String) ENGINE Log`, []);
+        
+        // Insert some data
+        await driver.insert(`${name}.test_table`, [[1, 'Alice'], [2, 'Bob']]);
+        
+        // Verify initial data
+        const initialData = await driver.query(`SELECT * FROM ${name}.test_table ORDER BY id`, []);
+        expect(initialData).toEqual([
+          { id: '1', name: 'Alice' },
+          { id: '2', name: 'Bob' }
+        ]);
+        
+        // Test ALTER TABLE ADD COLUMN - this should work with our compatibility layer
+        await driver.query(`ALTER TABLE ${name}.test_table ADD COLUMN email String`, []);
+        
+        // Verify the new column was added and data is preserved
+        const updatedData = await driver.query(`SELECT * FROM ${name}.test_table ORDER BY id`, []);
+        expect(updatedData).toEqual([
+          { id: '1', name: 'Alice', email: '' },
+          { id: '2', name: 'Bob', email: '' }
+        ]);
+        
+        // Test inserting data with the new column
+        await driver.insert(`${name}.test_table`, [[3, 'Charlie', 'charlie@example.com']]);
+        
+        const finalData = await driver.query(`SELECT * FROM ${name}.test_table ORDER BY id`, []);
+        expect(finalData).toEqual([
+          { id: '1', name: 'Alice', email: '' },
+          { id: '2', name: 'Bob', email: '' },
+          { id: '3', name: 'Charlie', email: 'charlie@example.com' }
+        ]);
+        
+        // Clean up
+        await driver.query(`DROP DATABASE ${name}`, []);
+        
+      } catch (error) {
+        // Clean up in case of error
+        try {
+          await driver.query(`DROP DATABASE IF EXISTS ${name}`, []);
+        } catch (cleanupError) {
+          // Ignore cleanup errors
+        }
+        throw error;
+      }
+    });
+  });
 });
