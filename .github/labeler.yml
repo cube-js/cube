@@ -123,9 +123,7 @@ client:react:
 
 client:vue:
 - changed-files:
-  - any-glob-to-any-file:
-    - packages/cubejs-client-vue/**/*
-    - packages/cubejs-client-vue3/**/*
+  - any-glob-to-any-file: packages/cubejs-client-vue3/**/*
 
 client:ngx:
 - changed-files:
