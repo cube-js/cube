@@ -229,7 +229,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('true')
     .asBoolStrict(),
   transpilationWorkerThreads: () => {
-    let enabled = get('CUBEJS_TRANSPILATION_WORKER_THREADS')
+    const enabled = get('CUBEJS_TRANSPILATION_WORKER_THREADS')
       .default('true')
       .asBoolStrict();
 
