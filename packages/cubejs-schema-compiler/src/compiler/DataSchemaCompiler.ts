@@ -5,9 +5,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import syntaxCheck from 'syntax-error';
-import { parse } from '@babel/parser';
-import babelGenerator from '@babel/generator';
-import babelTraverse from '@babel/traverse';
 import R from 'ramda';
 import workerpool from 'workerpool';
 import { LRUCache } from 'lru-cache';
@@ -275,12 +272,11 @@ export class DataSchemaCompiler {
     const errorsReport = new ErrorReporter(null, [], this.errorReportOptions);
     this.errorsReporter = errorsReport;
 
-    const transpilationWorkerThreads = getEnv('transpilationWorkerThreads');
     const transpilationNative = getEnv('transpilationNative');
     const transpilationNativeThreadsCount = getThreadsCount();
     const { compilerId } = this;
 
-    if (transpilationWorkerThreads) {
+    if (!transpilationNative) {
       const wc = getEnv('transpilationWorkerThreadsCount');
       this.workerPool = workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
@@ -292,11 +288,10 @@ export class DataSchemaCompiler {
       let cubeNames: string[] = [];
       let cubeSymbols: Record<string, Record<string, boolean>> = {};
       let transpilerNames: string[] = [];
-      let results: (FileContent | undefined)[];
 
-      if (transpilationNative || transpilationWorkerThreads) {
-        ({ cubeNames, cubeSymbols, transpilerNames } = this.prepareTranspileSymbols());
-      }
+      ({ cubeNames, cubeSymbols, transpilerNames } = this.prepareTranspileSymbols());
+
+      let results: (FileContent | undefined)[];
 
       if (transpilationNative) {
         const jsFiles = originalJsFiles;
@@ -325,28 +320,25 @@ export class DataSchemaCompiler {
           .map(f => this.transpileJinjaFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames }));
 
         results = (await Promise.all([...jsFilesTasks, ...yamlFilesTasks, ...jinjaFilesTasks])).flat();
-      } else if (transpilationWorkerThreads) {
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       } else {
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, {})));
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       }
 
       return results.filter(f => !!f) as FileContent[];
     };
 
     const transpilePhase = async (stage: CompileStage): Promise<FileContent[]> => {
-      let cubeNames: string[] = [];
-      let cubeSymbols: Record<string, Record<string, boolean>> = {};
-      let transpilerNames: string[] = [];
       let results: (FileContent | undefined)[];
 
       if (toCompile.length === 0) {
         return [];
       }
 
-      if (transpilationNative || transpilationWorkerThreads) {
-        ({ cubeNames, cubeSymbols, transpilerNames } = this.prepareTranspileSymbols());
-      }
+      let cubeNames: string[] = [];
+      let cubeSymbols: Record<string, Record<string, boolean>> = {};
+      let transpilerNames: string[] = [];
+
+      ({ cubeNames, cubeSymbols, transpilerNames } = this.prepareTranspileSymbols());
 
       // After the first phase all files are with JS source code: original or transpiled
 
@@ -363,10 +355,8 @@ export class DataSchemaCompiler {
         const jsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesNativeBulk(chunk, errorsReport, { transpilerNames, compilerId }));
 
         results = (await Promise.all(jsFilesTasks)).flat();
-      } else if (transpilationWorkerThreads) {
-        results = await Promise.all(toCompile.map(f => this.transpileJsFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       } else {
-        results = await Promise.all(toCompile.map(f => this.transpileJsFile(f, errorsReport, {})));
+        results = await Promise.all(toCompile.map(f => this.transpileJsFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       }
 
       return results.filter(f => !!f) as FileContent[];
@@ -520,7 +510,7 @@ export class DataSchemaCompiler {
             errorsReport,
             { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {}, compilerId: this.compilerId, stage: 0 }
           ).then(() => undefined);
-        } else if (transpilationWorkerThreads && this.workerPool) {
+        } else if (this.workerPool) {
           this.workerPool.terminate();
         }
       });
@@ -701,7 +691,7 @@ export class DataSchemaCompiler {
         errorsReport.exitFile();
 
         return { ...file, content: res[0].code };
-      } else if (getEnv('transpilationWorkerThreads')) {
+      } else {
         const data = {
           fileName: file.fileName,
           content: file.content,
@@ -715,25 +705,6 @@ export class DataSchemaCompiler {
         errorsReport.addWarnings(res.warnings);
 
         return { ...file, content: res.content };
-      } else {
-        const ast = parse(
-          file.content,
-          {
-            sourceFilename: file.fileName,
-            sourceType: 'module',
-            plugins: ['objectRestSpread'],
-          },
-        );
-
-        errorsReport.inFile(file);
-        this.transpilers.forEach((t) => {
-          babelTraverse(ast, t.traverseObject(errorsReport));
-        });
-        errorsReport.exitFile();
-
-        const content = babelGenerator(ast, {}, file.content).code;
-
-        return { ...file, content };
       }
     } catch (e: any) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
@@ -778,7 +749,7 @@ export class DataSchemaCompiler {
       this.compiledYamlCache.set(cacheKey, res[0].code);
 
       return { ...file, content: res[0].code };
-    } else if (getEnv('transpilationWorkerThreads')) {
+    } else {
       const data = {
         fileName: file.fileName,
         content: file.content,
@@ -794,12 +765,6 @@ export class DataSchemaCompiler {
       this.compiledYamlCache.set(cacheKey, res.content);
 
       return { ...file, content: res.content };
-    } else {
-      const transpiledFile = this.yamlCompiler.transpileYamlFile(file, errorsReport);
-
-      this.compiledYamlCache.set(cacheKey, transpiledFile?.content || '');
-
-      return transpiledFile;
     }
   }
 
