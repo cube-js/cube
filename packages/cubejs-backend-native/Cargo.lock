@@ -856,6 +856,7 @@ dependencies = [
  "convert_case 0.7.1",
  "cubeclient",
  "cubenativeutils",
+ "indoc",
  "itertools 0.10.5",
  "lazy_static",
  "minijinja",
@@ -1722,9 +1723,12 @@ dependencies = [
 
 [[package]]
 name = "indoc"
-version = "2.0.4"
+version = "2.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e186cfbae8084e513daff4240b4797e342f988cecda4fb6c939150f96315fd8"
+checksum = "79cf5c93f93228cf8efb3ba362535fb11199ac548a09ce117c9b1adc3030d706"
+dependencies = [
+ "rustversion",
+]
 
 [[package]]
 name = "instant"

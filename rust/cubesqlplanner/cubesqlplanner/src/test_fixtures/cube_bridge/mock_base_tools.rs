@@ -5,7 +5,9 @@ use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
-use crate::test_fixtures::cube_bridge::{MockDriverTools, MockSqlTemplatesRender, MockSqlUtils};
+use crate::test_fixtures::cube_bridge::{
+    MockDriverTools, MockJoinGraph, MockSqlTemplatesRender, MockSqlUtils,
+};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -28,6 +30,9 @@ pub struct MockBaseTools {
 
     #[builder(default = Rc::new(MockSqlUtils))]
     sql_utils: Rc<MockSqlUtils>,
+
+    #[builder(default = Rc::new(MockJoinGraph::new()))]
+    join_graph: Rc<MockJoinGraph>,
 }
 
 impl Default for MockBaseTools {
@@ -100,8 +105,9 @@ impl BaseTools for MockBaseTools {
 
     fn join_tree_for_hints(
         &self,
-        _hints: Vec<JoinHintItem>,
+        hints: Vec<JoinHintItem>,
     ) -> Result<Rc<dyn JoinDefinition>, CubeError> {
-        todo!("join_tree_for_hints not implemented in mock")
+        let result = self.join_graph.build_join(hints)?;
+        Ok(result as Rc<dyn JoinDefinition>)
     }
 }

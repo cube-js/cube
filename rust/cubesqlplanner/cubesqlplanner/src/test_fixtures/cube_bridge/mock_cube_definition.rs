@@ -20,9 +20,9 @@ pub struct MockCubeDefinition {
     #[builder(default)]
     join_map: Option<Vec<Vec<String>>>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default, setter(strip_option(fallback = sql_table_opt)))]
     sql_table: Option<String>,
-    #[builder(default, setter(strip_option))]
+    #[builder(default, setter(strip_option(fallback = sql_opt)))]
     sql: Option<String>,
 
     #[builder(default)]
