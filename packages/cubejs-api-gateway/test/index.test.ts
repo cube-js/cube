@@ -1150,4 +1150,82 @@ describe('API Gateway', () => {
       expect(dataSourceStorage.$testOrchestratorConnectionsDone).toEqual(false);
     });
   });
+
+  describe('/v1/cubesql', () => {
+    test('simple query works', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      // Mock the sqlServer.execSql method
+      const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone) => {
+        // Simulate writing schema and data to the stream
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [[1], [2], [3]]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3'
+        })
+        .responseType('text')
+        .expect(200);
+
+      // Verify the mock was called with correct parameters
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 3',
+        expect.anything(),
+        {},
+        undefined,
+        undefined
+      );
+    });
+
+    test('timezone can be passed', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      // Mock the sqlServer.execSql method
+      const execSqlMock = jest.fn(async (query, stream, securityContext, cacheMode, timezone) => {
+        // Simulate writing schema and data to the stream
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'created_at', column_type: 'Timestamp' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [['2025-12-22T16:00:00.000'], ['2025-12-24T16:00:00.000']]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT created_at FROM orders WHERE created_at > \'2025-12-22 13:00:00\'::timestamptz',
+          cache: 'stale-while-revalidate',
+          timezone: 'America/Los_Angeles'
+        })
+        .responseType('text')
+        .expect(200);
+
+      // Verify the mock was called with correct parameters including timezone
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT created_at FROM orders WHERE created_at > \'2025-12-22 13:00:00\'::timestamptz',
+        expect.anything(),
+        {},
+        'stale-while-revalidate',
+        'America/Los_Angeles'
+      );
+    });
+  });
 });

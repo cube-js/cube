@@ -153,6 +153,7 @@ impl QueryBuilder {
                 ungrouped: None,
                 subquery_joins: None,
                 join_hints: None,
+                timezone: None,
             },
             meta: self.meta,
         }

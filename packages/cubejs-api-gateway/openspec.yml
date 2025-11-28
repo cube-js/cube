@@ -479,6 +479,8 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1LoadRequestJoinHint"
+        timezone:
+          type: "string"
     V1LoadRequest:
       type: "object"
       properties:

@@ -322,7 +322,8 @@ This endpoint is part of the [SQL API][ref-sql-api].
 
 | Parameter | Description | Required |
 | --- | --- | --- |
-| `query` | The SQL query to run. | ✅ Yes |
+| `query` | The SQL query to run | ✅ Yes |
+| `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
 
 Response: a stream of newline-delimited JSON objects. The first object contains
@@ -643,3 +644,5 @@ Keep-Alive: timeout=5
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api
 [ref-folders]: /product/data-modeling/reference/view#folders
 [ref-cache-control]: /product/apis-integrations/rest-api#cache-control
+[ref-time-zone]: /product/apis-integrations/queries#time-zone
+[link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
