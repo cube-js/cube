@@ -8,9 +8,9 @@
 # Cube.js Vue
 
 ---
-**NOTE**
+**⚠️ DEPRECATED**
 
-This package is only compatible with Vue 2. If you are using Vue 3, consider the `@cubejs-client/vue3` package instead.
+This package is only compatible with Vue 2, which has reached End of Life (EOL). It is deprecated and will not receive any updates. We highly recommend upgrading to `@cubejs-client/vue3` and Vue 3.
 
 ---
 
