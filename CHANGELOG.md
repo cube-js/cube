@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+### Bug Fixes
+
+- **query-orchestrator:** Table used cache should not be used for unions ([#10192](https://github.com/cube-js/cube/issues/10192)) ([53d79bb](https://github.com/cube-js/cube/commit/53d79bbfd16aeefadb3bd8e0a73a5c0b5e920da4))
+
+### Features
+
+- **api-gateway:** Support query timezone in `/cubesql` API endpoint ([#10189](https://github.com/cube-js/cube/issues/10189)) ([499ddc6](https://github.com/cube-js/cube/commit/499ddc62fc1618b78f16a17943e1c72a670f6b48))
+
 ## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
 
 ### Bug Fixes
