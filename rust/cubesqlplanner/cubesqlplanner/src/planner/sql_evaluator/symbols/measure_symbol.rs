@@ -799,3 +799,32 @@ impl SymbolFactory for MeasureSymbolFactory {
         )))
     }
 }
+
+impl crate::utils::debug::DebugSql for MeasureSymbol {
+    fn debug_sql(&self, expand_deps: bool) -> String {
+        // Handle case expressions
+        if let Some(case) = &self.case {
+            return case.debug_sql(expand_deps);
+        }
+
+        // Get base SQL
+        let base_sql = if let Some(sql) = &self.member_sql {
+            sql.debug_sql(expand_deps)
+        } else {
+            "".to_string()
+        };
+
+        // Handle filtered measures
+        if !self.measure_filters.is_empty() {
+            let filters = self
+                .measure_filters
+                .iter()
+                .map(|f| f.debug_sql(expand_deps))
+                .collect::<Vec<_>>()
+                .join(" AND ");
+            return format!("{} FILTER (WHERE {})", base_sql, filters);
+        }
+
+        base_sql
+    }
+}
