@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeDimension {
     pub dimension: String,
     pub granularity: Option<String>,
@@ -21,7 +21,7 @@ pub struct TimeDimension {
     pub date_range: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FilterItem {
     pub or: Option<Vec<FilterItem>>,
     pub and: Option<Vec<FilterItem>>,
@@ -31,7 +31,7 @@ pub struct FilterItem {
     pub values: Option<Vec<Option<String>>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OrderByItem {
     pub id: String,
     pub desc: Option<bool>,
