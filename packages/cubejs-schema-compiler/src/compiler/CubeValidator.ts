@@ -138,6 +138,11 @@ const BaseDimensionWithoutSubQuery = {
     then: Joi.array().items(Joi.string()),
     otherwise: Joi.forbidden()
   }),
+  localTime: Joi.when('type', {
+    is: 'time',
+    then: Joi.boolean().strict(),
+    otherwise: Joi.forbidden()
+  }),
   granularities: Joi.when('type', {
     is: 'time',
     then: Joi.object().pattern(identifierRegex,

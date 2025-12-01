@@ -1292,4 +1292,98 @@ describe('Cube Validation', () => {
       expect(result.error).toBeTruthy();
     });
   });
+
+  describe('localTime validation', () => {
+    it('time dimension with localTime - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders',
+        sql: () => 'SELECT * FROM orders',
+        dimensions: {
+          local_date: {
+            sql: () => 'local_date',
+            type: 'time',
+            localTime: true
+          }
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('string dimension with localTime - should fail', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders',
+        sql: () => 'SELECT * FROM orders',
+        dimensions: {
+          local_date: {
+            sql: () => 'local_date',
+            type: 'string',
+            localTime: true
+          }
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          expect(message).toContain('localTime');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('number dimension with localTime - should fail', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders',
+        sql: () => 'SELECT * FROM orders',
+        dimensions: {
+          amount: {
+            sql: () => 'amount',
+            type: 'number',
+            localTime: true
+          }
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          expect(message).toContain('localTime');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('time dimension with localTime and granularities - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'orders',
+        sql: () => 'SELECT * FROM orders',
+        dimensions: {
+          local_date: {
+            sql: () => 'local_date',
+            type: 'time',
+            localTime: true,
+            granularities: {
+              fiscal_year: {
+                interval: '1 year',
+                origin: '2024-04-01'
+              }
+            }
+          }
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+  });
 });

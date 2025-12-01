@@ -33,6 +33,7 @@ type ConfigItem = {
   drillMembers?: any[];
   drillMembersGrouped?: any;
   granularities?: GranularityMeta[];
+  localTime?: boolean;
 };
 
 type AnnotatedConfigItem = Omit<ConfigItem, 'granularities'> & {
@@ -68,6 +69,9 @@ const annotation = (
     } : {}),
     ...(memberType === MemberTypeEnum.DIMENSIONS && config.granularities ? {
       granularities: config.granularities || [],
+    } : {}),
+    ...(memberType === MemberTypeEnum.DIMENSIONS && config.localTime ? {
+      localTime: config.localTime,
     } : {}),
   }];
 };

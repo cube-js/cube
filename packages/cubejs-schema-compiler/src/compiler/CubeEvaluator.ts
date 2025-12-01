@@ -35,6 +35,7 @@ export type DimensionDefinition = {
   fieldType?: string;
   multiStage?: boolean;
   shiftInterval?: string;
+  localTime?: boolean;
 };
 
 export type TimeShiftDefinition = {

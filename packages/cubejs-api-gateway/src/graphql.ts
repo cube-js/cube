@@ -346,16 +346,36 @@ function whereArgToQueryFilters(
 function parseDates(result: any) {
   const { timezone } = result.query;
 
-  const dateKeys = Object.entries<any>({
+  const allAnnotations = {
     ...result.annotation.measures,
     ...result.annotation.dimensions,
     ...result.annotation.timeDimensions,
-  }).reduce((res, [key, value]) => (value.type === 'time' ? [...res, key] : res), [] as any);
+  };
+
+  const dateKeys = Object.entries<any>(allAnnotations)
+    .reduce((res, [key, value]) => (value.type === 'time' ? [...res, key] : res), [] as any);
 
   result.data.forEach(row => {
     Object.keys(row).forEach(key => {
       if (dateKeys.includes(key)) {
-        row[key] = moment.tz(row[key], timezone).toISOString();
+        const annotation = allAnnotations[key];
+        if (annotation && annotation.localTime) {
+          // For localTime dimensions, format as ISO string without timezone conversion
+          // The timestamp is already in local time, we just need to ensure it's in ISO format
+          if (row[key]) {
+            const dateStr = row[key].toString();
+            // If it already has 'Z' suffix, use as-is. Otherwise, add it for ISO compliance.
+            if (dateStr.endsWith('Z')) {
+              row[key] = dateStr;
+            } else {
+              // Parse without timezone and format as UTC (treating local time as UTC)
+              const m = moment.utc(row[key]);
+              row[key] = m.toISOString();
+            }
+          }
+        } else {
+          row[key] = moment.tz(row[key], timezone).toISOString();
+        }
       }
       return row;
     });
