@@ -49,7 +49,7 @@ export class PrestodbQuery extends BaseQuery {
     return `from_iso8601_timestamp(${value})`;
   }
 
-  public convertTz(field) {
+  public override convertTz(field) {
     const atTimezone = `${field} AT TIME ZONE '${this.timezone}'`;
     return this.timezone ?
       `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${field})) AS TIMESTAMP)` :

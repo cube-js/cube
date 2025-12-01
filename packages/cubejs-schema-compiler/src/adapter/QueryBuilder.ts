@@ -15,6 +15,8 @@ import { SqliteQuery } from './SqliteQuery';
 import { AWSElasticSearchQuery } from './AWSElasticSearchQuery';
 import { ElasticSearchQuery } from './ElasticSearchQuery';
 import { CubeStoreQuery } from './CubeStoreQuery';
+import { AthenaQuery } from './AthenaQuery';
+import { TrinoQuery } from './TrinoQuery';
 
 const ADAPTERS = {
   postgres: PostgresQuery,
@@ -26,7 +28,8 @@ const ADAPTERS = {
   bigquery: BigqueryQuery,
   prestodb: PrestodbQuery,
   qubole_prestodb: PrestodbQuery,
-  athena: PrestodbQuery,
+  athena: AthenaQuery,
+  trino: TrinoQuery,
   vertica: VerticaQuery,
   snowflake: SnowflakeQuery,
   clickhouse: ClickHouseQuery,
