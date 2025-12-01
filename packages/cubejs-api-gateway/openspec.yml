@@ -291,17 +291,17 @@ components:
       required:
         - label
         - type
-    V1CubeMetaCustomDateFormat:
+    V1CubeMetaCustomTimeFormat:
       type: "object"
-      description: Custom date format for time dimensions
+      description: Custom time format for time dimensions
       properties:
         type:
           type: "string"
-          enum: ["custom-date"]
-          description: Type of the format (must be 'custom-date')
+          enum: ["custom-time"]
+          description: Type of the format (must be 'custom-time')
         value:
           type: "string"
-          description: Date format string (e.g., 'yyyy-MM-dd', 'dd/mm/yyyy hh:nn:ss')
+          description: Time format string (e.g., 'yyyy-MM-dd', 'dd/mm/yyyy hh:nn:ss')
       required:
         - type
         - value
@@ -309,8 +309,8 @@ components:
       oneOf:
         - $ref: "#/components/schemas/V1CubeMetaSimpleFormat"
         - $ref: "#/components/schemas/V1CubeMetaLinkFormat"
-        - $ref: "#/components/schemas/V1CubeMetaCustomDateFormat"
-      description: Format of dimension - can be a simple string format, a link configuration, or a custom date format
+        - $ref: "#/components/schemas/V1CubeMetaCustomTimeFormat"
+      description: Format of dimension - can be a simple string format, a link configuration, or a custom time format
     V1MetaResponse:
       type: "object"
       properties:

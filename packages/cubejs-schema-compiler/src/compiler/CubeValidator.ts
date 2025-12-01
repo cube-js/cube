@@ -119,10 +119,10 @@ const formatSchema = Joi.alternatives([
   })
 ]);
 
-const DATE_FORMAT_SPECIFIERS = new Set(['d', 'm', 'y', 'h', 'n', 's', 'q', 'w']);
-const DATE_FORMAT_SEPARATORS = new Set(['-', '/', ':', '.', ',', ' ']);
+const TIME_FORMAT_SPECIFIERS = new Set(['d', 'm', 'y', 'h', 'n', 's', 'q', 'w']);
+const TIME_FORMAT_SEPARATORS = new Set(['-', '/', ':', '.', ',', ' ']);
 
-const customDateFormatSchema = Joi.string().custom((value, helper) => {
+const customTimeFormatSchema = Joi.string().custom((value, helper) => {
   const invalidChars: string[] = [];
   let hasSpecifier = false;
 
@@ -135,21 +135,21 @@ const customDateFormatSchema = Joi.string().custom((value, helper) => {
     if (char === '"' || char === '\'') {
       const closeIndex = value.indexOf(char, i + 1);
       if (closeIndex === -1) {
-        return helper.message({ custom: `Invalid date format "${value}". Unclosed quote at position ${i}` });
+        return helper.message({ custom: `Invalid time format "${value}". Unclosed quote at position ${i}` });
       }
 
       i = closeIndex + 1;
     } else if (char === '[') {
       const closeIndex = value.indexOf(']', i + 1);
       if (closeIndex === -1) {
-        return helper.message({ custom: `Invalid date format "${value}". Unclosed bracket at position ${i}` });
+        return helper.message({ custom: `Invalid time format "${value}". Unclosed bracket at position ${i}` });
       }
 
       i = closeIndex + 1;
-    } else if (DATE_FORMAT_SPECIFIERS.has(char.toLowerCase())) {
+    } else if (TIME_FORMAT_SPECIFIERS.has(char.toLowerCase())) {
       hasSpecifier = true;
       i++;
-    } else if (DATE_FORMAT_SEPARATORS.has(char)) {
+    } else if (TIME_FORMAT_SEPARATORS.has(char)) {
       i++;
     } else if (char.toUpperCase() === 'A' || char.toUpperCase() === 'P') {
       i++;
@@ -160,11 +160,11 @@ const customDateFormatSchema = Joi.string().custom((value, helper) => {
   }
 
   if (!hasSpecifier) {
-    return helper.message({ custom: `Invalid date format "${value}". Format must contain at least one date/time specifier (d, m, y, h, n, s, q, w)` });
+    return helper.message({ custom: `Invalid time format "${value}". Format must contain at least one date/time specifier (d, m, y, h, n, s, q, w)` });
   }
 
   if (invalidChars.length > 0) {
-    return helper.message({ custom: `Invalid date format "${value}". Contains invalid characters: "${invalidChars.join('')}". Use quotes for literal text.` });
+    return helper.message({ custom: `Invalid time format "${value}". Contains invalid characters: "${invalidChars.join('')}". Use quotes for literal text.` });
   }
 
   return value;
@@ -172,7 +172,7 @@ const customDateFormatSchema = Joi.string().custom((value, helper) => {
 
 const timeFormatSchema = Joi.alternatives([
   formatSchema,
-  customDateFormatSchema
+  customTimeFormatSchema
 ]);
 
 const BaseDimensionWithoutSubQuery = {

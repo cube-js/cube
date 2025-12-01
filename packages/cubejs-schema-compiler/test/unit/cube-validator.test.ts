@@ -1293,8 +1293,8 @@ describe('Cube Validation', () => {
     });
   });
 
-  describe('Custom date format for time dimensions', () => {
-    it('time dimension with valid custom date format - correct', async () => {
+  describe('Custom time format for time dimensions', () => {
+    it('time dimension with valid custom time format - correct', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'name',
@@ -1313,7 +1313,7 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeFalsy();
     });
 
-    it('time dimension with complex date format - correct', async () => {
+    it('time dimension with complex time format - correct', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'name',
@@ -1408,7 +1408,7 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeTruthy();
     });
 
-    it('non-time dimension with date format string - error', async () => {
+    it('non-time dimension with time format string - error', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'name',

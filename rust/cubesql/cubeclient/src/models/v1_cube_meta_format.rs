@@ -11,14 +11,14 @@
 use crate::models;
 use serde::{Deserialize, Serialize};
 
-/// V1CubeMetaFormat : Format of dimension - can be a simple string format, a link configuration, or a custom date format
-/// Format of dimension - can be a simple string format, a link configuration, or a custom date format
+/// V1CubeMetaFormat : Format of dimension - can be a simple string format, a link configuration, or a custom time format
+/// Format of dimension - can be a simple string format, a link configuration, or a custom time format
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum V1CubeMetaFormat {
     V1CubeMetaSimpleFormat(models::V1CubeMetaSimpleFormat),
     V1CubeMetaLinkFormat(Box<models::V1CubeMetaLinkFormat>),
-    V1CubeMetaCustomDateFormat(Box<models::V1CubeMetaCustomDateFormat>),
+    V1CubeMetaCustomTimeFormat(Box<models::V1CubeMetaCustomTimeFormat>),
 }
 
 impl Default for V1CubeMetaFormat {
@@ -31,8 +31,8 @@ impl Default for V1CubeMetaFormat {
 pub enum Type {
     #[serde(rename = "link")]
     Link,
-    #[serde(rename = "custom-date")]
-    CustomDate,
+    #[serde(rename = "custom-time")]
+    CustomTime,
 }
 
 impl Default for Type {

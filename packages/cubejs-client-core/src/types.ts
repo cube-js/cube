@@ -15,10 +15,10 @@ export type GranularityAnnotation = {
   origin?: string;
 };
 
-export type DimensionCustomDateFormat = { type: 'custom-date'; value: string };
+export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
 export type DimensionLinkFormat = { type: 'link'; label: string };
 export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
-  | DimensionLinkFormat | DimensionCustomDateFormat;
+  | DimensionLinkFormat | DimensionCustomTimeFormat;
 
 export type Annotation = {
   title: string;

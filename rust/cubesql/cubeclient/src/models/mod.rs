@@ -1,9 +1,9 @@
 pub mod v1_cube_meta;
 pub use self::v1_cube_meta::V1CubeMeta;
-pub mod v1_cube_meta_custom_date_format;
-pub use self::v1_cube_meta_custom_date_format::V1CubeMetaCustomDateFormat;
+pub mod v1_cube_meta_custom_time_format;
+pub use self::v1_cube_meta_custom_time_format::V1CubeMetaCustomTimeFormat;
 // problem with code-gen, let's rename it as re-export
-pub use self::v1_cube_meta_custom_date_format::Type as V1CubeMetaCustomDateFormatType;
+pub use self::v1_cube_meta_custom_time_format::Type as V1CubeMetaCustomTimeFormatType;
 pub mod v1_cube_meta_dimension;
 pub use self::v1_cube_meta_dimension::V1CubeMetaDimension;
 pub mod v1_cube_meta_dimension_granularity;
