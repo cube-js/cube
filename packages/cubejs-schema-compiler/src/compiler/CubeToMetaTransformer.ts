@@ -77,7 +77,9 @@ export type MeasureConfig = {
   public: boolean;
 };
 
-export type DimensionFormat = string | { type: string; label?: string; value?: string };
+export type DimensionCustomDateFormat = { type: 'custom-date'; value: string };
+export type DimensionLinkFormat = { type: 'link'; label?: string };
+export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomDateFormat;
 
 export type DimensionConfig = {
   name: string;
