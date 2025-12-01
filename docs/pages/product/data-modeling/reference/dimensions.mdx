@@ -408,6 +408,82 @@ duplicate rows in the result set.
 
 </InfoBox>
 
+### `html`
+
+The `html` parameter allows to define an HTML fragment associated with a dimension.
+It can be rendered in eligible visualizations by supporting tools, e.g.,
+[Workbooks][ref-workbooks].
+
+HTML fragments are useful to provide users with rich formatting that goes beyond the
+capabilities of the [`format` parameter](#format).
+
+```yaml
+cubes:
+  - name: employees
+
+    dimensions:
+      - name: full_name
+        sql: full_name
+        type: string
+        html: |
+          <span style="color: red; text-decoration: line-through;">
+            {full_name}
+          </span>
+```
+
+HTML fragments can also use Jinja templates to render dynamic content. In that case, the
+Jinja template has to be [properly escaped][ref-jinja-escaping] using a literal variable
+expression (`{{ '...' }}`) or a raw block (`{% raw %} ... {% endraw %}`) to avoid being
+processed during the data model compilation. This approach is known as _Jinja-in-Jinja_.
+
+```yaml
+cubes:
+  - name: employees
+
+    dimensions:
+      - name: full_name
+        sql: full_name
+        type: string
+        html: {{ '{% if "{full_name}" | length > 10 %}looooooong {full_name}{% else %}short {full_name}{% endif %}' }}
+
+      - name: full_name_block
+        sql: full_name
+        type: string
+        html: |
+          {% raw %}
+            {% if {full_name} | length > 10 %}
+              looooooong {full_name}
+            {% else %}
+              short {full_name}
+            {% endif %}
+          {% endraw %}
+
+      - name: full_name_block_loop
+        sql: full_name
+        type: string
+        html: |
+          {% raw %}
+            <ul>
+            {% for part in {full_name} | split(" ") %}
+              <li>{{ part }}</li>
+            {% endfor %}
+            </ul>
+          {% endraw %}
+```
+
+#### Dimensions
+
+An HTML fragment will be rendered as an additional [synthetic](#synthetic) dimension in
+the result set, with the following naming convention: `<dimension_name>___html`.
+
+<InfoBox>
+
+All references in HTML fragments must resolve to a single value for a given value of the
+dimension on which the fragment is defined. Otherwise, it will result induplicate rows in
+the result set.
+
+</InfoBox>
+
 ### `meta`
 
 The `meta` parameter allows to attach arbitrary information to a dimension.
@@ -1039,3 +1115,4 @@ cube(`fiscal_calendar`, {
 [link-encode-uri-component]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent
 [ref-rest-filters]: /product/apis-integrations/rest-api/query-format#query-properties
 [ref-meta]: /product/apis-integrations/rest-api/reference#base_pathv1meta
+[ref-jinja-escaping]: https://jinja.palletsprojects.com/en/stable/templates/#escaping
