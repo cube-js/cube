@@ -113,6 +113,12 @@ impl SpanId {
     }
 }
 
+#[derive(Clone)]
+pub struct TransportServiceLoadResponse {
+    pub last_refresh_time: Option<String>,
+    pub results_batch: RecordBatch,
+}
+
 #[async_trait]
 pub trait TransportService: Send + Sync + Debug {
     // Load meta information about cubes
@@ -145,7 +151,7 @@ pub trait TransportService: Send + Sync + Debug {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
-    ) -> Result<Vec<RecordBatch>, CubeError>;
+    ) -> Result<Vec<TransportServiceLoadResponse>, CubeError>;
 
     async fn load_stream(
         &self,
@@ -193,11 +199,11 @@ struct MetaCacheBucket {
     value: Arc<MetaContext>,
 }
 
-/// This transports is used in standalone mode
+/// This transport is used in standalone mode
 #[derive(Debug)]
 pub struct HttpTransport {
     /// We use simple cache to improve DX with standalone mode
-    /// because currently we dont persist DF in the SessionState
+    /// because currently we don't persist DF in the SessionState,
     /// and it causes a lot of HTTP requests which slow down BI connections
     cache: RwLockAsync<Option<MetaCacheBucket>>,
 }
@@ -286,7 +292,7 @@ impl TransportService for HttpTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
-    ) -> Result<Vec<RecordBatch>, CubeError> {
+    ) -> Result<Vec<TransportServiceLoadResponse>, CubeError> {
         if meta.change_user().is_some() {
             return Err(CubeError::internal(
                 "Changing security context (__user) is not supported in the standalone mode"

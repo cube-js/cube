@@ -327,6 +327,13 @@ async fn handle_sql_query(
             let mut schema_response = Map::new();
             schema_response.insert("schema".into(), columns_json);
 
+            if let Some(last_refresh_time) = stream_schema.metadata().get("lastRefreshTime") {
+                schema_response.insert(
+                    "lastRefreshTime".into(),
+                    serde_json::Value::String(last_refresh_time.clone()),
+                );
+            }
+
             write_jsonl_message(
                 channel.clone(),
                 stream_methods.write.clone(),
