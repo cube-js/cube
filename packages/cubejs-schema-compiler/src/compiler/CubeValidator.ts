@@ -119,6 +119,62 @@ const formatSchema = Joi.alternatives([
   })
 ]);
 
+const DATE_FORMAT_SPECIFIERS = new Set(['d', 'm', 'y', 'h', 'n', 's', 'q', 'w']);
+const DATE_FORMAT_SEPARATORS = new Set(['-', '/', ':', '.', ',', ' ']);
+
+const customDateFormatSchema = Joi.string().custom((value, helper) => {
+  const invalidChars: string[] = [];
+  let hasSpecifier = false;
+
+  let i = 0;
+
+  while (i < value.length) {
+    const char = value[i];
+
+    // Handle quoted literals (skip content inside quotes or brackets)
+    if (char === '"' || char === '\'') {
+      const closeIndex = value.indexOf(char, i + 1);
+      if (closeIndex === -1) {
+        return helper.message({ custom: `Invalid date format "${value}". Unclosed quote at position ${i}` });
+      }
+
+      i = closeIndex + 1;
+    } else if (char === '[') {
+      const closeIndex = value.indexOf(']', i + 1);
+      if (closeIndex === -1) {
+        return helper.message({ custom: `Invalid date format "${value}". Unclosed bracket at position ${i}` });
+      }
+
+      i = closeIndex + 1;
+    } else if (DATE_FORMAT_SPECIFIERS.has(char.toLowerCase())) {
+      hasSpecifier = true;
+      i++;
+    } else if (DATE_FORMAT_SEPARATORS.has(char)) {
+      i++;
+    } else if (char.toUpperCase() === 'A' || char.toUpperCase() === 'P') {
+      i++;
+    } else {
+      invalidChars.push(char);
+      i++;
+    }
+  }
+
+  if (!hasSpecifier) {
+    return helper.message({ custom: `Invalid date format "${value}". Format must contain at least one date/time specifier (d, m, y, h, n, s, q, w)` });
+  }
+
+  if (invalidChars.length > 0) {
+    return helper.message({ custom: `Invalid date format "${value}". Contains invalid characters: "${invalidChars.join('')}". Use quotes for literal text.` });
+  }
+
+  return value;
+});
+
+const timeFormatSchema = Joi.alternatives([
+  formatSchema,
+  customDateFormatSchema
+]);
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -131,7 +187,11 @@ const BaseDimensionWithoutSubQuery = {
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
-  format: formatSchema,
+  format: Joi.when('type', {
+    is: 'time',
+    then: timeFormatSchema,
+    otherwise: formatSchema
+  }),
   meta: Joi.any(),
   values: Joi.when('type', {
     is: 'switch',

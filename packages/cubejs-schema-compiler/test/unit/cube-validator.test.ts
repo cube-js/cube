@@ -1292,4 +1292,139 @@ describe('Cube Validation', () => {
       expect(result.error).toBeTruthy();
     });
   });
+
+  describe('Custom date format for time dimensions', () => {
+    it('time dimension with valid custom date format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'yyyy-MM-dd'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with complex date format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'dd/mm/yyyy hh:nn:ss'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with quoted literals in format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'yyyy "Year" mm "Month"'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with standard format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'id'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with invalid format (no specifiers) - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'invalid'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('time dimension with invalid characters in format - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'yyyy@mm#dd'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('non-time dimension with date format string - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          status: {
+            sql: () => 'status',
+            type: 'string',
+            format: 'yyyy-MM-dd'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+  });
 });
