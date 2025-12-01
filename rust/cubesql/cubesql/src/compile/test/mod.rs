@@ -47,10 +47,9 @@ pub mod test_user_change;
 #[cfg(test)]
 pub mod test_wrapper;
 pub mod utils;
+use crate::compile::engine::df::scan::convert_transport_response;
 use crate::compile::engine::df::scan::CacheMode;
-use crate::compile::{
-    arrow::record_batch::RecordBatch, engine::df::scan::convert_transport_response,
-};
+use crate::transport::TransportServiceLoadResponse;
 pub use utils::*;
 
 pub fn get_test_meta() -> Vec<CubeMeta> {
@@ -913,7 +912,7 @@ impl TransportService for TestConnectionTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         _cache_mode: Option<CacheMode>,
-    ) -> Result<Vec<RecordBatch>, CubeError> {
+    ) -> Result<Vec<TransportServiceLoadResponse>, CubeError> {
         {
             let mut calls = self.load_calls.lock().await;
             calls.push(TestTransportLoadCall {

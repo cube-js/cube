@@ -5,6 +5,7 @@ use std::fmt::Display;
 
 use crate::auth::NativeSQLAuthContext;
 use crate::channel::{call_raw_js_with_channel_as_callback, NodeSqlGenerator, ValueFromJs};
+use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::node_obj_serializer::NodeObjSerializer;
 use crate::orchestrator::ResultWrapper;
 use crate::{
@@ -12,13 +13,15 @@ use crate::{
     stream::call_js_with_stream_as_callback,
 };
 use async_trait::async_trait;
+use cubeorchestrator::query_result_transform::RequestResultData;
+use cubesql::compile::arrow::datatypes::Schema;
 use cubesql::compile::engine::df::scan::{
-    convert_transport_response, transform_response, CacheMode, MemberField, RecordBatch, SchemaRef,
+    convert_transport_response, transform_response, CacheMode, MemberField, SchemaRef,
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
     SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponse,
-    TransportMetaResponse,
+    TransportMetaResponse, TransportServiceLoadResponse,
 };
 use cubesql::{
     di_service,
@@ -26,7 +29,7 @@ use cubesql::{
     transport::{CubeStreamReceiver, LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -342,7 +345,7 @@ impl TransportService for NodeBridgeTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
-    ) -> Result<Vec<RecordBatch>, CubeError> {
+    ) -> Result<Vec<TransportServiceLoadResponse>, CubeError> {
         trace!("[transport] Request ->");
 
         let native_auth = ctx
@@ -383,7 +386,7 @@ impl TransportService for NodeBridgeTransport {
                 self.on_sql_api_load.clone(),
                 extra,
                 Box::new(|cx, v| Ok(cx.string(v).as_value(cx))),
-                Box::new(move |cx, v| {
+                Box::new(move |mut cx, v| {
                     if let Ok(js_result_wrapped) = v.downcast::<JsObject, _>(cx) {
                         let get_results_js_method: Handle<JsFunction> =
                             js_result_wrapped.get(cx, "getResults").map_cube_err(
@@ -402,13 +405,36 @@ impl TransportService for NodeBridgeTransport {
                             .to_vec(cx)
                             .map_cube_err("Can't convert JS result to array")?;
 
-                        let native_wrapped_results = js_res_wrapped_vec
-                            .iter()
-                            .map(|r| ResultWrapper::from_js_result_wrapper(cx, *r))
-                            .collect::<Result<Vec<_>, _>>()
-                            .map_cube_err(
-                                "Can't construct result wrapper from JS ResultWrapper object",
+                        let get_root_result_object_method: Handle<JsFunction> =
+                            js_result_wrapped.get(cx, "getRootResultObject").map_cube_err(
+                                "Can't get getRootResultObject method from JS ResultWrapper object",
                             )?;
+
+                        let result_data_js_array = get_root_result_object_method
+                            .call(cx, js_result_wrapped.upcast::<JsValue>(), [])
+                            .map_cube_err(
+                                "Error calling getRootResultObject() method of JS ResultWrapper object",
+                            )?;
+
+                        let result_data_js_vec = result_data_js_array
+                            .downcast::<JsArray, _>(cx)
+                            .map_cube_err("Can't downcast getRootResultObject result to array")?
+                            .to_vec(cx)
+                            .map_cube_err("Can't convert getRootResultObject result to array")?;
+
+                        let mut native_wrapped_results = Vec::new();
+                        for (js_wrapper, js_result_data) in js_res_wrapped_vec.iter().zip(result_data_js_vec.iter()) {
+                            let mut wrapper = ResultWrapper::from_js_result_wrapper(cx, *js_wrapper)
+                                .map_cube_err("Can't construct result wrapper from JS ResultWrapper object")?;
+
+                            let deserializer = JsValueDeserializer::new(&mut cx, *js_result_data);
+                            let result_data: RequestResultData = Deserialize::deserialize(deserializer)
+                                .map_cube_err("Can't deserialize RequestResultData from getRootResultObject")?;
+
+                            wrapper.last_refresh_time = result_data.last_refresh_time;
+
+                            native_wrapped_results.push(wrapper);
+                        }
 
                         Ok(ValueFromJs::ResultWrapper(native_wrapped_results))
                     } else if let Ok(str) = v.downcast::<JsString, _>(cx) {
@@ -475,14 +501,33 @@ impl TransportService for NodeBridgeTransport {
                         }
                     };
 
-                    break convert_transport_response(response, schema.clone(), member_fields)
-                        .map_err(|err| CubeError::user(err.to_string()));
+                    break convert_transport_response(response, schema.clone(), member_fields);
                 }
                 ValueFromJs::ResultWrapper(result_wrappers) => {
                     break result_wrappers
                         .into_iter()
                         .map(|mut wrapper| {
-                            transform_response(&mut wrapper, schema.clone(), &member_fields)
+                            let updated_schema = if let Some(last_refresh_time) =
+                                wrapper.last_refresh_time.clone()
+                            {
+                                let mut metadata = schema.metadata().clone();
+                                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
+                                Arc::new(Schema::new_with_metadata(
+                                    schema.fields().to_vec(),
+                                    metadata,
+                                ))
+                            } else {
+                                schema.clone()
+                            };
+
+                            Ok(TransportServiceLoadResponse {
+                                last_refresh_time: wrapper.last_refresh_time.clone(),
+                                results_batch: transform_response(
+                                    &mut wrapper,
+                                    updated_schema,
+                                    &member_fields,
+                                )?,
+                            })
                         })
                         .collect::<Result<Vec<_>, _>>();
                 }

@@ -1,4 +1,5 @@
 use crate::compile::date_parser::parse_date_str;
+use crate::transport::TransportServiceLoadResponse;
 use crate::{
     compile::{
         engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
@@ -18,7 +19,7 @@ pub use datafusion::{
             ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder,
             Float64Builder, Int16Builder, Int32Builder, Int64Builder, NullArray, StringBuilder,
         },
-        datatypes::{DataType, SchemaRef},
+        datatypes::{DataType, Schema, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
         record_batch::RecordBatch,
     },
@@ -508,12 +509,13 @@ impl ExecutionPlan for CubeScanExecutionPlan {
 
         // For now execute method executes only one query at a time, so we
         // take the first result
+        let rb_schema = response.first().unwrap().schema().clone();
         one_shot_stream.data = Some(response.first().unwrap().clone());
 
         Ok(Box::pin(CubeScanStreamRouter::new(
             None,
             one_shot_stream,
-            self.schema.clone(),
+            rb_schema,
         )))
     }
 
@@ -734,6 +736,7 @@ async fn load_data(
             })?;
         let response = result.first();
         if let Some(data) = response.cloned() {
+            let data = data.results_batch;
             match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
                     return Err(ArrowError::ExternalError(Box::new(CubeError::user(
@@ -1171,15 +1174,18 @@ pub fn convert_transport_response(
     response: V1LoadResponse,
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
-) -> std::result::Result<Vec<RecordBatch>, CubeError> {
+) -> std::result::Result<Vec<TransportServiceLoadResponse>, CubeError> {
     response
         .results
         .into_iter()
         .map(|r| {
             let mut response = JsonValueObject::new(r.data.clone());
-            transform_response(&mut response, schema.clone(), &member_fields)
+            Ok(TransportServiceLoadResponse {
+                last_refresh_time: r.last_refresh_time,
+                results_batch: transform_response(&mut response, schema.clone(), &member_fields)?,
+            })
         })
-        .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
+        .collect::<std::result::Result<Vec<TransportServiceLoadResponse>, CubeError>>()
 }
 
 #[cfg(test)]
@@ -1248,7 +1254,7 @@ mod tests {
                 schema: SchemaRef,
                 member_fields: Vec<MemberField>,
                 _cache_mode: Option<CacheMode>,
-            ) -> Result<Vec<RecordBatch>, CubeError> {
+            ) -> Result<Vec<TransportServiceLoadResponse>, CubeError> {
                 let response = r#"
                 {
                     "results": [{
