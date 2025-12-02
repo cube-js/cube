@@ -1,0 +1,71 @@
+---
+cubes:
+  - name: orders
+    description: Orders
+    title: cube of orders
+    sql_table: public.order
+    sql_alias: order_facts
+    measures:
+      - meta:
+          ecto_field: subtotal_amount
+          ecto_type: integer
+        name: subtotal_amount
+        type: avg
+        sql: subtotal_amount
+      - meta:
+          ecto_field: tax_amount
+          ecto_type: integer
+        name: tax_amount
+        type: sum
+        format: currency
+        sql: tax_amount
+      - meta:
+          ecto_field: total_amount
+          ecto_type: integer
+        name: total_amount
+        type: sum
+        sql: total_amount
+      - meta:
+          ecto_field: discount_total_amount
+          ecto_type: integer
+        name: discount_total_amount
+        type: sum
+        sql: discount_total_amount
+      - name: discount_and_tax
+        type: number
+        format: currency
+        sql: sum(discount_total_amount + tax_amount)
+      - name: count
+        type: count
+    dimensions:
+      - meta:
+          ecto_field: id
+          ecto_field_type: id
+        name: order_id
+        type: number
+        primary_key: true
+        sql: id
+      - meta:
+          ecto_field: financial_status
+          ecto_field_type: string
+        name: FIN
+        type: string
+        sql: financial_status
+      - meta:
+          ecto_field: fulfillment_status
+          ecto_field_type: string
+        name: FUL
+        type: string
+        sql: fulfillment_status
+      - meta:
+          ecto_field: market_code
+          ecto_field_type: string
+        name: market_code
+        type: string
+        sql: market_code
+      - meta:
+          ecto_fields:
+            - brand_code
+        name: brand
+        type: string
+        sql: brand_code

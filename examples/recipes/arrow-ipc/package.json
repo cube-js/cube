@@ -1,0 +1,13 @@
+
+{
+  "name": "cube-ecto-test",
+  "private": true,
+  "scripts": {
+    "dev": "cubejs-server",
+    "build": "cubejs build"
+  },
+  "devDependencies": {
+    "@cubejs-backend/server": "*",
+    "@cubejs-backend/postgres-driver": "*"
+  }
+}

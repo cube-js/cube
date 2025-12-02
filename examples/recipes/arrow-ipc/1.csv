@@ -1,0 +1,13 @@
+,FUL,measure(orders.count),measure(orders.total_amount)
+0,partially_returned,158,425844.0
+1,partially_canceled,162,442070.0
+2,partially_fulfilled,201,571002.0
+3,returned,181,459158.0
+4,on_hold,167,481116.0
+5,rejected,182,467319.0
+6,fulfilled,171,452012.0
+7,in_progress,146,402334.0
+8,scheduled,154,422414.0
+9,accepted,154,399916.0
+10,unfulfilled,155,418133.0
+11,canceled,169,470683.0
