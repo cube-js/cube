@@ -122,7 +122,7 @@ const formatSchema = Joi.alternatives([
 // POSIX strftime specification (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions
 // See: https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html
 // See: https://d3js.org/d3-time-format
-const STRPTIME_SPECIFIERS = new Set([
+const TIME_SPECIFIERS = new Set([
   // POSIX standard specifiers
   'a', 'A', 'b', 'B', 'c', 'd', 'H', 'I', 'j', 'm',
   'M', 'n', 'p', 'S', 't', 'U', 'w', 'W', 'x', 'X',
@@ -147,13 +147,13 @@ const customTimeFormatSchema = Joi.string().custom((value, helper) => {
   while (i < value.length) {
     if (value[i] === '%') {
       if (i + 1 >= value.length) {
-        return helper.message({ custom: `Invalid strptime format "${value}". Incomplete specifier at end of string` });
+        return helper.message({ custom: `Invalid time format "${value}". Incomplete specifier at end of string` });
       }
 
       const specifier = value[i + 1];
 
-      if (!STRPTIME_SPECIFIERS.has(specifier)) {
-        return helper.message({ custom: `Invalid strptime format "${value}". Unknown specifier '%${specifier}'` });
+      if (!TIME_SPECIFIERS.has(specifier)) {
+        return helper.message({ custom: `Invalid time format "${value}". Unknown specifier '%${specifier}'` });
       }
 
       // %% is an escape for literal %, not a date/time specifier
