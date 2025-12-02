@@ -77,6 +77,10 @@ export type MeasureConfig = {
   public: boolean;
 };
 
+export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
+export type DimensionLinkFormat = { type: 'link'; label?: string };
+export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomTimeFormat;
+
 export type DimensionConfig = {
   name: string;
   title: string;
@@ -84,7 +88,7 @@ export type DimensionConfig = {
   description?: string;
   shortTitle: string;
   suggestFilterValues: boolean;
-  format?: string;
+  format?: DimensionFormat;
   meta?: any;
   isVisible: boolean;
   public: boolean;
@@ -252,7 +256,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
               extendedDimDef.suggestFilterValues == null
                 ? true
                 : extendedDimDef.suggestFilterValues,
-            format: extendedDimDef.format,
+            format: this.transformDimensionFormat(extendedDimDef),
             meta: extendedDimDef.meta,
             isVisible: dimensionVisibility,
             public: dimensionVisibility,
@@ -389,5 +393,24 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private titleize(name: string): string {
     return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+  }
+
+  private transformDimensionFormat({ format, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {
+    if (!format || type !== 'time') {
+      return format;
+    }
+
+    if (typeof format === 'object') {
+      return format;
+    }
+
+    // I don't know why, but we allow to define these formats for time dimensions.
+    // TODO: Should we deprecate it?
+    const standardFormats = ['imageUrl', 'currency', 'percent', 'number', 'id'];
+    if (standardFormats.includes(format)) {
+      return format;
+    }
+
+    return { type: 'custom-time', value: format };
   }
 }

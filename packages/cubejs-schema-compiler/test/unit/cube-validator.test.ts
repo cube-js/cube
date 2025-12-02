@@ -1292,4 +1292,196 @@ describe('Cube Validation', () => {
       expect(result.error).toBeTruthy();
     });
   });
+
+  describe('Custom time format for time dimensions (strptime)', () => {
+    it('time dimension with valid strptime format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%m-%d'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with complex strptime format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%d/%m/%Y %H:%M:%S'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with literal text in format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y Year %m Month'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with escaped percent - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%m-%d %%'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with standard format - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'id'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with invalid format (no specifiers) - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: 'invalid'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('time dimension with invalid specifier - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%K-%d'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('time dimension with incomplete specifier at end - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%m-%'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('time dimension with only escaped percent - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%%'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('non-time dimension with strptime format string - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          status: {
+            sql: () => 'status',
+            type: 'string',
+            format: '%Y-%m-%d'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+  });
 });

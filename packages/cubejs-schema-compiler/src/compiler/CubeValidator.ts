@@ -119,6 +119,69 @@ const formatSchema = Joi.alternatives([
   })
 ]);
 
+// POSIX strftime specification (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions
+// See: https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html
+// See: https://d3js.org/d3-time-format
+const TIME_SPECIFIERS = new Set([
+  // POSIX standard specifiers
+  'a', 'A', 'b', 'B', 'c', 'd', 'H', 'I', 'j', 'm',
+  'M', 'n', 'p', 'S', 't', 'U', 'w', 'W', 'x', 'X',
+  'y', 'Y', 'Z', '%',
+  // d3-time-format extensions
+  'e', // space-padded day of month
+  'f', // microseconds
+  'g', // ISO 8601 year without century
+  'G', // ISO 8601 year with century
+  'L', // milliseconds
+  'q', // quarter
+  'Q', // milliseconds since UNIX epoch
+  's', // seconds since UNIX epoch
+  'u', // Monday-based weekday [1,7]
+  'V', // ISO 8601 week number
+]);
+
+const customTimeFormatSchema = Joi.string().custom((value, helper) => {
+  let hasSpecifier = false;
+  let i = 0;
+
+  while (i < value.length) {
+    if (value[i] === '%') {
+      if (i + 1 >= value.length) {
+        return helper.message({ custom: `Invalid time format "${value}". Incomplete specifier at end of string` });
+      }
+
+      const specifier = value[i + 1];
+
+      if (!TIME_SPECIFIERS.has(specifier)) {
+        return helper.message({ custom: `Invalid time format "${value}". Unknown specifier '%${specifier}'` });
+      }
+
+      // %% is an escape for literal %, not a date/time specifier
+      if (specifier !== '%') {
+        hasSpecifier = true;
+      }
+
+      i += 2;
+    } else {
+      // Any other character is treated as literal text
+      i++;
+    }
+  }
+
+  if (!hasSpecifier) {
+    return helper.message({
+      custom: `Invalid strptime format "${value}". Format must contain at least one strptime specifier (e.g., %Y, %m, %d)`
+    });
+  }
+
+  return value;
+});
+
+const timeFormatSchema = Joi.alternatives([
+  formatSchema,
+  customTimeFormatSchema
+]);
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -131,7 +194,11 @@ const BaseDimensionWithoutSubQuery = {
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
-  format: formatSchema,
+  format: Joi.when('type', {
+    is: 'time',
+    then: timeFormatSchema,
+    otherwise: formatSchema
+  }),
   meta: Joi.any(),
   values: Joi.when('type', {
     is: 'switch',

@@ -291,11 +291,26 @@ components:
       required:
         - label
         - type
+    V1CubeMetaCustomTimeFormat:
+      type: "object"
+      description: Custom time format for time dimensions
+      properties:
+        type:
+          type: "string"
+          enum: ["custom-time"]
+          description: Type of the format (must be 'custom-time')
+        value:
+          type: "string"
+          description: "POSIX strftime format string (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions (e.g., '%Y-%m-%d', '%d/%m/%Y %H:%M:%S'). See https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html and https://d3js.org/d3-time-format"
+      required:
+        - type
+        - value
     V1CubeMetaFormat:
       oneOf:
         - $ref: "#/components/schemas/V1CubeMetaSimpleFormat"
         - $ref: "#/components/schemas/V1CubeMetaLinkFormat"
-      description: Format of dimension - can be either a simple string format or an object with link configuration
+        - $ref: "#/components/schemas/V1CubeMetaCustomTimeFormat"
+      description: Format of dimension - can be a simple string format, a link configuration, or a custom time format
     V1MetaResponse:
       type: "object"
       properties:
