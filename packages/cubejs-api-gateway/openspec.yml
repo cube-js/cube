@@ -305,12 +305,27 @@ components:
       required:
         - type
         - value
+    V1CubeMetaCustomNumericFormat:
+      type: "object"
+      description: Custom numeric format for numeric measures and dimensions
+      properties:
+        type:
+          type: "string"
+          enum: ["custom-numeric"]
+          description: Type of the format (must be 'custom-numeric')
+        value:
+          type: "string"
+          description: "d3-format specifier string (e.g., '.2f', ',.0f', '$,.2f', '.0%', '.2s'). See https://d3js.org/d3-format"
+      required:
+        - type
+        - value
     V1CubeMetaFormat:
       oneOf:
         - $ref: "#/components/schemas/V1CubeMetaSimpleFormat"
         - $ref: "#/components/schemas/V1CubeMetaLinkFormat"
         - $ref: "#/components/schemas/V1CubeMetaCustomTimeFormat"
-      description: Format of dimension - can be a simple string format, a link configuration, or a custom time format
+        - $ref: "#/components/schemas/V1CubeMetaCustomNumericFormat"
+      description: Format of measure or dimension - can be a simple string format, a link configuration, a custom time format, or a custom numeric format
     V1MetaResponse:
       type: "object"
       properties:
