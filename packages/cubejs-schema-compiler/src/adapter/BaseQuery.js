@@ -2075,7 +2075,15 @@ export class BaseQuery {
    * @return {string}
    */
   timeStampParam(timeDimension) {
-    return timeDimension.dateFieldType() === 'string' ? '?' : this.timeStampCast('?');
+    if (timeDimension.dateFieldType() === 'string') {
+      return '?';
+    }
+    // For localTime dimensions, use timestamp (without timezone) instead of timestamptz
+    const dimDef = timeDimension.dimensionDefinition && timeDimension.dimensionDefinition();
+    if (dimDef && dimDef.localTime) {
+      return this.dateTimeCast('?');
+    }
+    return this.timeStampCast('?');
   }
 
   timeRangeFilter(dimensionSql, fromTimeStampParam, toTimeStampParam) {
@@ -3404,6 +3412,7 @@ export class BaseQuery {
             !this.safeEvaluateSymbolContext().ignoreConvertTzForTimeDimension &&
             !memberExpressionType &&
             symbol.type === 'time' &&
+            !symbol.localTime &&
             this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
           ) {
             res = this.convertTz(res);

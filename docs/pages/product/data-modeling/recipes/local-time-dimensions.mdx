@@ -1,0 +1,260 @@
+# Local Time Dimensions
+
+This guide demonstrates how to use the `localTime` property for time dimensions
+that represent pre-converted local timestamps in your data warehouse.
+
+## Use Case
+
+When you store timestamps that are already converted to a specific timezone
+(e.g., business local time), you want to:
+
+- Use time dimension features like `dateRange`, `granularity`, and relative dates
+- **Avoid** automatic timezone conversion by Cube
+- Preserve the local time values as-is in both SQL generation and results
+
+This is particularly useful for:
+
+- Multi-location businesses with data in each location's timezone
+- Analyzing patterns by business hours (not UTC)
+- Pre-aggregated data already in local time
+- Sales reports and operational dashboards based on local business days
+
+## Problem
+
+By default, Cube time dimensions have two mutually exclusive behaviors:
+
+- **`type: time`** - Supports time features BUT always applies timezone conversion
+- **`type: string`** - No timezone conversion BUT loses all time dimension features
+
+## Solution
+
+Use the `localTime: true` property on time dimensions:
+
+<CodeTabs>
+
+```javascript
+cube(`Orders`, {
+  sql_table: `orders`,
+
+  dimensions: {
+    // Regular time dimension - timezone conversion applied
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+
+    // Local time dimension - no timezone conversion
+    local_date: {
+      sql: `DATE_FORMAT(from_utc_timestamp(created_at, ${Location.timezone}), 'yyyy-MM-dd')`,
+      type: `time`,
+      localTime: true,
+      description: `Date in the location's local timezone`,
+    },
+
+    local_hour: {
+      sql: `DATE_FORMAT(from_utc_timestamp(created_at, ${Location.timezone}), 'yyyy-MM-dd HH:00:00')`,
+      type: `time`,
+      localTime: true,
+      description: `Hour in the location's local timezone`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: Orders
+    sql_table: orders
+
+    dimensions:
+      # Regular time dimension - timezone conversion applied
+      - name: created_at
+        sql: created_at
+        type: time
+
+      # Local time dimension - no timezone conversion
+      - name: local_date
+        sql: "DATE_FORMAT(from_utc_timestamp(created_at, {Location.timezone}), 'yyyy-MM-dd')"
+        type: time
+        local_time: true
+        description: Date in the location's local timezone
+
+      - name: local_hour
+        sql: "DATE_FORMAT(from_utc_timestamp(created_at, {Location.timezone}), 'yyyy-MM-dd HH:00:00')"
+        type: time
+        local_time: true
+        description: Hour in the location's local timezone
+```
+
+</CodeTabs>
+
+## Behavior
+
+When `localTime: true` is set:
+
+### ✅ Enabled Features
+
+- `dateRange` with relative dates: `"last month"`, `"yesterday"`, `"this year"`
+- `granularity` for aggregation: `"day"`, `"hour"`, `"month"`
+- Date range pickers in UI tools
+- All standard time dimension query features
+
+### ❌ Disabled Conversions
+
+- Query `timezone` parameter is **not applied** to this dimension
+- SQL generation does **not wrap** the dimension with timezone conversion functions
+- Result values are **not converted** to the query timezone
+
+## Example Queries
+
+### Using dateRange with Local Time
+
+```json
+{
+  "measures": ["Orders.count"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.local_date",
+      "dateRange": "last month",
+      "granularity": "day"
+    }
+  ],
+  "timezone": "America/New_York"
+}
+```
+
+In this query:
+- `Orders.local_date` uses the pre-converted local timezone (from the SQL)
+- The `timezone: "America/New_York"` applies to other time dimensions, but **not** to `local_date`
+- `dateRange: "last month"` works as expected, filtering on local dates
+
+### Multi-Location Analysis
+
+```json
+{
+  "measures": ["Orders.count", "Orders.total_amount"],
+  "dimensions": ["Orders.location_id"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.local_hour",
+      "dateRange": "last 7 days",
+      "granularity": "hour"
+    }
+  ]
+}
+```
+
+This query analyzes orders by hour in each location's local timezone, enabling
+accurate "busiest hour" analysis across multiple timezones.
+
+## Comparison
+
+### Without localTime (Standard Behavior)
+
+```javascript
+dimensions: {
+  local_date: {
+    sql: `DATE_FORMAT(from_utc_timestamp(created_at, 'America/Los_Angeles'), 'yyyy-MM-dd')`,
+    type: `string`, // Must use string to avoid double conversion
+  }
+}
+```
+
+**Limitations:**
+- ❌ Cannot use `dateRange: "last month"`
+- ❌ Cannot use `granularity`
+- ❌ Must provide exact date strings: `["2025-10-01", "2025-10-31"]`
+
+### With localTime (New Behavior)
+
+```javascript
+dimensions: {
+  local_date: {
+    sql: `DATE_FORMAT(from_utc_timestamp(created_at, 'America/Los_Angeles'), 'yyyy-MM-dd')`,
+    type: `time`,
+    localTime: true,
+  }
+}
+```
+
+**Benefits:**
+- ✅ Can use `dateRange: "last month"`
+- ✅ Can use `granularity: "day"`
+- ✅ All time dimension features available
+- ✅ No timezone conversion applied
+
+## Database-Specific Examples
+
+### Databricks
+
+```javascript
+dimensions: {
+  local_date: {
+    sql: `DATE_FORMAT(from_utc_timestamp(${CUBE}.created_at, ${Location.timezone}), 'yyyy-MM-dd')`,
+    type: `time`,
+    localTime: true,
+  }
+}
+```
+
+### PostgreSQL
+
+```javascript
+dimensions: {
+  local_date: {
+    sql: `(${CUBE}.created_at AT TIME ZONE 'UTC' AT TIME ZONE ${Location.timezone})::date`,
+    type: `time`,
+    localTime: true,
+  }
+}
+```
+
+### BigQuery
+
+```javascript
+dimensions: {
+  local_date: {
+    sql: `DATE(${CUBE}.created_at, ${Location.timezone})`,
+    type: `time`,
+    localTime: true,
+  }
+}
+```
+
+### MySQL
+
+```javascript
+dimensions: {
+  local_date: {
+    sql: `CONVERT_TZ(${CUBE}.created_at, 'UTC', ${Location.timezone})`,
+    type: `time`,
+    localTime: true,
+  }
+}
+```
+
+## Important Notes
+
+1. **The SQL must return timestamp-compatible values** - The dimension SQL should
+   return values in a format that your database recognizes as timestamps (even
+   though they're in local time).
+
+2. **Consistent timezone in SQL** - Ensure your dimension SQL consistently
+   converts to the same timezone. Mixing timezones will produce incorrect results.
+
+3. **Backward compatible** - Existing time dimensions without `localTime` behave
+   exactly as before. This is an opt-in feature.
+
+4. **Works with granularities** - Custom granularities defined on the dimension
+   work correctly with `localTime: true`.
+
+## See Also
+
+- [Time Dimensions][ref-time-dimensions]
+- [Dimensions Reference][ref-dimensions]
+- [Working with String Time Dimensions][ref-string-time-dimensions]
+
+[ref-time-dimensions]: /product/data-modeling/reference/types-and-formats#time
+[ref-dimensions]: /product/data-modeling/reference/dimensions
+[ref-string-time-dimensions]: /product/data-modeling/recipes/string-time-dimensions
+

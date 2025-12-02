@@ -111,11 +111,17 @@ export class BaseTimeDimension extends BaseFilter {
       return context.renderedReference[path];
     }
 
+    const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+    const isLocalTime = dimDefinition.localTime;
+
     if (context.rollupQuery || context.wrapQuery) {
       if (context.rollupGranularity === this.granularityObj?.granularity) {
         return super.dimensionSql();
       }
 
+      if (isLocalTime && granularity) {
+        return this.localTimeGroupedColumn(this.query.dimensionSql(this), granularity);
+      }
       return this.query.dimensionTimeGroupedColumn(this.query.dimensionSql(this), <Granularity>granularity);
     }
 
@@ -123,7 +129,27 @@ export class BaseTimeDimension extends BaseFilter {
       return this.convertedToTz();
     }
 
+    // For localTime dimensions with granularity, use UTC timezone for grouping
+    if (isLocalTime && granularity) {
+      return this.localTimeGroupedColumn(this.convertedToTz(), granularity);
+    }
+
     return this.query.dimensionTimeGroupedColumn(this.convertedToTz(), <Granularity>granularity);
+  }
+
+  /**
+   * For localTime dimensions, apply time grouping without timezone conversion.
+   * This uses UTC as the timezone to preserve the local time values.
+   */
+  private localTimeGroupedColumn(dimension: string, granularity: Granularity): string {
+    // Temporarily override the query's timezone to UTC for grouping
+    const originalTimezone = this.query.timezone;
+    try {
+      (this.query as any).timezone = 'UTC';
+      return this.query.dimensionTimeGroupedColumn(dimension, granularity);
+    } finally {
+      (this.query as any).timezone = originalTimezone;
+    }
   }
 
   public dimensionDefinition(): DimensionDefinition | SegmentDefinition {
@@ -138,6 +164,11 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public convertedToTz() {
+    const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+    // Skip timezone conversion for local time dimensions
+    if (dimDefinition.localTime) {
+      return this.query.dimensionSql(this);
+    }
     return this.query.convertTz(this.query.dimensionSql(this));
   }
 
@@ -159,7 +190,15 @@ export class BaseTimeDimension extends BaseFilter {
 
   public dateFromFormatted() {
     if (!this.dateFromFormattedValue) {
-      this.dateFromFormattedValue = this.formatFromDate(this.dateRange[0]);
+      const formatted = this.formatFromDate(this.dateRange[0]);
+      const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+      // For local time dimensions, remove any ISO 8601 timezone suffix
+      // This includes: Z (UTC), +hh:mm, -hh:mm, +hhmm, -hhmm, +hh, -hh
+      if (dimDefinition.localTime) {
+        this.dateFromFormattedValue = this.stripTimezoneSuffix(formatted);
+      } else {
+        this.dateFromFormattedValue = formatted;
+      }
     }
 
     return this.dateFromFormattedValue;
@@ -176,6 +215,11 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public dateFromParam() {
+    const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+    // For local time dimensions, use local datetime params (no timezone conversion)
+    if (dimDefinition.localTime) {
+      return this.localDateTimeFromParam();
+    }
     return this.query.paramAllocator.allocateParamsForQuestionString(
       this.query.timeStampParam(this), [this.dateFrom()]
     );
@@ -193,10 +237,157 @@ export class BaseTimeDimension extends BaseFilter {
 
   public dateToFormatted() {
     if (!this.dateToFormattedValue) {
-      this.dateToFormattedValue = this.formatToDate(this.dateRange[1]);
+      const formatted = this.formatToDate(this.dateRange[1]);
+      const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+      // For local time dimensions, remove any ISO 8601 timezone suffix
+      // This includes: Z (UTC), +hh:mm, -hh:mm, +hhmm, -hhmm, +hh, -hh
+      if (dimDefinition.localTime) {
+        this.dateToFormattedValue = this.stripTimezoneSuffix(formatted);
+      } else {
+        this.dateToFormattedValue = formatted;
+      }
     }
 
     return this.dateToFormattedValue;
+  }
+
+  /**
+   * Strips ISO 8601 timezone designators from a datetime string.
+   * Handles all valid ISO 8601 timezone formats:
+   * - Z (UTC)
+   * - ±hh:mm (e.g., +05:30, -08:00)
+   * - ±hhmm (e.g., +0530, -0800)
+   * - ±hh (e.g., +05, -08)
+   * 
+   * Only strips timezone info from timestamps (containing 'T'), not from date-only strings.
+   */
+  private stripTimezoneSuffix(dateString: string): string {
+    if (!dateString) {
+      return dateString;
+    }
+    
+    // Only strip timezone if this is a timestamp (contains 'T'), not a date-only string
+    if (dateString.includes('T')) {
+      // Match ISO 8601 timezone designators at the end of the string:
+      // Z | [+-]hh:mm | [+-]hhmm | [+-]hh
+      return dateString.replace(/(?:Z|[+-]\d{2}(?::?\d{2})?)$/, '');
+    }
+    
+    return dateString;
+  }
+
+  /**
+   * Override formatFromDate for localTime dimensions to completely skip timezone conversion.
+   * For localTime dimensions, we want to preserve the exact datetime value without any timezone shifts.
+   */
+  public formatFromDate(date: string): string {
+    const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+    if (dimDefinition.localTime && date) {
+      // Strip timezone suffix from input and format without timezone conversion
+      const strippedDate = this.stripTimezoneSuffix(date);
+      
+      // Format directly without timezone conversion
+      return this.formatLocalDateTime(strippedDate, true);
+    }
+    return super.formatFromDate(date);
+  }
+
+  /**
+   * Override formatToDate for localTime dimensions to completely skip timezone conversion.
+   * For localTime dimensions, we want to preserve the exact datetime value without any timezone shifts.
+   */
+  public formatToDate(date: string): string {
+    const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+    if (dimDefinition.localTime && date) {
+      // Strip timezone suffix from input and format without timezone conversion
+      const strippedDate = this.stripTimezoneSuffix(date);
+      // Format directly without timezone conversion
+      return this.formatLocalDateTime(strippedDate, false);
+    }
+    return super.formatToDate(date);
+  }
+
+  /**
+   * Override inDbTimeZoneDateFrom for localTime dimensions to skip timezone conversion.
+   * For localTime dimensions, we want to use the formatted date directly without converting to DB timezone.
+   */
+  public inDbTimeZoneDateFrom(date: any): any {
+    const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+    if (dimDefinition.localTime) {
+      // For localTime, return the formatted date without timezone conversion
+      return this.formatFromDate(date);
+    }
+    return super.inDbTimeZoneDateFrom(date);
+  }
+
+  /**
+   * Override inDbTimeZoneDateTo for localTime dimensions to skip timezone conversion.
+   * For localTime dimensions, we want to use the formatted date directly without converting to DB timezone.
+   */
+  public inDbTimeZoneDateTo(date: any): any {
+    const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+    if (dimDefinition.localTime) {
+      // For localTime, return the formatted date without timezone conversion
+      return this.formatToDate(date);
+    }
+    return super.inDbTimeZoneDateTo(date);
+  }
+
+  /**
+   * Format a datetime string for localTime dimensions without applying timezone conversion.
+   * This ensures the datetime value stays exactly as specified, treating it as local time.
+   */
+  private formatLocalDateTime(date: string, isFromDate: boolean): string {
+    if (!date) {
+      return date;
+    }
+
+    const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$/;
+    const dateTimeLocalURegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d\d\d\d$/;
+    const dateRegex = /^\d\d\d\d-\d\d-\d\d$/;
+
+    const precision = this.query.timestampPrecision();
+    
+    // If already in correct format with correct precision, return as-is
+    if (precision === 3 && date.match(dateTimeLocalMsRegex)) {
+      return date;
+    }
+    if (precision === 6) {
+      if (date.length === 23 && date.match(dateTimeLocalMsRegex)) {
+        // Handle special case for formatToDate with .999
+        if (!isFromDate && date.endsWith('.999')) {
+          return `${date}999`;
+        }
+        return `${date}000`;
+      }
+      if (date.length === 26 && date.match(dateTimeLocalURegex)) {
+        return date;
+      }
+    }
+
+    // Handle date-only format (YYYY-MM-DD)
+    if (date.match(dateRegex)) {
+      const time = isFromDate ? '00:00:00' : '23:59:59';
+      const fractional = isFromDate ? '0'.repeat(precision) : '9'.repeat(precision);
+      return `${date}T${time}.${fractional}`;
+    }
+
+    // Parse the date WITHOUT timezone conversion using moment() instead of moment.tz()
+    const m = moment(date);
+    if (!m.isValid()) {
+      return date;
+    }
+
+    // Format based on whether this is a from or to date
+    if (isFromDate) {
+      return m.format(`YYYY-MM-DDTHH:mm:ss.${'S'.repeat(precision)}`);
+    } else {
+      // For "to" dates, if time is exactly midnight, set to end of day
+      if (m.format('HH:mm:ss') === '00:00:00') {
+        return m.format(`YYYY-MM-DDT23:59:59.${'9'.repeat(precision)}`);
+      }
+      return m.format(`YYYY-MM-DDTHH:mm:ss.${'S'.repeat(precision)}`);
+    }
   }
 
   protected dateToValue: any | null = null;
@@ -209,6 +400,11 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public dateToParam() {
+    const dimDefinition = this.dimensionDefinition() as DimensionDefinition;
+    // For local time dimensions, use local datetime params (no timezone conversion)
+    if (dimDefinition.localTime) {
+      return this.localDateTimeToParam();
+    }
     return this.query.paramAllocator.allocateParamsForQuestionString(
       this.query.timeStampParam(this), [this.dateTo()]
     );

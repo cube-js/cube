@@ -9,6 +9,7 @@ module.exports = {
   "using-dynamic-measures": "Dynamic data modeling",
   "dynamic-union-tables": "Dynamic union tables",
   "string-time-dimensions": "String time dimensions",
+  "local-time-dimensions": "Local time dimensions",
   "custom-granularity": "Custom time dimension granularities",
   "custom-calendar": "Custom calendars",
   "entity-attribute-value": "EAV model",

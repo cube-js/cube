@@ -785,6 +785,60 @@ cube(`fiscal_calendar`, {
 
 </CodeTabs>
 
+### `local_time`
+
+The `local_time` parameter is used with time dimensions to indicate that the
+dimension SQL already returns values in a local (business) timezone and should
+not be converted by Cube's automatic timezone conversion logic.
+
+When `local_time` is set to `true`:
+- The dimension retains all time dimension features (`dateRange`, `granularity`, etc.)
+- The query `timezone` parameter is **not applied** to this dimension
+- Results are **not converted** to the query timezone
+
+This is useful when your data warehouse stores timestamps that are pre-converted
+to specific local timezones, such as business operating hours or location-specific
+time values.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    local_date: {
+      sql: `DATE_FORMAT(from_utc_timestamp(created_at, 'America/Los_Angeles'), 'yyyy-MM-dd')`,
+      type: `time`,
+      local_time: true,
+      description: `Date in the location's local timezone`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: local_date
+        sql: "DATE_FORMAT(from_utc_timestamp(created_at, 'America/Los_Angeles'), 'yyyy-MM-dd')"
+        type: time
+        local_time: true
+        description: Date in the location's local timezone
+```
+
+</CodeTabs>
+
+<ReferenceBox>
+
+See the [Local Time Dimensions recipe][ref-local-time-dimensions] for detailed
+examples and use cases.
+
+</ReferenceBox>
+
 ### `time_shift`
 
 The `time_shift` parameter allows overriding the time shift behavior for time dimensions
@@ -908,3 +962,4 @@ cube(`fiscal_calendar`, {
 [ref-time-shift]: /product/data-modeling/concepts/multi-stage-calculations#time-shift
 [ref-cube-calendar]: /product/data-modeling/reference/cube#calendar
 [ref-measure-time-shift]: /product/data-modeling/reference/measures#time_shift
+[ref-local-time-dimensions]: /product/data-modeling/recipes/local-time-dimensions
