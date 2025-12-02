@@ -226,13 +226,13 @@ def example_arrow_to_csv():
         client.connect()
         client.set_arrow_ipc_output()
 
-        query = "SELECT * FROM information_schema.tables"
+        query = "SELECT  orders.FUL, MEASURE(orders.count) FROM orders GROUP BY 1"
         result = client.execute_query_with_arrow_streaming(query)
         pprint(result)
 
         # Save to CSV
         output_file = "/tmp/cubesql_results.csv"
-        result.to_parquet(output_file)
+        result.to_csv(output_file)
 
         print(f"Query: {query}")
         print(f"Results saved to: {output_file}")
@@ -252,7 +252,8 @@ def example_performance_comparison():
     try:
         client.connect()
 
-        test_query = "SELECT * FROM information_schema.columns"
+        #test_query = "SELECT * FROM information_schema.columns"
+        test_query = "SELECT  orders.FUL, MEASURE(orders.count) FROM orders GROUP BY 1"
 
         # Test with PostgreSQL format (default)
         print("\nTesting with PostgreSQL wire format (default):")
