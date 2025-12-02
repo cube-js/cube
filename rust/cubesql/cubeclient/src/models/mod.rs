@@ -1,5 +1,9 @@
 pub mod v1_cube_meta;
 pub use self::v1_cube_meta::V1CubeMeta;
+pub mod v1_cube_meta_custom_numeric_format;
+pub use self::v1_cube_meta_custom_numeric_format::V1CubeMetaCustomNumericFormat;
+// problem with code-gen, let's rename it as re-export
+pub use self::v1_cube_meta_custom_numeric_format::Type as V1CubeMetaCustomNumericFormatType;
 pub mod v1_cube_meta_custom_time_format;
 pub use self::v1_cube_meta_custom_time_format::V1CubeMetaCustomTimeFormat;
 // problem with code-gen, let's rename it as re-export

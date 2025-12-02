@@ -182,6 +182,82 @@ const timeFormatSchema = Joi.alternatives([
   customTimeFormatSchema
 ]);
 
+// d3-format specification (Python format spec mini-language)
+// See: https://d3js.org/d3-format
+// See: https://docs.python.org/3/library/string.html#format-specification-mini-language
+// Format specifier: [[fill]align][sign][symbol][0][width][,][.precision][~][type]
+const NUMERIC_FORMAT_TYPES = new Set([
+  'e', // exponent notation
+  'f', // fixed-point notation
+  'g', // either decimal or exponent notation
+  'r', // decimal notation, rounded to significant digits
+  's', // decimal notation with an SI prefix
+  '%', // multiply by 100 and format as percentage
+  'p', // multiply by 100, round to significant digits, and format as percentage
+  'b', // binary notation
+  'o', // octal notation
+  'd', // decimal notation (integer)
+  'x', // lowercase hexadecimal notation
+  'X', // uppercase hexadecimal notation
+  'c', // character data
+  'n', // like g, but with locale-specific thousand separator
+]);
+
+// d3-format specifier: [[fill]align][sign][symbol][0][width][,][.precision][~][type]
+// Regex breakdown:
+// (?:(.)?([<>=^]))?           - optional fill (any char) + align (<>=^)
+// ([+\-( ])?                  - optional sign (+, -, (, or space)
+// ([$#])?                     - optional symbol ($ or #)
+// (0)?                        - optional zero flag
+// (\d+)?                      - optional width (positive integer)
+// (,)?                        - optional comma flag (grouping)
+// (?:\.(\d+))?                - optional precision (.N where N is non-negative integer)
+// (~)?                        - optional tilde (trim insignificant zeros)
+// ([a-zA-Z%])?                - optional type character
+const NUMERIC_FORMAT_REGEX = /^(?:(.)?([<>=^]))?([+\-( ])?([$#])?(0)?(\d+)?(,)?(?:\.(\d+))?(~)?([a-zA-Z%])?$/;
+
+const customNumericFormatSchema = Joi.string().custom((value, helper) => {
+  const match = value.match(NUMERIC_FORMAT_REGEX);
+  if (!match) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Must be a valid d3-format specifier (e.g., ".2f", ",.0f", "$,.2f", ".0%", ".2s")`
+    });
+  }
+
+  const [, fill, align, sign, symbol, zero, width, comma, precision, tilde, type] = match;
+
+  if (fill && !align) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Fill character requires alignment specifier (<, >, =, or ^)`
+    });
+  }
+
+  if (type && !NUMERIC_FORMAT_TYPES.has(type.toLowerCase())) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Unknown type character '${type}'. Valid types: ${[...NUMERIC_FORMAT_TYPES].join(', ')}`
+    });
+  }
+
+  // Validate that the format is not empty (must have at least something meaningful)
+  if (!sign && !symbol && !zero && !width && !comma && precision === undefined && !tilde && !type) {
+    return helper.message({
+      custom: `Invalid numeric format "${value}". Format must contain at least one specifier (e.g., type, precision, comma, sign, symbol)`
+    });
+  }
+
+  return value;
+});
+
+const measureFormatSchema = Joi.alternatives([
+  Joi.string().valid('percent', 'currency', 'number'),
+  customNumericFormatSchema
+]);
+
+const dimensionNumericFormatSchema = Joi.alternatives([
+  formatSchema,
+  customNumericFormatSchema
+]);
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -195,8 +271,10 @@ const BaseDimensionWithoutSubQuery = {
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
   format: Joi.when('type', {
-    is: 'time',
-    then: timeFormatSchema,
+    switch: [
+      { is: 'time', then: timeFormatSchema },
+      { is: 'number', then: dimensionNumericFormatSchema },
+    ],
     otherwise: formatSchema
   }),
   meta: Joi.any(),
@@ -302,7 +380,7 @@ const ToDate = {
 
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
-  format: Joi.any().valid('percent', 'currency', 'number'),
+  format: measureFormatSchema,
   public: Joi.boolean().strict(),
   // TODO: Deprecate and remove, please use public
   visible: Joi.boolean().strict(),
