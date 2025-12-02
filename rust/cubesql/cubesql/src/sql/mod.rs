@@ -1,4 +1,5 @@
 pub(crate) mod auth_service;
+pub mod arrow_ipc;
 pub mod compiler_cache;
 pub(crate) mod database_variables;
 pub mod dataframe;
