@@ -19,6 +19,12 @@ import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
 
+export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
+export type DimensionLinkFormat = { type: 'link'; label?: string };
+export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
+export type MeasureFormat = string | CustomNumericFormat;
+
 // Extended types for cube symbols with all runtime properties
 export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   description?: string;
@@ -76,12 +82,6 @@ export type MeasureConfig = {
   isVisible: boolean;
   public: boolean;
 };
-
-export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
-export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
-export type DimensionLinkFormat = { type: 'link'; label?: string };
-export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
-export type MeasureFormat = string | CustomNumericFormat;
 
 export type DimensionConfig = {
   name: string;
