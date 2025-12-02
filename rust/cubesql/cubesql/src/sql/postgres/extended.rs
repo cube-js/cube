@@ -205,6 +205,7 @@ pub enum PortalFrom {
 pub enum PortalBatch {
     Description(protocol::RowDescription),
     Rows(BatchWriter),
+    ArrowIPCData(Vec<u8>),
     Completion(protocol::PortalCompletion),
 }
 
@@ -216,6 +217,8 @@ pub struct Portal {
     // State which holds corresponding data for each step. Option is used for dereferencing
     state: Option<PortalState>,
     span_id: Option<Arc<SpanId>>,
+    // Output format for query results (Arrow IPC or PostgreSQL)
+    output_format: crate::sql::OutputFormat,
 }
 
 unsafe impl Send for Portal {}
@@ -253,6 +256,23 @@ impl Portal {
             from,
             span_id,
             state: Some(PortalState::Prepared(PreparedState { plan })),
+            output_format: crate::sql::OutputFormat::default(),
+        }
+    }
+
+    pub fn new_with_output_format(
+        plan: QueryPlan,
+        format: protocol::Format,
+        from: PortalFrom,
+        span_id: Option<Arc<SpanId>>,
+        output_format: crate::sql::OutputFormat,
+    ) -> Self {
+        Self {
+            format,
+            from,
+            span_id,
+            state: Some(PortalState::Prepared(PreparedState { plan })),
+            output_format,
         }
     }
 
@@ -266,6 +286,7 @@ impl Portal {
             from,
             span_id,
             state: Some(PortalState::Empty),
+            output_format: crate::sql::OutputFormat::default(),
         }
     }
 
