@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+### Bug Fixes
+
+- **client-core:** Fix TypeScript module resolution via `exports.types` ([#10209](https://github.com/cube-js/cube/issues/10209)) ([6f4a650](https://github.com/cube-js/cube/commit/6f4a650957d811829922677c2ae1a0c0459c1331))
+- **schema-compiler:** Fix datetime tz conversion for Athena/Trino ([#10207](https://github.com/cube-js/cube/issues/10207)) ([32d50a5](https://github.com/cube-js/cube/commit/32d50a5d5a594f30dff2b1a55c87f5afdb89976f))
+
+### Features
+
+- Support custom date formatting for time dimensions ([#10204](https://github.com/cube-js/cube/issues/10204)) ([8e18659](https://github.com/cube-js/cube/commit/8e186592feb35b224d50eefa280f5422865e73bc))
+- Support custom numeric formatting ([#10213](https://github.com/cube-js/cube/issues/10213)) ([898d4d0](https://github.com/cube-js/cube/commit/898d4d05b5c20c284c02c37718ae754c5646cd49))
+
 ## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
 
 ### Bug Fixes
