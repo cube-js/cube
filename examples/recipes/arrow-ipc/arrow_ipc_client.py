@@ -20,13 +20,13 @@ import psycopg2
 import pyarrow as pa
 import pandas as pd
 from io import BytesIO
-
+from pprint import pprint
 
 class CubeSQLArrowIPCClient:
     """Client for connecting to CubeSQL with Arrow IPC output format."""
 
     def __init__(self, host: str = "127.0.0.1", port: int = 4444,
-                 user: str = "root", password: str = "", database: str = ""):
+                 user: str = "username", password: str = "password", database: str = "test"):
         """
         Initialize connection to CubeSQL server.
 
@@ -159,13 +159,13 @@ def example_basic_query():
 
         # Execute a simple query
         # Note: This assumes you have a Cube deployment configured
-        query = "SELECT * FROM information_schema.tables LIMIT 10"
+        query = "SELECT * FROM information_schema.tables"
         result = client.execute_query_with_arrow_streaming(query)
 
         print(f"\nQuery: {query}")
         print(f"Rows returned: {len(result)}")
         print("\nFirst few rows:")
-        print(result.head())
+        print(result.head(100))
 
     finally:
         client.close()
@@ -180,8 +180,9 @@ def example_arrow_to_numpy():
         client.connect()
         client.set_arrow_ipc_output()
 
-        query = "SELECT * FROM information_schema.columns LIMIT 5"
+        query = "SELECT * FROM information_schema.columns"
         result = client.execute_query_with_arrow_streaming(query)
+        pprint(result)
 
         print(f"Query: {query}")
         print(f"Result shape: {result.shape}")
@@ -201,11 +202,36 @@ def example_arrow_to_parquet():
         client.connect()
         client.set_arrow_ipc_output()
 
-        query = "SELECT * FROM information_schema.tables LIMIT 100"
+        query = "SELECT * FROM information_schema.tables"
         result = client.execute_query_with_arrow_streaming(query)
+        pprint(result)
 
         # Save to Parquet
         output_file = "/tmp/cubesql_results.parquet"
+        result.to_parquet(output_file)
+
+        print(f"Query: {query}")
+        print(f"Results saved to: {output_file}")
+        print(f"File size: {os.path.getsize(output_file)} bytes")
+
+    finally:
+        client.close()
+
+def example_arrow_to_csv():
+    """Example: Save Arrow results to CSV format."""
+    print("\n=== Example 4: Save Results to CSV ===")
+
+    client = CubeSQLArrowIPCClient()
+    try:
+        client.connect()
+        client.set_arrow_ipc_output()
+
+        query = "SELECT * FROM information_schema.tables"
+        result = client.execute_query_with_arrow_streaming(query)
+        pprint(result)
+
+        # Save to CSV
+        output_file = "/tmp/cubesql_results.csv"
         result.to_parquet(output_file)
 
         print(f"Query: {query}")
@@ -226,7 +252,7 @@ def example_performance_comparison():
     try:
         client.connect()
 
-        test_query = "SELECT * FROM information_schema.columns LIMIT 1000"
+        test_query = "SELECT * FROM information_schema.columns"
 
         # Test with PostgreSQL format (default)
         print("\nTesting with PostgreSQL wire format (default):")
@@ -290,6 +316,7 @@ def main():
         example_basic_query()
         example_arrow_to_numpy()
         example_arrow_to_parquet()
+        example_arrow_to_csv()
         example_performance_comparison()
     except Exception as e:
         print(f"Example execution error: {e}")
