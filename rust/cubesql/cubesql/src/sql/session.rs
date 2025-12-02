@@ -26,9 +26,10 @@ use crate::{
 /// Output format for query results
 ///
 /// Determines how query results are serialized and sent to clients.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OutputFormat {
     /// PostgreSQL wire protocol (default)
+    #[default]
     PostgreSQL,
     /// Apache Arrow IPC Streaming Format (RFC 0017)
     ArrowIPC,
@@ -50,12 +51,6 @@ impl OutputFormat {
             OutputFormat::PostgreSQL => "postgresql",
             OutputFormat::ArrowIPC => "arrow_ipc",
         }
-    }
-}
-
-impl Default for OutputFormat {
-    fn default() -> Self {
-        OutputFormat::PostgreSQL
     }
 }
 

@@ -1,10 +1,9 @@
 // Integration tests for Arrow IPC output format
 
-use std::{env, io::Cursor, pin::pin, time::Duration};
+use std::{env, time::Duration};
 
 use async_trait::async_trait;
 use cubesql::config::Config;
-use datafusion::arrow::ipc::reader::StreamReader;
 use portpicker::{pick_unused_port, Port};
 use tokio::time::sleep;
 use tokio_postgres::{Client, NoTls, SimpleQueryMessage};
@@ -17,6 +16,7 @@ pub struct ArrowIPCIntegrationTestSuite {
     _port: Port,
 }
 
+#[allow(dead_code)]
 fn get_env_var(env_name: &'static str) -> Option<String> {
     if let Ok(value) = env::var(env_name) {
         if value.is_empty() {
@@ -31,6 +31,7 @@ fn get_env_var(env_name: &'static str) -> Option<String> {
 }
 
 impl ArrowIPCIntegrationTestSuite {
+    #[allow(dead_code)]
     pub(crate) async fn before_all() -> AsyncTestConstructorResult {
         let mut env_defined = false;
 
@@ -83,6 +84,7 @@ impl ArrowIPCIntegrationTestSuite {
         }))
     }
 
+    #[allow(dead_code)]
     async fn create_client(config: tokio_postgres::Config) -> Client {
         let (client, connection) = config.connect(NoTls).await.unwrap();
 

@@ -936,6 +936,7 @@ impl AsyncPostgresShim {
     }
 
     /// Create a portal with the session's output format
+    #[allow(dead_code)]
     fn create_portal(
         &self,
         plan: QueryPlan,

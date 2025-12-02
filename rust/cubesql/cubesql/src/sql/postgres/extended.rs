@@ -260,6 +260,7 @@ impl Portal {
         }
     }
 
+    #[allow(dead_code)]
     pub fn new_with_output_format(
         plan: QueryPlan,
         format: protocol::Format,
