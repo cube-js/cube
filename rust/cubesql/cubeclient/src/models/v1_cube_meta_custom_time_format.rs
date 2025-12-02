@@ -17,7 +17,8 @@ pub struct V1CubeMetaCustomTimeFormat {
     /// Type of the format (must be 'custom-time')
     #[serde(rename = "type")]
     pub r#type: Type,
-    /// Time format string (e.g., 'yyyy-MM-dd', 'dd/mm/yyyy hh:nn:ss')
+    /// POSIX strftime format string (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions (e.g., '%Y-%m-%d', '%d/%m/%Y %H:%M:%S').
+    /// See https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html and https://d3js.org/d3-time-format
     #[serde(rename = "value")]
     pub value: String,
 }
