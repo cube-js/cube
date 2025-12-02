@@ -119,52 +119,59 @@ const formatSchema = Joi.alternatives([
   })
 ]);
 
-const TIME_FORMAT_SPECIFIERS = new Set(['d', 'm', 'y', 'h', 'n', 's', 'q', 'w']);
-const TIME_FORMAT_SEPARATORS = new Set(['-', '/', ':', '.', ',', ' ']);
+// POSIX strftime specification (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions
+// See: https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html
+// See: https://d3js.org/d3-time-format
+const STRPTIME_SPECIFIERS = new Set([
+  // POSIX standard specifiers
+  'a', 'A', 'b', 'B', 'c', 'd', 'H', 'I', 'j', 'm',
+  'M', 'n', 'p', 'S', 't', 'U', 'w', 'W', 'x', 'X',
+  'y', 'Y', 'Z', '%',
+  // d3-time-format extensions
+  'e', // space-padded day of month
+  'f', // microseconds
+  'g', // ISO 8601 year without century
+  'G', // ISO 8601 year with century
+  'L', // milliseconds
+  'q', // quarter
+  'Q', // milliseconds since UNIX epoch
+  's', // seconds since UNIX epoch
+  'u', // Monday-based weekday [1,7]
+  'V', // ISO 8601 week number
+]);
 
 const customTimeFormatSchema = Joi.string().custom((value, helper) => {
-  const invalidChars: string[] = [];
   let hasSpecifier = false;
-
   let i = 0;
 
   while (i < value.length) {
-    const char = value[i];
-
-    // Handle quoted literals (skip content inside quotes or brackets)
-    if (char === '"' || char === '\'') {
-      const closeIndex = value.indexOf(char, i + 1);
-      if (closeIndex === -1) {
-        return helper.message({ custom: `Invalid time format "${value}". Unclosed quote at position ${i}` });
+    if (value[i] === '%') {
+      if (i + 1 >= value.length) {
+        return helper.message({ custom: `Invalid strptime format "${value}". Incomplete specifier at end of string` });
       }
 
-      i = closeIndex + 1;
-    } else if (char === '[') {
-      const closeIndex = value.indexOf(']', i + 1);
-      if (closeIndex === -1) {
-        return helper.message({ custom: `Invalid time format "${value}". Unclosed bracket at position ${i}` });
+      const specifier = value[i + 1];
+
+      if (!STRPTIME_SPECIFIERS.has(specifier)) {
+        return helper.message({ custom: `Invalid strptime format "${value}". Unknown specifier '%${specifier}'` });
       }
 
-      i = closeIndex + 1;
-    } else if (TIME_FORMAT_SPECIFIERS.has(char.toLowerCase())) {
-      hasSpecifier = true;
-      i++;
-    } else if (TIME_FORMAT_SEPARATORS.has(char)) {
-      i++;
-    } else if (char.toUpperCase() === 'A' || char.toUpperCase() === 'P') {
-      i++;
+      // %% is an escape for literal %, not a date/time specifier
+      if (specifier !== '%') {
+        hasSpecifier = true;
+      }
+
+      i += 2;
     } else {
-      invalidChars.push(char);
+      // Any other character is treated as literal text
       i++;
     }
   }
 
   if (!hasSpecifier) {
-    return helper.message({ custom: `Invalid time format "${value}". Format must contain at least one date/time specifier (d, m, y, h, n, s, q, w)` });
-  }
-
-  if (invalidChars.length > 0) {
-    return helper.message({ custom: `Invalid time format "${value}". Contains invalid characters: "${invalidChars.join('')}". Use quotes for literal text.` });
+    return helper.message({
+      custom: `Invalid strptime format "${value}". Format must contain at least one strptime specifier (e.g., %Y, %m, %d)`
+    });
   }
 
   return value;

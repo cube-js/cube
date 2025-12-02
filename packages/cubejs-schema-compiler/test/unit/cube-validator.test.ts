@@ -1293,8 +1293,8 @@ describe('Cube Validation', () => {
     });
   });
 
-  describe('Custom time format for time dimensions', () => {
-    it('time dimension with valid custom time format - correct', async () => {
+  describe('Custom time format for time dimensions (strptime)', () => {
+    it('time dimension with valid strptime format - correct', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'name',
@@ -1303,7 +1303,7 @@ describe('Cube Validation', () => {
           createdAt: {
             sql: () => 'created_at',
             type: 'time',
-            format: 'yyyy-MM-dd'
+            format: '%Y-%m-%d'
           },
         },
         fileName: 'fileName',
@@ -1313,7 +1313,7 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeFalsy();
     });
 
-    it('time dimension with complex time format - correct', async () => {
+    it('time dimension with complex strptime format - correct', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'name',
@@ -1322,7 +1322,7 @@ describe('Cube Validation', () => {
           createdAt: {
             sql: () => 'created_at',
             type: 'time',
-            format: 'dd/mm/yyyy hh:nn:ss'
+            format: '%d/%m/%Y %H:%M:%S'
           },
         },
         fileName: 'fileName',
@@ -1332,7 +1332,7 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeFalsy();
     });
 
-    it('time dimension with quoted literals in format - correct', async () => {
+    it('time dimension with literal text in format - correct', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'name',
@@ -1341,7 +1341,26 @@ describe('Cube Validation', () => {
           createdAt: {
             sql: () => 'created_at',
             type: 'time',
-            format: 'yyyy "Year" mm "Month"'
+            format: '%Y Year %m Month'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('time dimension with escaped percent - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%m-%d %%'
           },
         },
         fileName: 'fileName',
@@ -1389,7 +1408,7 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeTruthy();
     });
 
-    it('time dimension with invalid characters in format - error', async () => {
+    it('time dimension with invalid specifier - error', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'name',
@@ -1398,7 +1417,7 @@ describe('Cube Validation', () => {
           createdAt: {
             sql: () => 'created_at',
             type: 'time',
-            format: 'yyyy@mm#dd'
+            format: '%Y-%K-%d'
           },
         },
         fileName: 'fileName',
@@ -1408,7 +1427,45 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeTruthy();
     });
 
-    it('non-time dimension with time format string - error', async () => {
+    it('time dimension with incomplete specifier at end - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%Y-%m-%'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('time dimension with only escaped percent - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            format: '%%'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('non-time dimension with strptime format string - error', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'name',
@@ -1417,7 +1474,7 @@ describe('Cube Validation', () => {
           status: {
             sql: () => 'status',
             type: 'string',
-            format: 'yyyy-MM-dd'
+            format: '%Y-%m-%d'
           },
         },
         fileName: 'fileName',

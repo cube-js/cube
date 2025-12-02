@@ -301,7 +301,7 @@ components:
           description: Type of the format (must be 'custom-time')
         value:
           type: "string"
-          description: Time format string (e.g., 'yyyy-MM-dd', 'dd/mm/yyyy hh:nn:ss')
+          description: "POSIX strftime format string (IEEE Std 1003.1 / POSIX.1) with d3-time-format extensions (e.g., '%Y-%m-%d', '%d/%m/%Y %H:%M:%S'). See https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html and https://d3js.org/d3-time-format"
       required:
         - type
         - value
