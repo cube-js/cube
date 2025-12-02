@@ -477,8 +477,9 @@ impl Portal {
         };
 
         // Serialize to Arrow IPC format
-        let ipc_data = crate::sql::arrow_ipc::ArrowIPCSerializer::serialize_single(&batch_for_write)
-            .map_err(|e| ConnectionError::Cube(e, None))?;
+        let ipc_data =
+            crate::sql::arrow_ipc::ArrowIPCSerializer::serialize_single(&batch_for_write)
+                .map_err(|e| ConnectionError::Cube(e, None))?;
 
         Ok((unused, ipc_data))
     }

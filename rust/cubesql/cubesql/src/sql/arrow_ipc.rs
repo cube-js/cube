@@ -120,7 +120,6 @@ impl ArrowIPCSerializer {
 
         Ok(cursor.into_inner())
     }
-
 }
 
 #[cfg(test)]
@@ -255,11 +254,8 @@ mod tests {
         let schema1 = Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]));
         let schema2 = Arc::new(Schema::new(vec![Field::new("name", DataType::Utf8, false)]));
 
-        let batch1 = RecordBatch::try_new(
-            schema1,
-            vec![Arc::new(Int64Array::from(vec![1, 2, 3]))],
-        )
-        .unwrap();
+        let batch1 =
+            RecordBatch::try_new(schema1, vec![Arc::new(Int64Array::from(vec![1, 2, 3]))]).unwrap();
 
         let batch2 = RecordBatch::try_new(
             schema2,
@@ -270,9 +266,6 @@ mod tests {
         let result = ArrowIPCSerializer::serialize_streaming(&[batch1, batch2]);
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("same schema"));
+        assert!(result.unwrap_err().to_string().contains("same schema"));
     }
 }

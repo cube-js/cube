@@ -869,7 +869,9 @@ impl AsyncPostgresShim {
 
                 // Parse output format from connection parameters
                 if let Some(output_format_str) = parameters.get("output_format") {
-                    if let Some(output_format) = crate::sql::OutputFormat::from_str(output_format_str) {
+                    if let Some(output_format) =
+                        crate::sql::OutputFormat::from_str(output_format_str)
+                    {
                         self.session.state.set_output_format(output_format);
                     }
                 }

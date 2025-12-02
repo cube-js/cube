@@ -114,10 +114,7 @@ impl ArrowIPCIntegrationTestSuite {
         self.set_arrow_ipc_output().await?;
 
         // Query the current setting
-        let rows = self
-            .client
-            .simple_query("SHOW output_format")
-            .await?;
+        let rows = self.client.simple_query("SHOW output_format").await?;
 
         // Verify the format is set
         let mut found = false;
@@ -146,10 +143,7 @@ impl ArrowIPCIntegrationTestSuite {
         self.set_arrow_ipc_output().await?;
 
         // Execute a simple system query with Arrow IPC output
-        let rows = self
-            .client
-            .simple_query("SELECT 1 as test_value")
-            .await?;
+        let rows = self.client.simple_query("SELECT 1 as test_value").await?;
 
         // For Arrow IPC, the response format is different from PostgreSQL
         // We should still get query results, but serialized in Arrow format
@@ -162,29 +156,23 @@ impl ArrowIPCIntegrationTestSuite {
     /// Test switching between output formats in the same session
     async fn test_format_switching(&mut self) -> RunResult<()> {
         // Start with PostgreSQL format (default)
-        let rows1 = self
-            .client
-            .simple_query("SELECT 1 as test")
-            .await?;
+        let rows1 = self.client.simple_query("SELECT 1 as test").await?;
         assert!(!rows1.is_empty(), "PostgreSQL format query failed");
 
         // Switch to Arrow IPC
         self.set_arrow_ipc_output().await?;
 
-        let rows2 = self
-            .client
-            .simple_query("SELECT 2 as test")
-            .await?;
+        let rows2 = self.client.simple_query("SELECT 2 as test").await?;
         assert!(!rows2.is_empty(), "Arrow IPC format query failed");
 
         // Switch back to PostgreSQL
         self.reset_output_format().await?;
 
-        let rows3 = self
-            .client
-            .simple_query("SELECT 3 as test")
-            .await?;
-        assert!(!rows3.is_empty(), "PostgreSQL format query after Arrow failed");
+        let rows3 = self.client.simple_query("SELECT 3 as test").await?;
+        assert!(
+            !rows3.is_empty(),
+            "PostgreSQL format query after Arrow failed"
+        );
 
         Ok(())
     }
@@ -207,17 +195,11 @@ impl ArrowIPCIntegrationTestSuite {
         self.set_arrow_ipc_output().await?;
 
         // Verify first query
-        let rows1 = self
-            .client
-            .simple_query("SELECT 1 as test")
-            .await?;
+        let rows1 = self.client.simple_query("SELECT 1 as test").await?;
         assert!(!rows1.is_empty(), "First Arrow IPC query failed");
 
         // Verify format persists to second query
-        let rows2 = self
-            .client
-            .simple_query("SELECT 2 as test")
-            .await?;
+        let rows2 = self.client.simple_query("SELECT 2 as test").await?;
         assert!(!rows2.is_empty(), "Second Arrow IPC query failed");
 
         self.reset_output_format().await?;
@@ -234,7 +216,10 @@ impl ArrowIPCIntegrationTestSuite {
             .simple_query("SELECT * FROM information_schema.tables LIMIT 5")
             .await?;
 
-        assert!(!rows.is_empty(), "information_schema query should return rows");
+        assert!(
+            !rows.is_empty(),
+            "information_schema query should return rows"
+        );
 
         self.reset_output_format().await?;
         Ok(())
@@ -245,11 +230,7 @@ impl ArrowIPCIntegrationTestSuite {
         self.set_arrow_ipc_output().await?;
 
         // Execute multiple queries
-        let queries = vec![
-            "SELECT 1 as num",
-            "SELECT 2 as num",
-            "SELECT 3 as num",
-        ];
+        let queries = vec!["SELECT 1 as num", "SELECT 2 as num", "SELECT 3 as num"];
 
         for query in queries {
             let rows = self.client.simple_query(query).await?;
@@ -271,52 +252,40 @@ impl AsyncTestSuite for ArrowIPCIntegrationTestSuite {
         println!("\n[ArrowIPCIntegrationTestSuite] Starting tests...");
 
         // Run all tests
-        self.test_set_output_format()
-            .await
-            .map_err(|e| {
-                println!("test_set_output_format failed: {:?}", e);
-                e
-            })?;
+        self.test_set_output_format().await.map_err(|e| {
+            println!("test_set_output_format failed: {:?}", e);
+            e
+        })?;
         println!("✓ test_set_output_format");
 
-        self.test_arrow_ipc_query()
-            .await
-            .map_err(|e| {
-                println!("test_arrow_ipc_query failed: {:?}", e);
-                e
-            })?;
+        self.test_arrow_ipc_query().await.map_err(|e| {
+            println!("test_arrow_ipc_query failed: {:?}", e);
+            e
+        })?;
         println!("✓ test_arrow_ipc_query");
 
-        self.test_format_switching()
-            .await
-            .map_err(|e| {
-                println!("test_format_switching failed: {:?}", e);
-                e
-            })?;
+        self.test_format_switching().await.map_err(|e| {
+            println!("test_format_switching failed: {:?}", e);
+            e
+        })?;
         println!("✓ test_format_switching");
 
-        self.test_invalid_output_format()
-            .await
-            .map_err(|e| {
-                println!("test_invalid_output_format failed: {:?}", e);
-                e
-            })?;
+        self.test_invalid_output_format().await.map_err(|e| {
+            println!("test_invalid_output_format failed: {:?}", e);
+            e
+        })?;
         println!("✓ test_invalid_output_format");
 
-        self.test_format_persistence()
-            .await
-            .map_err(|e| {
-                println!("test_format_persistence failed: {:?}", e);
-                e
-            })?;
+        self.test_format_persistence().await.map_err(|e| {
+            println!("test_format_persistence failed: {:?}", e);
+            e
+        })?;
         println!("✓ test_format_persistence");
 
-        self.test_arrow_ipc_system_tables()
-            .await
-            .map_err(|e| {
-                println!("test_arrow_ipc_system_tables failed: {:?}", e);
-                e
-            })?;
+        self.test_arrow_ipc_system_tables().await.map_err(|e| {
+            println!("test_arrow_ipc_system_tables failed: {:?}", e);
+            e
+        })?;
         println!("✓ test_arrow_ipc_system_tables");
 
         self.test_concurrent_arrow_ipc_queries()
