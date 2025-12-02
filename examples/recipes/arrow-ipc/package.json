@@ -1,6 +1,6 @@
 
 {
-  "name": "cube-ecto-test",
+  "name": "arrow-ipc-test",
   "private": true,
   "scripts": {
     "dev": "cubejs-server",
