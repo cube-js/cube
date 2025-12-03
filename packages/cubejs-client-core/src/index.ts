@@ -47,6 +47,10 @@ export type LoadMethodOptions = {
    */
   progressCallback?(result: ProgressResult): void;
   /**
+   * Cache mode for query execution
+   */
+  cache?: CacheMode;
+  /**
    * AbortSignal to cancel requests
    */
   signal?: AbortSignal;
@@ -108,10 +112,6 @@ export type CubeSqlOptions = LoadMethodOptions & {
    * Query timeout in milliseconds
    */
   timeout?: number;
-  /**
-   * Cache mode for query execution
-   */
-  cache?: CacheMode;
 };
 
 export type CubeSqlSchemaColumn = {
@@ -574,7 +574,8 @@ class CubeApi {
       () => this.request('load', {
         query,
         queryType: 'multi',
-        signal: options?.signal
+        signal: options?.signal,
+        cache: options?.cache,
       }),
       (response: any) => this.loadResponseInternal(response, options),
       options,

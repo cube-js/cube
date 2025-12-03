@@ -1,6 +1,5 @@
 import Meta from './Meta';
 import { TimeDimensionGranularity } from './time';
-import { TransportOptions } from './HttpTransport';
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 
