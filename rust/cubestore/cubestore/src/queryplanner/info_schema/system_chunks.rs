@@ -113,16 +113,6 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                 Arc::new(TimestampNanosecondArray::from_iter(chunks.iter().map(
                     |row| {
                         row.get_row()
-                            .created_at()
-                            .as_ref()
-                            .map(timestamp_nanos_or_panic)
-                    },
-                )))
-            }),
-            Box::new(|chunks| {
-                Arc::new(TimestampNanosecondArray::from_iter(chunks.iter().map(
-                    |row| {
-                        row.get_row()
                             .oldest_insert_at()
                             .as_ref()
                             .map(timestamp_nanos_or_panic)
