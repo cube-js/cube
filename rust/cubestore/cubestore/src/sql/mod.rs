@@ -808,12 +808,13 @@ impl SqlService for SqlServiceImpl {
 
                 let disable_quoting = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "disable_quoting")
-                    .map_or(Ok(false), |option| match &option.value {
-                        Value::Boolean(value) => Ok(*value),
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "disable_quoting")
+                    .map_or(Ok(false), |(_, value)| match value {
+                        Expr::Value(Value::Boolean(value)) => Ok(*value),
                         _ => Err(CubeError::user(format!(
                             "Bad disable_quoting flag (expected boolean) {}",
-                            option.value
+                            value
                         ))),
                     })?;
 
@@ -4349,9 +4350,9 @@ mod tests {
             };
             assert_eq!(
                 pp_plan,
-                "Projection, [information_schema.tables.table_name]\
+                "Projection, [information_schema.tables.table_name:table_name]\
                 \n  Filter\
-                \n    Scan information_schema.tables, source: InfoSchemaTableProvider, fields: [table_schema, table_name]"
+                \n    Scan information_schema.tables, source: InfoSchemaTableProvider(table: Tables), fields: [table_schema, table_name]"
             );
         }).await;
     }

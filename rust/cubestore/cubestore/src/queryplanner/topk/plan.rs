@@ -321,7 +321,7 @@ struct ColumnProjection<'a> {
 
 fn extract_projections_and_havings(
     p: &Arc<LogicalPlan>,
-) -> Result<Option<ColumnProjection>, DataFusionError> {
+) -> Result<Option<ColumnProjection<'_>>, DataFusionError> {
     // Goal:  Deal with arbitrary series of Projection and Filter, where the Projections are column
     // projections (or cardinality(column)), on top of an underlying node.
     //

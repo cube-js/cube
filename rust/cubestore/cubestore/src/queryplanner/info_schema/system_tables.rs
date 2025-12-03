@@ -181,26 +181,23 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 )))
             }),
             Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(
-                    tables
-                        .iter()
-                        .map(|row| {
-                            row.table
-                                .get_row()
-                                .seal_at()
-                                .as_ref()
-                                .map(timestamp_nanos_or_panic)
-                        })
-                        .collect::<Vec<_>>(),
+                Arc::new(TimestampNanosecondArray::from_iter(tables.iter().map(
+                    |row| {
+                        row.table
+                            .get_row()
+                            .seal_at()
+                            .as_ref()
+                            .map(timestamp_nanos_or_panic)
+                    },
+                )))
+            }),
+            Box::new(|tables| {
+                Arc::new(BooleanArray::from_iter(
+                    tables.iter().map(|row| Some(row.table.get_row().sealed())),
                 ))
             }),
             Box::new(|tables| {
-                Arc::new(BooleanArray::from_iter_values(
-                    tables.iter().map(|row| row.table.get_row().sealed()),
-                ))
-            }),
-            Box::new(|tables| {
-                Arc::new(StringArray::from_iter_values(tables.iter().map(|row| {
+                Arc::new(StringArray::from_iter(tables.iter().map(|row| {
                     row.table
                         .get_row()
                         .select_statement()

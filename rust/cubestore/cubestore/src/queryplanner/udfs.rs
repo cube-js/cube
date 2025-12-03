@@ -1,5 +1,3 @@
-//TODO rebase use super::udf_xirr::XirrAccumulator;
-use crate::queryplanner::coalesce::SUPPORTED_COALESCE_TYPES;
 use crate::queryplanner::hll::{Hll, HllUnion};
 use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::udf_xirr::{XirrUDF, XIRR_UDAF_NAME};
@@ -32,6 +30,7 @@ pub fn registerable_scalar_udfs_iter() -> impl Iterator<Item = ScalarUDF> {
         ScalarUDF::new_from_impl(DateAddSub::new_sub()),
         ScalarUDF::new_from_impl(UnixTimestamp::new()),
         ScalarUDF::new_from_impl(ConvertTz::new()),
+        ScalarUDF::new_from_impl(Now::new()),
     ]
     .into_iter()
 }
@@ -72,62 +71,74 @@ pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
 // TODO: add custom type and use it instead of `Binary` for HLL columns.
 
 #[derive(Debug)]
-struct UnixTimestamp {
+struct Now {
     signature: Signature,
 }
 
-struct Now {}
 impl Now {
-    fn signature() -> Signature {
-        Signature::Exact(Vec::new())
-    }
-}
-/* TODO rebase - reimplement for new interface
-impl CubeScalarUDF for Now {
-    fn kind(&self) -> CubeScalarUDFKind {
-        CubeScalarUDFKind::Now
+    fn new() -> Self {
+        Now {
+            signature: Self::signature(),
+        }
     }
 
+    fn signature() -> Signature {
+        Signature::exact(Vec::new(), Volatility::Stable)
+    }
+}
+
+impl ScalarUDFImpl for Now {
     fn name(&self) -> &str {
         "NOW"
     }
 
-    fn descriptor(&self) -> ScalarUDF {
-        ScalarUDF {
-            name: self.name().to_string(),
-            signature: Self::signature(),
-            return_type: Arc::new(|inputs| {
-                assert!(inputs.is_empty());
-                Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
-            }),
-            fun: Arc::new(|_| {
-                let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        return Err(DataFusionError::Internal(format!(
-                            "Failed to get current timestamp: {}",
-                            e
-                        )))
-                    }
-                };
-
-                let nanos = match i64::try_from(t.as_nanos()) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        return Err(DataFusionError::Internal(format!(
-                            "Failed to convert timestamp to i64: {}",
-                            e
-                        )))
-                    }
-                };
-
-                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                    Some(nanos),
-                )))
-            }),
-        }
+    fn as_any(&self) -> &dyn Any {
+        self
     }
-} */
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, _arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+        Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
+    }
+
+    fn invoke_with_args(
+        &self,
+        _args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> datafusion::error::Result<ColumnarValue> {
+        let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(DataFusionError::Internal(format!(
+                    "Failed to get current timestamp: {}",
+                    e
+                )))
+            }
+        };
+
+        let nanos = match i64::try_from(t.as_nanos()) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(DataFusionError::Internal(format!(
+                    "Failed to convert timestamp to i64: {}",
+                    e
+                )))
+            }
+        };
+
+        Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+            Some(nanos),
+            None,
+        )))
+    }
+}
+
+#[derive(Debug)]
+struct UnixTimestamp {
+    signature: Signature,
+}
 
 impl UnixTimestamp {
     pub fn new() -> Self {
@@ -145,40 +156,6 @@ impl ScalarUDFImpl for UnixTimestamp {
         "unix_timestamp"
     }
 
-    /* TODO rebase - reimplement for new interface
-     * fn descriptor(&self) -> ScalarUDF {
-        ScalarUDF {
-            name: self.name().to_string(),
-            signature: Self::signature(),
-            return_type: Arc::new(|inputs| {
-                assert!(inputs.is_empty());
-                Ok(Arc::new(DataType::Int64))
-            }),
-            fun: Arc::new(|_| {
-                let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        return Err(DataFusionError::Internal(format!(
-                            "Failed to get current timestamp: {}",
-                            e
-                        )))
-                    }
-                };
-
-                let seconds = match i64::try_from(t.as_secs()) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        return Err(DataFusionError::Internal(format!(
-                            "Failed to convert timestamp to i64: {}",
-                            e
-                        )))
-                    }
-                };
-
-                Ok(ColumnarValue::Scalar(ScalarValue::Int64(Some(seconds))))
-            }),
-        }
-    }*/
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -191,16 +168,31 @@ impl ScalarUDFImpl for UnixTimestamp {
         Ok(DataType::Int64)
     }
 
-    fn invoke(&self, _args: &[ColumnarValue]) -> datafusion::common::Result<ColumnarValue> {
-        Err(DataFusionError::Internal(
-            "UNIX_TIMESTAMP() was not optimized away".to_string(),
-        ))
-    }
+    fn invoke_with_args(
+        &self,
+        _args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> datafusion::error::Result<ColumnarValue> {
+        let t = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(DataFusionError::Internal(format!(
+                    "Failed to get current timestamp: {}",
+                    e
+                )))
+            }
+        };
 
-    fn invoke_no_args(&self, _number_rows: usize) -> datafusion::common::Result<ColumnarValue> {
-        Err(DataFusionError::Internal(
-            "UNIX_TIMESTAMP() was not optimized away".to_string(),
-        ))
+        let seconds = match i64::try_from(t.as_secs()) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(DataFusionError::Internal(format!(
+                    "Failed to convert timestamp to i64: {}",
+                    e
+                )))
+            }
+        };
+
+        Ok(ColumnarValue::Scalar(ScalarValue::Int64(Some(seconds))))
     }
 
     fn simplify(

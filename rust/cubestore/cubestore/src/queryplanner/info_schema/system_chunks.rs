@@ -105,7 +105,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                         row.get_row()
                             .created_at()
                             .as_ref()
-                            .map(|t| t.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),

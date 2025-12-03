@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 #![feature(box_patterns)]
 #![feature(hash_set_entry)]
 
