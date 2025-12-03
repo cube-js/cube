@@ -153,10 +153,17 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       await this.query(dropIfExistsSql, [])
 
       const unloadSql = /* sql */`
-        CREATE TABLE ${unloadCatalog}.${unloadSchema}."${tableName}"
+        CREATE TABLE ${trinoTable}
         WITH (FORMAT='TEXTFILE') AS ${unloadOptions.query!.sql}
       `
-      await this.query(unloadSql, unloadOptions.query!.params)
+
+      try {
+        await this.query(unloadSql, unloadOptions.query!.params)
+      } finally {
+        // Ensure intermediate table is cleaned up
+        await this.query(dropIfExistsSql, [])
+      }
+
       const columns = await this.tableColumns(unloadCatalog, unloadSchema, tableName)
 
       return columns;
