@@ -232,12 +232,22 @@ impl PhysicalPlanBuilder {
     ) -> Result<Vec<OrderBy>, CubeError> {
         let mut result = Vec::new();
         for o in order_by.iter() {
-            for position in logical_schema.find_member_positions(&o.name()) {
+            let positions = logical_schema.find_member_positions(&o.name());
+
+            if positions.is_empty() {
                 result.push(OrderBy::new(
                     Expr::Member(MemberExpression::new(o.member_symbol())),
-                    position + 1,
+                    0,
                     o.desc(),
                 ));
+            } else {
+                for position in positions {
+                    result.push(OrderBy::new(
+                        Expr::Member(MemberExpression::new(o.member_symbol())),
+                        position + 1,
+                        o.desc(),
+                    ));
+                }
             }
         }
         Ok(result)
