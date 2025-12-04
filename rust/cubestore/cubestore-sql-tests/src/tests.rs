@@ -357,6 +357,9 @@ lazy_static::lazy_static! {
         "decimal_math",
         "planning_filter_multiple_in_for_decimal",
         "planning_numeric_cast",
+        "create_table_with_csv_no_header",
+        "create_table_with_csv_no_header_and_delimiter",
+        "create_table_with_csv_no_header_and_quotes",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
