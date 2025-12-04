@@ -234,7 +234,10 @@ impl PhysicalPlanBuilder {
         for o in order_by.iter() {
             let positions = logical_schema.find_member_positions(&o.name());
 
-            if positions.is_empty() {
+            // TODO: Check for `is_measure` is temporary here until
+            // correct processing of order by dimension that is not included in the
+            // selection list will be implemented
+            if positions.is_empty() && o.member_symbol().is_measure() {
                 result.push(OrderBy::new(
                     Expr::Member(MemberExpression::new(o.member_symbol())),
                     0,
