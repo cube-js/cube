@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+### Features
+
+- **cubesql:** Speed up field lookups in DFSchema ([#10214](https://github.com/cube-js/cube/issues/10214)) ([52fe97f](https://github.com/cube-js/cube/commit/52fe97fd47deeffbeb930745fb43fae4b040bc6b))
+
 ## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
 
 ### Features

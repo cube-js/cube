@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+### Features
+
+- **client-core:** Add baseRequestId to the client public methods ([#10212](https://github.com/cube-js/cube/issues/10212)) ([2d6e923](https://github.com/cube-js/cube/commit/2d6e923b60b4712a6dd87554c6d129437d8df1c8))
+- **cubesql:** Speed up field lookups in DFSchema ([#10214](https://github.com/cube-js/cube/issues/10214)) ([52fe97f](https://github.com/cube-js/cube/commit/52fe97fd47deeffbeb930745fb43fae4b040bc6b))
+- **firebolt:** Change default renewal threshold to 2 minutes ([#10219](https://github.com/cube-js/cube/issues/10219)) ([800134e](https://github.com/cube-js/cube/commit/800134e4d6ee4b496bec92502e802ae2a3c602fe))
+- **tesseract:** Support order by measure not included in the select list ([#10218](https://github.com/cube-js/cube/issues/10218)) ([2efb5ec](https://github.com/cube-js/cube/commit/2efb5ec31bb4cc1cd6348eb8efbbb28fdfb9f270))
+
 ## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
 
 ### Bug Fixes
