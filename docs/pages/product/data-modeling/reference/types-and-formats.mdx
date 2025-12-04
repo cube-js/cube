@@ -214,11 +214,11 @@ engine][link-tesseract]. Tesseract is currently in preview. Use the
 
 </WarningBox>
 
-Unlike the `number` type which is used for calculations on measures (e.g., 
+Unlike the `number` type which is used for calculations on measures (e.g.,
 `SUM(revenue) / COUNT(*)`), `number_agg` indicates that the `sql` parameter contains
 a direct SQL aggregate function.
 
-The `sql` parameter is required and must include a custom aggregate function that returns a numeric 
+The `sql` parameter is required and must include a custom aggregate function that returns a numeric
 value.
 
 <CodeTabs>
@@ -646,8 +646,8 @@ cubes:
 
 </CodeTabs>
 
-Note that the type of the target column should be `TIMESTAMP`. 
-If your time-based column is type `DATE` or another temporal type, 
+Note that the type of the target column should be `TIMESTAMP`.
+If your time-based column is type `DATE` or another temporal type,
 you should cast it to a timestamp in the `sql` parameter of the dimension.
 
 <ReferenceBox>
@@ -1021,7 +1021,7 @@ cube(`orders`, {
     created_at: {
       sql: `created_at`,
       type: `time`,
-      format: `%B %d, %Y`
+      format: `%Y-%m-%d %H:%M:%S`
     }
   }
 })
@@ -1036,7 +1036,7 @@ cubes:
       - name: created_at
         sql: created_at
         type: time
-        format: "%B %d, %Y"
+        format: "%Y-%m-%d %H:%M:%S"
 ```
 
 </CodeTabs>
@@ -1045,12 +1045,10 @@ cubes:
 
 | Format string | Example output |
 |---------------|----------------|
-| `%Y-%m-%d` | 2025-12-04 |
-| `%d/%m/%Y` | 04/12/2025 |
-| `%B %d, %Y` | December 04, 2025 |
-| `%b %d, %Y` | Dec 04, 2025 |
 | `%m/%d/%Y %H:%M` | 12/04/2025 14:30 |
 | `%Y-%m-%d %H:%M:%S` | 2025-12-04 14:30:00 |
+| `%B %d, %Y` | December 04, 2025 |
+| `%b %d, %Y` | Dec 04, 2025 |
 | `%I:%M %p` | 02:30 PM |
 | `%A, %B %d` | Thursday, December 04 |
 | `Q%q %Y` | Q4 2025 |
