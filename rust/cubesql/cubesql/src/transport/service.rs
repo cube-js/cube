@@ -193,11 +193,11 @@ struct MetaCacheBucket {
     value: Arc<MetaContext>,
 }
 
-/// This transports is used in standalone mode
+/// This transport is used in standalone mode
 #[derive(Debug)]
 pub struct HttpTransport {
     /// We use simple cache to improve DX with standalone mode
-    /// because currently we dont persist DF in the SessionState
+    /// because currently we don't persist DF in the SessionState,
     /// and it causes a lot of HTTP requests which slow down BI connections
     cache: RwLockAsync<Option<MetaCacheBucket>>,
 }

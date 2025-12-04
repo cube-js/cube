@@ -21,6 +21,8 @@ pub struct V1LoadResult {
     pub data: Vec<serde_json::Value>,
     #[serde(rename = "refreshKeyValues", skip_serializing_if = "Option::is_none")]
     pub refresh_key_values: Option<Vec<serde_json::Value>>,
+    #[serde(rename = "lastRefreshTime", skip_serializing_if = "Option::is_none")]
+    pub last_refresh_time: Option<String>,
 }
 
 impl V1LoadResult {
@@ -33,6 +35,7 @@ impl V1LoadResult {
             annotation: Box::new(annotation),
             data,
             refresh_key_values: None,
+            last_refresh_time: None,
         }
     }
 }
