@@ -998,8 +998,97 @@ cubes:
 
 </CodeTabs>
 
+### Custom time formatting
+
+Dimensions with `time` type support custom formatting using
+[POSIX strftime][link-strftime] format strings with [d3-time-format][link-d3-time-format] extensions.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+      format: `%B %d, %Y`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+        format: "%B %d, %Y"
+```
+
+</CodeTabs>
+
+#### Common format examples
+
+| Format string | Example output |
+|---------------|----------------|
+| `%Y-%m-%d` | 2025-12-04 |
+| `%d/%m/%Y` | 04/12/2025 |
+| `%B %d, %Y` | December 04, 2025 |
+| `%b %d, %Y` | Dec 04, 2025 |
+| `%m/%d/%Y %H:%M` | 12/04/2025 14:30 |
+| `%Y-%m-%d %H:%M:%S` | 2025-12-04 14:30:00 |
+| `%I:%M %p` | 02:30 PM |
+| `%A, %B %d` | Thursday, December 04 |
+| `Q%q %Y` | Q4 2025 |
+| `Week %V, %Y` | Week 49, 2025 |
+
+#### Supported format specifiers
+
+| Specifier | Description |
+|-----------|-------------|
+| `%a` | Abbreviated weekday name |
+| `%A` | Full weekday name |
+| `%b` | Abbreviated month name |
+| `%B` | Full month name |
+| `%c` | Locale's date and time |
+| `%d` | Day of month [01,31] |
+| `%e` | Space-padded day of month |
+| `%f` | Microseconds |
+| `%g` | ISO 8601 year without century |
+| `%G` | ISO 8601 year with century |
+| `%H` | Hour (24-hour) [00,23] |
+| `%I` | Hour (12-hour) [01,12] |
+| `%j` | Day of year [001,366] |
+| `%L` | Milliseconds |
+| `%m` | Month [01,12] |
+| `%M` | Minute [00,59] |
+| `%p` | AM or PM |
+| `%q` | Quarter [1,4] |
+| `%Q` | Milliseconds since UNIX epoch |
+| `%s` | Seconds since UNIX epoch |
+| `%S` | Second [00,61] |
+| `%u` | Monday-based weekday [1,7] |
+| `%U` | Sunday-based week number [00,53] |
+| `%V` | ISO 8601 week number |
+| `%w` | Sunday-based weekday [0,6] |
+| `%W` | Monday-based week number [00,53] |
+| `%x` | Locale's date |
+| `%X` | Locale's time |
+| `%y` | Year without century [00,99] |
+| `%Y` | Year with century |
+| `%Z` | Time zone name |
+| `%%` | Literal percent sign |
+
 [ref-string-time-dims]: /product/data-modeling/recipes/string-time-dimensions
 [ref-schema-ref-preaggs-rollup]:
   /product/data-modeling/reference/pre-aggregations#rollup
 [ref-calculated-measures]: /product/data-modeling/concepts/calculated-members#calculated-measures
 [ref-drilldowns]: /product/apis-integrations/recipes/drilldowns
+[link-strftime]: https://pubs.opengroup.org/onlinepubs/009695399/functions/strptime.html
+[link-d3-time-format]: https://d3js.org/d3-time-format
