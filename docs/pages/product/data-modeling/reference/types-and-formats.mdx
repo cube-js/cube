@@ -1003,6 +1003,14 @@ cubes:
 Dimensions with `time` type support custom formatting using
 [POSIX strftime][link-strftime] format strings with [d3-time-format][link-d3-time-format] extensions.
 
+<WarningBox>
+
+Custom time formatting is currently applied only in Cube Cloud and the MDX API.
+For other integrations, such as embedded analytics, you will need to apply the
+formatting on the client side using the format specification from the metadata.
+
+</WarningBox>
+
 <CodeTabs>
 
 ```javascript
