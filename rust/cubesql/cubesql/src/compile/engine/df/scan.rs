@@ -1,5 +1,4 @@
 use crate::compile::date_parser::parse_date_str;
-use crate::transport::TransportServiceLoadResponse;
 use crate::{
     compile::{
         engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
@@ -736,7 +735,6 @@ async fn load_data(
             })?;
         let response = result.first();
         if let Some(data) = response.cloned() {
-            let data = data.results_batch;
             match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
                     return Err(ArrowError::ExternalError(Box::new(CubeError::user(
@@ -1174,18 +1172,26 @@ pub fn convert_transport_response(
     response: V1LoadResponse,
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
-) -> std::result::Result<Vec<TransportServiceLoadResponse>, CubeError> {
+) -> std::result::Result<Vec<RecordBatch>, CubeError> {
     response
         .results
         .into_iter()
         .map(|r| {
             let mut response = JsonValueObject::new(r.data.clone());
-            Ok(TransportServiceLoadResponse {
-                last_refresh_time: r.last_refresh_time,
-                results_batch: transform_response(&mut response, schema.clone(), &member_fields)?,
-            })
+            let updated_schema = if let Some(last_refresh_time) = r.last_refresh_time.clone() {
+                let mut metadata = schema.metadata().clone();
+                metadata.insert("lastRefreshTime".to_string(), last_refresh_time);
+                Arc::new(Schema::new_with_metadata(
+                    schema.fields().to_vec(),
+                    metadata,
+                ))
+            } else {
+                schema.clone()
+            };
+
+            transform_response(&mut response, updated_schema, &member_fields)
         })
-        .collect::<std::result::Result<Vec<TransportServiceLoadResponse>, CubeError>>()
+        .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
 }
 
 #[cfg(test)]
@@ -1254,7 +1260,7 @@ mod tests {
                 schema: SchemaRef,
                 member_fields: Vec<MemberField>,
                 _cache_mode: Option<CacheMode>,
-            ) -> Result<Vec<TransportServiceLoadResponse>, CubeError> {
+            ) -> Result<Vec<RecordBatch>, CubeError> {
                 let response = r#"
                 {
                     "results": [{

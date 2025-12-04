@@ -113,12 +113,6 @@ impl SpanId {
     }
 }
 
-#[derive(Clone)]
-pub struct TransportServiceLoadResponse {
-    pub last_refresh_time: Option<String>,
-    pub results_batch: RecordBatch,
-}
-
 #[async_trait]
 pub trait TransportService: Send + Sync + Debug {
     // Load meta information about cubes
@@ -151,7 +145,7 @@ pub trait TransportService: Send + Sync + Debug {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
-    ) -> Result<Vec<TransportServiceLoadResponse>, CubeError>;
+    ) -> Result<Vec<RecordBatch>, CubeError>;
 
     async fn load_stream(
         &self,
@@ -292,7 +286,7 @@ impl TransportService for HttpTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
-    ) -> Result<Vec<TransportServiceLoadResponse>, CubeError> {
+    ) -> Result<Vec<RecordBatch>, CubeError> {
         if meta.change_user().is_some() {
             return Err(CubeError::internal(
                 "Changing security context (__user) is not supported in the standalone mode"

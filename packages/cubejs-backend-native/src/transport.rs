@@ -16,12 +16,12 @@ use async_trait::async_trait;
 use cubeorchestrator::query_result_transform::RequestResultData;
 use cubesql::compile::arrow::datatypes::Schema;
 use cubesql::compile::engine::df::scan::{
-    convert_transport_response, transform_response, CacheMode, MemberField, SchemaRef,
+    convert_transport_response, transform_response, CacheMode, MemberField, RecordBatch, SchemaRef,
 };
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
     SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponse,
-    TransportMetaResponse, TransportServiceLoadResponse,
+    TransportMetaResponse,
 };
 use cubesql::{
     di_service,
@@ -345,7 +345,7 @@ impl TransportService for NodeBridgeTransport {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
         cache_mode: Option<CacheMode>,
-    ) -> Result<Vec<TransportServiceLoadResponse>, CubeError> {
+    ) -> Result<Vec<RecordBatch>, CubeError> {
         trace!("[transport] Request ->");
 
         let native_auth = ctx
@@ -422,7 +422,7 @@ impl TransportService for NodeBridgeTransport {
                             .to_vec(cx)
                             .map_cube_err("Can't convert getRootResultObject result to array")?;
 
-                        let mut native_wrapped_results = Vec::new();
+                        let mut native_wrapped_results = Vec::with_capacity(js_res_wrapped_vec.len());
                         for (js_wrapper, js_result_data) in js_res_wrapped_vec.iter().zip(result_data_js_vec.iter()) {
                             let mut wrapper = ResultWrapper::from_js_result_wrapper(cx, *js_wrapper)
                                 .map_cube_err("Can't construct result wrapper from JS ResultWrapper object")?;
@@ -501,7 +501,8 @@ impl TransportService for NodeBridgeTransport {
                         }
                     };
 
-                    break convert_transport_response(response, schema.clone(), member_fields);
+                    break convert_transport_response(response, schema.clone(), member_fields)
+                        .map_err(|err| CubeError::user(err.to_string()));
                 }
                 ValueFromJs::ResultWrapper(result_wrappers) => {
                     break result_wrappers
@@ -520,14 +521,7 @@ impl TransportService for NodeBridgeTransport {
                                 schema.clone()
                             };
 
-                            Ok(TransportServiceLoadResponse {
-                                last_refresh_time: wrapper.last_refresh_time.clone(),
-                                results_batch: transform_response(
-                                    &mut wrapper,
-                                    updated_schema,
-                                    &member_fields,
-                                )?,
-                            })
+                            transform_response(&mut wrapper, updated_schema, &member_fields)
                         })
                         .collect::<Result<Vec<_>, _>>();
                 }
