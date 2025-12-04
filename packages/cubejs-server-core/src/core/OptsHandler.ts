@@ -463,7 +463,7 @@ export class OptsHandler {
       telemetry: getEnv('telemetry'),
       scheduledRefreshTimeZones: getEnv('scheduledRefreshTimezones'),
       scheduledRefreshContexts: async () => [null],
-      basePath: '/cubejs-api',
+      basePath: process.env.CUBEJS_API_BASE_PATH || '/cubejs-api',
       dashboardAppPath: 'dashboard-app',
       dashboardAppPort: 3000,
       scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
