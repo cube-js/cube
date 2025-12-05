@@ -142,6 +142,7 @@ export type LoadPreAggregationResult = {
   queryKey?: any[];
   rollupLambdaId?: string;
   partitionRange?: QueryDateRange;
+  isMultiTableUnion?: boolean;
 };
 
 export type PreAggregationTableToTempTable = [string, LoadPreAggregationResult];
@@ -515,7 +516,9 @@ export class PreAggregations {
             ...loadResult,
             type: p.type,
           };
-          await this.addTableUsed(usedPreAggregation.targetTableName);
+          if (!usedPreAggregation.isMultiTableUnion) {
+            await this.addTableUsed(usedPreAggregation.targetTableName);
+          }
 
           if (i === preAggregations.length - 1 && queryBody.values) {
             queryParamsReplacement = await loader.replaceQueryBuildRangeParams(

@@ -8,6 +8,12 @@ import {
   displayCLIWarning,
 } from '@cubejs-backend/shared';
 import {
+  isCubeStoreSupported,
+  CubeStoreHandler,
+  CubeStoreDevDriver
+} from '@cubejs-backend/cubestore-driver';
+
+import {
   CreateOptions,
   SystemOptions,
   DriverDecoratedOptions,
@@ -403,15 +409,8 @@ export class OptsHandler {
 
     if (externalDbType === 'cubestore' && this.isDevMode() && !opts.serverless) {
       if (!definedExtDBVariables.length) {
-        // There is no @cubejs-backend/cubestore-driver dependency in the core
-        // package. At the same time, @cubejs-backend/cubestore-driver is already
-        // exist at the moment, when the core server instance is up. That is the
-        // reason why we inject it in this way.
-        //
-        // eslint-disable-next-line global-require,import/no-extraneous-dependencies
-        const cubeStorePackage = require('@cubejs-backend/cubestore-driver');
-        if (cubeStorePackage.isCubeStoreSupported()) {
-          const cubeStoreHandler = new cubeStorePackage.CubeStoreHandler({
+        if (isCubeStoreSupported()) {
+          const cubeStoreHandler = new CubeStoreHandler({
             stdout: (data) => {
               console.log(data.toString().trim());
             },
@@ -436,7 +435,7 @@ export class OptsHandler {
 
           // Lazy loading for Cube Store
           externalDriverFactory =
-            () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
+            () => new CubeStoreDevDriver(cubeStoreHandler);
         } else {
           this.core.logger('Cube Store is not supported on your system', {
             warning: (

@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Bug Fixes
+
+- **server-core:** pass contextToRoles option ([#10182](https://github.com/cube-js/cube/issues/10182)) ([4b7ba4e](https://github.com/cube-js/cube/commit/4b7ba4e47090d904f31786137b8c8b5d45d519ef))
+
+## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.6](https://github.com/cube-js/cube/compare/v1.5.5...v1.5.6) (2025-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.5.5](https://github.com/cube-js/cube/compare/v1.5.4...v1.5.5) (2025-11-24)
+
+### Bug Fixes
+
+- **api-gateway:** Fix passing cacheMode from user's request ([#10162](https://github.com/cube-js/cube/issues/10162)) ([64c66c4](https://github.com/cube-js/cube/commit/64c66c4a4bdcf3e7e1ae3094791031e22397243e))
+
+### Performance Improvements
+
+- **schema-compiler:** Add Server Core shared caches for model compilation ([#10144](https://github.com/cube-js/cube/issues/10144)) ([87de073](https://github.com/cube-js/cube/commit/87de0734bf987969096d7f92c65a6ad20ef656e6))
+- **schema-compiler:** More aggressive compilers cleanup ([#10153](https://github.com/cube-js/cube/issues/10153)) ([005a46d](https://github.com/cube-js/cube/commit/005a46d734e25b1b02a3a6315172772e8988b027))
+
 ## [1.5.4](https://github.com/cube-js/cube/compare/v1.5.3...v1.5.4) (2025-11-18)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

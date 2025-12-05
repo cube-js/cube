@@ -1,0 +1,82 @@
+# Private embedding
+
+<InfoBox>
+  Embedding is available on [Premium and Enterprise plans](https://cube.dev/pricing).
+</InfoBox>
+
+Private embedding is designed for **internal use cases** where team members already have Cube accounts. Simply drop an iframe into your internal tools—no API keys or complex setup required. Users will authenticate with their existing Cube credentials when accessing embedded content.
+
+## How it works
+
+To embed Cube content, you simply need to paste an `<iframe>` tag into your application or tool. Get the embed code and paste it wherever you want the content to appear.
+
+### Analytics Chat
+
+The embed URL for Analytics Chat is always the same:
+
+```html
+<iframe
+  title="Analytics Chat"
+  src="https://your-account.cubecloud.dev/embed/chat"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+### Dashboards
+
+To embed a dashboard:
+
+1. Open your dashboard in Cube
+2. Click **Share** → **Embed**
+3. Copy the generated iframe code
+
+<img src="https://lgo0ecceic.ucarecd.net/24999bd4-1a7a-4c15-999a-848e6ec3fbe4/" alt="Share embed dialog" />
+
+Then paste the iframe code into your application.
+
+
+## Common Applications
+
+### Embedding in Notion
+
+To embed a Cube dashboard in Notion:
+
+1. In Cube, open your dashboard and click **Share** → **Embed**
+2. Copy the embed URL (just the URL, not the iframe code):
+   ```
+   https://your-account.cubecloud.dev/embed/dashboard/OwVQpbdaZmBT
+   ```
+3. In Notion, type `/embed` and select **Embed**
+4. Paste the URL when prompted
+
+When team members open the Notion page, they'll be prompted to sign in with their Cube credentials if not already authenticated.
+
+### Embedding in Salesforce
+
+To embed Cube analytics in Salesforce:
+
+1. Navigate to the Salesforce page where you want to add the dashboard
+2. Add a **Visualforce Page** component
+3. Use an iframe to embed your Cube dashboard:
+
+```html
+<apex:page>
+  <iframe
+    src="https://your-account.cubecloud.dev/embed/dashboard/OwVQpbdaZmBT"
+    width="100%"
+    height="800"
+    frameborder="0"
+  ></iframe>
+</apex:page>
+```
+
+## Security
+
+Private embedding uses Cube's built-in authentication. Users must:
+
+- Have an active Cube account
+- Be signed in to Cube (or will be prompted to sign in)
+- Have appropriate permissions to view the embedded content
+
+Access control is managed through your existing Cube [roles and permissions](/product/administration/users-and-permissions/roles-and-permissions) settings.

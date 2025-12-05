@@ -3357,6 +3357,7 @@ impl WrappedSelectNode {
             });
 
         let load_request = V1LoadRequestQuery {
+            timezone: None,
             measures: Some(
                 aggregate
                     .iter()

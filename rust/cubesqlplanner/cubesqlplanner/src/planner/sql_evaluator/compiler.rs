@@ -4,11 +4,11 @@ use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, MeasureSymbolFactory,
     SqlCall, SymbolFactory, TraversalVisitor,
 };
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::security_context::SecurityContext;
-use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::planner::sql_evaluator::sql_call_builder::SqlCallBuilder;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
-    sql_utils: Rc<dyn SqlUtils>,
+    base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
     timezone: Tz,
     /* (type, name) */
@@ -26,14 +26,14 @@ pub struct Compiler {
 impl Compiler {
     pub fn new(
         cube_evaluator: Rc<dyn CubeEvaluator>,
-        sql_utils: Rc<dyn SqlUtils>,
+        base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
         timezone: Tz,
     ) -> Self {
         Self {
             cube_evaluator,
             security_context,
-            sql_utils,
+            base_tools,
             timezone,
             members: HashMap::new(),
         }
@@ -132,7 +132,7 @@ impl Compiler {
         let call_builder = SqlCallBuilder::new(
             self,
             self.cube_evaluator.clone(),
-            self.sql_utils.clone(),
+            self.base_tools.clone(),
             self.security_context.clone(),
         );
         let sql_call = call_builder.build(&cube_name, member_sql.clone())?;

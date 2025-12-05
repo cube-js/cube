@@ -50,6 +50,11 @@ export type LoadMethodOptions = {
    * AbortSignal to cancel requests
    */
   signal?: AbortSignal;
+
+  /**
+   * Client provided request ID, if client wants to track request onb their own
+   */
+  baseRequestId?: string;
 };
 
 export type DeeplyReadonly<T> = {
@@ -277,8 +282,8 @@ class CubeApi {
 
   protected request(method: string, params?: any) {
     return this.transport.request(method, {
-      baseRequestId: uuidv4(),
-      ...params
+      ...params,
+      baseRequestId: params?.baseRequestId || uuidv4(),
     });
   }
 
@@ -574,7 +579,8 @@ class CubeApi {
       () => this.request('load', {
         query,
         queryType: 'multi',
-        signal: options?.signal
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
       }),
       (response: any) => this.loadResponseInternal(response, options),
       options,
@@ -640,7 +646,8 @@ class CubeApi {
       () => this.request('subscribe', {
         query,
         queryType: 'multi',
-        signal: options?.signal
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
       }),
       (response: any) => this.loadResponseInternal(response, options),
       { ...options, subscribe: true },
@@ -659,7 +666,8 @@ class CubeApi {
     return this.loadMethod(
       () => this.request('sql', {
         query,
-        signal: options?.signal
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
       }),
       (response: any) => (Array.isArray(response) ? response.map((body) => new SqlQuery(body)) : new SqlQuery(response)),
       options,
@@ -677,7 +685,8 @@ class CubeApi {
   public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
-        signal: options?.signal
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
       }),
       (body: MetaResponse) => new Meta(body),
       options,
@@ -696,7 +705,8 @@ class CubeApi {
     return this.loadMethod(
       () => this.request('dry-run', {
         query,
-        signal: options?.signal
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
       }),
       (response: DryRunResponse) => response,
       options,
@@ -719,7 +729,8 @@ class CubeApi {
           cache: options?.cache,
           method: 'POST',
           signal: options?.signal,
-          fetchTimeout: options?.timeout
+          fetchTimeout: options?.timeout,
+          baseRequestId: options?.baseRequestId,
         });
 
         return request;

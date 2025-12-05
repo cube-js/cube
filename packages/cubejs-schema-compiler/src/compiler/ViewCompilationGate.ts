@@ -1,9 +1,7 @@
-export class ViewCompilationGate {
-  private shouldCompile: any;
+import { CompilerInterface } from './PrepareCompiler';
 
-  public constructor() {
-    this.shouldCompile = false;
-  }
+export class ViewCompilationGate implements CompilerInterface {
+  private shouldCompile: boolean = false;
 
   public compile(cubes: any[]) {
     // When developing Data Access Policies feature, we've come across a

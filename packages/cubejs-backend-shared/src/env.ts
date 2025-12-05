@@ -228,9 +228,19 @@ const variables: Record<string, (...args: any) => any> = {
   nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
     .default('true')
     .asBoolStrict(),
-  transpilationWorkerThreads: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS')
-    .default('true')
-    .asBoolStrict(),
+  transpilationWorkerThreads: () => {
+    const enabled = get('CUBEJS_TRANSPILATION_WORKER_THREADS')
+      .default('true')
+      .asBoolStrict();
+
+    if (!enabled) {
+      console.warn(
+        'Worker thread transpilation is enabled by default and cannot be disabled with CUBEJS_TRANSPILATION_WORKER_THREADS.'
+      );
+    }
+
+    return true;
+  },
   allowNonStrictDateRangeMatching: () => get('CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH')
     .default('true')
     .asBoolStrict(),
@@ -244,6 +254,12 @@ const variables: Record<string, (...args: any) => any> = {
   nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
     .default('')
     .asString(),
+  defaultTimezone: () => get('CUBEJS_DEFAULT_TIMEZONE')
+    .default('UTC')
+    .asString(),
+  preciseDecimalInCubestore: () => get('CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -2179,6 +2195,9 @@ export function getEnv<T extends keyof Vars>(key: T, opts?: Parameters<Vars[T]>)
     `Unsupported env variable: "${key}"`,
   );
 }
+
+// trigger warning
+getEnv('transpilationWorkerThreads');
 
 export function isDockerImage(): boolean {
   return Boolean(process.env.CUBEJS_DOCKER_IMAGE_TAG);

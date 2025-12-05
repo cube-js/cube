@@ -1583,6 +1583,14 @@ impl LanguageToLogicalPlanConverter {
                 let mut query_order = Vec::new();
                 let mut query_dimensions = Vec::new();
 
+                query.timezone = self
+                    .cube_context
+                    .session_state
+                    .query_timezone
+                    .read()
+                    .unwrap()
+                    .clone();
+
                 for m in members {
                     match m {
                         LogicalPlanLanguage::Measure(measure_params) => {

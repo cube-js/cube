@@ -2,6 +2,8 @@
 src/lib.rs
 src/models/mod.rs
 src/models/v1_cube_meta.rs
+src/models/v1_cube_meta_custom_numeric_format.rs
+src/models/v1_cube_meta_custom_time_format.rs
 src/models/v1_cube_meta_dimension.rs
 src/models/v1_cube_meta_dimension_granularity.rs
 src/models/v1_cube_meta_folder.rs

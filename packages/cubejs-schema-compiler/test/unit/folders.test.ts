@@ -25,20 +25,20 @@ describe('Cube Folders', () => {
       (it) => it.config.name === 'test_view'
     );
 
-    expect(emptyView.config.folders.length).toBe(2);
+    expect(emptyView?.config.folders.length).toBe(2);
 
-    const folder1 = emptyView.config.folders.find(
+    const folder1 = emptyView?.config.folders.find(
       (it) => it.name === 'folder1'
     );
-    expect(folder1.members).toEqual([
+    expect(folder1?.members).toEqual([
       'test_view.age',
       'test_view.renamed_gender',
     ]);
 
-    const folder2 = emptyView.config.folders.find(
+    const folder2 = emptyView?.config.folders.find(
       (it) => it.name === 'folder2'
     );
-    expect(folder2.members).toEqual(
+    expect(folder2?.members).toEqual(
       expect.arrayContaining(['test_view.age', 'test_view.renamed_gender'])
     );
   });
@@ -48,29 +48,29 @@ describe('Cube Folders', () => {
       (it) => it.config.name === 'test_view4'
     );
 
-    expect(testView.config.folders.length).toBe(3);
+    expect(testView?.config.folders.length).toBe(3);
 
-    const folder1 = testView.config.folders.find(
+    const folder1 = testView?.config.folders.find(
       (it) => it.name === 'folder1'
     );
-    expect(folder1.members).toEqual([
+    expect(folder1?.members).toEqual([
       'test_view4.users_age',
       'test_view4.users_state',
       'test_view4.renamed_orders_status',
     ]);
 
-    const folder2 = testView.config.folders.find(
+    const folder2 = testView?.config.folders.find(
       (it) => it.name === 'folder2'
     );
-    expect(folder2.members).toEqual(
+    expect(folder2?.members).toEqual(
       expect.arrayContaining(['test_view4.users_city', 'test_view4.users_renamed_in_view3_gender'])
     );
 
-    const folder3 = testView.config.folders.find(
+    const folder3 = testView?.config.folders.find(
       (it) => it.name === 'folder3'
     );
-    expect(folder3.members.length).toBe(9);
-    expect(folder3.members).toEqual([
+    expect(folder3?.members.length).toBe(9);
+    expect(folder3?.members).toEqual([
       'test_view4.users_city',
       'test_view4.renamed_orders_status',
       'test_view4.renamed_orders_count',
@@ -99,43 +99,43 @@ describe('Cube Folders', () => {
       (it) => it.config.name === 'test_view4'
     );
 
-    expect(testView.config.folders.length).toBe(5);
+    expect(testView?.config.folders.length).toBe(5);
 
-    const folder1 = testView.config.folders.find(
+    const folder1 = testView?.config.folders.find(
       (it) => it.name === 'folder1'
     );
-    expect(folder1.members).toEqual([
+    expect(folder1?.members).toEqual([
       'test_view4.users_age',
       'test_view4.users_state',
       'test_view4.renamed_orders_status',
     ]);
 
-    const folder2 = testView.config.folders.find(
+    const folder2 = testView?.config.folders.find(
       (it) => it.name === 'folder2'
     );
-    expect(folder2.members).toEqual(
+    expect(folder2?.members).toEqual(
       expect.arrayContaining(['test_view4.users_city', 'test_view4.users_renamed_in_view3_gender'])
     );
 
-    const folder3 = testView.config.folders.find(
+    const folder3 = testView?.config.folders.find(
       (it) => it.name === 'folder3'
     );
-    expect(folder3.members.length).toBe(1);
-    expect(folder3.members).toEqual([
+    expect(folder3?.members.length).toBe(1);
+    expect(folder3?.members).toEqual([
       'test_view4.users_city',
     ]);
 
-    const folder4 = testView.config.folders.find(
+    const folder4 = testView?.config.folders.find(
       (it) => it.name === 'folder3/inner folder 4'
     );
-    expect(folder4.members.length).toBe(1);
-    expect(folder4.members).toEqual(['test_view4.renamed_orders_status']);
+    expect(folder4?.members.length).toBe(1);
+    expect(folder4?.members).toEqual(['test_view4.renamed_orders_status']);
 
-    const folder5 = testView.config.folders.find(
+    const folder5 = testView?.config.folders.find(
       (it) => it.name === 'folder3/inner folder 5'
     );
-    expect(folder5.members.length).toBe(9);
-    expect(folder5.members).toEqual([
+    expect(folder5?.members.length).toBe(9);
+    expect(folder5?.members).toEqual([
       'test_view4.renamed_orders_count',
       'test_view4.renamed_orders_id',
       'test_view4.renamed_orders_number',
@@ -153,33 +153,33 @@ describe('Cube Folders', () => {
       (it) => it.config.name === 'test_view4'
     );
 
-    expect(testView.config.nestedFolders.length).toBe(3);
+    expect(testView?.config.nestedFolders.length).toBe(3);
 
-    const folder1 = testView.config.nestedFolders.find(
+    const folder1 = testView?.config.nestedFolders.find(
       (it) => it.name === 'folder1'
     );
-    expect(folder1.members).toEqual([
+    expect(folder1?.members).toEqual([
       'test_view4.users_age',
       'test_view4.users_state',
       'test_view4.renamed_orders_status',
     ]);
 
-    const folder2 = testView.config.nestedFolders.find(
+    const folder2 = testView?.config.nestedFolders.find(
       (it) => it.name === 'folder2'
     );
-    expect(folder2.members).toEqual(
+    expect(folder2?.members).toEqual(
       expect.arrayContaining(['test_view4.users_city', 'test_view4.users_renamed_in_view3_gender'])
     );
 
-    const folder3 = testView.config.nestedFolders.find(
+    const folder3 = testView?.config.nestedFolders.find(
       (it) => it.name === 'folder3'
     );
-    expect(folder3.members.length).toBe(3);
-    expect(folder3.members[1]).toEqual(
+    expect(folder3?.members.length).toBe(3);
+    expect(folder3?.members[1]).toEqual(
       { name: 'inner folder 4', members: ['test_view4.renamed_orders_status'] }
     );
-    expect(folder3.members[2].name).toEqual('inner folder 5');
-    expect(folder3.members[2].members).toEqual([
+    expect((folder3?.members[2] as any)?.name).toEqual('inner folder 5');
+    expect((folder3?.members[2] as any)?.members).toEqual([
       'test_view4.renamed_orders_count',
       'test_view4.renamed_orders_id',
       'test_view4.renamed_orders_number',
@@ -200,31 +200,31 @@ describe('Cube Folders', () => {
       (it) => it.config.name === 'test_view3'
     );
 
-    expect(view2.config.folders.length).toBe(1);
-    expect(view3.config.folders.length).toBe(2);
+    expect(view2?.config.folders.length).toBe(1);
+    expect(view3?.config.folders.length).toBe(2);
 
-    const folder1 = view2.config.folders.find(
+    const folder1 = view2?.config.folders.find(
       (it) => it.name === 'folder1'
     );
-    expect(folder1.members).toEqual([
+    expect(folder1?.members).toEqual([
       'test_view2.users_age',
       'test_view2.users_state',
       'test_view2.renamed_orders_status',
     ]);
 
-    const folder1v3 = view3.config.folders.find(
+    const folder1v3 = view3?.config.folders.find(
       (it) => it.name === 'folder1'
     );
-    expect(folder1v3.members).toEqual([
+    expect(folder1v3?.members).toEqual([
       'test_view3.users_age',
       'test_view3.users_state',
       'test_view3.renamed_orders_status',
     ]);
 
-    const folder2 = view3.config.folders.find(
+    const folder2 = view3?.config.folders.find(
       (it) => it.name === 'folder2'
     );
-    expect(folder2.members).toEqual(
+    expect(folder2?.members).toEqual(
       expect.arrayContaining(['test_view3.users_city', 'test_view3.users_renamed_in_view3_gender'])
     );
   });
@@ -252,10 +252,10 @@ describe('Cube Folders', () => {
       (it) => it.config.name === 'test_view2'
     );
 
-    expect(view.config.folders.length).toBe(1);
+    expect(view?.config.folders.length).toBe(1);
 
-    const folder1 = view.config.folders.find((it) => it.name === 'folder1');
-    expect(folder1.members).toEqual([
+    const folder1 = view?.config.folders.find((it) => it.name === 'folder1');
+    expect(folder1?.members).toEqual([
       'test_view2.users_age',
       'test_view2.users_state',
       'test_view2.renamed_orders_status',

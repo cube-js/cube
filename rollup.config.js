@@ -182,15 +182,6 @@ export default bundle(
     })
   )
   .concat(
-    bundle('cubejs-client-vue', 'cubejsVue', {
-      input: 'packages/cubejs-client-vue/src/index.js',
-      external: ['vue'],
-      globals: {
-        vue: 'Vue',
-      },
-    })
-  )
-  .concat(
     bundle('cubejs-client-vue3', 'cubejsVue3', {
       input: 'packages/cubejs-client-vue3/src/index.js',
       external: ['vue'],

@@ -438,7 +438,7 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache);
+          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext, req.body.cache, req.body.timezone);
         } catch (e: any) {
           this.handleError({
             e,
@@ -1290,7 +1290,7 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(rewrittenQuery, persistent);
+          return normalizeQuery(rewrittenQuery, persistent, cacheMode);
         }
       )
     );

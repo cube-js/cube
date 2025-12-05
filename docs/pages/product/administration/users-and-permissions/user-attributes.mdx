@@ -1,0 +1,43 @@
+# User Attributes
+
+_Secure data access with user attributes for filtering based on individual permissions._
+
+User attributes allow you to implement row-level security by filtering data based on user-specific values. This documentation explains how to set up and use user attributes for access control.
+
+## Creating User Attributes
+
+1. Go to <Btn>Admin → Attributes</Btn>
+2. Click to create a new attribute
+3. Configure the attribute:
+   - Set a name
+   - Choose the type
+   - Optionally set a default value
+   - Optionally set a display name
+
+## Setting User Attribute Values
+
+User attributes can be set on a per-user basis:
+
+1. Go to the user's page
+2. Locate the attributes section
+3. Set the desired attribute value (e.g., setting city to "Los Angeles")
+
+## Implementing Row-Level Access Policy
+
+To filter data based on user attributes, implement an access policy in your views:
+
+```yaml
+views:
+  - name: orders_view
+    access_policy:
+      - role: "*"  # Applies to all roles
+        row_level:
+          filters:
+            - member: customers_city
+              operator: equals
+              values: ["{ userAttributes.city }"]
+```
+
+## Effect on Queries
+
+When the access policy is implemented, queries will automatically be filtered based on the user's attributes. This ensures users can only access data that matches their attribute values.

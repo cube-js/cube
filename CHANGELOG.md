@@ -3,6 +3,80 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+### Features
+
+- **client-core:** Add baseRequestId to the client public methods ([#10212](https://github.com/cube-js/cube/issues/10212)) ([2d6e923](https://github.com/cube-js/cube/commit/2d6e923b60b4712a6dd87554c6d129437d8df1c8))
+- **cubesql:** Speed up field lookups in DFSchema ([#10214](https://github.com/cube-js/cube/issues/10214)) ([52fe97f](https://github.com/cube-js/cube/commit/52fe97fd47deeffbeb930745fb43fae4b040bc6b))
+- **firebolt:** Change default renewal threshold to 2 minutes ([#10219](https://github.com/cube-js/cube/issues/10219)) ([800134e](https://github.com/cube-js/cube/commit/800134e4d6ee4b496bec92502e802ae2a3c602fe))
+- **tesseract:** Support order by measure not included in the select list ([#10218](https://github.com/cube-js/cube/issues/10218)) ([2efb5ec](https://github.com/cube-js/cube/commit/2efb5ec31bb4cc1cd6348eb8efbbb28fdfb9f270))
+
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+### Bug Fixes
+
+- **client-core:** Fix TypeScript module resolution via `exports.types` ([#10209](https://github.com/cube-js/cube/issues/10209)) ([6f4a650](https://github.com/cube-js/cube/commit/6f4a650957d811829922677c2ae1a0c0459c1331))
+- **schema-compiler:** Fix datetime tz conversion for Athena/Trino ([#10207](https://github.com/cube-js/cube/issues/10207)) ([32d50a5](https://github.com/cube-js/cube/commit/32d50a5d5a594f30dff2b1a55c87f5afdb89976f))
+
+### Features
+
+- Support custom date formatting for time dimensions ([#10204](https://github.com/cube-js/cube/issues/10204)) ([8e18659](https://github.com/cube-js/cube/commit/8e186592feb35b224d50eefa280f5422865e73bc))
+- Support custom numeric formatting ([#10213](https://github.com/cube-js/cube/issues/10213)) ([898d4d0](https://github.com/cube-js/cube/commit/898d4d05b5c20c284c02c37718ae754c5646cd49))
+
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+### Bug Fixes
+
+- **query-orchestrator:** Table used cache should not be used for unions ([#10192](https://github.com/cube-js/cube/issues/10192)) ([53d79bb](https://github.com/cube-js/cube/commit/53d79bbfd16aeefadb3bd8e0a73a5c0b5e920da4))
+
+### Features
+
+- **api-gateway:** Support query timezone in `/cubesql` API endpoint ([#10189](https://github.com/cube-js/cube/issues/10189)) ([499ddc6](https://github.com/cube-js/cube/commit/499ddc62fc1618b78f16a17943e1c72a670f6b48))
+
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+### Bug Fixes
+
+- **bigquery-driver:** Cannot find module: package.json ([#10184](https://github.com/cube-js/cube/issues/10184)) ([9a2b6a9](https://github.com/cube-js/cube/commit/9a2b6a9e6dffdc5b6c7641d7c543b858f2260e34))
+
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix matching for pre-aggs with custom granularities ([#10180](https://github.com/cube-js/cube/issues/10180)) ([e426f6b](https://github.com/cube-js/cube/commit/e426f6b3737fbbec724a266722ef9520b3582592))
+- **server-core:** pass contextToRoles option ([#10182](https://github.com/cube-js/cube/issues/10182)) ([4b7ba4e](https://github.com/cube-js/cube/commit/4b7ba4e47090d904f31786137b8c8b5d45d519ef))
+
+### Features
+
+- **api-gateway:** Introduce CUBEJS_DEFAULT_TIMEZONE env ([#10178](https://github.com/cube-js/cube/issues/10178)) ([7d72978](https://github.com/cube-js/cube/commit/7d72978e022b2975cf97ffcc69ec4febca261d66))
+- **base-driver, other drivers:** Support numeric types with precision and scale for cube store data exports ([#10175](https://github.com/cube-js/cube/issues/10175)) ([9ba6e77](https://github.com/cube-js/cube/commit/9ba6e77e934791ee7ff80643a7a9a862f2a97e2b))
+- **bigquery-driver:** Set up Cube User agent for connection ([#10177](https://github.com/cube-js/cube/issues/10177)) ([64106a2](https://github.com/cube-js/cube/commit/64106a26c65ee42b3a1872b56f6ce0d1355a19ba))
+- **cubesql:** Implement time to idle eviction for query cache ([#10176](https://github.com/cube-js/cube/issues/10176)) ([4f9ccba](https://github.com/cube-js/cube/commit/4f9ccba8f90c7c133757842cd1df325d7cb1e122))
+
+## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
+
+### Bug Fixes
+
+- **schema-compiler:** Free jinja instance after compilation ([#10169](https://github.com/cube-js/cube/issues/10169)) ([ec7ca2f](https://github.com/cube-js/cube/commit/ec7ca2f627520eabcd751775ef9a6d02fc3cb262))
+
+## [1.5.6](https://github.com/cube-js/cube/compare/v1.5.5...v1.5.6) (2025-11-24)
+
+**Note:** Version bump only for package cubejs
+
+## [1.5.5](https://github.com/cube-js/cube/compare/v1.5.4...v1.5.5) (2025-11-24)
+
+### Bug Fixes
+
+- **api-gateway:** Fix passing cacheMode from user's request ([#10162](https://github.com/cube-js/cube/issues/10162)) ([64c66c4](https://github.com/cube-js/cube/commit/64c66c4a4bdcf3e7e1ae3094791031e22397243e))
+- **trino-driver, presto-driver:** Qualify information schema queries with a catalog name ([#10158](https://github.com/cube-js/cube/issues/10158)) ([9cb11bc](https://github.com/cube-js/cube/commit/9cb11bc95962e64cb459af5417f6ba2af77f1516))
+
+### Performance Improvements
+
+- **schema-compiler:** Add Server Core shared caches for model compilation ([#10144](https://github.com/cube-js/cube/issues/10144)) ([87de073](https://github.com/cube-js/cube/commit/87de0734bf987969096d7f92c65a6ad20ef656e6))
+- **schema-compiler:** More aggressive compilers cleanup ([#10153](https://github.com/cube-js/cube/issues/10153)) ([005a46d](https://github.com/cube-js/cube/commit/005a46d734e25b1b02a3a6315172772e8988b027))
+- **schema-compiler:** Optimize CubeToMetaTransformer compilation flow ([#10150](https://github.com/cube-js/cube/issues/10150)) ([caac28b](https://github.com/cube-js/cube/commit/caac28bea4bf75ec1daa360586b99ae2521cdd82))
+
 ## [1.5.4](https://github.com/cube-js/cube/compare/v1.5.3...v1.5.4) (2025-11-18)
 
 ### Bug Fixes

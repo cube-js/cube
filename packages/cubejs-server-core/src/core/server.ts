@@ -183,8 +183,8 @@ export class CubejsServerCore {
 
     this.logger = opts.logger || (
       process.env.NODE_ENV !== 'production'
-        ? devLogger(process.env.CUBEJS_LOG_LEVEL)
-        : prodLogger(process.env.CUBEJS_LOG_LEVEL)
+        ? devLogger(process.env.CUBEJS_LOG_LEVEL as any)
+        : prodLogger(process.env.CUBEJS_LOG_LEVEL as any)
     );
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);
@@ -537,6 +537,7 @@ export class CubejsServerCore {
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           contextToRoles: this.options.contextToRoles,
+          contextToGroups: this.options.contextToGroups,
           preAggregationsSchema: await this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
@@ -700,6 +701,7 @@ export class CubejsServerCore {
       {
         schemaVersion: options.schemaVersion || this.options.schemaVersion,
         contextToRoles: this.options.contextToRoles,
+        contextToGroups: this.options.contextToGroups,
         devServer: this.options.devServer,
         logger: this.logger,
         externalDbType: options.externalDbType,
