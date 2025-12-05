@@ -35,6 +35,7 @@ export type CubeSymbolDefinition = {
   granularities?: Record<string, GranularityDefinition>;
   timeShift?: TimeshiftDefinition[];
   format?: string;
+  order?: 'asc' | 'desc';
 };
 
 export type HierarchyDefinition = {

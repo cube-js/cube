@@ -145,6 +145,13 @@ components:
           type: "object"
         format:
           $ref: "#/components/schemas/V1CubeMetaFormat"
+        order:
+          $ref: "#/components/schemas/V1CubeMetaDimensionOrder"
+    V1CubeMetaDimensionOrder:
+      type: "string"
+      enum:
+        - "asc"
+        - "desc"
     V1CubeMetaMeasure:
       type: "object"
       required:

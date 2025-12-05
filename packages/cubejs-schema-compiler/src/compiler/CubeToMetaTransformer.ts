@@ -97,6 +97,7 @@ export type DimensionConfig = {
   primaryKey: boolean;
   aliasMember?: string;
   granularities?: GranularityDefinition[];
+  order?: 'asc' | 'desc';
 };
 
 export type SegmentConfig = {
@@ -274,6 +275,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
                   origin: gDef.origin,
                 }))
                 : undefined,
+            order: extendedDimDef.order,
           };
         }),
         segments: Object.entries(extendedCube.segments || {}).map((nameToSegment: [string, any]) => {

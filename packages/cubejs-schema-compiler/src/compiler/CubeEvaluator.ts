@@ -36,6 +36,7 @@ export type DimensionDefinition = {
   fieldType?: string;
   multiStage?: boolean;
   shiftInterval?: string;
+  order?: 'asc' | 'desc';
 };
 
 export type TimeShiftDefinition = {
