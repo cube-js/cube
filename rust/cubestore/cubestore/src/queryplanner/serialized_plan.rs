@@ -1,36 +1,38 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
-use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta, Snapshots};
+use crate::queryplanner::planning::{ClusterSendNode, ExtensionNodeSerialized, PlanningMeta};
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
-use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
-use crate::queryplanner::udfs::aggregate_udf_by_kind;
-use crate::queryplanner::udfs::{
-    aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
-    CubeScalarUDFKind,
+use crate::queryplanner::rolling::RollingWindowAggregate;
+use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper};
+use crate::queryplanner::{
+    pretty_printers, CubeTableLogical, InfoSchemaTableProvider, QueryPlannerImpl,
 };
-use crate::queryplanner::InfoSchemaTableProvider;
 use crate::table::Row;
 use crate::CubeError;
-use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::cube_ext::alias::LogicalAlias;
-use datafusion::cube_ext::join::SkewedLeftCrossJoin;
-use datafusion::cube_ext::joinagg::CrossJoinAgg;
-use datafusion::cube_ext::rolling::RollingWindowAggregate;
-use datafusion::logical_plan::window_frames::WindowFrameBound;
-use datafusion::logical_plan::{
-    Column, DFSchemaRef, Expr, JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
-    PlanVisitor,
-};
-use datafusion::physical_plan::parquet::ParquetMetadataCache;
-use datafusion::physical_plan::{aggregates, functions};
-use datafusion::scalar::ScalarValue;
+use datafusion::optimizer::propagate_empty_relation::apply_aliasing_projection_if_necessary;
 use serde_derive::{Deserialize, Serialize};
-use sqlparser::ast::RollingOffset;
+
+use datafusion::catalog::TableProvider;
+use datafusion::common::tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeVisitor};
+use datafusion::common::DFSchemaRef;
+use datafusion::common::TableReference;
+use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
+use datafusion::datasource::DefaultTableSource;
+use datafusion::error::DataFusionError;
+use datafusion::logical_expr::{
+    Aggregate, Distinct, DistinctOn, EmptyRelation, Extension, Filter, Join, Limit, LogicalPlan,
+    Projection, RecursiveQuery, Repartition, Sort, Subquery, SubqueryAlias, TableScan, Union,
+    Unnest, Values, Window,
+};
+use datafusion::prelude::{SessionConfig, SessionContext};
+use datafusion_proto::bytes::logical_plan_from_bytes_with_extension_codec;
+use datafusion_proto::logical_plan::LogicalExtensionCodec;
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
@@ -70,9 +72,19 @@ impl RowFilter {
     }
 }
 
+/// SerializedPlan, but before we actually serialize the LogicalPlan.
+#[derive(Debug)]
+pub struct PreSerializedPlan {
+    logical_plan: LogicalPlan,
+    schema_snapshot: Arc<SchemaSnapshot>,
+    partition_ids_to_execute: Vec<(u64, RowFilter)>,
+    inline_table_ids_to_execute: Vec<InlineTableId>,
+    trace_obj: Option<String>,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SerializedPlan {
-    logical_plan: Arc<SerializedLogicalPlan>,
+    logical_plan: Arc<Vec<u8>>,
     schema_snapshot: Arc<SchemaSnapshot>,
     partition_ids_to_execute: Vec<(u64, RowFilter)>,
     inline_table_ids_to_execute: Vec<InlineTableId>,
@@ -84,7 +96,7 @@ pub struct SchemaSnapshot {
     index_snapshots: PlanningMeta,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd)]
 pub struct IndexSnapshot {
     pub table_path: TablePath,
     pub index: IdRow<Index>,
@@ -114,7 +126,7 @@ impl IndexSnapshot {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd)]
 pub struct PartitionSnapshot {
     pub partition: IdRow<Partition>,
     pub chunks: Vec<IdRow<Chunk>>,
@@ -130,126 +142,14 @@ impl PartitionSnapshot {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Hash, PartialEq, Eq, PartialOrd)]
 pub struct InlineSnapshot {
     pub id: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum SerializedLogicalPlan {
-    Projection {
-        expr: Vec<SerializedExpr>,
-        input: Arc<SerializedLogicalPlan>,
-        schema: DFSchemaRef,
-    },
-    Filter {
-        predicate: SerializedExpr,
-        input: Arc<SerializedLogicalPlan>,
-    },
-    Aggregate {
-        input: Arc<SerializedLogicalPlan>,
-        group_expr: Vec<SerializedExpr>,
-        aggr_expr: Vec<SerializedExpr>,
-        schema: DFSchemaRef,
-    },
-    Sort {
-        expr: Vec<SerializedExpr>,
-        input: Arc<SerializedLogicalPlan>,
-    },
-    Union {
-        inputs: Vec<Arc<SerializedLogicalPlan>>,
-        schema: DFSchemaRef,
-        alias: Option<String>,
-    },
-    Join {
-        left: Arc<SerializedLogicalPlan>,
-        right: Arc<SerializedLogicalPlan>,
-        on: Vec<(Column, Column)>,
-        join_type: JoinType,
-        join_constraint: JoinConstraint,
-        schema: DFSchemaRef,
-    },
-    TableScan {
-        table_name: String,
-        source: SerializedTableSource,
-        projection: Option<Vec<usize>>,
-        projected_schema: DFSchemaRef,
-        filters: Vec<SerializedExpr>,
-        alias: Option<String>,
-        limit: Option<usize>,
-    },
-    EmptyRelation {
-        produce_one_row: bool,
-        schema: DFSchemaRef,
-    },
-    Limit {
-        n: usize,
-        input: Arc<SerializedLogicalPlan>,
-    },
-    Skip {
-        n: usize,
-        input: Arc<SerializedLogicalPlan>,
-    },
-    Repartition {
-        input: Arc<SerializedLogicalPlan>,
-        partitioning_scheme: SerializePartitioning,
-    },
-    Alias {
-        input: Arc<SerializedLogicalPlan>,
-        alias: String,
-        schema: DFSchemaRef,
-    },
-    ClusterSend {
-        input: Arc<SerializedLogicalPlan>,
-        snapshots: Vec<Snapshots>,
-        #[serde(default)]
-        limit_and_reverse: Option<(usize, bool)>,
-    },
-    ClusterAggregateTopK {
-        limit: usize,
-        input: Arc<SerializedLogicalPlan>,
-        group_expr: Vec<SerializedExpr>,
-        aggregate_expr: Vec<SerializedExpr>,
-        sort_columns: Vec<SortColumn>,
-        having_expr: Option<SerializedExpr>,
-        schema: DFSchemaRef,
-        snapshots: Vec<Snapshots>,
-    },
-    CrossJoin {
-        left: Arc<SerializedLogicalPlan>,
-        right: Arc<SerializedLogicalPlan>,
-        on: SerializedExpr,
-        join_schema: DFSchemaRef,
-    },
-    CrossJoinAgg {
-        left: Arc<SerializedLogicalPlan>,
-        right: Arc<SerializedLogicalPlan>,
-        on: SerializedExpr,
-        join_schema: DFSchemaRef,
-
-        group_expr: Vec<SerializedExpr>,
-        agg_expr: Vec<SerializedExpr>,
-        schema: DFSchemaRef,
-    },
-    RollingWindowAgg {
-        schema: DFSchemaRef,
-        input: Arc<SerializedLogicalPlan>,
-        dimension: Column,
-        partition_by: Vec<Column>,
-        from: SerializedExpr,
-        to: SerializedExpr,
-        every: SerializedExpr,
-        rolling_aggs: Vec<SerializedExpr>,
-        group_by_dimension: Option<SerializedExpr>,
-        aggs: Vec<SerializedExpr>,
-    },
-    Panic {},
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum SerializePartitioning {
-    RoundRobinBatch(usize),
-    Hash(Vec<SerializedExpr>, usize),
+pub struct SerializedLogicalPlan {
+    serialized_bytes: Arc<Vec<u8>>,
 }
 
 pub struct WorkerContext {
@@ -257,779 +157,693 @@ pub struct WorkerContext {
     worker_partition_ids: Vec<(u64, RowFilter)>,
     inline_table_ids_to_execute: Vec<InlineTableId>,
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
+    parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
 }
 
-impl SerializedLogicalPlan {
-    fn logical_plan(&self, worker_context: &WorkerContext) -> Result<LogicalPlan, CubeError> {
-        debug_assert!(worker_context
-            .worker_partition_ids
-            .iter()
-            .is_sorted_by_key(|(id, _)| id));
-        Ok(match self {
-            SerializedLogicalPlan::Projection {
-                expr,
-                input,
-                schema,
-            } => LogicalPlan::Projection {
-                expr: expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan(worker_context)?),
-                schema: schema.clone(),
-            },
-            SerializedLogicalPlan::Filter { predicate, input } => LogicalPlan::Filter {
-                predicate: predicate.expr(),
-                input: Arc::new(input.logical_plan(worker_context)?),
-            },
-            SerializedLogicalPlan::Aggregate {
-                input,
-                group_expr,
-                aggr_expr,
-                schema,
-            } => LogicalPlan::Aggregate {
-                group_expr: group_expr.iter().map(|e| e.expr()).collect(),
-                aggr_expr: aggr_expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan(worker_context)?),
-                schema: schema.clone(),
-            },
-            SerializedLogicalPlan::Sort { expr, input } => LogicalPlan::Sort {
-                expr: expr.iter().map(|e| e.expr()).collect(),
-                input: Arc::new(input.logical_plan(worker_context)?),
-            },
-            SerializedLogicalPlan::Union {
-                inputs,
-                schema,
-                alias,
-            } => LogicalPlan::Union {
-                inputs: inputs
-                    .iter()
-                    .map(|p| -> Result<LogicalPlan, CubeError> {
-                        Ok(p.logical_plan(worker_context)?)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?,
-                schema: schema.clone(),
-                alias: alias.clone(),
-            },
-            SerializedLogicalPlan::TableScan {
-                table_name,
-                source,
-                projection,
-                projected_schema,
-                filters,
-                alias: _,
-                limit,
-            } => LogicalPlan::TableScan {
-                table_name: table_name.clone(),
-                source: match source {
-                    SerializedTableSource::CubeTable(v) => Arc::new(v.to_worker_table(
-                        worker_context.remote_to_local_names.clone(),
-                        worker_context.worker_partition_ids.clone(),
-                        worker_context.chunk_id_to_record_batches.clone(),
-                        worker_context.parquet_metadata_cache.clone(),
-                    )),
-                    SerializedTableSource::InlineTable(v) => Arc::new(
-                        v.to_worker_table(worker_context.inline_table_ids_to_execute.clone()),
-                    ),
-                },
-                projection: projection.clone(),
-                projected_schema: projected_schema.clone(),
-                filters: filters.iter().map(|e| e.expr()).collect(),
-                limit: limit.clone(),
-            },
-            SerializedLogicalPlan::EmptyRelation {
-                produce_one_row,
-                schema,
-            } => LogicalPlan::EmptyRelation {
-                produce_one_row: *produce_one_row,
-                schema: schema.clone(),
-            },
-            SerializedLogicalPlan::Limit { n, input } => LogicalPlan::Limit {
-                n: *n,
-                input: Arc::new(input.logical_plan(worker_context)?),
-            },
-            SerializedLogicalPlan::Skip { n, input } => LogicalPlan::Skip {
-                n: *n,
-                input: Arc::new(input.logical_plan(worker_context)?),
-            },
-            SerializedLogicalPlan::Join {
-                left,
-                right,
-                on,
-                join_type,
-                join_constraint,
-                schema,
-            } => LogicalPlan::Join {
-                left: Arc::new(left.logical_plan(worker_context)?),
-                right: Arc::new(right.logical_plan(worker_context)?),
-                on: on.clone(),
-                join_type: join_type.clone(),
-                join_constraint: *join_constraint,
-                schema: schema.clone(),
-            },
-            SerializedLogicalPlan::Repartition {
-                input,
-                partitioning_scheme,
-            } => LogicalPlan::Repartition {
-                input: Arc::new(input.logical_plan(worker_context)?),
-                partitioning_scheme: match partitioning_scheme {
-                    SerializePartitioning::RoundRobinBatch(s) => Partitioning::RoundRobinBatch(*s),
-                    SerializePartitioning::Hash(e, s) => {
-                        Partitioning::Hash(e.iter().map(|e| e.expr()).collect(), *s)
-                    }
-                },
-            },
-            SerializedLogicalPlan::Alias {
-                input,
-                alias,
-                schema,
-            } => LogicalPlan::Extension {
-                node: Arc::new(LogicalAlias {
-                    input: input.logical_plan(worker_context)?,
-                    alias: alias.clone(),
-                    schema: schema.clone(),
-                }),
-            },
-            SerializedLogicalPlan::ClusterSend {
-                input,
-                snapshots,
-                limit_and_reverse,
-            } => ClusterSendNode {
-                input: Arc::new(input.logical_plan(worker_context)?),
-                snapshots: snapshots.clone(),
-                limit_and_reverse: limit_and_reverse.clone(),
+fn is_empty_relation(plan: &LogicalPlan) -> Option<DFSchemaRef> {
+    match plan {
+        LogicalPlan::EmptyRelation(EmptyRelation {
+            produce_one_row,
+            schema,
+        }) => {
+            if !produce_one_row {
+                Some(schema.clone())
+            } else {
+                None
             }
-            .into_plan(),
-            SerializedLogicalPlan::ClusterAggregateTopK {
-                limit,
-                input,
-                group_expr,
-                aggregate_expr,
-                sort_columns,
-                having_expr,
-                schema,
-                snapshots,
-            } => ClusterAggregateTopK {
-                limit: *limit,
-                input: Arc::new(input.logical_plan(worker_context)?),
-                group_expr: group_expr.iter().map(|e| e.expr()).collect(),
-                aggregate_expr: aggregate_expr.iter().map(|e| e.expr()).collect(),
-                order_by: sort_columns.clone(),
-                having_expr: having_expr.as_ref().map(|e| e.expr()),
-                schema: schema.clone(),
-                snapshots: snapshots.clone(),
-            }
-            .into_plan(),
-            SerializedLogicalPlan::CrossJoin {
-                left,
-                right,
-                on,
-                join_schema,
-            } => LogicalPlan::Extension {
-                node: Arc::new(SkewedLeftCrossJoin {
-                    left: left.logical_plan(worker_context)?,
-                    right: right.logical_plan(worker_context)?,
-                    on: on.expr(),
-                    schema: join_schema.clone(),
-                }),
-            },
-            SerializedLogicalPlan::CrossJoinAgg {
-                left,
-                right,
-                on,
-                join_schema,
-                group_expr,
-                agg_expr,
-                schema,
-            } => LogicalPlan::Extension {
-                node: Arc::new(CrossJoinAgg {
-                    join: SkewedLeftCrossJoin {
-                        left: left.logical_plan(worker_context)?,
-                        right: right.logical_plan(worker_context)?,
-                        on: on.expr(),
-                        schema: join_schema.clone(),
-                    },
-                    group_expr: group_expr.iter().map(|e| e.expr()).collect(),
-                    agg_expr: agg_expr.iter().map(|e| e.expr()).collect(),
-                    schema: schema.clone(),
-                }),
-            },
-            SerializedLogicalPlan::RollingWindowAgg {
-                schema,
-                input,
-                dimension,
-                partition_by,
-                from,
-                to,
-                every,
-                rolling_aggs,
-                group_by_dimension,
-                aggs,
-            } => LogicalPlan::Extension {
-                node: Arc::new(RollingWindowAggregate {
-                    schema: schema.clone(),
-                    input: input.logical_plan(worker_context)?,
-                    dimension: dimension.clone(),
-                    from: from.expr(),
-                    to: to.expr(),
-                    every: every.expr(),
-                    partition_by: partition_by.clone(),
-                    rolling_aggs: exprs(&rolling_aggs),
-                    group_by_dimension: group_by_dimension.as_ref().map(|d| d.expr()),
-                    aggs: exprs(&aggs),
-                }),
-            },
-            SerializedLogicalPlan::Panic {} => LogicalPlan::Extension {
-                node: Arc::new(PanicWorkerNode {}),
-            },
-        })
-    }
-    fn is_empty_relation(&self) -> Option<DFSchemaRef> {
-        match self {
-            SerializedLogicalPlan::EmptyRelation {
-                produce_one_row,
-                schema,
-            } => {
-                if !produce_one_row {
-                    Some(schema.clone())
-                } else {
-                    None
-                }
-            }
-            _ => None,
         }
+        _ => None,
     }
+}
 
+impl PreSerializedPlan {
     fn remove_unused_tables(
-        &self,
+        plan: &LogicalPlan,
         partition_ids_to_execute: &Vec<(u64, RowFilter)>,
         inline_tables_to_execute: &Vec<InlineTableId>,
-    ) -> SerializedLogicalPlan {
+    ) -> Result<LogicalPlan, CubeError> {
         debug_assert!(partition_ids_to_execute
             .iter()
             .is_sorted_by_key(|(id, _)| id));
-        match self {
-            SerializedLogicalPlan::Projection {
+        let res = match plan {
+            LogicalPlan::Projection(Projection {
                 expr,
                 input,
                 schema,
-            } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-                if input.is_empty_relation().is_some() {
-                    SerializedLogicalPlan::EmptyRelation {
+                ..
+            }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    &input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
                         schema: schema.clone(),
-                    }
+                    })
                 } else {
-                    SerializedLogicalPlan::Projection {
-                        expr: expr.clone(),
-                        input: Arc::new(input),
-                        schema: schema.clone(),
-                    }
+                    LogicalPlan::Projection(Projection::try_new_with_schema(
+                        expr.clone(),
+                        Arc::new(input),
+                        schema.clone(),
+                    )?)
                 }
             }
-            SerializedLogicalPlan::Filter { predicate, input } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+            LogicalPlan::Filter(Filter {
+                predicate,
+                input,
+                having,
+                ..
+            }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    &input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
-                if let Some(schema) = input.is_empty_relation() {
-                    SerializedLogicalPlan::EmptyRelation {
+                if let Some(schema) = is_empty_relation(&input) {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
                         schema: schema.clone(),
-                    }
+                    })
                 } else {
-                    SerializedLogicalPlan::Filter {
-                        predicate: predicate.clone(),
-                        input: Arc::new(input),
-                    }
+                    LogicalPlan::Filter(if *having {
+                        Filter::try_new_with_having(predicate.clone(), Arc::new(input))
+                    } else {
+                        Filter::try_new(predicate.clone(), Arc::new(input))
+                    }?)
                 }
             }
-            SerializedLogicalPlan::Aggregate {
+            LogicalPlan::Aggregate(Aggregate {
                 input,
                 group_expr,
                 aggr_expr,
                 schema,
-            } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-                SerializedLogicalPlan::Aggregate {
-                    input: Arc::new(input),
-                    group_expr: group_expr.clone(),
-                    aggr_expr: aggr_expr.clone(),
-                    schema: schema.clone(),
-                }
+                ..
+            }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    &input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                LogicalPlan::Aggregate(Aggregate::try_new_with_schema(
+                    Arc::new(input),
+                    group_expr.clone(),
+                    aggr_expr.clone(),
+                    schema.clone(),
+                )?)
             }
-            SerializedLogicalPlan::Sort { expr, input } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+            LogicalPlan::Sort(Sort { expr, input, fetch }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    &input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
-                if let Some(schema) = input.is_empty_relation() {
-                    SerializedLogicalPlan::EmptyRelation {
+                if let Some(schema) = is_empty_relation(&input) {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
                         schema: schema.clone(),
-                    }
+                    })
                 } else {
-                    SerializedLogicalPlan::Sort {
+                    LogicalPlan::Sort(Sort {
                         expr: expr.clone(),
                         input: Arc::new(input),
-                    }
+                        fetch: *fetch,
+                    })
                 }
             }
-            SerializedLogicalPlan::Union {
-                inputs,
-                schema,
-                alias,
-            } => {
-                let inputs = inputs
-                    .iter()
-                    .filter_map(|i| {
-                        let i = i.remove_unused_tables(
-                            partition_ids_to_execute,
-                            inline_tables_to_execute,
-                        );
-                        if i.is_empty_relation().is_some() {
-                            None
-                        } else {
-                            Some(Arc::new(i))
-                        }
-                    })
-                    .collect::<Vec<_>>();
+            LogicalPlan::Union(Union { inputs, schema }) => {
+                let mut new_inputs: Vec<LogicalPlan> = Vec::with_capacity(inputs.len());
+                for input in inputs {
+                    let i = PreSerializedPlan::remove_unused_tables(
+                        &input,
+                        partition_ids_to_execute,
+                        inline_tables_to_execute,
+                    )?;
+                    if !is_empty_relation(&i).is_some() {
+                        new_inputs.push(i);
+                    }
+                }
 
-                if inputs.is_empty() {
-                    SerializedLogicalPlan::EmptyRelation {
+                let res = match new_inputs.len() {
+                    0 => LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
                         schema: schema.clone(),
+                    }),
+                    1 => {
+                        // Union _requires_ 2 or more inputs.
+                        let plan = new_inputs.pop().unwrap();
+                        apply_aliasing_projection_if_necessary(plan, schema)?
                     }
-                } else {
-                    SerializedLogicalPlan::Union {
-                        inputs,
-                        schema: schema.clone(),
-                        alias: alias.clone(),
+                    _ => {
+                        let plan = LogicalPlan::Union(Union::try_new_with_loose_types(
+                            new_inputs.into_iter().map(Arc::new).collect(),
+                        )?);
+                        apply_aliasing_projection_if_necessary(plan, schema)?
                     }
-                }
+                };
+                res
             }
-            SerializedLogicalPlan::TableScan {
+            LogicalPlan::TableScan(TableScan {
                 table_name,
                 source,
                 projection,
                 projected_schema,
                 filters,
-                alias,
-                limit,
-            } => {
-                let is_empty = match source {
-                    SerializedTableSource::CubeTable(table) => {
+                fetch,
+            }) => {
+                let is_empty = if let Some(default_source) =
+                    source.as_any().downcast_ref::<DefaultTableSource>()
+                {
+                    if let Some(table) = default_source
+                        .table_provider
+                        .as_any()
+                        .downcast_ref::<CubeTable>()
+                    {
                         !table.has_partitions(partition_ids_to_execute)
-                    }
-                    SerializedTableSource::InlineTable(table) => {
+                    } else if let Some(table) = default_source
+                        .table_provider
+                        .as_any()
+                        .downcast_ref::<InlineTableProvider>()
+                    {
                         !table.has_inline_table_id(inline_tables_to_execute)
-                    }
-                };
-                if is_empty {
-                    SerializedLogicalPlan::EmptyRelation {
-                        produce_one_row: false,
-                        schema: projected_schema.clone(),
+                    } else {
+                        return Err(CubeError::internal(
+                            "remove_unused_tables called with unexpected table provider"
+                                .to_string(),
+                        ));
                     }
                 } else {
-                    SerializedLogicalPlan::TableScan {
+                    return Err(CubeError::internal(
+                        "remove_unused_tables called with unexpected table source".to_string(),
+                    ));
+                };
+                if is_empty {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
+                        schema: projected_schema.clone(),
+                    })
+                } else {
+                    LogicalPlan::TableScan(TableScan {
                         table_name: table_name.clone(),
                         source: source.clone(),
                         projection: projection.clone(),
                         projected_schema: projected_schema.clone(),
                         filters: filters.clone(),
-                        alias: alias.clone(),
-                        limit: limit.clone(),
-                    }
+                        fetch: *fetch,
+                    })
                 }
             }
-            SerializedLogicalPlan::EmptyRelation {
+            LogicalPlan::EmptyRelation(EmptyRelation {
                 produce_one_row,
                 schema,
-            } => SerializedLogicalPlan::EmptyRelation {
+            }) => LogicalPlan::EmptyRelation(EmptyRelation {
                 produce_one_row: *produce_one_row,
                 schema: schema.clone(),
-            },
-            SerializedLogicalPlan::Limit { n, input } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+            }),
+            LogicalPlan::Limit(Limit { skip, fetch, input }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
-                if let Some(schema) = input.is_empty_relation() {
-                    SerializedLogicalPlan::EmptyRelation {
+                if let Some(schema) = is_empty_relation(&input) {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
                         schema: schema.clone(),
-                    }
+                    })
                 } else {
-                    SerializedLogicalPlan::Limit {
-                        n: *n,
+                    LogicalPlan::Limit(Limit {
+                        skip: skip.clone(),
+                        fetch: fetch.clone(),
                         input: Arc::new(input),
-                    }
+                    })
                 }
             }
-            SerializedLogicalPlan::Skip { n, input } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-
-                if let Some(schema) = input.is_empty_relation() {
-                    SerializedLogicalPlan::EmptyRelation {
-                        produce_one_row: false,
-                        schema: schema.clone(),
-                    }
-                } else {
-                    SerializedLogicalPlan::Skip {
-                        n: *n,
-                        input: Arc::new(input),
-                    }
-                }
-            }
-            SerializedLogicalPlan::Join {
+            LogicalPlan::Join(Join {
                 left,
                 right,
                 on,
+                filter,
                 join_type,
                 join_constraint,
                 schema,
-            } => {
-                let left =
-                    left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-                let right =
-                    right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                null_equals_null,
+            }) => {
+                let left = PreSerializedPlan::remove_unused_tables(
+                    left,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                let right = PreSerializedPlan::remove_unused_tables(
+                    right,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
-                SerializedLogicalPlan::Join {
+                LogicalPlan::Join(Join {
                     left: Arc::new(left),
                     right: Arc::new(right),
                     on: on.clone(),
+                    filter: filter.clone(),
                     join_type: join_type.clone(),
                     join_constraint: *join_constraint,
                     schema: schema.clone(),
-                }
+                    null_equals_null: *null_equals_null,
+                })
             }
-            SerializedLogicalPlan::Repartition {
+            LogicalPlan::Repartition(Repartition {
                 input,
                 partitioning_scheme,
-            } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+            }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
-                if let Some(schema) = input.is_empty_relation() {
-                    SerializedLogicalPlan::EmptyRelation {
+                if let Some(schema) = is_empty_relation(&input) {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
                         schema: schema.clone(),
-                    }
+                    })
                 } else {
-                    SerializedLogicalPlan::Repartition {
+                    LogicalPlan::Repartition(Repartition {
                         input: Arc::new(input),
                         partitioning_scheme: partitioning_scheme.clone(),
-                    }
+                    })
                 }
             }
-            SerializedLogicalPlan::Alias {
+            LogicalPlan::Subquery(Subquery {
+                subquery,
+                outer_ref_columns,
+            }) => {
+                let subquery: LogicalPlan = PreSerializedPlan::remove_unused_tables(
+                    subquery,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+
+                if is_empty_relation(&subquery).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
+                        schema: subquery.schema().clone(),
+                    })
+                } else {
+                    LogicalPlan::Subquery(Subquery {
+                        subquery: Arc::new(subquery),
+                        outer_ref_columns: outer_ref_columns.clone(),
+                    })
+                }
+            }
+            LogicalPlan::SubqueryAlias(SubqueryAlias {
                 input,
                 alias,
                 schema,
-            } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                ..
+            }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
-                if input.is_empty_relation().is_some() {
-                    SerializedLogicalPlan::EmptyRelation {
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
                         schema: schema.clone(),
-                    }
+                    })
                 } else {
-                    SerializedLogicalPlan::Alias {
-                        input: Arc::new(input),
-                        alias: alias.clone(),
+                    LogicalPlan::SubqueryAlias(SubqueryAlias::try_new(
+                        Arc::new(input),
+                        alias.clone(),
+                    )?)
+                }
+            }
+            // TODO upgrade DF: Figure out where CrossJoin went.
+            // LogicalPlan::CrossJoin(CrossJoin {
+            //     left,
+            //     right,
+            //     schema,
+            // }) => {
+            //     let left = PreSerializedPlan::remove_unused_tables(
+            //         left,
+            //         partition_ids_to_execute,
+            //         inline_tables_to_execute,
+            //     )?;
+            //     let right = PreSerializedPlan::remove_unused_tables(
+            //         right,
+            //         partition_ids_to_execute,
+            //         inline_tables_to_execute,
+            //     )?;
+
+            //     LogicalPlan::CrossJoin(CrossJoin {
+            //         left: Arc::new(left),
+            //         right: Arc::new(right),
+            //         schema: schema.clone(),
+            //     })
+            // }
+            LogicalPlan::Window(Window {
+                input,
+                window_expr,
+                schema,
+            }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
                         schema: schema.clone(),
-                    }
+                    })
+                } else {
+                    LogicalPlan::Window(Window {
+                        input: Arc::new(input),
+                        window_expr: window_expr.clone(),
+                        schema: schema.clone(),
+                    })
                 }
             }
-            SerializedLogicalPlan::ClusterSend {
+            LogicalPlan::Distinct(Distinct::All(input)) => {
+                let schema = input.schema();
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    })
+                } else {
+                    LogicalPlan::Distinct(Distinct::All(Arc::new(input)))
+                }
+            }
+            LogicalPlan::Distinct(Distinct::On(DistinctOn {
+                on_expr,
+                select_expr,
+                sort_expr,
                 input,
-                snapshots,
-                limit_and_reverse,
-            } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-                SerializedLogicalPlan::ClusterSend {
-                    input: Arc::new(input),
-                    snapshots: snapshots.clone(),
-                    limit_and_reverse: limit_and_reverse.clone(),
-                }
-            }
-            SerializedLogicalPlan::ClusterAggregateTopK {
-                limit,
-                input,
-                group_expr,
-                aggregate_expr,
-                sort_columns,
-                having_expr,
                 schema,
-                snapshots,
-            } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-                SerializedLogicalPlan::ClusterAggregateTopK {
-                    limit: *limit,
-                    input: Arc::new(input),
-                    group_expr: group_expr.clone(),
-                    aggregate_expr: aggregate_expr.clone(),
-                    sort_columns: sort_columns.clone(),
-                    having_expr: having_expr.clone(),
-                    schema: schema.clone(),
-                    snapshots: snapshots.clone(),
+            })) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    })
+                } else {
+                    LogicalPlan::Distinct(Distinct::On(DistinctOn {
+                        on_expr: on_expr.clone(),
+                        select_expr: select_expr.clone(),
+                        sort_expr: sort_expr.clone(),
+                        input: Arc::new(input),
+                        schema: schema.clone(),
+                    }))
                 }
             }
-            SerializedLogicalPlan::CrossJoin {
-                left,
-                right,
-                on,
-                join_schema,
-            } => {
-                let left =
-                    left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-                let right =
-                    right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-
-                SerializedLogicalPlan::CrossJoin {
-                    left: Arc::new(left),
-                    right: Arc::new(right),
-                    on: on.clone(),
-                    join_schema: join_schema.clone(),
-                }
+            LogicalPlan::RecursiveQuery(RecursiveQuery {
+                name,
+                static_term,
+                recursive_term,
+                is_distinct,
+            }) => {
+                let static_term = PreSerializedPlan::remove_unused_tables(
+                    static_term,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                let recursive_term = PreSerializedPlan::remove_unused_tables(
+                    recursive_term,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                LogicalPlan::RecursiveQuery(RecursiveQuery {
+                    name: name.clone(),
+                    static_term: Arc::new(static_term),
+                    recursive_term: Arc::new(recursive_term),
+                    is_distinct: *is_distinct,
+                })
             }
-            SerializedLogicalPlan::CrossJoinAgg {
-                left,
-                right,
-                on,
-                join_schema,
-                group_expr,
-                agg_expr,
-                schema,
-            } => {
-                let left =
-                    left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-                let right =
-                    right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-
-                SerializedLogicalPlan::CrossJoinAgg {
-                    left: Arc::new(left),
-                    right: Arc::new(right),
-                    on: on.clone(),
-                    join_schema: join_schema.clone(),
-                    group_expr: group_expr.clone(),
-                    agg_expr: agg_expr.clone(),
-                    schema: schema.clone(),
-                }
-            }
-            SerializedLogicalPlan::RollingWindowAgg {
-                schema,
-                input,
-                dimension,
-                partition_by,
-                from,
-                to,
-                every,
-                rolling_aggs,
-                group_by_dimension,
-                aggs,
-            } => {
-                let input =
-                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-                SerializedLogicalPlan::RollingWindowAgg {
-                    schema: schema.clone(),
-                    input: Arc::new(input),
-                    dimension: dimension.clone(),
-                    partition_by: partition_by.clone(),
-                    from: from.clone(),
-                    to: to.clone(),
-                    every: every.clone(),
-                    rolling_aggs: rolling_aggs.clone(),
-                    group_by_dimension: group_by_dimension.clone(),
-                    aggs: aggs.clone(),
-                }
-            }
-            SerializedLogicalPlan::Panic {} => SerializedLogicalPlan::Panic {},
-        }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum SerializedExpr {
-    Alias(Box<SerializedExpr>, String),
-    Column(String, Option<String>),
-    ScalarVariable(Vec<String>),
-    Literal(ScalarValue),
-    BinaryExpr {
-        left: Box<SerializedExpr>,
-        op: Operator,
-        right: Box<SerializedExpr>,
-    },
-    Not(Box<SerializedExpr>),
-    IsNotNull(Box<SerializedExpr>),
-    IsNull(Box<SerializedExpr>),
-    Negative(Box<SerializedExpr>),
-    Between {
-        expr: Box<SerializedExpr>,
-        negated: bool,
-        low: Box<SerializedExpr>,
-        high: Box<SerializedExpr>,
-    },
-    Case {
-        /// Optional base expression that can be compared to literal values in the "when" expressions
-        expr: Option<Box<SerializedExpr>>,
-        /// One or more when/then expressions
-        when_then_expr: Vec<(Box<SerializedExpr>, Box<SerializedExpr>)>,
-        /// Optional "else" expression
-        else_expr: Option<Box<SerializedExpr>>,
-    },
-    Cast {
-        expr: Box<SerializedExpr>,
-        data_type: DataType,
-    },
-    TryCast {
-        expr: Box<SerializedExpr>,
-        data_type: DataType,
-    },
-    Sort {
-        expr: Box<SerializedExpr>,
-        asc: bool,
-        nulls_first: bool,
-    },
-    ScalarFunction {
-        fun: functions::BuiltinScalarFunction,
-        args: Vec<SerializedExpr>,
-    },
-    ScalarUDF {
-        fun: CubeScalarUDFKind,
-        args: Vec<SerializedExpr>,
-    },
-    AggregateFunction {
-        fun: aggregates::AggregateFunction,
-        args: Vec<SerializedExpr>,
-        distinct: bool,
-    },
-    AggregateUDF {
-        fun: CubeAggregateUDFKind,
-        args: Vec<SerializedExpr>,
-    },
-    RollingAggregate {
-        agg: Box<SerializedExpr>,
-        start: WindowFrameBound,
-        end: WindowFrameBound,
-        offset_to_end: bool,
-    },
-    InList {
-        expr: Box<SerializedExpr>,
-        list: Vec<SerializedExpr>,
-        negated: bool,
-    },
-    Wildcard,
-}
-
-impl SerializedExpr {
-    fn expr(&self) -> Expr {
-        match self {
-            SerializedExpr::Alias(e, a) => Expr::Alias(Box::new(e.expr()), a.to_string()),
-            SerializedExpr::Column(c, a) => Expr::Column(Column {
-                name: c.clone(),
-                relation: a.clone(),
+            LogicalPlan::Values(Values { schema, values }) => LogicalPlan::Values(Values {
+                schema: schema.clone(),
+                values: values.clone(),
             }),
-            SerializedExpr::ScalarVariable(v) => Expr::ScalarVariable(v.clone()),
-            SerializedExpr::Literal(v) => Expr::Literal(v.clone()),
-            SerializedExpr::BinaryExpr { left, op, right } => Expr::BinaryExpr {
-                left: Box::new(left.expr()),
-                op: op.clone(),
-                right: Box::new(right.expr()),
-            },
-            SerializedExpr::Not(e) => Expr::Not(Box::new(e.expr())),
-            SerializedExpr::IsNotNull(e) => Expr::IsNotNull(Box::new(e.expr())),
-            SerializedExpr::IsNull(e) => Expr::IsNull(Box::new(e.expr())),
-            SerializedExpr::Cast { expr, data_type } => Expr::Cast {
-                expr: Box::new(expr.expr()),
-                data_type: data_type.clone(),
-            },
-            SerializedExpr::TryCast { expr, data_type } => Expr::TryCast {
-                expr: Box::new(expr.expr()),
-                data_type: data_type.clone(),
-            },
-            SerializedExpr::Sort {
-                expr,
-                asc,
-                nulls_first,
-            } => Expr::Sort {
-                expr: Box::new(expr.expr()),
-                asc: *asc,
-                nulls_first: *nulls_first,
-            },
-            SerializedExpr::ScalarFunction { fun, args } => Expr::ScalarFunction {
-                fun: fun.clone(),
-                args: args.iter().map(|e| e.expr()).collect(),
-            },
-            SerializedExpr::ScalarUDF { fun, args } => Expr::ScalarUDF {
-                fun: Arc::new(scalar_udf_by_kind(*fun).descriptor()),
-                args: args.iter().map(|e| e.expr()).collect(),
-            },
-            SerializedExpr::AggregateFunction {
-                fun,
-                args,
-                distinct,
-            } => Expr::AggregateFunction {
-                fun: fun.clone(),
-                args: args.iter().map(|e| e.expr()).collect(),
-                distinct: *distinct,
-            },
-            SerializedExpr::AggregateUDF { fun, args } => Expr::AggregateUDF {
-                fun: Arc::new(aggregate_udf_by_kind(*fun).descriptor()),
-                args: args.iter().map(|e| e.expr()).collect(),
-            },
-            SerializedExpr::Case {
-                expr,
-                else_expr,
-                when_then_expr,
-            } => Expr::Case {
-                expr: expr.as_ref().map(|e| Box::new(e.expr())),
-                else_expr: else_expr.as_ref().map(|e| Box::new(e.expr())),
-                when_then_expr: when_then_expr
-                    .iter()
-                    .map(|(w, t)| (Box::new(w.expr()), Box::new(t.expr())))
-                    .collect(),
-            },
-            SerializedExpr::Wildcard => Expr::Wildcard,
-            SerializedExpr::Negative(value) => Expr::Negative(Box::new(value.expr())),
-            SerializedExpr::Between {
-                expr,
-                negated,
-                low,
-                high,
-            } => Expr::Between {
-                expr: Box::new(expr.expr()),
-                negated: *negated,
-                low: Box::new(low.expr()),
-                high: Box::new(high.expr()),
-            },
-            SerializedExpr::RollingAggregate {
-                agg,
-                start,
-                end,
-                offset_to_end,
-            } => Expr::RollingAggregate {
-                agg: Box::new(agg.expr()),
-                start: start.clone(),
-                end: end.clone(),
-                offset: match offset_to_end {
-                    false => RollingOffset::Start,
-                    true => RollingOffset::End,
-                },
-            },
-            SerializedExpr::InList {
-                expr,
-                list,
-                negated,
-            } => Expr::InList {
-                expr: Box::new(expr.expr()),
-                list: list.iter().map(|e| e.expr()).collect(),
-                negated: *negated,
-            },
-        }
+            LogicalPlan::Unnest(Unnest {
+                input,
+                exec_columns,
+                list_type_columns,
+                struct_type_columns,
+                dependency_indices,
+                schema,
+                options,
+            }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    })
+                } else {
+                    LogicalPlan::Unnest(Unnest {
+                        input: Arc::new(input),
+                        exec_columns: exec_columns.clone(),
+                        list_type_columns: list_type_columns.clone(),
+                        struct_type_columns: struct_type_columns.clone(),
+                        dependency_indices: dependency_indices.clone(),
+                        schema: schema.clone(),
+                        options: options.clone(),
+                    })
+                }
+            }
+            LogicalPlan::Extension(Extension { node }) => {
+                if let Some(cluster_send) = node.as_any().downcast_ref::<ClusterSendNode>() {
+                    let ClusterSendNode {
+                        id,
+                        input,
+                        snapshots,
+                        limit_and_reverse,
+                    } = cluster_send;
+                    let input = PreSerializedPlan::remove_unused_tables(
+                        &input,
+                        partition_ids_to_execute,
+                        inline_tables_to_execute,
+                    )?;
+                    LogicalPlan::Extension(Extension {
+                        node: Arc::new(ClusterSendNode {
+                            id: *id,
+                            input: Arc::new(input),
+                            snapshots: snapshots.clone(),
+                            limit_and_reverse: *limit_and_reverse,
+                        }),
+                    })
+                } else if let Some(panic_worker) = node.as_any().downcast_ref::<PanicWorkerNode>() {
+                    let PanicWorkerNode {} = panic_worker; // (No fields to recurse; just clone the existing Arc `node`.)
+                    LogicalPlan::Extension(Extension { node: node.clone() })
+                } else if let Some(cluster_agg_topk) =
+                    node.as_any().downcast_ref::<ClusterAggregateTopKUpper>()
+                {
+                    let ClusterAggregateTopKUpper {
+                        limit,
+                        input,
+                        order_by,
+                        having_expr,
+                    } = cluster_agg_topk;
+                    let input = PreSerializedPlan::remove_unused_tables(
+                        input,
+                        partition_ids_to_execute,
+                        inline_tables_to_execute,
+                    )?;
+                    LogicalPlan::Extension(Extension {
+                        node: Arc::new(ClusterAggregateTopKUpper {
+                            limit: *limit,
+                            input: Arc::new(input),
+                            order_by: order_by.clone(),
+                            having_expr: having_expr.clone(),
+                        }),
+                    })
+                } else if let Some(cluster_agg_topk) =
+                    node.as_any().downcast_ref::<ClusterAggregateTopKLower>()
+                {
+                    let ClusterAggregateTopKLower {
+                        input,
+                        group_expr,
+                        aggregate_expr,
+                        schema,
+                        snapshots,
+                    } = cluster_agg_topk;
+                    let input = PreSerializedPlan::remove_unused_tables(
+                        input,
+                        partition_ids_to_execute,
+                        inline_tables_to_execute,
+                    )?;
+                    LogicalPlan::Extension(Extension {
+                        node: Arc::new(ClusterAggregateTopKLower {
+                            input: Arc::new(input),
+                            group_expr: group_expr.clone(),
+                            aggregate_expr: aggregate_expr.clone(),
+                            schema: schema.clone(),
+                            snapshots: snapshots.clone(),
+                        }),
+                    })
+                } else if let Some(rolling_window) =
+                    node.as_any().downcast_ref::<RollingWindowAggregate>()
+                {
+                    let RollingWindowAggregate {
+                        schema,
+                        input,
+                        dimension,
+                        dimension_alias,
+                        partition_by,
+                        from,
+                        to,
+                        every,
+                        rolling_aggs,
+                        rolling_aggs_alias,
+                        group_by_dimension,
+                        aggs,
+                        lower_bound,
+                        upper_bound,
+                        offset_to_end,
+                    } = rolling_window;
+                    let input = PreSerializedPlan::remove_unused_tables(
+                        input,
+                        partition_ids_to_execute,
+                        inline_tables_to_execute,
+                    )?;
+                    LogicalPlan::Extension(Extension {
+                        node: Arc::new(RollingWindowAggregate {
+                            schema: schema.clone(),
+                            input: Arc::new(input),
+                            dimension: dimension.clone(),
+                            partition_by: partition_by.clone(),
+                            from: from.clone(),
+                            to: to.clone(),
+                            every: every.clone(),
+                            rolling_aggs: rolling_aggs.clone(),
+                            rolling_aggs_alias: rolling_aggs_alias.clone(),
+                            group_by_dimension: group_by_dimension.clone(),
+                            aggs: aggs.clone(),
+                            lower_bound: lower_bound.clone(),
+                            upper_bound: upper_bound.clone(),
+                            dimension_alias: dimension_alias.clone(),
+                            offset_to_end: *offset_to_end,
+                        }),
+                    })
+                } else {
+                    // TODO upgrade DF: Ensure any uture backported plan extensions are implemented.
+                    return Err(CubeError::internal(format!(
+                        "remove_unused_tables not handling Extension case: {:?}",
+                        node
+                    )));
+                }
+            }
+            LogicalPlan::Explain(_)
+            | LogicalPlan::Statement(_)
+            | LogicalPlan::Analyze(_)
+            | LogicalPlan::Dml(_)
+            | LogicalPlan::Ddl(_)
+            | LogicalPlan::Copy(_)
+            | LogicalPlan::DescribeTable(_) => {
+                return Err(CubeError::internal(format!(
+                    "remove_unused_tables not handling case: {}",
+                    pretty_printers::pp_plan(plan)
+                )));
+            } // TODO upgrade DF
+              // SerializedLogicalPlan::CrossJoinAgg {
+              //     left,
+              //     right,
+              //     on,
+              //     join_schema,
+              //     group_expr,
+              //     agg_expr,
+              //     schema,
+              // } => {
+              //     let left =
+              //         left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+              //     let right =
+              //         right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+              //     SerializedLogicalPlan::CrossJoinAgg {
+              //         left: Arc::new(left),
+              //         right: Arc::new(right),
+              //         on: on.clone(),
+              //         join_schema: join_schema.clone(),
+              //         group_expr: group_expr.clone(),
+              //         agg_expr: agg_expr.clone(),
+              //         schema: schema.clone(),
+              //     }
+              // }
+              // SerializedLogicalPlan::RollingWindowAgg {
+              //     schema,
+              //     input,
+              //     dimension,
+              //     partition_by,
+              //     from,
+              //     to,
+              //     every,
+              //     rolling_aggs,
+              //     group_by_dimension,
+              //     aggs,
+              // } => {
+              //     let input =
+              //         input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+              //     SerializedLogicalPlan::RollingWindowAgg {
+              //         schema: schema.clone(),
+              //         input: Arc::new(input),
+              //         dimension: dimension.clone(),
+              //         partition_by: partition_by.clone(),
+              //         from: from.clone(),
+              //         to: to.clone(),
+              //         every: every.clone(),
+              //         rolling_aggs: rolling_aggs.clone(),
+              //         group_by_dimension: group_by_dimension.clone(),
+              //         aggs: aggs.clone(),
+              //     }
+              // }
+        };
+        // Now, for this node, we go through every Expr in the node and remove unused tables from the Subquery.
+        // This wraps a LogicalPlan::Subquery node and expects the same result.
+        let res: LogicalPlan = res
+            .map_subqueries(|node: LogicalPlan| {
+                match node {
+                    LogicalPlan::Subquery(Subquery {
+                        subquery,
+                        outer_ref_columns,
+                    }) => {
+                        let subquery: LogicalPlan = PreSerializedPlan::remove_unused_tables(
+                            &subquery,
+                            partition_ids_to_execute,
+                            inline_tables_to_execute,
+                        )?;
+
+                        // We must return a LogicalPlan::Subquery.
+                        Ok(Transformed::yes(LogicalPlan::Subquery(Subquery {
+                            subquery: Arc::new(subquery),
+                            outer_ref_columns,
+                        })))
+                    }
+                    _ => Err(DataFusionError::Internal(
+                        "map_subqueries should pass a subquery node".to_string(),
+                    )),
+                }
+            })?
+            .data;
+        Ok(res)
     }
 }
 
@@ -1039,15 +853,31 @@ pub enum SerializedTableSource {
     InlineTable(InlineTableProvider),
 }
 
-impl SerializedPlan {
-    pub async fn try_new(
+impl PreSerializedPlan {
+    pub fn to_serialized_plan(&self) -> Result<SerializedPlan, CubeError> {
+        let serialized_logical_plan =
+            datafusion_proto::bytes::logical_plan_to_bytes_with_extension_codec(
+                &self.logical_plan,
+                &CubeExtensionCodec {
+                    worker_context: None,
+                },
+            )?;
+        Ok(SerializedPlan {
+            logical_plan: Arc::new(serialized_logical_plan.to_vec()),
+            schema_snapshot: self.schema_snapshot.clone(),
+            partition_ids_to_execute: self.partition_ids_to_execute.clone(),
+            inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
+            trace_obj: self.trace_obj.clone(),
+        })
+    }
+
+    pub fn try_new(
         plan: LogicalPlan,
         index_snapshots: PlanningMeta,
         trace_obj: Option<String>,
     ) -> Result<Self, CubeError> {
-        let serialized_logical_plan = Self::serialized_logical_plan(&plan);
-        Ok(SerializedPlan {
-            logical_plan: Arc::new(serialized_logical_plan),
+        Ok(PreSerializedPlan {
+            logical_plan: plan,
             schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
             partition_ids_to_execute: Vec::new(),
             inline_table_ids_to_execute: Vec::new(),
@@ -1059,51 +889,28 @@ impl SerializedPlan {
         &self,
         partition_ids_to_execute: Vec<(u64, RowFilter)>,
         inline_table_ids_to_execute: Vec<InlineTableId>,
-    ) -> Self {
-        Self {
-            logical_plan: Arc::new(
-                self.logical_plan
-                    .remove_unused_tables(&partition_ids_to_execute, &inline_table_ids_to_execute),
-            ),
+    ) -> Result<Self, CubeError> {
+        let logical_plan = PreSerializedPlan::remove_unused_tables(
+            &self.logical_plan,
+            &partition_ids_to_execute,
+            &inline_table_ids_to_execute,
+        )?;
+        Ok(Self {
+            logical_plan,
             schema_snapshot: self.schema_snapshot.clone(),
             partition_ids_to_execute,
             inline_table_ids_to_execute,
             trace_obj: self.trace_obj.clone(),
-        }
-    }
-
-    pub fn logical_plan(
-        &self,
-        remote_to_local_names: HashMap<String, String>,
-        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
-    ) -> Result<LogicalPlan, CubeError> {
-        self.logical_plan.logical_plan(&WorkerContext {
-            remote_to_local_names,
-            worker_partition_ids: self.partition_ids_to_execute.clone(),
-            inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
-            chunk_id_to_record_batches,
-            parquet_metadata_cache,
         })
     }
 
-    pub fn trace_obj(&self) -> Option<String> {
-        self.trace_obj.clone()
-    }
-
-    pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {
-        &self.schema_snapshot.index_snapshots.indices
-    }
-
-    pub fn planning_meta(&self) -> &PlanningMeta {
-        &self.schema_snapshot.index_snapshots
-    }
-
-    pub fn files_to_download(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
-        self.list_files_to_download(|id| {
-            self.partition_ids_to_execute
-                .binary_search_by_key(&id, |(id, _)| *id)
-                .is_ok()
+    pub fn replace_logical_plan(&self, logical_plan: LogicalPlan) -> Result<Self, CubeError> {
+        Ok(Self {
+            logical_plan,
+            schema_snapshot: self.schema_snapshot.clone(),
+            partition_ids_to_execute: self.partition_ids_to_execute.clone(),
+            inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
+            trace_obj: self.trace_obj.clone(),
         })
     }
 
@@ -1122,7 +929,18 @@ impl SerializedPlan {
         /* chunk_id */ Option<u64>,
     )> {
         let indexes = self.index_snapshots();
+        Self::list_files_to_download_given_index_snapshots(indexes, include_partition)
+    }
 
+    fn list_files_to_download_given_index_snapshots(
+        indexes: &Vec<IndexSnapshot>,
+        include_partition: impl Fn(u64) -> bool,
+    ) -> Vec<(
+        IdRow<Partition>,
+        /* file_name */ String,
+        /* size */ Option<u64>,
+        /* chunk_id */ Option<u64>,
+    )> {
         let mut files = Vec::new();
 
         for index in indexes.iter() {
@@ -1157,6 +975,112 @@ impl SerializedPlan {
         }
 
         files
+    }
+
+    pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {
+        &self.schema_snapshot.index_snapshots.indices
+    }
+
+    pub fn planning_meta(&self) -> &PlanningMeta {
+        &self.schema_snapshot.index_snapshots
+    }
+
+    pub fn logical_plan(&self) -> &LogicalPlan {
+        &self.logical_plan
+    }
+}
+
+impl SerializedPlan {
+    pub async fn try_new(
+        plan: LogicalPlan,
+        index_snapshots: PlanningMeta,
+        trace_obj: Option<String>,
+    ) -> Result<Self, CubeError> {
+        let serialized_logical_plan =
+            datafusion_proto::bytes::logical_plan_to_bytes_with_extension_codec(
+                &plan,
+                &CubeExtensionCodec {
+                    worker_context: None,
+                },
+            )?;
+        Ok(SerializedPlan {
+            logical_plan: Arc::new(serialized_logical_plan.to_vec()),
+            schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
+            partition_ids_to_execute: Vec::new(),
+            inline_table_ids_to_execute: Vec::new(),
+            trace_obj,
+        })
+    }
+
+    pub fn to_pre_serialized(
+        &self,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
+    ) -> Result<PreSerializedPlan, CubeError> {
+        let plan = self.logical_plan(
+            remote_to_local_names,
+            chunk_id_to_record_batches,
+            parquet_metadata_cache,
+        )?;
+        Ok(PreSerializedPlan {
+            logical_plan: plan,
+            schema_snapshot: self.schema_snapshot.clone(),
+            partition_ids_to_execute: self.partition_ids_to_execute.clone(),
+            inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
+            trace_obj: self.trace_obj.clone(),
+        })
+    }
+
+    pub fn logical_plan(
+        &self,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
+    ) -> Result<LogicalPlan, CubeError> {
+        // TODO upgrade DF: We might avoid constructing so many one-time-use SessionContexts.
+
+        // We need registered Cube UDFs and UDAFs (and there are no UDWFs) to deserialize the plan,
+        // but not much else.
+        let session_context = SessionContext::new_with_state(
+            QueryPlannerImpl::minimal_session_state_from_final_config(SessionConfig::new()).build(),
+        );
+
+        let logical_plan = logical_plan_from_bytes_with_extension_codec(
+            self.logical_plan.as_slice(),
+            &session_context,
+            &CubeExtensionCodec {
+                worker_context: Some(WorkerContext {
+                    remote_to_local_names,
+                    worker_partition_ids: self.partition_ids_to_execute.clone(),
+                    inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
+                    chunk_id_to_record_batches,
+                    parquet_metadata_cache,
+                }),
+            },
+        )?;
+        Ok(logical_plan)
+    }
+
+    pub fn trace_obj(&self) -> Option<String> {
+        self.trace_obj.clone()
+    }
+
+    pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {
+        &self.schema_snapshot.index_snapshots.indices
+    }
+
+    pub fn planning_meta(&self) -> &PlanningMeta {
+        &self.schema_snapshot.index_snapshots
+    }
+
+    pub fn files_to_download(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
+        let indexes: &Vec<IndexSnapshot> = self.index_snapshots();
+        PreSerializedPlan::list_files_to_download_given_index_snapshots(indexes, |id| {
+            self.partition_ids_to_execute
+                .binary_search_by_key(&id, |(id, _)| *id)
+                .is_ok()
+        })
     }
 
     pub fn in_memory_chunks_to_load(&self) -> Vec<(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)> {
@@ -1196,354 +1120,212 @@ impl SerializedPlan {
         chunk_ids
     }
 
-    pub fn is_data_select_query(plan: &LogicalPlan) -> bool {
+    pub fn is_data_select_query<'a>(plan: &'a LogicalPlan) -> bool {
         struct Visitor {
             seen_data_scans: bool,
         }
-        impl PlanVisitor for Visitor {
-            type Error = ();
+        impl<'n> TreeNodeVisitor<'n> for Visitor {
+            type Node = LogicalPlan;
 
-            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
-                if let LogicalPlan::TableScan { source, .. } = plan {
-                    if source
+            fn f_down(
+                &mut self,
+                plan: &'n Self::Node,
+            ) -> datafusion::common::Result<TreeNodeRecursion> {
+                if let LogicalPlan::TableScan(TableScan {
+                    source, table_name, ..
+                }) = plan
+                {
+                    let table_provider = &source
+                        .as_any()
+                        .downcast_ref::<DefaultTableSource>()
+                        .ok_or_else(|| {
+                            DataFusionError::Plan(format!(
+                                "Non DefaultTableSource source found for {}",
+                                table_name
+                            ))
+                        })?
+                        .table_provider;
+                    if table_provider
                         .as_any()
                         .downcast_ref::<InfoSchemaTableProvider>()
                         .is_none()
-                        && source
+                        && table_provider
                             .as_any()
                             .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
                             .is_none()
                     {
                         self.seen_data_scans = true;
-                        return Ok(false);
+                        return Ok(TreeNodeRecursion::Stop);
                     }
                 }
-                Ok(true)
+                Ok(TreeNodeRecursion::Continue)
+            }
+
+            fn f_up(
+                &mut self,
+                _node: &'n Self::Node,
+            ) -> datafusion::common::Result<TreeNodeRecursion> {
+                Ok(TreeNodeRecursion::Continue)
             }
         }
 
         let mut v = Visitor {
             seen_data_scans: false,
         };
-        plan.accept(&mut v).expect("no failures possible");
+        plan.visit(&mut v).expect("no failures possible");
         return v.seen_data_scans;
-    }
-
-    fn serialized_logical_plan(plan: &LogicalPlan) -> SerializedLogicalPlan {
-        match plan {
-            LogicalPlan::EmptyRelation {
-                produce_one_row,
-                schema,
-            } => SerializedLogicalPlan::EmptyRelation {
-                produce_one_row: *produce_one_row,
-                schema: schema.clone(),
-            },
-            LogicalPlan::TableScan {
-                table_name,
-                source,
-                projected_schema,
-                projection,
-                filters,
-                limit,
-            } => SerializedLogicalPlan::TableScan {
-                table_name: table_name.clone(),
-                source: if let Some(cube_table) = source.as_any().downcast_ref::<CubeTable>() {
-                    SerializedTableSource::CubeTable(cube_table.clone())
-                } else if let Some(inline_table) =
-                    source.as_any().downcast_ref::<InlineTableProvider>()
-                {
-                    SerializedTableSource::InlineTable(inline_table.clone())
-                } else {
-                    panic!("Unexpected table source");
-                },
-                alias: None,
-                projected_schema: projected_schema.clone(),
-                projection: projection.clone(),
-                filters: filters.iter().map(|e| Self::serialized_expr(e)).collect(),
-                limit: limit.clone(),
-            },
-            LogicalPlan::Projection {
-                input,
-                expr,
-                schema,
-            } => SerializedLogicalPlan::Projection {
-                input: Arc::new(Self::serialized_logical_plan(input)),
-                expr: expr.iter().map(|e| Self::serialized_expr(e)).collect(),
-                schema: schema.clone(),
-            },
-            LogicalPlan::Filter { predicate, input } => SerializedLogicalPlan::Filter {
-                input: Arc::new(Self::serialized_logical_plan(input)),
-                predicate: Self::serialized_expr(predicate),
-            },
-            LogicalPlan::Aggregate {
-                input,
-                group_expr,
-                aggr_expr,
-                schema,
-            } => SerializedLogicalPlan::Aggregate {
-                input: Arc::new(Self::serialized_logical_plan(input)),
-                group_expr: group_expr
-                    .iter()
-                    .map(|e| Self::serialized_expr(e))
-                    .collect(),
-                aggr_expr: aggr_expr.iter().map(|e| Self::serialized_expr(e)).collect(),
-                schema: schema.clone(),
-            },
-            LogicalPlan::Sort { expr, input } => SerializedLogicalPlan::Sort {
-                input: Arc::new(Self::serialized_logical_plan(input)),
-                expr: expr.iter().map(|e| Self::serialized_expr(e)).collect(),
-            },
-            LogicalPlan::Limit { n, input } => SerializedLogicalPlan::Limit {
-                input: Arc::new(Self::serialized_logical_plan(input)),
-                n: *n,
-            },
-            LogicalPlan::Skip { n, input } => SerializedLogicalPlan::Skip {
-                input: Arc::new(Self::serialized_logical_plan(input)),
-                n: *n,
-            },
-            LogicalPlan::CreateExternalTable { .. } => unimplemented!(),
-            LogicalPlan::Explain { .. } => unimplemented!(),
-            LogicalPlan::Extension { node } => {
-                if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
-                    SerializedLogicalPlan::ClusterSend {
-                        input: Arc::new(Self::serialized_logical_plan(&cs.input)),
-                        snapshots: cs.snapshots.clone(),
-                        limit_and_reverse: cs.limit_and_reverse.clone(),
-                    }
-                } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
-                    SerializedLogicalPlan::ClusterAggregateTopK {
-                        limit: topk.limit,
-                        input: Arc::new(Self::serialized_logical_plan(&topk.input)),
-                        group_expr: topk
-                            .group_expr
-                            .iter()
-                            .map(|e| Self::serialized_expr(e))
-                            .collect(),
-                        aggregate_expr: topk
-                            .aggregate_expr
-                            .iter()
-                            .map(|e| Self::serialized_expr(e))
-                            .collect(),
-                        sort_columns: topk.order_by.clone(),
-                        having_expr: topk.having_expr.as_ref().map(|e| Self::serialized_expr(&e)),
-                        schema: topk.schema.clone(),
-                        snapshots: topk.snapshots.clone(),
-                    }
-                } else if let Some(j) = node.as_any().downcast_ref::<CrossJoinAgg>() {
-                    SerializedLogicalPlan::CrossJoinAgg {
-                        left: Arc::new(Self::serialized_logical_plan(&j.join.left)),
-                        right: Arc::new(Self::serialized_logical_plan(&j.join.right)),
-                        on: Self::serialized_expr(&j.join.on),
-                        join_schema: j.join.schema.clone(),
-                        group_expr: Self::exprs(&j.group_expr),
-                        agg_expr: Self::exprs(&j.agg_expr),
-                        schema: j.schema.clone(),
-                    }
-                } else if let Some(join) = node.as_any().downcast_ref::<SkewedLeftCrossJoin>() {
-                    SerializedLogicalPlan::CrossJoin {
-                        left: Arc::new(Self::serialized_logical_plan(&join.left)),
-                        right: Arc::new(Self::serialized_logical_plan(&join.right)),
-                        on: Self::serialized_expr(&join.on),
-                        join_schema: join.schema.clone(),
-                    }
-                } else if let Some(alias) = node.as_any().downcast_ref::<LogicalAlias>() {
-                    SerializedLogicalPlan::Alias {
-                        input: Arc::new(Self::serialized_logical_plan(&alias.input)),
-                        alias: alias.alias.clone(),
-                        schema: alias.schema.clone(),
-                    }
-                } else if let Some(r) = node.as_any().downcast_ref::<RollingWindowAggregate>() {
-                    SerializedLogicalPlan::RollingWindowAgg {
-                        schema: r.schema.clone(),
-                        input: Arc::new(Self::serialized_logical_plan(&r.input)),
-                        dimension: r.dimension.clone(),
-                        partition_by: r.partition_by.clone(),
-                        from: Self::serialized_expr(&r.from),
-                        to: Self::serialized_expr(&r.to),
-                        every: Self::serialized_expr(&r.every),
-                        rolling_aggs: Self::serialized_exprs(&r.rolling_aggs),
-                        group_by_dimension: r
-                            .group_by_dimension
-                            .as_ref()
-                            .map(|d| Self::serialized_expr(d)),
-                        aggs: Self::serialized_exprs(&r.aggs),
-                    }
-                } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
-                    SerializedLogicalPlan::Panic {}
-                } else {
-                    panic!("unknown extension");
-                }
-            }
-            LogicalPlan::Union {
-                inputs,
-                schema,
-                alias,
-            } => SerializedLogicalPlan::Union {
-                inputs: inputs
-                    .iter()
-                    .map(|input| Arc::new(Self::serialized_logical_plan(&input)))
-                    .collect::<Vec<_>>(),
-                schema: schema.clone(),
-                alias: alias.clone(),
-            },
-            LogicalPlan::Join {
-                left,
-                right,
-                on,
-                join_type,
-                join_constraint,
-                schema,
-            } => SerializedLogicalPlan::Join {
-                left: Arc::new(Self::serialized_logical_plan(&left)),
-                right: Arc::new(Self::serialized_logical_plan(&right)),
-                on: on.clone(),
-                join_type: join_type.clone(),
-                join_constraint: *join_constraint,
-                schema: schema.clone(),
-            },
-            LogicalPlan::Repartition {
-                input,
-                partitioning_scheme,
-            } => SerializedLogicalPlan::Repartition {
-                input: Arc::new(Self::serialized_logical_plan(&input)),
-                partitioning_scheme: match partitioning_scheme {
-                    Partitioning::RoundRobinBatch(s) => SerializePartitioning::RoundRobinBatch(*s),
-                    Partitioning::Hash(e, s) => SerializePartitioning::Hash(
-                        e.iter().map(|e| Self::serialized_expr(e)).collect(),
-                        *s,
-                    ),
-                },
-            },
-            LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
-                panic!("unsupported plan node")
-            }
-        }
-    }
-
-    fn exprs<'a>(es: impl IntoIterator<Item = &'a Expr>) -> Vec<SerializedExpr> {
-        es.into_iter().map(|e| Self::serialized_expr(e)).collect()
-    }
-
-    fn serialized_expr(expr: &Expr) -> SerializedExpr {
-        match expr {
-            Expr::Alias(expr, alias) => {
-                SerializedExpr::Alias(Box::new(Self::serialized_expr(expr)), alias.to_string())
-            }
-            Expr::Column(c) => SerializedExpr::Column(c.name.clone(), c.relation.clone()),
-            Expr::ScalarVariable(v) => SerializedExpr::ScalarVariable(v.clone()),
-            Expr::Literal(v) => SerializedExpr::Literal(v.clone()),
-            Expr::BinaryExpr { left, op, right } => SerializedExpr::BinaryExpr {
-                left: Box::new(Self::serialized_expr(left)),
-                op: op.clone(),
-                right: Box::new(Self::serialized_expr(right)),
-            },
-            Expr::Not(e) => SerializedExpr::Not(Box::new(Self::serialized_expr(&e))),
-            Expr::IsNotNull(e) => SerializedExpr::IsNotNull(Box::new(Self::serialized_expr(&e))),
-            Expr::IsNull(e) => SerializedExpr::IsNull(Box::new(Self::serialized_expr(&e))),
-            Expr::Cast { expr, data_type } => SerializedExpr::Cast {
-                expr: Box::new(Self::serialized_expr(&expr)),
-                data_type: data_type.clone(),
-            },
-            Expr::TryCast { expr, data_type } => SerializedExpr::TryCast {
-                expr: Box::new(Self::serialized_expr(&expr)),
-                data_type: data_type.clone(),
-            },
-            Expr::Sort {
-                expr,
-                asc,
-                nulls_first,
-            } => SerializedExpr::Sort {
-                expr: Box::new(Self::serialized_expr(&expr)),
-                asc: *asc,
-                nulls_first: *nulls_first,
-            },
-            Expr::ScalarFunction { fun, args } => SerializedExpr::ScalarFunction {
-                fun: fun.clone(),
-                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
-            },
-            Expr::ScalarUDF { fun, args } => SerializedExpr::ScalarUDF {
-                fun: scalar_kind_by_name(&fun.name).unwrap(),
-                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
-            },
-            Expr::AggregateFunction {
-                fun,
-                args,
-                distinct,
-            } => SerializedExpr::AggregateFunction {
-                fun: fun.clone(),
-                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
-                distinct: *distinct,
-            },
-            Expr::AggregateUDF { fun, args } => SerializedExpr::AggregateUDF {
-                fun: aggregate_kind_by_name(&fun.name).unwrap(),
-                args: args.iter().map(|e| Self::serialized_expr(&e)).collect(),
-            },
-            Expr::Case {
-                expr,
-                when_then_expr,
-                else_expr,
-            } => SerializedExpr::Case {
-                expr: expr.as_ref().map(|e| Box::new(Self::serialized_expr(&e))),
-                else_expr: else_expr
-                    .as_ref()
-                    .map(|e| Box::new(Self::serialized_expr(&e))),
-                when_then_expr: when_then_expr
-                    .iter()
-                    .map(|(w, t)| {
-                        (
-                            Box::new(Self::serialized_expr(&w)),
-                            Box::new(Self::serialized_expr(&t)),
-                        )
-                    })
-                    .collect(),
-            },
-            Expr::Wildcard => SerializedExpr::Wildcard,
-            Expr::Negative(value) => {
-                SerializedExpr::Negative(Box::new(Self::serialized_expr(&value)))
-            }
-            Expr::Between {
-                expr,
-                negated,
-                low,
-                high,
-            } => SerializedExpr::Between {
-                expr: Box::new(Self::serialized_expr(&expr)),
-                negated: *negated,
-                low: Box::new(Self::serialized_expr(&low)),
-                high: Box::new(Self::serialized_expr(&high)),
-            },
-            Expr::InList {
-                expr,
-                list,
-                negated,
-            } => SerializedExpr::InList {
-                expr: Box::new(Self::serialized_expr(&expr)),
-                list: list.iter().map(|e| Self::serialized_expr(&e)).collect(),
-                negated: *negated,
-            },
-            Expr::RollingAggregate {
-                agg,
-                start: start_bound,
-                end: end_bound,
-                offset,
-            } => SerializedExpr::RollingAggregate {
-                agg: Box::new(Self::serialized_expr(&agg)),
-                start: start_bound.clone(),
-                end: end_bound.clone(),
-                offset_to_end: match offset {
-                    RollingOffset::Start => false,
-                    RollingOffset::End => true,
-                },
-            },
-            Expr::WindowFunction { .. } => panic!("window functions are not supported"),
-        }
-    }
-
-    fn serialized_exprs(e: &[Expr]) -> Vec<SerializedExpr> {
-        e.iter().map(|e| Self::serialized_expr(e)).collect()
     }
 }
 
-fn exprs(e: &[SerializedExpr]) -> Vec<Expr> {
-    e.iter().map(|e| e.expr()).collect()
+impl Debug for CubeExtensionCodec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CubeExtensionCodec")
+    }
+}
+
+struct CubeExtensionCodec {
+    worker_context: Option<WorkerContext>,
+}
+
+impl LogicalExtensionCodec for CubeExtensionCodec {
+    fn try_decode(
+        &self,
+        buf: &[u8],
+        inputs: &[LogicalPlan],
+        ctx: &SessionContext,
+    ) -> datafusion::common::Result<Extension> {
+        use serde::Deserialize;
+        let r = flexbuffers::Reader::get_root(buf)
+            .map_err(|e| DataFusionError::Execution(format!("try_decode: {}", e)))?;
+        let serialized = ExtensionNodeSerialized::deserialize(r)
+            .map_err(|e| DataFusionError::Execution(format!("try_decode: {}", e)))?;
+        Ok(Extension {
+            node: match serialized {
+                ExtensionNodeSerialized::ClusterSend(serialized) => {
+                    Arc::new(ClusterSendNode::from_serialized(inputs, serialized))
+                }
+                ExtensionNodeSerialized::PanicWorker(serialized) => {
+                    Arc::new(PanicWorkerNode::from_serialized(inputs, serialized))
+                }
+                ExtensionNodeSerialized::RollingWindowAggregate(serialized) => Arc::new(
+                    RollingWindowAggregate::from_serialized(serialized, inputs, ctx)?,
+                ),
+                ExtensionNodeSerialized::ClusterAggregateTopKUpper(serialized) => Arc::new(
+                    ClusterAggregateTopKUpper::from_serialized(serialized, inputs, ctx)?,
+                ),
+                ExtensionNodeSerialized::ClusterAggregateTopKLower(serialized) => Arc::new(
+                    ClusterAggregateTopKLower::from_serialized(serialized, inputs, ctx)?,
+                ),
+            },
+        })
+    }
+
+    fn try_encode(&self, node: &Extension, buf: &mut Vec<u8>) -> datafusion::common::Result<()> {
+        use serde::Serialize;
+        let mut ser = flexbuffers::FlexbufferSerializer::new();
+        let to_serialize = if let Some(cluster_send) =
+            node.node.as_any().downcast_ref::<ClusterSendNode>()
+        {
+            ExtensionNodeSerialized::ClusterSend(cluster_send.to_serialized())
+        } else if let Some(panic_worker) = node.node.as_any().downcast_ref::<PanicWorkerNode>() {
+            ExtensionNodeSerialized::PanicWorker(panic_worker.to_serialized())
+        } else if let Some(rolling_window_aggregate) =
+            node.node.as_any().downcast_ref::<RollingWindowAggregate>()
+        {
+            ExtensionNodeSerialized::RollingWindowAggregate(
+                rolling_window_aggregate.to_serialized()?,
+            )
+        } else if let Some(topk_aggregate) = node
+            .node
+            .as_any()
+            .downcast_ref::<ClusterAggregateTopKUpper>()
+        {
+            ExtensionNodeSerialized::ClusterAggregateTopKUpper(topk_aggregate.to_serialized()?)
+        } else if let Some(topk_aggregate) = node
+            .node
+            .as_any()
+            .downcast_ref::<ClusterAggregateTopKLower>()
+        {
+            ExtensionNodeSerialized::ClusterAggregateTopKLower(topk_aggregate.to_serialized()?)
+        } else {
+            todo!("{:?}", node)
+        };
+        to_serialize
+            .serialize(&mut ser)
+            .map_err(|e| DataFusionError::Execution(format!("try_encode: {}", e)))?;
+        buf.extend(ser.take_buffer());
+        Ok(())
+    }
+
+    fn try_decode_table_provider(
+        &self,
+        buf: &[u8],
+        _table_ref: &TableReference,
+        _schema: SchemaRef,
+        _ctx: &SessionContext,
+    ) -> datafusion::common::Result<Arc<dyn TableProvider>> {
+        use serde::Deserialize;
+        let r = flexbuffers::Reader::get_root(buf)
+            .map_err(|e| DataFusionError::Execution(format!("try_decode_table_provider: {}", e)))?;
+        let serialized = SerializedTableProvider::deserialize(r)
+            .map_err(|e| DataFusionError::Execution(format!("try_decode_table_provider: {}", e)))?;
+        let provider: Arc<dyn TableProvider> = match serialized {
+            SerializedTableProvider::CubeTable(table) => {
+                let worker_context = self
+                    .worker_context
+                    .as_ref()
+                    .expect("WorkerContext isn't set for try_decode_table_provider");
+                Arc::new(table.to_worker_table(
+                    worker_context.remote_to_local_names.clone(),
+                    worker_context.worker_partition_ids.clone(),
+                    worker_context.chunk_id_to_record_batches.clone(),
+                    worker_context.parquet_metadata_cache.clone(),
+                ))
+            }
+            SerializedTableProvider::CubeTableLogical(logical) => Arc::new(logical),
+            SerializedTableProvider::InlineTableProvider(inline) => {
+                let worker_context = self
+                    .worker_context
+                    .as_ref()
+                    .expect("WorkerContext isn't set for try_decode_table_provider");
+                Arc::new(inline.to_worker_table(worker_context.inline_table_ids_to_execute.clone()))
+            }
+        };
+        Ok(provider)
+    }
+
+    fn try_encode_table_provider(
+        &self,
+        table_ref: &TableReference,
+        node: Arc<dyn TableProvider>,
+        buf: &mut Vec<u8>,
+    ) -> datafusion::common::Result<()> {
+        let to_serialize = if let Some(cube_table) = node.as_any().downcast_ref::<CubeTable>() {
+            SerializedTableProvider::CubeTable(cube_table.clone())
+        } else if let Some(cube_table_logical) = node.as_any().downcast_ref::<CubeTableLogical>() {
+            SerializedTableProvider::CubeTableLogical(cube_table_logical.clone())
+        } else if let Some(inline_table) = node.as_any().downcast_ref::<InlineTableProvider>() {
+            SerializedTableProvider::InlineTableProvider(inline_table.clone())
+        } else {
+            return Err(DataFusionError::Execution(format!(
+                "Can't encode table provider for {}",
+                table_ref
+            )));
+        };
+
+        use serde::Serialize;
+        let mut ser = flexbuffers::FlexbufferSerializer::new();
+        to_serialize
+            .serialize(&mut ser)
+            .map_err(|e| DataFusionError::Execution(format!("try_encode_table_provider: {}", e)))?;
+        buf.extend(ser.take_buffer());
+        Ok(())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SerializedTableProvider {
+    CubeTable(CubeTable),
+    CubeTableLogical(CubeTableLogical),
+    InlineTableProvider(InlineTableProvider),
 }

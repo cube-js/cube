@@ -198,7 +198,6 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-gnu
         include:
           # Please use minimal possible version of ubuntu, because it produces constraint on glibc
           - os: ubuntu-22.04
@@ -211,13 +210,6 @@ jobs:
             executable_name: cubestored
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
-            compress: false
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            executable_name: cubestored
-            # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
-            strip: false
-            # UPX is broken, issue https://github.com/cube-js/cube/issues/4474
             compress: false
       fail-fast: false
     container:
@@ -260,4 +252,55 @@ jobs:
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz
+          retention-days: 1
+
+  cubestore_linux_aarch64:
+    name: Build aarch64-unknown-linux-gnu
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      OPENSSL_STATIC: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libssl-dev \
+            libsasl2-dev \
+            libclang-dev \
+            clang \
+            pkg-config
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2025-08-01
+          target: aarch64-unknown-linux-gnu
+          rustflags: ""
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./rust/cubestore -> target
+          prefix-key: v0-rust-cubestore
+          key: target-aarch64-unknown-linux-gnu-native
+      - name: Build with Cargo
+        run: |
+          cd rust/cubestore && cargo build --release --target=aarch64-unknown-linux-gnu -p cubestore
+      - name: Create folder for archive
+        run: |
+          mkdir cubestore-archive
+          mkdir cubestore-archive/bin
+      - name: Create archive for release
+        run: |
+          mv rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored cubestore-archive/bin/cubestored
+          cd cubestore-archive
+          tar -cvzf cubestored-aarch64-unknown-linux-gnu.tar.gz ./*
+      - uses: actions/upload-artifact@v4
+        with:
+          path: cubestore-archive/cubestored-aarch64-unknown-linux-gnu.tar.gz
+          name: cubestored-aarch64-unknown-linux-gnu.tar.gz
           retention-days: 1

@@ -6,16 +6,18 @@ use serde_derive::{Deserialize, Serialize};
 
 use cubestore::config::Config;
 use cubestore::util::respawn;
+use cubestore::util::respawn::register_pushdownable_envs;
 use cubestore_sql_tests::multiproc::{
     multiproc_child_main, run_multiproc_test, MultiProcTest, SignalInit, WaitCompletion, WorkerProc,
 };
-use cubestore_sql_tests::{run_sql_tests, TestFn};
+use cubestore_sql_tests::{run_sql_tests, BasicSqlClient, TestFn};
 
 const METASTORE_PORT: u16 = 51336;
 const WORKER_PORTS: [u16; 2] = [51337, 51338];
 
 #[cfg(not(target_os = "windows"))]
 fn main() {
+    register_pushdownable_envs(&["CUBESTORE_TEST_LOG_WORKER"]);
     respawn::register_handler(multiproc_child_main::<ClusterSqlTest>);
     respawn::init(); // TODO: logs in worker processes.
 
@@ -76,7 +78,11 @@ impl MultiProcTest for ClusterSqlTest {
                 c
             })
             .start_test(|services| async move {
-                (self.test_fn)(Box::new(services.sql_service)).await;
+                (self.test_fn)(Box::new(BasicSqlClient {
+                    prefix: "cluster",
+                    service: services.sql_service,
+                }))
+                .await;
             })
             .await;
     }
@@ -94,12 +100,16 @@ impl WorkerProc<WorkerArgs> for WorkerFn {
     ) {
         // Note that Rust's libtest does not consume output in subprocesses.
         // Disable logs to keep output compact.
-        if !std::env::var("CUBESTORE_TEST_LOG_WORKER").is_ok() {
+        if std::env::var("CUBESTORE_TEST_LOG_WORKER").is_err() {
             *cubestore::config::TEST_LOGGING_INITIALIZED.write().await = true;
         }
         Config::test(&test_name)
             .update_config(|mut c| {
-                c.select_worker_pool_size = 2;
+                c.select_worker_pool_size = if std::env::var("CUBESTORE_TEST_LOG_WORKER").is_ok() {
+                    0
+                } else {
+                    2
+                };
                 c.server_name = format!("localhost:{}", WORKER_PORTS[id]);
                 c.worker_bind_address = Some(c.server_name.clone());
                 c.metastore_remote_address = Some(format!("localhost:{}", METASTORE_PORT));

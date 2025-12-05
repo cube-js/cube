@@ -62,9 +62,17 @@ pub enum Representation {
 impl Representation {
     fn from_state(state: &State) -> Result<Representation> {
         if state.has_data() {
-            return Ok(Representation::Normal(NormalRepresentation::new(state)?));
+            Ok(Representation::Normal(NormalRepresentation::new(state)?))
         } else {
-            return Ok(Representation::Sparse(SparseRepresentation::new(state)?));
+            Ok(Representation::Sparse(SparseRepresentation::new(state)?))
+        }
+    }
+
+    /// Allocated size not including size_of::<Self>.  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        match self {
+            Representation::Sparse(sparse) => sparse.allocated_size(),
+            Representation::Normal(_) => 0,
         }
     }
 }
@@ -99,7 +107,7 @@ impl HyperLogLogPlusPlus {
     ///
     /// `proto` is a valid aggregator state of type `AggregatorType::HYPERLOGLOG_PLUS_UNIQUE`.
     pub fn read(proto: &[u8]) -> Result<HyperLogLogPlusPlus> {
-        return Self::for_coded_input(CodedInputStream::from_bytes(proto));
+        Self::for_coded_input(CodedInputStream::from_bytes(proto))
     }
 
     pub fn write(&self) -> Vec<u8> {
@@ -111,19 +119,19 @@ impl HyperLogLogPlusPlus {
                 return state.to_byte_array();
             }
         }
-        return self.state.to_byte_array();
+        self.state.to_byte_array()
     }
 
     pub fn cardinality(&mut self) -> u64 {
         match &mut self.representation {
-            Representation::Sparse(r) => return r.cardinality(&mut self.state),
-            Representation::Normal(r) => return r.cardinality(&self.state),
+            Representation::Sparse(r) => r.cardinality(&mut self.state),
+            Representation::Normal(r) => r.cardinality(&self.state),
         }
     }
 
     pub fn is_compatible(&self, other: &HyperLogLogPlusPlus) -> bool {
-        return self.state.precision == other.state.precision
-            && self.state.sparse_precision == other.state.sparse_precision;
+        self.state.precision == other.state.precision
+            && self.state.sparse_precision == other.state.sparse_precision
     }
 
     /// Will crash if `self.is_compatible(other)` returns false.
@@ -158,21 +166,21 @@ impl HyperLogLogPlusPlus {
         if let Some(n) = new_repr {
             self.representation = Representation::Normal(n)
         }
-        return Ok(());
+        Ok(())
     }
 
     fn for_coded_input(proto: CodedInputStream) -> Result<HyperLogLogPlusPlus> {
-        return Self::from_state(State::parse_stream(proto)?);
+        Self::from_state(State::parse_stream(proto)?)
     }
 
     fn from_state(state: State) -> Result<HyperLogLogPlusPlus> {
-        if !(state.type_ == AGGREGATOR_TYPE_HYPERLOGLOG_PLUS_UNIQUE) {
+        if state.type_ != AGGREGATOR_TYPE_HYPERLOGLOG_PLUS_UNIQUE {
             return Err(ZetaError::new(format!(
                 "Expected proto to be of type HYPERLOGLOG_PLUS_UNIQUE but was {:?}",
                 state.type_
             )));
         }
-        if !(state.encoding_version == Self::ENCODING_VERSION) {
+        if state.encoding_version != Self::ENCODING_VERSION {
             return Err(ZetaError::new(format!(
                 "Expected encoding version to be {} but was {}",
                 Self::ENCODING_VERSION,
@@ -182,9 +190,14 @@ impl HyperLogLogPlusPlus {
         // TODO: implement or remove.
         // allowedTypes = Type.extractAndNormalize(state);
         let representation = Representation::from_state(&state)?;
-        return Ok(HyperLogLogPlusPlus {
+        Ok(HyperLogLogPlusPlus {
             state,
             representation,
-        });
+        })
+    }
+
+    /// Allocated size not including size_of::<Self>.  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        self.state.allocated_size() + self.representation.allocated_size()
     }
 }

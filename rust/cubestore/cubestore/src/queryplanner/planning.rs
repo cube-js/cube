@@ -19,52 +19,67 @@
 use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use async_trait::async_trait;
-use datafusion::arrow::datatypes::{Field, SchemaRef};
+use datafusion::arrow::datatypes::Field;
 use datafusion::error::DataFusionError;
-use datafusion::execution::context::ExecutionContextState;
-use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, Operator, UserDefinedLogicalNode};
-use datafusion::physical_plan::aggregates::AggregateFunction as FusionAggregateFunction;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::planner::ExtensionPlanner;
 use datafusion::physical_plan::{
-    ExecutionPlan, OptimizerHints, Partitioning, PhysicalPlanner, SendableRecordBatchStream,
+    DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, SendableRecordBatchStream,
 };
 use flatbuffers::bitflags::_core::any::Any;
 use flatbuffers::bitflags::_core::fmt::Formatter;
 use itertools::{EitherOrBoth, Itertools};
 
-use crate::cluster::Cluster;
+use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{
     AggregateFunction, Chunk, Column, IdRow, Index, IndexType, MetaStore, Partition, Schema,
 };
+use crate::queryplanner::metadata_cache::NoopParquetMetadataCache;
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
+use crate::queryplanner::panic::PanicWorkerSerialized;
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTableProvider};
-use crate::queryplanner::serialized_plan::{
-    IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
+use crate::queryplanner::rolling::RollingWindowAggregateSerialized;
+use crate::queryplanner::serialized_plan::PreSerializedPlan;
+use crate::queryplanner::serialized_plan::{IndexSnapshot, InlineSnapshot, PartitionSnapshot};
+use crate::queryplanner::topk::{
+    materialize_topk, ClusterAggregateTopKLowerSerialized, ClusterAggregateTopKUpperSerialized,
 };
-use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
+use crate::queryplanner::topk::{plan_topk, DummyTopKLowerExec};
+use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper};
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::{cmp_same_types, Row};
-use crate::CubeError;
-use datafusion::logical_plan;
-use datafusion::optimizer::utils::expr_to_columns;
-use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
+use crate::{app_metrics, CubeError};
+use datafusion::common;
+use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
+use datafusion::common::DFSchemaRef;
+use datafusion::datasource::DefaultTableSource;
+use datafusion::execution::{SessionState, TaskContext};
+use datafusion::logical_expr::expr::Alias;
+use datafusion::logical_expr::utils::expr_to_columns;
+use datafusion::logical_expr::{
+    expr, Aggregate, BinaryExpr, Expr, Extension, FetchType, Filter, InvariantLevel, Join, Limit,
+    LogicalPlan, Operator, Projection, SkipType, Sort, SortExpr, SubqueryAlias, TableScan, Union,
+    Unnest, UserDefinedLogicalNode,
+};
+use datafusion::physical_expr::{Distribution, LexRequirement};
+use datafusion::physical_planner::{ExtensionPlanner, PhysicalPlanner};
 use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 
 #[cfg(test)]
 pub async fn choose_index(
-    p: &LogicalPlan,
+    p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     choose_index_ext(p, metastore, true).await
@@ -91,17 +106,23 @@ fn de_vec_as_map<'de, D: Deserializer<'de>>(
     Vec::<(u64, MultiPartition)>::deserialize(d).map(HashMap::from_iter)
 }
 
+fn system_time_to_df_error(e: std::time::SystemTimeError) -> DataFusionError {
+    DataFusionError::Execution(e.to_string())
+}
+
 pub async fn choose_index_ext(
-    p: &LogicalPlan,
+    p: LogicalPlan,
     metastore: &dyn PlanIndexStore,
     enable_topk: bool,
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
-    rewrite_plan(p, &ConstraintsContext::default(), &mut collector)?;
+    // TODO p.clone()
+    rewrite_plan(p.clone(), &ConstraintsContext::default(), &mut collector)?;
 
     // Consult metastore to choose the index.
     // TODO should be single snapshot read to ensure read consistency here
+    let get_tables_with_indices_start = SystemTime::now();
     let tables = metastore
         .get_tables_with_indexes(
             collector
@@ -116,11 +137,25 @@ pub async fn choose_index_ext(
                 .collect_vec(),
         )
         .await?;
+    let time_2 = SystemTime::now();
+    let get_tables_with_indices_micros = time_2
+        .duration_since(get_tables_with_indices_start)
+        .map_err(system_time_to_df_error)?
+        .as_micros() as i64;
+    let mut cumulative_await_micros = get_tables_with_indices_micros;
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_GET_TABLES_WITH_INDICES_TIME_US
+        .report(get_tables_with_indices_micros);
     assert_eq!(tables.len(), collector.constraints.len());
     let mut candidates = Vec::new();
     for (c, inputs) in collector.constraints.iter().zip(tables) {
-        candidates.push(pick_index(c, inputs.0, inputs.1, inputs.2).await?)
+        candidates.push(pick_index(c, inputs.0, inputs.1, inputs.2)?)
     }
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_PICK_INDEX_TIME_US.report(
+        time_2
+            .elapsed()
+            .map_err(system_time_to_df_error)?
+            .as_micros() as i64,
+    );
 
     // We pick partitioned index only when all tables request the same one.
     let mut indices: Vec<_> = match all_have_same_partitioned_index(&candidates) {
@@ -135,12 +170,20 @@ pub async fn choose_index_ext(
             .collect::<Result<_, DataFusionError>>()?,
     };
 
+    let get_active_partitions_and_chunks_start = SystemTime::now();
     // TODO should be single snapshot read to ensure read consistency here
     let partitions = metastore
         .get_active_partitions_and_chunks_by_index_id_for_select(
             indices.iter().map(|i| i.index.get_id()).collect_vec(),
         )
         .await?;
+    let get_active_partitions_and_chunks_micros = get_active_partitions_and_chunks_start
+        .elapsed()
+        .map_err(system_time_to_df_error)?
+        .as_micros() as i64;
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_GET_ACTIVE_PARTITIONS_AND_CHUNKS_BY_INDEX_ID_TIME_US
+        .report(get_active_partitions_and_chunks_micros);
+    cumulative_await_micros += get_active_partitions_and_chunks_micros;
 
     assert_eq!(partitions.len(), indices.len());
     for ((i, c), ps) in indices
@@ -157,6 +200,7 @@ pub async fn choose_index_ext(
         next_index: 0,
         enable_topk,
         can_pushdown_limit: true,
+        cluster_send_next_id: 1,
     };
 
     let plan = rewrite_plan(p, &ChooseIndexContext::default(), &mut r)?;
@@ -171,8 +215,17 @@ pub async fn choose_index_ext(
         }
     }
 
+    let get_multi_partition_subtree_start_time = SystemTime::now();
     // TODO should be single snapshot read to ensure read consistency here
     let multi_part_subtree = metastore.get_multi_partition_subtree(multi_parts).await?;
+    let get_multi_partition_subtree_micros = get_multi_partition_subtree_start_time
+        .elapsed()
+        .map_err(system_time_to_df_error)?
+        .as_micros() as i64;
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_GET_MULTI_PARTITION_SUBTREE_TIME_US
+        .report(get_multi_partition_subtree_micros);
+    cumulative_await_micros += get_multi_partition_subtree_micros;
+    app_metrics::DATA_QUERY_CHOOSE_INDEX_EXT_TOTAL_AWAITING_TIME_US.report(cumulative_await_micros);
     Ok((
         plan,
         PlanningMeta {
@@ -386,12 +439,13 @@ impl<'a> PlanIndexStore for &'a dyn MetaStore {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct SortColumns {
     sort_on: Vec<String>,
     required: bool,
 }
 
+#[derive(Debug)]
 struct IndexConstraints {
     sort_on: Option<SortColumns>,
     table: TablePath,
@@ -438,52 +492,56 @@ impl PlanRewriter for CollectConstraints {
         c: &Self::Context,
     ) -> Result<LogicalPlan, DataFusionError> {
         match &n {
-            LogicalPlan::TableScan {
+            LogicalPlan::TableScan(TableScan {
                 projection,
                 filters,
                 source,
                 ..
-            } => {
-                if let Some(table) = source.as_any().downcast_ref::<CubeTableLogical>() {
-                    //If there is no aggregations and joins push order_by columns into constraints sort_on
-                    let sort_on = if c.aggregates.is_empty() || c.order_col_names.is_none() {
-                        if let Some(order_col_names) = &c.order_col_names {
-                            match &c.sort_on {
-                                Some(s) => {
-                                    if s.required {
-                                        c.sort_on.clone()
-                                    } else {
-                                        Some(SortColumns {
-                                            sort_on: s
-                                                .sort_on
-                                                .iter()
-                                                .chain(order_col_names.iter())
-                                                .map(|n| n.clone())
-                                                .unique()
-                                                .collect::<Vec<_>>(),
-                                            required: s.required,
-                                        })
+            }) => {
+                if let Some(source) = source.as_any().downcast_ref::<DefaultTableSource>() {
+                    let table_provider = source.table_provider.clone();
+                    if let Some(table) = table_provider.as_any().downcast_ref::<CubeTableLogical>()
+                    {
+                        //If there is no aggregations and joins push order_by columns into constraints sort_on
+                        let sort_on = if c.aggregates.is_empty() || c.order_col_names.is_none() {
+                            if let Some(order_col_names) = &c.order_col_names {
+                                match &c.sort_on {
+                                    Some(s) => {
+                                        if s.required {
+                                            c.sort_on.clone()
+                                        } else {
+                                            Some(SortColumns {
+                                                sort_on: s
+                                                    .sort_on
+                                                    .iter()
+                                                    .chain(order_col_names.iter())
+                                                    .map(|n| n.clone())
+                                                    .unique()
+                                                    .collect::<Vec<_>>(),
+                                                required: s.required,
+                                            })
+                                        }
                                     }
+                                    None => Some(SortColumns {
+                                        sort_on: order_col_names.clone(),
+                                        required: false,
+                                    }),
                                 }
-                                None => Some(SortColumns {
-                                    sort_on: order_col_names.clone(),
-                                    required: false,
-                                }),
+                            } else {
+                                c.sort_on.clone()
                             }
                         } else {
                             c.sort_on.clone()
-                        }
-                    } else {
-                        c.sort_on.clone()
+                        };
+                        self.constraints.push(IndexConstraints {
+                            sort_on,
+                            table: table.table.clone(),
+                            projection: projection.clone(),
+                            filters: filters.clone(),
+                            aggregates: c.aggregates.clone(),
+                        })
                     };
-                    self.constraints.push(IndexConstraints {
-                        sort_on,
-                        table: table.table.clone(),
-                        projection: projection.clone(),
-                        filters: filters.clone(),
-                        aggregates: c.aggregates.clone(),
-                    })
-                };
+                }
             }
             _ => {}
         }
@@ -496,11 +554,11 @@ impl PlanRewriter for CollectConstraints {
         current_context: &Self::Context,
     ) -> Option<Self::Context> {
         match n {
-            LogicalPlan::Aggregate {
+            LogicalPlan::Aggregate(Aggregate {
                 group_expr,
                 aggr_expr,
                 ..
-            } => {
+            }) => {
                 let sort_on = group_expr
                     .iter()
                     .map(extract_column_name)
@@ -519,7 +577,7 @@ impl PlanRewriter for CollectConstraints {
                     order_col_names: current_context.order_col_names.clone(),
                 })
             }
-            LogicalPlan::Sort { expr, input, .. } => {
+            LogicalPlan::Sort(Sort { expr, input, .. }) => {
                 let (names, _) = sort_to_column_names(expr, input);
 
                 if !names.is_empty() {
@@ -528,7 +586,7 @@ impl PlanRewriter for CollectConstraints {
                     None
                 }
             }
-            LogicalPlan::Filter { predicate, .. } => {
+            LogicalPlan::Filter(Filter { predicate, .. }) => {
                 let mut sort_on = Vec::new();
                 if single_value_filter_columns(predicate, &mut sort_on) {
                     if !sort_on.is_empty() {
@@ -562,19 +620,26 @@ impl PlanRewriter for CollectConstraints {
 
     fn enter_join_left(&mut self, join: &LogicalPlan, _: &Self::Context) -> Option<Self::Context> {
         let join_on;
-        if let LogicalPlan::Join { on, .. } = join {
+        if let LogicalPlan::Join(Join { on, .. }) = join {
             join_on = on;
         } else {
             panic!("expected join node");
         }
-        Some(ConstraintsContext {
-            sort_on: Some(SortColumns {
-                sort_on: join_on.iter().map(|(l, _)| l.name.clone()).collect(),
-                required: true,
-            }),
-            aggregates: Vec::new(),
-            order_col_names: None,
-        })
+        join_on
+            .iter()
+            .map(|(l, _)| match l {
+                Expr::Column(c) => Some(c.name.to_string()),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()
+            .map(|sort_on| ConstraintsContext {
+                sort_on: Some(SortColumns {
+                    sort_on,
+                    required: true,
+                }),
+                aggregates: Vec::new(),
+                order_col_names: None,
+            })
     }
 
     fn enter_join_right(
@@ -583,24 +648,31 @@ impl PlanRewriter for CollectConstraints {
         _c: &Self::Context,
     ) -> Option<Self::Context> {
         let join_on;
-        if let LogicalPlan::Join { on, .. } = join {
+        if let LogicalPlan::Join(Join { on, .. }) = join {
             join_on = on;
         } else {
             panic!("expected join node");
         }
-        Some(ConstraintsContext {
-            sort_on: Some(SortColumns {
-                sort_on: join_on.iter().map(|(_, r)| r.name.clone()).collect(),
-                required: true,
-            }),
-            aggregates: Vec::new(),
-            order_col_names: None,
-        })
+        join_on
+            .iter()
+            .map(|(_, r)| match r {
+                Expr::Column(c) => Some(c.name.to_string()),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()
+            .map(|sort_on| ConstraintsContext {
+                sort_on: Some(SortColumns {
+                    sort_on,
+                    required: true,
+                }),
+                aggregates: Vec::new(),
+                order_col_names: None,
+            })
     }
 }
 fn extract_column_name(expr: &Expr) -> Option<String> {
     match expr {
-        Expr::Alias(e, _) => extract_column_name(e),
+        Expr::Alias(Alias { expr, .. }) => extract_column_name(expr),
         Expr::Column(col) => Some(col.name.clone()), // TODO use alias
         _ => None,
     }
@@ -610,7 +682,7 @@ fn extract_column_name(expr: &Expr) -> Option<String> {
 fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
     fn get_name(exprs: &Vec<Expr>, may_be_alias: &String) -> String {
         let expr = exprs.iter().find(|&expr| match expr {
-            Expr::Alias(_, name) => name == may_be_alias,
+            Expr::Alias(Alias { name, .. }) => name == may_be_alias,
             _ => false,
         });
         if let Some(expr) = expr {
@@ -621,26 +693,26 @@ fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
         may_be_alias.clone()
     }
     match input {
-        LogicalPlan::Projection { expr, .. } => get_name(expr, may_be_alias),
-        LogicalPlan::Filter { input, .. } => get_original_name(may_be_alias, input),
-        LogicalPlan::Aggregate { group_expr, .. } => get_name(group_expr, may_be_alias),
+        LogicalPlan::Projection(Projection { expr, .. }) => get_name(expr, may_be_alias),
+        LogicalPlan::Filter(Filter { input, .. }) => get_original_name(may_be_alias, input),
+        LogicalPlan::Aggregate(Aggregate { group_expr, .. }) => get_name(group_expr, may_be_alias),
         _ => may_be_alias.clone(),
     }
 }
 
-fn sort_to_column_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> (Vec<String>, bool) {
+fn sort_to_column_names(sort_exprs: &Vec<SortExpr>, input: &LogicalPlan) -> (Vec<String>, bool) {
     let mut res = Vec::new();
     let mut has_desc = false;
     let mut has_asc = false;
     for sexpr in sort_exprs.iter() {
         match sexpr {
-            Expr::Sort { expr, asc, .. } => {
+            SortExpr { expr, asc, .. } => {
                 if *asc {
                     has_asc = true;
                 } else {
                     has_desc = true;
                 }
-                match expr.as_ref() {
+                match expr {
                     Expr::Column(c) => {
                         res.push(get_original_name(&c.name, input));
                     }
@@ -648,9 +720,6 @@ fn sort_to_column_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> (Vec<Str
                         return (Vec::new(), true);
                     }
                 }
-            }
-            _ => {
-                return (Vec::new(), true);
             }
         }
     }
@@ -661,10 +730,7 @@ fn sort_to_column_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> (Vec<Str
     }
 }
 
-fn single_value_filter_columns<'a>(
-    expr: &'a Expr,
-    columns: &mut Vec<&'a logical_plan::Column>,
-) -> bool {
+fn single_value_filter_columns<'a>(expr: &'a Expr, columns: &mut Vec<&'a common::Column>) -> bool {
     match expr {
         Expr::Column(c) => {
             columns.push(c);
@@ -681,7 +747,7 @@ fn single_value_filter_columns<'a>(
             }
         }
         Expr::Literal(_) => true,
-        Expr::BinaryExpr { left, op, right } => match op {
+        Expr::BinaryExpr(BinaryExpr { left, op, right }) => match op {
             Operator::Eq => {
                 single_value_filter_columns(left, columns)
                     && single_value_filter_columns(right, columns)
@@ -713,9 +779,10 @@ struct ChooseIndex<'a> {
     chosen_indices: &'a [IndexSnapshot],
     enable_topk: bool,
     can_pushdown_limit: bool,
+    cluster_send_next_id: usize,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ChooseIndexContext {
     limit: Option<usize>,
     sort: Option<Vec<String>>,
@@ -754,16 +821,60 @@ impl PlanRewriter for ChooseIndex<'_> {
     type Context = ChooseIndexContext;
 
     fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
+        // TODO upgrade DF: This might be broken, or very sensitive to planning behavior.  For
+        // example we handle skips, but don't remove limit when we see a Filter.  It might have been
+        // so before the DF upgrade too.
         match n {
-            LogicalPlan::Limit { n, .. } => Some(context.update_limit(Some(*n))),
-            LogicalPlan::Skip { n, .. } => {
-                if let Some(limit) = context.limit {
-                    Some(context.update_limit(Some(limit + *n)))
+            LogicalPlan::Limit(limit@Limit {
+                // fetch: Some(n),
+                // skip: 0,
+                ..
+            }) => {
+                // None means no update to limit.  Some(x) means call update_limit(x).
+                let maybe_limit_update: Option<Option<usize>> = match limit.get_fetch_type().ok()? {
+                    FetchType::Literal(Some(n)) =>
+                    if let Some(existing_limit) = context.limit {
+                        if n < existing_limit {
+                            Some(Some(n))
+                        } else {
+                            None
+                        }
+                    } else {
+                        Some(Some(n))
+                    },
+                    FetchType::Literal(None) => None,
+                    FetchType::UnsupportedExpr =>
+                        // Remove the limit (and possible optimization) in case we get a non-constant limit.
+                        Some(None)
+                };
+
+                // Now handle the skip that comes underneath or "before" the limit.
+                let maybe_limit_update: Option<Option<usize>> = match limit.get_skip_type().ok()? {
+                    SkipType::Literal(skip_n) =>
+                    if skip_n == 0 {
+                        maybe_limit_update
+                    } else {
+                        // This is the limit (that would be applied or left in place by this function, if there were no skip) "above" the skip:
+                        let existing_limit = maybe_limit_update.as_ref().unwrap_or(&context.limit);
+
+                        if let Some(existing_limit_n) = existing_limit {
+                            Some(Some(existing_limit_n + skip_n))
+                        } else {
+                            maybe_limit_update
+                        }
+                    },
+                    SkipType::UnsupportedExpr =>
+                        // Remove the limit (and possible optimization) if we get a non-constant skip underneath it.
+                        Some(None),
+                };
+
+                if let Some(limit_update) = maybe_limit_update {
+                    Some(context.update_limit(limit_update))
                 } else {
                     None
                 }
-            }
-            LogicalPlan::Filter { predicate, .. } => {
+            },
+            LogicalPlan::Filter(Filter { predicate, .. }) => {
                 let mut single_filtered = Vec::new();
                 if single_value_filter_columns(predicate, &mut single_filtered) {
                     Some(
@@ -778,13 +889,20 @@ impl PlanRewriter for ChooseIndex<'_> {
                     None
                 }
             }
-            LogicalPlan::Sort { expr, input, .. } => {
+            LogicalPlan::Sort(Sort {
+                expr, input, fetch, ..
+            }) => {
+                let mut new_context = fetch.as_ref().map(|f| context.update_limit(Some(*f)));
                 let (names, sort_is_asc) = sort_to_column_names(expr, input);
                 if !names.is_empty() {
-                    Some(context.update_sort(names, sort_is_asc))
-                } else {
-                    None
+                    new_context = Some(
+                        new_context
+                            .as_ref()
+                            .unwrap_or(context)
+                            .update_sort(names, sort_is_asc),
+                    );
                 }
+                new_context
             }
             _ => None,
         }
@@ -805,7 +923,7 @@ impl PlanRewriter for ChooseIndex<'_> {
 }
 
 fn try_extract_cluster_send(p: &LogicalPlan) -> Option<&ClusterSendNode> {
-    if let LogicalPlan::Extension { node } = p {
+    if let LogicalPlan::Extension(Extension { node }) = p {
         return node.as_any().downcast_ref::<ClusterSendNode>();
     }
     return None;
@@ -818,73 +936,103 @@ impl ChooseIndex<'_> {
         ctx: &ChooseIndexContext,
     ) -> Result<LogicalPlan, DataFusionError> {
         match &mut p {
-            LogicalPlan::TableScan { source, .. } => {
-                if let Some(table) = source.as_any().downcast_ref::<CubeTableLogical>() {
-                    assert!(
-                        self.next_index < self.chosen_indices.len(),
-                        "inconsistent state"
-                    );
-
-                    assert_eq!(
-                        table.table.table.get_id(),
-                        self.chosen_indices[self.next_index]
-                            .table_path
-                            .table
-                            .get_id()
-                    );
-
-                    let snapshot = self.chosen_indices[self.next_index].clone();
-                    self.next_index += 1;
-
-                    let table_schema = source.schema();
-                    *source = Arc::new(CubeTable::try_new(
-                        snapshot.clone(),
-                        // Filled by workers
-                        HashMap::new(),
-                        Vec::new(),
-                        NoopParquetMetadataCache::new(),
-                    )?);
-
-                    let index_schema = source.schema();
-                    assert_eq!(table_schema, index_schema);
-                    let limit = self.get_limit_for_pushdown(snapshot.sort_on(), ctx);
-                    let limit_and_reverse = if let Some(limit) = limit {
-                        Some((limit, !ctx.sort_is_asc))
-                    } else {
-                        None
-                    };
-
-                    return Ok(ClusterSendNode::new(
-                        Arc::new(p),
-                        vec![vec![Snapshot::Index(snapshot)]],
-                        limit_and_reverse,
-                    )
-                    .into_plan());
-                } else if let Some(table) = source.as_any().downcast_ref::<InlineTableProvider>() {
-                    let id = table.get_id();
-                    return Ok(ClusterSendNode::new(
-                        Arc::new(p),
-                        vec![vec![Snapshot::Inline(InlineSnapshot { id })]],
-                        None,
-                    )
-                    .into_plan());
-                } else if let Some(_) = source.as_any().downcast_ref::<InfoSchemaTableProvider>() {
-                    return Err(DataFusionError::Plan(
-                        "Unexpected table source: InfoSchemaTableProvider".to_string(),
-                    ));
-                } else if let Some(_) = source
-                    .as_any()
-                    .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
+            LogicalPlan::TableScan(TableScan {
+                source, table_name, ..
+            }) => {
+                if let Some(default_table_source) =
+                    source.as_any().downcast_ref::<DefaultTableSource>()
                 {
-                    return Err(DataFusionError::Plan(
-                        "Unexpected table source: InfoSchemaQueryCacheTableProvider".to_string(),
-                    ));
+                    let table_provider = default_table_source.table_provider.clone();
+                    if let Some(table) = table_provider.as_any().downcast_ref::<CubeTableLogical>()
+                    {
+                        assert!(
+                            self.next_index < self.chosen_indices.len(),
+                            "inconsistent state: next_index: {}, chosen_indices: {:?}",
+                            self.next_index,
+                            self.chosen_indices
+                        );
+
+                        assert_eq!(
+                            table.table.table.get_id(),
+                            self.chosen_indices[self.next_index]
+                                .table_path
+                                .table
+                                .get_id()
+                        );
+
+                        let snapshot = self.chosen_indices[self.next_index].clone();
+                        self.next_index += 1;
+
+                        let table_schema = source.schema();
+                        *source = Arc::new(DefaultTableSource::new(Arc::new(CubeTable::try_new(
+                            snapshot.clone(),
+                            // Filled by workers
+                            HashMap::new(),
+                            Vec::new(),
+                            NoopParquetMetadataCache::new(),
+                        )?)));
+
+                        let index_schema = source.schema();
+                        assert_eq!(table_schema, index_schema);
+                        let limit = self.get_limit_for_pushdown(snapshot.sort_on(), ctx);
+                        let limit_and_reverse = if let Some(limit) = limit {
+                            Some((limit, !ctx.sort_is_asc))
+                        } else {
+                            None
+                        };
+
+                        return Ok(ClusterSendNode::new(
+                            self.get_cluster_send_next_id(),
+                            Arc::new(p),
+                            vec![vec![Snapshot::Index(snapshot)]],
+                            limit_and_reverse,
+                        )
+                        .into_plan());
+                    } else if let Some(table) = table_provider
+                        .as_any()
+                        .downcast_ref::<InlineTableProvider>()
+                    {
+                        let id = table.get_id();
+                        return Ok(ClusterSendNode::new(
+                            self.get_cluster_send_next_id(),
+                            Arc::new(p),
+                            vec![vec![Snapshot::Inline(InlineSnapshot { id })]],
+                            None,
+                        )
+                        .into_plan());
+                    } else if let Some(_) = table_provider
+                        .as_any()
+                        .downcast_ref::<InfoSchemaTableProvider>()
+                    {
+                        return Err(DataFusionError::Plan(
+                            "Unexpected table source: InfoSchemaTableProvider".to_string(),
+                        ));
+                    } else if let Some(_) = table_provider
+                        .as_any()
+                        .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
+                    {
+                        return Err(DataFusionError::Plan(
+                            "Unexpected table source: InfoSchemaQueryCacheTableProvider"
+                                .to_string(),
+                        ));
+                    } else {
+                        return Err(DataFusionError::Plan("Unexpected table source".to_string()));
+                    }
                 } else {
-                    return Err(DataFusionError::Plan("Unexpected table source".to_string()));
+                    return Err(DataFusionError::Plan(format!(
+                        "Expected DefaultTableSource for: {}",
+                        table_name
+                    )));
                 }
             }
             _ => return Ok(p),
         }
+    }
+
+    fn get_cluster_send_next_id(&mut self) -> usize {
+        let id = self.cluster_send_next_id;
+        self.cluster_send_next_id += 1;
+        id
     }
 
     fn get_limit_for_pushdown(
@@ -944,42 +1092,19 @@ fn check_aggregates_expr(table: &IdRow<Table>, aggregates: &Vec<Expr>) -> bool {
 
     for aggr in aggregates.iter() {
         match aggr {
-            Expr::AggregateFunction { fun, args, .. } => {
+            Expr::AggregateFunction(expr::AggregateFunction {
+                func,
+                params: expr::AggregateFunctionParams { args, .. },
+            }) => {
                 if args.len() != 1 {
                     return false;
                 }
 
-                let aggr_fun = match fun {
-                    FusionAggregateFunction::Sum => Some(AggregateFunction::SUM),
-                    FusionAggregateFunction::Max => Some(AggregateFunction::MAX),
-                    FusionAggregateFunction::Min => Some(AggregateFunction::MIN),
-                    _ => None,
-                };
-
-                if aggr_fun.is_none() {
-                    return false;
-                }
-
-                let aggr_fun = aggr_fun.unwrap();
-
-                let col_match = match &args[0] {
-                    Expr::Column(col) => table_aggregates.iter().any(|ta| {
-                        ta.function() == &aggr_fun && ta.column().get_name() == &col.name
-                    }),
-                    _ => false,
-                };
-
-                if !col_match {
-                    return false;
-                }
-            }
-            Expr::AggregateUDF { fun, args } => {
-                if args.len() != 1 {
-                    return false;
-                }
-
-                let aggr_fun = match fun.name.to_uppercase().as_str() {
-                    "MERGE" => Some(AggregateFunction::MERGE),
+                let aggr_fun = match func.name().to_lowercase().as_str() {
+                    "sum" => Some(AggregateFunction::SUM),
+                    "max" => Some(AggregateFunction::MAX),
+                    "min" => Some(AggregateFunction::MIN),
+                    "merge" => Some(AggregateFunction::MERGE),
                     _ => None,
                 };
 
@@ -1009,7 +1134,7 @@ fn check_aggregates_expr(table: &IdRow<Table>, aggregates: &Vec<Expr>) -> bool {
 }
 
 // Picks the index, but not partitions snapshots.
-async fn pick_index(
+fn pick_index(
     c: &IndexConstraints,
     schema: IdRow<Schema>,
     table: IdRow<Table>,
@@ -1179,10 +1304,7 @@ async fn pick_index(
         IndexSnapshot {
             index: index.clone(),
             partitions: Vec::new(), // filled with results of `pick_partitions` later.
-            table_path: TablePath {
-                table: table.clone(),
-                schema: schema.clone(),
-            },
+            table_path: TablePath::new(schema.clone(), table.clone()),
             sort_on: index_sort_on,
         }
     };
@@ -1195,7 +1317,7 @@ async fn pick_index(
 fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
     indexes: T,
     projection_columns: &Vec<Column>,
-    filter_columns: &HashSet<logical_plan::Column>,
+    filter_columns: &HashSet<common::Column>,
 ) -> Option<&'a IdRow<Index>> {
     #[derive(PartialEq, Eq, Clone)]
     struct Score {
@@ -1323,7 +1445,7 @@ fn partition_filter_schema(index: &IdRow<Index>) -> datafusion::arrow::datatypes
     datafusion::arrow::datatypes::Schema::new(schema_fields)
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Hash, PartialEq, Eq, PartialOrd)]
 pub enum Snapshot {
     Index(IndexSnapshot),
     Inline(InlineSnapshot),
@@ -1331,20 +1453,39 @@ pub enum Snapshot {
 
 pub type Snapshots = Vec<Snapshot>;
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum ExtensionNodeSerialized {
+    ClusterSend(ClusterSendSerialized),
+    PanicWorker(PanicWorkerSerialized),
+    RollingWindowAggregate(RollingWindowAggregateSerialized),
+    ClusterAggregateTopKUpper(ClusterAggregateTopKUpperSerialized),
+    ClusterAggregateTopKLower(ClusterAggregateTopKLowerSerialized),
+}
+
 #[derive(Debug, Clone)]
 pub struct ClusterSendNode {
+    pub id: usize,
     pub input: Arc<LogicalPlan>,
+    pub snapshots: Vec<Snapshots>,
+    pub limit_and_reverse: Option<(usize, bool)>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ClusterSendSerialized {
+    pub id: usize,
     pub snapshots: Vec<Snapshots>,
     pub limit_and_reverse: Option<(usize, bool)>,
 }
 
 impl ClusterSendNode {
     pub fn new(
+        id: usize,
         input: Arc<LogicalPlan>,
         snapshots: Vec<Snapshots>,
         limit_and_reverse: Option<(usize, bool)>,
     ) -> Self {
         ClusterSendNode {
+            id,
             input,
             snapshots,
             limit_and_reverse,
@@ -1352,8 +1493,25 @@ impl ClusterSendNode {
     }
 
     pub fn into_plan(self) -> LogicalPlan {
-        LogicalPlan::Extension {
+        LogicalPlan::Extension(Extension {
             node: Arc::new(self),
+        })
+    }
+
+    pub fn from_serialized(inputs: &[LogicalPlan], serialized: ClusterSendSerialized) -> Self {
+        Self {
+            id: serialized.id,
+            input: Arc::new(inputs[0].clone()),
+            snapshots: serialized.snapshots,
+            limit_and_reverse: serialized.limit_and_reverse,
+        }
+    }
+
+    pub fn to_serialized(&self) -> ClusterSendSerialized {
+        ClusterSendSerialized {
+            id: self.id,
+            snapshots: self.snapshots.clone(),
+            limit_and_reverse: self.limit_and_reverse.clone(),
         }
     }
 }
@@ -1363,12 +1521,20 @@ impl UserDefinedLogicalNode for ClusterSendNode {
         self
     }
 
+    fn name(&self) -> &str {
+        "ClusterSend"
+    }
+
     fn inputs(&self) -> Vec<&LogicalPlan> {
         vec![self.input.as_ref()]
     }
 
     fn schema(&self) -> &DFSchemaRef {
         self.input.schema()
+    }
+
+    fn check_invariants(&self, _check: InvariantLevel, _plan: &LogicalPlan) -> common::Result<()> {
+        Ok(())
     }
 
     fn expressions(&self) -> Vec<Expr> {
@@ -1383,19 +1549,40 @@ impl UserDefinedLogicalNode for ClusterSendNode {
         write!(f, "ClusterSend")
     }
 
-    fn from_template(
+    fn with_exprs_and_inputs(
         &self,
-        exprs: &[Expr],
-        inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion::common::Result<Arc<dyn UserDefinedLogicalNode>> {
         assert!(exprs.is_empty());
         assert_eq!(inputs.len(), 1);
 
-        Arc::new(ClusterSendNode {
+        Ok(Arc::new(ClusterSendNode {
+            id: self.id,
             input: Arc::new(inputs[0].clone()),
             snapshots: self.snapshots.clone(),
             limit_and_reverse: self.limit_and_reverse.clone(),
-        })
+        }))
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        let mut state = state;
+        self.input.hash(&mut state);
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        other
+            .as_any()
+            .downcast_ref::<ClusterSendNode>()
+            .map(|s| self.input.eq(&s.input))
+            .unwrap_or(false)
+    }
+
+    fn dyn_ord(&self, other: &dyn UserDefinedLogicalNode) -> Option<Ordering> {
+        other
+            .as_any()
+            .downcast_ref::<ClusterSendNode>()
+            .and_then(|s| self.input.as_ref().partial_cmp(s.input.as_ref()))
     }
 }
 
@@ -1405,37 +1592,59 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
         // These nodes have no children, return unchanged.
         LogicalPlan::TableScan { .. }
         | LogicalPlan::EmptyRelation { .. }
-        | LogicalPlan::CreateExternalTable { .. }
         | LogicalPlan::Explain { .. } => return Ok(p),
         // The ClusterSend itself, return unchanged.
         LogicalPlan::Extension { .. } => return Ok(p),
         // These nodes collect results from multiple partitions, return unchanged.
         LogicalPlan::Aggregate { .. }
-        | LogicalPlan::Sort { .. }
-        | LogicalPlan::Limit { .. }
-        | LogicalPlan::Skip { .. }
-        | LogicalPlan::Repartition { .. } => return Ok(p),
-        // We can always pull cluster send for these nodes.
-        LogicalPlan::Projection { input, .. } | LogicalPlan::Filter { input, .. } => {
-            let send;
-            if let Some(s) = try_extract_cluster_send(input) {
-                send = s;
-            } else {
+        | LogicalPlan::Window { .. }
+        | LogicalPlan::Repartition { .. }
+        | LogicalPlan::Limit { .. } => return Ok(p),
+        // Collects results but let's push sort,fetch underneath the input.
+        LogicalPlan::Sort(Sort { expr, input, fetch }) => {
+            let Some(send) = try_extract_cluster_send(input) else {
                 return Ok(p);
-            }
+            };
+            let Some(fetch) = fetch else {
+                return Ok(p);
+            };
+            let id = send.id;
+            snapshots = send.snapshots.clone();
+            let under_sort = LogicalPlan::Sort(Sort {
+                expr: expr.clone(),
+                input: send.input.clone(),
+                fetch: Some(*fetch),
+            });
+            // We discard limit_and_reverse, because we add a Sort node into the plan right here.
+            let limit_and_reverse = None;
+            let new_send =
+                ClusterSendNode::new(id, Arc::new(under_sort), snapshots, limit_and_reverse);
+            *input = Arc::new(new_send.into_plan());
+            return Ok(p);
+        }
+        // We can always pull cluster send for these nodes.
+        LogicalPlan::Projection(Projection { input, .. })
+        | LogicalPlan::Filter(Filter { input, .. })
+        | LogicalPlan::SubqueryAlias(SubqueryAlias { input, .. })
+        | LogicalPlan::Unnest(Unnest { input, .. }) => {
+            let Some(send) = try_extract_cluster_send(input) else {
+                return Ok(p);
+            };
+            let id = send.id;
             snapshots = send.snapshots.clone();
             let limit = send.limit_and_reverse.clone();
 
             *input = send.input.clone();
-            return Ok(ClusterSendNode::new(Arc::new(p), snapshots, limit).into_plan());
+            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, limit).into_plan());
         }
-        LogicalPlan::Union { inputs, .. } => {
+        LogicalPlan::Union(Union { inputs, .. }) => {
             // Handle UNION over constants, e.g. inline data series.
             if inputs.iter().all(|p| try_extract_cluster_send(p).is_none()) {
                 return Ok(p);
             }
             let mut union_snapshots = Vec::new();
             let mut limits = Vec::new();
+            let mut id = 0;
             for i in inputs.into_iter() {
                 let send;
                 if let Some(s) = try_extract_cluster_send(i) {
@@ -1445,9 +1654,12 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                         "UNION argument not supported".to_string(),
                     ));
                 }
+                if id == 0 {
+                    id = send.id;
+                }
                 union_snapshots.extend(send.snapshots.concat());
                 limits.push(send.limit_and_reverse);
-                *i = send.input.as_ref().clone();
+                *i = send.input.clone();
             }
             let limit = if limits.is_empty() || limits.iter().any(|l| l.is_none()) {
                 None
@@ -1457,9 +1669,9 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 limits[0]
             };
             snapshots = vec![union_snapshots];
-            return Ok(ClusterSendNode::new(Arc::new(p), snapshots, limit).into_plan());
+            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, limit).into_plan());
         }
-        LogicalPlan::Join { left, right, .. } => {
+        LogicalPlan::Join(Join { left, right, .. }) => {
             let lsend;
             let rsend;
             if let (Some(l), Some(r)) = (
@@ -1469,10 +1681,9 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 lsend = l;
                 rsend = r;
             } else {
-                return Err(DataFusionError::Plan(
-                    "JOIN argument not supported".to_string(),
-                ));
+                return Ok(p);
             }
+            let id = lsend.id;
             snapshots = lsend
                 .snapshots
                 .iter()
@@ -1481,46 +1692,137 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 .collect();
             *left = lsend.input.clone();
             *right = rsend.input.clone();
-            return Ok(ClusterSendNode::new(Arc::new(p), snapshots, None).into_plan());
+            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, None).into_plan());
         }
-        LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
-            return Err(DataFusionError::Internal(
-                "unsupported operation".to_string(),
-            ))
-        }
+        x => {
+            return Err(DataFusionError::Internal(format!(
+                "Unsupported operation to distribute: {}",
+                x
+            )))
+        } // TODO upgrade DF
+          // LogicalPlan::Subquery(_) => {}
+          // LogicalPlan::SubqueryAlias(_) => {}
+          // LogicalPlan::Statement(_) => {}
+          // LogicalPlan::Values(_) => {}
+          // LogicalPlan::Analyze(_) => {}
+          // LogicalPlan::Distinct(_) => {}
+          // LogicalPlan::Prepare(_) => {}
+          // LogicalPlan::Execute(_) => {}
+          // LogicalPlan::Dml(_) => {}
+          // LogicalPlan::Ddl(_) => {}
+          // LogicalPlan::Copy(_) => {}
+          // LogicalPlan::DescribeTable(_) => {}
+          // LogicalPlan::Unnest(_) => {}
+          // LogicalPlan::RecursiveQuery(_) => {}
     }
 }
 
 pub struct CubeExtensionPlanner {
     pub cluster: Option<Arc<dyn Cluster>>,
-    pub serialized_plan: Arc<SerializedPlan>,
+    // Set on the workers.
+    pub worker_planning_params: Option<WorkerPlanningParams>,
+    pub serialized_plan: Arc<PreSerializedPlan>,
 }
 
+#[async_trait]
 impl ExtensionPlanner for CubeExtensionPlanner {
-    fn plan_extension(
+    async fn plan_extension(
         &self,
         planner: &dyn PhysicalPlanner,
         node: &dyn UserDefinedLogicalNode,
-        _logical_inputs: &[&LogicalPlan],
+        logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
-        state: &ExecutionContextState,
+        state: &SessionState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>, DataFusionError> {
         let inputs = physical_inputs;
         if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
+
+            pub struct FindClusterSendCutPoint<'n> {
+                pub parent: Option<&'n LogicalPlan>,
+                pub cluster_send_to_find: &'n ClusterSendNode,
+                pub result: Option<&'n LogicalPlan>,
+            }
+
+            impl<'n> TreeNodeVisitor<'n> for FindClusterSendCutPoint<'n> {
+                type Node = LogicalPlan;
+
+                fn f_down(&mut self, node: &'n Self::Node) -> common::Result<TreeNodeRecursion> {
+                    if let LogicalPlan::Extension(Extension { node: n }) = node {
+                        if let Some(cs) = n.as_any().downcast_ref::<ClusterSendNode>() {
+                            if cs.id == self.cluster_send_to_find.id {
+                                if let Some(LogicalPlan::Aggregate(_)) = self.parent {
+                                    self.result = Some(self.parent.clone().unwrap());
+                                } else {
+                                    self.result = Some(node);
+                                }
+                                return Ok(TreeNodeRecursion::Stop);
+                            }
+                        }
+                    }
+                    self.parent = Some(node);
+                    Ok(TreeNodeRecursion::Continue)
+                }
+            }
+
+            let mut find_cluster_send_cut_point = FindClusterSendCutPoint {
+                parent: None,
+                cluster_send_to_find: cs,
+                result: None,
+            };
+
+            self.serialized_plan
+                .logical_plan()
+                .visit(&mut find_cluster_send_cut_point)?;
             Ok(Some(self.plan_cluster_send(
                 input.clone(),
                 &cs.snapshots,
-                input.schema(),
                 false,
                 usize::MAX,
                 cs.limit_and_reverse.clone(),
+                Some(find_cluster_send_cut_point.result.ok_or_else(|| {
+                    CubeError::internal("ClusterSend cut point not found".to_string())
+                })?),
+                /* required input ordering */ None,
             )?))
-        } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
+        } else if let Some(topk_lower) = node.as_any().downcast_ref::<ClusterAggregateTopKLower>() {
             assert_eq!(inputs.len(), 1);
-            let input = inputs.into_iter().next().unwrap();
-            Ok(Some(plan_topk(planner, self, topk, input.clone(), state)?))
+
+            // We need a dummy execution plan node, so we can pass DF's assertion of the schema.
+            Ok(Some(Arc::new(DummyTopKLowerExec {
+                schema: topk_lower.schema.inner().clone(),
+                input: inputs[0].clone(),
+            })))
+        } else if let Some(topk_upper) = node.as_any().downcast_ref::<ClusterAggregateTopKUpper>() {
+            assert_eq!(inputs.len(), 1);
+            assert_eq!(logical_inputs.len(), 1);
+            let msg: &'static str =
+                "ClusterAggregateTopKUpper expects its child to be a ClusterAggregateTopKLower";
+            let LogicalPlan::Extension(Extension { node }) = logical_inputs[0] else {
+                return Err(DataFusionError::Internal(msg.to_owned()));
+            };
+            let Some(lower_node) = node.as_any().downcast_ref::<ClusterAggregateTopKLower>() else {
+                return Err(DataFusionError::Internal(msg.to_owned()));
+            };
+
+            // The input should be (and must be) a DummyTopKLowerExec node.
+            let Some(DummyTopKLowerExec {
+                schema: _,
+                input: lower_input,
+            }) = inputs[0].as_any().downcast_ref::<DummyTopKLowerExec>()
+            else {
+                return Err(DataFusionError::Internal("ClusterAggregateTopKUpper expects its physical input to be a DummyTopKLowerExec".to_owned()));
+            };
+
+            Ok(Some(plan_topk(
+                planner,
+                self,
+                topk_upper,
+                lower_node,
+                lower_input.clone(),
+                state,
+            )?))
         } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
             assert_eq!(inputs.len(), 0);
             Ok(Some(plan_panic_worker()?))
@@ -1535,31 +1837,42 @@ impl CubeExtensionPlanner {
         &self,
         input: Arc<dyn ExecutionPlan>,
         snapshots: &Vec<Snapshots>,
-        schema: SchemaRef,
         use_streaming: bool,
         max_batch_rows: usize,
         limit_and_reverse: Option<(usize, bool)>,
+        logical_plan_to_send: Option<&LogicalPlan>,
+        required_input_ordering: Option<LexRequirement>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         if snapshots.is_empty() {
-            return Ok(Arc::new(EmptyExec::new(false, schema)));
+            return Ok(Arc::new(EmptyExec::new(input.schema())));
         }
         // Note that MergeExecs are added automatically when needed.
         if let Some(c) = self.cluster.as_ref() {
             Ok(Arc::new(ClusterSendExec::new(
-                schema,
                 c.clone(),
-                self.serialized_plan.clone(),
+                if let Some(logical_plan_to_send) = logical_plan_to_send {
+                    Arc::new(
+                        self.serialized_plan
+                            .replace_logical_plan(logical_plan_to_send.clone())?,
+                    )
+                } else {
+                    self.serialized_plan.clone()
+                },
                 snapshots,
                 input,
                 use_streaming,
+                limit_and_reverse,
+                required_input_ordering,
             )?))
         } else {
-            Ok(Arc::new(WorkerExec {
+            let worker_planning_params = self.worker_planning_params.expect("cluster_send_partition_count must be set when CubeExtensionPlanner::cluster is None");
+            Ok(Arc::new(WorkerExec::new(
                 input,
-                schema,
                 max_batch_rows,
                 limit_and_reverse,
-            }))
+                required_input_ordering,
+                worker_planning_params,
+            )))
         }
     }
 }
@@ -1569,11 +1882,39 @@ impl CubeExtensionPlanner {
 #[derive(Debug)]
 pub struct WorkerExec {
     pub input: Arc<dyn ExecutionPlan>,
-    // TODO: remove and use `self.input.schema()`
-    //       This is a hacky workaround for wrong schema of joins after projection pushdown.
-    pub schema: SchemaRef,
     pub max_batch_rows: usize,
     pub limit_and_reverse: Option<(usize, bool)>,
+    pub required_input_ordering: Option<LexRequirement>,
+    properties: PlanProperties,
+}
+
+impl WorkerExec {
+    pub fn new(
+        input: Arc<dyn ExecutionPlan>,
+        max_batch_rows: usize,
+        limit_and_reverse: Option<(usize, bool)>,
+        required_input_ordering: Option<LexRequirement>,
+        worker_planning_params: WorkerPlanningParams,
+    ) -> WorkerExec {
+        // This, importantly, gives us the same PlanProperties as ClusterSendExec.
+        let properties = ClusterSendExec::compute_properties(
+            input.properties(),
+            worker_planning_params.worker_partition_count,
+        );
+        WorkerExec {
+            input,
+            max_batch_rows,
+            limit_and_reverse,
+            required_input_ordering,
+            properties,
+        }
+    }
+}
+
+impl DisplayAs for WorkerExec {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "WorkerExec")
+    }
 }
 
 #[async_trait]
@@ -1582,40 +1923,59 @@ impl ExecutionPlan for WorkerExec {
         self
     }
 
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 1);
+        let input = children.into_iter().next().unwrap();
+        let properties: PlanProperties = ClusterSendExec::compute_properties(
+            input.properties(),
+            self.properties.output_partitioning().partition_count(),
+        );
         Ok(Arc::new(WorkerExec {
-            input: children.into_iter().next().unwrap(),
-            schema: self.schema.clone(),
+            input,
             max_batch_rows: self.max_batch_rows,
             limit_and_reverse: self.limit_and_reverse.clone(),
+            required_input_ordering: self.required_input_ordering.clone(),
+            properties,
         }))
     }
 
-    fn output_hints(&self) -> OptimizerHints {
-        self.input.output_hints()
-    }
-
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        self.input.execute(partition).await
+        self.input.execute(partition, context)
+    }
+
+    fn name(&self) -> &str {
+        "WorkerExec"
+    }
+
+    fn properties(&self) -> &PlanProperties {
+        &self.properties
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::SinglePartition; self.children().len()]
+    }
+
+    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
+        vec![self.required_input_ordering.clone()]
+    }
+
+    fn maintains_input_order(&self) -> Vec<bool> {
+        // TODO upgrade DF: If the WorkerExec has the number of partitions so it can produce the same output, we could occasionally return true.
+        // vec![self.input_for_optimizations.output_partitioning().partition_count() <= 1]
+
+        // For now, same as default implementation:
+        vec![false]
     }
 }
 
@@ -1641,12 +2001,8 @@ pub mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use datafusion::arrow::datatypes::Schema as ArrowSchema;
-    use datafusion::datasource::TableProvider;
-    use datafusion::execution::context::ExecutionContext;
-    use datafusion::logical_plan::LogicalPlan;
-    use datafusion::physical_plan::udaf::AggregateUDF;
-    use datafusion::physical_plan::udf::ScalarUDF;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema as ArrowSchema};
+    use datafusion::datasource::DefaultTableSource;
     use datafusion::sql::parser::Statement as DFStatement;
     use datafusion::sql::planner::{ContextProvider, SqlToRel};
     use itertools::Itertools;
@@ -1660,11 +2016,18 @@ pub mod tests {
     use crate::queryplanner::pretty_printers::PPOptions;
     use crate::queryplanner::query_executor::ClusterSendExec;
     use crate::queryplanner::serialized_plan::RowRange;
-    use crate::queryplanner::{pretty_printers, CubeTableLogical};
+    use crate::queryplanner::{
+        pretty_printers, sql_to_rel_options, CubeTableLogical, QueryPlannerImpl,
+    };
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::table::{Row, TableValue};
     use crate::CubeError;
-    use datafusion::catalog::TableReference;
+    use datafusion::config::ConfigOptions;
+    use datafusion::error::DataFusionError;
+    use datafusion::execution::{SessionState, SessionStateBuilder};
+    use datafusion::logical_expr::{AggregateUDF, LogicalPlan, ScalarUDF, TableSource, WindowUDF};
+    use datafusion::prelude::SessionConfig;
+    use datafusion::sql::TableReference;
     use std::collections::HashMap;
     use std::iter::FromIterator;
 
@@ -1674,18 +2037,16 @@ pub mod tests {
         let plan = initial_plan("SELECT * FROM s.Customers WHERE customer_id = 1", &indices);
         assert_eq!(
             pretty_printers::pp_plan(&plan),
-            "Projection, [s.Customers.customer_id, s.Customers.customer_name, s.Customers.customer_city, s.Customers.customer_registered_date]\
-           \n  Filter\
-           \n    Scan s.Customers, source: CubeTableLogical, fields: *"
+            "Filter\
+            \n  Scan s.Customers, source: CubeTableLogical, fields: *"
         );
 
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let plan = choose_index(plan, &indices).await.unwrap().0;
         assert_eq!(
             pretty_printers::pp_plan(&plan),
             "ClusterSend, indices: [[0]]\
-           \n  Projection, [s.Customers.customer_id, s.Customers.customer_name, s.Customers.customer_city, s.Customers.customer_registered_date]\
-           \n    Filter\
-           \n      Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: *"
+            \n  Filter\
+            \n    Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: *"
         );
 
         let plan = initial_plan(
@@ -1695,11 +2056,11 @@ pub mod tests {
              ",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
-        let expected ="Projection, [s.Orders.order_customer, s.Orders.order_id]\
-                       \n  Aggregate\
-                       \n    ClusterSend, indices: [[2]]\
-                       \n      Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer]), fields: [order_id, order_customer]";
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+        let expected =
+            "Aggregate\
+            \n  ClusterSend, indices: [[2]]\
+            \n    Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer]), fields: [order_id, order_customer]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
         let plan = initial_plan(
             "SELECT order_customer, order_id \
@@ -1708,7 +2069,12 @@ pub mod tests {
              ",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+        let expected =
+            "Projection, [s.Orders.order_customer:order_customer, s.Orders.order_id:order_id]\
+            \n  Aggregate\
+            \n    ClusterSend, indices: [[2]]\
+            \n      Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer]), fields: [order_id, order_customer]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
@@ -1719,13 +2085,12 @@ pub mod tests {
              ",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
-        let expected ="Projection, [s.Orders.order_customer, s.Orders.order_id]\
-                       \n  Aggregate\
-                       \n    ClusterSend, indices: [[3]]\
-                       \n      Filter\
-                       \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer, order_id]), fields: [order_id, order_customer]";
-
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+        let expected =
+            "Aggregate\
+            \n  ClusterSend, indices: [[3]]\
+            \n    Filter\
+            \n      Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer, order_id]), fields: [order_id, order_customer]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
@@ -1736,7 +2101,13 @@ pub mod tests {
              ",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+        let expected =
+            "Projection, [s.Orders.order_customer:order_customer, s.Orders.order_id:order_id]\
+            \n  Aggregate\
+            \n    ClusterSend, indices: [[3]]\
+            \n      Filter\
+            \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer, order_id]), fields: [order_id, order_customer]";
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
@@ -1747,13 +2118,14 @@ pub mod tests {
              ",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let plan = choose_index(plan, &indices).await.unwrap().0;
 
-        let expected ="Projection, [s.Orders.order_customer, s.Orders.order_id]\
-                       \n  Aggregate\
-                       \n    ClusterSend, indices: [[2]]\
-                       \n      Filter\
-                       \n        Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer, order_product]), fields: [order_id, order_customer, order_product]";
+        let expected =
+            "Projection, [s.Orders.order_customer:order_customer, s.Orders.order_id:order_id]\
+            \n  Aggregate\
+            \n    ClusterSend, indices: [[2]]\
+            \n      Filter\
+            \n        Scan s.Orders, source: CubeTable(index: default:2:[]:sort_on[order_id, order_customer, order_product]), fields: [order_id, order_customer, order_product]";
 
         assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
@@ -1764,12 +2136,14 @@ pub mod tests {
              JOIN s.Customers ON order_customer = customer_id",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
-        assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0]]\
-                                  \n  Projection, [s.Orders.order_id, s.Orders.order_amount, s.Customers.customer_name]\
-                                  \n    Join on: [#s.Orders.order_customer = #s.Customers.customer_id]\
-                                  \n      Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_amount]\
-                                  \n      Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]");
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+        let expected =
+            "ClusterSend, indices: [[3], [0]]\
+            \n  Projection, [s.Orders.order_id:order_id, s.Orders.order_amount:order_amount, s.Customers.customer_name:customer_name]\
+            \n    Join on: [s.Orders.order_customer = s.Customers.customer_id]\
+            \n      Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_amount]\
+            \n      Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]";
+        assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
             "SELECT order_id, customer_name, product_name \
@@ -1778,14 +2152,17 @@ pub mod tests {
              JOIN s.Products ON order_product = product_id",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
-        assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0], [5]]\
-        \n  Projection, [s.Orders.order_id, s.Customers.customer_name, s.Products.product_name]\
-        \n    Join on: [#s.Orders.order_product = #s.Products.product_id]\
-        \n      Join on: [#s.Orders.order_customer = #s.Customers.customer_id]\
-        \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_product]\
-        \n        Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
-        \n      Scan s.Products, source: CubeTable(index: default:5:[]:sort_on[product_id]), fields: *");
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+        let expected =
+            "ClusterSend, indices: [[3], [0], [5]]\
+            \n  Projection, [s.Orders.order_id:order_id, s.Customers.customer_name:customer_name, s.Products.product_name:product_name]\
+            \n    Join on: [s.Orders.order_product = s.Products.product_id]\
+            \n      Projection, [s.Orders.order_id:order_id, s.Orders.order_product:order_product, s.Customers.customer_name:customer_name]\
+            \n        Join on: [s.Orders.order_customer = s.Customers.customer_id]\
+            \n          Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_id, order_customer, order_product]\
+            \n          Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
+            \n      Scan s.Products, source: CubeTable(index: default:5:[]:sort_on[product_id]), fields: *";
+        assert_eq!(pretty_printers::pp_plan(&plan), expected);
 
         let plan = initial_plan(
             "SELECT c2.customer_name \
@@ -1795,15 +2172,21 @@ pub mod tests {
              WHERE c1.customer_name = 'Customer 1'",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
-        assert_eq!(pretty_printers::pp_plan(&plan), "ClusterSend, indices: [[3], [0], [1]]\
-                                  \n  Projection, [c2.customer_name]\
-                                  \n    Join on: [#s.Orders.order_city = #c2.customer_city]\
-                                  \n      Join on: [#s.Orders.order_customer = #c1.customer_id]\
-                                  \n        Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
-                                  \n        Filter\
-                                  \n          Scan c1, source: CubeTable(index: default:0:[]:sort_on[customer_id, customer_name]), fields: [customer_id, customer_name]\
-                                  \n      Scan c2, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [customer_name, customer_city]");
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+        let expected =
+            "ClusterSend, indices: [[3], [0], [1]]\
+            \n  Projection, [c2.customer_name:customer_name]\
+            \n    Join on: [s.Orders.order_city = c2.customer_city]\
+            \n      Projection, [s.Orders.order_city:order_city]\
+            \n        Join on: [s.Orders.order_customer = c1.customer_id]\
+            \n          Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
+            \n          SubqueryAlias\
+            \n            Projection, [s.Customers.customer_id:customer_id]\
+            \n              Filter\
+            \n                Scan s.Customers, source: CubeTable(index: default:0:[]:sort_on[customer_id]), fields: [customer_id, customer_name]\
+            \n      SubqueryAlias\
+            \n        Scan s.Customers, source: CubeTable(index: by_city:1:[]:sort_on[customer_city]), fields: [customer_name, customer_city]";
+        assert_eq!(pretty_printers::pp_plan(&plan), expected);
     }
 
     #[tokio::test]
@@ -1814,21 +2197,21 @@ pub mod tests {
              GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+
         assert_eq!(
             pretty_printers::pp_plan(&plan),
-            "Projection, [s.Orders.order_customer, SUM(s.Orders.order_amount)]\
-           \n  ClusterAggregateTopK, limit: 10\
-           \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
+            "ClusterAggregateTopK, limit: 10\
+            \n  Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
         // Projections should be handled properly.
         let plan = initial_plan(
             "SELECT order_customer `customer`, SUM(order_amount) `amount` FROM s.Orders \
-             GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+             GROUP BY 1 ORDER BY 2 DESC NULLS LAST LIMIT 10",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let plan = choose_index(plan, &indices).await.unwrap().0;
         assert_eq!(
             pretty_printers::pp_plan(&plan),
             "Projection, [customer, amount]\
@@ -1838,16 +2221,16 @@ pub mod tests {
 
         let plan = initial_plan(
             "SELECT SUM(order_amount) `amount`, order_customer `customer` FROM s.Orders \
-             GROUP BY 2 ORDER BY 1 DESC LIMIT 10",
+             GROUP BY 2 ORDER BY 1 DESC NULLS LAST LIMIT 10",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let plan = choose_index(plan, &indices).await.unwrap().0;
         let mut with_sort_by = PPOptions::default();
         with_sort_by.show_sort_by = true;
         assert_eq!(
             pretty_printers::pp_plan_ext(&plan, &with_sort_by),
             "Projection, [amount, customer]\
-           \n  ClusterAggregateTopK, limit: 10, sortBy: [2 desc null last]\
+           \n  ClusterAggregateTopK, limit: 10, sortBy: [2 desc nulls last]\
            \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
@@ -1857,11 +2240,11 @@ pub mod tests {
              GROUP BY 1 ORDER BY 2 ASC LIMIT 10",
             &indices,
         );
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let plan = choose_index(plan, &indices).await.unwrap().0;
         assert_eq!(
             pretty_printers::pp_plan_ext(&plan, &with_sort_by),
             "Projection, [customer, amount]\
-           \n  ClusterAggregateTopK, limit: 10, sortBy: [2 null last]\
+           \n  ClusterAggregateTopK, limit: 10, sortBy: [2 nulls last]\
            \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
@@ -1870,16 +2253,16 @@ pub mod tests {
             "SELECT order_customer `customer`, SUM(order_amount) `amount`, \
                     MIN(order_amount) `min_amount`, MAX(order_amount) `max_amount` \
              FROM s.Orders \
-             GROUP BY 1 ORDER BY 3 DESC, 2 ASC LIMIT 10",
+             GROUP BY 1 ORDER BY 3 DESC NULLS LAST, 2 ASC LIMIT 10",
             &indices,
         );
         let mut verbose = with_sort_by;
         verbose.show_aggregations = true;
-        let plan = choose_index(&plan, &indices).await.unwrap().0;
+        let plan = choose_index(plan, &indices).await.unwrap().0;
         assert_eq!(
             pretty_printers::pp_plan_ext(&plan, &verbose),
             "Projection, [customer, amount, min_amount, max_amount]\
-           \n  ClusterAggregateTopK, limit: 10, aggs: [SUM(#s.Orders.order_amount), MIN(#s.Orders.order_amount), MAX(#s.Orders.order_amount)], sortBy: [3 desc null last, 2 null last]\
+           \n  ClusterAggregateTopK, limit: 10, aggs: [sum(s.Orders.order_amount), min(s.Orders.order_amount), max(s.Orders.order_amount)], sortBy: [3 desc nulls last, 2 nulls last]\
            \n    Scan s.Orders, source: CubeTable(index: by_customer:3:[]:sort_on[order_customer]), fields: [order_customer, order_amount]"
         );
 
@@ -1890,7 +2273,7 @@ pub mod tests {
              GROUP BY 1 LIMIT 10",
             &indices,
         );
-        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        let pp = pretty_printers::pp_plan(&choose_index(plan, &indices).await.unwrap().0);
         assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
 
         // No limit.
@@ -1899,7 +2282,7 @@ pub mod tests {
              GROUP BY 1 ORDER BY 2 DESC",
             &indices,
         );
-        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        let pp = pretty_printers::pp_plan(&choose_index(plan, &indices).await.unwrap().0);
         assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
 
         // Sort by group key, not the aggregation result.
@@ -1908,7 +2291,7 @@ pub mod tests {
              GROUP BY 1 ORDER BY 1 DESC LIMIT 10",
             &indices,
         );
-        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        let pp = pretty_printers::pp_plan(&choose_index(plan, &indices).await.unwrap().0);
         assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
 
         // Unsupported aggregation function.
@@ -1917,14 +2300,14 @@ pub mod tests {
              GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
             &indices,
         );
-        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        let pp = pretty_printers::pp_plan(&choose_index(plan, &indices).await.unwrap().0);
         assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
         let plan = initial_plan(
             "SELECT order_customer `customer`, COUNT(order_amount) `amount` FROM s.Orders \
              GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
             &indices,
         );
-        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        let pp = pretty_printers::pp_plan(&choose_index(plan, &indices).await.unwrap().0);
         assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
 
         // Distinct aggregations.
@@ -1933,7 +2316,7 @@ pub mod tests {
              GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
             &indices,
         );
-        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        let pp = pretty_printers::pp_plan(&choose_index(plan, &indices).await.unwrap().0);
         assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
 
         // Complicated sort expressions.
@@ -1942,7 +2325,7 @@ pub mod tests {
              GROUP BY 1 ORDER BY amount * amount  DESC LIMIT 10",
             &indices,
         );
-        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        let pp = pretty_printers::pp_plan(&choose_index(plan, &indices).await.unwrap().0);
         assert!(!pp.contains("TopK"), "plan contained topk:\n{}", pp);
     }
 
@@ -1955,10 +2338,10 @@ pub mod tests {
             &indices,
         );
 
-        let pp = pretty_printers::pp_plan(&choose_index(&plan, &indices).await.unwrap().0);
+        let pp = pretty_printers::pp_plan(&choose_index(plan.clone(), &indices).await.unwrap().0);
         assert_eq!(pp, "ClusterSend, indices: [[6], [2]]\
-                      \n  Projection, [s.Customers.customer_name, s.Orders.order_city]\
-                      \n    Join on: [#s.Orders.order_customer = #s.Customers.customer_id]\
+                      \n  Projection, [s.Customers.customer_name:customer_name, s.Orders.order_city:order_city]\
+                      \n    Join on: [s.Orders.order_customer = s.Customers.customer_id]\
                       \n      Scan s.Orders, source: CubeTable(index: #mi0:6:[]:sort_on[order_customer]), fields: [order_customer, order_city]\
                       \n      Scan s.Customers, source: CubeTable(index: #mi0:2:[]:sort_on[customer_id]), fields: [customer_id, customer_name]");
 
@@ -2015,11 +2398,11 @@ pub mod tests {
         }
 
         // Plan again.
-        let (with_index, meta) = choose_index(&plan, &indices).await.unwrap();
+        let (with_index, meta) = choose_index(plan, &indices).await.unwrap();
         let pp = pretty_printers::pp_plan(&with_index);
         assert_eq!(pp, "ClusterSend, indices: [[6], [2]]\
-                      \n  Projection, [s.Customers.customer_name, s.Orders.order_city]\
-                      \n    Join on: [#s.Orders.order_customer = #s.Customers.customer_id]\
+                      \n  Projection, [s.Customers.customer_name:customer_name, s.Orders.order_city:order_city]\
+                      \n    Join on: [s.Orders.order_customer = s.Customers.customer_id]\
                       \n      Scan s.Orders, source: CubeTable(index: #mi0:6:[5, 6, 7, 8, 9]:sort_on[order_customer]), fields: [order_customer, order_city]\
                       \n      Scan s.Customers, source: CubeTable(index: #mi0:2:[0, 1, 2, 3, 4]:sort_on[customer_id]), fields: [customer_id, customer_name]");
 
@@ -2118,7 +2501,7 @@ pub mod tests {
     fn make_test_indices(add_multi_indices: bool) -> TestIndices {
         const SCHEMA: u64 = 0;
         const PARTITIONED_INDEX: u64 = 0; // Only 1 partitioned index for now.
-        let mut i = TestIndices::default();
+        let mut i = TestIndices::new();
 
         let customers_cols = int_columns(&[
             "customer_id",
@@ -2279,22 +2662,38 @@ pub mod tests {
             other => panic!("not a statement, actual {:?}", other),
         };
 
-        let plan = SqlToRel::new(i)
-            .statement_to_plan(&DFStatement::Statement(statement))
+        let plan = SqlToRel::new_with_options(i, sql_to_rel_options())
+            .statement_to_plan(DFStatement::Statement(Box::new(statement)))
             .unwrap();
-        ExecutionContext::new().optimize(&plan).unwrap()
+        QueryPlannerImpl::make_execution_context(SessionConfig::new())
+            .state()
+            .optimize(&plan)
+            .unwrap()
     }
 
-    #[derive(Debug, Default)]
+    #[derive(Debug)]
     pub struct TestIndices {
+        session_state: Arc<SessionState>,
         tables: Vec<Table>,
         indices: Vec<Index>,
         partitions: Vec<Partition>,
         chunks: Vec<Chunk>,
         multi_partitions: Vec<MultiPartition>,
+        config_options: ConfigOptions,
     }
 
     impl TestIndices {
+        pub fn new() -> TestIndices {
+            TestIndices {
+                session_state: Arc::new(SessionStateBuilder::new().with_default_features().build()),
+                tables: Vec::new(),
+                indices: Vec::new(),
+                partitions: Vec::new(),
+                chunks: Vec::new(),
+                multi_partitions: Vec::new(),
+                config_options: ConfigOptions::default(),
+            }
+        }
         pub fn add_table(&mut self, t: Table) -> u64 {
             assert_eq!(t.get_schema_id(), 0);
             let table_id = self.tables.len() as u64;
@@ -2335,44 +2734,92 @@ pub mod tests {
     }
 
     impl ContextProvider for TestIndices {
-        fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
+        fn get_table_source(
+            &self,
+            name: TableReference,
+        ) -> Result<Arc<dyn TableSource>, DataFusionError> {
             let name = match name {
                 TableReference::Partial { schema, table } => {
-                    if schema != "s" {
-                        return None;
+                    if schema.as_ref() != "s" {
+                        return Err(DataFusionError::Plan(format!(
+                            "Schema not found {}",
+                            schema
+                        )));
                     }
                     table
                 }
-                TableReference::Bare { .. } | TableReference::Full { .. } => return None,
+                TableReference::Bare { .. } | TableReference::Full { .. } => {
+                    return Err(DataFusionError::Plan(format!("Table not found {}", name)))
+                }
             };
             self.tables
                 .iter()
-                .find_position(|t| t.get_table_name() == name)
-                .map(|(id, t)| -> Arc<dyn TableProvider> {
+                .find_position(|t| t.get_table_name() == name.as_ref())
+                .map(|(id, t)| -> Arc<dyn TableSource> {
                     let schema = Arc::new(ArrowSchema::new(
                         t.get_columns()
                             .iter()
                             .map(|c| c.clone().into())
-                            .collect::<Vec<_>>(),
+                            .collect::<Vec<Field>>(),
                     ));
-                    Arc::new(CubeTableLogical {
-                        table: TablePath {
-                            table: IdRow::new(id as u64, t.clone()),
-                            schema: Arc::new(self.schema()),
-                        },
+                    Arc::new(DefaultTableSource::new(Arc::new(CubeTableLogical {
+                        table: TablePath::new(
+                            Arc::new(self.schema()),
+                            IdRow::new(id as u64, t.clone()),
+                        ),
                         schema,
-                    })
+                    })))
                 })
+                .ok_or(DataFusionError::Plan(format!("Table not found {}", name)))
         }
 
-        fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
+        fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
             // Note that this is missing HLL functions.
+            let name = name.to_ascii_lowercase();
+            self.session_state.scalar_functions().get(&name).cloned()
+        }
+
+        fn get_aggregate_meta(&self, name_param: &str) -> Option<Arc<AggregateUDF>> {
+            // Note that this is missing HLL functions.
+            let name = name_param.to_ascii_lowercase();
+            self.session_state.aggregate_functions().get(&name).cloned()
+        }
+
+        fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {
+            let name = name.to_ascii_lowercase();
+            self.session_state.window_functions().get(&name).cloned()
+        }
+
+        fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
             None
         }
 
-        fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
-            // Note that this is missing HLL functions.
-            None
+        fn options(&self) -> &ConfigOptions {
+            &self.config_options
+        }
+
+        fn udf_names(&self) -> Vec<String> {
+            self.session_state
+                .scalar_functions()
+                .keys()
+                .cloned()
+                .collect()
+        }
+
+        fn udaf_names(&self) -> Vec<String> {
+            self.session_state
+                .aggregate_functions()
+                .keys()
+                .cloned()
+                .collect()
+        }
+
+        fn udwf_names(&self) -> Vec<String> {
+            self.session_state
+                .window_functions()
+                .keys()
+                .cloned()
+                .collect()
         }
     }
 

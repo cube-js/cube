@@ -112,6 +112,15 @@ impl HllUnion {
 
         return Ok(());
     }
+
+    /// The size of allocated memory used (not including `sizeof::<Self>()`).  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        match self {
+            Self::Airlift(hll_sketch) => hll_sketch.allocated_size(),
+            Self::ZetaSketch(hll_pp) => hll_pp.allocated_size(),
+            Self::DataSketches(hll_uds) => hll_uds.allocated_size(),
+        }
+    }
 }
 
 #[cfg(test)]
