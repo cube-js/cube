@@ -974,7 +974,7 @@ frequently.
 When using `every` with `sql`, the purpose is to reduce the load from running
 the refresh key query itself, not to minimize the number of pre-aggregation
 refreshes. The refresh key SQL should be designed to return consistent results
-and only change when the underlying data actually changes, ensuring minimal
+and only change when the underlying data needs to be updated, ensuring minimal
 refreshes even if the query is executed multiple times.
 
 </WarningBox>
