@@ -51,7 +51,7 @@ cubes:
           - CUBE.status
         measures:
           - CUBE.count
-    
+
     # ...
 ```
 
@@ -809,7 +809,7 @@ tenants in case different tenants have different pre-aggregation SQL.
 Choose the count of partitions wisely as those consume memory and CPU resources.
 As a rule of thumb, you do not want to go over 500-1,000 partitions per pre-aggregation in total
 to keep the partitioning overhead low. Too many partitions will most likely
-cause out of memory. 
+cause out of memory.
 In case of very long build ranges please consider use [Lambda pre-aggregations][ref-caching-lambda-preaggs] to reduce partition count per pre-aggregation.
 
 </WarningBox>
@@ -817,7 +817,7 @@ In case of very long build ranges please consider use [Lambda pre-aggregations][
 ### `refresh_key`
 
 Cube can also take care of keeping pre-aggregations up to date with the
-`refresh_key` property. By default, it is set to `every: '1 hour'`, 
+`refresh_key` property. By default, it is set to `every: '1 hour'`,
 if neither of the cubes' pre-aggregation references don't override `refresh_key`.
 
 <InfoBox>
@@ -963,6 +963,21 @@ cubes:
 In the above example, the refresh key SQL will be executed every hour. If the
 results of the SQL refresh key differ from the last execution, then the
 pre-aggregation will be refreshed.
+
+<WarningBox>
+
+The `every` parameter guarantees that the refresh key will be executed **at
+least** once during the specified interval. However, it does **not** guarantee
+that it will be executed **at most** once. The refresh key may be checked more
+frequently.
+
+When using `every` with `sql`, the purpose is to reduce the load from running
+the refresh key query itself, not to minimize the number of pre-aggregation
+refreshes. The refresh key SQL should be designed to return consistent results
+and only change when the underlying data actually changes, ensuring minimal
+refreshes even if the query is executed multiple times.
+
+</WarningBox>
 
 #### `incremental`
 
@@ -1241,7 +1256,7 @@ cubes:
 ### `scheduled_refresh`
 
 To always keep pre-aggregations up-to-date, you can set
-`scheduled_refresh: true`. This option defaults to `true`. 
+`scheduled_refresh: true`. This option defaults to `true`.
 In production mode, pre-aggregations with `scheduled_refresh: false` will not be
 built automatically and require external orchestration to trigger their refresh.
 Additionally, any `scheduled_refresh: false` pre-aggregations that were built manually or on-demand will be considered
@@ -1334,8 +1349,8 @@ The SQL queries for the build range (as defined by the `sql` property) are
 executed based on the [`refresh_key`][self-refreshkey] settings of the
 pre-aggregation.
 
-In case of very small `update_window` or `FILTER_PARAMS` are used in the [`refresh_key`][self-refreshkey] definition 
-and the current timestamp is used as `build_range_end`, there's a possibility 
+In case of very small `update_window` or `FILTER_PARAMS` are used in the [`refresh_key`][self-refreshkey] definition
+and the current timestamp is used as `build_range_end`, there's a possibility
 to write [`refresh_key`][self-refreshkey] which won't refresh due to cycle dependency on each other.
 To address such cases, you can use relative date in the future for the `build_range_end`.
 For example, you can add one day to the current timestamp and use it as `build_range_end`.
