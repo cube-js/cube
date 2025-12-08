@@ -60,7 +60,9 @@ use ingestion::job_runner::JobRunner;
 use itertools::Itertools;
 use log::{debug, error, info, warn};
 use mockall::automock;
+#[cfg(not(target_os = "windows"))]
 use opentelemetry::trace::{SpanContext, SpanId, TraceContextExt, TraceFlags, TraceId};
+#[cfg(not(target_os = "windows"))]
 use opentelemetry::Context as OtelContext;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -78,6 +80,7 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
+#[cfg(not(target_os = "windows"))]
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[automock]
