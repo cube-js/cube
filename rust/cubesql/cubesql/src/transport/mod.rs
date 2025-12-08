@@ -21,6 +21,7 @@ pub type CubeMetaCustomTimeFormat = cubeclient::models::V1CubeMetaCustomTimeForm
 pub type CubeMetaCustomTimeFormatType = cubeclient::models::V1CubeMetaCustomTimeFormatType;
 pub type CubeMetaLinkFormat = cubeclient::models::V1CubeMetaLinkFormat;
 pub type CubeMetaLinkFormatType = cubeclient::models::V1CubeMetaLinkFormatType;
+pub type CubeMetaDimensionOrder = cubeclient::models::V1CubeMetaDimensionOrder;
 
 pub type CubeMetaFormat = cubeclient::models::V1CubeMetaFormat;
 // Request/Response
