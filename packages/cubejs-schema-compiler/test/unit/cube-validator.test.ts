@@ -1675,5 +1675,68 @@ describe('Cube Validation', () => {
       const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
       expect(validationResult.error).toBeTruthy();
     });
+
+    it('dimension with valid order asc - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          status: {
+            sql: () => 'status',
+            type: 'string',
+            order: 'asc'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('dimension with valid order desc - correct', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          createdAt: {
+            sql: () => 'created_at',
+            type: 'time',
+            order: 'desc'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('dimension with invalid order value - error', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'name',
+        sql: () => 'SELECT * FROM public.Orders',
+        dimensions: {
+          status: {
+            sql: () => 'status',
+            type: 'string',
+            order: 'invalid' // should only accept 'asc' or 'desc'
+          },
+        },
+        fileName: 'fileName',
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('order');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
   });
 });

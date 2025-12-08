@@ -11,7 +11,9 @@ pub use self::v1_cube_meta_custom_time_format::Type as V1CubeMetaCustomTimeForma
 pub mod v1_cube_meta_dimension;
 pub use self::v1_cube_meta_dimension::V1CubeMetaDimension;
 pub mod v1_cube_meta_dimension_granularity;
+pub mod v1_cube_meta_dimension_order;
 pub use self::v1_cube_meta_dimension_granularity::V1CubeMetaDimensionGranularity;
+pub use self::v1_cube_meta_dimension_order::V1CubeMetaDimensionOrder;
 pub mod v1_cube_meta_folder;
 pub use self::v1_cube_meta_folder::V1CubeMetaFolder;
 pub mod v1_cube_meta_format;
