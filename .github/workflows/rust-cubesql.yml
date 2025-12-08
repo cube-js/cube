@@ -232,20 +232,25 @@ jobs:
       matrix:
         # We do not need to test under all versions, we do it under linux
         node-version: [22.x]
-        os-version: ["macos-14"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         include:
           - target: x86_64-apple-darwin
+            os-version: macos-15-intel
             python-version: "3.9"
           - target: x86_64-apple-darwin
+            os-version: macos-15-intel
             python-version: "3.10"
           - target: x86_64-apple-darwin
+            os-version: macos-15-intel
             python-version: "3.11"
           - target: x86_64-apple-darwin
+            os-version: macos-15-intel
             python-version: "3.12"
           - target: x86_64-apple-darwin
+            os-version: macos-15-intel
             python-version: "fallback"
           - target: aarch64-apple-darwin
+            os-version: macos-14
             python-version: "fallback"
       fail-fast: false
 
