@@ -1378,7 +1378,7 @@ class ApiGateway {
         order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
       });
 
-      res(queryType === QueryTypeEnum.REGULAR_QUERY ?
+      await res(queryType === QueryTypeEnum.REGULAR_QUERY ?
         { sql: toQuery(sqlQueries[0]) } :
         sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
     } catch (e: any) {
@@ -1512,7 +1512,7 @@ class ApiGateway {
         [...dataSources].map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
-      res({ memberToDataSource, dataSourceToSqlGenerator });
+      await res({ memberToDataSource, dataSourceToSqlGenerator });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -1594,7 +1594,7 @@ class ApiGateway {
         ))
       );
 
-      res({
+      await res({
         queryType,
         normalizedQueries,
         queryOrder: sqlQueries.map((sqlQuery) => R.fromPairs(
@@ -1961,11 +1961,11 @@ class ApiGateway {
       );
 
       if (props.queryType === 'multi') {
-        // We prepare the final json result on native side
+        // We prepare the final JSON result on the native side
         const resultMulti = new ResultMultiWrapper(results, { queryType, slowQuery });
         await res(resultMulti);
       } else {
-        // We prepare the full final json result on native side
+        // We prepare the full final JSON result on the native side
         await res(results[0]);
       }
     } catch (e: any) {
@@ -2142,12 +2142,16 @@ class ApiGateway {
         queryType,
         apiType,
       });
+
       const state = await subscriptionState();
       if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
-        res(result.message, result.opts);
+        // We prepare the full final JSON result on the native side
+        await res(result.message, result.opts);
       } else if (error) {
-        res(error.message, error.opts);
+        // We prepare the full final JSON result on the native side
+        await res(error.message, error.opts);
       }
+
       await subscribe({ error, result });
     } catch (e: any) {
       this.handleError({
