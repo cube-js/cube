@@ -73,7 +73,7 @@ impl ServerManager {
         protocol: DatabaseProtocol,
     ) -> RwLockReadGuard<'_, DatabaseVariables> {
         match protocol {
-            DatabaseProtocol::PostgreSQL => self
+            DatabaseProtocol::PostgreSQL | DatabaseProtocol::ArrowNative => self
                 .postgres_variables
                 .read()
                 .expect("failed to unlock variables for reading"),
@@ -89,7 +89,7 @@ impl ServerManager {
         protocol: DatabaseProtocol,
     ) -> RwLockWriteGuard<'_, DatabaseVariables> {
         match protocol {
-            DatabaseProtocol::PostgreSQL => self
+            DatabaseProtocol::PostgreSQL | DatabaseProtocol::ArrowNative => self
                 .postgres_variables
                 .write()
                 .expect("failed to unlock variables for reading"),

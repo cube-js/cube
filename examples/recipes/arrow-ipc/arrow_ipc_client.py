@@ -227,7 +227,7 @@ def example_arrow_to_csv():
         client.set_arrow_ipc_output()
 
         query = "SELECT  orders.FUL, MEASURE(orders.count) FROM orders GROUP BY 1"
-        result = client.execute_query_with_arrow_streaming(query)
+        result = client.execute_query_arrow(query)
         pprint(result)
 
         # Save to CSV

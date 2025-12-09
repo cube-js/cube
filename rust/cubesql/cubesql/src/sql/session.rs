@@ -386,7 +386,7 @@ impl SessionState {
         match guard {
             Some(vars) => vars,
             _ => match &self.protocol {
-                DatabaseProtocol::PostgreSQL => return POSTGRES_DEFAULT_VARIABLES.clone(),
+                DatabaseProtocol::PostgreSQL | DatabaseProtocol::ArrowNative => return POSTGRES_DEFAULT_VARIABLES.clone(),
                 DatabaseProtocol::Extension(ext) => ext.get_session_default_variables(),
             },
         }
@@ -401,7 +401,7 @@ impl SessionState {
         match &*guard {
             Some(vars) => vars.get(name).cloned(),
             _ => match &self.protocol {
-                DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.get(name).cloned(),
+                DatabaseProtocol::PostgreSQL | DatabaseProtocol::ArrowNative => POSTGRES_DEFAULT_VARIABLES.get(name).cloned(),
                 DatabaseProtocol::Extension(ext) => ext.get_session_variable_default(name),
             },
         }

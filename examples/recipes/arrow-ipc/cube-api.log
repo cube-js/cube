@@ -1,0 +1,331 @@
+yarn run v1.22.22
+$ cubejs-server
+Warning. There is no cube.js file. Continue with environment variables
+🔥 Cube Store (1.5.10) is assigned to 3030 port.
+Warning. Option apiSecret is required in dev mode. Cube has generated it as 195028f3b07264924ff37b5b98938c9d
+🔓 Authentication checks are disabled in developer mode. Please use NODE_ENV=production to enable it.
+🦅 Dev environment available at http://localhost:4008
+2025-12-09T01:40:05.796Z DEBUG [cubejs_native::node_export] Cube SQL Start
+🔗 Cube SQL (pg) is listening on 0.0.0.0:4444
+🚀 Cube API server (1.5.10) is listening on 4008
+[32mRefresh Scheduler Run[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+{
+  "securityContext": {}
+}
+[32mCompiling schema[0m: 
+{
+  "version": "default_schema_version_ec2706cca6c61ebb1faac14f80069539"
+}
+[32mCompiling schema completed[0m: (1238ms)
+{
+  "version": "default_schema_version_ec2706cca6c61ebb1faac14f80069539"
+}
+[32mQuery started[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+{}
+[32mMissing cache for[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "spanId": "4aee7235dbf64508aba936a85c2145ad"
+}
+[32mWaiting for query[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+{
+  "queueId": 0,
+  "spanId": "4aee7235dbf64508aba936a85c2145ad",
+  "queueSize": 0,
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "queuePrefix": "SQL_QUERY_EXT_STANDALONE",
+  "waitingForRequestId": "scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5"
+}
+[32mPerforming query[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+{
+  "queueId": 0,
+  "queueSize": 0,
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "queuePrefix": "SQL_QUERY_EXT_STANDALONE",
+  "timeInQueue": 0
+}
+[32mQuery started[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+{}
+[32mQuery started[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+{}
+2025-12-09T01:40:37.202Z INFO  [cubestored] <pid:1104978> Cube Store version 1.5.10
+2025-12-09T01:40:37.253Z INFO  [cubestore::http::status] <pid:1104978> Serving status probes at 0.0.0.0:3031
+2025-12-09T01:40:37.265Z INFO  [cubestore::metastore::rocks_fs] <pid:1104978> Using existing metastore in /home/io/projects/learn_erl/cube/examples/recipes/arrow-ipc/.cubestore/data/metastore
+2025-12-09T01:40:37.400Z INFO  [cubestore::http] <pid:1104978> Http Server is listening on 0.0.0.0:3030
+2025-12-09T01:40:37.400Z INFO  [cubestore::mysql] <pid:1104978> MySQL port open on 0.0.0.0:13306
+[32mExecuting SQL[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+--
+  SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key
+--
+{
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ]
+}
+[32mPerforming query completed[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5 (418ms)
+{
+  "queueId": 0,
+  "queueSize": 0,
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "queuePrefix": "SQL_QUERY_EXT_STANDALONE",
+  "timeInQueue": 0
+}
+[32mRenewed[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "spanId": "4aee7235dbf64508aba936a85c2145ad"
+}
+[32mOutgoing network usage[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5
+{
+  "service": "cache",
+  "spanId": "4aee7235dbf64508aba936a85c2145ad",
+  "bytes": 137,
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ]
+}
+[32mQuery completed[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5 (462ms)
+{}
+[32mQuery completed[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5 (385ms)
+{}
+[32mQuery completed[0m: scheduler-94eb3ab4-34f0-47fc-aa88-34d94a2b09a5 (368ms)
+{}
+2025-12-09T01:40:52.402Z INFO  [cubestore::metastore::rocks_fs] <pid:1104978> Using existing cachestore in /home/io/projects/learn_erl/cube/examples/recipes/arrow-ipc/.cubestore/data/cachestore
+[32mRefresh Scheduler Run[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{
+  "securityContext": {}
+}
+[32mQuery started[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{}
+[32mFound cache entry[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "time": 1765244437486,
+  "renewedAgo": 28245,
+  "renewalKey": "STANDALONE#SQL_QUERY_RESULT:870b71854699194b0caa0b9c03ee3c0b",
+  "newRenewalKey": "STANDALONE#SQL_QUERY_RESULT:870b71854699194b0caa0b9c03ee3c0b",
+  "renewalThreshold": 10,
+  "spanId": "a4c44a839373cb448210b12c2cd2141a"
+}
+[32mWaiting for renew[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "renewalThreshold": 10,
+  "spanId": "a4c44a839373cb448210b12c2cd2141a"
+}
+[32mWaiting for query[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{
+  "queueId": 1,
+  "spanId": "a4c44a839373cb448210b12c2cd2141a",
+  "queueSize": 0,
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "queuePrefix": "SQL_QUERY_EXT_STANDALONE",
+  "waitingForRequestId": "scheduler-63423425-82da-4a43-a2ee-e920cc859d1e"
+}
+[32mPerforming query[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{
+  "queueId": 1,
+  "queueSize": 0,
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "queuePrefix": "SQL_QUERY_EXT_STANDALONE",
+  "timeInQueue": 0
+}
+[32mExecuting SQL[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+--
+  SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key
+--
+{
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ]
+}
+[32mQuery started[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{}
+[32mPerforming query completed[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e (20ms)
+{
+  "queueId": 1,
+  "queueSize": 0,
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "queuePrefix": "SQL_QUERY_EXT_STANDALONE",
+  "timeInQueue": 0
+}
+[32mRenewed[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "spanId": "a4c44a839373cb448210b12c2cd2141a"
+}
+[32mOutgoing network usage[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{
+  "service": "cache",
+  "spanId": "a4c44a839373cb448210b12c2cd2141a",
+  "bytes": 137,
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ]
+}
+[32mQuery completed[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e (24ms)
+{}
+[32mQuery completed[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e (3ms)
+{}
+[32mQuery started[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{}
+[32mFound cache entry[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "time": 1765244465752,
+  "renewedAgo": 14,
+  "renewalKey": "STANDALONE#SQL_QUERY_RESULT:870b71854699194b0caa0b9c03ee3c0b",
+  "newRenewalKey": "STANDALONE#SQL_QUERY_RESULT:870b71854699194b0caa0b9c03ee3c0b",
+  "renewalThreshold": 10,
+  "spanId": "89dfba3cf3f234bb2092f3e08854a46c"
+}
+[32mUsing cache for[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "spanId": "89dfba3cf3f234bb2092f3e08854a46c"
+}
+[32mQuery completed[0m: scheduler-63423425-82da-4a43-a2ee-e920cc859d1e (2ms)
+{}
+[32mRefresh Scheduler Run[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{
+  "securityContext": {}
+}
+[32mQuery started[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{}
+[32mFound cache entry[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "time": 1765244465752,
+  "renewedAgo": 29962,
+  "renewalKey": "STANDALONE#SQL_QUERY_RESULT:870b71854699194b0caa0b9c03ee3c0b",
+  "newRenewalKey": "STANDALONE#SQL_QUERY_RESULT:870b71854699194b0caa0b9c03ee3c0b",
+  "renewalThreshold": 10,
+  "spanId": "4948898b714c5fa3a47f9c50c2d0aa7e"
+}
+[32mWaiting for renew[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "renewalThreshold": 10,
+  "spanId": "4948898b714c5fa3a47f9c50c2d0aa7e"
+}
+[32mWaiting for query[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{
+  "queueId": 2,
+  "spanId": "4948898b714c5fa3a47f9c50c2d0aa7e",
+  "queueSize": 0,
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "queuePrefix": "SQL_QUERY_EXT_STANDALONE",
+  "waitingForRequestId": "scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf"
+}
+[32mPerforming query[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{
+  "queueId": 2,
+  "queueSize": 0,
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "queuePrefix": "SQL_QUERY_EXT_STANDALONE",
+  "timeInQueue": 0
+}
+[32mExecuting SQL[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+--
+  SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key
+--
+{
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ]
+}
+[32mQuery started[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{}
+[32mQuery started[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{}
+[32mPerforming query completed[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf (8ms)
+{
+  "queueId": 2,
+  "queueSize": 0,
+  "queryKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "queuePrefix": "SQL_QUERY_EXT_STANDALONE",
+  "timeInQueue": 0
+}
+[32mRenewed[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ],
+  "spanId": "4948898b714c5fa3a47f9c50c2d0aa7e"
+}
+[32mOutgoing network usage[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf
+{
+  "service": "cache",
+  "spanId": "4948898b714c5fa3a47f9c50c2d0aa7e",
+  "bytes": 137,
+  "cacheKey": [
+    "SELECT FLOOR((UNIX_TIMESTAMP()) / 10) as refresh_key",
+    []
+  ]
+}
+[32mQuery completed[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf (11ms)
+{}
+[32mQuery completed[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf (6ms)
+{}
+[32mQuery completed[0m: scheduler-c143d893-eb38-4586-ab7a-fb924244f3cf (4ms)
+{}
