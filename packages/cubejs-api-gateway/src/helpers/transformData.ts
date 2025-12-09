@@ -6,8 +6,8 @@
  */
 
 import R from 'ramda';
-import { UserError } from '../UserError';
-import { ConfigItem } from './prepareAnnotation';
+import { UserError } from '../user-error';
+import { ConfigItem } from './prepare-annotation';
 import {
   DBResponsePrimitive,
   DBResponseValue,

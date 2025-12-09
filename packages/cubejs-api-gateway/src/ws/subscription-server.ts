@@ -1,9 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 
-import { UserError } from './UserError';
-import type { ApiGateway } from './gateway';
-import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
-import { ExtendedRequestContext, ContextAcceptorFn } from './interfaces';
+import { UserError } from '../user-error';
+import type { ApiGateway } from '../gateway';
+import type { LocalSubscriptionStore } from './local-subscription-store';
+import { ExtendedRequestContext, ContextAcceptorFn } from '../interfaces';
 
 const methodParams: Record<string, string[]> = {
   load: ['query', 'queryType'],

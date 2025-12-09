@@ -1,4 +1,4 @@
-import { CubejsHandlerError } from './CubejsHandlerError';
+import { CubejsHandlerError } from './cubejs-handler-error';
 
 export class UserError extends CubejsHandlerError {
   public constructor(message: string) {

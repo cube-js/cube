@@ -19,7 +19,7 @@ import {
   transformSegment,
   transformJoins,
   transformPreAggregations,
-} from '../../src/helpers/transformMetaExtended';
+} from '../../src/helpers/transform-meta-extended';
 
 const MOCK_USERS_CUBE = {
   measures: {

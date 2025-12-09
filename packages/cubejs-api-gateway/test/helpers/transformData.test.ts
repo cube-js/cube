@@ -21,7 +21,7 @@ import {
 } from '../../src/helpers/transformValue';
 import {
   ConfigItem,
-} from '../../src/helpers/prepareAnnotation';
+} from '../../src/helpers/prepare-annotation';
 import transformDataDefault
   from '../../src/helpers/transformData';
 import {
@@ -792,7 +792,7 @@ describe('transformData helpers', () => {
           .timeDimensions
       )
     ) as QueryTimeDimension[];
-    
+
     expect(() => {
       getBlendingResponseKey();
     }).toThrow(
