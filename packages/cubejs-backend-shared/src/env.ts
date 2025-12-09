@@ -2037,7 +2037,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('30')
     .asInt(),
   cubeStoreRollingWindowJoin: () => get('CUBEJS_CUBESTORE_ROLLING_WINDOW_JOIN')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
