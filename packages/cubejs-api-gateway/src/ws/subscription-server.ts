@@ -175,13 +175,17 @@ export class SubscriptionServer {
         bytes,
       }, context);
 
-      const allowedParams = methodParams[message.method];
-      const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
-        .reduce((a, b) => ({ ...a, ...b }), {});
+      const collectedParams: Record<string, unknown> = Object.create(null);
+
+      if (message.params) {
+        for (const k of methodParams[message.method]) {
+          collectedParams[k] = message.params[k];
+        }
+      }
 
       const method = message.method.replace(/[^a-z]+(.)/g, (_m, chr) => chr.toUpperCase());
       await this.apiGateway[method]({
-        ...params,
+        ...collectedParams,
         connectionId,
         context,
         signedWithPlaygroundAuthSecret: authContext.signedWithPlaygroundAuthSecret,
