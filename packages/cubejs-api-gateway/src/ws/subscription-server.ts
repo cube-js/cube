@@ -58,7 +58,7 @@ export class SubscriptionServer {
 
   protected mapZodError(error: ZodError): string {
     return error.issues
-      .map(e => e.message)
+      .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
       .join(', ');
   }
 
