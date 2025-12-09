@@ -14,14 +14,14 @@ import {
 import type { ApiGateway } from '../gateway';
 import type { LocalSubscriptionStore } from './local-subscription-store';
 
-const methodParams: Record<string, string[]> = {
+const methodParams: Record<string, string[]> = Object.freeze({
   load: ['query', 'queryType'],
   sql: ['query'],
   'dry-run': ['query'],
   meta: [],
   subscribe: ['query', 'queryType'],
   unsubscribe: [],
-};
+});
 
 const calcMessageLength = (message: unknown) => Buffer.byteLength(
   typeof message === 'string' ? message : JSON.stringify(message)
