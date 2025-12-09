@@ -77,11 +77,11 @@ import {
   ContextRejectionMiddlewareFn,
   ContextAcceptorFn,
 } from './interfaces';
-import { getRequestIdFromRequest, requestParser } from './requestParser';
-import { UserError } from './UserError';
-import { CubejsHandlerError } from './CubejsHandlerError';
-import { SubscriptionServer, WebSocketSendMessageFn } from './SubscriptionServer';
-import { LocalSubscriptionStore } from './LocalSubscriptionStore';
+import { getRequestIdFromRequest, requestParser } from './request-parser';
+import { UserError } from './user-error';
+import { CubejsHandlerError } from './cubejs-handler-error';
+import { SubscriptionServer, WebSocketSendMessageFn } from './ws/subscription-server';
+import { LocalSubscriptionStore } from './ws/local-subscription-store';
 import {
   getPivotQuery,
   getQueryGranularity,
@@ -97,7 +97,7 @@ import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer, SQLServerConstructorOptions } from './sql-server';
 import { getJsonQueryFromGraphQLQuery, makeSchema } from './graphql';
-import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
+import { ConfigItem, prepareAnnotation } from './helpers/prepare-annotation';
 import {
   transformCube,
   transformMeasure,
@@ -105,7 +105,7 @@ import {
   transformSegment,
   transformJoins,
   transformPreAggregations,
-} from './helpers/transformMetaExtended';
+} from './helpers/transform-meta-extended';
 
 type HandleErrorOptions = {
     e: any,

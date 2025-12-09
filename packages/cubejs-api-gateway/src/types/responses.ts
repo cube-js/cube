@@ -1,4 +1,4 @@
-import type { ConfigItem } from '../helpers/prepareAnnotation';
+import type { ConfigItem } from '../helpers/prepare-annotation';
 import type { NormalizedQuery } from './query';
 import type { QueryType, ResultType } from './strings';
 

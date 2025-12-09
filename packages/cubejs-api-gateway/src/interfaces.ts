@@ -52,7 +52,7 @@ import {
 import {
   ConfigItem,
   GranularityMeta
-} from './helpers/prepareAnnotation';
+} from './helpers/prepare-annotation';
 
 export {
   AliasToMemberMap,

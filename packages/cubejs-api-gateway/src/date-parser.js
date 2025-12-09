@@ -1,7 +1,7 @@
 import moment from 'moment-timezone';
 import { parse } from 'chrono-node';
 
-import { UserError } from './UserError';
+import { UserError } from './user-error';
 
 const momentFromResult = (result, timezone) => {
   const dateMoment = moment().tz(timezone);
