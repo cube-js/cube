@@ -26,6 +26,8 @@ import {
 import type { Application as ExpressApplication } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
+import type { SubscriptionServer } from '@cubejs-backend/api-gateway';
+
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
@@ -449,7 +451,7 @@ export class CubejsServerCore {
     }
   }
 
-  public initSubscriptionServer(sendMessage) {
+  public initSubscriptionServer(sendMessage): SubscriptionServer {
     const apiGateway = this.apiGateway();
     return apiGateway.initSubscriptionServer(sendMessage);
   }
