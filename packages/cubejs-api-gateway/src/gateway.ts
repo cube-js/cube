@@ -674,7 +674,8 @@ class ApiGateway {
           joins: transformJoins(cubeDefinitions[cube.name]?.joins),
           preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
-      res({ cubes });
+
+      await res({ cubes });
     } catch (e: any) {
       this.handleError({
         e,
@@ -687,6 +688,7 @@ class ApiGateway {
 
   public async getPreAggregations({ cacheOnly, metaOnly, context, res }: { cacheOnly?: boolean, metaOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
+
     try {
       const compilerApi = await this.getCompilerApi(context);
       const preAggregations = await compilerApi.preAggregations();
@@ -768,7 +770,7 @@ class ApiGateway {
         })),
       });
 
-      res({
+      await res({
         preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
       });
     } catch (e: any) {
@@ -799,7 +801,7 @@ class ApiGateway {
       const { partitions } = (preAggregationPartitions?.[0] || {});
       const preAggregationPartition = partitions?.find(p => p?.tableName === versionEntry.table_name);
 
-      res({
+      await res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
           context,
           preAggregationPartition
@@ -824,7 +826,7 @@ class ApiGateway {
           query
         );
 
-      res({ result });
+      await res({ result });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -1177,7 +1179,7 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       const orchestratorApi = await this.getAdapterApi(context);
-      res({
+      await res({
         result: await orchestratorApi.getPreAggregationQueueStates()
       });
     } catch (e: any) {
@@ -1194,7 +1196,7 @@ class ApiGateway {
     try {
       const { queryKeys, dataSource } = normalizeQueryCancelPreAggregations(this.parseQueryParam(query));
       const orchestratorApi = await this.getAdapterApi(context);
-      res({
+      await res({
         result: await orchestratorApi.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource)
       });
     } catch (e: any) {
@@ -1333,7 +1335,8 @@ class ApiGateway {
       await this.assertApiScope('sql', context.securityContext);
 
       const result = await this.sqlServer.sql4sql(query, disablePostProcessing, context.securityContext);
-      res({ sql: result });
+
+      await res({ sql: result });
     } catch (e: any) {
       this.handleError({
         e,
