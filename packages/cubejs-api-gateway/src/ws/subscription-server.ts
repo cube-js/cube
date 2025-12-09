@@ -8,7 +8,7 @@ import {
   authMessageSchema,
   unsubscribeMessageSchema,
   methodMessageSchema,
-  WsMessage
+  WsMessage,
 } from './message-schema';
 
 import type { ApiGateway } from '../gateway';
@@ -38,7 +38,7 @@ export class SubscriptionServer {
   ) {
   }
 
-  protected resultFn(connectionId: string, messageId: string, requestId: string | undefined, logNetworkUsage: boolean = true) {
+  protected resultFn(connectionId: string, messageId: string | number | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
     return async (message, { status } = { status: 200 }) => {
       if (logNetworkUsage) {
         this.apiGateway.log({ type: 'Outgoing network usage', service: 'api-ws', bytes: calcMessageLength(message), }, { requestId });
@@ -106,14 +106,14 @@ export class SubscriptionServer {
     }
   }
 
-  protected async handleMessage(connectionId: string, message: any, isSubscription: boolean) {
+  protected async handleMessage(connectionId: string, message: WsMessage, isSubscription: boolean) {
     let authContext: any = {};
     let context: Partial<ExtendedRequestContext> = {};
 
     const bytes = calcMessageLength(message);
 
     try {
-      if (message.authorization) {
+      if ('authorization' in message) {
         authContext = { isSubscription, protocol: 'ws' };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
 
@@ -128,7 +128,7 @@ export class SubscriptionServer {
         return;
       }
 
-      if (message.unsubscribe) {
+      if ('unsubscribe' in message) {
         await this.subscriptionStore.unsubscribe(connectionId, message.unsubscribe);
         return;
       }
@@ -158,9 +158,16 @@ export class SubscriptionServer {
         throw new UserError(`Unsupported method: ${message.method}`);
       }
 
-      const baseRequestId = message.requestId || `${connectionId}-${message.messageId}`;
+      const subscriptionId = String(message.messageId);
+      const baseRequestId = message.requestId || `${connectionId}-${subscriptionId}`;
       const requestId = `${baseRequestId}-span-${uuidv4()}`;
-      context = await this.apiGateway.contextByReq(message, authContext.securityContext, requestId);
+
+      context = await this.apiGateway.contextByReq(
+        // TODO: We need to standardize type for WS request type
+        message as any,
+        authContext.securityContext,
+        requestId
+      );
 
       this.apiGateway.log({
         type: 'Incoming network usage',
@@ -172,7 +179,7 @@ export class SubscriptionServer {
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
         .reduce((a, b) => ({ ...a, ...b }), {});
 
-      const method = message.method.replace(/[^a-z]+(.)/g, (m, chr) => chr.toUpperCase());
+      const method = message.method.replace(/[^a-z]+(.)/g, (_m, chr) => chr.toUpperCase());
       await this.apiGateway[method]({
         ...params,
         connectionId,
@@ -182,22 +189,25 @@ export class SubscriptionServer {
         apiType: 'ws',
         res: this.resultFn(connectionId, message.messageId, requestId),
         subscriptionState: async () => {
-          const subscription = await this.subscriptionStore.getSubscription(connectionId, message.messageId);
+          const subscription = await this.subscriptionStore.getSubscription(connectionId, subscriptionId);
           return subscription && subscription.state;
         },
-        subscribe: async (state) => this.subscriptionStore.subscribe(connectionId, message.messageId, {
+        subscribe: async (state) => this.subscriptionStore.subscribe(connectionId, subscriptionId, {
           message,
           state
         }),
-        unsubscribe: async () => this.subscriptionStore.unsubscribe(connectionId, message.messageId)
+        unsubscribe: async () => this.subscriptionStore.unsubscribe(connectionId, subscriptionId)
       });
 
       await this.sendMessage(connectionId, { messageProcessedId: message.messageId });
     } catch (e) {
+      const messageId = 'messageId' in message ? message.messageId : undefined;
+      const query = 'params' in message ? message.params?.query : undefined;
+
       this.apiGateway.handleError({
         e,
-        query: message.query,
-        res: this.resultFn(connectionId, message.messageId, context.requestId),
+        query,
+        res: this.resultFn(connectionId, messageId, context.requestId),
         context
       });
     }
@@ -211,7 +221,7 @@ export class SubscriptionServer {
   }
 
   public async disconnect(connectionId: string) {
-    await this.subscriptionStore.cleanupSubscriptions(connectionId);
+    await this.subscriptionStore.disconnect(connectionId);
   }
 
   public clear() {

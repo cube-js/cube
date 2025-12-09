@@ -23,12 +23,12 @@ export class LocalSubscriptionStore {
   }
 
   public async getSubscription(connectionId: string, subscriptionId: string) {
-    const connection = this.getConnection(connectionId);
+    const connection = this.getConnectionOrCreate(connectionId);
     return connection.subscriptions.get(subscriptionId);
   }
 
   public async subscribe(connectionId: string, subscriptionId: string, subscription) {
-    const connection = this.getConnection(connectionId);
+    const connection = this.getConnectionOrCreate(connectionId);
     connection.subscriptions.set(subscriptionId, {
       ...subscription,
       timestamp: new Date()
@@ -36,7 +36,7 @@ export class LocalSubscriptionStore {
   }
 
   public async unsubscribe(connectionId: string, subscriptionId: string) {
-    const connection = this.getConnection(connectionId);
+    const connection = this.getConnectionOrCreate(connectionId);
     connection.subscriptions.delete(subscriptionId);
   }
 
@@ -60,19 +60,19 @@ export class LocalSubscriptionStore {
     return result;
   }
 
-  public async cleanupSubscriptions(connectionId: string) {
+  public async disconnect(connectionId: string) {
     this.connections.delete(connectionId);
   }
 
   public async getAuthContext(connectionId: string) {
-    return this.getConnection(connectionId).authContext;
+    return this.getConnectionOrCreate(connectionId).authContext;
   }
 
   public async setAuthContext(connectionId: string, authContext) {
-    this.getConnection(connectionId).authContext = authContext;
+    this.getConnectionOrCreate(connectionId).authContext = authContext;
   }
 
-  protected getConnection(connectionId: string): LocalSubscriptionStoreConnection {
+  protected getConnectionOrCreate(connectionId: string): LocalSubscriptionStoreConnection {
     const connect = this.connections.get(connectionId);
     if (connect) {
       return connect;
