@@ -49,7 +49,8 @@
     "nexus": "^1.1.0",
     "node-fetch": "^2.6.1",
     "ramda": "^0.27.0",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.5.12",
