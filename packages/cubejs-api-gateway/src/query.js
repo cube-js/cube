@@ -3,8 +3,8 @@ import moment from 'moment';
 import Joi from 'joi';
 import { getEnv } from '@cubejs-backend/shared';
 
-import { UserError } from './UserError';
-import { dateParser } from './dateParser';
+import { UserError } from './user-error';
+import { dateParser } from './date-parser';
 import { QueryType } from './types/enums';
 
 const getQueryGranularity = (queries) => R.pipe(
