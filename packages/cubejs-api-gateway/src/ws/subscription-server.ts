@@ -1,9 +1,18 @@
 import { v4 as uuidv4 } from 'uuid';
+import type { ZodError } from 'zod';
 
 import { UserError } from '../user-error';
+import { ExtendedRequestContext, ContextAcceptorFn } from '../interfaces';
+import { CubejsHandlerError } from '../cubejs-handler-error';
+import {
+  authMessageSchema,
+  unsubscribeMessageSchema,
+  methodMessageSchema,
+  WsMessage
+} from './message-schema';
+
 import type { ApiGateway } from '../gateway';
 import type { LocalSubscriptionStore } from './local-subscription-store';
-import { ExtendedRequestContext, ContextAcceptorFn } from '../interfaces';
 
 const methodParams: Record<string, string[]> = {
   load: ['query', 'queryType'],
@@ -29,36 +38,91 @@ export class SubscriptionServer {
   ) {
   }
 
-  public resultFn(connectionId: string, messageId: string, requestId: string | undefined) {
+  protected resultFn(connectionId: string, messageId: string, requestId: string | undefined, logNetworkUsage: boolean = true) {
     return async (message, { status } = { status: 200 }) => {
-      this.apiGateway.log({
-        type: 'Outgoing network usage',
-        service: 'api-ws',
-        bytes: calcMessageLength(message),
-      }, { requestId });
+      if (logNetworkUsage) {
+        this.apiGateway.log({ type: 'Outgoing network usage', service: 'api-ws', bytes: calcMessageLength(message), }, { requestId });
+      }
+
       return this.sendMessage(connectionId, { messageId, message, status });
     };
   }
 
-  public async processMessage(connectionId: string, message, isSubscription) {
+  protected deserializeMessage(message: any): any {
+    try {
+      return JSON.parse(message);
+    } catch (e: any) {
+      throw new CubejsHandlerError(400, 'Invalid JSON payload', e.message);
+    }
+  }
+
+  protected mapZodError(error: ZodError): string {
+    return error.issues
+      .map(e => e.message)
+      .join(', ');
+  }
+
+  protected validateMessage(message: object): WsMessage {
+    if ('authorization' in message) {
+      const result = authMessageSchema.safeParse(message);
+      if (!result.success) {
+        throw new CubejsHandlerError(400, 'Invalid authorization message format', this.mapZodError(result.error));
+      }
+
+      return result.data;
+    }
+
+    if ('unsubscribe' in message) {
+      const result = unsubscribeMessageSchema.safeParse(message);
+      if (!result.success) {
+        throw new CubejsHandlerError(400, 'Invalid unsubscribe message format', this.mapZodError(result.error));
+      }
+
+      return result.data;
+    }
+
+    const result = methodMessageSchema.safeParse(message);
+    if (!result.success) {
+      throw new CubejsHandlerError(400, 'Invalid message format', this.mapZodError(result.error));
+    }
+
+    return result.data;
+  }
+
+  public async processMessage(connectionId: string, body: string) {
+    let message: any | undefined;
+
+    try {
+      message = this.deserializeMessage(body);
+      message = this.validateMessage(message);
+
+      await this.handleMessage(connectionId, message, false);
+    } catch (e) {
+      this.apiGateway.handleError({
+        e,
+        query: message?.query,
+        res: this.resultFn(connectionId, message?.messageId, undefined, false),
+      });
+    }
+  }
+
+  protected async handleMessage(connectionId: string, message: any, isSubscription: boolean) {
     let authContext: any = {};
     let context: Partial<ExtendedRequestContext> = {};
 
     const bytes = calcMessageLength(message);
 
     try {
-      if (typeof message === 'string') {
-        message = JSON.parse(message);
-      }
-
       if (message.authorization) {
-        authContext = { isSubscription: true, protocol: 'ws' };
+        authContext = { isSubscription, protocol: 'ws' };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
+
         const acceptanceResult = await this.contextAcceptor(authContext);
         if (!acceptanceResult.accepted) {
           this.sendMessage(connectionId, acceptanceResult.rejectMessage);
           return;
         }
+
         await this.subscriptionStore.setAuthContext(connectionId, authContext);
         this.sendMessage(connectionId, { handshake: true });
         return;
@@ -74,7 +138,6 @@ export class SubscriptionServer {
       }
 
       authContext = await this.subscriptionStore.getAuthContext(connectionId);
-
       if (!authContext) {
         await this.sendMessage(
           connectionId,
@@ -88,10 +151,10 @@ export class SubscriptionServer {
       }
 
       if (!message.method) {
-        throw new UserError('method is required');
+        throw new UserError('Method is required');
       }
 
-      if (!methodParams[message.method]) {
+      if (!methodParams.hasOwnProperty(message.method)) {
         throw new UserError(`Unsupported method: ${message.method}`);
       }
 
@@ -141,9 +204,9 @@ export class SubscriptionServer {
   }
 
   public async processSubscriptions() {
-    const allSubscriptions = await this.subscriptionStore.getAllSubscriptions();
+    const allSubscriptions = this.subscriptionStore.getAllSubscriptions();
     await Promise.all(allSubscriptions.map(async subscription => {
-      await this.processMessage(subscription.connectionId, subscription.message, true);
+      await this.handleMessage(subscription.connectionId, subscription.message, true);
     }));
   }
 

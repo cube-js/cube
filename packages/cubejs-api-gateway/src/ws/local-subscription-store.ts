@@ -2,8 +2,19 @@ interface LocalSubscriptionStoreOptions {
   heartBeatInterval?: number;
 }
 
+export type LocalSubscriptionStoreSubscription = {
+  message: any,
+  state: any,
+  timestamp: Date,
+};
+
+export type LocalSubscriptionStoreConnection = {
+  subscriptions: Map<string, LocalSubscriptionStoreSubscription>,
+  authContext?: any,
+};
+
 export class LocalSubscriptionStore {
-  protected connections = {};
+  protected readonly connections: Map<string, LocalSubscriptionStoreConnection> = new Map();
 
   protected readonly hearBeatInterval: number;
 
@@ -13,40 +24,44 @@ export class LocalSubscriptionStore {
 
   public async getSubscription(connectionId: string, subscriptionId: string) {
     const connection = this.getConnection(connectionId);
-    return connection.subscriptions[subscriptionId];
+    return connection.subscriptions.get(subscriptionId);
   }
 
   public async subscribe(connectionId: string, subscriptionId: string, subscription) {
     const connection = this.getConnection(connectionId);
-    connection.subscriptions[subscriptionId] = {
+    connection.subscriptions.set(subscriptionId, {
       ...subscription,
       timestamp: new Date()
-    };
+    });
   }
 
   public async unsubscribe(connectionId: string, subscriptionId: string) {
     const connection = this.getConnection(connectionId);
-    delete connection.subscriptions[subscriptionId];
+    connection.subscriptions.delete(subscriptionId);
   }
 
-  public async getAllSubscriptions() {
-    return Object.keys(this.connections).map(connectionId => {
-      Object.keys(this.connections[connectionId].subscriptions).filter(
-        subscriptionId => new Date().getTime() -
-          this.connections[connectionId].subscriptions[subscriptionId].timestamp.getTime() >
-          this.hearBeatInterval * 4 * 1000
-      ).forEach(subscriptionId => { delete this.connections[connectionId].subscriptions[subscriptionId]; });
+  public getAllSubscriptions() {
+    const now = Date.now();
+    const staleThreshold = this.hearBeatInterval * 4 * 1000;
+    const result: Array<{ connectionId: string } & LocalSubscriptionStoreSubscription> = [];
 
-      return Object.keys(this.connections[connectionId].subscriptions)
-        .map(subscriptionId => ({
-          connectionId,
-          ...this.connections[connectionId].subscriptions[subscriptionId]
-        }));
-    }).reduce((a, b) => a.concat(b), []);
+    for (const [connectionId, connection] of this.connections) {
+      for (const [subscriptionId, subscription] of connection.subscriptions) {
+        if (now - subscription.timestamp.getTime() > staleThreshold) {
+          connection.subscriptions.delete(subscriptionId);
+        }
+      }
+
+      for (const [, subscription] of connection.subscriptions) {
+        result.push({ connectionId, ...subscription });
+      }
+    }
+
+    return result;
   }
 
   public async cleanupSubscriptions(connectionId: string) {
-    delete this.connections[connectionId];
+    this.connections.delete(connectionId);
   }
 
   public async getAuthContext(connectionId: string) {
@@ -57,15 +72,19 @@ export class LocalSubscriptionStore {
     this.getConnection(connectionId).authContext = authContext;
   }
 
-  protected getConnection(connectionId: string) {
-    if (!this.connections[connectionId]) {
-      this.connections[connectionId] = { subscriptions: {} };
+  protected getConnection(connectionId: string): LocalSubscriptionStoreConnection {
+    const connect = this.connections.get(connectionId);
+    if (connect) {
+      return connect;
     }
 
-    return this.connections[connectionId];
+    const connection = { subscriptions: new Map() };
+    this.connections.set(connectionId, connection);
+
+    return connection;
   }
 
   public clear() {
-    this.connections = {};
+    this.connections.clear();
   }
 }
