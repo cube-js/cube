@@ -9,11 +9,11 @@
 
 import { MemberType } from '../../src/types/enums';
 import prepareAnnotationDef
-  from '../../src/helpers/prepareAnnotation';
+  from '../../src/helpers/prepare-annotation';
 import {
   annotation,
   prepareAnnotation,
-} from '../../src/helpers/prepareAnnotation';
+} from '../../src/helpers/prepare-annotation';
 
 describe('prepareAnnotation helpers', () => {
   test('export looks as expected', () => {

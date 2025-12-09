@@ -1,6 +1,6 @@
 /* globals describe,test,expect,jest */
 
-import { dateParser } from '../src/dateParser';
+import { dateParser } from '../src/date-parser';
 
 describe('dateParser', () => {
   test('custom daily ranges returns day aligned dateRange', () => {
