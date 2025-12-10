@@ -7,4 +7,4 @@ export * from './user-error';
 export { getRequestIdFromRequest } from './request-parser';
 export { TransformDataRequest } from './types/responses';
 
-export type { SubscriptionServer } from './ws';
+export type { SubscriptionServer, WebSocketSendMessageFn } from './ws';
