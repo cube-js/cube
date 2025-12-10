@@ -44,11 +44,12 @@ The REST API supports the following transports:
 
 ### HTTP transport
 
-You can use the `curl` utility to execute requests to the REST API:
+You can use the `curl` utility to execute requests to the REST API. Provide the [API
+token](#authentication) in the `Authorization` header:
 
 ```bash
 curl \
-  -H "Authorization: JSON.WEB.TOKEN" \
+  -H "Authorization: TOKEN" \
   -G \
   --data-urlencode 'query={
     "dimensions": [
@@ -82,7 +83,7 @@ from the REST API in your terminal:
 
 ```bash
 curl \
-  -H "Authorization: JSON.WEB.TOKEN" \
+  -H "Authorization: TOKEN" \
   -G \
   --data-urlencode 'query={"measures": ["orders.count"]}' \
   http://localhost:4000/cubejs-api/v1/load | jq .data
@@ -93,7 +94,7 @@ endpoint][ref-ref-meta-endpoint]:
 
 ```bash
 curl \
-  -H "Authorization: JSON.WEB.TOKEN" \
+  -H "Authorization: TOKEN" \
   http://localhost:4000/cubejs-api/v1/meta | jq
 ```
 
@@ -102,8 +103,27 @@ from your JavaScript applications.
 
 ### WebSocket transport
 
-WebSocket can be used to provide real-time experience. You can configire it via the
-`CUBEJS_WEB_SOCKETS` environment variable.
+WebSocket transport can be used to provide real-time experience. You can configure it via
+the `CUBEJS_WEB_SOCKETS` environment variable.
+
+You can use the [`websocat` utility][link-websocat] to test the WebSocket transport:
+
+```bash
+websocat ws://localhost:4000/cubejs-api/v1/ws --text
+```
+
+After connecting, send the [API token](#authentication) as the first message:
+
+```json
+{"authorization":"TOKEN"}
+```
+
+Then, send requests. Each request should include a distinct `messageId`, the desired API
+endpoint in `method`, and additional `params`:
+
+```json
+{"messageId":"1","method":"load","params":{"query":{"measures":["orders.count"]}}}
+```
 
 Clients using the [JavaScript SDK][ref-javascript-sdk] can be switched to WebSocket
 by passing `WebSocketTransport` to the `CubeApi` constructor:
@@ -114,7 +134,7 @@ import WebSocketTransport from "@cubejs-client/ws-transport"
 
 const cubeApi = cube({
   transport: new WebSocketTransport({
-    authorization: CUBE_TOKEN,
+    authorization: TOKEN,
     apiUrl: "ws://localhost:4000/"
   })
 })
@@ -327,3 +347,4 @@ warehouse][ref-data-warehouses].
 [ref-javascript-sdk]: /product/apis-integrations/javascript-sdk
 [ref-recipe-real-time-data-fetch]: /product/apis-integrations/recipes/real-time-data-fetch
 [ref-refresh-keys]: /product/data-modeling/reference/cube#refresh_key
+[link-websocat]: https://github.com/vi/websocat
