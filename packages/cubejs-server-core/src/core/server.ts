@@ -572,88 +572,49 @@ export class CubejsServerCore {
   public async getOrchestratorApi(context: RequestContext): Promise<OrchestratorApi> {
     const orchestratorId = await this.contextToOrchestratorId(context);
 
-    if (this.orchestratorStorage.has(orchestratorId)) {
-      return this.orchestratorStorage.get(orchestratorId);
-    }
-
-    /**
-     * Hash table to store promises which will be resolved with the
-     * datasource drivers. DriverFactoryByDataSource function is closure
-     * this constant.
-     */
-    const driverPromise: Record<string, Promise<BaseDriver>> = {};
-
-    let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
-
-    const contextToDbType: DbTypeAsyncFn = this.contextToDbType.bind(this);
-    const externalDbType = this.contextToExternalDbType(context);
-
-    // orchestrator options can be empty, if user didn't define it.
-    // so we are adding default and configuring queues concurrency.
-    const orchestratorOptions =
-      this.optsHandler.getOrchestratorInitializedOptions(
-        context,
-        (await this.orchestratorOptions(context)) || {},
-      );
-
-    const orchestratorApi = this.createOrchestratorApi(
+    return this.orchestratorStorage.getOrInit(orchestratorId, async () => {
       /**
-       * Driver factory function `DriverFactoryByDataSource`.
+       * Hash table to store promises which will be resolved with the
+       * datasource drivers. DriverFactoryByDataSource function is a closure
+       * this constant.
        */
-      async (dataSource = 'default') => {
-        if (driverPromise[dataSource]) {
-          return driverPromise[dataSource];
-        }
+      const driverPromise: Record<string, Promise<BaseDriver>> = {};
 
-        // eslint-disable-next-line no-return-assign
-        return driverPromise[dataSource] = (async () => {
-          let driver: BaseDriver | null = null;
+      let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
-          try {
-            driver = await this.resolveDriver(
-              {
-                ...context,
-                dataSource,
-              },
-              orchestratorOptions,
-            );
+      const contextToDbType: DbTypeAsyncFn = this.contextToDbType.bind(this);
+      const externalDbType = this.contextToExternalDbType(context);
 
-            if (typeof driver === 'object' && driver != null) {
-              if (driver.setLogger) {
-                driver.setLogger(this.logger);
-              }
+      // orchestrator options can be empty, if user didn't define it.
+      // so we are adding default and configuring queues concurrency.
+      const orchestratorOptions =
+        this.optsHandler.getOrchestratorInitializedOptions(
+          context,
+          (await this.orchestratorOptions(context)) || {},
+        );
 
-              await driver.testConnection();
-
-              return driver;
-            }
-
-            throw new Error(
-              `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
-            );
-          } catch (e) {
-            driverPromise[dataSource] = null;
-
-            if (driver) {
-              await driver.release();
-            }
-
-            throw e;
-          }
-        })();
-      },
-      {
-        externalDriverFactory: this.options.externalDriverFactory && (async () => {
-          if (externalPreAggregationsDriverPromise) {
-            return externalPreAggregationsDriverPromise;
+      return this.createOrchestratorApi(
+        /**
+         * Driver factory function `DriverFactoryByDataSource`.
+         */
+        async (dataSource = 'default') => {
+          if (driverPromise[dataSource]) {
+            return driverPromise[dataSource];
           }
 
           // eslint-disable-next-line no-return-assign
-          return externalPreAggregationsDriverPromise = (async () => {
+          return driverPromise[dataSource] = (async () => {
             let driver: BaseDriver | null = null;
 
             try {
-              driver = await this.options.externalDriverFactory(context);
+              driver = await this.resolveDriver(
+                {
+                  ...context,
+                  dataSource,
+                },
+                orchestratorOptions,
+              );
+
               if (typeof driver === 'object' && driver != null) {
                 if (driver.setLogger) {
                   driver.setLogger(this.logger);
@@ -665,10 +626,10 @@ export class CubejsServerCore {
               }
 
               throw new Error(
-                `Unexpected return type, externalDriverFactory must return driver, actual: ${getRealType(driver)}`
+                `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
               );
             } catch (e) {
-              externalPreAggregationsDriverPromise = null;
+              driverPromise[dataSource] = null;
 
               if (driver) {
                 await driver.release();
@@ -677,23 +638,56 @@ export class CubejsServerCore {
               throw e;
             }
           })();
-        }),
-        contextToDbType: async (dataSource) => contextToDbType({
-          ...context,
-          dataSource
-        }),
-        // speedup with cache
-        contextToExternalDbType: () => externalDbType,
-        redisPrefix: orchestratorId,
-        skipExternalCacheAndQueue: externalDbType === 'cubestore',
-        cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-        ...orchestratorOptions,
-      }
-    );
+        },
+        {
+          externalDriverFactory: this.options.externalDriverFactory && (async () => {
+            if (externalPreAggregationsDriverPromise) {
+              return externalPreAggregationsDriverPromise;
+            }
 
-    this.orchestratorStorage.set(orchestratorId, orchestratorApi);
+            // eslint-disable-next-line no-return-assign
+            return externalPreAggregationsDriverPromise = (async () => {
+              let driver: BaseDriver | null = null;
 
-    return orchestratorApi;
+              try {
+                driver = await this.options.externalDriverFactory(context);
+                if (typeof driver === 'object' && driver != null) {
+                  if (driver.setLogger) {
+                    driver.setLogger(this.logger);
+                  }
+
+                  await driver.testConnection();
+
+                  return driver;
+                }
+
+                throw new Error(
+                  `Unexpected return type, externalDriverFactory must return driver, actual: ${getRealType(driver)}`
+                );
+              } catch (e) {
+                externalPreAggregationsDriverPromise = null;
+
+                if (driver) {
+                  await driver.release();
+                }
+
+                throw e;
+              }
+            })();
+          }),
+          contextToDbType: async (dataSource) => contextToDbType({
+            ...context,
+            dataSource
+          }),
+          // speedup with cache
+          contextToExternalDbType: () => externalDbType,
+          redisPrefix: orchestratorId,
+          skipExternalCacheAndQueue: externalDbType === 'cubestore',
+          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+          ...orchestratorOptions,
+        }
+      );
+    });
   }
 
   protected createCompilerApi(repository, options: Record<string, any> = {}) {
