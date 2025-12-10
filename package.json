@@ -28,7 +28,7 @@
   "dependencies": {
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "core-js": "^3.34.0",
-    "lerna": "^8.1.9"
+    "lerna": "^9.0.0"
   },
   "files": [
     "src",
