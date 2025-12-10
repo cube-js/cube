@@ -27,7 +27,7 @@
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "core-js": "^3.34.0",
-    "lerna": "^8.2.2"
+    "lerna": "^9.0.0"
   },
   "files": [
     "src",
