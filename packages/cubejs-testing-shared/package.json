@@ -3,6 +3,11 @@
   "version": "1.4.0",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.git",
+    "directory": "packages/cubejs-testing-shared"
+  },
   "license": "Apache-2.0",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
