@@ -65,6 +65,8 @@ jobs:
           NODE_OPTIONS: --max_old_space_size=4096
       - name: NPM publish
         run: ./node_modules/.bin/lerna publish from-package --yes
+        env:
+          NPM_CONFIG_PROVENANCE: true
 
   native_linux:
     # Please use minimal possible version of ubuntu, because it produces constraint on glibc
