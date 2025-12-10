@@ -25,6 +25,11 @@
     "bin"
   ],
   "author": "Cube Dev, Inc.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.git",
+    "directory": "rust/cubestore"
+  },
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "1.5.13",
