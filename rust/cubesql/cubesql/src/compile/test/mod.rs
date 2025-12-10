@@ -644,6 +644,7 @@ pub fn sql_generator(
                     ("functions/LOWER".to_string(), "LOWER({{ args_concat }})".to_string()),
                     ("functions/UPPER".to_string(), "UPPER({{ args_concat }})".to_string()),
                     ("functions/PERCENTILECONT".to_string(), "PERCENTILE_CONT({{ args_concat }})".to_string()),
+                    ("expressions/query_aliased".to_string(), "{{ query }} AS {{ quoted_alias }}".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
@@ -652,12 +653,17 @@ pub fn sql_generator(
   {% if from %}
 FROM (
   {{ from | indent(2) }}
-) AS {{ from_alias }} {% endif %} {% if filter %}
+) AS {{ from_alias }} {% endif %}{% for join in joins %}
+{{ join }}{% endfor %}{% if filter %}
 WHERE {{ filter }}{% endif %}{% if group_by %}
 GROUP BY {{ group_by }}{% endif %}{% if order_by %}
 ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit is not none %}
 LIMIT {{ limit }}{% endif %}{% if offset is not none %}
 OFFSET {{ offset }}{% endif %}"#.to_string(),
+                    ),
+                    (
+                        "statements/join".to_string(),
+                        "{{ join_type }} JOIN {{ source }} ON {{ condition }}".to_string(),
                     ),
                     (
                         "statements/group_by_exprs".to_string(),

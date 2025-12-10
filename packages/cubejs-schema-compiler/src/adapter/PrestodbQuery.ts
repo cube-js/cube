@@ -148,6 +148,7 @@ export class PrestodbQuery extends BaseQuery {
       'FROM (\n  {{ from }}\n) AS {{ from_alias }} {% elif from_prepared %}\n' +
       'FROM {{ from_prepared }}' +
       '{% endif %}' +
+      '{% for join in joins %}\n{{ join }}{% endfor %}' +
       '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
