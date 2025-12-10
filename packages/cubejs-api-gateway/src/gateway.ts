@@ -674,7 +674,8 @@ class ApiGateway {
           joins: transformJoins(cubeDefinitions[cube.name]?.joins),
           preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
-      res({ cubes });
+
+      await res({ cubes });
     } catch (e: any) {
       this.handleError({
         e,
@@ -687,6 +688,7 @@ class ApiGateway {
 
   public async getPreAggregations({ cacheOnly, metaOnly, context, res }: { cacheOnly?: boolean, metaOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
+
     try {
       const compilerApi = await this.getCompilerApi(context);
       const preAggregations = await compilerApi.preAggregations();
@@ -768,7 +770,7 @@ class ApiGateway {
         })),
       });
 
-      res({
+      await res({
         preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
       });
     } catch (e: any) {
@@ -799,7 +801,7 @@ class ApiGateway {
       const { partitions } = (preAggregationPartitions?.[0] || {});
       const preAggregationPartition = partitions?.find(p => p?.tableName === versionEntry.table_name);
 
-      res({
+      await res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
           context,
           preAggregationPartition
@@ -824,7 +826,7 @@ class ApiGateway {
           query
         );
 
-      res({ result });
+      await res({ result });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -1177,7 +1179,7 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       const orchestratorApi = await this.getAdapterApi(context);
-      res({
+      await res({
         result: await orchestratorApi.getPreAggregationQueueStates()
       });
     } catch (e: any) {
@@ -1194,7 +1196,7 @@ class ApiGateway {
     try {
       const { queryKeys, dataSource } = normalizeQueryCancelPreAggregations(this.parseQueryParam(query));
       const orchestratorApi = await this.getAdapterApi(context);
-      res({
+      await res({
         result: await orchestratorApi.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource)
       });
     } catch (e: any) {
@@ -1333,7 +1335,8 @@ class ApiGateway {
       await this.assertApiScope('sql', context.securityContext);
 
       const result = await this.sqlServer.sql4sql(query, disablePostProcessing, context.securityContext);
-      res({ sql: result });
+
+      await res({ sql: result });
     } catch (e: any) {
       this.handleError({
         e,
@@ -1378,7 +1381,7 @@ class ApiGateway {
         order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
       });
 
-      res(queryType === QueryTypeEnum.REGULAR_QUERY ?
+      await res(queryType === QueryTypeEnum.REGULAR_QUERY ?
         { sql: toQuery(sqlQueries[0]) } :
         sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
     } catch (e: any) {
@@ -1512,7 +1515,7 @@ class ApiGateway {
         [...dataSources].map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
-      res({ memberToDataSource, dataSourceToSqlGenerator });
+      await res({ memberToDataSource, dataSourceToSqlGenerator });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -1594,7 +1597,7 @@ class ApiGateway {
         ))
       );
 
-      res({
+      await res({
         queryType,
         normalizedQueries,
         queryOrder: sqlQueries.map((sqlQuery) => R.fromPairs(
@@ -1961,11 +1964,11 @@ class ApiGateway {
       );
 
       if (props.queryType === 'multi') {
-        // We prepare the final json result on native side
+        // We prepare the final JSON result on the native side
         const resultMulti = new ResultMultiWrapper(results, { queryType, slowQuery });
         await res(resultMulti);
       } else {
-        // We prepare the full final json result on native side
+        // We prepare the full final JSON result on the native side
         await res(results[0]);
       }
     } catch (e: any) {
@@ -2142,12 +2145,16 @@ class ApiGateway {
         queryType,
         apiType,
       });
+
       const state = await subscriptionState();
       if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
-        res(result.message, result.opts);
+        // We prepare the full final JSON result on the native side
+        await res(result.message, result.opts);
       } else if (error) {
-        res(error.message, error.opts);
+        // We prepare the full final JSON result on the native side
+        await res(error.message, error.opts);
       }
+
       await subscribe({ error, result });
     } catch (e: any) {
       this.handleError({

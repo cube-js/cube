@@ -26,7 +26,7 @@ import {
 import type { Application as ExpressApplication } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
-import type { SubscriptionServer } from '@cubejs-backend/api-gateway';
+import type { SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
 
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
@@ -451,7 +451,7 @@ export class CubejsServerCore {
     }
   }
 
-  public initSubscriptionServer(sendMessage): SubscriptionServer {
+  public initSubscriptionServer(sendMessage: WebSocketSendMessageFn): SubscriptionServer {
     const apiGateway = this.apiGateway();
     return apiGateway.initSubscriptionServer(sendMessage);
   }
