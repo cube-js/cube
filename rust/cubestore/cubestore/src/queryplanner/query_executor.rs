@@ -1201,7 +1201,7 @@ impl ExecutionPlan for CubeTableExec {
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
-        vec![true; self.children().len()]
+        vec![false; self.children().len()]
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {

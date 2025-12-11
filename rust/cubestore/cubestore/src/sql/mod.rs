@@ -4868,6 +4868,96 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ungroupped_with_order_and_limit() {
+        Config::test("ungroupped_with_order_and_limit")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+                service
+                    .exec_query(
+                        "CREATE TABLE test.topk_test (id int, name varchar, total_sales int)",
+                    )
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query(
+                        "INSERT INTO test.topk_test (id, name, total_sales) VALUES
+                        (121, 'Octavia', 58600),
+                        (122, 'Parker', 15800),
+                        (123, 'Quintessa', 79500),
+                        (124, 'Reginald', 32100),
+                        (125, 'Scarlett', 6900),
+                        (126, 'Tristan', 91700),
+                        (127, 'Unity', 48900),
+                        (128, 'Valentina', 25300),
+                        (129, 'Winston', 67200),
+                        (130, 'Xiomara', 39800),
+                        (131, 'Yesenia', 12100),
+                        (132, 'Zephyr', 84300),
+                        (133, 'Alessandra', 55900),
+                        (134, 'Brendan', 20600),
+                        (135, 'Cordelia', 76400),
+                        (136, 'Darius', 43700),
+                        (137, 'Emilia', 8600),
+                        (138, 'Fletcher', 65800),
+                        (139, 'Guadalupe', 36200),
+                        (140, 'Hendrix', 97100),
+                        (141, 'Imogen', 29000),
+                        (142, 'Jameson', 72300),
+                        (143, 'Kalani', 45500),
+                        (144, 'Lennox', 17200),
+                        (145, 'Magnolia', 88600),
+                        (146, 'Nathaniel', 51800),
+                        (147, 'Orion', 23900),
+                        (148, 'Penelope', 69700),
+                        (149, 'Quincey', 40400),
+                        (150, 'Remington', 10400),
+                        (151, 'Seraphina', 81200),
+                        (152, 'Thaddeus', 54100),
+                        (153, 'Ulysses', 27400),
+                        (154, 'Vivienne', 92900),
+                        (155, 'Weston', 47200),
+                        (156, 'Ximena', 18900),
+                        (157, 'Yannick', 75800),
+                        (158, 'Zinnia', 34400),
+                        (159, 'Atticus', 62700),
+                        (160, 'Beatrix', 49800)",
+                    )
+                    .await
+                    .unwrap();
+                let res = service
+                    .exec_query(
+                        "SELECT name, total_sales FROM test.topk_test  ORDER BY 1 ASC limit 3",
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    res.get_rows(),
+                    &vec![
+                        Row::new(vec![
+                            TableValue::String("Alessandra".to_string()),
+                            TableValue::Int(55900),
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("Atticus".to_string()),
+                            TableValue::Int(62700),
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("Beatrix".to_string()),
+                            TableValue::Int(49800),
+                        ]),
+                    ]
+                );
+            })
+            .await;
+
+        //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
+    }
+
+    #[tokio::test]
     async fn total_count_over_single_row() {
         Config::test("total_count_over_single_row")
             .start_test(async move |services| {
