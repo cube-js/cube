@@ -105,7 +105,7 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
     ) -> Option<Arc<dyn datasource::TableProvider>> {
         match self {
             DatabaseProtocol::PostgreSQL => self.get_postgres_provider(context, tr),
-            DatabaseProtocol::ArrowNative => None,
+            DatabaseProtocol::ArrowNative => self.get_arrow_native_provider(context, tr),
             DatabaseProtocol::Extension(ext) => ext.get_provider(&context, tr),
         }
     }
@@ -116,9 +116,7 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
     ) -> Result<String, CubeError> {
         match self {
             DatabaseProtocol::PostgreSQL => self.get_postgres_table_name(table_provider),
-            DatabaseProtocol::ArrowNative => Err(CubeError::internal(
-                "table_name_by_table_provider not supported for ArrowNative protocol".to_string(),
-            )),
+            DatabaseProtocol::ArrowNative => self.get_arrow_native_table_name(table_provider),
             DatabaseProtocol::Extension(ext) => ext.table_name_by_table_provider(table_provider),
         }
     }
