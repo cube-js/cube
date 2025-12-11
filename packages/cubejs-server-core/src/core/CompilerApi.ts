@@ -304,7 +304,7 @@ export class CompilerApi {
   }
 
   public async getDbType(dataSource: string = 'default'): Promise<string> {
-    return this.dbType({ dataSource, securityContext: {}, requestId: '' });
+    return this.dbType({ dataSource });
   }
 
   public getDialectClass(dataSource: string = 'default', dbType: string): BaseQuery {
