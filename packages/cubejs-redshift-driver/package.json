@@ -6,7 +6,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
-    "directory": "packages/cubejs-postgres-driver"
+    "directory": "packages/cubejs-redshift-driver"
   },
   "engines": {
     "node": "^14.0.0 || ^16.0.0 || >=17.0.0"

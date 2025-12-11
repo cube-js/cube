@@ -7,7 +7,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
-    "directory": "packages/cubejs-druid-driver"
+    "directory": "packages/cubejs-backend-maven"
   },
   "engines": {
     "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
