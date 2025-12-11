@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.1](https://github.com/cube-js/cube/compare/v1.4.0...v1.4.1) (2025-12-11)
+
+### Bug Fixes
+
+- Improve WS request sanitization ([#10231](https://github.com/cube-js/cube/issues/10231)) ([43f8a77](https://github.com/cube-js/cube/commit/43f8a77a121de02a57bd7455572d82c32628a2bd))
+
 # [1.4.0](https://github.com/cube-js/cube/compare/v1.3.86...v1.4.0) (2025-10-29)
 
 **Note:** Version bump only for package @cubejs-backend/server
