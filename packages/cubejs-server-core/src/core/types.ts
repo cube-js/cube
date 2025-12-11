@@ -162,12 +162,12 @@ export type DriverConfig = {
   type: DatabaseType,
 } & DriverOptions;
 
-export type DbTypeFn = (context: DbTypeContext) =>
+export type DbTypeFn = (context: DriverContext) =>
   DatabaseType | Promise<DatabaseType>;
 export type DriverFactoryFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 
-export type DbTypeAsyncFn = (context: DbTypeContext) =>
+export type DbTypeInternalFn = (context: DbTypeContext) =>
   Promise<DatabaseType>;
 export type DriverFactoryAsyncFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig>;
@@ -251,7 +251,7 @@ export interface CreateOptions {
 }
 
 export interface DriverDecoratedOptions extends CreateOptions {
-  dbType: DbTypeAsyncFn;
+  dbType: DbTypeInternalFn;
   driverFactory: DriverFactoryAsyncFn;
 }
 

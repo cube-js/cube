@@ -20,7 +20,7 @@ import {
   ServerCoreInitializedOptions,
   RequestContext,
   DriverContext,
-  DbTypeAsyncFn,
+  DbTypeInternalFn,
   DriverFactoryAsyncFn,
   DatabaseType,
   DriverConfig,
@@ -242,7 +242,7 @@ export class OptsHandler {
     opts: CreateOptions & {
       driverFactory: DriverFactoryAsyncFn,
     },
-  ): DbTypeAsyncFn {
+  ): DbTypeInternalFn {
     const { dbType, driverFactory } = opts;
     return async (ctx: DriverContext) => {
       if (!dbType) {
