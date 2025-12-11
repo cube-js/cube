@@ -110,6 +110,7 @@ export CUBESQL_CUBE_TOKEN="${CUBE_TOKEN}"
 export CUBESQL_PG_PORT="${PG_PORT}"
 export CUBEJS_ARROW_PORT="${ARROW_PORT}"
 export CUBESQL_LOG_LEVEL="${CUBESQL_LOG_LEVEL:-info}"
+export CUBESTORE_LOG_LEVEL="trace"
 
 echo ""
 echo -e "${BLUE}Configuration:${NC}"

@@ -229,12 +229,13 @@ impl Message {
         let data = cursor.get_ref();
 
         if pos + len > data.len() {
-            return Err(CubeError::internal("Insufficient data for string".to_string()));
+            return Err(CubeError::internal(
+                "Insufficient data for string".to_string(),
+            ));
         }
 
-        let s = String::from_utf8(data[pos..pos + len].to_vec()).map_err(|e| {
-            CubeError::internal(format!("Invalid UTF-8 string: {}", e))
-        })?;
+        let s = String::from_utf8(data[pos..pos + len].to_vec())
+            .map_err(|e| CubeError::internal(format!("Invalid UTF-8 string: {}", e)))?;
 
         cursor.set_position((pos + len) as u64);
         Ok(s)
@@ -255,7 +256,9 @@ impl Message {
         let data = cursor.get_ref();
 
         if pos + len > data.len() {
-            return Err(CubeError::internal("Insufficient data for bytes".to_string()));
+            return Err(CubeError::internal(
+                "Insufficient data for bytes".to_string(),
+            ));
         }
 
         let bytes = data[pos..pos + len].to_vec();
@@ -265,13 +268,12 @@ impl Message {
 }
 
 /// Read a message from an async stream
-pub async fn read_message<R: AsyncReadExt + Unpin>(
-    reader: &mut R,
-) -> Result<Message, CubeError> {
+pub async fn read_message<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<Message, CubeError> {
     // Read length prefix
-    let len = reader.read_u32().await.map_err(|e| {
-        CubeError::internal(format!("Failed to read message length: {}", e))
-    })?;
+    let len = reader
+        .read_u32()
+        .await
+        .map_err(|e| CubeError::internal(format!("Failed to read message length: {}", e)))?;
 
     if len == 0 {
         return Err(CubeError::internal("Invalid message length: 0".to_string()));
@@ -287,9 +289,10 @@ pub async fn read_message<R: AsyncReadExt + Unpin>(
 
     // Read payload
     let mut payload = vec![0u8; len as usize];
-    reader.read_exact(&mut payload).await.map_err(|e| {
-        CubeError::internal(format!("Failed to read message payload: {}", e))
-    })?;
+    reader
+        .read_exact(&mut payload)
+        .await
+        .map_err(|e| CubeError::internal(format!("Failed to read message payload: {}", e)))?;
 
     // Decode message
     Message::decode(&payload)
@@ -301,12 +304,14 @@ pub async fn write_message<W: AsyncWriteExt + Unpin>(
     message: &Message,
 ) -> Result<(), CubeError> {
     let encoded = message.encode()?;
-    writer.write_all(&encoded).await.map_err(|e| {
-        CubeError::internal(format!("Failed to write message: {}", e))
-    })?;
-    writer.flush().await.map_err(|e| {
-        CubeError::internal(format!("Failed to flush message: {}", e))
-    })?;
+    writer
+        .write_all(&encoded)
+        .await
+        .map_err(|e| CubeError::internal(format!("Failed to write message: {}", e)))?;
+    writer
+        .flush()
+        .await
+        .map_err(|e| CubeError::internal(format!("Failed to flush message: {}", e)))?;
     Ok(())
 }
 

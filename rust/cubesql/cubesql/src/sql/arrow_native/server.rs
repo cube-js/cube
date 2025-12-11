@@ -82,7 +82,12 @@ impl ProcessingLoop for ArrowNativeServer {
                 let auth_service = self.auth_service.clone();
 
                 let session = match session_manager
-                    .create_session(DatabaseProtocol::ArrowNative, client_addr, client_port, None)
+                    .create_session(
+                        DatabaseProtocol::ArrowNative,
+                        client_addr,
+                        client_port,
+                        None,
+                    )
                     .await
                 {
                     Ok(session) => session,
@@ -95,9 +100,13 @@ impl ProcessingLoop for ArrowNativeServer {
                 let connection_id = session.state.connection_id;
 
                 joinset.spawn(async move {
-                    if let Err(e) =
-                        Self::handle_connection(socket, session_manager.clone(), auth_service, session)
-                            .await
+                    if let Err(e) = Self::handle_connection(
+                        socket,
+                        session_manager.clone(),
+                        auth_service,
+                        session,
+                    )
+                    .await
                     {
                         error!("Connection error from {}: {}", addr, e);
                     }
@@ -241,9 +250,13 @@ impl ArrowNativeServer {
                     Message::QueryRequest { sql } => {
                         debug!("Executing query: {}", sql);
 
-                        if let Err(e) =
-                            Self::execute_query(&mut socket, session.clone(), &sql, database.as_deref())
-                                .await
+                        if let Err(e) = Self::execute_query(
+                            &mut socket,
+                            session.clone(),
+                            &sql,
+                            database.as_deref(),
+                        )
+                        .await
                         {
                             error!("Query execution error: {}", e);
                             let _ = StreamWriter::write_error(
@@ -277,9 +290,10 @@ impl ArrowNativeServer {
         _database: Option<&str>,
     ) -> Result<(), CubeError> {
         // Get auth context - for now we'll use what's in the session
-        let auth_context = session.state.auth_context().ok_or_else(|| {
-            CubeError::internal("No auth context available".to_string())
-        })?;
+        let auth_context = session
+            .state
+            .auth_context()
+            .ok_or_else(|| CubeError::internal("No auth context available".to_string()))?;
 
         // Get compiler cache entry
         let cache_entry = session
@@ -306,9 +320,10 @@ impl ArrowNativeServer {
                 let df = DataFusionDataFrame::new(ctx.state.clone(), &plan);
 
                 // Execute to get SendableRecordBatchStream
-                let stream = df.execute_stream().await.map_err(|e| {
-                    CubeError::internal(format!("Failed to execute stream: {}", e))
-                })?;
+                let stream = df
+                    .execute_stream()
+                    .await
+                    .map_err(|e| CubeError::internal(format!("Failed to execute stream: {}", e)))?;
 
                 // Stream results directly using StreamWriter
                 StreamWriter::stream_query_results(socket, stream).await?;

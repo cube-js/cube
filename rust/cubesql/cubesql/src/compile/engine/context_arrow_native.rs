@@ -21,12 +21,8 @@ impl DatabaseProtocol {
             datafusion::catalog::TableReference::Partial { table, .. } => {
                 table.to_ascii_lowercase()
             }
-            datafusion::catalog::TableReference::Full { table, .. } => {
-                table.to_ascii_lowercase()
-            }
-            datafusion::catalog::TableReference::Bare { table } => {
-                table.to_ascii_lowercase()
-            }
+            datafusion::catalog::TableReference::Full { table, .. } => table.to_ascii_lowercase(),
+            datafusion::catalog::TableReference::Bare { table } => table.to_ascii_lowercase(),
         };
 
         // Look up cube in metadata

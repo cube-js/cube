@@ -409,7 +409,11 @@ impl Config {
                 .register_typed::<ArrowNativeServer, _, _, _>(|i| async move {
                     let config = i.get_service_typed::<dyn ConfigObj>().await;
                     ArrowNativeServer::new(
-                        config.arrow_native_bind_address().as_ref().unwrap().to_string(),
+                        config
+                            .arrow_native_bind_address()
+                            .as_ref()
+                            .unwrap()
+                            .to_string(),
                         i.get_service_typed().await,
                         i.get_service_typed().await,
                     )

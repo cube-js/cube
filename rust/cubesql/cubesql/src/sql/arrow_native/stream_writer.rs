@@ -81,7 +81,9 @@ impl StreamWriter {
     }
 
     /// Serialize Arrow schema to IPC format
-    fn serialize_schema(schema: &Arc<datafusion::arrow::datatypes::Schema>) -> Result<Vec<u8>, CubeError> {
+    fn serialize_schema(
+        schema: &Arc<datafusion::arrow::datatypes::Schema>,
+    ) -> Result<Vec<u8>, CubeError> {
         use datafusion::arrow::ipc::writer::IpcWriteOptions;
         use std::io::Cursor;
 
@@ -89,16 +91,13 @@ impl StreamWriter {
         let options = IpcWriteOptions::default();
 
         // Write schema message
-        let mut writer = ArrowStreamWriter::try_new_with_options(
-            &mut cursor,
-            schema.as_ref(),
-            options,
-        )
-        .map_err(|e| CubeError::internal(format!("Failed to create IPC writer: {}", e)))?;
+        let mut writer =
+            ArrowStreamWriter::try_new_with_options(&mut cursor, schema.as_ref(), options)
+                .map_err(|e| CubeError::internal(format!("Failed to create IPC writer: {}", e)))?;
 
-        writer.finish().map_err(|e| {
-            CubeError::internal(format!("Failed to finish schema write: {}", e))
-        })?;
+        writer
+            .finish()
+            .map_err(|e| CubeError::internal(format!("Failed to finish schema write: {}", e)))?;
 
         drop(writer);
 
