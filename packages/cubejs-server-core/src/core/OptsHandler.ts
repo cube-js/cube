@@ -21,7 +21,7 @@ import {
   RequestContext,
   DriverContext,
   DbTypeInternalFn,
-  DriverFactoryAsyncFn,
+  DriverFactoryInternalFn,
   DatabaseType,
   DriverConfig,
   OrchestratorOptions,
@@ -210,7 +210,7 @@ export class OptsHandler {
   /**
    * Async driver factory getter.
    */
-  private getDriverFactory(opts: CreateOptions): DriverFactoryAsyncFn {
+  private getDriverFactory(opts: CreateOptions): DriverFactoryInternalFn {
     const { dbType, driverFactory } = opts;
     this.decoratedType = !dbType;
     this.decoratedFactory = !driverFactory;
@@ -240,7 +240,7 @@ export class OptsHandler {
    */
   private getDbType(
     opts: CreateOptions & {
-      driverFactory: DriverFactoryAsyncFn,
+      driverFactory: DriverFactoryInternalFn,
     },
   ): DbTypeInternalFn {
     const { dbType, driverFactory } = opts;

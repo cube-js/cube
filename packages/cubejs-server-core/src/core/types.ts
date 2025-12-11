@@ -89,7 +89,7 @@ export interface DriverContext extends RequestContext {
   dataSource: string;
 }
 
-export interface DbTypeContext {
+export interface DbTypeInternalContext {
   dataSource: string;
 }
 
@@ -167,9 +167,9 @@ export type DbTypeFn = (context: DriverContext) =>
 export type DriverFactoryFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 
-export type DbTypeInternalFn = (context: DbTypeContext) =>
+export type DbTypeInternalFn = (context: DbTypeInternalContext) =>
   Promise<DatabaseType>;
-export type DriverFactoryAsyncFn = (context: DriverContext) =>
+export type DriverFactoryInternalFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig>;
 
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
@@ -252,7 +252,7 @@ export interface CreateOptions {
 
 export interface DriverDecoratedOptions extends CreateOptions {
   dbType: DbTypeInternalFn;
-  driverFactory: DriverFactoryAsyncFn;
+  driverFactory: DriverFactoryInternalFn;
 }
 
 export type ServerCoreInitializedOptions = Required<
