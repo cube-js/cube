@@ -50,7 +50,7 @@ import type {
   ServerCoreInitializedOptions,
   ContextToAppIdFn,
   DatabaseType,
-  DbTypeAsyncFn,
+  DbTypeInternalFn,
   ExternalDbTypeFn,
   OrchestratorOptionsFn,
   OrchestratorInitedOptions,
@@ -132,7 +132,7 @@ export class CubejsServerCore {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
-  protected contextToDbType: DbTypeAsyncFn;
+  protected contextToDbType: DbTypeInternalFn;
 
   protected contextToExternalDbType: ExternalDbTypeFn;
 
@@ -585,7 +585,7 @@ export class CubejsServerCore {
 
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
-    const contextToDbType: DbTypeAsyncFn = this.contextToDbType.bind(this);
+    const contextToDbType: DbTypeInternalFn = this.contextToDbType.bind(this);
     const externalDbType = this.contextToExternalDbType(context);
 
     // orchestrator options can be empty, if user didn't define it.

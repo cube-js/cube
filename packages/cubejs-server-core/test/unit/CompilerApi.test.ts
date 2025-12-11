@@ -1,7 +1,7 @@
 import { SchemaFileRepository } from '@cubejs-backend/shared';
 import type { Compiler, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { CompilerApi } from '../../src/core/CompilerApi';
-import { DbTypeAsyncFn } from '../../src/core/types';
+import { DbTypeInternalFn } from '../../src/core/types';
 
 // Test helper class to expose protected properties
 class CompilerApiTestable extends CompilerApi {
@@ -39,7 +39,7 @@ describe('CompilerApi', () => {
     };
 
     // Mock dbType function
-    const mockDbType: DbTypeAsyncFn = async () => 'postgres';
+    const mockDbType: DbTypeInternalFn = async () => 'postgres';
 
     beforeEach(() => {
       compilerApi = new CompilerApiTestable(

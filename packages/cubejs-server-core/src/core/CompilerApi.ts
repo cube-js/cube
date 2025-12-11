@@ -27,7 +27,7 @@ import { disposedProxy } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
-import { DbTypeAsyncFn, DialectClassFn, LoggerFn } from './types';
+import { DbTypeInternalFn, DialectClassFn, LoggerFn } from './types';
 
 type Context = any;
 
@@ -85,7 +85,7 @@ export interface DataSourceInfo {
 export class CompilerApi {
   protected readonly repository: SchemaFileRepository;
 
-  protected readonly dbType: DbTypeAsyncFn;
+  protected readonly dbType: DbTypeInternalFn;
 
   protected readonly dialectClass?: DialectClassFn;
 
@@ -133,7 +133,7 @@ export class CompilerApi {
 
   protected queryFactory?: QueryFactory;
 
-  public constructor(repository: SchemaFileRepository, dbType: DbTypeAsyncFn, options: CompilerApiOptions) {
+  public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
     this.repository = repository;
     this.dbType = dbType;
     this.dialectClass = options.dialectClass;
@@ -304,7 +304,7 @@ export class CompilerApi {
   }
 
   public async getDbType(dataSource: string = 'default'): Promise<string> {
-    return this.dbType({ dataSource, securityContext: {}, requestId: '' });
+    return this.dbType({ dataSource });
   }
 
   public getDialectClass(dataSource: string = 'default', dbType: string): BaseQuery {
