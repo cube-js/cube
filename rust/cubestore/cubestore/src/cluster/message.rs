@@ -8,22 +8,24 @@ use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+use crate::cluster::WorkerPlanningParams;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NetworkMessage {
     /// Route subqueries to other nodes and collect results.
     RouterSelect(SerializedPlan),
 
     /// Partial select on the worker.
-    Select(SerializedPlan),
+    Select(SerializedPlan, WorkerPlanningParams),
     SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
 
     //Perform explain analyze of worker query part and return it pretty printed physical plan
-    ExplainAnalyze(SerializedPlan),
+    ExplainAnalyze(SerializedPlan, WorkerPlanningParams),
     ExplainAnalyzeResult(Result<String, CubeError>),
 
     /// Select that sends results in batches. The immediate response is [SelectResultSchema],
     /// followed by a stream of [SelectResultBatch].
-    SelectStart(SerializedPlan),
+    SelectStart(SerializedPlan, WorkerPlanningParams),
     /// Response to [SelectStart].
     SelectResultSchema(Result<SchemaRef, CubeError>),
     /// [None] indicates the end of the stream.

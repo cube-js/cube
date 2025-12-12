@@ -1,7 +1,9 @@
 use crate::table::{cmp_same_types, TableValue};
 use crate::util::decimal::Decimal;
 use datafusion::arrow::datatypes::{DataType, Schema};
-use datafusion::logical_plan::{Column, Expr, Operator};
+use datafusion::common::Column;
+use datafusion::logical_expr::expr::InList;
+use datafusion::logical_expr::{BinaryExpr, Expr, Operator};
 use datafusion::scalar::ScalarValue;
 use std::cmp::Ordering;
 
@@ -153,32 +155,34 @@ impl Builder<'_> {
     #[must_use]
     fn extract_filter(&self, e: &Expr, mut r: Vec<MinMaxCondition>) -> Vec<MinMaxCondition> {
         match e {
-            Expr::BinaryExpr {
+            Expr::BinaryExpr(BinaryExpr {
                 left: box Expr::Column(c),
                 op,
                 right,
-            } if Self::is_comparison(*op) => {
+            }) if Self::is_comparison(*op) => {
                 if let Some(cc) = self.extract_column_compare(c, *op, right) {
                     self.apply_stat(&cc, &mut r);
                 }
+
                 return r;
             }
-            Expr::BinaryExpr {
+            Expr::BinaryExpr(BinaryExpr {
                 left,
                 op,
                 right: box Expr::Column(c),
-            } if Self::is_comparison(*op) => {
+            }) if Self::is_comparison(*op) => {
                 if let Some(cc) = self.extract_column_compare(c, Self::invert_comparison(*op), left)
                 {
                     self.apply_stat(&cc, &mut r);
                 }
+
                 return r;
             }
-            Expr::InList {
+            Expr::InList(InList {
                 expr: box Expr::Column(c),
                 list,
                 negated: false,
-            } => {
+            }) => {
                 // equivalent to <name> = <list_1> OR ... OR <name> = <list_n>.
                 let elems = list.iter().map(|v| {
                     let mut r = r.clone();
@@ -188,34 +192,36 @@ impl Builder<'_> {
                     }
                     r
                 });
+
                 return self.handle_or(elems);
             }
-            Expr::InList {
+            Expr::InList(InList {
                 expr: box Expr::Column(c),
                 list,
                 negated: true,
-            } => {
+            }) => {
                 // equivalent to <name> != <list_1> AND ... AND <name> != <list_n>.
                 for v in list {
                     if let Some(cc) = self.extract_column_compare(c, Operator::NotEq, v) {
                         self.apply_stat(&cc, &mut r);
                     }
                 }
+
                 return r;
             }
-            Expr::BinaryExpr {
+            Expr::BinaryExpr(BinaryExpr {
                 left,
                 op: Operator::And,
                 right,
-            } => {
+            }) => {
                 let r = self.extract_filter(left, r);
                 return self.extract_filter(right, r);
             }
-            Expr::BinaryExpr {
-                box left,
+            Expr::BinaryExpr(BinaryExpr {
+                left,
                 op: Operator::Or,
-                box right,
-            } => {
+                right,
+            }) => {
                 return self.handle_or(
                     [left, right]
                         .iter()
@@ -406,7 +412,7 @@ impl Builder<'_> {
         }
         match t {
             t if Self::is_signed_int(t) => Self::extract_signed_int(v),
-            DataType::Int64Decimal(scale) => Self::extract_decimal(v, *scale),
+            DataType::Decimal128(_precision, scale) => Self::extract_decimal(v, *scale),
             DataType::Boolean => Self::extract_bool(v),
             DataType::Utf8 => Self::extract_string(v),
             _ => None,
@@ -448,22 +454,31 @@ impl Builder<'_> {
         Some(TableValue::String(s.unwrap()))
     }
 
-    fn extract_decimal(v: &ScalarValue, scale: usize) -> Option<TableValue> {
+    fn extract_decimal(v: &ScalarValue, scale: i8) -> Option<TableValue> {
         let decimal_value = match v {
-            ScalarValue::Int64Decimal(v, input_scale) => {
-                Builder::int_to_decimal_value(v.unwrap(), scale as i64 - (*input_scale as i64))
+            ScalarValue::Decimal128(v, _input_precision, input_scale) => {
+                Builder::int_to_decimal_value(
+                    v.unwrap() as i128,
+                    scale as i64 - (*input_scale as i64),
+                )
             }
-            ScalarValue::Int16(v) => Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64),
-            ScalarValue::Int32(v) => Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64),
-            ScalarValue::Int64(v) => Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64),
+            ScalarValue::Int16(v) => {
+                Builder::int_to_decimal_value(v.unwrap() as i128, scale as i64)
+            }
+            ScalarValue::Int32(v) => {
+                Builder::int_to_decimal_value(v.unwrap() as i128, scale as i64)
+            }
+            ScalarValue::Int64(v) => {
+                Builder::int_to_decimal_value(v.unwrap() as i128, scale as i64)
+            }
             ScalarValue::Float64(v) => {
-                Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64)
+                Builder::int_to_decimal_value(v.unwrap() as i128, scale as i64)
             }
             ScalarValue::Float32(v) => {
-                Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64)
+                Builder::int_to_decimal_value(v.unwrap() as i128, scale as i64)
             }
             ScalarValue::Utf8(s) | ScalarValue::LargeUtf8(s) => {
-                match s.as_ref().unwrap().parse::<i64>() {
+                match s.as_ref().unwrap().parse::<i128>() {
                     Ok(v) => Builder::int_to_decimal_value(v, scale as i64),
                     Err(_) => {
                         log::error!("could not convert string to int: {}", s.as_ref().unwrap());
@@ -476,7 +491,7 @@ impl Builder<'_> {
         Some(decimal_value)
     }
 
-    fn int_to_decimal_value(mut value: i64, diff_scale: i64) -> TableValue {
+    fn int_to_decimal_value(mut value: i128, diff_scale: i64) -> TableValue {
         if diff_scale > 0 {
             for _ in 0..diff_scale {
                 value *= 10;
@@ -560,14 +575,14 @@ impl Builder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::queryplanner::sql_to_rel_options;
     use crate::sql::parser::{CubeStoreParser, Statement as CubeStatement};
     use datafusion::arrow::datatypes::Field;
-    use datafusion::catalog::TableReference;
-    use datafusion::datasource::TableProvider;
-    use datafusion::logical_plan::ToDFSchema;
-    use datafusion::physical_plan::udaf::AggregateUDF;
-    use datafusion::physical_plan::udf::ScalarUDF;
-    use datafusion::sql::planner::{ContextProvider, SqlToRel};
+    use datafusion::common::{TableReference, ToDFSchema};
+    use datafusion::config::ConfigOptions;
+    use datafusion::error::DataFusionError;
+    use datafusion::logical_expr::{AggregateUDF, ScalarUDF, TableSource, WindowUDF};
+    use datafusion::sql::planner::{ContextProvider, PlannerContext, SqlToRel};
     use smallvec::alloc::sync::Arc;
     use sqlparser::ast::{Query, Select, SelectItem, SetExpr, Statement as SQLStatement};
 
@@ -932,7 +947,7 @@ mod tests {
     #[test]
     fn test_empty_filter() {
         let f = PartitionFilter::extract(
-            &Schema::new(vec![]),
+            &Schema::empty(),
             &[Expr::Literal(ScalarValue::Boolean(Some(true)))],
         );
         assert_eq!(f.min_max, vec![]);
@@ -1434,8 +1449,8 @@ mod tests {
     fn schema(s: &[(&str, DataType)]) -> Schema {
         Schema::new(
             s.iter()
-                .map(|(name, dt)| Field::new(name, dt.clone(), false))
-                .collect(),
+                .map(|(name, dt)| Field::new(name.to_string(), dt.clone(), false))
+                .collect::<Vec<Field>>(),
         )
     }
 
@@ -1447,7 +1462,7 @@ mod tests {
             .unwrap();
         match parsed {
             CubeStatement::Statement(SQLStatement::Query(box Query {
-                body: SetExpr::Select(box Select { projection, .. }),
+                body: box SetExpr::Select(box Select { projection, .. }),
                 ..
             })) => match projection.as_slice() {
                 [SelectItem::UnnamedExpr(e)] => sql_expr = e.clone(),
@@ -1456,15 +1471,32 @@ mod tests {
             _ => panic!("unexpected parse result"),
         }
 
-        SqlToRel::new(&NoContextProvider {})
-            .sql_to_rex(&sql_expr, &schema.clone().to_dfschema().unwrap())
-            .unwrap()
+        SqlToRel::new_with_options(
+            &NoContextProvider {
+                config_options: ConfigOptions::new(),
+            },
+            sql_to_rel_options(),
+        )
+        .sql_to_expr(
+            sql_expr,
+            &schema.clone().to_dfschema().unwrap(),
+            &mut PlannerContext::default(),
+        )
+        .unwrap()
     }
 
-    pub struct NoContextProvider {}
+    pub struct NoContextProvider {
+        config_options: ConfigOptions,
+    }
     impl ContextProvider for NoContextProvider {
-        fn get_table_provider(&self, _name: TableReference) -> Option<Arc<dyn TableProvider>> {
-            None
+        fn get_table_source(
+            &self,
+            name: TableReference,
+        ) -> Result<Arc<dyn TableSource>, DataFusionError> {
+            Err(DataFusionError::Plan(format!(
+                "Table is not found: {}",
+                name
+            )))
         }
 
         fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
@@ -1473,6 +1505,30 @@ mod tests {
 
         fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
             None
+        }
+
+        fn get_window_meta(&self, _name: &str) -> Option<Arc<WindowUDF>> {
+            None
+        }
+
+        fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
+            None
+        }
+
+        fn options(&self) -> &ConfigOptions {
+            &self.config_options
+        }
+
+        fn udf_names(&self) -> Vec<String> {
+            Vec::new()
+        }
+
+        fn udaf_names(&self) -> Vec<String> {
+            Vec::new()
+        }
+
+        fn udwf_names(&self) -> Vec<String> {
+            Vec::new()
         }
     }
 }

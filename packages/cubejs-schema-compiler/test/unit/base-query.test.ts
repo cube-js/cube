@@ -919,13 +919,13 @@ describe('SQL Generation', () => {
 
           if (q.measures[0].includes('count')) {
             expect(queryString.includes('DATE_BIN(INTERVAL')).toBeTruthy();
-            expect(queryString.includes('INTERVAL \'6 MONTH\'')).toBeTruthy();
+            expect(queryString.toLowerCase().includes('interval \'6 month\'')).toBeTruthy();
           } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
             expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
-            expect(queryString.includes('INTERVAL \'2 DAY\'')).toBeTruthy();
+            expect(queryString.toLowerCase().includes('interval \'2 day\'')).toBeTruthy();
           } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
             expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
-            expect(queryString.includes('INTERVAL \'3 DAY\'')).toBeTruthy();
+            expect(queryString.toLowerCase().includes('interval \'3 day\'')).toBeTruthy();
           }
         });
       });

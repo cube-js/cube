@@ -78,7 +78,7 @@ fn read_varint(data: &[u8]) -> Result<(/*result*/ u32, /*bytes read*/ usize)> {
             break;
         }
     }
-    return Ok((result, offset));
+    Ok((result, offset))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -104,11 +104,11 @@ impl Iterator for DifferenceDecoder<'_> {
             Ok((n, cnt)) => {
                 self.data = &self.data[cnt..];
                 self.last += n;
-                return Some(Ok(self.last));
+                Some(Ok(self.last))
             }
             Err(e) => {
                 self.data = &[]; // stop on error.
-                return Some(Err(e));
+                Some(Err(e))
             }
         }
     }

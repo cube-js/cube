@@ -192,7 +192,10 @@ pub enum RocksSecondaryIndexValueVersion {
 pub type PackedDateTime = u32;
 
 fn base_date_epoch() -> NaiveDateTime {
-    NaiveDate::from_ymd(2022, 1, 1).and_hms(0, 0, 0)
+    NaiveDate::from_ymd_opt(2022, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
 }
 
 pub trait RocksSecondaryIndexValueVersionEncoder {
@@ -209,7 +212,7 @@ impl RocksSecondaryIndexValueVersionDecoder for u32 {
             return Ok(None);
         }
 
-        let timestamp = DateTime::<Utc>::from_utc(base_date_epoch(), Utc)
+        let timestamp = DateTime::<Utc>::from_naive_utc_and_offset(base_date_epoch(), Utc)
             + chrono::Duration::seconds(self as i64);
 
         Ok(Some(timestamp))
@@ -267,10 +270,11 @@ impl<'a> RocksSecondaryIndexValue<'a> {
                     let expire = if expire_timestamp == 0 {
                         None
                     } else {
-                        Some(DateTime::<Utc>::from_utc(
-                            NaiveDateTime::from_timestamp(expire_timestamp, 0),
-                            Utc,
-                        ))
+                        Some(
+                            DateTime::<Utc>::from_timestamp(expire_timestamp, 0).ok_or_else(
+                                || CubeError::internal("timestamp out of range".to_owned()),
+                            )?,
+                        )
                     };
 
                     Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
@@ -596,7 +600,7 @@ impl WriteBatchIterator for WriteBatchContainer {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct IdRow<T: Clone> {
     pub(crate) id: u64,
     pub(crate) row: T,

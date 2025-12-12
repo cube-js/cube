@@ -1,47 +1,57 @@
 //! Presentation of query plans for use in tests.
 
 use bigdecimal::ToPrimitive;
-
-use datafusion::cube_ext::alias::LogicalAlias;
-use datafusion::datasource::TableProvider;
-use datafusion::logical_plan::{LogicalPlan, PlanVisitor};
+use datafusion::arrow::datatypes::Schema;
+use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
+use datafusion::common::DFSchema;
+use datafusion::datasource::physical_plan::ParquetSource;
+use datafusion::datasource::{DefaultTableSource, TableProvider};
+use datafusion::error::DataFusionError;
+use datafusion::logical_expr::{
+    Aggregate, EmptyRelation, Explain, Extension, FetchType, Filter, Join, Limit, LogicalPlan,
+    Projection, Repartition, SkipType, Sort, TableScan, Union, Window,
+};
+use datafusion::physical_expr::{AcrossPartitions, ConstExpr, LexOrdering};
+use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
+use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
+use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::hash_aggregate::{
-    AggregateMode, AggregateStrategy, HashAggregateExec,
-};
-use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
-use datafusion::physical_plan::merge_join::MergeJoinExec;
-use datafusion::physical_plan::merge_sort::{
-    LastRowByUniqueKeyExec, MergeReSortExec, MergeSortExec,
-};
-use datafusion::physical_plan::sort::SortExec;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{DefaultDisplay, ExecutionPlan, InputOrderMode, PlanProperties};
+use datafusion::prelude::Expr;
+use datafusion_datasource::file_scan_config::FileScanConfig;
+use datafusion_datasource::memory::MemorySourceConfig;
+use datafusion_datasource::source::DataSourceExec;
 use itertools::{repeat_n, Itertools};
+use std::fmt::Write;
+use std::sync::Arc;
 
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
+use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, Snapshot, WorkerExec};
+use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{
     ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
 };
+use crate::queryplanner::rolling::{RollingWindowAggExec, RollingWindowAggregate};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::tail_limit::TailLimitExec;
-use crate::queryplanner::topk::ClusterAggregateTopK;
-use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
-use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
-use datafusion::cube_ext::join::CrossJoinExec;
-use datafusion::cube_ext::joinagg::CrossJoinAggExec;
-use datafusion::cube_ext::rolling::RollingWindowAggExec;
-use datafusion::cube_ext::rolling::RollingWindowAggregate;
+use crate::queryplanner::topk::SortColumn;
+use crate::queryplanner::topk::{
+    AggregateTopKExec, ClusterAggregateTopKLower, ClusterAggregateTopKUpper,
+};
+use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider, QueryPlan};
+//use crate::streaming::topic_table_provider::TopicTableProvider;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::parquet::ParquetExec;
+use datafusion::physical_plan::joins::{HashJoinExec, SortMergeJoinExec};
 use datafusion::physical_plan::projection::ProjectionExec;
-use datafusion::physical_plan::skip::SkipExec;
+use datafusion::physical_plan::repartition::RepartitionExec;
+use datafusion::physical_plan::sorts::sort::SortExec;
+use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::union::UnionExec;
 
 #[derive(Default, Clone, Copy)]
@@ -49,9 +59,52 @@ pub struct PPOptions {
     pub show_filters: bool,
     pub show_sort_by: bool,
     pub show_aggregations: bool,
+    pub show_schema: bool,
     // Applies only to physical plan.
     pub show_output_hints: bool,
     pub show_check_memory_nodes: bool,
+    pub show_partitions: bool,
+    pub show_metrics: bool,
+    pub traverse_past_clustersend: bool,
+}
+
+impl PPOptions {
+    #[allow(unused)]
+    pub fn show_most() -> PPOptions {
+        PPOptions {
+            show_filters: true,
+            show_sort_by: true,
+            show_aggregations: true,
+            show_schema: true,
+            show_output_hints: true,
+            show_check_memory_nodes: true,
+            show_partitions: true,
+            show_metrics: false, // yeah.  Is useful only after plan is evaluated, so defaults to false.
+            traverse_past_clustersend: false,
+        }
+    }
+
+    #[allow(unused)]
+    /// Like [`Self::show_most`] but omits computed metadata.
+    pub fn show_nonmeta() -> PPOptions {
+        PPOptions {
+            show_filters: true,
+            show_sort_by: true,
+            show_aggregations: true,
+
+            traverse_past_clustersend: true,
+
+            show_schema: false,
+            show_output_hints: false,
+            show_check_memory_nodes: false,
+            show_partitions: false,
+            show_metrics: false,
+        }
+    }
+
+    pub fn none() -> PPOptions {
+        PPOptions::default()
+    }
 }
 
 pub fn pp_phys_plan(p: &dyn ExecutionPlan) -> String {
@@ -65,46 +118,75 @@ pub fn pp_phys_plan_ext(p: &dyn ExecutionPlan, o: &PPOptions) -> String {
 }
 
 pub fn pp_plan(p: &LogicalPlan) -> String {
-    pp_plan_ext(p, &PPOptions::default())
+    pp_plan_ext(p, &PPOptions::none())
+}
+
+pub fn pp_query_plan_ext(qp: &QueryPlan, o: &PPOptions) -> String {
+    pp_plan_ext(
+        match qp {
+            QueryPlan::Meta(p) => p,
+            QueryPlan::Select(pre_serialized_plan, _) => pre_serialized_plan.logical_plan(),
+        },
+        o,
+    )
+}
+
+pub fn pp_query_plan(p: &QueryPlan) -> String {
+    pp_query_plan_ext(p, &PPOptions::none())
 }
 
 pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
     let mut v = Printer {
         level: 0,
+        expecting_topk_lower: false,
         output: String::new(),
+        level_stack: Vec::new(),
         opts,
     };
-    p.accept(&mut v).unwrap();
+    p.visit(&mut v).unwrap();
     return v.output;
 
     pub struct Printer<'a> {
         level: usize,
+        expecting_topk_lower: bool,
         output: String,
+        // We pop a stack of levels instead of decrementing the level, because with topk upper/lower
+        // node pairs, we skip a level.
+        level_stack: Vec<usize>,
         opts: &'a PPOptions,
     }
 
-    impl PlanVisitor for Printer<'_> {
-        type Error = ();
+    impl<'a> TreeNodeVisitor<'a> for Printer<'a> {
+        type Node = LogicalPlan;
 
-        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+        fn f_down(&mut self, plan: &LogicalPlan) -> Result<TreeNodeRecursion, DataFusionError> {
+            self.level_stack.push(self.level);
+
+            let initial_output_len = self.output.len();
             if self.level != 0 {
                 self.output += "\n";
             }
+
+            let was_expecting_topk_lower = self.expecting_topk_lower;
+            self.expecting_topk_lower = false;
+            let mut saw_expected_topk_lower = false;
+
             self.output.extend(repeat_n(' ', 2 * self.level));
             match plan {
-                LogicalPlan::Projection {
+                LogicalPlan::Projection(Projection {
                     expr,
                     schema,
-                    input,
-                } => {
+                    input: _,
+                    ..
+                }) => {
                     self.output += &format!(
                         "Projection, [{}]",
                         expr.iter()
                             .enumerate()
                             .map(|(i, e)| {
-                                let in_name = e.name(input.schema()).unwrap();
-                                let out_name = schema.field(i).qualified_name();
-                                if in_name != out_name {
+                                let in_name = e.schema_name().to_string();
+                                let out_name = schema.field(i).name();
+                                if &in_name != out_name {
                                     format!("{}:{}", in_name, out_name)
                                 } else {
                                     in_name
@@ -113,43 +195,56 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                             .join(", ")
                     );
                 }
-                LogicalPlan::Filter { predicate, .. } => {
+                LogicalPlan::Filter(Filter { predicate, .. }) => {
                     self.output += "Filter";
                     if self.opts.show_filters {
                         self.output += &format!(", predicate: {:?}", predicate)
                     }
                 }
-                LogicalPlan::Aggregate { aggr_expr, .. } => {
+                LogicalPlan::Aggregate(Aggregate { aggr_expr, .. }) => {
                     self.output += "Aggregate";
                     if self.opts.show_aggregations {
-                        self.output += &format!(", aggs: {:?}", aggr_expr)
+                        self.output += &format!(", aggs: {}", pp_exprs(aggr_expr))
                     }
                 }
-                LogicalPlan::Sort { expr, .. } => {
+                LogicalPlan::Sort(Sort { expr, fetch, .. }) => {
                     self.output += "Sort";
                     if self.opts.show_sort_by {
                         self.output += &format!(", by: {:?}", expr)
                     }
+                    if let Some(fetch) = fetch {
+                        self.output += &format!(", fetch: {}", fetch)
+                    }
                 }
-                LogicalPlan::Union { .. } => self.output += "Union",
-                LogicalPlan::Join { on, .. } => {
+                LogicalPlan::Union(Union { schema, .. }) => {
+                    self.output += &format!("Union, schema: {}", pp_df_schema(schema.as_ref()))
+                }
+                LogicalPlan::Join(Join { on, .. }) => {
                     self.output += &format!(
                         "Join on: [{}]",
                         on.iter().map(|(l, r)| format!("{} = {}", l, r)).join(", ")
                     )
                 }
-                LogicalPlan::Repartition { .. } => self.output += "Repartition",
-                LogicalPlan::TableScan {
+                LogicalPlan::Repartition(Repartition { .. }) => self.output += "Repartition",
+                LogicalPlan::TableScan(TableScan {
                     table_name,
                     source,
                     projected_schema,
                     filters,
+                    fetch,
                     ..
-                } => {
+                }) => {
                     self.output += &format!(
                         "Scan {}, source: {}",
                         table_name,
-                        pp_source(source.as_ref())
+                        pp_source(
+                            source
+                                .as_any()
+                                .downcast_ref::<DefaultTableSource>()
+                                .expect("Non DefaultTableSource table found")
+                                .table_provider
+                                .clone()
+                        )
                     );
                     if projected_schema.fields().len() != source.schema().fields().len() {
                         self.output += &format!(
@@ -167,13 +262,49 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                     if self.opts.show_filters && !filters.is_empty() {
                         self.output += &format!(", filters: {:?}", filters)
                     }
+                    if let Some(fetch) = fetch {
+                        self.output += &format!(", fetch: {}", fetch)
+                    }
                 }
-                LogicalPlan::EmptyRelation { .. } => self.output += "Empty",
-                LogicalPlan::Limit { .. } => self.output += "Limit",
-                LogicalPlan::Skip { .. } => self.output += "Skip",
-                LogicalPlan::CreateExternalTable { .. } => self.output += "CreateExternalTable",
-                LogicalPlan::Explain { .. } => self.output += "Explain",
-                LogicalPlan::Extension { node } => {
+                LogicalPlan::EmptyRelation(EmptyRelation { .. }) => self.output += "Empty",
+                LogicalPlan::Limit(
+                    limit @ Limit {
+                        skip: _,
+                        fetch: _,
+                        input: _,
+                    },
+                ) => {
+                    let fetch: Result<FetchType, DataFusionError> = limit.get_fetch_type();
+                    let skip: Result<SkipType, DataFusionError> = limit.get_skip_type();
+                    let mut sep = ", ";
+                    let mut silent_infinite_fetch = false;
+                    match skip {
+                        Ok(SkipType::Literal(0)) => {
+                            sep = "";
+                        }
+                        Ok(SkipType::Literal(_n)) => {
+                            silent_infinite_fetch = true;
+                            self.output += "Skip";
+                        }
+                        Ok(SkipType::UnsupportedExpr) => self.output += "Skip UnsupportedExpr",
+                        Err(e) => self.output += &format!("Skip Err({})", e),
+                    };
+                    match fetch {
+                        Ok(FetchType::Literal(Some(_))) => self.output += &format!("{}Limit", sep),
+                        Ok(FetchType::Literal(None)) => {
+                            if !silent_infinite_fetch {
+                                self.output += &format!("{}Limit infinity", sep)
+                            }
+                        }
+                        Ok(FetchType::UnsupportedExpr) => {
+                            self.output += &format!("{}Limit UnsupportedExpr", sep)
+                        }
+                        Err(e) => self.output += &format!("{}Limit Err({})", sep, e),
+                    };
+                }
+                // LogicalPlan::CreateExternalTable(CreateExternalTable { .. }) => self.output += "CreateExternalTable",
+                LogicalPlan::Explain(Explain { .. }) => self.output += "Explain",
+                LogicalPlan::Extension(Extension { node }) => {
                     if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
                         self.output += &format!(
                             "ClusterSend, indices: {:?}",
@@ -190,45 +321,132 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                     .collect_vec())
                                 .collect_vec()
                         )
-                    } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>()
+                    } else if let Some(topk) =
+                        node.as_any().downcast_ref::<ClusterAggregateTopKUpper>()
                     {
+                        // We have some cute, or ugly, code here, to avoid having separate upper and
+                        // lower nodes in the pretty-printing.  Maybe this is to create fewer
+                        // differences in the tests in the upgrade DF and non-upgrade DF branch.
+
                         self.output += &format!("ClusterAggregateTopK, limit: {}", topk.limit);
-                        if self.opts.show_aggregations {
-                            self.output += &format!(", aggs: {:?}", topk.aggregate_expr)
-                        }
-                        if self.opts.show_sort_by {
-                            self.output += &format!(
-                                ", sortBy: {}",
-                                pp_sort_columns(topk.group_expr.len(), &topk.order_by)
-                            );
-                        }
-                        if self.opts.show_filters {
-                            if let Some(having) = &topk.having_expr {
-                                self.output += &format!(", having: {:?}", having)
+                        let lower_node: Option<&ClusterAggregateTopKLower> =
+                            match topk.input.as_ref() {
+                                LogicalPlan::Extension(Extension { node }) => {
+                                    if let Some(lower_node) =
+                                        node.as_any().downcast_ref::<ClusterAggregateTopKLower>()
+                                    {
+                                        Some(lower_node)
+                                    } else {
+                                        None
+                                    }
+                                }
+                                _ => None,
+                            };
+
+                        if let Some(lower_node) = lower_node {
+                            if self.opts.show_aggregations {
+                                self.output +=
+                                    &format!(", aggs: {}", pp_exprs(&lower_node.aggregate_expr))
                             }
+                            if self.opts.show_sort_by {
+                                self.output += &format!(
+                                    ", sortBy: {}",
+                                    pp_sort_columns(lower_node.group_expr.len(), &topk.order_by)
+                                );
+                            }
+                            if self.opts.show_filters {
+                                if let Some(having) = &topk.having_expr {
+                                    self.output += &format!(", having: {:?}", having)
+                                }
+                            }
+                            self.expecting_topk_lower = true;
+                        } else {
+                            self.output += ", (ERROR: no matching lower node)";
+                        }
+                        self.expecting_topk_lower = true;
+                    } else if let Some(_) =
+                        node.as_any().downcast_ref::<ClusterAggregateTopKLower>()
+                    {
+                        if !was_expecting_topk_lower {
+                            self.output +=
+                                &format!("ClusterAggregateTopKLower (ERROR: unexpected)");
+                        } else {
+                            // Pop the newline and indentation we just pushed.
+                            self.output.truncate(initial_output_len);
+                            // And then note that we shouldn't increment the level.
+                            saw_expected_topk_lower = true;
                         }
                     } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
                         self.output += &format!("PanicWorker")
                     } else if let Some(_) = node.as_any().downcast_ref::<RollingWindowAggregate>() {
                         self.output += &format!("RollingWindowAggreagate");
-                    } else if let Some(alias) = node.as_any().downcast_ref::<LogicalAlias>() {
-                        self.output += &format!("LogicalAlias, alias: {}", alias.alias);
                     } else {
                         log::error!("unknown extension node")
                     }
                 }
-                LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
-                    panic!("unsupported logical plan node")
+                LogicalPlan::Window(Window { .. }) => {
+                    self.output += "Window";
+                }
+                // TODO upgrade DF: There may be some join printable as "Cross" in DF.
+                // LogicalPlan::CrossJoin(CrossJoin { .. }) => {
+                //     self.output += "CrossJoin";
+                // }
+                LogicalPlan::Subquery(_) => {
+                    self.output += "Subquery";
+                }
+                LogicalPlan::SubqueryAlias(_) => {
+                    self.output += "SubqueryAlias";
+                }
+                LogicalPlan::Statement(_) => {
+                    self.output += "Statement";
+                }
+                LogicalPlan::Values(_) => {
+                    self.output += "Values";
+                }
+                LogicalPlan::Analyze(_) => {
+                    self.output += "Analyze";
+                }
+                LogicalPlan::Distinct(_) => {
+                    self.output += "Distinct";
+                }
+                LogicalPlan::Dml(_) => {
+                    self.output += "Dml";
+                }
+                LogicalPlan::Ddl(_) => {
+                    self.output += "Ddl";
+                }
+                LogicalPlan::Copy(_) => {
+                    self.output += "Copy";
+                }
+                LogicalPlan::DescribeTable(_) => {
+                    self.output += "DescribeTable";
+                }
+                LogicalPlan::Unnest(_) => {
+                    self.output += "Unnest";
+                }
+                LogicalPlan::RecursiveQuery(_) => {
+                    self.output += "RecursiveQuery";
                 }
             }
 
-            self.level += 1;
-            Ok(true)
+            if self.opts.show_schema {
+                self.output += &format!(", schema: {}", pp_df_schema(plan.schema().as_ref()));
+            }
+
+            if !saw_expected_topk_lower {
+                self.level += 1;
+            } else if !was_expecting_topk_lower {
+                // Not the cleanest place to put this message, but it's not supposed to happen.
+                self.output += ", ERROR: no topk lower node";
+            }
+
+            Ok(TreeNodeRecursion::Continue)
         }
 
-        fn post_visit(&mut self, _plan: &LogicalPlan) -> Result<bool, Self::Error> {
-            self.level -= 1;
-            Ok(true)
+        fn f_up(&mut self, _plan: &LogicalPlan) -> Result<TreeNodeRecursion, DataFusionError> {
+            // The level_stack shouldn't be empty, fwiw.
+            self.level = self.level_stack.pop().unwrap_or_default();
+            Ok(TreeNodeRecursion::Continue)
         }
     }
 }
@@ -250,25 +468,26 @@ fn pp_index(index: &IndexSnapshot) -> String {
     r
 }
 
-fn pp_source(t: &dyn TableProvider) -> String {
+fn pp_source(t: Arc<dyn TableProvider>) -> String {
     if t.as_any().is::<CubeTableLogical>() {
         "CubeTableLogical".to_string()
     } else if let Some(t) = t.as_any().downcast_ref::<CubeTable>() {
         format!("CubeTable(index: {})", pp_index(t.index_snapshot()))
     } else if let Some(t) = t.as_any().downcast_ref::<InlineTableProvider>() {
         format!("InlineTableProvider(data: {} rows)", t.get_data().len())
-    } else if t
+    } else if let Some(t) = t.as_any().downcast_ref::<InfoSchemaTableProvider>() {
+        format!("InfoSchemaTableProvider(table: {:?})", t.table)
+    } else if let Some(_) = t
         .as_any()
-        .downcast_ref::<InfoSchemaTableProvider>()
-        .is_some()
+        .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
     {
-        "InfoSchemaTableProvider".to_string()
+        "InfoSchemaQueryCacheTableProvider".to_string()
     } else {
         panic!("unknown table provider");
     }
 }
 
-fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
+pub fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
     format!(
         "[{}]",
         cs.iter()
@@ -278,12 +497,32 @@ fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
                     r += " desc";
                 }
                 if !c.nulls_first {
-                    r += " null last";
+                    r += " nulls last";
                 }
                 r
             })
             .join(", ")
     )
+}
+
+fn pp_append_sort_by(out: &mut String, ordering: &LexOrdering) {
+    let _ = write!(
+        out,
+        ", by: [{}]",
+        ordering
+            .iter()
+            .map(|e| {
+                let mut r = format!("{}", e.expr);
+                if e.options.descending {
+                    r += " desc";
+                }
+                if !e.options.nulls_first {
+                    r += " nulls last";
+                }
+                r
+            })
+            .join(", "),
+    );
 }
 
 fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, out: &mut String) {
@@ -295,7 +534,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
         return;
     }
     pp_instance(p, indent, o, out);
-    if p.as_any().is::<ClusterSendExec>() {
+    if !o.traverse_past_clustersend && p.as_any().is::<ClusterSendExec>() {
         // Do not show children of ClusterSend. This is a hack to avoid rewriting all tests.
         return;
     }
@@ -303,11 +542,17 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
         pp_phys_plan_indented(c.as_ref(), indent + 2, o, out);
     }
 
+    #[allow(deprecated)]
     fn pp_instance(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, out: &mut String) {
+        use datafusion::datasource::physical_plan::ParquetExec;
+        use datafusion_datasource::memory::MemoryExec;
+
         if indent != 0 {
             *out += "\n";
         }
         out.extend(repeat_n(' ', indent));
+
+        let mut skip_show_partitions = false;
 
         let a = p.as_any();
         if let Some(t) = a.downcast_ref::<CubeTableExec>() {
@@ -321,7 +566,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 );
             }
             if o.show_filters && t.filter.is_some() {
-                *out += &format!(", predicate: {:?}", t.filter.as_ref().unwrap())
+                *out += &format!(", predicate: {}", t.filter.as_ref().unwrap())
             }
         } else if let Some(_) = a.downcast_ref::<EmptyExec>() {
             *out += "Empty";
@@ -340,25 +585,50 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     })
                     .join(", ")
             );
-        } else if let Some(agg) = a.downcast_ref::<HashAggregateExec>() {
-            let strat = match agg.strategy() {
-                AggregateStrategy::Hash => "Hash",
-                AggregateStrategy::InplaceSorted => "Inplace",
+        } else if let Some(agg) = a.downcast_ref::<AggregateExec>() {
+            let strat = match agg.input_order_mode() {
+                InputOrderMode::Sorted => "Sorted",
+                InputOrderMode::Linear => "Linear",
+                InputOrderMode::PartiallySorted(_) => "PartiallySorted",
             };
             let mode = match agg.mode() {
                 AggregateMode::Partial => "Partial",
                 AggregateMode::Final => "Final",
                 AggregateMode::FinalPartitioned => "FinalPartitioned",
-                AggregateMode::Full => "Full",
+                AggregateMode::Single => "Single",
+                AggregateMode::SinglePartitioned => "SinglePartitioned",
             };
-            *out += &format!("{}{}Aggregate", mode, strat);
+            *out += &format!("{}{}Aggregate", strat, mode);
             if o.show_aggregations {
                 *out += &format!(", aggs: {:?}", agg.aggr_expr())
             }
+            if let Some(limit) = agg.limit() {
+                *out += &format!(", limit: {}", limit)
+            }
+        } else if let Some(agg) = a.downcast_ref::<InlineAggregateExec>() {
+            let mode = match agg.mode() {
+                InlineAggregateMode::Partial => "Partial",
+                InlineAggregateMode::Final => "Final",
+            };
+            *out += &format!("Inline{}Aggregate", mode);
+            if o.show_aggregations {
+                *out += &format!(", aggs: {:?}", agg.aggr_expr())
+            }
+            if let Some(limit) = agg.limit() {
+                *out += &format!(", limit: {}", limit)
+            }
         } else if let Some(l) = a.downcast_ref::<LocalLimitExec>() {
-            *out += &format!("LocalLimit, n: {}", l.limit());
+            *out += &format!("LocalLimit, n: {}", l.fetch());
         } else if let Some(l) = a.downcast_ref::<GlobalLimitExec>() {
-            *out += &format!("GlobalLimit, n: {}", l.limit());
+            *out += &format!(
+                "GlobalLimit, n: {}",
+                l.fetch()
+                    .map(|l| l.to_string())
+                    .unwrap_or("None".to_string())
+            );
+            if l.skip() > 0 {
+                *out += &format!(", skip: {}", l.skip());
+            }
         } else if let Some(l) = a.downcast_ref::<TailLimitExec>() {
             *out += &format!("TailLimit, n: {}", l.limit);
         } else if let Some(f) = a.downcast_ref::<FilterExec>() {
@@ -368,23 +638,12 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
         } else if let Some(s) = a.downcast_ref::<SortExec>() {
             *out += "Sort";
+
             if o.show_sort_by {
-                *out += &format!(
-                    ", by: [{}]",
-                    s.expr()
-                        .iter()
-                        .map(|e| {
-                            let mut r = format!("{}", e.expr);
-                            if e.options.descending {
-                                r += " desc";
-                            }
-                            if !e.options.nulls_first {
-                                r += " nulls last";
-                            }
-                            r
-                        })
-                        .join(", ")
-                );
+                pp_append_sort_by(out, s.expr());
+            }
+            if let Some(fetch) = s.fetch() {
+                *out += &format!(", fetch: {}", fetch);
             }
         } else if let Some(_) = a.downcast_ref::<HashJoinExec>() {
             *out += "HashJoin";
@@ -406,6 +665,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     })
                     .join(", ")
             );
+            skip_show_partitions = true;
         } else if let Some(topk) = a.downcast_ref::<AggregateTopKExec>() {
             *out += &format!("AggregateTopK, limit: {:?}", topk.limit);
             if o.show_aggregations {
@@ -426,60 +686,171 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "PanicWorker";
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
             *out += &format!("Worker");
-        } else if let Some(_) = a.downcast_ref::<MergeExec>() {
-            *out += "Merge";
-        } else if let Some(_) = a.downcast_ref::<MergeSortExec>() {
+        } else if let Some(_) = a.downcast_ref::<CoalesceBatchesExec>() {
+            *out += "CoalesceBatches";
+        } else if let Some(_) = a.downcast_ref::<CoalescePartitionsExec>() {
+            *out += "CoalescePartitions";
+        } else if let Some(s) = a.downcast_ref::<SortPreservingMergeExec>() {
             *out += "MergeSort";
-        } else if let Some(_) = a.downcast_ref::<MergeReSortExec>() {
-            *out += "MergeResort";
-        } else if let Some(j) = a.downcast_ref::<MergeJoinExec>() {
+            if o.show_sort_by {
+                pp_append_sort_by(out, s.expr());
+            }
+            if let Some(fetch) = s.fetch() {
+                *out += &format!(", fetch: {}", fetch);
+            }
+        } else if let Some(j) = a.downcast_ref::<SortMergeJoinExec>() {
             *out += &format!(
                 "MergeJoin, on: [{}]",
-                j.join_on()
-                    .iter()
+                j.on.iter()
                     .map(|(l, r)| format!("{} = {}", l, r))
                     .join(", ")
             );
-        } else if let Some(j) = a.downcast_ref::<CrossJoinExec>() {
-            *out += &format!("CrossJoin, on: {}", j.on)
-        } else if let Some(j) = a.downcast_ref::<CrossJoinAggExec>() {
-            *out += &format!("CrossJoinAgg, on: {}", j.join.on);
-            if o.show_aggregations {
-                *out += &format!(", aggs: {:?}", j.agg_expr)
-            }
+            // } else if let Some(j) = a.downcast_ref::<CrossJoinExec>() {
+            //     *out += &format!("CrossJoin, on: {}", j.on)
+            // } else if let Some(j) = a.downcast_ref::<CrossJoinAggExec>() {
+            //     *out += &format!("CrossJoinAgg, on: {}", j.join.on);
+            //     if o.show_aggregations {
+            //         *out += &format!(", aggs: {:?}", j.agg_expr)
+            //     }
         } else if let Some(_) = a.downcast_ref::<UnionExec>() {
             *out += "Union";
         } else if let Some(_) = a.downcast_ref::<FilterByKeyRangeExec>() {
             *out += "FilterByKeyRange";
         } else if let Some(p) = a.downcast_ref::<ParquetExec>() {
+            // We don't use ParquetExec any more.
             *out += &format!(
-                "ParquetScan, files: {}",
-                p.partitions()
+                "ParquetExec (ERROR: deprecated), files: {}",
+                p.base_config()
+                    .file_groups
                     .iter()
-                    .map(|p| p.filenames.iter())
                     .flatten()
+                    .map(|p| p.object_meta.location.to_string())
                     .join(",")
             );
-        } else if let Some(_) = a.downcast_ref::<SkipExec>() {
-            *out += "SkipRows";
+        } else if let Some(dse) = a.downcast_ref::<DataSourceExec>() {
+            let data_source = dse.data_source();
+            let data_source_any = data_source.as_any();
+            if let Some(fse) = data_source_any.downcast_ref::<FileScanConfig>() {
+                if let Some(p) = fse.file_source().as_any().downcast_ref::<ParquetSource>() {
+                    *out += &format!(
+                        "ParquetScan, files: {}",
+                        fse.file_groups
+                            .iter()
+                            .flatten()
+                            .map(|p| p.object_meta.location.to_string())
+                            .join(","),
+                    );
+                    if o.show_filters {
+                        if let Some(predicate) = p.predicate() {
+                            *out += &format!(", predicate: {}", predicate);
+                        }
+                        // pruning_predicate and page_pruning_predicate are derived from
+                        // p.predicate(), and they tend to be more verbose.  Note: because we have
+                        // configured the default pushdown_filters = false (default false as of DF
+                        // <= 46.0.1), p.predicate() is not directly used.
+
+                        // if let Some(pruning_predicate) = p.pruning_predicate() {
+                        //     *out += &format!(", pruning_predicate: {}", pruning_predicate.predicate_expr());
+                        // }
+                        // if let Some(page_pruning_predicate) = p.page_pruning_predicate() {
+                        //     // If this is uncommented, page_pruning_predicate.predicates() would need to be added to DF.
+                        //     *out += &format!(", page_pruning_predicates: [{}]", page_pruning_predicate.predicates().iter().map(|pred| pred.predicate_expr()).join(", "));
+                        // }
+                    }
+                } else {
+                    *out += &format!("{}", DefaultDisplay(dse));
+                }
+            } else if data_source_any.is::<MemorySourceConfig>() {
+                *out += "MemoryScan";
+            } else {
+                *out += &format!("{}", DefaultDisplay(dse));
+            }
         } else if let Some(_) = a.downcast_ref::<RollingWindowAggExec>() {
             *out += "RollingWindowAgg";
         } else if let Some(_) = a.downcast_ref::<LastRowByUniqueKeyExec>() {
             *out += "LastRowByUniqueKey";
-        } else if let Some(_) = a.downcast_ref::<MemoryExec>() {
-            *out += "MemoryScan";
+        } else if a.is::<MemoryExec>() {
+            // We don't use MemoryExec any more.
+            *out += "MemoryExec (ERROR: deprecated)";
+        } else if let Some(r) = a.downcast_ref::<RepartitionExec>() {
+            *out += &format!("Repartition, partitioning: {}", r.partitioning());
         } else {
             let to_string = format!("{:?}", p);
             *out += &to_string.split(" ").next().unwrap_or(&to_string);
         }
 
         if o.show_output_hints {
-            let hints = p.output_hints();
-            if !hints.single_value_columns.is_empty() {
-                *out += &format!(", single_vals: {:?}", hints.single_value_columns);
+            let properties: &PlanProperties = p.properties();
+
+            // What show_output_hints shows is previous Cubestore's output hints.  We convert from
+            // DF's existing properties() to the old output format (and what the old output_hints()
+            // function returned).
+            //
+            // So the choice to show the particular sort_order and single_vals in terms of column
+            // indices is solely based on that past, and to update the `planning_hints` test in a
+            // straightforward and transparent manner.
+
+            let svals: &[ConstExpr] = properties.equivalence_properties().constants();
+            if svals.len() > 0 {
+                let sv_columns: Option<Vec<usize>> = svals
+                    .iter()
+                    .map(|const_expr| match const_expr.across_partitions() {
+                        AcrossPartitions::Uniform(_) => {
+                            if let Some(column_expr) =
+                                const_expr.expr().as_any().downcast_ref::<Column>()
+                            {
+                                Some(column_expr.index())
+                            } else {
+                                None
+                            }
+                        }
+                        AcrossPartitions::Heterogeneous => None,
+                    })
+                    .collect();
+
+                if let Some(column_indices) = sv_columns {
+                    *out += &format!(", single_vals: {:?}", column_indices);
+                } else {
+                    *out += &format!(", single_vals: [..., len = {}]", svals.len());
+                }
             }
-            if let Some(so) = hints.sort_order {
-                *out += &format!(", sort_order: {:?}", so);
+
+            let ordering = properties.output_ordering();
+            if let Some(so) = ordering {
+                let so_columns: Option<Vec<usize>> = so
+                    .iter()
+                    .map(|sort_expr| {
+                        if let Some(column_expr) = sort_expr.expr.as_any().downcast_ref::<Column>()
+                        {
+                            Some(column_expr.index())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if let Some(column_indices) = so_columns {
+                    *out += &format!(", sort_order: {:?}", column_indices);
+                } else {
+                    *out += &format!(", sort_order: [..., len = {}]", so.len());
+                }
+            }
+        }
+
+        if o.show_schema {
+            *out += &format!(", schema: {}", pp_schema(p.schema().as_ref()));
+        }
+
+        if o.show_partitions && !skip_show_partitions {
+            *out += &format!(
+                ", partitions: {}",
+                p.properties().output_partitioning().partition_count()
+            );
+        }
+
+        if o.show_metrics {
+            if let Some(m) = p.metrics() {
+                *out += &format!(", metrics: {}", m);
             }
         }
     }
@@ -498,4 +869,22 @@ fn pp_row_range(r: &RowRange) -> String {
         Some(e) => format!("{:?}", e.values()),
     };
     format!("[{},{})", s, e)
+}
+
+fn pp_exprs(v: &Vec<Expr>) -> String {
+    "[".to_owned() + &v.iter().map(|e: &Expr| format!("{}", e)).join(", ") + "]"
+}
+
+fn pp_df_schema(schema: &DFSchema) -> String {
+    // Like pp_schema but with qualifiers.
+    format!("{}", schema)
+}
+
+fn pp_schema(schema: &Schema) -> String {
+    // Mimicking DFSchema's Display
+    format!(
+        "fields:[{}], metadata:{:?}",
+        schema.fields.iter().map(|f| f.name()).join(", "),
+        schema.metadata
+    )
 }
