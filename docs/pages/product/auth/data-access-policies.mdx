@@ -51,11 +51,6 @@ cubes:
     # ...
 
     access_policy:
-        # For all roles, restrict access entirely
-      - role: "*"
-        member_level:
-          includes: []
-
         # For the `manager` role,
         #   allow access to all members
         #   but filter rows by the user's country
@@ -162,6 +157,40 @@ filtered by the row-level security rules of both views.
 
 </InfoBox>
 
+## Troubleshooting
+
+### Common pitfalls
+
+Be careful with the [_any role_ shorthand][ref-ref-dap-role] (`role: "*"`) in data access
+policies that don't restrict access on member __and__ row level. Given that policies for
+multiple roles are [combined together](#policy-evaluation) using the _OR_ semantics,
+a policy that allows access for _any role_ without restrictions on a certain level will
+effectively grant unrestricted access on that level to all users:
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+        # No access on member level, __full access__ on row level for any role
+      - role: "*"
+        member_level:
+          includes: []
+
+        # Some restrictions on row level for the `restricted` role
+      - role: restricted
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: [ "USA" ]
+```
+
+In the example above, all users will have full access to all members and all rows of the
+`orders` cube, regardless of their roles, because of the first policy applies to _any
+role_ and is combined with the second one using the _OR_ semantics.
+
 
 [ref-mls-public]: /product/auth/member-level-security#managing-member-level-access
 [ref-rls-queryrewrite]: /product/auth/row-level-security#managing-row-level-access
@@ -169,3 +198,4 @@ filtered by the row-level security rules of both views.
 [ref-ctx-to-roles]: /product/configuration/reference/config#context_to_roles
 [ref-ref-dap]: /product/data-modeling/reference/data-access-policies
 [ref-config-queryrewrite]: /product/configuration/reference/config#query_rewrite
+[ref-ref-dap-role]: /product/data-modeling/reference/data-access-policies#role
