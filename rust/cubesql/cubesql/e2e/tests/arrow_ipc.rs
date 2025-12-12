@@ -1,6 +1,6 @@
 // Integration tests for Arrow IPC output format
 
-use std::{env, time::Duration};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use cubesql::config::Config;
@@ -16,42 +16,11 @@ pub struct ArrowIPCIntegrationTestSuite {
     _port: Port,
 }
 
-#[allow(dead_code)]
-fn get_env_var(env_name: &'static str) -> Option<String> {
-    if let Ok(value) = env::var(env_name) {
-        if value.is_empty() {
-            log::warn!("Environment variable {} is declared, but empty", env_name);
-            None
-        } else {
-            Some(value)
-        }
-    } else {
-        None
-    }
-}
-
 impl ArrowIPCIntegrationTestSuite {
     #[allow(dead_code)]
     pub(crate) async fn before_all() -> AsyncTestConstructorResult {
-        let mut env_defined = false;
-
-        if let Some(testing_cube_token) = get_env_var("CUBESQL_TESTING_CUBE_TOKEN") {
-            env::set_var("CUBESQL_CUBE_TOKEN", testing_cube_token);
-            env_defined = true;
-        };
-
-        if let Some(testing_cube_url) = get_env_var("CUBESQL_TESTING_CUBE_URL") {
-            env::set_var("CUBESQL_CUBE_URL", testing_cube_url);
-        } else {
-            env_defined = false;
-        };
-
-        if !env_defined {
-            return AsyncTestConstructorResult::Skipped(
-                "Testing variables are not defined, passing....".to_string(),
-            );
-        };
-
+        // Arrow IPC tests don't need Cube server - they test the protocol layer
+        // using simple queries and system catalog queries only
         let port = pick_unused_port().expect("No ports free");
 
         tokio::spawn(async move {
