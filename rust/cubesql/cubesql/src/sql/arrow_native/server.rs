@@ -362,7 +362,7 @@ impl ArrowNativeServer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 
     #[test]
     fn test_server_creation() {
