@@ -1,6 +1,6 @@
 // Integration tests for Arrow IPC output format
 
-use std::time::Duration;
+use std::{env, time::Duration};
 
 use async_trait::async_trait;
 use cubesql::config::Config;
@@ -17,10 +17,35 @@ pub struct ArrowIPCIntegrationTestSuite {
 }
 
 impl ArrowIPCIntegrationTestSuite {
-    #[allow(dead_code)]
     pub(crate) async fn before_all() -> AsyncTestConstructorResult {
-        // Arrow IPC tests don't need Cube server - they test the protocol layer
-        // using simple queries and system catalog queries only
+        // Check for required Cube server credentials
+        // Note: Even though these tests use simple queries (SELECT 1, etc.),
+        // CubeSQL still needs to connect to Cube's metadata API on startup
+        let mut env_defined = false;
+
+        if let Some(testing_cube_token) = env::var("CUBESQL_TESTING_CUBE_TOKEN").ok() {
+            if !testing_cube_token.is_empty() {
+                env::set_var("CUBESQL_CUBE_TOKEN", testing_cube_token);
+                env_defined = true;
+            }
+        }
+
+        if let Some(testing_cube_url) = env::var("CUBESQL_TESTING_CUBE_URL").ok() {
+            if !testing_cube_url.is_empty() {
+                env::set_var("CUBESQL_CUBE_URL", testing_cube_url);
+            } else {
+                env_defined = false;
+            }
+        } else {
+            env_defined = false;
+        }
+
+        if !env_defined {
+            return AsyncTestConstructorResult::Skipped(
+                "Arrow IPC tests require CUBESQL_TESTING_CUBE_TOKEN and CUBESQL_TESTING_CUBE_URL".to_string(),
+            );
+        }
+
         let port = pick_unused_port().expect("No ports free");
 
         tokio::spawn(async move {
@@ -53,7 +78,6 @@ impl ArrowIPCIntegrationTestSuite {
         }))
     }
 
-    #[allow(dead_code)]
     async fn create_client(config: tokio_postgres::Config) -> Client {
         let (client, connection) = config.connect(NoTls).await.unwrap();
 
