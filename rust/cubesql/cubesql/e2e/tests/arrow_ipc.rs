@@ -42,7 +42,8 @@ impl ArrowIPCIntegrationTestSuite {
 
         if !env_defined {
             return AsyncTestConstructorResult::Skipped(
-                "Arrow IPC tests require CUBESQL_TESTING_CUBE_TOKEN and CUBESQL_TESTING_CUBE_URL".to_string(),
+                "Arrow IPC tests require CUBESQL_TESTING_CUBE_TOKEN and CUBESQL_TESTING_CUBE_URL"
+                    .to_string(),
             );
         }
 
