@@ -29,139 +29,6 @@ const moduleFileCache = {};
 
 const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
 
-// Compilation metrics tracking
-interface PhaseMetrics {
-  transpile: number;
-  compile: number;
-  asyncModules?: number;
-}
-
-interface CompilationMetrics {
-  compilationNumber: number;
-  totalTime: number;
-  phases: {
-    phase0: PhaseMetrics;
-    phase1: PhaseMetrics;
-    phase3: PhaseMetrics;
-  };
-}
-
-let compilationMetricsCount = 0;
-const compilationMetricsHistory: CompilationMetrics[] = [];
-const slowCompilationMetricsHistory: CompilationMetrics[] = [];
-
-const formatMs = (ms: number) => ms.toFixed(2);
-const formatPercent = (part: number, total: number) => ((part / total) * 100).toFixed(1);
-
-const printCompilationMetricsReport = () => {
-  if (compilationMetricsHistory.length === 0) {
-    return;
-  }
-
-  console.log(`\n${'='.repeat(100)}`);
-  console.log(`📊 COMPILATION METRICS REPORT (${compilationMetricsHistory.length} compilations)`);
-  console.log('='.repeat(100));
-
-  // Summary statistics
-  const totalTimes = compilationMetricsHistory.map(m => m.totalTime);
-  const avgTotal = totalTimes.reduce((a, b) => a + b, 0) / totalTimes.length;
-  const minTotal = Math.min(...totalTimes);
-  const maxTotal = Math.max(...totalTimes);
-
-  console.log('\n📈 SUMMARY:');
-  console.log(`  Total compilations: ${compilationMetricsHistory.length}`);
-  console.log(`  Avg total time:     ${formatMs(avgTotal)} ms`);
-  console.log(`  Min total time:     ${formatMs(minTotal)} ms`);
-  console.log(`  Max total time:     ${formatMs(maxTotal)} ms`);
-
-  // Detailed table - last 20 compilations
-  const recentMetrics = compilationMetricsHistory.slice(-20);
-  console.log('\n📋 LAST 20 COMPILATIONS (times in ms):');
-  console.log('─'.repeat(100));
-  console.log('  # | Total  | P0-T  | P0-C  | P0-A  | P1-T  | P1-C  | P1-A  | P3-T  | P3-C  | P3-A ');
-  console.log('─'.repeat(100));
-
-  recentMetrics.forEach((m) => {
-    const p0t = formatMs(m.phases.phase0.transpile).padStart(5);
-    const p0c = formatMs(m.phases.phase0.compile).padStart(5);
-    const p0a = m.phases.phase0.asyncModules !== undefined ? formatMs(m.phases.phase0.asyncModules).padStart(5) : '  -  ';
-    const p1t = formatMs(m.phases.phase1.transpile).padStart(5);
-    const p1c = formatMs(m.phases.phase1.compile).padStart(5);
-    const p1a = m.phases.phase1.asyncModules !== undefined ? formatMs(m.phases.phase1.asyncModules).padStart(5) : '  -  ';
-    const p3t = formatMs(m.phases.phase3.transpile).padStart(5);
-    const p3c = formatMs(m.phases.phase3.compile).padStart(5);
-    const p3a = m.phases.phase3.asyncModules !== undefined ? formatMs(m.phases.phase3.asyncModules).padStart(5) : '  -  ';
-
-    console.log(
-      `${String(m.compilationNumber).padStart(3)} | ` +
-      `${formatMs(m.totalTime).padStart(6)} | ` +
-      `${p0t} | ${p0c} | ${p0a} | ` +
-      `${p1t} | ${p1c} | ${p1a} | ` +
-      `${p3t} | ${p3c} | ${p3a}`
-    );
-  });
-
-  console.log('─'.repeat(100));
-
-  // Phase time breakdown for the last compilation
-  if (compilationMetricsHistory.length > 0) {
-    const lastMetric = compilationMetricsHistory[compilationMetricsHistory.length - 1];
-    console.log('\n🔍 LAST COMPILATION BREAKDOWN:');
-    console.log(`  Total time: ${formatMs(lastMetric.totalTime)} ms`);
-    console.log('\n  Phase 0:');
-    console.log(`    Transpile: ${formatMs(lastMetric.phases.phase0.transpile)} ms (${formatPercent(lastMetric.phases.phase0.transpile, lastMetric.totalTime)}%)`);
-    console.log(`    Compile:   ${formatMs(lastMetric.phases.phase0.compile)} ms (${formatPercent(lastMetric.phases.phase0.compile, lastMetric.totalTime)}%)`);
-    if (lastMetric.phases.phase0.asyncModules !== undefined) {
-      console.log(`    AsyncMods: ${formatMs(lastMetric.phases.phase0.asyncModules)} ms (${formatPercent(lastMetric.phases.phase0.asyncModules, lastMetric.totalTime)}%)`);
-    }
-    console.log(`  Phase 1:`);
-    console.log(`    Transpile: ${formatMs(lastMetric.phases.phase1.transpile)} ms (${formatPercent(lastMetric.phases.phase1.transpile, lastMetric.totalTime)}%)`);
-    console.log(`    Compile:   ${formatMs(lastMetric.phases.phase1.compile)} ms (${formatPercent(lastMetric.phases.phase1.compile, lastMetric.totalTime)}%)`);
-    if (lastMetric.phases.phase1.asyncModules !== undefined) {
-      console.log(`    AsyncMods: ${formatMs(lastMetric.phases.phase1.asyncModules)} ms (${formatPercent(lastMetric.phases.phase1.asyncModules, lastMetric.totalTime)}%)`);
-    }
-    console.log(`  Phase 3:`);
-    console.log(`    Transpile: ${formatMs(lastMetric.phases.phase3.transpile)} ms (${formatPercent(lastMetric.phases.phase3.transpile, lastMetric.totalTime)}%)`);
-    console.log(`    Compile:   ${formatMs(lastMetric.phases.phase3.compile)} ms (${formatPercent(lastMetric.phases.phase3.compile, lastMetric.totalTime)}%)`);
-    if (lastMetric.phases.phase3.asyncModules !== undefined) {
-      console.log(`    AsyncMods: ${formatMs(lastMetric.phases.phase3.asyncModules)} ms (${formatPercent(lastMetric.phases.phase3.asyncModules, lastMetric.totalTime)}%)`);
-    }
-  }
-
-  // Slow compilations report (> 400ms)
-  if (slowCompilationMetricsHistory.length > 0) {
-    console.log('\n🐌 SLOW COMPILATIONS (> 400ms):');
-    console.log('─'.repeat(100));
-    console.log('  #  | Total  |  P0-T  |  P0-C  |  P0-A  |  P1-T  |  P1-C  |  P1-A  |  P3-T  |  P3-C  |  P3-A ');
-    console.log('─'.repeat(100));
-
-    slowCompilationMetricsHistory.forEach((m) => {
-      const p0t = formatMs(m.phases.phase0.transpile).padStart(6);
-      const p0c = formatMs(m.phases.phase0.compile).padStart(6);
-      const p0a = m.phases.phase0.asyncModules !== undefined ? formatMs(m.phases.phase0.asyncModules).padStart(6) : '  -  ';
-      const p1t = formatMs(m.phases.phase1.transpile).padStart(6);
-      const p1c = formatMs(m.phases.phase1.compile).padStart(6);
-      const p1a = m.phases.phase1.asyncModules !== undefined ? formatMs(m.phases.phase1.asyncModules).padStart(6) : '  -  ';
-      const p3t = formatMs(m.phases.phase3.transpile).padStart(6);
-      const p3c = formatMs(m.phases.phase3.compile).padStart(6);
-      const p3a = m.phases.phase3.asyncModules !== undefined ? formatMs(m.phases.phase3.asyncModules).padStart(6) : '  -  ';
-
-      console.log(
-        `${String(m.compilationNumber).padStart(4)} | ` +
-        `${formatMs(m.totalTime).padStart(6)} | ` +
-        `${p0t} | ${p0c} | ${p0a} | ` +
-        `${p1t} | ${p1c} | ${p1a} | ` +
-        `${p3t} | ${p3c} | ${p3a}`
-      );
-    });
-
-    console.log('─'.repeat(100));
-    console.log(`  Total slow compilations: ${slowCompilationMetricsHistory.length}`);
-  }
-
-  console.log(`\n${'='.repeat(100)}\n`);
-};
-
 const getThreadsCount = () => {
   const envThreads = getEnv('transpilationWorkerThreadsCount');
   if (envThreads > 0) {
@@ -372,22 +239,6 @@ export class DataSchemaCompiler {
   }
 
   protected async doCompile() {
-    // Start measuring total compilation time
-    const compilationStartTime = new Date().getTime();
-    compilationMetricsCount++;
-    const currentCompilationNumber = compilationMetricsCount;
-
-    // Initialize metrics object for this compilation
-    const metrics: CompilationMetrics = {
-      compilationNumber: currentCompilationNumber,
-      totalTime: 0,
-      phases: {
-        phase0: { transpile: 0, compile: 0, asyncModules: 0 },
-        phase1: { transpile: 0, compile: 0, asyncModules: 0 },
-        phase3: { transpile: 0, compile: 0, asyncModules: 0 },
-      },
-    };
-
     const files = await this.repository.dataSchemaFiles();
 
     this.pythonContext = await this.loadPythonContext(files, 'globals.py');
@@ -527,14 +378,6 @@ export class DataSchemaCompiler {
     };
 
     this.compileV8ContextCache = vm.createContext({
-      console: {
-        log: console.log.bind(console),
-        error: console.error.bind(console),
-        warn: console.warn.bind(console),
-        info: console.info.bind(console),
-        debug: console.debug.bind(console),
-        trace: console.trace.bind(console),
-      },
       view: (name, cube) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
@@ -622,87 +465,34 @@ export class DataSchemaCompiler {
     const compilePhaseFirst = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
       // clear the objects for the next phase
       cleanup();
-
-      // Measure transpilation time
-      const transpileStart = new Date().getTime();
       transpiledFiles = await transpilePhaseFirst(stage);
-      const transpileTime = new Date().getTime() - transpileStart;
 
       // We render jinja and transpile yaml only once on first phase and then use resulting JS for these files
       // afterward avoiding costly YAML/Python parsing again. Original JS files are preserved as is for cache hits.
       const convertedToJsFiles = transpiledFiles.filter(f => !f.fileName.endsWith('.js'));
       toCompile = [...originalJsFiles, ...convertedToJsFiles];
 
-      // Measure compilation time (always measure asyncModules)
-      const compileStart = new Date().getTime();
-      const result = await this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport, true);
-      const compileTime = new Date().getTime() - compileStart;
-
-      return { transpileTime, compileTime, asyncModulesTime: result.asyncModulesTime };
+      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
     };
 
     const compilePhase = async (compilers: CompileCubeFilesCompilers, stage: 0 | 1 | 2 | 3) => {
       // clear the objects for the next phase
       cleanup();
-
-      // Measure transpilation time
-      const transpileStart = new Date().getTime();
       transpiledFiles = await transpilePhase(stage);
-      const transpileTime = new Date().getTime() - transpileStart;
 
-      // Measure compilation time (always measure asyncModules)
-      const compileStart = new Date().getTime();
-      const result = await this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport, true);
-      const compileTime = new Date().getTime() - compileStart;
-
-      return { transpileTime, compileTime, asyncModulesTime: result.asyncModulesTime };
+      return this.compileCubeFiles(cubes, contexts, compiledFiles, asyncModules, compilers, transpiledFiles, errorsReport);
     };
 
     return compilePhaseFirst({ cubeCompilers: this.cubeNameCompilers }, 0)
-      .then((phase0Metrics) => {
-        metrics.phases.phase0.transpile = phase0Metrics.transpileTime;
-        metrics.phases.phase0.compile = phase0Metrics.compileTime;
-        metrics.phases.phase0.asyncModules = phase0Metrics.asyncModulesTime;
-        return compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }, 1);
-      })
-      .then((phase1Metrics) => {
-        metrics.phases.phase1.transpile = phase1Metrics.transpileTime;
-        metrics.phases.phase1.compile = phase1Metrics.compileTime;
-        metrics.phases.phase1.asyncModules = phase1Metrics.asyncModulesTime;
-
-        // Skip phase 2 (views compilation) and go directly to phase 3
-        return compilePhase({
-          cubeCompilers: this.cubeCompilers,
-          contextCompilers: this.contextCompilers,
-        }, 3);
-      })
-      .then((phase3Metrics) => {
-        metrics.phases.phase3.transpile = phase3Metrics.transpileTime;
-        metrics.phases.phase3.compile = phase3Metrics.compileTime;
-        metrics.phases.phase3.asyncModules = phase3Metrics.asyncModulesTime;
-
-        // Calculate total time
-        metrics.totalTime = new Date().getTime() - compilationStartTime;
-
-        // Save metrics to history (keep last 20 to prevent memory leak)
-        compilationMetricsHistory.push(metrics);
-        if (compilationMetricsHistory.length > 20) {
-          compilationMetricsHistory.shift();
-        }
-
-        // Save slow compilations separately (> 400ms)
-        if (metrics.totalTime > 400) {
-          slowCompilationMetricsHistory.push(metrics);
-          if (slowCompilationMetricsHistory.length > 20) {
-            slowCompilationMetricsHistory.shift();
-          }
-        }
-
-        // Print compilation metrics report every 50 compilations
-        if (compilationMetricsCount % 50 === 0) {
-          printCompilationMetricsReport();
-        }
-
+      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }, 1))
+      .then(() => (this.viewCompilationGate.shouldCompileViews() ?
+        compilePhase({ cubeCompilers: this.viewCompilers }, 2)
+        : Promise.resolve()))
+      .then(() => compilePhase({
+        cubeCompilers: this.cubeCompilers,
+        contextCompilers: this.contextCompilers,
+      }, 3))
+      .then(() => {
         // Free unneeded resources
         cleanup();
         transpiledFiles = [];
@@ -1024,9 +814,8 @@ export class DataSchemaCompiler {
     asyncModules: CallableFunction[],
     compilers: CompileCubeFilesCompilers,
     transpiledFiles: FileContent[],
-    errorsReport: ErrorReporter,
-    measureAsyncModules = false
-  ): Promise<{ asyncModulesTime?: number }> {
+    errorsReport: ErrorReporter
+  ) {
     transpiledFiles
       .forEach((file) => {
         this.compileFile(
@@ -1035,19 +824,9 @@ export class DataSchemaCompiler {
           compiledFiles,
         );
       });
-
-    let asyncModulesTime: number | undefined;
-    if (measureAsyncModules) {
-      const asyncModulesStart = new Date().getTime();
-      await asyncModules.reduce((a: Promise<void>, b: CallableFunction) => a.then(() => b()), Promise.resolve());
-      asyncModulesTime = new Date().getTime() - asyncModulesStart;
-    } else {
-      await asyncModules.reduce((a: Promise<void>, b: CallableFunction) => a.then(() => b()), Promise.resolve());
-    }
-
+    await asyncModules.reduce((a: Promise<void>, b: CallableFunction) => a.then(() => b()), Promise.resolve());
     return this.compileObjects(compilers.cubeCompilers || [], cubes, errorsReport)
-      .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport))
-      .then(() => ({ asyncModulesTime }));
+      .then(() => this.compileObjects(compilers.contextCompilers || [], contexts, errorsReport));
   }
 
   public throwIfAnyErrors() {
