@@ -274,7 +274,7 @@ jobs:
       - name: 'Upload cubestored-x86_64-unknown-linux-gnu-release artifact'
         uses: actions/upload-artifact@v4
         with:
-          name: cubestored-df46-x86_64-unknown-linux-gnu-release
+          name: cubestored-x86_64-unknown-linux-gnu-release
           path: ./rust/cubestore/target/release/cubestored
           retention-days: 5
 
@@ -389,7 +389,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./rust/cubestore/target/release/
-          name: cubestored-df46-x86_64-unknown-linux-gnu-release
+          name: cubestored-x86_64-unknown-linux-gnu-release
       - name: Run Cube Store in background
         run: |
           chmod +x ./rust/cubestore/target/release/cubestored
@@ -596,7 +596,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: rust/cubestore/downloaded/latest/bin/
-          name: cubestored-df46-x86_64-unknown-linux-gnu-release
+          name: cubestored-x86_64-unknown-linux-gnu-release
       - name: Chmod +x for cubestored
         run: |
           chmod +x ./rust/cubestore/downloaded/latest/bin/cubestored
