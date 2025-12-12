@@ -23,14 +23,14 @@ impl ArrowIPCIntegrationTestSuite {
         // CubeSQL still needs to connect to Cube's metadata API on startup
         let mut env_defined = false;
 
-        if let Some(testing_cube_token) = env::var("CUBESQL_TESTING_CUBE_TOKEN").ok() {
+        if let Ok(testing_cube_token) = env::var("CUBESQL_TESTING_CUBE_TOKEN") {
             if !testing_cube_token.is_empty() {
                 env::set_var("CUBESQL_CUBE_TOKEN", testing_cube_token);
                 env_defined = true;
             }
         }
 
-        if let Some(testing_cube_url) = env::var("CUBESQL_TESTING_CUBE_URL").ok() {
+        if let Ok(testing_cube_url) = env::var("CUBESQL_TESTING_CUBE_URL") {
             if !testing_cube_url.is_empty() {
                 env::set_var("CUBESQL_CUBE_URL", testing_cube_url);
             } else {
