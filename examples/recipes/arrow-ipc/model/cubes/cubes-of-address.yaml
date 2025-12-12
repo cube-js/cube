@@ -43,3 +43,10 @@ cubes:
         type: string
         description: Louzy documentation
         sql: first_name
+
+    pre_aggregations:
+      - name: given_names
+        measures:
+          - of_addresses.count_of_records
+        dimensions:
+          - of_addresses.given_name

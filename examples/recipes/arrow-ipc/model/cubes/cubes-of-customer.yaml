@@ -115,3 +115,10 @@ cubes:
         type: time
         description: updated_at timestamp
         sql: updated_at
+
+    pre_aggregations:
+        - name: zod
+          measures:
+            - of_customers.emails_distinct
+          dimensions:
+            - of_customers.zodiac

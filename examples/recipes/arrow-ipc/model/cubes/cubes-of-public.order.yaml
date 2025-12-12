@@ -69,3 +69,22 @@ cubes:
         name: brand
         type: string
         sql: brand_code
+
+    pre_aggregations:
+      - name: ful
+        measures:
+          - orders.count
+          - orders.subtotal_amount
+          - orders.total_amount
+          - orders.tax_amount
+        dimensions:
+          - orders.FUL
+
+      - name: fin
+        measures:
+          - orders.count
+          - orders.subtotal_amount
+          - orders.total_amount
+          - orders.tax_amount
+        dimensions:
+          - orders.FIN
