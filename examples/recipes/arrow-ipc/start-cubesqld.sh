@@ -53,7 +53,7 @@ fi
 echo -e "${YELLOW}Cube.js API is running on port ${CUBE_API_PORT}${NC}"
 
 # Check if cubesqld ports are free
-PG_PORT=${CUBEJS_PG_SQL_PORT:-4444}
+#PG_PORT=${CUBEJS_PG_SQL_PORT:-4444}
 ARROW_PORT=${CUBEJS_ARROW_PORT:-4445}
 
 echo ""
@@ -107,9 +107,9 @@ CUBE_TOKEN="${CUBESQL_CUBE_TOKEN:-test}"
 
 export CUBESQL_CUBE_URL="${CUBE_API_URL}"
 export CUBESQL_CUBE_TOKEN="${CUBE_TOKEN}"
-export CUBESQL_PG_PORT="${PG_PORT}"
+export CUBESQL_PG_PORT="4444"
 export CUBEJS_ARROW_PORT="${ARROW_PORT}"
-export CUBESQL_LOG_LEVEL="${CUBESQL_LOG_LEVEL:-info}"
+export CUBESQL_LOG_LEVEL="${CUBESQL_LOG_LEVEL:-trace}"
 export CUBESTORE_LOG_LEVEL="error"
 
 echo ""

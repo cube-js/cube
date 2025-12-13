@@ -258,7 +258,7 @@ impl ArrowNativeServer {
                         )
                         .await
                         {
-                            error!("Query execution error: {}", e);
+                            error!("Query execution error AND WHAT ARE WE DOING ABOUT IT: {}", e);
                             let _ = StreamWriter::write_error(
                                 &mut socket,
                                 "QUERY_ERROR".to_string(),
