@@ -535,8 +535,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
 
     const pivotImpl = (resultIndex = 0) => {
       let groupByXAxis = groupByToPairs<{ xValues: string[], row: Record<string, any> }, string>(({ xValues }) => this.axisValuesString(xValues));
-
-      const measureValue = (row: Record<string, any>, measure: string) => row[measure] || normalizedPivotConfig.fillWithValue || 0;
+      const measureValue = (row: Record<string, any>, measure: string) => row[measure] ?? normalizedPivotConfig.fillWithValue ?? 0;
 
       if (
         normalizedPivotConfig.fillMissingDates &&
