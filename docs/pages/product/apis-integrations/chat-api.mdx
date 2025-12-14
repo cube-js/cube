@@ -11,7 +11,7 @@ The Chat API is available in Cube Cloud on [Premium and above](https://cube.dev/
 ## Endpoint
 
 ```
-https://ai-engineer.cubecloud.dev/api/v1/public/{tenantName}/agents/{agentId}/chat/stream-chat-state
+https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/{tenantName}/agents/{agentId}/chat/stream-chat-state
 ```
 
 
@@ -153,9 +153,11 @@ The attributes passed during session generation become available as `userAttribu
 
 ## Endpoint Reference
 
+Endpoint URL can be found in settings of an Agent but typically it would be defined as following:
+
 **POST** `/api/v1/public/{tenantName}/agents/{agentId}/chat/stream-chat-state`
 
-**Base URL:** `https://ai-engineer.cubecloud.dev`
+**Base URL:** `https://ai.gcp-us-central1.cubecloud.dev`
 
 ### Path Parameters
 
@@ -746,7 +748,7 @@ When an error occurs, the `result` property of the toolCall will contain an `err
 <CodeTabs>
 
 ```bash cURL
-curl -X POST "https://ai-engineer.cubecloud.dev/api/v1/public/cloud/agents/2/chat/stream-chat-state" \
+curl -X POST "https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/cloud/agents/2/chat/stream-chat-state" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_SESSION_TOKEN" \
   -d '{
@@ -790,7 +792,7 @@ const { token } = await tokenResponse.json();
 
 // Now use the token to make the chat request
 const response = await fetch(
-  'https://ai-engineer.cubecloud.dev/api/v1/public/cloud/agents/2/chat/stream-chat-state',
+  'https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/cloud/agents/2/chat/stream-chat-state',
   {
     method: 'POST',
     headers: {
@@ -857,7 +859,7 @@ token_response = requests.post(token_url, headers=session_headers, json={"sessio
 token = token_response.json()["token"]
 
 # Now use the token to make the chat request
-url = "https://ai-engineer.cubecloud.dev/api/v1/public/cloud/agents/2/chat/stream-chat-state"
+url = "https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/cloud/agents/2/chat/stream-chat-state"
 headers = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {token}"
