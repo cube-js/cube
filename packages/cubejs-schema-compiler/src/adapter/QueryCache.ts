@@ -3,28 +3,24 @@ export interface QueryCacheInterface {
 }
 
 export class QueryCache implements QueryCacheInterface {
-  private readonly storage: {};
+  private readonly storage: Map<string, any>;
 
   public constructor() {
-    this.storage = {};
+    this.storage = new Map();
   }
 
   /**
    * @returns Returns the result of executing a function (Either call a function or take a value from the cache)
    */
   public cache(key: any[], fn: Function): any {
-    let keyHolder = this.storage;
-    const { length } = key;
-    for (let i = 0; i < length - 1; i++) {
-      if (!keyHolder[key[i]]) {
-        keyHolder[key[i]] = {};
-      }
-      keyHolder = keyHolder[key[i]];
+    const keyString = JSON.stringify(key);
+
+    let result = this.storage.get(keyString);
+    if (!result) {
+      result = fn();
+      this.storage.set(keyString, result);
     }
-    const lastKey = key[length - 1];
-    if (!keyHolder[lastKey]) {
-      keyHolder[lastKey] = fn();
-    }
-    return keyHolder[lastKey];
+
+    return result;
   }
 }
