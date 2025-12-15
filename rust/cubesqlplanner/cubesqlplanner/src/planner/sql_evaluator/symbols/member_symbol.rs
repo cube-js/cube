@@ -364,7 +364,7 @@ impl MemberSymbol {
             )))
         } else if sql_call.dependencies_count() == 0 {
             Err(CubeError::user(format!(
-                "Multi stage member '{}' don't reference other members.",
+                "Multi stage member '{}' doesn't reference other members.",
                 self.full_name()
             )))
         } else {
