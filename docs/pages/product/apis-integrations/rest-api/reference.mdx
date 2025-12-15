@@ -93,6 +93,32 @@ values.
 
 </WarningBox>
 
+## `{base_path}/v1/convert`
+
+Takes an API query in `input` format and converts it to the specified `output` format.
+This endpoint is useful for converting queries, such as from the REST API format to the
+SQL API format.
+
+Request parameters:
+
+| Parameter, type | Description | Required |
+| --- | --- | --- |
+| `input`, `string` | Input query format:<br/>`sql` for [SQL API][ref-sql-api] queries. | ✅ Yes |
+| `output`, `string` | Output query format:<br/>`rest` for [REST API][ref-rest-api] queries. | ✅ Yes |
+| `query`, `string` | Input query | ✅ Yes |
+
+The response will contain a JSON object with the following properties:
+
+| Property, type | Description |
+| --- | --- |
+| `status`, `string` | Query conversion status, `ok` or `error` |
+| `query`, `object` | Converted query |
+| `error`, `string` | Error message in case of an error |
+
+An error will be returned if the input query can't be converted to the specified
+output format, e.g., if the input SQL API query requires post-processing on top of REST API
+capabilities or if the input SQL API query results in multiple REST API queries.
+
 ## `{base_path}/v1/sql`
 
 Takes an API query and returns the SQL query that can be executed against the data source
