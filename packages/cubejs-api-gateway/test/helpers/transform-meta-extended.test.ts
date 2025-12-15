@@ -225,12 +225,12 @@ describe('transformMetaExtended helpers', () => {
       {
         name: 'PlaygroundUsers',
         relationship: 'belongsTo',
-        sql: () => `{CUBE}.id = {PlaygroundUsers.anonymous}`,
+        sql: () => '{CUBE}.id = {PlaygroundUsers.anonymous}',
       },
       {
         name: 'IpEnrich',
         relationship: 'belongsTo',
-        sql: () => `{CUBE.email} = {IpEnrich.email}`,
+        sql: () => '{CUBE.email} = {IpEnrich.email}',
       },
     ];
     

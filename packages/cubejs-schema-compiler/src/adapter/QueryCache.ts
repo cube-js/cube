@@ -20,6 +20,10 @@ export function fastComputeCacheKey(key: unknown): string {
 
       if (typeof key[i] === 'string' || typeof key[i] === 'number') {
         result += key[i];
+      } else if (key[i] === undefined) {
+        result += 'undefined';
+      } else if (key[i] === null) {
+        result += 'null';
       } else if (typeof key[i] === 'function') {
         throw new TypeError(`Function is not allowed as subkey, passed as ${key[i]}`);
       } else {
