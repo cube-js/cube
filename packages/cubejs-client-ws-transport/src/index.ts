@@ -1,4 +1,6 @@
 import WebSocket from 'isomorphic-ws';
+
+import type { CloseEvent, MessageEvent } from 'ws';
 import type { ITransport, ITransportResponse } from '@cubejs-client/core';
 
 /**
@@ -138,10 +140,10 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
         ws.sendMessage({ authorization: this.authorization });
       };
 
-      ws.onmessage = (event: any) => {
+      ws.onmessage = (event: MessageEvent) => {
         ws.lastMessageTimestamp = new Date();
 
-        const message: any = JSON.parse(event.data);
+        const message: any = JSON.parse(event.data.toString());
         if (message.handshake) {
           ws.reconcile();
           ws.reconcileTimer = setInterval(() => {
@@ -160,16 +162,37 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
         ws.sendQueue();
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event: CloseEvent) => {
         if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
           ws.close();
         }
+
         if (ws.reconcileTimer) {
           clearInterval(ws.reconcileTimer);
           ws.reconcileTimer = null;
         }
+
         if (this.ws === ws) {
           this.ws = null;
+
+          // Close code 1009: Message Too Big. Server rejects messages exceeding maxPayload
+          // without decoding. Retrying would cause an infinite loop, so we notify subscribers
+          // and clear subscriptions instead.
+          if (event?.code === 1009) {
+            const error = new WebSocketTransportResult({
+              status: 413,
+              message: { error: event?.reason || 'WebSocket message too big' }
+            });
+
+            Object.values(this.messageIdToSubscription).forEach(sub => {
+              sub.callback(error);
+            });
+
+            this.messageIdToSubscription = {};
+
+            return;
+          }
+
           if (Object.keys(this.messageIdToSubscription).length) {
             this.initSocket();
           }
