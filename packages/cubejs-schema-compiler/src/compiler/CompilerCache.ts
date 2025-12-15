@@ -30,11 +30,12 @@ export class CompilerCache implements QueryCacheInterface {
   public cache(key: any[], fn: Function): any {
     const keyString = fastComputeCacheKey(key);
 
-    let result = this.cacheStorage.get(keyString);
-    if (!result) {
-      result = fn();
-      this.cacheStorage.set(keyString, result);
+    if (this.cacheStorage.has(keyString)) {
+      return this.cacheStorage.get(keyString);
     }
+
+    const result = fn();
+    this.cacheStorage.set(keyString, result);
 
     return result;
   }

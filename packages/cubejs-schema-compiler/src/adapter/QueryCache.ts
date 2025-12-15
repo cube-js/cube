@@ -54,11 +54,12 @@ export class QueryCache implements QueryCacheInterface {
   public cache(key: any[], fn: Function): any {
     const keyString = fastComputeCacheKey(key);
 
-    let result = this.storage.get(keyString);
-    if (!result) {
-      result = fn();
-      this.storage.set(keyString, result);
+    if (this.storage.has(keyString)) {
+      return this.storage.get(keyString);
     }
+
+    const result = fn();
+    this.storage.set(keyString, result);
 
     return result;
   }
