@@ -59,6 +59,15 @@ describe('SubscriptionServer', () => {
       expect(mockSubscriptionStore.unsubscribe).toHaveBeenCalledWith('conn-1', 'msg-1');
     });
 
+    it('should accept unsubscribe with numeric messageId', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', JSON.stringify({ unsubscribe: 123 }));
+
+      expect(mockSubscriptionStore.unsubscribe).toHaveBeenCalledWith('conn-1', 123);
+    });
+
     it('should accept valid load message', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);

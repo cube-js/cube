@@ -2,6 +2,8 @@ interface LocalSubscriptionStoreOptions {
   heartBeatInterval?: number;
 }
 
+export type SubscriptionId = string | number;
+
 export type LocalSubscriptionStoreSubscription = {
   message: any,
   state: any,
@@ -9,7 +11,7 @@ export type LocalSubscriptionStoreSubscription = {
 };
 
 export type LocalSubscriptionStoreConnection = {
-  subscriptions: Map<string, LocalSubscriptionStoreSubscription>,
+  subscriptions: Map<SubscriptionId, LocalSubscriptionStoreSubscription>,
   authContext?: any,
 };
 
@@ -35,7 +37,7 @@ export class LocalSubscriptionStore {
     });
   }
 
-  public async unsubscribe(connectionId: string, subscriptionId: string) {
+  public async unsubscribe(connectionId: string, subscriptionId: SubscriptionId) {
     const connection = this.getConnectionOrCreate(connectionId);
     connection.subscriptions.delete(subscriptionId);
   }
