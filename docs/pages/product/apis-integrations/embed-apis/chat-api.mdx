@@ -2,17 +2,22 @@
 
 The Chat API enables real-time conversations with AI agents for analytics and data exploration.
 
-<SuccessBox>
+<InfoBox>
 
-The Chat API is available in Cube Cloud on [Premium and above](https://cube.dev/pricing) product tiers.
+The Chat API is available on [Premium and Enterprise plans](https://cube.dev/pricing).
 
-</SuccessBox>
+</InfoBox>
 
 ## Endpoint
 
+
+The endpoint has the following structure:
+
 ```
-https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/{tenantName}/agents/{agentId}/chat/stream-chat-state
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/stream-chat-state
 ```
+
+Copy the exact Chat API URL from your agent settings (**Chat API URL** field) in <Btn>Admin → Agents</Btn>.
 
 
 ## Overview
@@ -21,57 +26,18 @@ The Chat API enables real-time streaming conversations with Cube's AI agents. Th
 
 ## Authentication
 
-Use the session-based authentication flow:
-
-1. **Generate a session** using your [API key][ref-api-keys]. This endpoint will automatically create (insert) or update the external user based on the `externalId` provided:
-
 <WarningBox>
 Accounts are limited to 10,000 external users. To increase this limit, please contact support.
 </WarningBox>
 
-```javascript
-const session = await fetch('https://your-tenant.cubecloud.dev/api/v1/embed/generate-session', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Api-Key ${API_KEY}',
-  },
-  body: JSON.stringify({ 
-    externalId: 'user@example.com',
-    userAttributes: [ // optional
-      {
-        name: 'city',
-        value: 'San Francisco'
-      }
-    ]
-  }),
-});
-
-const { sessionId } = await session.json();
-```
-
-2. **Exchange session ID for a token**:
+Pass your [API key][ref-api-keys] directly to the Chat API endpoint. The session will be created automatically based on the `externalId` provided:
 
 ```javascript
-const tokenResponse = await fetch('https://your-tenant.cubecloud.dev/api/v1/embed/session/token', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Api-Key ${API_KEY}',
-  },
-  body: JSON.stringify({ sessionId }),
-});
+// Copy the Chat API URL from your agent settings (Admin → Agents → Chat API URL field)
+const CHAT_API_URL = 'YOUR_CHAT_API_URL';
 
-const { token } = await tokenResponse.json();
-```
-
-## Direct API Key Authentication
-
-For simpler integration, you can pass the API key directly to the Chat API endpoint. The session will be created automatically:
-
-```javascript
 const response = await fetch(
-  'https://ai.gcp-us-central1.cubecloud.dev/v1/public/{tenantName}/agents/{agentId}/chat/stream-chat-state',
+  CHAT_API_URL,
   {
     method: 'POST',
     headers: {
@@ -153,21 +119,34 @@ The attributes passed during session generation become available as `userAttribu
 
 ## Endpoint Reference
 
-Endpoint URL can be found in settings of an Agent but typically it would be defined as following:
+**POST**
 
-**POST** `/api/v1/public/{tenantName}/agents/{agentId}/chat/stream-chat-state`
+```
+https://ai.{cloudRegion}.cubecloud.dev/api/v1/public/{accountName}/agents/{agentId}/chat/stream-chat-state
+```
 
-**Base URL:** `https://ai.gcp-us-central1.cubecloud.dev`
+<InfoBox>
+
+Copy the complete Chat API URL from your agent settings (**Chat API URL** field) in <Btn>Admin → Agents</Btn>.
+
+</InfoBox>
 
 ### Path Parameters
 
-- **`tenantName`** (string, required): The tenant identifier (e.g., "acme"). It is in your account URL, e.g. https://acme.cubecloud.dev
+- **`cloudRegion`** (string): The cloud region identifier (e.g., "gcp-us-central1")
+- **`accountName`** (string, required): The account identifier (e.g., "acme"). It is in your account URL, e.g. https://acme.cubecloud.dev
 - **`agentId`** (string, required): The AI agent identifier (e.g., "1"). You can find it in <Btn>Admin → Agents → Click on Agent row in the table</Btn>.
 
 ### Request Body
 
-- **`chatId`** (string, required): Unique identifier for the chat session. We recommend generating a UUID for this.
-- **`input`** (string): User message or query to send to the AI agent, e.g. "What is our revenue last month?"
+- **`input`** (string): User message or query to send to the AI agent, e.g. "What is our revenue last month?". If omitted, returns current state of thread with provided `chatId`.
+- **`chatId`** (string): Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__`.
+- **`sessionSettings`** (object, required): Session configuration for the user
+  - **`externalId`** (string, required): Unique identifier for the user
+  - **`email`** (string): User's email address
+  - **`userAttributes`** (array): Array of `{name, value}` pairs for row-level security
+  - **`groups`** (string[]): Array of group names for user
+  - **`securityContext`** (object): Custom security context object passed to Cube queries
 
 ## Response Format
 
@@ -748,60 +727,43 @@ When an error occurs, the `result` property of the toolCall will contain an `err
 <CodeTabs>
 
 ```bash cURL
-curl -X POST "https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/cloud/agents/2/chat/stream-chat-state" \
+# Copy YOUR_CHAT_API_URL from your agent settings (Admin → Agents → Chat API URL field)
+curl -X POST "YOUR_CHAT_API_URL" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_SESSION_TOKEN" \
+  -H "Authorization: Api-Key YOUR_API_KEY" \
   -d '{
-    "chatId": "chat-session-123",
-    "input": "Show me revenue trends for the last 6 months"
+    "input": "Show me revenue trends for the last 6 months",
+    "sessionSettings": {
+      "externalId": "user@example.com"
+    }
   }'
 ```
 
 ```javascript JavaScript
-// First, get a session token
-const session = await fetch('https://your-tenant.cubecloud.dev/api/v1/embed/generate-session', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Api-Key ${API_KEY}',
-  },
-  body: JSON.stringify({ 
-    externalId: 'user@example.com',
-    email: 'user@example.com',
-    userAttributes: [
-      {
-        name: 'city',
-        value: 'San Francisco'
-      }
-    ]
-  }),
-});
+// Copy the Chat API URL from your agent settings (Admin → Agents → Chat API URL field)
+const CHAT_API_URL = 'YOUR_CHAT_API_URL';
+const API_KEY = 'YOUR_API_KEY';
 
-const { sessionId } = await session.json();
-
-const tokenResponse = await fetch('https://your-tenant.cubecloud.dev/api/v1/embed/session/token', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Api-Key ${API_KEY}',
-  },
-  body: JSON.stringify({ sessionId }),
-});
-
-const { token } = await tokenResponse.json();
-
-// Now use the token to make the chat request
 const response = await fetch(
-  'https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/cloud/agents/2/chat/stream-chat-state',
+  CHAT_API_URL,
   {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Api-Key ${API_KEY}`
     },
     body: JSON.stringify({
-      chatId: 'chat-session-123',
-      input: 'Hello, how can you help me analyze our data?'
+      input: 'Hello, how can you help me analyze our data?',
+      sessionSettings: {
+        externalId: 'user@example.com',
+        email: 'user@example.com', // optional
+        userAttributes: [ // optional
+          {
+            name: 'city',
+            value: 'San Francisco'
+          }
+        ]
+      }
     })
   }
 );
@@ -835,42 +797,30 @@ while (true) {
 import requests
 import json
 
-# First, get a session token
-session_url = "https://your-tenant.cubecloud.dev/api/v1/embed/generate-session"
-session_headers = {
-    "Content-Type": "application/json",
-    "Authorization": f"Api-Key {api_key}"
-}
+# Copy the Chat API URL from your agent settings (Admin → Agents → Chat API URL field)
+CHAT_API_URL = "YOUR_CHAT_API_URL"
+API_KEY = "YOUR_API_KEY"
 
-session_response = requests.post(session_url, headers=session_headers, json={
-    "externalId": "user@example.com",
-    "email": "user@example.com",
-    "userAttributes": [
-        {
-            "name": "city",
-            "value": "San Francisco"
-        }
-    ]
-})
-session_id = session_response.json()["sessionId"]
-
-token_url = "https://your-tenant.cubecloud.dev/api/v1/embed/session/token"
-token_response = requests.post(token_url, headers=session_headers, json={"sessionId": session_id})
-token = token_response.json()["token"]
-
-# Now use the token to make the chat request
-url = "https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/cloud/agents/2/chat/stream-chat-state"
 headers = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {token}"
+    "Authorization": f"Api-Key {API_KEY}"
 }
 
 data = {
-    "chatId": "chat-session-123",
-    "input": "What are our top performing products?"
+    "input": "What are our top performing products?",
+    "sessionSettings": {
+        "externalId": "user@example.com",
+        "email": "user@example.com",  # optional
+        "userAttributes": [  # optional
+            {
+                "name": "city",
+                "value": "San Francisco"
+            }
+        ]
+    }
 }
 
-response = requests.post(url, headers=headers, json=data, stream=True)
+response = requests.post(CHAT_API_URL, headers=headers, json=data, stream=True)
 
 for line in response.iter_lines():
     if line:
@@ -882,9 +832,9 @@ for line in response.iter_lines():
 
 ## Error Handling
 
-- **401 Unauthorized**: Invalid or missing JWT token. Verify your token is properly signed and not expired.
+- **401 Unauthorized**: Invalid or missing API key. Verify your API key is correct and has the necessary permissions.
 - **400 Bad Request**: Invalid request body or parameters. Check required fields and data types.
-- **404 Not Found**: Agent or tenant not found. Verify the tenantName and agentId parameters.
+- **404 Not Found**: Agent or tenant not found. Verify the Chat API URL from your agent settings.
 - **500 Internal Server Error**: Server processing error. Contact support if the issue persists.
 
 

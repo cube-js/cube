@@ -37,23 +37,12 @@ To use the embedded chat or dashboard, you need an [API key][ref-api-keys]:
 
 ### Generate an embed session
 
-Use the `/api/v1/embed/generate-session` endpoint to create a session for your user. This endpoint will automatically create (insert) or update the external user based on the `externalId` provided.
+Use the [Generate Session API][ref-generate-session] to create a session for your user. This endpoint will automatically create (insert) or update the external user based on the `externalId` provided.
 
 <WarningBox>
   Accounts are limited to 10,000 external users. To increase this limit, please
   contact support.
 </WarningBox>
-
-
-#### Request parameters
-
-- **`deploymentId`** (required): The deployment ID to scope the session to. This ensures tokens and access are limited to a specific deployment and model, providing better security isolation.
-- **`externalId`** (required): A unique identifier for your user (e.g., email, user ID)
-- **`userAttributes`** (optional): Array of attributes for row-level security and personalized responses
-
-<InfoBox>
-  The `deploymentId` parameter is required for security purposes. It scopes the generated session token to a specific deployment and data model, preventing unauthorized access across different deployments or models.
-</InfoBox>
 
 #### Example (JavaScript)
 
@@ -62,7 +51,7 @@ const API_KEY = "YOUR_API_KEY";
 const DEPLOYMENT_ID = 32;
 
 const session = await fetch(
-  "https://your-tenant.cubecloud.dev/api/v1/embed/generate-session",
+  "https://your-account.cubecloud.dev/api/v1/embed/generate-session",
   {
     method: "POST",
     headers: {
@@ -187,4 +176,5 @@ User attributes enable row-level security and personalized chat responses by fil
 - Department heads see only their department's metrics
 
 
-[ref-api-keys]: /product/workspace/api-keys
+[ref-api-keys]: /product/administration/workspace/api-keys
+[ref-generate-session]: /product/apis-integrations/embed-apis/generate-session
