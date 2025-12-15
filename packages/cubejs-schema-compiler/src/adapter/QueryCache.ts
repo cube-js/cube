@@ -9,7 +9,7 @@ export interface QueryCacheInterface {
  * - For strings/numbers (common case), ~3x faster than JSON.stringify
  * - Only falls back to JSON.stringify for objects/arrays
  */
-export function computeCacheKey(key: unknown): string {
+export function fastComputeCacheKey(key: unknown): string {
   if (Array.isArray(key)) {
     let result = '';
 
@@ -20,6 +20,8 @@ export function computeCacheKey(key: unknown): string {
 
       if (typeof key[i] === 'string' || typeof key[i] === 'number') {
         result += key[i];
+      } else if (typeof key[i] === 'function') {
+        throw new TypeError(`Function is not allowed as subkey, passed as ${key[i]}`);
       } else {
         result += JSON.stringify(key[i]);
       }
@@ -46,7 +48,7 @@ export class QueryCache implements QueryCacheInterface {
    * @returns Returns the result of executing a function (Either call a function or take a value from the cache)
    */
   public cache(key: any[], fn: Function): any {
-    const keyString = computeCacheKey(key);
+    const keyString = fastComputeCacheKey(key);
 
     let result = this.storage.get(keyString);
     if (!result) {
