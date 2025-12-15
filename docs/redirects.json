@@ -1988,5 +1988,80 @@
     "source": "/product/agentic-analytics/roles-and-permissions",
     "destination": "/product/administration/users-and-permissions/roles-and-permissions",
     "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/queries",
+    "destination": "/product/apis-integrations/core-data-apis/queries",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/joins",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/joins",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/query-format",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/reference",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/sql-api/security",
+    "destination": "/product/apis-integrations/core-data-apis/sql-api/security",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/dax-api",
+    "destination": "/product/apis-integrations/core-data-apis/dax-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/dax-api/reference",
+    "destination": "/product/apis-integrations/core-data-apis/dax-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/mdx-api",
+    "destination": "/product/apis-integrations/core-data-apis/mdx-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api/query-format",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api/query-format",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/rest-api/reference",
+    "destination": "/product/apis-integrations/core-data-apis/rest-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/graphql-api",
+    "destination": "/product/apis-integrations/core-data-apis/graphql-api",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/graphql-api/reference",
+    "destination": "/product/apis-integrations/core-data-apis/graphql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/apis-integrations/chat-api",
+    "destination": "/product/apis-integrations/embed-apis/chat-api",
+    "permanent": true
   }
 ]
