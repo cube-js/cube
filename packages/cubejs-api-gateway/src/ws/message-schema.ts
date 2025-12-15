@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const messageId = z.union([z.string().max(16), z.number()]);
+const messageId = z.union([z.string().max(16), z.int()]);
 const requestId = z.string().max(64).optional();
 
 export const authMessageSchema = z.object({
@@ -8,7 +8,7 @@ export const authMessageSchema = z.object({
 }).strict();
 
 export const unsubscribeMessageSchema = z.object({
-  unsubscribe: z.string().max(16),
+  unsubscribe: messageId,
 }).strict();
 
 const queryParams = z.object({
