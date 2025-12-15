@@ -1,5 +1,5 @@
 import { LRUCache } from 'lru-cache';
-import { QueryCacheInterface, QueryCache } from '../adapter/QueryCache';
+import { QueryCacheInterface, QueryCache, computeCacheKey } from '../adapter/QueryCache';
 
 export class CompilerCache implements QueryCacheInterface {
   protected readonly queryCache: LRUCache<string, QueryCache>;
@@ -28,7 +28,7 @@ export class CompilerCache implements QueryCacheInterface {
   }
 
   public cache(key: any[], fn: Function): any {
-    const keyString = JSON.stringify(key);
+    const keyString = computeCacheKey(key);
 
     let result = this.cacheStorage.get(keyString);
     if (!result) {
@@ -44,7 +44,7 @@ export class CompilerCache implements QueryCacheInterface {
   }
 
   public getQueryCache(key: unknown): QueryCacheInterface {
-    const keyString = JSON.stringify(key);
+    const keyString = computeCacheKey(key);
 
     const exist = this.queryCache.get(keyString);
     if (exist) {
