@@ -247,6 +247,7 @@ crate::plan_to_language! {
         AggregateUDFExpr {
             fun: Arc<AggregateUDF>,
             args: Vec<Expr>,
+            distinct: bool,
         },
         TableUDFExpr {
             fun: Arc<TableUDF>,
@@ -1470,15 +1471,23 @@ fn window_fun_expr_var_arg(
     )
 }
 
-fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
+fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
+    udaf_expr_var_arg(fun_name, list_expr("AggregateUDFExprArgs", args), distinct)
+}
+
+fn udaf_expr_var_arg(
+    fun_name: impl Display,
+    arg_list: impl Display,
+    distinct: impl Display,
+) -> String {
     let prefix = if fun_name.to_string().starts_with("?") {
         ""
     } else {
         "AggregateUDFExprFun:"
     };
     format!(
-        "(AggregateUDFExpr {prefix}{fun_name} {})",
-        list_expr("AggregateUDFExprArgs", args),
+        "(AggregateUDFExpr {}{} {} {})",
+        prefix, fun_name, arg_list, distinct
     )
 }
 

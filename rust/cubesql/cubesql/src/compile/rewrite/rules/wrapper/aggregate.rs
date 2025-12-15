@@ -15,9 +15,9 @@ use crate::{
             wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
             wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer,
             wrapper_pushdown_replacer, wrapper_replacer_context, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, ColumnExprColumn,
-            ListType, LiteralExprValue, LogicalPlanData, LogicalPlanLanguage,
-            WrappedSelectPushToCube, WrapperReplacerContextAliasToCube,
+            AggregateFunctionExprFun, AggregateUDFExprDistinct, AggregateUDFExprFun,
+            AliasExprAlias, ColumnExprColumn, ListType, LiteralExprValue, LogicalPlanData,
+            LogicalPlanLanguage, WrappedSelectPushToCube, WrapperReplacerContextAliasToCube,
             WrapperReplacerContextPushToCube,
         },
     },
@@ -389,6 +389,7 @@ impl WrapperRules {
                                 "?context",
                             ),
                         ],
+                        "AggregateUDFExprDistinct:false",
                     ),
                     "?out_measure_alias",
                 ),
@@ -411,6 +412,7 @@ impl WrapperRules {
                         "?new_agg_type".to_string(),
                         wrapper_pullup_replacer("?filter_expr", "?context"),
                     ],
+                    "AggregateUDFExprDistinct:false",
                 ),
                 wrapper_pullup_replacer(
                     udaf_expr(
@@ -420,6 +422,7 @@ impl WrapperRules {
                             "?new_agg_type".to_string(),
                             "?filter_expr".to_string(),
                         ],
+                        "AggregateUDFExprDistinct:false",
                     ),
                     "?context",
                 ),
@@ -959,9 +962,13 @@ impl WrapperRules {
         ));
         let udaf_args_expr =
             egraph.add(LogicalPlanLanguage::AggregateUDFExprArgs(vec![column_expr]));
+        let udaf_distinct_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExprDistinct(
+            AggregateUDFExprDistinct(false),
+        ));
         let udaf_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExpr([
             udaf_name_expr,
             udaf_args_expr,
+            udaf_distinct_expr,
         ]));
 
         subst.insert(out_expr_var, udaf_expr);
@@ -1012,9 +1019,13 @@ impl WrapperRules {
             new_aggregation_expr,
             add_filters_expr,
         ]));
+        let udaf_distinct_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExprDistinct(
+            AggregateUDFExprDistinct(false),
+        ));
         let udaf_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExpr([
             udaf_name_expr,
             udaf_args_expr,
+            udaf_distinct_expr,
         ]));
 
         if let Some(out_expr_var) = out_expr_var {

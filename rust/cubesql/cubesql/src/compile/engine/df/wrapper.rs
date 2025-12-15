@@ -1190,9 +1190,19 @@ impl WrappedSelectNode {
                 )
                 .await
             }
-            Expr::AggregateUDF { fun, args } => {
+            Expr::AggregateUDF {
+                fun,
+                args,
+                distinct,
+            } => {
                 if fun.name != PATCH_MEASURE_UDAF_NAME {
                     return Ok((None, sql_query));
+                }
+
+                if *distinct {
+                    return Err(CubeError::internal(
+                        "Patch measure with DISTINCT flag is not supported".to_string(),
+                    ));
                 }
 
                 let Some(push_to_cube_context) = push_to_cube_context else {
@@ -2861,10 +2871,20 @@ impl WrappedSelectNode {
                     })?;
                 Ok((resulting_sql, sql_query))
             }
-            Expr::AggregateUDF { ref fun, ref args } => {
+            Expr::AggregateUDF {
+                ref fun,
+                ref args,
+                distinct,
+            } => {
                 match fun.name.as_str() {
                     // TODO allow this only in agg expr
                     MEASURE_UDAF_NAME => {
+                        if distinct {
+                            return Err(DataFusionError::Internal(
+                                "MEASURE function with DISTINCT flag is not supported".to_string(),
+                            ));
+                        }
+
                         let Some(PushToCubeContext {
                             ungrouped_scan_node,
                             ..
