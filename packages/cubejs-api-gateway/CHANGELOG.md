@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
+
+### Bug Fixes
+
+- **api-gateway:** Allow messageId to be int in unsubscribe WS request ([#10250](https://github.com/cube-js/cube/issues/10250)) ([1e2e7cb](https://github.com/cube-js/cube/commit/1e2e7cb382bfb95376f1149f9f91608914ff4bc1))
+
 ## [1.5.14](https://github.com/cube-js/cube/compare/v1.5.13...v1.5.14) (2025-12-11)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway
