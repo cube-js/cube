@@ -1,4 +1,8 @@
-export class QueryCache {
+export interface QueryCacheInterface {
+  cache(key: any[], fn: Function): any;
+}
+
+export class QueryCache implements QueryCacheInterface {
   private readonly storage: {};
 
   public constructor() {
