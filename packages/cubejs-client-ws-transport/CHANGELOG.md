@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.2](https://github.com/cube-js/cube/compare/v1.4.1...v1.4.2) (2025-12-16)
+
+### Bug Fixes
+
+- **client-ws-transport:** Handle WebSocket close code 1009 (Message Too Big) ([#10246](https://github.com/cube-js/cube/issues/10246)) ([30a72fa](https://github.com/cube-js/cube/commit/30a72fac4922ca2e545d974368395a179ea35c57))
+
 ## [1.4.1](https://github.com/cube-js/cube/compare/v1.4.0...v1.4.1) (2025-12-11)
 
 **Note:** Version bump only for package @cubejs-client/ws-transport
