@@ -143,7 +143,11 @@ impl RewriteRules for MemberRules {
             ),
             self.measure_rewrite(
                 "measure-fun",
-                udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
+                udaf_expr(
+                    MEASURE_UDAF_NAME,
+                    vec![column_expr("?column")],
+                    "AggregateUDFExprDistinct:false",
+                ),
                 Some("?column"),
                 None,
                 None,
@@ -647,7 +651,11 @@ impl MemberRules {
         ));
         rules.push(find_matching_old_member(
             "udaf-fun",
-            udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
+            udaf_expr(
+                MEASURE_UDAF_NAME,
+                vec![column_expr("?column")],
+                "AggregateUDFExprDistinct:false",
+            ),
             ColumnToSearch::Var("?column"),
             None,
         ));
@@ -1129,7 +1137,11 @@ impl MemberRules {
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-udaf-fun",
-            udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
+            udaf_expr(
+                MEASURE_UDAF_NAME,
+                vec![column_expr("?column")],
+                "AggregateUDFExprDistinct:false",
+            ),
             measure_expr("?name", "?old_alias"),
             None,
             None,
@@ -1138,7 +1150,11 @@ impl MemberRules {
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-udaf-fun-on-dimension",
-            udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
+            udaf_expr(
+                MEASURE_UDAF_NAME,
+                vec![column_expr("?column")],
+                "AggregateUDFExprDistinct:false",
+            ),
             dimension_expr("?name", "?old_alias"),
             None,
             None,
