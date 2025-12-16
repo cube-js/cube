@@ -33,7 +33,7 @@ export function convertTimeStrToSeconds(
   throw new InvalidConfiguration(envName, input, description);
 }
 
-export function convertByteSizeToNumber(
+export function convertSizeToBytes(
   input: string,
   envName: string,
   description: string = 'Must be a number in bytes or size string (1kb, 1mb, 1gb).',
@@ -175,7 +175,7 @@ const variables: Record<string, (...args: any) => any> = {
   serverKeepAliveTimeout: () => get('CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT')
     .asInt(),
   maxRequestSize: () => {
-    const value = convertByteSizeToNumber(process.env.CUBEJS_MAX_REQUEST_SIZE || '50mb', 'CUBEJS_MAX_REQUEST_SIZE');
+    const value = convertSizeToBytes(process.env.CUBEJS_MAX_REQUEST_SIZE || '50mb', 'CUBEJS_MAX_REQUEST_SIZE');
 
     const minBytes = 100 * 1024; // 100kb
     const maxBytes = 64 * 1024 * 1024; // 64mb

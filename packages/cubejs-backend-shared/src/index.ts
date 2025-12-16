@@ -3,7 +3,7 @@ export {
   assertDataSource,
   keyByDataSource,
   isDockerImage,
-  convertByteSizeToNumber,
+  convertSizeToBytes,
 } from './env';
 export * from './enums';
 export * from './package';

@@ -1,4 +1,4 @@
-import { getEnv, convertTimeStrToSeconds, convertByteSizeToNumber } from '../src/env';
+import { getEnv, convertTimeStrToSeconds, convertSizeToBytes } from '../src/env';
 
 test('convertTimeStrToMs', () => {
   expect(convertTimeStrToSeconds('1', 'VARIABLE_ENV')).toBe(1);
@@ -16,24 +16,24 @@ test('convertTimeStrToMs(exception)', () => {
   );
 });
 
-test('convertByteSizeToNumber', () => {
-  expect(convertByteSizeToNumber('1024', 'VARIABLE_ENV')).toBe(1024);
-  expect(convertByteSizeToNumber('1kb', 'VARIABLE_ENV')).toBe(1024);
-  expect(convertByteSizeToNumber('10KB', 'VARIABLE_ENV')).toBe(10 * 1024);
-  expect(convertByteSizeToNumber('1mb', 'VARIABLE_ENV')).toBe(1024 * 1024);
-  expect(convertByteSizeToNumber('50MB', 'VARIABLE_ENV')).toBe(50 * 1024 * 1024);
-  expect(convertByteSizeToNumber('1gb', 'VARIABLE_ENV')).toBe(1024 * 1024 * 1024);
-  expect(convertByteSizeToNumber('2GB', 'VARIABLE_ENV')).toBe(2 * 1024 * 1024 * 1024);
+test('convertSizeToBytes', () => {
+  expect(convertSizeToBytes('1024', 'VARIABLE_ENV')).toBe(1024);
+  expect(convertSizeToBytes('1kb', 'VARIABLE_ENV')).toBe(1024);
+  expect(convertSizeToBytes('10KB', 'VARIABLE_ENV')).toBe(10 * 1024);
+  expect(convertSizeToBytes('1mb', 'VARIABLE_ENV')).toBe(1024 * 1024);
+  expect(convertSizeToBytes('50MB', 'VARIABLE_ENV')).toBe(50 * 1024 * 1024);
+  expect(convertSizeToBytes('1gb', 'VARIABLE_ENV')).toBe(1024 * 1024 * 1024);
+  expect(convertSizeToBytes('2GB', 'VARIABLE_ENV')).toBe(2 * 1024 * 1024 * 1024);
 });
 
-test('convertByteSizeToNumber(exception)', () => {
-  expect(() => convertByteSizeToNumber('', 'VARIABLE_ENV')).toThrowError(
+test('convertSizeToBytes(exception)', () => {
+  expect(() => convertSizeToBytes('', 'VARIABLE_ENV')).toThrowError(
     `Value "" is not valid for VARIABLE_ENV. Must be a number in bytes or size string (1kb, 1mb, 1gb).`
   );
-  expect(() => convertByteSizeToNumber('abc', 'VARIABLE_ENV')).toThrowError(
+  expect(() => convertSizeToBytes('abc', 'VARIABLE_ENV')).toThrowError(
     `Value "abc" is not valid for VARIABLE_ENV. Must be a number in bytes or size string (1kb, 1mb, 1gb).`
   );
-  expect(() => convertByteSizeToNumber('1tb', 'VARIABLE_ENV')).toThrowError(
+  expect(() => convertSizeToBytes('1tb', 'VARIABLE_ENV')).toThrowError(
     `Value "1tb" is not valid for VARIABLE_ENV. Must be a number in bytes or size string (1kb, 1mb, 1gb).`
   );
 });
