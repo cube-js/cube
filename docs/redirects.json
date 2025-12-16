@@ -1761,7 +1761,12 @@
   },
   {
     "source": "/product/workspace/playground",
-    "destination": "/product/administration/workspace/playground",
+    "destination": "/product/exploration/playground",
+    "permanent": true
+  },
+  {
+    "source": "/product/administration/workspace/playground",
+    "destination": "/product/exploration/playground",
     "permanent": true
   },
   {

@@ -3,47 +3,30 @@
 Workbooks allow you to build reports with an AI agent, organize the results of your
 analysis, and share insights with your team.
 
-## Query data
+## Tabs
 
-The Data Pane in Cube workbooks provides an intuitive interface for exploring and
-querying your data models, giving you direct access to all available semantic views
-along with their measures and dimensions.
+Workbooks can contain one or more tabs, each providing a different way to query and analyze your data. Tabs enable you to organize multiple analyses within a single workbook, making it easy to explore different aspects of your data or combine insights from different sources.
 
-## Source SQL
+## Tab types
 
-The Source SQL capability in Cube workbooks allows you to query your connected data
-sources directly, beyond just the semantic layer. Our AI agent can research your data
-source, help you build SQL queries, and refine results in real-time to provide deeper
-insights and exploration capabilities.
+Workbooks support two types of tabs, each designed for different querying approaches:
 
-<video
-  autoPlay
-  muted
-  loop
-  playsInline
-  className="w-full aspect-video rounded-xl"
-  src="https://lgo0ecceic.ucarecd.net/05eac530-c203-4bbb-a116-eebdff6dc0c4/"
-></video>
+### Semantic Query
 
-## Dashboards
+[Semantic Query tabs](/product/exploration/workbooks/querying-data) allow you to query your data model through the semantic layer. This ensures all queries use consistent metrics, respect access control policies, and benefit from pre-aggregations for fast performance.
 
-Transform your data analysis into polished, interactive applications with Cube's
-dashboard builder. Create comprehensive dashboards that combine multiple visualizations,
-filters, and content into cohesive data stories.
+You can query the semantic layer in three ways:
 
-## Charts
+- **Point and click** – Use the intuitive interface to select measures and dimensions, build visualizations, and explore your data interactively
+- **AI agent** – Ask the AI agent to build queries and visualizations based on natural language questions
+- **Semantic SQL** – Write Semantic SQL queries manually to have full control over your queries while still leveraging the semantic layer
 
-### Chart templates
+### Source SQL Query
 
-Cube provides quick chart templates that make it faster to create common visualizations.
-These templates automatically map the right data fields and apply best practices for
-each visualization type.
+[Source SQL Query tabs](/product/exploration/workbooks/source-sql-tabs) allow you to query your connected data sources directly, bypassing the semantic layer. This gives you direct access to your raw data and enables deeper exploration beyond what's defined in your data model.
 
-Charts in Cube workbooks provide powerful visualization capabilities for your data
-models, enabling you to create interactive and insightful visual representations of your
-analytics.
+You can query source SQL in two ways:
 
-### Table chart
+- **Write SQL manually** – Write standard SQL queries directly against your data source for maximum flexibility
+- **Ask AI** – Use the AI agent to help you research your data source, build SQL queries, and refine results in real-time
 
-Table charts provide a tabular view of your data, perfect for detailed data exploration
-and when you need to see exact values rather than visual trends.
