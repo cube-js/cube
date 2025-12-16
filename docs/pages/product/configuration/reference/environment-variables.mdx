@@ -1233,6 +1233,15 @@ after it has finished writing the last response, before a socket will be destroy
 | ----------------------------------------- | ------------------------ | ------------------------ |
 | A valid number or string representing one | NodeJS's version default | NodeJS's version default |
 
+## `CUBEJS_MAX_REQUEST_SIZE`
+
+The maximum allowed size for incoming requests. Applies to both HTTP body parser
+and WebSocket message payload limits.
+
+| Possible Values                                   | Default in Development | Default in Production |
+| ------------------------------------------------- | ---------------------- | --------------------- |
+| A number in bytes or size string (1kb, 1mb, 1gb)  | `50mb`                 | `50mb`                |
+
 ## `CUBEJS_SQL_USER`
 
 A username required to access the [SQL API][ref-sql-api].
