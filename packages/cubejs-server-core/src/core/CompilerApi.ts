@@ -663,10 +663,8 @@ export class CompilerApi {
           );
 
           // Check if the policy grants access to all members used in the query
-          return [...cubeMembersInQuery].every(memberName =>
-            policy.memberLevel.includesMembers.includes(memberName) &&
-            !policy.memberLevel.excludesMembers.includes(memberName)
-          );
+          return [...cubeMembersInQuery].every(memberName => policy.memberLevel.includesMembers.includes(memberName) &&
+            !policy.memberLevel.excludesMembers.includes(memberName));
         });
 
         for (const policy of policiesWithMemberAccess) {
