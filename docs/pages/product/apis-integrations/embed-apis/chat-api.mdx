@@ -77,7 +77,7 @@ while (true) {
 |-------|------|----------|-------------|
 | `input` | string | No | The user's message or question. If omitted returns current state of thread with provided chatId. |
 | `chatId` | string | No | Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__` sent as the `state.chatId` field. |
-| `sessionSettings.externalId` | string | Yes | Unique identifier for the user |
+| `sessionSettings.externalId` | string | Yes | Unique identifier for the user, lowercase and without spaces |
 | `sessionSettings.email` | string | No | User's email address |
 | `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security |
 | `sessionSettings.groups` | string[] | No | Array of group names the user belongs to |
