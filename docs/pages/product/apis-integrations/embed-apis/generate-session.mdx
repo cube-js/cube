@@ -47,15 +47,13 @@ The API returns a session object:
 
 ```json
 {
-  "sessionId": "abc123def456...",
-  "expiresAt": "2024-01-15T10:30:00Z"
+  "sessionId": "abc123def456..."
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `sessionId` | string | Unique session identifier to use for embedding content |
-| `expiresAt` | string | ISO 8601 timestamp when the session expires |
 
 Use the `sessionId` directly in your embed URL to authenticate and load content securely.
 

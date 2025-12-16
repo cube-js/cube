@@ -15,19 +15,10 @@ can be accessed by any users and they are also visible during data model introsp
 
 ## Managing member-level access
 
-You can use [data access policies][ref-dap] to configure member-level access
-for different [roles][ref-dap-roles]. With the `access_policy` parameter in
+You can use [access policies][ref-dap] to configure member-level access
+for different groups. With the `access_policy` parameter in
 [cubes][ref-ref-cubes] and [views][ref-ref-views], you can define which members
-are accessible to users with specific roles.
-
-<InfoBox>
-
-In [development mode][ref-dev-mode] in [Playground][ref-playground], access
-control checks are disabled and all access policies are not evaluated. It helps
-you conveniently debug the data model by querying any members in
-API queries and during data model introspection.
-
-</InfoBox>
+are accessible to users with specific groups.
 
 Use the `member_level` parameter to specify either:
 - `includes`: a list of allowed members, or
@@ -35,7 +26,13 @@ Use the `member_level` parameter to specify either:
 
 You can use `"*"` as a shorthand to include or exclude all members.
 
-In the following example, member-level access is configured for different roles:
+<InfoBox>
+
+When you define access policies for specific groups, access is automatically denied to all other groups. You don't need to create a default policy that denies access.
+
+</InfoBox>
+
+In the following example, member-level access is configured for different groups:
 
 <CodeTabs>
 
@@ -52,26 +49,21 @@ views:
           - count_30d
     
     access_policy:
-      # Default policy: no access for users without specific roles
-      - role: "*"
-        member_level:
-          includes: []
-      
       # Managers can access all members except for `count`
-      - role: manager
+      - group: manager
         member_level:
           excludes:
             - count
       
       # Observers can access all members except for `count` and `count_7d`
-      - role: observer
+      - group: observer
         member_level:
           excludes:
             - count
             - count_7d
       
       # Guests can only access the `count_30d` measure
-      - role: guest
+      - group: guest
         member_level:
           includes:
             - count_30d
@@ -94,15 +86,8 @@ view(`orders_view`, {
 
   access_policy: [
     {
-      // Default policy: no access for users without specific roles
-      role: `*`,
-      member_level: {
-        includes: []
-      }
-    },
-    {
       // Managers can access all members except for `count`
-      role: `manager`,
+      group: `manager`,
       member_level: {
         excludes: [
           `count`
@@ -111,7 +96,7 @@ view(`orders_view`, {
     },
     {
       // Observers can access all members except for `count` and `count_7d`
-      role: `observer`,
+      group: `observer`,
       member_level: {
         excludes: [
           `count`,
@@ -121,7 +106,7 @@ view(`orders_view`, {
     },
     {
       // Guests can only access the `count_30d` measure
-      role: `guest`,
+      group: `guest`,
       member_level: {
         includes: [
           `count_30d`
@@ -136,7 +121,7 @@ view(`orders_view`, {
 
 This configuration results in the following access:
 
-| Role | Access |
+| Group | Access |
 | --- | --- |
 | `manager` | All members except for `count` |
 | `observer` | All members except for `count` and `count_7d` |
@@ -144,28 +129,8 @@ This configuration results in the following access:
 | All other users | No access to this view at all |
 
 Access policies also respect member-level security restrictions configured via
-`public` parameters. For more details, see the [data access policies
+`public` parameters. For more details, see the [access policies
 reference][ref-dap-ref].
-
-## Using the public parameter
-
-You can explicitly make a data model entity public or private by setting its
-`public` parameter to `true` or `false`. This parameter is available for
-[cubes][ref-cubes-public], [views][ref-views-public], [measures][ref-measures-public],
-[dimensions][ref-dimensions-public], [hierarchies][ref-hierarchies-public], and
-[segments][ref-segments-public].
-
-You can also control whether a data model entity should be public or private
-[dynamically][ref-dynamic-data-modeling] by using the [security context][ref-security-context].
-
-<WarningBox>
-
-While the `public` parameter provides a simple way to restrict access, it applies
-globally to all users. __It is recommended to use [data access policies][ref-dap]
-by default__ as they allow you to define granular access control rules
-in one place.
-
-</WarningBox>
 
 
 [ref-data-modeling-concepts]: /product/data-modeling/concepts
@@ -173,7 +138,6 @@ in one place.
 [ref-cubes]: /product/data-modeling/concepts#cubes
 [ref-views]: /product/data-modeling/concepts#views
 [ref-dap]: /product/auth/data-access-policies
-[ref-dap-roles]: /product/auth/data-access-policies#data-access-roles
 [ref-ref-cubes]: /product/data-modeling/reference/cube
 [ref-ref-views]: /product/data-modeling/reference/view
 [ref-dev-mode]: /product/configuration#development-mode
