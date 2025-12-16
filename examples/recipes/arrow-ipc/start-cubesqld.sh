@@ -77,6 +77,8 @@ CUBESQLD_DEBUG="$CUBE_ROOT/rust/cubesql/target/debug/cubesqld"
 CUBESQLD_RELEASE="$CUBE_ROOT/rust/cubesql/target/release/cubesqld"
 CUBESQLD_LOCAL="$SCRIPT_DIR/bin/cubesqld"
 
+echo "---> "${CUBESQLD_RELEASE}
+
 CUBESQLD_BIN=""
 if [ -f "$CUBESQLD_DEBUG" ]; then
     CUBESQLD_BIN="$CUBESQLD_DEBUG"
