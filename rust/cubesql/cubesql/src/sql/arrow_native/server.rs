@@ -258,16 +258,26 @@ impl ArrowNativeServer {
                         )
                         .await
                         {
-                            error!(
-                                "Query execution error AND WHAT ARE WE DOING ABOUT IT: {}",
-                                e
-                            );
-                            let _ = StreamWriter::write_error(
+                            error!("Query execution error: {}", e);
+
+                            // Attempt to send error message to client
+                            if let Err(write_err) = StreamWriter::write_error(
                                 &mut socket,
                                 "QUERY_ERROR".to_string(),
                                 e.to_string(),
                             )
-                            .await;
+                            .await
+                            {
+                                error!(
+                                    "Failed to send error message to client: {}. Original error: {}",
+                                    write_err, e
+                                );
+                                // Connection is broken, exit handler loop
+                                break;
+                            }
+
+                            // Error successfully sent, continue serving this connection
+                            debug!("Error message sent to client successfully");
                         }
                     }
                     _ => {
