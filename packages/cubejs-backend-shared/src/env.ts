@@ -175,8 +175,20 @@ const variables: Record<string, (...args: any) => any> = {
   serverKeepAliveTimeout: () => get('CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT')
     .asInt(),
   maxRequestSize: () => {
-    const value = process.env.CUBEJS_MAX_REQUEST_SIZE || '50mb';
-    return convertByteSizeToNumber(value, 'CUBEJS_MAX_REQUEST_SIZE');
+    const value = convertByteSizeToNumber(process.env.CUBEJS_MAX_REQUEST_SIZE || '50mb', 'CUBEJS_MAX_REQUEST_SIZE');
+
+    const minBytes = 100 * 1024; // 100kb
+    const maxBytes = 64 * 1024 * 1024; // 64mb
+
+    if (value < minBytes || value > maxBytes) {
+      throw new InvalidConfiguration(
+        'CUBEJS_MAX_REQUEST_SIZE',
+        value,
+        'Must be between 100kb and 64mb.'
+      );
+    }
+
+    return value;
   },
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')

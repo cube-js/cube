@@ -121,13 +121,25 @@ describe('getEnv', () => {
     delete process.env.CUBEJS_MAX_REQUEST_SIZE;
     expect(getEnv('maxRequestSize')).toBe(50 * 1024 * 1024); // default 50mb
 
-    process.env.CUBEJS_MAX_REQUEST_SIZE = '100mb';
-    expect(getEnv('maxRequestSize')).toBe(100 * 1024 * 1024);
+    process.env.CUBEJS_MAX_REQUEST_SIZE = '64mb';
+    expect(getEnv('maxRequestSize')).toBe(64 * 1024 * 1024);
 
-    process.env.CUBEJS_MAX_REQUEST_SIZE = '1gb';
-    expect(getEnv('maxRequestSize')).toBe(1024 * 1024 * 1024);
+    process.env.CUBEJS_MAX_REQUEST_SIZE = '100kb';
+    expect(getEnv('maxRequestSize')).toBe(100 * 1024);
 
     process.env.CUBEJS_MAX_REQUEST_SIZE = '512kb';
     expect(getEnv('maxRequestSize')).toBe(512 * 1024);
+  });
+
+  test('maxRequestSize(exception)', () => {
+    process.env.CUBEJS_MAX_REQUEST_SIZE = '50kb';
+    expect(() => getEnv('maxRequestSize')).toThrowError(
+      'Value "50kb" is not valid for CUBEJS_MAX_REQUEST_SIZE. Must be between 100kb and 64mb.'
+    );
+
+    process.env.CUBEJS_MAX_REQUEST_SIZE = '100mb';
+    expect(() => getEnv('maxRequestSize')).toThrowError(
+      'Value "100mb" is not valid for CUBEJS_MAX_REQUEST_SIZE. Must be between 100kb and 64mb.'
+    );
   });
 });
