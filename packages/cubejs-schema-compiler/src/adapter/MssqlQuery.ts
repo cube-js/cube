@@ -246,6 +246,8 @@ export class MssqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    // NOTE: MSSQL does not support DISTINCT clause. No workaround is available
+    delete templates.functions.STRING_AGG;
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
     delete templates.expressions.ilike;

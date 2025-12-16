@@ -163,6 +163,7 @@ class DremioQuery extends BaseQuery {
     // really need the date locale formatting here...
     templates.functions.DATE = 'TO_DATE({{ args_concat }},\'YYYY-MM-DD\', 1)';
     templates.functions.DATEDIFF = 'DATE_DIFF(DATE, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
+    templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
     templates.expressions.interval_single_date_part = 'CAST({{ num }} as INTERVAL {{ date_part }})';
     templates.quotes.identifiers = '"';
     return templates;
