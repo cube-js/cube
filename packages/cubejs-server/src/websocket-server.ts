@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 import crypto from 'crypto';
 import util from 'util';
-import { CancelableInterval, createCancelableInterval } from '@cubejs-backend/shared';
+import { CancelableInterval, createCancelableInterval, getEnv } from '@cubejs-backend/shared';
 
 import type { CubejsServerCore } from '@cubejs-backend/server-core';
 import type http from 'http';
@@ -29,6 +29,7 @@ export class WebSocketServer {
     this.wsServer = new WebSocket.Server({
       server,
       path: this.options.webSocketsBasePath,
+      maxPayload: getEnv('maxRequestSize'),
     });
 
     const connectionIdToSocket: Record<string, any> = {};
