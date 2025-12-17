@@ -14,11 +14,14 @@
 
 # Ignoring builds for native from local machime to protect a problem with different architecture
 packages/cubejs-backend-native/index.node
+!packages/cubejs-backend-native/index-jemalloc.node
 packages/cubejs-backend-native/native/
 # Caches
 packages/cubejs-backend-native/target
 packages/*/node_modules/
 packages/*/dist/
+!packages/cubejs-server-core/dist/
+!packages/cubejs-schema-compiler/dist/
 packages/*/coverage/
 # Other
 packages/cubejs-server-core/playground/
