@@ -139,6 +139,7 @@ export class PrestodbQuery extends BaseQuery {
     templates.functions.DATEDIFF = 'DATE_DIFF(\'{{ date_part }}\', {{ args[1] }}, {{ args[2] }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.TRUNC = 'TRUNCATE({{ args_concat }})';
+    templates.functions.STRING_AGG = 'ARRAY_JOIN(ARRAY_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}), COALESCE({{ args[1] }}, \'\'))';
     delete templates.functions.PERCENTILECONT;
     templates.statements.select = '{% if ctes %} WITH \n' +
           '{{ ctes | join(\',\n\') }}\n' +

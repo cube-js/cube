@@ -4256,6 +4256,7 @@ export class BaseQuery {
         COVAR_POP: 'COVAR_POP({{ args_concat }})',
         COVAR_SAMP: 'COVAR_SAMP({{ args_concat }})',
         GROUP_ANY: 'max({{ expr }})',
+        STRING_AGG: 'STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})',
         COALESCE: 'COALESCE({{ args_concat }})',
         CONCAT: 'CONCAT({{ args_concat }})',
         FLOOR: 'FLOOR({{ args_concat }})',

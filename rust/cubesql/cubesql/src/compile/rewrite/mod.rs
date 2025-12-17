@@ -1491,6 +1491,14 @@ fn udaf_expr_var_arg(
     )
 }
 
+fn udaf_fun_expr_args(left: impl Display, right: impl Display) -> String {
+    format!("(AggregateUDFExprArgs {} {})", left, right)
+}
+
+fn udaf_fun_expr_args_empty_tail() -> String {
+    "AggregateUDFExprArgs".to_string()
+}
+
 fn limit(skip: impl Display, fetch: impl Display, input: impl Display) -> String {
     format!("(Limit {} {} {})", skip, fetch, input)
 }

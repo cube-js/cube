@@ -112,6 +112,7 @@ export class SnowflakeQuery extends BaseQuery {
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
     templates.functions.CHARACTERLENGTH = 'LENGTH({{ args[0] }})';
     templates.functions.BTRIM = 'TRIM({{ args_concat }})';
+    templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.timestamp_literal = '\'{{ value }}\'::timestamp_tz';

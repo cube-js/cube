@@ -141,6 +141,7 @@ export class PinotQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
     templates.statements.select = 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
       'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
       '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +
