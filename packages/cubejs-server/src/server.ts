@@ -93,7 +93,7 @@ export class CubejsServer {
 
       const app = express();
       app.use(cors(this.config.http.cors));
-      app.use(bodyParser.json({ limit: '50mb' }));
+      app.use(bodyParser.json({ limit: getEnv('maxRequestSize') }));
 
       if (this.config.gracefulShutdown) {
         app.use(gracefulMiddleware(this.status, this.config.gracefulShutdown));

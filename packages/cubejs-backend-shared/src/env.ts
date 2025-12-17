@@ -33,6 +33,32 @@ export function convertTimeStrToSeconds(
   throw new InvalidConfiguration(envName, input, description);
 }
 
+export function convertSizeToBytes(
+  input: string,
+  envName: string,
+  description: string = 'Must be a number in bytes or size string (1kb, 1mb, 1gb).',
+): number {
+  if (/^\d+$/.test(input)) {
+    return parseInt(input, 10);
+  }
+
+  if (input.length > 2) {
+    switch (input.slice(-2).toLowerCase()) {
+      case 'kb':
+        return parseInt(input.slice(0, -2), 10) * 1024;
+      case 'mb':
+        return parseInt(input.slice(0, -2), 10) * 1024 * 1024;
+      case 'gb':
+        return parseInt(input.slice(0, -2), 10) * 1024 * 1024 * 1024;
+      default: {
+        throw new InvalidConfiguration(envName, input, description);
+      }
+    }
+  }
+
+  throw new InvalidConfiguration(envName, input, description);
+}
+
 export function asPortNumber(input: number, envName: string) {
   if (input < 0) {
     throw new InvalidConfiguration(envName, input, 'Should be a positive integer.');
@@ -148,6 +174,23 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
   serverKeepAliveTimeout: () => get('CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT')
     .asInt(),
+  maxRequestSize: () => {
+    const value = process.env.CUBEJS_MAX_REQUEST_SIZE || '50mb';
+    const bytes = convertSizeToBytes(value, 'CUBEJS_MAX_REQUEST_SIZE');
+
+    const minBytes = 100 * 1024; // 100kb
+    const maxBytes = 64 * 1024 * 1024; // 64mb
+
+    if (bytes < minBytes || bytes > maxBytes) {
+      throw new InvalidConfiguration(
+        'CUBEJS_MAX_REQUEST_SIZE',
+        value,
+        'Must be between 100kb and 64mb.'
+      );
+    }
+
+    return bytes;
+  },
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
