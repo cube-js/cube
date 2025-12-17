@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
+
+### Bug Fixes
+
+- **snowflake-driver:** Fix type mapping for `fixed` type ([#10258](https://github.com/cube-js/cube/issues/10258)) ([ec7944c](https://github.com/cube-js/cube/commit/ec7944c0bec0bd4cb4ac003f5597bc0e044d08f5))
+- **snowflake-driver:** Fix type mapping for numerics with scale ([#10259](https://github.com/cube-js/cube/issues/10259)) ([3915e5a](https://github.com/cube-js/cube/commit/3915e5a26d49b812f70a537ec9fde0d0f762692e))
+
+### Features
+
+- **cubesql:** Support `DISTINCT` flag in UDAFs ([#10252](https://github.com/cube-js/cube/issues/10252)) ([1d93825](https://github.com/cube-js/cube/commit/1d93825d5b010c16e52dcf10b5cd1b395fb308f4))
+- **cubesql:** Support `STRING_AGG` SQL push down ([#10256](https://github.com/cube-js/cube/issues/10256)) ([8c82fa5](https://github.com/cube-js/cube/commit/8c82fa5e9d3503bb4c7b5b7fbe85afa8d5656d14))
+- **server:** Introduce CUBEJS_MAX_REQUEST_SIZE env variable ([#10260](https://github.com/cube-js/cube/issues/10260)) ([71ca412](https://github.com/cube-js/cube/commit/71ca4120296a26176a543045eb06ac4261832579))
+
 ## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
 
 ### Bug Fixes
