@@ -202,7 +202,8 @@ export class CubejsServerCore {
     this.scheduledRefreshTimeZones = wrapToFnIfNeeded(this.options.scheduledRefreshTimeZones || []);
 
     this.compilerCache = new LRUCache<string, CompilerApi>({
-      max: this.options.compilerCacheSize || 250,
+      // max: this.options.compilerCacheSize || 250,
+      max: 50,
       ttl: this.options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: this.options.updateCompilerCacheKeepAlive,
       // needed to clear the setInterval timer for proactive cache internal cleanups
@@ -231,7 +232,7 @@ export class CubejsServerCore {
       );
     }
 
-    this.startScheduledRefreshTimer();
+    // this.startScheduledRefreshTimer();
 
     this.event = async (event, props: LoggerFnParams) => {
       if (!this.options.telemetry) {
@@ -520,6 +521,9 @@ export class CubejsServerCore {
 
   public async getCompilerApi(context: RequestContext) {
     const appId = await this.contextToAppId(context);
+
+    console.log(`Server Core getCompilerApi->contextToAppId->appId: ${appId}`);
+
     let compilerApi = this.compilerCache.get(appId);
     const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
 
@@ -549,6 +553,9 @@ export class CubejsServerCore {
       );
 
       this.compilerCache.set(appId, compilerApi);
+      console.log(`[CubejsServerCore] CompilerApi created and cached for appId: ${appId}, cache size: ${this.compilerCache.size}`);
+    } else {
+      console.log(`[CubejsServerCore] CompilerApi reused from cache for appId: ${appId}, cache size: ${this.compilerCache.size}`);
     }
 
     compilerApi.schemaVersion = currentSchemaVersion;
@@ -720,7 +727,8 @@ export class CubejsServerCore {
         standalone: this.standalone,
         allowNodeRequire: options.allowNodeRequire,
         fastReload: options.fastReload || getEnv('fastReload'),
-        compilerCacheSize: this.options.compilerCacheSize || 250,
+        // compilerCacheSize: this.options.compilerCacheSize || 250,
+        compilerCacheSize: 50,
         maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
         updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive
       },

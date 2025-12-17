@@ -82,6 +82,13 @@ export interface DataSourceInfo {
   driverCapabilities?: DriverCapabilities;
 }
 
+// Memory tracking for leak detection
+let compilationCount = 0;
+const MEMORY_CHECK_EVERY = 50; // Check every 250 compilations
+const memoryBaseline = { heapUsed: 0, heapTotal: 0, external: 0, rss: 0 };
+let lastMemoryCheck = null;
+const memoryHistory = []; // Store all memory measurements
+
 export class CompilerApi {
   protected readonly repository: SchemaFileRepository;
 
@@ -184,6 +191,7 @@ export class CompilerApi {
   }
 
   public dispose(): void {
+    // Clear interval
     if (this.compiledScriptCacheInterval) {
       clearInterval(this.compiledScriptCacheInterval);
       this.compiledScriptCacheInterval = null;
@@ -251,6 +259,136 @@ export class CompilerApi {
 
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
     const startCompilingTime = new Date().getTime();
+
+    // Memory tracking: increment compilation counter
+    compilationCount++;
+
+    // Check memory every N compilations with forced GC
+    if (compilationCount % MEMORY_CHECK_EVERY === 0) {
+      const beforeGC = process.memoryUsage();
+
+      // Try to run GC if available (requires --expose-gc flag)
+      if (global.gc) {
+        global.gc();
+        // Give time for GC finalization
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      const afterGC = process.memoryUsage();
+
+      // Set baseline on first check
+      if (compilationCount === MEMORY_CHECK_EVERY) {
+        memoryBaseline.heapUsed = afterGC.heapUsed;
+        memoryBaseline.heapTotal = afterGC.heapTotal;
+        memoryBaseline.external = afterGC.external;
+        memoryBaseline.rss = afterGC.rss;
+      }
+
+      const deltaFromBaseline = {
+        heapUsed: afterGC.heapUsed - memoryBaseline.heapUsed,
+        heapTotal: afterGC.heapTotal - memoryBaseline.heapTotal,
+        external: afterGC.external - memoryBaseline.external,
+        rss: afterGC.rss - memoryBaseline.rss,
+      };
+
+      const deltaFromLast = lastMemoryCheck ? {
+        heapUsed: afterGC.heapUsed - lastMemoryCheck.heapUsed,
+        heapTotal: afterGC.heapTotal - lastMemoryCheck.heapTotal,
+      } : null;
+
+      const formatMB = (bytes) => (bytes / 1024 / 1024).toFixed(2);
+
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`🔬 MEMORY CHECK #${compilationCount / MEMORY_CHECK_EVERY} (after ${compilationCount} compilations)`);
+      console.log('='.repeat(80));
+
+      if (!global.gc) {
+        console.log('⚠️  GC NOT AVAILABLE - run with --expose-gc for accurate measurements');
+        console.log('   Example: node --expose-gc node_modules/.bin/cubejs-server');
+      }
+
+      console.log('\nBefore GC:');
+      console.log(`  RSS:        ${formatMB(beforeGC.rss)} MB`);
+      console.log(`  Heap Total: ${formatMB(beforeGC.heapTotal)} MB`);
+      console.log(`  Heap Used:  ${formatMB(beforeGC.heapUsed)} MB`);
+      console.log(`  External:   ${formatMB(beforeGC.external)} MB`);
+
+      console.log('\nAfter GC:');
+      console.log(`  RSS:        ${formatMB(afterGC.rss)} MB`);
+      console.log(`  Heap Total: ${formatMB(afterGC.heapTotal)} MB`);
+      console.log(`  Heap Used:  ${formatMB(afterGC.heapUsed)} MB`);
+      console.log(`  External:   ${formatMB(afterGC.external)} MB`);
+
+      const freedByGC = beforeGC.heapUsed - afterGC.heapUsed;
+      console.log(`\n  GC Freed:   ${formatMB(freedByGC)} MB`);
+
+      console.log('\nΔ from BASELINE:');
+      console.log(`  RSS:        ${deltaFromBaseline.rss >= 0 ? '+' : ''}${formatMB(deltaFromBaseline.rss)} MB`);
+      console.log(`  Heap Total: ${deltaFromBaseline.heapTotal >= 0 ? '+' : ''}${formatMB(deltaFromBaseline.heapTotal)} MB`);
+      console.log(`  Heap Used:  ${deltaFromBaseline.heapUsed >= 0 ? '+' : ''}${formatMB(deltaFromBaseline.heapUsed)} MB`);
+      console.log(`  External:   ${deltaFromBaseline.external >= 0 ? '+' : ''}${formatMB(deltaFromBaseline.external)} MB`);
+
+      if (deltaFromLast) {
+        console.log('\nΔ from LAST CHECK:');
+        console.log(`  Heap Total: ${deltaFromLast.heapTotal >= 0 ? '+' : ''}${formatMB(deltaFromLast.heapTotal)} MB`);
+        console.log(`  Heap Used:  ${deltaFromLast.heapUsed >= 0 ? '+' : ''}${formatMB(deltaFromLast.heapUsed)} MB`);
+      }
+
+      // Leak warnings
+      const heapGrowthMB = deltaFromBaseline.heapUsed / 1024 / 1024;
+      if (heapGrowthMB > 100) {
+        console.log('\n❌ CRITICAL: Heap growth > 100 MB - MEMORY LEAK DETECTED!');
+      } else if (heapGrowthMB > 50) {
+        console.log('\n⚠️  WARNING: Heap growth > 50 MB - possible memory leak');
+      }
+
+      console.log('='.repeat(67));
+
+      // Save measurement to history
+      memoryHistory.push({
+        checkpoint: Math.floor(compilationCount / MEMORY_CHECK_EVERY),
+        compilations: compilationCount,
+        beforeGC: beforeGC.heapUsed,
+        afterGC: afterGC.heapUsed,
+        freed: beforeGC.heapUsed - afterGC.heapUsed,
+        deltaFromBaseline: deltaFromBaseline.heapUsed,
+        deltaFromLast: deltaFromLast ? deltaFromLast.heapUsed : 0,
+      });
+
+      // Display memory history table
+      console.log('\n📊 MEMORY HISTORY (Heap Used after GC):');
+      console.log('─'.repeat(67));
+      console.log('Check | Compilations | After GC  | Δ Baseline | Δ Last    | Trend');
+      console.log('─'.repeat(67));
+
+      memoryHistory.forEach((record, idx) => {
+        const afterGCMB = formatMB(record.afterGC);
+        const deltaBaselineMB = formatMB(record.deltaFromBaseline);
+        const deltaLastMB = idx > 0 ? formatMB(record.deltaFromLast) : '  -  ';
+
+        // Simple trend indicator
+        let trend = '→';
+        if (idx > 0) {
+          if (record.deltaFromLast > 10 * 1024 * 1024) trend = '↗↗'; // Significant growth
+          else if (record.deltaFromLast > 1 * 1024 * 1024) trend = '↗'; // Small growth
+          else if (record.deltaFromLast < -1 * 1024 * 1024) trend = '↘'; // Decrease
+          else trend = '→'; // Stable
+        }
+
+        console.log(
+          `  ${String(record.checkpoint).padStart(3)}  | ` +
+          `${String(record.compilations).padStart(12)} | ` +
+          `${afterGCMB.padStart(9)} | ` +
+          `${(record.deltaFromBaseline >= 0 ? '+' : '') + deltaBaselineMB.padStart(record.deltaFromBaseline >= 0 ? 9 : 10)} | ` +
+          `${deltaLastMB.padStart(9)} | ${trend}`
+        );
+      });
+
+      console.log(`${'='.repeat(67)}\n`);
+
+      lastMemoryCheck = afterGC;
+    }
+
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,
@@ -268,6 +406,34 @@ export class CompilerApi {
         compiledYamlCache: this.compiledYamlCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
+
+      // const mem = process.memoryUsage();
+      // console.log('Memory usage after compilation: \n', {
+      //   rss: `${(mem.rss / 1024 / 1024).toFixed(2)} MB`,
+      //   heapTotal: `${(mem.heapTotal / 1024 / 1024).toFixed(2)} MB`,
+      //   heapUsed: `${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+      //   external: `${(mem.external / 1024 / 1024).toFixed(2)} MB`,
+      // });
+
+      // const filename = `dumps/heap-${Date.now()}.heapsnapshot`;
+      // const stream = v8.getHeapSnapshot();
+      //
+      // const file = fs.createWriteStream(filename);
+      // stream.pipe(file);
+      //
+      // let done = false;
+      //
+      // const onDone = () => {
+      //   if (!done) {
+      //     done = true;
+      //     console.log('Heap snapshot saved to', filename);
+      //   }
+      // };
+      //
+      // file.on('finish', onDone);
+      // stream.on('end', onDone);
+      // stream.on('error', (err) => console.error('Stream error:', err));
+      // file.on('error', (err) => console.error('File error:', err));
 
       this.logger('Compiling schema completed', {
         version: compilerVersion,
