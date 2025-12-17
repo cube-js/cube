@@ -1761,6 +1761,7 @@ describe('Cube Validation', () => {
       expect(errorMessage).toContain('Views can\'t define multiple join paths to the same cube');
       expect(errorMessage).toContain('View \'test_view\'');
       expect(errorMessage).toContain('has multiple paths to \'X\'');
+      expect(errorMessage).toContain('within root \'A\'');
       expect(errorMessage).toContain('\'A.D.E.X\'');
       expect(errorMessage).toContain('\'A.F.X\'');
       expect(errorMessage).toContain('Use extends to create a child cube');
@@ -1786,7 +1787,7 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeFalsy();
     });
 
-    it('view with three-way conflict - should report all', async () => {
+    it('view with conflict in one root only - should report only that root', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'test_view',
@@ -1805,12 +1806,14 @@ describe('Cube Validation', () => {
       } as any);
 
       expect(errorMessage).toContain('has multiple paths to \'X\'');
+      expect(errorMessage).toContain('within root \'A\'');
       expect(errorMessage).toContain('\'A.B.X\'');
       expect(errorMessage).toContain('\'A.C.X\'');
-      expect(errorMessage).toContain('\'D.E.X\'');
+      // D.E.X should NOT be in the error message as it's a different root
+      expect(errorMessage).not.toContain('\'D.E.X\'');
     });
 
-    it('view with multiple different conflicts - should report all', async () => {
+    it('view with multiple different conflicts in different roots - should report all', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'test_view',
@@ -1818,9 +1821,9 @@ describe('Cube Validation', () => {
         fileName: 'fileName',
         cubes: [
           { joinPath: () => 'A.B.X', prefix: false, includes: ['*'] },
-          { joinPath: () => 'C.D.X', prefix: false, includes: ['*'] },
-          { joinPath: () => 'E.F.Y', prefix: false, includes: ['*'] },
-          { joinPath: () => 'G.H.Y', prefix: false, includes: ['*'] }
+          { joinPath: () => 'A.D.X', prefix: false, includes: ['*'] },
+          { joinPath: () => 'C.E.Y', prefix: false, includes: ['*'] },
+          { joinPath: () => 'C.F.Y', prefix: false, includes: ['*'] }
         ]
       };
 
@@ -1832,10 +1835,12 @@ describe('Cube Validation', () => {
       const allErrors = errorMessages.join(' ');
       expect(allErrors).toContain('has multiple paths to \'X\'');
       expect(allErrors).toContain('has multiple paths to \'Y\'');
+      expect(allErrors).toContain('within root \'A\'');
+      expect(allErrors).toContain('within root \'C\'');
       expect(allErrors).toContain('\'A.B.X\'');
-      expect(allErrors).toContain('\'C.D.X\'');
-      expect(allErrors).toContain('\'E.F.Y\'');
-      expect(allErrors).toContain('\'G.H.Y\'');
+      expect(allErrors).toContain('\'A.D.X\'');
+      expect(allErrors).toContain('\'C.E.Y\'');
+      expect(allErrors).toContain('\'C.F.Y\'');
     });
 
     it('view with single-segment paths - should pass', async () => {
@@ -1858,7 +1863,7 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeFalsy();
     });
 
-    it('view with transitive cube conflict - cube appears as leaf and intermediate - should fail', async () => {
+    it('view with cube in different roots - should pass', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'test_view',
@@ -1870,17 +1875,14 @@ describe('Cube Validation', () => {
         ]
       };
 
-      let errorMessage = '';
-      cubeValidator.validate(cube, {
-        error: (msg: any) => { errorMessage = msg; }
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
       } as any);
 
-      expect(errorMessage).toContain('has multiple paths to \'A\'');
-      expect(errorMessage).toContain('\'A\'');
-      expect(errorMessage).toContain('\'B.A\'');
+      expect(validationResult.error).toBeFalsy();
     });
 
-    it('view with transitive cube conflict - cube appears in middle of different paths - should fail', async () => {
+    it('view with same cube in middle of different root paths - should pass', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'test_view',
@@ -1892,14 +1894,11 @@ describe('Cube Validation', () => {
         ]
       };
 
-      let errorMessage = '';
-      cubeValidator.validate(cube, {
-        error: (msg: any) => { errorMessage = msg; }
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
       } as any);
 
-      expect(errorMessage).toContain('has multiple paths to \'B\'');
-      expect(errorMessage).toContain('\'A.B\'');
-      expect(errorMessage).toContain('\'C.B\'');
+      expect(validationResult.error).toBeFalsy();
     });
 
     it('view with complex transitive conflicts - multiple cubes with conflicts - should fail', async () => {
@@ -1921,11 +1920,12 @@ describe('Cube Validation', () => {
 
       // All intermediate and leaf cubes that appear in multiple paths should be reported
       expect(errorMessage).toContain('has multiple paths to \'C\'');
+      expect(errorMessage).toContain('within root \'A\'');
       expect(errorMessage).toContain('\'A.B.C\'');
       expect(errorMessage).toContain('\'A.D.C\'');
     });
 
-    it('view with deep transitive conflicts - cube in different depths - should fail', async () => {
+    it('view with same cube at different depths in different roots - should pass', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {
         name: 'test_view',
@@ -1937,14 +1937,11 @@ describe('Cube Validation', () => {
         ]
       };
 
-      let errorMessage = '';
-      cubeValidator.validate(cube, {
-        error: (msg: any) => { errorMessage = msg; }
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
       } as any);
 
-      expect(errorMessage).toContain('has multiple paths to \'B\'');
-      expect(errorMessage).toContain('\'A.B\'');
-      expect(errorMessage).toContain('\'C.D.E.B\'');
+      expect(validationResult.error).toBeFalsy();
     });
 
     it('view with no transitive conflicts - different cubes in paths - should pass', async () => {
@@ -1956,6 +1953,25 @@ describe('Cube Validation', () => {
         cubes: [
           { joinPath: () => 'A.B.C', prefix: false, includes: ['*'] },
           { joinPath: () => 'D.E.F', prefix: false, includes: ['*'] }
+        ]
+      };
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (msg: any) => { throw new Error(`Unexpected error: ${msg}`); }
+      } as any);
+
+      expect(validationResult.error).toBeFalsy();
+    });
+
+    it('view with same cube in different roots - should pass', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = {
+        name: 'test_view',
+        isView: true,
+        fileName: 'fileName',
+        cubes: [
+          { joinPath: () => 'A.B.C', prefix: false, includes: ['*'] },
+          { joinPath: () => 'D.B.C', prefix: false, includes: ['*'] }
         ]
       };
 

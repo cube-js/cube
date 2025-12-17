@@ -1161,20 +1161,28 @@ export class CubeValidator implements CompilerInterface {
   }
 
   /**
-   * Validates that each leaf node (last segment of joinPath) appears only once across all cubes in a view.
-   * This ensures that there is only one path to reach each cube in the view's join graph.
+   * Validates that each cube appears only once within each root path in a view.
+   * This ensures that there is only one path to reach each cube within each root's join graph.
+   * For example: 'a.b.c' + 'd.b.c' is valid (different roots), but 'a.b.c' + 'a.d.c' is invalid (same root 'a').
    */
   private validateUniqueLeafCubes(viewName: string, cubesArray: any[], errorReporter: ErrorReporter) {
     if (!cubesArray || cubesArray.length === 0) {
       return;
     }
 
-    const cubesJoinPaths = new Map<string, Set<string>>();
+    const rootCubePaths = new Map<string, Map<string, Set<string>>>();
 
     for (const cube of cubesArray) {
       try {
         const fullPath = this.cubeSymbols.evaluateReferences(null, cube.joinPath as () => ToString, { collectJoinHints: true });
         const split = fullPath.split('.');
+        const rootCube = split[0];
+
+        if (!rootCubePaths.has(rootCube)) {
+          rootCubePaths.set(rootCube, new Map<string, Set<string>>());
+        }
+
+        const cubesJoinPaths = rootCubePaths.get(rootCube)!;
 
         for (let i = 0; i < split.length; i++) {
           const cubeName = split[i];
@@ -1190,11 +1198,13 @@ export class CubeValidator implements CompilerInterface {
       }
     }
 
-    // Check for cubes with multiple paths
-    for (const [cubeName, paths] of cubesJoinPaths.entries()) {
-      if (paths.size > 1) {
-        const pathList = Array.from(paths).map(path => `'${path}'`).join(', ');
-        errorReporter.error(`Views can't define multiple join paths to the same cube. View '${viewName}' has multiple paths to '${cubeName}': ${pathList}. Use extends to create a child cube and reference it instead`);
+    // Check for cubes with multiple paths within each root
+    for (const [rootCube, cubesJoinPaths] of rootCubePaths.entries()) {
+      for (const [cubeName, paths] of cubesJoinPaths.entries()) {
+        if (paths.size > 1) {
+          const pathList = Array.from(paths).map(path => `'${path}'`).join(', ');
+          errorReporter.error(`Views can't define multiple join paths to the same cube. View '${viewName}' has multiple paths to '${cubeName}' within root '${rootCube}': ${pathList}. Use extends to create a child cube and reference it instead`);
+        }
       }
     }
   }
