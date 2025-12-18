@@ -1,0 +1,17 @@
+# Runtime logs
+*.log
+
+# Process ID files
+*.pid
+
+# Node modules
+node_modules/
+
+# Environment file (use .env.example as template)
+.env
+
+# Build artifacts
+bin/
+
+# CubeStore data
+.cubestore/
