@@ -647,6 +647,13 @@ cubes:
 A [`granularity`][self-granularity] **must** also be included in the
 pre-aggregation definition.
 
+<InfoBox>
+
+To define multiple time dimensions for a single pre-aggregation, use the
+[`time_dimensions`][self-timedimensions] property instead.
+
+</InfoBox>
+
 ### `granularity`
 
 The `granularity` property defines the time dimension granularity of data
@@ -693,6 +700,92 @@ The value can be either a default granularity (i.e., `second`, `minute`, `hour`,
 `day`, `week`, `month`, `quarter`, or `year`) or a [custom
 granularity][ref-custom-granularity]. This property is required when using
 [`time_dimension`][self-timedimension].
+
+### `time_dimensions`
+
+The `time_dimensions` property allows you to define multiple time dimensions for
+a single pre-aggregation. Each time dimension is specified with its own
+granularity. This is useful when you need to pre-aggregate data based on
+multiple time columns.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  pre_aggregations: {
+    multiple_time_dimensions: {
+      measures: [CUBE.count],
+      time_dimensions: [
+        {
+          dimension: CUBE.created_at,
+          granularity: `day`
+        },
+        {
+          dimension: CUBE.completed_at,
+          granularity: `day`
+        }
+      ],
+      partition_granularity: `month`
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  dimensions: {
+    created_at: {
+      type: `time`,
+      sql: `created_at`
+    },
+
+    completed_at: {
+      type: `time`,
+      sql: `completed_at`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    pre_aggregations:
+      - name: multiple_time_dimensions
+        measures:
+          - count
+        time_dimensions:
+          - dimension: created_at
+            granularity: day
+          - dimension: completed_at
+            granularity: day
+        partition_granularity: month
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: created_at
+        type: time
+        sql: created_at
+
+      - name: completed_at
+        type: time
+        sql: completed_at
+```
+
+</CodeTabs>
+
+When using `time_dimensions`, you cannot use the [`time_dimension`][self-timedimension]
+or [`granularity`][self-granularity] properties, as each time dimension defines
+its own granularity.
 
 ### `segments`
 
@@ -1778,6 +1871,7 @@ cubes:
 [self-rollupjoin]: #rollup_join
 [self-rolluplambda]: #rollup_lambda
 [self-timedimension]: #time_dimension
+[self-timedimensions]: #time_dimensions
 [self-buildrange]: #build_range_start-and-build_range_end
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
 [wiki-composable-agg-fn]:
