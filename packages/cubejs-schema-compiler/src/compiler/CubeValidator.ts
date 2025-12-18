@@ -1,7 +1,7 @@
 import Joi from 'joi';
 import cronParser from 'cron-parser';
 
-import type { CubeSymbols, CubeDefinition } from './CubeSymbols';
+import { CubeSymbols, CubeDefinition, ToString } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
 
@@ -1146,6 +1146,11 @@ export class CubeValidator implements CompilerInterface {
     };
     const result = cube.isView ? viewSchema.validate(cube, options) : cubeSchema.validate(cube, options);
 
+    if (cube.isView) {
+      // We need to verify that leaf cubes in view are present only once
+      this.validateUniqueLeafCubes(cube.name, cube.cubes, errorReporter);
+    }
+
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error));
     } else {
@@ -1153,6 +1158,55 @@ export class CubeValidator implements CompilerInterface {
     }
 
     return result;
+  }
+
+  /**
+   * Validates that each cube appears only once within each root path in a view.
+   * This ensures that there is only one path to reach each cube within each root's join graph.
+   * For example: 'a.b.c' + 'd.b.c' is valid (different roots), but 'a.b.c' + 'a.d.c' is invalid (same root 'a').
+   */
+  private validateUniqueLeafCubes(viewName: string, cubesArray: any[], errorReporter: ErrorReporter) {
+    if (!cubesArray || cubesArray.length === 0) {
+      return;
+    }
+
+    const rootCubePaths = new Map<string, Map<string, Set<string>>>();
+
+    for (const cube of cubesArray) {
+      try {
+        const fullPath = this.cubeSymbols.evaluateReferences(null, cube.joinPath as () => ToString, { collectJoinHints: true });
+        const split = fullPath.split('.');
+        const rootCube = split[0];
+
+        if (!rootCubePaths.has(rootCube)) {
+          rootCubePaths.set(rootCube, new Map<string, Set<string>>());
+        }
+
+        const cubesJoinPaths = rootCubePaths.get(rootCube)!;
+
+        for (let i = 0; i < split.length; i++) {
+          const cubeName = split[i];
+          const path = split.slice(0, i + 1).join('.');
+
+          if (!cubesJoinPaths.has(cubeName)) {
+            cubesJoinPaths.set(cubeName, new Set<string>());
+          }
+          cubesJoinPaths.get(cubeName)!.add(path);
+        }
+      } catch (e) {
+        // Ignore errors during joinPath evaluation - cube may not be defined yet
+      }
+    }
+
+    // Check for cubes with multiple paths within each root
+    for (const [rootCube, cubesJoinPaths] of rootCubePaths.entries()) {
+      for (const [cubeName, paths] of cubesJoinPaths.entries()) {
+        if (paths.size > 1) {
+          const pathList = Array.from(paths).map(path => `'${path}'`).join(', ');
+          errorReporter.error(`Views can't define multiple join paths to the same cube. View '${viewName}' has multiple paths to '${cubeName}' within root '${rootCube}': ${pathList}. Use extends to create a child cube and reference it instead`);
+        }
+      }
+    }
   }
 
   public isCubeValid(cube: CubeDefinition): boolean {
