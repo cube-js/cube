@@ -56,7 +56,6 @@ import {
   MetaResponseResultFn,
   RequestQuery,
   QueryConvertRequest,
-  QueryConvertResponse,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -1604,10 +1603,15 @@ class ApiGateway {
     try {
       await this.assertApiScope('sql', context.securityContext);
 
-      const result: QueryConvertResponse = {
-        status: 'ok',
-        query: {},
-      };
+      if (convertQuery.input !== 'sql') {
+        throw new Error(`Unexpected input parameter value '${convertQuery.input}'`);
+      }
+
+      if (convertQuery.output !== 'rest') {
+        throw new Error(`Unexpected output parameter value '${convertQuery.input}'`);
+      }
+
+      const result = await this.sqlServer.rest4sql(convertQuery.query, context.securityContext);
 
       await res(result);
     } catch (e: any) {

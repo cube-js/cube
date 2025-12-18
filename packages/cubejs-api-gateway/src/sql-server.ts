@@ -4,10 +4,12 @@ import {
   shutdownInterface,
   execSql,
   sql4sql,
+  rest4sql,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
   Sql4SqlResponse,
+  QueryConvertResponse,
 } from '@cubejs-backend/native';
 import type { ShutdownMode } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv, CacheMode } from '@cubejs-backend/shared';
@@ -71,6 +73,10 @@ export class SQLServer {
 
   public async sql4sql(sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> {
     return sql4sql(this.sqlInterfaceInstance!, sqlQuery, disablePostProcessing, securityContext);
+  }
+
+  public async rest4sql(sqlQuery: string, securityContext?: unknown): Promise<QueryConvertResponse> {
+    return rest4sql(this.sqlInterfaceInstance!, sqlQuery, securityContext);
   }
 
   protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {
