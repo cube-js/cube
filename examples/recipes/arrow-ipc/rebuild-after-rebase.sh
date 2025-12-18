@@ -138,19 +138,45 @@ if [ "$DEEP_CLEAN" = true ]; then
     echo ""
 fi
 
-# Step 1: Install root dependencies
+# Step 1: Install root dependencies (skip post-install scripts first)
 echo -e "${GREEN}Step 1: Installing root dependencies...${NC}"
 cd "$CUBE_ROOT"
-yarn install
-check_status "Root dependencies installed"
+
+# If deep clean was done, need to install without post-install scripts first
+# because post-install scripts depend on built packages
+if [ "$DEEP_CLEAN" = true ]; then
+    echo -e "${YELLOW}Installing without post-install scripts (packages not built yet)...${NC}"
+    yarn install --ignore-scripts
+    check_status "Dependencies installed (scripts skipped)"
+else
+    yarn install
+    check_status "Root dependencies installed"
+fi
 
 # Step 2: Build all packages (TypeScript + client bundles)
 echo ""
-echo -e "${GREEN}Step 2: Building all packages...${NC}"
+echo -e "${GREEN}Step 2: Building TypeScript packages...${NC}"
 echo -e "${YELLOW}This may take 1-2 minutes...${NC}"
 cd "$CUBE_ROOT"
+yarn tsc
+check_status "TypeScript packages built"
+
+echo ""
+echo -e "${GREEN}Step 2b: Building client bundles...${NC}"
+cd "$CUBE_ROOT"
 yarn build
-check_status "All packages built"
+check_status "Client bundles built"
+
+# Step 2.5: Re-run install with post-install scripts if they were skipped
+if [ "$DEEP_CLEAN" = true ]; then
+    echo ""
+    echo -e "${GREEN}Step 2.5: Running post-install scripts...${NC}"
+    echo -e "${YELLOW}(Optional module failures can be safely ignored)${NC}"
+    cd "$CUBE_ROOT"
+    # Allow post-install to fail on optional modules
+    yarn install || true
+    echo -e "${GREEN}✓ Install completed (some optional modules may have failed)${NC}"
+fi
 
 # Step 3: Verify workspace setup
 echo ""
