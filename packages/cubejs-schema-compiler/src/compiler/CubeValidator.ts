@@ -279,6 +279,8 @@ const BaseDimensionWithoutSubQuery = {
   }),
   meta: Joi.any(),
   order: Joi.string().valid('asc', 'desc'),
+  key: Joi.func(),
+  keyReference: Joi.string(),
   values: Joi.when('type', {
     is: 'switch',
     then: Joi.array().items(Joi.string()),
