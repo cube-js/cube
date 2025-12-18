@@ -156,16 +156,12 @@ fi
 # Step 2: Build all packages (TypeScript + client bundles)
 echo ""
 echo -e "${GREEN}Step 2: Building TypeScript packages...${NC}"
-echo -e "${YELLOW}This may take 1-2 minutes...${NC}"
+echo -e "${YELLOW}This may take 30-40 seconds...${NC}"
 cd "$CUBE_ROOT"
 
-# Use skipLibCheck to avoid test file type errors during development builds
-npx tsc --skipLibCheck
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ TypeScript packages built${NC}"
-else
-    echo -e "${YELLOW}⚠ TypeScript build completed with some errors (non-critical)${NC}"
-fi
+# Use yarn tsc which runs "tsc --build" for proper TypeScript project references
+yarn tsc
+check_status "TypeScript packages built"
 
 echo ""
 echo -e "${GREEN}Step 2b: Building client bundles...${NC}"
@@ -177,9 +173,9 @@ check_status "Client bundles built"
 echo ""
 echo -e "${GREEN}Step 2c: Generating oclif manifest...${NC}"
 cd "$CUBE_ROOT/packages/cubejs-server"
-OCLIF_TS_NODE=0 yarn oclif-dev manifest 2>/dev/null || echo -e "${YELLOW}⚠ oclif manifest generation skipped (not critical)${NC}"
+OCLIF_TS_NODE=0 yarn run oclif-dev manifest
+check_status "Oclif manifest generated"
 cd "$CUBE_ROOT"
-echo -e "${GREEN}✓ Manifest generation complete${NC}"
 
 # Step 2.5: Re-run install with post-install scripts if they were skipped
 if [ "$DEEP_CLEAN" = true ]; then
