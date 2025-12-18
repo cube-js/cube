@@ -217,6 +217,32 @@ SET output_format = 'default';
 
 ## Troubleshooting
 
+### Build Issues After Rebase
+
+**Problem**: `./start-cube-api.sh` fails with "Cannot find module" errors
+**Cause**: TypeScript packages not built in correct order
+**Solution**: Use the rebuild script
+
+```bash
+cd ~/projects/learn_erl/cube/examples/recipes/arrow-ipc
+./rebuild-after-rebase.sh
+```
+
+Choose option 1 (Quick rebuild) for regular development, or option 2 (Deep clean) for major issues.
+
+**Note**: The Cube monorepo has complex build dependencies. Some TypeScript test files may have type errors that don't affect runtime functionality. The rebuild script uses `--skipLibCheck` to handle this.
+
+**If problems persist**, manually build backend packages:
+```bash
+cd ~/projects/learn_erl/cube
+npx tsc --skipLibCheck
+
+# Build specific packages if needed
+cd packages/cubejs-api-gateway && yarn build
+cd ../cubejs-server-core && yarn build
+cd ../cubejs-server && yarn build
+```
+
 ### "Table or CTE not found"
 **Cause**: CubeSQL couldn't load metadata from Cube API
 **Solution**: Verify `CUBE_API_URL` and `CUBE_API_TOKEN` are set correctly
@@ -228,6 +254,11 @@ SET output_format = 'default';
 ### Arrow parsing errors
 **Cause**: Client library doesn't support Arrow IPC streaming format
 **Solution**: Ensure you're using Apache Arrow >= 1.0.0 in your client library
+
+### Oclif Manifest Errors
+**Cause**: oclif CLI framework can't generate manifest due to dependency issues
+**Impact**: Non-critical for development; cubejs-server may show warnings
+**Solution**: Can be safely ignored for arrow-ipc feature demonstration
 
 ## Performance Benchmarks
 
