@@ -3,6 +3,52 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
+
+### Features
+
+- **cubesql:** Support `DISTINCT` flag in UDAFs ([#10252](https://github.com/cube-js/cube/issues/10252)) ([1d93825](https://github.com/cube-js/cube/commit/1d93825d5b010c16e52dcf10b5cd1b395fb308f4))
+
+## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.14](https://github.com/cube-js/cube/compare/v1.5.13...v1.5.14) (2025-12-11)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.13](https://github.com/cube-js/cube/compare/v1.5.12...v1.5.13) (2025-12-10)
+
+### Features
+
+- **backend-native:** expose lastRefreshTime via /cubesql API ([#10206](https://github.com/cube-js/cube/issues/10206)) ([fb5a40f](https://github.com/cube-js/cube/commit/fb5a40f0e225208cb56febc54e0ebfb6e94a6bc3))
+
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+### Features
+
+- **cubesql:** Speed up field lookups in DFSchema ([#10214](https://github.com/cube-js/cube/issues/10214)) ([52fe97f](https://github.com/cube-js/cube/commit/52fe97fd47deeffbeb930745fb43fae4b040bc6b))
+
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+### Features
+
+- **api-gateway:** Support query timezone in `/cubesql` API endpoint ([#10189](https://github.com/cube-js/cube/issues/10189)) ([499ddc6](https://github.com/cube-js/cube/commit/499ddc62fc1618b78f16a17943e1c72a670f6b48))
+
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Features
+
+- **cubesql:** Implement time to idle eviction for query cache ([#10176](https://github.com/cube-js/cube/issues/10176)) ([4f9ccba](https://github.com/cube-js/cube/commit/4f9ccba8f90c7c133757842cd1df325d7cb1e122))
+
 ## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/native

@@ -736,8 +736,15 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns the JS type by the Databricks type.
    */
-  protected toGenericType(columnType: string): string {
-    return DatabricksToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
+    const match = columnType.trim().toLowerCase().match(/^numeric\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+
+    if (match) {
+      precision = Number(match[1]);
+      scale = Number(match[2]);
+    }
+
+    return DatabricksToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType, precision, scale);
   }
 
   /**

@@ -8,7 +8,7 @@ Cube Cloud also provides single sign-on (SSO) via identity providers supporting
 
 Finally, Cube Cloud provides the [LDAP integration](#ldap-integration), enabling
 users of [APIs & integrations][ref-apis] to authenticate via an LDAP catalog
-and assume roles that work with [data access policies][ref-dap] once [authentication
+and assume roles that work with [access policies][ref-dap] once [authentication
 integration][ref-auth-integration] is enabled.
 
 <SuccessBox>
@@ -113,7 +113,7 @@ Use the tooltips in Cube Cloud to get more information about each setting.
 #### User roles mapping
 
 You can configure how user data in an LDAP catalog maps to roles in Cube Cloud.
-You can also use mapped roles with [data access policies][ref-dap] once [authentication
+You can also use mapped roles with [access policies][ref-dap] once [authentication
 integration][ref-auth-integration] is enabled.
 
 Mapping is performed as follows:
@@ -140,7 +140,7 @@ All roles will be available under `cubeCloud.roles` array in the [security conte
 
 #### User attributes mapping
 
-You can also bring more user data from an LDAP catalog to use with [data access policies][ref-dap].
+You can also bring more user data from an LDAP catalog to use with [access policies][ref-dap].
 Mapping is performed using the rules under <Btn>Attribute mapping</Btn>.
 
 All mapped attributes and their values will be available under `cubeCloud.userAttributes`

@@ -19,6 +19,12 @@ import type { JoinGraph } from './JoinGraph';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
 
+export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
+export type DimensionLinkFormat = { type: 'link'; label?: string };
+export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
+export type MeasureFormat = string | CustomNumericFormat;
+
 // Extended types for cube symbols with all runtime properties
 export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   description?: string;
@@ -61,7 +67,7 @@ export type MeasureConfig = {
   title: string;
   description?: string;
   shortTitle: string;
-  format?: string;
+  format?: MeasureFormat;
   cumulativeTotal: boolean;
   cumulative: boolean;
   type: string;
@@ -84,13 +90,14 @@ export type DimensionConfig = {
   description?: string;
   shortTitle: string;
   suggestFilterValues: boolean;
-  format?: string;
+  format?: DimensionFormat;
   meta?: any;
   isVisible: boolean;
   public: boolean;
   primaryKey: boolean;
   aliasMember?: string;
   granularities?: GranularityDefinition[];
+  order?: 'asc' | 'desc';
 };
 
 export type SegmentConfig = {
@@ -252,7 +259,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
               extendedDimDef.suggestFilterValues == null
                 ? true
                 : extendedDimDef.suggestFilterValues,
-            format: extendedDimDef.format,
+            format: this.transformDimensionFormat(extendedDimDef),
             meta: extendedDimDef.meta,
             isVisible: dimensionVisibility,
             public: dimensionVisibility,
@@ -268,6 +275,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
                   origin: gDef.origin,
                 }))
                 : undefined,
+            order: extendedDimDef.order,
           };
         }),
         segments: Object.entries(extendedCube.segments || {}).map((nameToSegment: [string, any]) => {
@@ -368,7 +376,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
       title: this.title(cubeTitle, nameToMetric, false),
       description: extendedMetricDef.description,
       shortTitle: this.title(cubeTitle, nameToMetric, true),
-      format: extendedMetricDef.format,
+      format: this.transformMeasureFormat(extendedMetricDef.format),
       cumulativeTotal: isCumulative,
       cumulative: isCumulative,
       type,
@@ -389,5 +397,42 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
   private titleize(name: string): string {
     return inflection.titleize(inflection.underscore(camelCase(name, { pascalCase: true })));
+  }
+
+  private transformDimensionFormat({ format, type }: ExtendedCubeSymbolDefinition): DimensionFormat | undefined {
+    if (!format || typeof format === 'object') {
+      return format;
+    }
+
+    const standardFormats = ['imageUrl', 'currency', 'percent', 'number', 'id'];
+    if (standardFormats.includes(format)) {
+      return format;
+    }
+
+    // Custom time format for time dimensions
+    if (type === 'time') {
+      return { type: 'custom-time', value: format };
+    }
+
+    // Custom numeric format for number dimensions
+    if (type === 'number') {
+      return { type: 'custom-numeric', value: format };
+    }
+
+    return format;
+  }
+
+  private transformMeasureFormat(format: string | undefined): MeasureFormat | undefined {
+    if (!format) {
+      return undefined;
+    }
+
+    const standardFormats = ['percent', 'currency', 'number'];
+    if (standardFormats.includes(format)) {
+      return format;
+    }
+
+    // Custom numeric format
+    return { type: 'custom-numeric', value: format };
   }
 }

@@ -37,6 +37,7 @@ pub struct ResultWrapper {
     transform_data: TransformDataRequest,
     data: Arc<QueryResult>,
     transformed_data: Option<TransformedData>,
+    pub last_refresh_time: Option<String>,
 }
 
 impl ResultWrapper {
@@ -114,6 +115,7 @@ impl ResultWrapper {
             transform_data: transform_request,
             data: query_result,
             transformed_data: None,
+            last_refresh_time: None,
         })
     }
 

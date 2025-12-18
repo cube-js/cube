@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
+
+### Bug Fixes
+
+- **snowflake-driver:** Fix type mapping for `fixed` type ([#10258](https://github.com/cube-js/cube/issues/10258)) ([ec7944c](https://github.com/cube-js/cube/commit/ec7944c0bec0bd4cb4ac003f5597bc0e044d08f5))
+- **snowflake-driver:** Fix type mapping for numerics with scale ([#10259](https://github.com/cube-js/cube/issues/10259)) ([3915e5a](https://github.com/cube-js/cube/commit/3915e5a26d49b812f70a537ec9fde0d0f762692e))
+
+## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.5.14](https://github.com/cube-js/cube/compare/v1.5.13...v1.5.14) (2025-12-11)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.5.13](https://github.com/cube-js/cube/compare/v1.5.12...v1.5.13) (2025-12-10)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Features
+
+- **base-driver, other drivers:** Support numeric types with precision and scale for cube store data exports ([#10175](https://github.com/cube-js/cube/issues/10175)) ([9ba6e77](https://github.com/cube-js/cube/commit/9ba6e77e934791ee7ff80643a7a9a862f2a97e2b))
+
 ## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver

@@ -5,6 +5,8 @@ import {
   QueryOptions,
   StreamTableData,
   GenericDataBaseType,
+  TableStructure,
+  TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
@@ -40,7 +42,7 @@ const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
 export class DuckDBDriver extends BaseDriver implements DriverInterface {
   protected initPromise: Promise<InitPromise> | null = null;
 
-  private schema: string;
+  private readonly schema: string;
 
   public constructor(
     protected readonly config: DuckDBDriverConfiguration = {},
@@ -50,12 +52,15 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     this.schema = this.config.schema || getEnv('duckdbSchema', this.config);
   }
 
-  public toGenericType(columnType: string): GenericDataBaseType {
-    if (columnType.toLowerCase() in DuckDBToGenericType) {
-      return DuckDBToGenericType[columnType.toLowerCase()];
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
+    const match = columnType.trim().toLowerCase().match(/^numeric\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+
+    if (match) {
+      precision = Number(match[1]);
+      scale = Number(match[2]);
     }
 
-    return super.toGenericType(columnType.toLowerCase());
+    return DuckDBToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType.toLowerCase(), precision, scale);
   }
 
   private async installExtensions(extensions: string[], execAsync: (sql: string, ...params: any[]) => Promise<void>, repository: string = ''): Promise<void> {

@@ -14,12 +14,19 @@ export type GranularityAnnotation = {
   origin?: string;
 };
 
+export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
+export type CustomNumericFormat = { type: 'custom-numeric'; value: string };
+export type DimensionLinkFormat = { type: 'link'; label: string };
+export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
+  | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
+export type MeasureFormat = 'percent' | 'currency' | 'number' | CustomNumericFormat;
+
 export type Annotation = {
   title: string;
   shortTitle: string;
   type: string;
   meta?: any;
-  format?: 'currency' | 'percent' | 'number';
+  format?: DimensionFormat;
   drillMembers?: any[];
   drillMembersGrouped?: any;
   granularity?: GranularityAnnotation;
@@ -387,6 +394,7 @@ export type CubeTimeDimensionGranularity = {
 export type BaseCubeDimension = BaseCubeMember & {
   primaryKey?: boolean;
   suggestFilterValues: boolean;
+  format?: DimensionFormat;
 };
 
 export type CubeTimeDimension = BaseCubeDimension &

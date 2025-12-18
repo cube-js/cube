@@ -2,6 +2,7 @@ use crate::cube_bridge::case_switch_definition::CaseSwitchDefinition;
 use crate::cube_bridge::case_switch_else_item::CaseSwitchElseItem;
 use crate::cube_bridge::case_switch_item::CaseSwitchItem;
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::test_fixtures::cube_bridge::yaml::case::YamlCaseSwitchDefinition;
 use crate::test_fixtures::cube_bridge::{
     MockCaseSwitchElseItem, MockCaseSwitchItem, MockMemberSql,
 };
@@ -15,6 +16,14 @@ pub struct MockCaseSwitchDefinition {
     switch: String,
     when: Vec<Rc<MockCaseSwitchItem>>,
     else_sql: Rc<MockCaseSwitchElseItem>,
+}
+
+impl MockCaseSwitchDefinition {
+    pub fn from_yaml(yaml: &str) -> Result<Rc<Self>, CubeError> {
+        let yaml_def: YamlCaseSwitchDefinition = serde_yaml::from_str(yaml)
+            .map_err(|e| CubeError::user(format!("Failed to parse YAML: {}", e)))?;
+        Ok(yaml_def.build())
+    }
 }
 
 impl CaseSwitchDefinition for MockCaseSwitchDefinition {
@@ -42,6 +51,31 @@ impl CaseSwitchDefinition for MockCaseSwitchDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
+
+    #[test]
+    fn test_from_yaml() {
+        let yaml = indoc! {"
+            switch: \"{CUBE.currency}\"
+            when:
+              - value: USD
+                sql: \"'dollars'\"
+              - value: EUR
+                sql: \"'euros'\"
+            else:
+              sql: \"'unknown'\"
+        "};
+
+        let case_switch = MockCaseSwitchDefinition::from_yaml(yaml).unwrap();
+
+        assert!(case_switch.switch().is_ok());
+
+        let when_result = case_switch.when().unwrap();
+        assert_eq!(when_result.len(), 2);
+
+        let else_result = case_switch.else_sql().unwrap();
+        assert!(else_result.sql().is_ok());
+    }
 
     #[test]
     fn test_mock_case_switch_definition() {

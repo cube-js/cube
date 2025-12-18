@@ -324,3 +324,16 @@ impl MemberSymbol {
         self.get_dependencies().is_empty()
     }
 }
+
+impl crate::utils::debug::DebugSql for MemberSymbol {
+    fn debug_sql(&self, expand_deps: bool) -> String {
+        match self {
+            MemberSymbol::Dimension(d) => d.debug_sql(expand_deps),
+            MemberSymbol::Measure(m) => m.debug_sql(expand_deps),
+            MemberSymbol::TimeDimension(t) => t.debug_sql(expand_deps),
+            MemberSymbol::CubeName(c) => c.debug_sql(expand_deps),
+            MemberSymbol::CubeTable(c) => c.debug_sql(expand_deps),
+            MemberSymbol::MemberExpression(e) => e.debug_sql(expand_deps),
+        }
+    }
+}

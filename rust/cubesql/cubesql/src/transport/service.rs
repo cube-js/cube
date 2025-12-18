@@ -8,6 +8,7 @@ use datafusion::{
         datatypes::{DataType, SchemaRef},
         record_batch::RecordBatch,
     },
+    logical_expr::AggregateUDF,
     logical_plan::window_frames::{WindowFrame, WindowFrameBound, WindowFrameUnits},
     physical_plan::{aggregates::AggregateFunction, windows::WindowFunction},
 };
@@ -193,11 +194,11 @@ struct MetaCacheBucket {
     value: Arc<MetaContext>,
 }
 
-/// This transports is used in standalone mode
+/// This transport is used in standalone mode
 #[derive(Debug)]
 pub struct HttpTransport {
     /// We use simple cache to improve DX with standalone mode
-    /// because currently we dont persist DF in the SessionState
+    /// because currently we don't persist DF in the SessionState,
     /// and it causes a lot of HTTP requests which slow down BI connections
     cache: RwLockAsync<Option<MetaCacheBucket>>,
 }
@@ -412,6 +413,10 @@ impl SqlTemplates {
         aggregate_function.to_string()
     }
 
+    pub fn udaf_function_name(&self, udaf: &AggregateUDF, _distinct: bool) -> String {
+        udaf.name.to_ascii_uppercase()
+    }
+
     pub fn select(
         &self,
         from: String,
@@ -581,6 +586,20 @@ impl SqlTemplates {
         self.render_template(
             "expressions/within_group",
             context! { fun_sql => sql, within_group_concat => within_group_concat },
+        )
+    }
+
+    pub fn udaf_function(
+        &self,
+        udaf: &AggregateUDF,
+        args: Vec<String>,
+        distinct: bool,
+    ) -> Result<String, CubeError> {
+        let function = self.udaf_function_name(udaf, distinct);
+        let args_concat = args.join(", ");
+        self.render_template(
+            &format!("functions/{}", function),
+            context! { args_concat => args_concat, args => args, distinct => distinct },
         )
     }
 

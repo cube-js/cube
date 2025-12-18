@@ -3,6 +3,55 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
+
+### Features
+
+- **cubesql:** Support `STRING_AGG` SQL push down ([#10256](https://github.com/cube-js/cube/issues/10256)) ([8c82fa5](https://github.com/cube-js/cube/commit/8c82fa5e9d3503bb4c7b5b7fbe85afa8d5656d14))
+
+## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.14](https://github.com/cube-js/cube/compare/v1.5.13...v1.5.14) (2025-12-11)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.13](https://github.com/cube-js/cube/compare/v1.5.12...v1.5.13) (2025-12-10)
+
+### Features
+
+- Allow to specify default dimension order in schema ([#10224](https://github.com/cube-js/cube/issues/10224)) ([f2e1a98](https://github.com/cube-js/cube/commit/f2e1a98a66ae5c656a553d178e94281f053c771b))
+
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix datetime tz conversion for Athena/Trino ([#10207](https://github.com/cube-js/cube/issues/10207)) ([32d50a5](https://github.com/cube-js/cube/commit/32d50a5d5a594f30dff2b1a55c87f5afdb89976f))
+
+### Features
+
+- Support custom date formatting for time dimensions ([#10204](https://github.com/cube-js/cube/issues/10204)) ([8e18659](https://github.com/cube-js/cube/commit/8e186592feb35b224d50eefa280f5422865e73bc))
+- Support custom numeric formatting ([#10213](https://github.com/cube-js/cube/issues/10213)) ([898d4d0](https://github.com/cube-js/cube/commit/898d4d05b5c20c284c02c37718ae754c5646cd49))
+
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix matching for pre-aggs with custom granularities ([#10180](https://github.com/cube-js/cube/issues/10180)) ([e426f6b](https://github.com/cube-js/cube/commit/e426f6b3737fbbec724a266722ef9520b3582592))
+
 ## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
 
 ### Bug Fixes

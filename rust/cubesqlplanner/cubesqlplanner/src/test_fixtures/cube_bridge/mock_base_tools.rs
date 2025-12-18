@@ -3,11 +3,10 @@ use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
-use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::test_fixtures::cube_bridge::{
-    MockDriverTools, MockSecurityContext, MockSqlTemplatesRender, MockSqlUtils,
+    MockDriverTools, MockJoinGraph, MockSqlTemplatesRender, MockSqlUtils,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -29,11 +28,11 @@ pub struct MockBaseTools {
     #[builder(default = Rc::new(MockSqlTemplatesRender::default_templates()))]
     sql_templates: Rc<MockSqlTemplatesRender>,
 
-    #[builder(default = Rc::new(MockSecurityContext))]
-    security_context: Rc<MockSecurityContext>,
-
     #[builder(default = Rc::new(MockSqlUtils))]
     sql_utils: Rc<MockSqlUtils>,
+
+    #[builder(default = Rc::new(MockJoinGraph::new()))]
+    join_graph: Rc<MockJoinGraph>,
 }
 
 impl Default for MockBaseTools {
@@ -53,10 +52,6 @@ impl BaseTools for MockBaseTools {
 
     fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError> {
         Ok(self.sql_templates.clone())
-    }
-
-    fn security_context_for_rust(&self) -> Result<Rc<dyn SecurityContext>, CubeError> {
-        Ok(self.security_context.clone())
     }
 
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError> {
@@ -110,8 +105,9 @@ impl BaseTools for MockBaseTools {
 
     fn join_tree_for_hints(
         &self,
-        _hints: Vec<JoinHintItem>,
+        hints: Vec<JoinHintItem>,
     ) -> Result<Rc<dyn JoinDefinition>, CubeError> {
-        todo!("join_tree_for_hints not implemented in mock")
+        let result = self.join_graph.build_join(hints)?;
+        Ok(result as Rc<dyn JoinDefinition>)
     }
 }

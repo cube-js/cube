@@ -3,6 +3,61 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
+
+### Features
+
+- **server:** Introduce CUBEJS_MAX_REQUEST_SIZE env variable ([#10260](https://github.com/cube-js/cube/issues/10260)) ([71ca412](https://github.com/cube-js/cube/commit/71ca4120296a26176a543045eb06ac4261832579))
+
+## [1.5.15](https://github.com/cube-js/cube/compare/v1.5.14...v1.5.15) (2025-12-15)
+
+### Bug Fixes
+
+- **api-gateway:** Allow messageId to be int in unsubscribe WS request ([#10250](https://github.com/cube-js/cube/issues/10250)) ([1e2e7cb](https://github.com/cube-js/cube/commit/1e2e7cb382bfb95376f1149f9f91608914ff4bc1))
+
+## [1.5.14](https://github.com/cube-js/cube/compare/v1.5.13...v1.5.14) (2025-12-11)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.5.13](https://github.com/cube-js/cube/compare/v1.5.12...v1.5.13) (2025-12-10)
+
+### Bug Fixes
+
+- Add await boundary for response sending ([#10233](https://github.com/cube-js/cube/issues/10233)) ([9e9f9d1](https://github.com/cube-js/cube/commit/9e9f9d1ab5ad3712403cd726ab49864f5d416468))
+- Improve WS request sanitization ([#10231](https://github.com/cube-js/cube/issues/10231)) ([6271520](https://github.com/cube-js/cube/commit/62715203c70b71e371bf2ccad83609ea4b9ce2d1))
+
+### Features
+
+- Allow to specify default dimension order in schema ([#10224](https://github.com/cube-js/cube/issues/10224)) ([f2e1a98](https://github.com/cube-js/cube/commit/f2e1a98a66ae5c656a553d178e94281f053c771b))
+- **backend-native:** expose lastRefreshTime via /cubesql API ([#10206](https://github.com/cube-js/cube/issues/10206)) ([fb5a40f](https://github.com/cube-js/cube/commit/fb5a40f0e225208cb56febc54e0ebfb6e94a6bc3))
+
+## [1.5.12](https://github.com/cube-js/cube/compare/v1.5.11...v1.5.12) (2025-12-04)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.5.11](https://github.com/cube-js/cube/compare/v1.5.10...v1.5.11) (2025-12-02)
+
+### Features
+
+- Support custom date formatting for time dimensions ([#10204](https://github.com/cube-js/cube/issues/10204)) ([8e18659](https://github.com/cube-js/cube/commit/8e186592feb35b224d50eefa280f5422865e73bc))
+- Support custom numeric formatting ([#10213](https://github.com/cube-js/cube/issues/10213)) ([898d4d0](https://github.com/cube-js/cube/commit/898d4d05b5c20c284c02c37718ae754c5646cd49))
+
+## [1.5.10](https://github.com/cube-js/cube/compare/v1.5.9...v1.5.10) (2025-11-28)
+
+### Features
+
+- **api-gateway:** Support query timezone in `/cubesql` API endpoint ([#10189](https://github.com/cube-js/cube/issues/10189)) ([499ddc6](https://github.com/cube-js/cube/commit/499ddc62fc1618b78f16a17943e1c72a670f6b48))
+
+## [1.5.9](https://github.com/cube-js/cube/compare/v1.5.8...v1.5.9) (2025-11-26)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.5.8](https://github.com/cube-js/cube/compare/v1.5.7...v1.5.8) (2025-11-26)
+
+### Features
+
+- **api-gateway:** Introduce CUBEJS_DEFAULT_TIMEZONE env ([#10178](https://github.com/cube-js/cube/issues/10178)) ([7d72978](https://github.com/cube-js/cube/commit/7d72978e022b2975cf97ffcc69ec4febca261d66))
+
 ## [1.5.7](https://github.com/cube-js/cube/compare/v1.5.6...v1.5.7) (2025-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

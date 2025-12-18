@@ -10,13 +10,14 @@ use crate::{
             extract_exprlist_from_groupping_set,
             rewriter::{CubeEGraph, Rewriter},
             AggregateFunctionExprDistinct, AggregateFunctionExprFun, AggregateSplit,
-            AggregateUDFExprFun, AliasExprAlias, AnyExprAll, AnyExprOp, BetweenExprNegated,
-            BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
-            CubeScanAliasToCube, CubeScanJoinHints, CubeScanLimit, CubeScanOffset,
-            CubeScanUngrouped, CubeScanWrapped, DimensionName, EmptyRelationDerivedSourceTableName,
-            EmptyRelationIsWrappable, EmptyRelationProduceOneRow, FilterMemberMember,
-            FilterMemberOp, FilterMemberValues, FilterOpOp, GroupingSetExprType, GroupingSetType,
-            InListExprNegated, InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
+            AggregateUDFExprDistinct, AggregateUDFExprFun, AliasExprAlias, AnyExprAll, AnyExprOp,
+            BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
+            ColumnExprColumn, CubeScanAliasToCube, CubeScanJoinHints, CubeScanLimit,
+            CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
+            EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
+            EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
+            FilterOpOp, GroupingSetExprType, GroupingSetType, InListExprNegated,
+            InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
             JoinNullEqualsNull, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
             LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
             LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
@@ -481,11 +482,16 @@ impl LogicalPlanToLanguageConverter {
                     window_frame,
                 ]))
             }
-            Expr::AggregateUDF { fun, args } => {
+            Expr::AggregateUDF {
+                fun,
+                args,
+                distinct,
+            } => {
                 let fun = add_expr_data_node!(graph, fun.name, AggregateUDFExprFun);
                 let args =
                     add_expr_list_node!(graph, args, query_params, AggregateUDFExprArgs, flat_list);
-                graph.add(LogicalPlanLanguage::AggregateUDFExpr([fun, args]))
+                let distinct = add_expr_data_node!(graph, distinct, AggregateUDFExprDistinct);
+                graph.add(LogicalPlanLanguage::AggregateUDFExpr([fun, args, distinct]))
             }
             Expr::TableUDF { fun, args } => {
                 let fun = add_expr_data_node!(graph, fun.name, TableUDFExprFun);
@@ -1188,13 +1194,18 @@ pub fn node_to_expr(
         LogicalPlanLanguage::AggregateUDFExpr(params) => {
             let fun_name = match_data_node!(node_by_id, params[0], AggregateUDFExprFun);
             let args = match_expr_list_node!(node_by_id, to_expr, params[1], AggregateUDFExprArgs);
+            let distinct = match_data_node!(node_by_id, params[2], AggregateUDFExprDistinct);
             let fun = cube_context
                 .get_aggregate_meta(&fun_name)
                 .ok_or(CubeError::user(format!(
                     "Aggregate UDF '{}' is not found",
                     fun_name
                 )))?;
-            Expr::AggregateUDF { fun, args }
+            Expr::AggregateUDF {
+                fun,
+                args,
+                distinct,
+            }
         }
         LogicalPlanLanguage::TableUDFExpr(params) => {
             let fun_name = match_data_node!(node_by_id, params[0], TableUDFExprFun);
@@ -1582,6 +1593,14 @@ impl LanguageToLogicalPlanConverter {
                 let mut query_time_dimensions = Vec::new();
                 let mut query_order = Vec::new();
                 let mut query_dimensions = Vec::new();
+
+                query.timezone = self
+                    .cube_context
+                    .session_state
+                    .query_timezone
+                    .read()
+                    .unwrap()
+                    .clone();
 
                 for m in members {
                     match m {

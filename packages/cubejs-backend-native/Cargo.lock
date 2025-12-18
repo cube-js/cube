@@ -136,9 +136,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ca33f4bc4ed1babef42cad36cc1f51fa88be00420404e5b1e80ab1b18f7678c"
 dependencies = [
  "concurrent-queue",
- "event-listener",
- "event-listener-strategy",
+ "event-listener 4.0.0",
+ "event-listener-strategy 0.4.0",
  "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "async-lock"
+version = "3.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fd03604047cee9b6ce9de9f70c6cd540a0520c813cbd49bae61f33ab80ed1dc"
+dependencies = [
+ "event-listener 5.4.1",
+ "event-listener-strategy 0.5.4",
  "pin-project-lite",
 ]
 
@@ -621,6 +632,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-epoch"
+version = "0.9.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-utils"
 version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -682,7 +702,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
 dependencies = [
  "arrow",
  "chrono",
@@ -805,6 +825,7 @@ dependencies = [
  "log",
  "lru",
  "minijinja",
+ "moka",
  "paste",
  "pg-srv",
  "postgres-types",
@@ -835,6 +856,7 @@ dependencies = [
  "convert_case 0.7.1",
  "cubeclient",
  "cubenativeutils",
+ "indoc",
  "itertools 0.10.5",
  "lazy_static",
  "minijinja",
@@ -856,7 +878,7 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -889,7 +911,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
 dependencies = [
  "arrow",
  "ordered-float 2.10.1",
@@ -900,7 +922,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
 dependencies = [
  "async-trait",
  "chrono",
@@ -913,7 +935,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -924,7 +946,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=cf034bac8babafdeb56d29a6bf75cbaa7912a8b4#cf034bac8babafdeb56d29a6bf75cbaa7912a8b4"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f#50a3b1192fcd8c6b95d66cda41a2b1dbf95c253f"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -1041,12 +1063,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-listener"
+version = "5.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13b66accf52311f30a0db42147dadea9850cb48cd070028831ae5f5d4b856ab"
+dependencies = [
+ "concurrent-queue",
+ "parking",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "event-listener-strategy"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "958e4d70b6d5e81971bebec42271ec641e7ff4e170a6fa605f2b8a8b65cb97d3"
 dependencies = [
- "event-listener",
+ "event-listener 4.0.0",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "event-listener-strategy"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
+dependencies = [
+ "event-listener 5.4.1",
  "pin-project-lite",
 ]
 
@@ -1680,9 +1723,12 @@ dependencies = [
 
 [[package]]
 name = "indoc"
-version = "2.0.4"
+version = "2.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e186cfbae8084e513daff4240b4797e342f988cecda4fb6c939150f96315fd8"
+checksum = "79cf5c93f93228cf8efb3ba362535fb11199ac548a09ce117c9b1adc3030d706"
+dependencies = [
+ "rustversion",
+]
 
 [[package]]
 name = "instant"
@@ -1994,6 +2040,27 @@ dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "moka"
+version = "0.12.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8261cd88c312e0004c1d51baad2980c66528dfdb2bee62003e643a4d8f86b077"
+dependencies = [
+ "async-lock",
+ "crossbeam-channel",
+ "crossbeam-epoch",
+ "crossbeam-utils",
+ "equivalent",
+ "event-listener 5.4.1",
+ "futures-util",
+ "parking_lot",
+ "portable-atomic",
+ "rustc_version",
+ "smallvec",
+ "tagptr",
+ "uuid 1.6.1",
 ]
 
 [[package]]
@@ -2393,6 +2460,12 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "portable-atomic"
+version = "1.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f84267b20a16ea918e43c6a88433c2d54fa145c92a811b5b047ccbe153674483"
 
 [[package]]
 name = "postgres"
@@ -3320,6 +3393,12 @@ dependencies = [
  "quote",
  "syn 2.0.98",
 ]
+
+[[package]]
+name = "tagptr"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b2093cf4c8eb1e67749a6762251bc9cd836b6fc171623bd0a9d324d37af2417"
 
 [[package]]
 name = "tap"

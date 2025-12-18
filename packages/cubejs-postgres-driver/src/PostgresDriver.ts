@@ -39,8 +39,6 @@ NativeTypeToPostgresType['705'] = 'UNKNOWN';
 const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   // bpchar (“blank-padded char”, the internal name of the character data type)
   bpchar: 'varchar',
-  // Numeric is an alias
-  numeric: 'decimal',
   // External mapping
   hll: 'HLL_POSTGRES',
 };
@@ -386,12 +384,12 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     };
   }
 
-  public toGenericType(columnType: string): GenericDataBaseType {
-    if (columnType in PostgresToGenericType) {
-      return PostgresToGenericType[columnType];
-    }
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    return this.tableColumnTypesWithPrecision(table);
+  }
 
-    return super.toGenericType(columnType);
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null): GenericDataBaseType {
+    return PostgresToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType, precision, scale);
   }
 
   public readOnly() {

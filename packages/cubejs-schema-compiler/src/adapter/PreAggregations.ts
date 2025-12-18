@@ -566,7 +566,7 @@ export class PreAggregations {
   public static timeDimensionsAsIs(timeDimensions: BaseTimeDimension[] | undefined): [expressionPath: string, resolvedGranularity: string | null][] {
     return timeDimensions && R.sortBy(
       ([exprPath]) => exprPath,
-      timeDimensions.map(d => [d.expressionPath(), d.resolvedGranularity()] as [string, string | null]),
+      timeDimensions.map(d => [d.expressionPath(), d.resolvedGranularityAsIs()] as [string, string | null]),
     ) || [];
   }
 

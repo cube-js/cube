@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "1.5.7",
+  "version": "1.5.16",
   "engines": {},
   "repository": {
     "type": "git",
@@ -13,6 +13,7 @@
   "typings": "dist/src/index.d.ts",
   "author": "Cube Dev, Inc.",
   "exports": {
+    "types": "./dist/src/index.d.ts",
     "import": "./dist/src/index.js",
     "require": "./dist/cubejs-client-core.cjs.js"
   },
@@ -38,7 +39,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.5.7",
+    "@cubejs-backend/linter": "1.5.16",
     "@types/jest": "^29",
     "@types/moment-range": "^4.0.0",
     "@types/ramda": "^0.27.34",

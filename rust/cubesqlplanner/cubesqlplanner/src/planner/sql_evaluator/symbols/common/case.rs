@@ -371,3 +371,58 @@ impl Case {
         }
     }
 }
+
+impl crate::utils::debug::DebugSql for Case {
+    fn debug_sql(&self, expand_deps: bool) -> String {
+        match self {
+            Case::Case(case_def) => {
+                let mut result = "CASE\n".to_string();
+
+                for when in &case_def.items {
+                    let condition = when.sql.debug_sql(expand_deps);
+                    let then = match &when.label {
+                        CaseLabel::String(s) => format!("'{}'", s),
+                        CaseLabel::Sql(sql) => sql.debug_sql(expand_deps),
+                    };
+                    result.push_str(&format!("  WHEN {} THEN {}\n", condition, then));
+                }
+
+                let else_sql = match &case_def.else_label {
+                    CaseLabel::String(s) => format!("'{}'", s),
+                    CaseLabel::Sql(sql) => sql.debug_sql(expand_deps),
+                };
+                result.push_str(&format!("  ELSE {}\n", else_sql));
+
+                result.push_str("END");
+                result
+            }
+            Case::CaseSwitch(case_switch) => {
+                let switch_sql = match &case_switch.switch {
+                    CaseSwitchItem::Sql(sql) => sql.debug_sql(expand_deps),
+                    CaseSwitchItem::Member(member) => {
+                        if expand_deps {
+                            member.debug_sql(true)
+                        } else {
+                            format!("{{{}}}", member.full_name())
+                        }
+                    }
+                };
+
+                let mut result = format!("CASE {}\n", switch_sql);
+
+                for when in &case_switch.items {
+                    let then = when.sql.debug_sql(expand_deps);
+                    result.push_str(&format!("  WHEN '{}' THEN {}\n", when.value, then));
+                }
+
+                if let Some(else_sql) = &case_switch.else_sql {
+                    let else_sql_str = else_sql.debug_sql(expand_deps);
+                    result.push_str(&format!("  ELSE {}\n", else_sql_str));
+                }
+
+                result.push_str("END");
+                result
+            }
+        }
+    }
+}

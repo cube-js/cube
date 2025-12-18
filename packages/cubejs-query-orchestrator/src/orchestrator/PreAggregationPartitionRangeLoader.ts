@@ -295,6 +295,7 @@ export class PreAggregationPartitionRangeLoader {
       const unionTargetTableName = allTableTargetNames
         .map(targetTableName => `SELECT * FROM ${targetTableName}${emptyResult ? ' WHERE 1 = 0' : ''}`)
         .join(' UNION ALL ');
+
       return {
         targetTableName: allTableTargetNames.length === 1 && !emptyResult ? allTableTargetNames[0] : `(${unionTargetTableName})`,
         refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
@@ -302,6 +303,7 @@ export class PreAggregationPartitionRangeLoader {
         buildRangeEnd: !emptyResult && loadResults.length && loadResults[loadResults.length - 1].buildRangeEnd,
         lambdaTable,
         rollupLambdaId: this.preAggregation.rollupLambdaId,
+        isMultiTableUnion: allTableTargetNames.length > 1,
       };
     } else {
       return new PreAggregationLoader(

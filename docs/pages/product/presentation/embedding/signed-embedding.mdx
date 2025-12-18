@@ -1,0 +1,180 @@
+# Signed embedding
+
+<InfoBox>
+  Embedding is available on [Premium and Enterprise plans](https://cube.dev/pricing).
+</InfoBox>
+
+Signed embedding is designed for **external, customer-facing analytics**. It uses JWT tokens for seamless authentication, making it ideal for:
+
+- Embedding analytics in your SaaS application for customers
+- White-label analytics solutions
+- Multi-tenant applications where each customer sees their own data
+- Public-facing dashboards with controlled access
+
+Users authenticate through your application without needing Cube accounts, providing a seamless experience. The session tokens are cryptographically signed to ensure secure access with user-specific permissions.
+
+## Getting started
+
+Signed embedding works through a two-step authentication flow:
+
+1. **Generate a session** – Your backend generates a temporary session using the Cube API
+2. **Exchange for a token** – The iframe automatically exchanges the session for a long-lived access token
+
+**Session lifecycle:**
+- **Sessions** are valid for **5 minutes** and must be exchanged within this window
+- **Tokens** are valid for **24 hours** after exchange
+- Sessions are single-use and expire after being exchanged
+
+This ensures secure authentication while maintaining a smooth user experience.
+
+### Get your API key
+
+To use the embedded chat or dashboard, you need an [API key][ref-api-keys]:
+
+- Go to <Btn>Access → API Keys</Btn> in your Cube admin panel
+- Generate or copy your existing API key.
+- You'll use this key to authenticate API calls for generating embed sessions.
+
+### Generate an embed session
+
+Use the [Generate Session API][ref-generate-session] to create a session for your user. This endpoint will automatically create (insert) or update the external user based on the `externalId` provided.
+
+<WarningBox>
+  Accounts are limited to 10,000 external users. To increase this limit, please
+  contact support.
+</WarningBox>
+
+#### Example (JavaScript)
+
+```javascript
+const API_KEY = "YOUR_API_KEY";
+const DEPLOYMENT_ID = 32;
+
+const session = await fetch(
+  "https://your-account.cubecloud.dev/api/v1/embed/generate-session",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Api-Key ${API_KEY}",
+    },
+    body: JSON.stringify({
+      deploymentId: DEPLOYMENT_ID,
+      externalId: "user@example.com",
+      userAttributes: [
+        // optional - enables row-level security
+        {
+          name: "city",
+          value: "San Francisco",
+        },
+        {
+          name: "department",
+          value: "Sales",
+        },
+      ],
+    }),
+  },
+);
+
+const data = await session.json();
+const sessionId = data.sessionId;
+```
+
+### Embedding via iframe
+
+Use the session ID to embed the chat UI or the dashboard UI in your application:
+
+```html
+<iframe
+  title="Analytics Chat"
+  src="https://your-tenant.cubecloud.dev/embed/chat?sessionId=YOUR_SESSION_ID"
+></iframe>
+```
+
+```html
+<iframe
+  title="Dashboard"
+  src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
+  width="100%"
+></iframe>
+```
+
+#### Complete example
+
+Here's a complete HTML example that demonstrates the full flow for embedding a dashboard:
+
+```html
+<html>
+  <head>
+    <script>
+      (async () => {
+        const API_BASE_URL = "https://your-tenant.cubecloud.dev";
+        const API_KEY = "YOUR_API_KEY";
+        const DEPLOYMENT_ID = 32;
+        const externalId = "user@example.com";
+
+        const sessionResponse = await fetch(
+          `${API_BASE_URL}/api/v1/embed/generate-session`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Api-Key ${API_KEY}`,
+            },
+            body: JSON.stringify({
+              deploymentId: DEPLOYMENT_ID,
+              externalId: externalId,
+            }),
+          },
+        );
+
+        const sessionData = await sessionResponse.json();
+
+        const iframe = document.getElementById("dashboard-iframe");
+        const baseUrl =
+          "https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID";
+        iframe.src = `${baseUrl}?session=${sessionData.sessionId}`;
+      })();
+    </script>
+  </head>
+
+  <body>
+    <iframe
+      id="dashboard-iframe"
+      src=""
+      width="100%"
+      height="800"
+      frameborder="0"
+      allowtransparency="true"
+      allowfullscreen="true"
+    ></iframe>
+  </body>
+</html>
+```
+
+## User attributes
+
+User attributes enable row-level security and personalized chat responses by filtering data based on user permissions. The attributes you pass during session generation automatically filter data queries and responses.
+
+<InfoBox>
+  User attributes must first be configured in your Cube admin panel. See the
+  [User Attributes documentation](/product/administration/users-and-permissions/user-attributes) for
+  setup instructions.
+</InfoBox>
+
+**How it works:**
+
+1. **Configure attributes** in your admin panel (e.g., `city`, `department`)
+2. **Pass attributes** during session generation
+3. **Data is automatically filtered** based on user permissions through access policies
+4. **AI responses are personalized** to the user's context
+
+**Example use cases:**
+
+- Sales reps only see data for their assigned territory
+- Regional managers see data filtered by their city
+- Department heads see only their department's metrics
+
+
+[ref-api-keys]: /product/administration/workspace/api-keys
+[ref-generate-session]: /product/apis-integrations/embed-apis/generate-session

@@ -100,6 +100,9 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   // It's a limitation for now, because anyway we don't work with JSON objects in Cube Store.
   object: 'HLL_SNOWFLAKE',
   number: 'decimal',
+  // For some reason, snowflake SDK returns `fixed` type for DWH types like NUMBER(38, 15)
+  // @see https://docs.snowflake.com/en/sql-reference/data-types-numeric for more info on types
+  fixed: 'decimal',
   timestamp_ntz: 'timestamp'
 };
 
@@ -401,7 +404,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         return emptyKeys.filter(key => key !== 'keyId' && key !== 'secretKey');
       }
     }
-    
+
     return emptyKeys;
   }
 
@@ -421,7 +424,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       const emptyKeys = Object.keys(exportBucket)
         .filter((key: string) => exportBucket[<keyof SnowflakeDriverExportBucket>key] === undefined);
       const keysToValidate = this.getRequiredExportBucketKeys(exportBucket, emptyKeys);
-      
+
       if (keysToValidate.length) {
         throw new Error(
           `Unsupported configuration exportBucket, some configuration keys are empty: ${keysToValidate.join(',')}`
@@ -695,11 +698,13 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of table fields meta info.
    */
-  public async tableColumnTypes(table: string) {
+  public override async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
     const columns = await this.query<{
       COLUMN_NAME: string,
-      DATA_TYPE: string
+      DATA_TYPE: string,
+      NUMERIC_PRECISION: number | null,
+      NUMERIC_SCALE: number | null
     }[]>(
       `SELECT COLUMNS.COLUMN_NAME,
         CASE
@@ -708,7 +713,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
             COLUMNS.DATA_TYPE = 'NUMBER'
           THEN 'int'
           ELSE COLUMNS.DATA_TYPE
-        END as DATA_TYPE
+        END as DATA_TYPE,
+        COLUMNS.NUMERIC_PRECISION,
+        COLUMNS.NUMERIC_SCALE
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE
         TABLE_NAME = ${this.param(0)} AND
@@ -718,7 +725,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     );
     return columns.map(c => ({
       name: c.COLUMN_NAME,
-      type: this.toGenericType(c.DATA_TYPE),
+      type: this.toGenericType(c.DATA_TYPE, c.NUMERIC_PRECISION, c.NUMERIC_SCALE),
     }));
   }
 
@@ -941,13 +948,13 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         type: '',
       };
       if (column.isNumber()) {
-        // @ts-ignore
-        if (column.getScale() === 0) {
+        const precision = column.getPrecision();
+        const scale = column.getScale();
+
+        if (scale === 0) {
           type.type = 'int';
-        } else if (column.getScale() && column.getScale() <= 10) {
-          type.type = 'decimal';
         } else {
-          type.type = this.toGenericType(column.getType());
+          type.type = this.toGenericType(column.getType(), precision, scale);
         }
       } else {
         type.type = this.toGenericType(column.getType());
@@ -1026,8 +1033,14 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public toGenericType(columnType: string) {
-    return SnowflakeToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
+  protected override toGenericType(columnType: string, precision?: number | null, scale?: number | null) {
+    const genericType = SnowflakeToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
+
+    if (genericType === 'decimal' && precision && scale && getEnv('preciseDecimalInCubestore')) {
+      return `decimal(${precision}, ${scale})`;
+    }
+
+    return genericType;
   }
 
   public async getTablesQuery(schemaName: string) {

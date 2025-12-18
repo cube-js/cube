@@ -1,0 +1,80 @@
+# Core Data APIs
+
+Core Data APIs enable you to query and retrieve data from your Cube semantic layer using various protocols and formats, including SQL, DAX, MDX, REST, and GraphQL.
+
+## Choosing the Right API
+
+* To connect to [Microsoft Power BI][ref-powerbi], use the [DAX API][ref-dax-api]
+
+* To connect to [Microsoft Excel][ref-excel], use either the [MDX API][ref-mdx-api] or [Cube Cloud for Excel][ref-cube-cloud-for-excel]
+
+* To connect to [Google Sheets][ref-sheets], use [Cube Cloud for Sheets][ref-cube-cloud-for-sheets]
+
+* To connect to AI assistants, use the [Model Context Protocol (MCP) server][ref-mcp-server]
+
+* For internal or self-serve [business intelligence][cube-issbi], use [Semantic Layer Sync][ref-sls] if it supports your BI tools. Otherwise, connect via the [SQL API][ref-sql-api] directly
+
+* For [embedded analytics][cube-ea] and [real-time analytics][cube-rta], use [REST API][ref-rest-api] or [GraphQL API][ref-graphql-api]. When using the REST API, the [JavaScript SDK][ref-js-sdk] can simplify integration with your front-end code
+
+All Core Data APIs share common [querying concepts][ref-queries] and support authentication, security contexts, and access policies defined in your semantic layer.
+
+<ReferenceBox>
+
+See this [GitHub issue](https://github.com/cube-js/cube/issues/1744#issuecomment-2291680777)
+for an unofficial, community-maintained [client library for Python](https://github.com/mharrisb1/cube-http-client).
+
+</ReferenceBox>
+
+## Data modeling
+
+Support for data modeling features differ across APIs, integrations, and [visualization
+tools][ref-viz-tools]. Some of the features with partial support are listed below:
+
+| Feature | ✅ Supported in |
+| --- | --- |
+| [Hierarchies][ref-hierarchies] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
+| Flat [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Microsoft Excel][ref-excel] via the [MDX API][ref-mdx-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>[Apache Superset][ref-superset] via [Semantic Layer Sync][ref-sls]<br/>[Preset][ref-preset] via [Semantic Layer Sync][ref-sls]<br/><br/>Also, supported in [Playground][ref-playground] |
+| Nested [folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Microsoft Excel][ref-excel] via the [MDX API][ref-mdx-api] |
+
+## Authentication methods
+
+Support for authentication methods differ across APIs, integrations, and [visualization
+tools][ref-viz-tools]:
+
+| Method | ✅ Supported in |
+| --- | --- |
+| [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api]<br/>[Semantic Layer Sync][ref-sls]<br/>[SQL API][ref-sql-api] |
+| [Kerberos][ref-auth-kerberos] and [NTLM][ref-auth-ntlm] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api] |
+| [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
+| [JSON Web Token][ref-auth-jwt] | [REST API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api] |
+
+[cube-issbi]: https://cube.dev/use-cases/semantic-layer
+[cube-ea]: https://cube.dev/use-cases/embedded-analytics
+[cube-rta]: https://cube.dev/use-cases/real-time-analytics
+[ref-queries]: /product/apis-integrations/core-data-apis/queries
+[ref-sql-api]: /product/apis-integrations/core-data-apis/sql-api
+[ref-dax-api]: /product/apis-integrations/core-data-apis/dax-api
+[ref-mdx-api]: /product/apis-integrations/core-data-apis/mdx-api
+[ref-rest-api]: /product/apis-integrations/core-data-apis/rest-api
+[ref-graphql-api]: /product/apis-integrations/core-data-apis/graphql-api
+[ref-sls]: /product/apis-integrations/semantic-layer-sync
+[ref-js-sdk]: /product/apis-integrations/javascript-sdk
+[ref-cube-cloud-for-excel]: /product/apis-integrations/microsoft-excel
+[ref-cube-cloud-for-sheets]: /product/apis-integrations/google-sheets
+[ref-mcp-server]: /product/apis-integrations/mcp-server
+[ref-viz-tools]: /product/configuration/visualization-tools
+[ref-hierarchies]: /product/data-modeling/reference/hierarchies
+[ref-folders]: /product/data-modeling/reference/view#folders
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[ref-excel]: /product/configuration/visualization-tools/excel
+[ref-sheets]: /product/configuration/visualization-tools/google-sheets
+[ref-tableau]: /product/configuration/visualization-tools/tableau
+[ref-auth-user-pass]: /product/auth/methods/name-password
+[ref-auth-idp]: /product/auth/methods/identity-provider
+[ref-auth-jwt]: /product/auth/methods/jwt
+[ref-auth-kerberos]: /product/auth/methods/kerberos
+[ref-auth-ntlm]: /product/auth/methods/ntlm
+[ref-superset]: /product/configuration/visualization-tools/superset
+[ref-preset]: /product/configuration/visualization-tools/superset
+[ref-playground]: /product/administration/workspace/playground
+
