@@ -23,6 +23,38 @@ echo "  1. Cube.js packages (TypeScript)"
 echo "  2. CubeSQL binary (Rust)"
 echo ""
 
+# Ask about deep clean
+echo -e "${YELLOW}Do you want to perform a deep clean first?${NC}"
+echo "This will remove all caches, build artifacts, and node_modules."
+echo "Choose this after major rebases or when experiencing build issues."
+echo ""
+echo "Options:"
+echo "  1) Quick rebuild (incremental, fastest)"
+echo "  2) Deep clean + full rebuild (removes everything, slowest but safest)"
+echo ""
+read -p "Choose option (1/2) [default: 1]: " -n 1 -r
+echo ""
+echo ""
+
+DEEP_CLEAN=false
+if [[ $REPLY == "2" ]]; then
+    DEEP_CLEAN=true
+    echo -e "${RED}⚠️  DEEP CLEAN MODE ENABLED${NC}"
+    echo "This will remove:"
+    echo "  - All node_modules directories"
+    echo "  - All Rust target directories"
+    echo "  - All TypeScript build artifacts"
+    echo "  - Recipe binaries and caches"
+    echo ""
+    read -p "Are you sure? This will take 5-10 minutes to rebuild. (y/n): " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Cancelled. Running quick rebuild instead..."
+        DEEP_CLEAN=false
+    fi
+    echo ""
+fi
+
 # Function to check if a command succeeded
 check_status() {
     if [ $? -eq 0 ]; then
@@ -32,6 +64,79 @@ check_status() {
         exit 1
     fi
 }
+
+# Deep clean if requested
+if [ "$DEEP_CLEAN" = true ]; then
+    echo -e "${BLUE}======================================${NC}"
+    echo -e "${BLUE}Deep Clean Phase${NC}"
+    echo -e "${BLUE}======================================${NC}"
+    echo ""
+
+    # Clean recipe directory
+    echo -e "${GREEN}Cleaning recipe directory...${NC}"
+    cd "$SCRIPT_DIR"
+    rm -rf node_modules yarn.lock bin .cubestore *.log *.pid
+    check_status "Recipe directory cleaned"
+
+    # Clean Cube.js build artifacts
+    echo ""
+    echo -e "${GREEN}Cleaning Cube.js build artifacts...${NC}"
+    cd "$CUBE_ROOT"
+
+    # Use yarn clean if available
+    if grep -q '"clean"' package.json; then
+        yarn clean
+        check_status "Cube.js build artifacts cleaned"
+    else
+        echo -e "${YELLOW}No clean script found, manually cleaning dist directories${NC}"
+        find packages -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
+        find packages -type d -name "lib" -exec rm -rf {} + 2>/dev/null || true
+        find packages -type f -name "tsconfig.tsbuildinfo" -delete 2>/dev/null || true
+        check_status "Manual cleanup complete"
+    fi
+
+    # Clean node_modules (this is the slowest part)
+    echo ""
+    echo -e "${GREEN}Removing node_modules...${NC}"
+    echo -e "${YELLOW}This may take 1-2 minutes...${NC}"
+    cd "$CUBE_ROOT"
+    rm -rf node_modules
+    check_status "node_modules removed"
+
+    # Clean Rust target directories
+    echo ""
+    echo -e "${GREEN}Cleaning Rust build artifacts...${NC}"
+    cd "$CUBE_ROOT/rust/cubesql"
+    if [ -d "target" ]; then
+        rm -rf target
+        check_status "CubeSQL target directory removed"
+    else
+        echo -e "${YELLOW}CubeSQL target directory not found, skipping${NC}"
+    fi
+
+    # Clean other Rust crates if they exist
+    for rust_dir in "$CUBE_ROOT/rust"/*; do
+        if [ -d "$rust_dir/target" ]; then
+            echo -e "${YELLOW}Cleaning $(basename $rust_dir)/target${NC}"
+            rm -rf "$rust_dir/target"
+        fi
+    done
+
+    if [ -d "$CUBE_ROOT/packages/cubejs-backend-native/target" ]; then
+        echo -e "${YELLOW}Cleaning cubejs-backend-native/target${NC}"
+        rm -rf "$CUBE_ROOT/packages/cubejs-backend-native/target"
+    fi
+
+    check_status "All Rust artifacts cleaned"
+
+    echo ""
+    echo -e "${GREEN}✓ Deep clean complete!${NC}"
+    echo ""
+    echo -e "${BLUE}======================================${NC}"
+    echo -e "${BLUE}Rebuild Phase${NC}"
+    echo -e "${BLUE}======================================${NC}"
+    echo ""
+fi
 
 # Step 1: Install root dependencies
 echo -e "${GREEN}Step 1: Installing root dependencies...${NC}"
@@ -66,31 +171,52 @@ fi
 
 echo -e "${GREEN}✓ Recipe will use root workspace dependencies${NC}"
 
-# Step 4: Build CubeSQL (optional - ask user)
+# Step 4: Build CubeSQL (optional - ask user, or automatic after deep clean)
 echo ""
 echo -e "${YELLOW}Step 4: Build CubeSQL?${NC}"
-echo "Building CubeSQL (Rust) takes 5-10 minutes."
-read -p "Build CubeSQL now? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+
+# Automatic build after deep clean (since we removed target directory)
+BUILD_CUBESQL=false
+if [ "$DEEP_CLEAN" = true ]; then
+    echo -e "${YELLOW}Deep clean was performed, CubeSQL must be rebuilt.${NC}"
+    BUILD_CUBESQL=true
+else
+    echo "Building CubeSQL (Rust) takes 5-10 minutes."
+    read -p "Build CubeSQL now? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        BUILD_CUBESQL=true
+    fi
+fi
+
+if [ "$BUILD_CUBESQL" = true ]; then
     echo -e "${GREEN}Building CubeSQL...${NC}"
     cd "$CUBE_ROOT/rust/cubesql"
 
     # Check if we should do release or debug build
-    echo -e "${YELLOW}Build type:${NC}"
-    echo "  1) Debug (faster build, slower runtime)"
-    echo "  2) Release (slower build, faster runtime)"
-    read -p "Choose build type (1/2): " -n 1 -r
-    echo
-
-    if [[ $REPLY == "2" ]]; then
+    if [ "$DEEP_CLEAN" = true ]; then
+        # Default to release build after deep clean
+        echo -e "${YELLOW}Deep clean mode: building release version (recommended)${NC}"
+        echo "This will take 5-10 minutes..."
         cargo build --release --bin cubesqld
         check_status "CubeSQL built (release)"
         CUBESQLD_BIN="$CUBE_ROOT/rust/cubesql/target/release/cubesqld"
     else
-        cargo build --bin cubesqld
-        check_status "CubeSQL built (debug)"
-        CUBESQLD_BIN="$CUBE_ROOT/rust/cubesql/target/debug/cubesqld"
+        echo -e "${YELLOW}Build type:${NC}"
+        echo "  1) Debug (faster build, slower runtime)"
+        echo "  2) Release (slower build, faster runtime)"
+        read -p "Choose build type (1/2): " -n 1 -r
+        echo
+
+        if [[ $REPLY == "2" ]]; then
+            cargo build --release --bin cubesqld
+            check_status "CubeSQL built (release)"
+            CUBESQLD_BIN="$CUBE_ROOT/rust/cubesql/target/release/cubesqld"
+        else
+            cargo build --bin cubesqld
+            check_status "CubeSQL built (debug)"
+            CUBESQLD_BIN="$CUBE_ROOT/rust/cubesql/target/debug/cubesqld"
+        fi
     fi
 
     # Copy to recipe bin directory
@@ -134,6 +260,16 @@ echo -e "${BLUE}======================================${NC}"
 echo -e "${GREEN}Rebuild Complete!${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo ""
+
+# Show what was done
+if [ "$DEEP_CLEAN" = true ]; then
+    echo -e "${GREEN}✓ Deep clean performed${NC}"
+    echo "  - Removed all caches and build artifacts"
+    echo "  - Fresh install of all dependencies"
+    echo "  - Complete rebuild of all packages"
+    echo ""
+fi
+
 echo "You can now start the services:"
 echo ""
 echo -e "${YELLOW}Start Cube.js API server:${NC}"
