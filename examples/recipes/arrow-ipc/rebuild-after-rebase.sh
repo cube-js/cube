@@ -47,16 +47,24 @@ cd "$CUBE_ROOT"
 yarn tsc
 check_status "TypeScript packages built"
 
-# Step 3: Install recipe dependencies
+# Step 3: Verify workspace setup
 echo ""
-echo -e "${GREEN}Step 3: Installing recipe dependencies...${NC}"
+echo -e "${GREEN}Step 3: Verifying workspace setup...${NC}"
 cd "$SCRIPT_DIR"
-if [ -f "package.json" ]; then
-    yarn install
-    check_status "Recipe dependencies installed"
-else
-    echo -e "${YELLOW}No package.json in recipe directory, skipping${NC}"
+
+# Remove local yarn.lock if it exists (should use root workspace)
+if [ -f "yarn.lock" ]; then
+    echo -e "${YELLOW}Removing local yarn.lock (using root workspace instead)${NC}"
+    rm yarn.lock
 fi
+
+# Remove local node_modules if it exists (should use root workspace)
+if [ -d "node_modules" ]; then
+    echo -e "${YELLOW}Removing local node_modules (using root workspace instead)${NC}"
+    rm -rf node_modules
+fi
+
+echo -e "${GREEN}✓ Recipe will use root workspace dependencies${NC}"
 
 # Step 4: Build CubeSQL (optional - ask user)
 echo ""
