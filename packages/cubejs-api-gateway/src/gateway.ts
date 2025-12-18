@@ -56,6 +56,8 @@ import {
   SqlApiRequest,
   MetaResponseResultFn,
   RequestQuery,
+  QueryConvertRequest,
+  QueryConvertResponse,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -413,6 +415,14 @@ class ApiGateway {
     app.post(`${this.basePath}/v1/dry-run`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
       await this.dryRun({
         query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    app.post(`${this.basePath}/v1/convert`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+      await this.convertQuery({
+        convertQuery: req.body,
         context: req.context,
         res: this.resToResultFn(res)
       });
@@ -1599,6 +1609,26 @@ class ApiGateway {
       },
       requestId: context.requestId
     };
+  }
+
+  protected async convertQuery({ convertQuery, context, res }: QueryConvertRequest) {
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+
+      const result: QueryConvertResponse = {
+        status: 'ok',
+        query: {},
+      };
+
+      await res(result);
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query: convertQuery,
+        res,
+      });
+    }
   }
 
   protected async dryRun({ query, context, res }: QueryRequest) {

@@ -142,6 +142,22 @@ type QueryRequest = BaseRequest & {
   cacheMode?: CacheMode;
 };
 
+type ConvertQuery = {
+  input: 'sql';
+  output: 'rest';
+  query: string;
+};
+
+type QueryConvertRequest = BaseRequest & {
+  convertQuery: ConvertQuery;
+};
+
+type QueryConvertResponse = {
+  status: string;
+  query: any;
+  error?: string;
+};
+
 type SqlApiRequest = BaseRequest & {
   query: Record<string, any>;
   sqlQuery?: [string, string[]];
@@ -215,6 +231,7 @@ type PreAggJobStatusResponse =
   | PreAggJobStatusObject;
 
 export {
+  ConvertQuery,
   RequestContext,
   RequestExtension,
   ExtendedRequestContext,
@@ -228,6 +245,8 @@ export {
   BaseRequest,
   RequestQuery,
   QueryRequest,
+  QueryConvertResponse,
+  QueryConvertRequest,
   PreAggsJobsRequest,
   PreAggsSelector,
   PreAggJob,
