@@ -39,13 +39,13 @@ cd "$CUBE_ROOT"
 yarn install
 check_status "Root dependencies installed"
 
-# Step 2: Build TypeScript packages
+# Step 2: Build all packages (TypeScript + client bundles)
 echo ""
-echo -e "${GREEN}Step 2: Building TypeScript packages...${NC}"
-echo -e "${YELLOW}This may take several minutes...${NC}"
+echo -e "${GREEN}Step 2: Building all packages...${NC}"
+echo -e "${YELLOW}This may take 1-2 minutes...${NC}"
 cd "$CUBE_ROOT"
-yarn tsc
-check_status "TypeScript packages built"
+yarn build
+check_status "All packages built"
 
 # Step 3: Verify workspace setup
 echo ""
