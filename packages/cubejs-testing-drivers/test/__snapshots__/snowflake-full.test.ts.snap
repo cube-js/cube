@@ -12591,6 +12591,10 @@ Array [
 exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: ungrouped pre-agg: ungrouped_pre_agg 1`] = `
 Array [
   Object {
+    "productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "totalSales": null,
+  },
+  Object {
     "productName": "Canon PC1080F Personal Copier",
     "totalSales": 2399.96,
   },
@@ -12761,10 +12765,6 @@ Array [
   Object {
     "productName": "OIC #2 Pencils, Medium Soft",
     "totalSales": 3.76,
-  },
-  Object {
-    "productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
-    "totalSales": null,
   },
 ]
 `;
@@ -15822,7 +15822,7 @@ Array [
     "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
     "BigECommerce.orderDate.quarter": "2020-10-01T00:00:00.000",
-    "BigECommerce.totalProfit": "139.9970",
+    "BigECommerce.totalProfit": "139.997",
     "BigECommerce.totalProfitForQuarter": "1576.6324",
   },
   Object {
