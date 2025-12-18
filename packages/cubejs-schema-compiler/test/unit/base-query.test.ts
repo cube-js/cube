@@ -1250,7 +1250,7 @@ describe('SQL Generation', () => {
         .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 1800) / 3600)`, false, expect.any(BaseQuery)]);
 
       expect(query.everyRefreshKeySql({ every: '30 5 * * 5', timezone }))
-        .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 365400) / 604800)`, false, expect.any(BaseQuery)]);
+        .toEqual([`FLOOR((${utcOffset} + EXTRACT(EPOCH FROM NOW()) - 106200) / 604800)`, false, expect.any(BaseQuery)]);
 
       for (let i = 1; i < 59; i++) {
         expect(query.everyRefreshKeySql({ every: `${i} * * * *`, timezone }))
