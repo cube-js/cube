@@ -67,6 +67,7 @@ features:
 | Deprecated | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7    |           |
 | Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
 | Deprecated | [`renewQuery` parameter of the `/v1/load` endpoint](#renewquery-parameter-of-the-v1load-endpoint)                                 | v1.3.73   |           |
+| Deprecated | [Elasticsearch driver](#elasticsearch-driver)                                                                                     | v1.6.0     |           |
 
 ### Node.js 8
 
@@ -416,5 +417,13 @@ no more new features, only security updates. Please upgrade to Node.js 22 or hig
 
 ### `renewQuery` parameter of the `/v1/load` endpoint
 
+**Deprecated in Release: v1.3.73**
+
 This parameter is deprecated and will be removed in future releases. See [cache control](https://cube.dev/docs/product/apis-integrations/rest-api#cache-control)
 options and use the new `cache` parameter of the `/v1/load` endpoint instead.
+
+### Elasticsearch driver
+
+**Deprecated in Release: v1.6.0**
+
+The Elasticsearch driver is deprecated and will be removed in a future release.
