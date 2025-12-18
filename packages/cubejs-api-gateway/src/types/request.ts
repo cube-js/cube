@@ -152,12 +152,6 @@ type QueryConvertRequest = BaseRequest & {
   convertQuery: ConvertQuery;
 };
 
-type QueryConvertResponse = {
-  status: string;
-  query: any;
-  error?: string;
-};
-
 type SqlApiRequest = BaseRequest & {
   query: Record<string, any>;
   sqlQuery?: [string, string[]];
@@ -245,7 +239,6 @@ export {
   BaseRequest,
   RequestQuery,
   QueryRequest,
-  QueryConvertResponse,
   QueryConvertRequest,
   PreAggsJobsRequest,
   PreAggsSelector,
