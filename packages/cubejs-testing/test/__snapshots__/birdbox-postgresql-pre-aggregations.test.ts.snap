@@ -14,7 +14,7 @@ Array [
 exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension: Rolling Mixed With Dimension 1`] = `
 Array [
   Object {
-    "visitors.checkinsRolling2day": "2",
+    "visitors.checkinsRolling2day": "5",
     "visitors.checkinsRollingTotal": "5",
     "visitors.count": "1",
     "visitors.createdAt": "2017-01-05T00:00:00.000",
