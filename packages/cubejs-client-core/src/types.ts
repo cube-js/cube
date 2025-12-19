@@ -1,6 +1,5 @@
 import Meta from './Meta';
 import { TimeDimensionGranularity } from './time';
-import { TransportOptions } from './HttpTransport';
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 
@@ -27,7 +26,7 @@ export type Annotation = {
   shortTitle: string;
   type: string;
   meta?: any;
-  format?: DimensionFormat;
+  format?: DimensionFormat | MeasureFormat;
   drillMembers?: any[];
   drillMembersGrouped?: any;
   granularity?: GranularityAnnotation;
@@ -396,6 +395,7 @@ export type BaseCubeDimension = BaseCubeMember & {
   primaryKey?: boolean;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  key?: string;
 };
 
 export type CubeTimeDimension = BaseCubeDimension &
