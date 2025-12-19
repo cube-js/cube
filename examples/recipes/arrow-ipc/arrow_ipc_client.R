@@ -42,12 +42,12 @@ CubeSQLArrowIPCClient <- R6::R6Class(
     #' Initialize client with connection parameters
     #'
     #' @param host CubeSQL server hostname (default: "127.0.0.1")
-    #' @param port CubeSQL server port (default: 4444)
-    #' @param user Database user (default: "root")
-    #' @param password Database password (default: "")
-    #' @param dbname Database name (default: "")
-    initialize = function(host = "127.0.0.1", port = 4444L, user = "root",
-                          password = "", dbname = "") {
+    #' @param port CubeSQL server port (default: 4445)
+    #' @param user Database user (default: "username")
+    #' @param password Database password (default: "password")
+    #' @param dbname Database name (default: "test")
+    initialize = function(host = "127.0.0.1", port = 4445L, user = "username",
+                          password = "password", dbname = "test") {
       self$config <- list(
         host = host,
         port = port,

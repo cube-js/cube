@@ -25,7 +25,7 @@ from pprint import pprint
 class CubeSQLArrowIPCClient:
     """Client for connecting to CubeSQL with Arrow IPC output format."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 4444,
+    def __init__(self, host: str = "127.0.0.1", port: int = 4445,
                  user: str = "username", password: str = "password", database: str = "test"):
         """
         Initialize connection to CubeSQL server.
@@ -305,7 +305,7 @@ def main():
         test_client.connect()
         test_client.close()
     except Exception as e:
-        print(f"Warning: Could not connect to CubeSQL at 127.0.0.1:4444")
+        print(f"Warning: Could not connect to CubeSQL at 127.0.0.1:4445")
         print(f"Error: {e}")
         print("\nTo run the examples, start CubeSQL with:")
         print("  CUBESQL_CUBE_URL=... CUBESQL_CUBE_TOKEN=... cargo run --bin cubesqld")
