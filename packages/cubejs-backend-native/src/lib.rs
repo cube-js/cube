@@ -16,6 +16,7 @@ pub mod node_obj_serializer;
 pub mod orchestrator;
 #[cfg(feature = "python")]
 pub mod python;
+pub mod rest4sql;
 pub mod sql4sql;
 pub mod stream;
 pub mod template;
