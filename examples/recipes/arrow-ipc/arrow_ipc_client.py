@@ -302,6 +302,7 @@ def main():
     # Check if CubeSQL is running
     try:
         test_client = CubeSQLArrowIPCClient()
+        pprint(test_client)
         test_client.connect()
         test_client.close()
     except Exception as e:
