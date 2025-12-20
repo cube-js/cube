@@ -575,14 +575,19 @@ class CubeApi {
    */
   public load<QueryType extends DeeplyReadonly<Query | Query[]>>(query: QueryType, options?: LoadMethodOptions, callback?: CallableFunction, responseFormat: ResponseFormat = 'default') {
     [query, options] = this.prepareQueryOptions(query, options, responseFormat);
+    const params: any = {
+      query,
+      queryType: 'multi',
+      signal: options?.signal,
+      baseRequestId: options?.baseRequestId,
+    };
+
+    if (options?.cache) {
+      params.cache = options.cache;
+    }
+
     return this.loadMethod(
-      () => this.request('load', {
-        query,
-        queryType: 'multi',
-        signal: options?.signal,
-        cache: options?.cache,
-        baseRequestId: options?.baseRequestId,
-      }),
+      () => this.request('load', params),
       (response: any) => this.loadResponseInternal(response, options),
       options,
       callback
