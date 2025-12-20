@@ -1,5 +1,6 @@
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::{Chunk, IdRow, MetaStoreTable};
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -28,7 +29,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
             Field::new("id", DataType::UInt64, false),
             Field::new("file_name", DataType::Utf8, false),
             Field::new("partition_id", DataType::UInt64, false),
-            Field::new("replay_handle_id", DataType::UInt64, false),
+            Field::new("replay_handle_id", DataType::UInt64, true),
             Field::new("row_count", DataType::UInt64, true),
             Field::new("uploaded", DataType::Boolean, true),
             Field::new("active", DataType::Boolean, true),
@@ -46,7 +47,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
             Field::new(
                 "deactivated_at",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
             Field::new("file_size", DataType::UInt64, true),
             Field::new("min_row", DataType::Utf8, true),
@@ -104,7 +105,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                         row.get_row()
                             .created_at()
                             .as_ref()
-                            .map(|t| t.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),
@@ -114,7 +115,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                         row.get_row()
                             .oldest_insert_at()
                             .as_ref()
-                            .map(|t| t.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),
@@ -124,13 +125,16 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                         row.get_row()
                             .deactivated_at()
                             .as_ref()
-                            .map(|t| t.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),
             Box::new(|chunks| {
-                Arc::new(UInt64Array::from_iter(
-                    chunks.iter().map(|row| row.get_row().file_size()),
+                Arc::new(UInt64Array::from(
+                    chunks
+                        .iter()
+                        .map(|row| row.get_row().file_size())
+                        .collect::<Vec<_>>(),
                 ))
             }),
             Box::new(|chunks| {

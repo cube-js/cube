@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.1](https://github.com/cube-js/cube/compare/v1.6.0...v1.6.1) (2025-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+# [1.6.0](https://github.com/cube-js/cube/compare/v1.5.16...v1.6.0) (2025-12-18)
+
+### Bug Fixes
+
+- **api-gateway:** subscribe, added POST method ([#10266](https://github.com/cube-js/cube/issues/10266)) ([af53f8f](https://github.com/cube-js/cube/commit/af53f8f63ecb384c73fac3d0a88032ec152db8e3))
+
 ## [1.5.16](https://github.com/cube-js/cube/compare/v1.5.15...v1.5.16) (2025-12-17)
 
 ### Features

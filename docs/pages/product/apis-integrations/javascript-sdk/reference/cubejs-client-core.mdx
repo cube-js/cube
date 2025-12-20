@@ -815,6 +815,7 @@ Name | Type | Optional? | Description |
 `progressCallback` |  | ✅ Yes |  |
 `subscribe` | `boolean` | ✅ Yes | Pass `true` to use continuous fetch behavior. |
 `signal` | `AbortSignal` | ✅ Yes | AbortSignal to cancel the request. This allows you to manually abort requests using AbortController. |
+`baseRequestId` | `string` | ✅ Yes | Base request ID ([`spanId`](https://cube.dev/docs/product/apis-integrations/core-data-apis/rest-api#request-span-annotation)) to be used for the request. If not provided a random request ID will be generated. |
 
 ### `LoadResponse`
 

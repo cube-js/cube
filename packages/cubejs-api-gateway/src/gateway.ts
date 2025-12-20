@@ -346,6 +346,16 @@ class ApiGateway {
       });
     }));
 
+    app.post(`${this.basePath}/v1/subscribe`, jsonParser, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      await this.load({
+        query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res),
+        queryType: req.body.queryType,
+        cacheMode: req.body.cache,
+      });
+    }));
+
     app.get(`${this.basePath}/v1/sql`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
       // TODO parse req.query with zod/joi/...
 

@@ -1,4 +1,5 @@
 use crate::cachestore::QueueAllItem;
+use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -64,7 +65,7 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                 Arc::new(TimestampNanosecondArray::from_iter_values(
                     items
                         .iter()
-                        .map(|row| row.item.get_row().get_created().timestamp_nanos()),
+                        .map(|row| timestamp_nanos_or_panic(row.item.get_row().get_created())),
                 ))
             }),
             Box::new(|items| {
@@ -88,7 +89,7 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                             .get_row()
                             .get_heartbeat()
                             .as_ref()
-                            .map(|v| v.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),
@@ -99,7 +100,7 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                             .get_row()
                             .get_orphaned()
                             .as_ref()
-                            .map(|v| v.timestamp_nanos())
+                            .map(timestamp_nanos_or_panic)
                     },
                 )))
             }),

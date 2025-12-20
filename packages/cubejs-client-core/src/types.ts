@@ -26,7 +26,7 @@ export type Annotation = {
   shortTitle: string;
   type: string;
   meta?: any;
-  format?: DimensionFormat;
+  format?: DimensionFormat | MeasureFormat;
   drillMembers?: any[];
   drillMembersGrouped?: any;
   granularity?: GranularityAnnotation;
@@ -395,6 +395,7 @@ export type BaseCubeDimension = BaseCubeMember & {
   primaryKey?: boolean;
   suggestFilterValues: boolean;
   format?: DimensionFormat;
+  key?: string;
 };
 
 export type CubeTimeDimension = BaseCubeDimension &
