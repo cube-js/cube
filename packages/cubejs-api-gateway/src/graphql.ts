@@ -93,6 +93,24 @@ const OrderBy = enumType({
   ]
 });
 
+const FloatWithTitle = objectType({
+  name: 'FloatWithTitle',
+  definition(t) {
+    t.float('value');
+    t.string('title');
+    t.string('shortTitle');
+  },
+});
+
+const StringWithTitle = objectType({
+  name: 'StringWithTitle',
+  definition(t) {
+    t.string('value');
+    t.string('title');
+    t.string('shortTitle');
+  },
+});
+
 export const TimeDimension = objectType({
   name: 'TimeDimension',
   definition(t) {
@@ -123,6 +141,8 @@ export const TimeDimension = objectType({
     t.nonNull.field('year', {
       type: 'DateTime',
     });
+    t.string('title');
+    t.string('shortTitle');
   },
 });
 
@@ -131,11 +151,11 @@ function mapType(type: string, isInputType?: boolean) {
     case 'time':
       return isInputType ? 'DateTime' : 'TimeDimension';
     case 'string':
-      return 'String';
+      return isInputType ? 'String' : 'StringWithTitle';
     case 'number':
-      return 'Float';
+      return isInputType ? 'Float' : 'FloatWithTitle';
     default:
-      return 'String';
+      return isInputType ? 'String' : 'StringWithTitle';
   }
 }
 
@@ -499,6 +519,8 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
     StringFilter,
     DateTimeFilter,
     OrderBy,
+    FloatWithTitle,
+    StringWithTitle,
     TimeDimension
   ];
 
@@ -676,13 +698,53 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
 
           return results.data.map(entry => R.toPairs(entry)
             .reduce((res, pair) => {
-              let path = pair[0].split('.');
+              const memberKey = pair[0];
+              let path = memberKey.split('.');
               path[0] = unCapitalize(path[0]);
-              if (results.annotation.dimensions[pair[0]]?.type === 'time') {
+
+              // Get annotation for this member
+              const annotation =
+                results.annotation.measures[memberKey] ||
+                results.annotation.dimensions[memberKey] ||
+                results.annotation.timeDimensions[memberKey];
+
+              let value = pair[1];
+
+              // For time dimensions, handle specially
+              if (results.annotation.dimensions[memberKey]?.type === 'time') {
                 path = [...path, 'value'];
               }
-              return (results.annotation.timeDimensions[pair[0]] && path.length !== 3)
-                ? res : R.set(R.lensPath(path), pair[1], res);
+
+              // Skip time dimensions without proper path length
+              if (results.annotation.timeDimensions[memberKey] && path.length !== 3) {
+                return res;
+              }
+
+              // Wrap scalar values (measures and non-time dimensions) with title information
+              const isTimeDimension = results.annotation.dimensions[memberKey]?.type === 'time';
+              const isMeasure = !!results.annotation.measures[memberKey];
+              const isScalarDimension = results.annotation.dimensions[memberKey] && !isTimeDimension;
+
+              if (annotation && (isMeasure || isScalarDimension)) {
+                value = {
+                  value: pair[1],
+                  title: annotation.title,
+                  shortTitle: annotation.shortTitle
+                };
+              }
+
+              // For time dimensions, add title to the result object
+              if (annotation && results.annotation.dimensions[memberKey]?.type === 'time') {
+                const baseRes = R.set(R.lensPath(path), pair[1], res);
+                const titlePath = [...path.slice(0, -1), 'title'];
+                const shortTitlePath = [...path.slice(0, -1), 'shortTitle'];
+                return R.pipe(
+                  R.set(R.lensPath(titlePath), annotation.title),
+                  R.set(R.lensPath(shortTitlePath), annotation.shortTitle)
+                )(baseRes);
+              }
+
+              return R.set(R.lensPath(path), value, res);
             }, {}));
         }
       });

@@ -262,4 +262,121 @@ describe('GraphQL Schema', () => {
       });
     });
   });
+
+  describe('with titles', () => {
+    const app = express();
+
+    const metaConfigWithTitles = [
+      {
+        config: {
+          name: 'Orders',
+          measures: [
+            {
+              name: 'Orders.count',
+              title: 'Orders Count',
+              shortTitle: 'Count',
+              type: 'number',
+              isVisible: true,
+            },
+          ],
+          dimensions: [
+            {
+              name: 'Orders.status',
+              title: 'Orders Status',
+              shortTitle: 'Status',
+              type: 'string',
+              isVisible: true,
+            },
+            {
+              name: 'Orders.createdAt',
+              title: 'Orders Created At',
+              shortTitle: 'Created At',
+              type: 'time',
+              isVisible: true,
+            },
+          ],
+        },
+      },
+    ];
+
+    app.use('/graphql', jsonParser, (req, res) => {
+      const schema = makeSchema(metaConfigWithTitles);
+
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          apiGateway: {
+            async load({ query, res: response }) {
+              response({
+                query,
+                annotation: {
+                  measures: {
+                    'Orders.count': {
+                      title: 'Orders Count',
+                      shortTitle: 'Count',
+                      type: 'number',
+                    },
+                  },
+                  dimensions: {
+                    'Orders.status': {
+                      title: 'Orders Status',
+                      shortTitle: 'Status',
+                      type: 'string',
+                    },
+                    'Orders.createdAt': {
+                      title: 'Orders Created At',
+                      shortTitle: 'Created At',
+                      type: 'time',
+                    },
+                  },
+                  timeDimensions: {},
+                },
+                data: [
+                  {
+                    'Orders.count': 150,
+                    'Orders.status': 'completed',
+                  },
+                ],
+              });
+            },
+          },
+        },
+      })(req, res);
+    });
+
+    test('should return titles with scalar values', async () => {
+      const query = `
+        query CubeQuery {
+          cube {
+            orders {
+              count
+              status
+            }
+          }
+        }
+      `;
+
+      const response = await request(app)
+        .post('/graphql')
+        .set('Content-Type', 'application/json')
+        .send(gqlQuery(query));
+
+      console.log('Response:', JSON.stringify(response.body, null, 2));
+
+      expect(response.body.errors).toBeUndefined();
+      expect(response.body.data).toBeDefined();
+      expect(response.body.data.cube).toBeDefined();
+      expect(response.body.data.cube[0].orders.count).toEqual({
+        value: 150,
+        title: 'Orders Count',
+        shortTitle: 'Count',
+      });
+      expect(response.body.data.cube[0].orders.status).toEqual({
+        value: 'completed',
+        title: 'Orders Status',
+        shortTitle: 'Status',
+      });
+    });
+  });
 });
