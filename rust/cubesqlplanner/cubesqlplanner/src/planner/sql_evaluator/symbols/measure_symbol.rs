@@ -358,6 +358,16 @@ impl MeasureSymbol {
         Ok(MemberSymbol::new_measure(Rc::new(result)))
     }
 
+    pub fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        //FIXME We don't include filters and order_by here for backward compatibility
+        // because BaseQuery doesn't validate these SQL calls
+        let result = self
+            .member_sql
+            .iter()
+            .chain(self.case.iter().flat_map(|case| case.iter_sql_calls()));
+        Box::new(result)
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         if let Some(member_sql) = &self.member_sql {
@@ -746,14 +756,32 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
-        let is_calculated =
-            MeasureSymbol::is_calculated_type(&definition.static_data().measure_type)
-                && !definition.static_data().multi_stage.unwrap_or(false);
+        let measure_type = &definition.static_data().measure_type;
+        let is_calculated = MeasureSymbol::is_calculated_type(&measure_type)
+            && !definition.static_data().multi_stage.unwrap_or(false);
 
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
-        //TODO move owned logic to rust
-        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
-        let owned_by_cube = owned_by_cube && !is_multi_stage;
+        let owned_by_cube = if is_multi_stage {
+            false
+        } else if measure_type == "count" && sql.is_none() {
+            true
+        } else {
+            let mut owned = false;
+            if let Some(sql) = &sql {
+                owned |= sql.is_owned_by_cube();
+            }
+            for sql in &measure_filters {
+                owned |= sql.is_owned_by_cube();
+            }
+            for sql in &measure_drill_filters {
+                owned |= sql.is_owned_by_cube();
+            }
+            if let Some(case) = &case {
+                owned |= case.is_owned_by_cube();
+            }
+            owned
+        };
+
         let cube = cube_evaluator.cube_from_path(cube_name.clone())?;
         let alias =
             PlanSqlTemplates::memeber_alias_name(cube.static_data().resolved_alias(), &name, &None);

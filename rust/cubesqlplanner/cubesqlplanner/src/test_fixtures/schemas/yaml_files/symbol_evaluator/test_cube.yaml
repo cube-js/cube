@@ -1,0 +1,43 @@
+cubes:
+    - name: test_cube
+      sql: "SELECT 1"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: source
+            type: string
+            sql: "{CUBE}.source"
+          - name: source_extended
+            type: string
+            sql: "CONCAT({CUBE.source}, '_source')"
+          - name: created_at
+            type: time
+            sql: created_at
+          - name: location
+            type: geo
+            latitude: latitude
+            longitude: longitude
+      measures:
+          - name: sum_revenue
+            type: sum
+            sql: revenue
+          - name: min_revenue
+            type: min
+            sql: revenue
+          - name: max_revenue
+            type: max
+            sql: revenue
+          - name: avg_revenue
+            type: avg
+            sql: revenue
+          - name: complex_measure
+            type: number
+            sql: "{sum_revenue} + {CUBE.avg_revenue}/{test_cube.min_revenue} - {test_cube.min_revenue}"
+          - name: count_distinct_id
+            type: countDistinct
+            sql: id
+          - name: count_distinct_approx_id
+            type: countDistinctApprox
+            sql: id

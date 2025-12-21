@@ -3,13 +3,13 @@ use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
 use crate::cube_bridge::member_sql::{FilterParamsColumn, SecutityContextProps, SqlTemplate};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::CubeNameSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
-use typed_builder::TypedBuilder;
 
 pub struct SqlCallArg;
 
@@ -50,7 +50,7 @@ pub struct SqlCallFilterGroupItem {
     pub filter_params: Vec<SqlCallFilterParamsItem>,
 }
 
-#[derive(Clone, TypedBuilder, Debug)]
+#[derive(Clone, Debug)]
 pub struct SqlCall {
     template: SqlTemplate,
     deps: Vec<SqlCallDependency>,
@@ -60,6 +60,22 @@ pub struct SqlCall {
 }
 
 impl SqlCall {
+    pub(super) fn new(
+        template: SqlTemplate,
+        deps: Vec<SqlCallDependency>,
+        filter_params: Vec<SqlCallFilterParamsItem>,
+        filter_groups: Vec<SqlCallFilterGroupItem>,
+        security_context: SecutityContextProps,
+    ) -> Self {
+        Self {
+            template,
+            deps,
+            filter_params,
+            filter_groups,
+            security_context,
+        }
+    }
+
     pub fn eval(
         &self,
         visitor: &SqlEvaluatorVisitor,
@@ -71,7 +87,6 @@ impl SqlCall {
             let (filter_params, filter_groups, deps, context_values) =
                 self.prepare_template_params(visitor, node_processor, &query_tools, templates)?;
 
-            // Substitute placeholders in template in a single pass
             Self::substitute_template(
                 template,
                 &deps,
@@ -120,6 +135,27 @@ impl SqlCall {
                 .collect::<Result<Vec<_>, _>>()?,
         };
         Ok(result)
+    }
+
+    pub fn is_owned_by_cube(&self) -> bool {
+        if self.deps.is_empty() {
+            true
+        } else {
+            self.deps.iter().any(|dep| dep.symbol.is_cube())
+        }
+    }
+
+    pub fn cube_name_deps(&self) -> Vec<Rc<CubeNameSymbol>> {
+        self.deps
+            .iter()
+            .filter_map(|dep| {
+                if let Ok(cube) = dep.symbol.as_cube_name() {
+                    Some(cube.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn prepare_template_params(
