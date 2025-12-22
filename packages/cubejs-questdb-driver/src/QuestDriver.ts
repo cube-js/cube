@@ -99,7 +99,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
       ...config
     });
     this.pool.on('error', (err) => {
-      this.databasePoolError(err);
+      console.log(`Unexpected error on idle client: ${err.stack || err}`);
     });
     this.config = <Partial<Config>>{
       ...this.getInitialConfiguration(),
@@ -143,13 +143,6 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
 
   private async queryResponse(query: string, values: unknown[]) {
     const conn = await this.pool.connect();
-
-    // Attach error handler to the client to prevent unhandled error events
-    // from crashing the process when connections are terminated unexpectedly.
-    // See: https://github.com/brianc/node-postgres/issues/2112
-    conn.on('error', (err) => {
-      this.databasePoolError(err);
-    });
 
     try {
       const res = await conn.query({
