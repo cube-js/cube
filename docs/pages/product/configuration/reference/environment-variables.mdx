@@ -1329,6 +1329,15 @@ Define which metrics collector format.
 | --------------------- | ---------------------- | --------------------- |
 | `statsd`, `dogstatsd` | `statsd`               | `statsd`              |
 
+## `CUBESTORE_METRICS_BIND_ADDRESS`
+
+Define the IP address to bind the metrics collector server to. Binding to
+the default loopback interface will prevent sending of metrics to other devices.
+
+| Possible Values    | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A valid IP address | `127.0.0.1`            | `127.0.0.1`         |
+
 ## `CUBESTORE_METRICS_ADDRESS`
 
 Required IP address to send metrics.
