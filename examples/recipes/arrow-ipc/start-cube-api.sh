@@ -42,7 +42,7 @@ export CUBEJS_DB_USER=${CUBEJS_DB_USER:-postgres}
 export CUBEJS_DB_PASS=${CUBEJS_DB_PASS:-postgres}
 export CUBEJS_DB_HOST=${CUBEJS_DB_HOST:-localhost}
 export CUBEJS_DEV_MODE=${CUBEJS_DEV_MODE:-true}
-export CUBEJS_LOG_LEVEL="trace" #${CUBEJS_LOG_LEVEL:-trace}
+export CUBEJS_LOG_LEVEL=${CUBEJS_LOG_LEVEL:-error}
 export NODE_ENV=${NODE_ENV:-development}
 
 # Function to check if a port is in use
@@ -100,4 +100,5 @@ cleanup() {
 trap cleanup EXIT
 
 # Run Cube.js API server
+env | grep CUBE | sort
 exec yarn dev 2>&1 | tee cube-api.log

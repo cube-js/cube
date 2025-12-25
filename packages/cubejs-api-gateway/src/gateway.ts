@@ -1792,7 +1792,7 @@ class ApiGateway {
       };
     },
     response: any,
-    responseType?: ResultType,
+    responseType?: ResultType, // #TODO arrow
   ): ResultWrapper {
     const resultWrapper = response.data;
 

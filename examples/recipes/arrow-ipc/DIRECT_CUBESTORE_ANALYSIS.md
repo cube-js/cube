@@ -367,10 +367,10 @@ pub async fn load_stream(&self, query: &str) -> BoxStream<RecordBatch> {
 **Benefit**: ~50% data transfer efficiency improvement
 
 ### D. Cube API Arrow Response (2 weeks)
-**Add `/v1/load.arrow` endpoint** to Cube API that returns Arrow IPC directly:
+**Add `/v1/arrow` endpoint** to Cube API that returns Arrow IPC directly:
 ```typescript
 // packages/cubejs-api-gateway
-router.post('/v1/load.arrow', async (req, res) => {
+router.post('/v1/arrow', async (req, res) => {
   const result = await queryOrchestrator.executeQuery(req.body.query);
   const arrowBuffer = convertToArrow(result);
   res.set('Content-Type', 'application/vnd.apache.arrow.stream');
@@ -451,10 +451,11 @@ Total query time: ~30-45ms (40% improvement)
 
 ## 8. Recommendation
 
+TODO THIS
 ### Immediate (Next 2-3 months):
 **Optimize existing architecture** with low-risk improvements:
 1. HTTP/2 connection pooling
-2. Add `/v1/load.arrow` endpoint to Cube API
+2. Add `/v1/arrow` endpoint to Cube API
 3. Implement result streaming
 4. Benchmark and measure
 
@@ -467,14 +468,6 @@ If performance still insufficient:
 3. Gradual rollout with feature flags
 4. Keep Cube API path for complex queries
 
-### Long-term (12+ months):
-Consider contributing **Arrow Flight support to CubeStore** upstream:
-- Benefits entire Cube ecosystem
-- Standardized protocol
-- Better BI tool integration
-- Community maintenance
-
----
 
 ## 9. Code References
 
@@ -503,7 +496,3 @@ Consider contributing **Arrow Flight support to CubeStore** upstream:
 
 **The most pragmatic approach is:**
 1. **First**: Optimize the existing cubesqld → Cube API → CubeStore path (2-3 months, low risk)
-2. **If needed**: Implement hybrid schema sync approach (3-4 months, medium risk)
-3. **Long-term**: Contribute Arrow Flight support to CubeStore (benefits entire ecosystem)
-
-**Key Insight**: The bottleneck is likely not the HTTP layer but the semantic compilation complexity. Optimizing the existing path will yield most of the benefit with far less risk and effort than a complete rewrite.
