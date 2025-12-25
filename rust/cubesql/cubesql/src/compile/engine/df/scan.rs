@@ -1374,16 +1374,14 @@ fn generate_pre_agg_sql(
 
     // CubeStore pre-agg tables have version/partition/build suffixes:
     // {schema}.{cube}_{preagg}_{version}_{partition}_{build}
-    // HACK: For now, hardcode the known table name from testing
-    // TODO: Query information_schema or get from Cube API metadata
-
-    let full_table_name = if table_pattern == "orders_with_preagg_orders_by_market_brand_daily" {
-        // Use the actual table name from cubestore
-        "orders_with_preagg_orders_by_market_brand_daily_vk520sa1_535ph4ux_1kkr9fn".to_string()
-    } else {
-        // Fall back to pattern for other tables
-        table_pattern.to_string()
-    };
+    // For now, use the pattern and let CubeStore's helpful error message tell us the table names
+    // We'll parse the error and try the latest version
+    //
+    // TODO: Implement proper table name discovery via:
+    // 1. Query information_schema.tables for matching pattern
+    // 2. OR get actual table name from Cube API /v1/pre-aggregations/jobs endpoint
+    // 3. OR cache table names on first query
+    let full_table_name = table_pattern.to_string();
 
     // Replace {TABLE} placeholder with actual table name
     let select_clause = select_fields

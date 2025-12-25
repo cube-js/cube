@@ -1032,12 +1032,21 @@ pub fn parse_pre_aggregations_from_cubes(cubes: &[crate::transport::CubeMeta]) -
 }
 
 /// Parse reference string like "[item1, item2, item3]" into Vec<String>
+/// Also strips cube prefixes if present (e.g., "cube.field" -> "field")
 fn parse_reference_string(refs: &Option<String>) -> Vec<String> {
     refs.as_ref()
         .map(|s| {
             s.trim_matches(|c| c == '[' || c == ']')
                 .split(',')
-                .map(|item| item.trim().to_string())
+                .map(|item| {
+                    let trimmed = item.trim();
+                    // Strip cube prefix if present (e.g., "mandata_captate.market_code" -> "market_code")
+                    if let Some(dot_pos) = trimmed.rfind('.') {
+                        trimmed[dot_pos + 1..].to_string()
+                    } else {
+                        trimmed.to_string()
+                    }
+                })
                 .filter(|item| !item.is_empty())
                 .collect()
         })
