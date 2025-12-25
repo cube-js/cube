@@ -11,7 +11,7 @@ use crate::{
         ArrowNativeServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl,
         SqlAuthService,
     },
-    transport::{HttpTransport, TransportService},
+    transport::{HybridTransport, TransportService},
     CubeError,
 };
 use futures::future::join_all;
@@ -344,10 +344,13 @@ impl Config {
             .register_typed::<dyn ConfigObj, _, _, _>(|_| async move { config_obj_to_register })
             .await;
 
+        // Register HybridTransport (intelligently routes between Http and CubeStore)
         self.injector
-            .register_typed::<dyn TransportService, _, _, _>(|_| async move {
-                Arc::new(HttpTransport::new())
-            })
+            .register_typed_with_default::<dyn TransportService, HybridTransport, _, _>(
+                |_| async move {
+                    Arc::new(HybridTransport::new().expect("Failed to initialize HybridTransport"))
+                },
+            )
             .await;
 
         self.injector

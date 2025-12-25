@@ -355,3 +355,6 @@ mod tests {
         assert!(transport.is_ok());
     }
 }
+
+// Register CubeStoreTransport for dependency injection
+crate::di_service!(CubeStoreTransport, [TransportService]);

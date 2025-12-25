@@ -1,6 +1,7 @@
 pub(crate) mod ctx;
 pub(crate) mod cubestore_transport;
 pub(crate) mod ext;
+pub(crate) mod hybrid_transport;
 pub(crate) mod service;
 
 // Re-export types to minimise version maintenance for crate users such as cloud
@@ -36,4 +37,5 @@ pub type TransportError = cubeclient::models::V1Error;
 pub use ctx::*;
 pub use cubestore_transport::*;
 pub use ext::*;
+pub use hybrid_transport::*;
 pub use service::*;
