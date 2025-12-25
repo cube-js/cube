@@ -10,12 +10,12 @@ dayjs.extend(isoWeek);
 
 // A custom locale for internal use that doesn't affect the global dayjs instance
 const cubeInternalLocale = 'cube-internal-en';
-dayjs.locale({
+const customLocale = {
   ...en,
   name: cubeInternalLocale,
   weekStart: 1
-});
-dayjs.locale('en');
+};
+(dayjs as any).Ls[cubeInternalLocale] = customLocale;
 
 export type SqlInterval = string;
 
